@@ -280,7 +280,7 @@ def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventB
         _strip_unsigned_values(pdu_json)
 
     depth = pdu_json["depth"]
-    if not isinstance(depth, int):
+    if type(depth) is not int:
         raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
 
     if depth < 0:

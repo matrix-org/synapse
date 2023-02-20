@@ -77,7 +77,7 @@ class Thumbnailer:
             image_exif = self.image._getexif()  # type: ignore
             if image_exif is not None:
                 image_orientation = image_exif.get(EXIF_ORIENTATION_TAG)
-                assert isinstance(image_orientation, int)
+                assert type(image_orientation) is int
                 self.transpose_method = EXIF_TRANSPOSE_MAPPINGS.get(image_orientation)
         except Exception as e:
             # A lot of parsing errors can happen when parsing EXIF

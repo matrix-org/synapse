@@ -35,6 +35,7 @@ from synapse.storage.databases.main.appservice import (
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
 )
+from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
 from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
@@ -43,6 +44,7 @@ from synapse.storage.databases.main.event_push_actions import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.filtering import FilteringWorkerStore
+from synapse.storage.databases.main.profile import ProfileWorkerStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
@@ -54,7 +56,7 @@ from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
-from synapse.types import StateMap
+from synapse.types import JsonDict, StateMap
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.logcontext import LoggingContext
 
@@ -63,6 +65,7 @@ logger = logging.getLogger("synapse.app.admin_cmd")
 
 class AdminCmdSlavedStore(
     FilteringWorkerStore,
+    ClientIpWorkerStore,
     DeviceWorkerStore,
     TagsWorkerStore,
     DeviceInboxWorkerStore,
@@ -82,6 +85,7 @@ class AdminCmdSlavedStore(
     EventsWorkerStore,
     RegistrationWorkerStore,
     RoomWorkerStore,
+    ProfileWorkerStore,
 ):
     def __init__(
         self,
@@ -191,6 +195,32 @@ class FileExfiltrationWriter(ExfiltrationWriter):
         with open(knock_state, "a") as f:
             for event in state.values():
                 print(json.dumps(event), file=f)
+
+    def write_profile(self, profile: JsonDict) -> None:
+        user_directory = os.path.join(self.base_directory, "user_data")
+        os.makedirs(user_directory, exist_ok=True)
+        profile_file = os.path.join(user_directory, "profile")
+
+        with open(profile_file, "a") as f:
+            print(json.dumps(profile), file=f)
+
+    def write_devices(self, devices: List[JsonDict]) -> None:
+        user_directory = os.path.join(self.base_directory, "user_data")
+        os.makedirs(user_directory, exist_ok=True)
+        device_file = os.path.join(user_directory, "devices")
+
+        for device in devices:
+            with open(device_file, "a") as f:
+                print(json.dumps(device), file=f)
+
+    def write_connections(self, connections: List[JsonDict]) -> None:
+        user_directory = os.path.join(self.base_directory, "user_data")
+        os.makedirs(user_directory, exist_ok=True)
+        connection_file = os.path.join(user_directory, "connections")
+
+        for connection in connections:
+            with open(connection_file, "a") as f:
+                print(json.dumps(connection), file=f)
 
     def finished(self) -> str:
         return self.base_directory

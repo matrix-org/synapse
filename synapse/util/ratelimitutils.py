@@ -364,12 +364,22 @@ class _PerHostRatelimiter:
 
     def _on_exit(self, request_id: object) -> None:
         logger.debug("Ratelimit(%s) [%s]: Processed req", self.host, id(request_id))
-        self.current_processing.discard(request_id)
-        try:
-            # start processing the next item on the queue.
-            _, deferred = self.ready_request_queue.popitem(last=False)
 
-            with PreserveLoggingContext():
-                deferred.callback(None)
-        except KeyError:
-            pass
+        # When requests complete synchronously, we will recursively start the next
+        # request in the queue. To avoid stack exhaustion, we defer starting the next
+        # request until the next reactor tick.
+
+        def start_next_request() -> None:
+            # We only remove the completed request from the list when we're about to
+            # start the next one, otherwise we can allow extra requests through.
+            self.current_processing.discard(request_id)
+            try:
+                # start processing the next item on the queue.
+                _, deferred = self.ready_request_queue.popitem(last=False)
+
+                with PreserveLoggingContext():
+                    deferred.callback(None)
+            except KeyError:
+                pass
+
+        self.clock.call_later(0.0, start_next_request)

@@ -17,6 +17,8 @@
 
 """Contains constants from the specification."""
 
+import enum
+
 from typing_extensions import Final
 
 # the max size of a (canonical-json-encoded) event
@@ -231,6 +233,9 @@ class EventContentFields:
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
 
+    # Use for mentioning users.
+    MSC3952_MENTIONS: Final = "org.matrix.msc3952.mentions"
+
     # an unspecced field added to to-device messages to identify them uniquely-ish
     TO_DEVICE_MSGID: Final = "org.matrix.msgid"
 
@@ -249,6 +254,7 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT: Final = "m.direct"
     IGNORED_USER_LIST: Final = "m.ignored_user_list"
+    TAG: Final = "m.tag"
 
 
 class HistoryVisibility:
@@ -290,3 +296,8 @@ class ApprovalNoticeMedium:
 
     NONE = "org.matrix.msc3866.none"
     EMAIL = "org.matrix.msc3866.email"
+
+
+class Direction(enum.Enum):
+    BACKWARDS = "b"
+    FORWARDS = "f"

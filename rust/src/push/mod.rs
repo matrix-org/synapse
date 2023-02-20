@@ -271,6 +271,10 @@ pub enum KnownCondition {
     RelatedEventMatch(RelatedEventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.inverse_related_event_match")]
     InverseRelatedEventMatch(RelatedEventMatchCondition),
+    #[serde(rename = "org.matrix.msc3952.is_user_mention")]
+    IsUserMention,
+    #[serde(rename = "org.matrix.msc3952.is_room_mention")]
+    IsRoomMention,
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -413,8 +417,11 @@ impl PushRules {
 pub struct FilteredPushRules {
     push_rules: PushRules,
     enabled_map: BTreeMap<String, bool>,
-    msc3664_enabled: bool,
     msc1767_enabled: bool,
+    msc3381_polls_enabled: bool,
+    msc3664_enabled: bool,
+    msc3952_intentional_mentions: bool,
+    msc3958_suppress_edits_enabled: bool,
 }
 
 #[pymethods]
@@ -423,14 +430,20 @@ impl FilteredPushRules {
     pub fn py_new(
         push_rules: PushRules,
         enabled_map: BTreeMap<String, bool>,
-        msc3664_enabled: bool,
         msc1767_enabled: bool,
+        msc3381_polls_enabled: bool,
+        msc3664_enabled: bool,
+        msc3952_intentional_mentions: bool,
+        msc3958_suppress_edits_enabled: bool,
     ) -> Self {
         Self {
             push_rules,
             enabled_map,
-            msc3664_enabled,
             msc1767_enabled,
+            msc3381_polls_enabled,
+            msc3664_enabled,
+            msc3952_intentional_mentions,
+            msc3958_suppress_edits_enabled,
         }
     }
 
@@ -449,13 +462,28 @@ impl FilteredPushRules {
             .iter()
             .filter(|rule| {
                 // Ignore disabled experimental push rules
+
+                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                    return false;
+                }
+
                 if !self.msc3664_enabled
                     && rule.rule_id == "global/override/.im.nheko.msc3664.reply"
                 {
                     return false;
                 }
 
-                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                if !self.msc3381_polls_enabled && rule.rule_id.contains("org.matrix.msc3930") {
+                    return false;
+                }
+
+                if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
+                {
+                    return false;
+                }
+                if !self.msc3958_suppress_edits_enabled
+                    && rule.rule_id == "global/override/.com.beeper.suppress_edits"
+                {
                     return false;
                 }
 
@@ -513,6 +541,28 @@ fn test_deserialize_unstable_msc3931_condition() {
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::RoomVersionSupports { feature: _ })
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3952_user_condition() {
+    let json = r#"{"kind":"org.matrix.msc3952.is_user_mention"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::IsUserMention)
+    ));
+}
+
+#[test]
+fn test_deserialize_unstable_msc3952_room_condition() {
+    let json = r#"{"kind":"org.matrix.msc3952.is_room_mention"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::IsRoomMention)
     ));
 }
 

@@ -80,6 +80,7 @@ from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
+    StrCollection,
     UserID,
     get_domain_from_id,
 )
@@ -615,7 +616,7 @@ class FederationEventHandler:
 
     @trace
     async def backfill(
-        self, dest: str, room_id: str, limit: int, extremities: Collection[str]
+        self, dest: str, room_id: str, limit: int, extremities: StrCollection
     ) -> None:
         """Trigger a backfill request to `dest` for the given `room_id`
 
@@ -1565,7 +1566,7 @@ class FederationEventHandler:
     @trace
     @tag_args
     async def _get_events_and_persist(
-        self, destination: str, room_id: str, event_ids: Collection[str]
+        self, destination: str, room_id: str, event_ids: StrCollection
     ) -> None:
         """Fetch the given events from a server, and persist them as outliers.
 
@@ -2258,6 +2259,10 @@ class FederationEventHandler:
             ) = await self._storage_controllers.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
+
+            # After persistence we always need to notify replication there may
+            # be new data.
+            self._notifier.notify_replication()
 
             if self._ephemeral_messages_enabled:
                 for event in events:

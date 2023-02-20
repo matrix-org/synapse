@@ -19,6 +19,7 @@ import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Awaitable,
     Callable,
     Collection,
@@ -37,7 +38,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -110,8 +111,9 @@ class SendJoinResult:
     # True if 'state' elides non-critical membership events
     partial_state: bool
 
-    # if 'partial_state' is set, a list of the servers in the room (otherwise empty)
-    servers_in_room: List[str]
+    # If 'partial_state' is set, a set of the servers in the room (otherwise empty).
+    # Always contains the server we joined off.
+    servers_in_room: AbstractSet[str]
 
 
 class FederationClient(FederationBase):
@@ -1014,7 +1016,11 @@ class FederationClient(FederationBase):
         )
 
     async def send_join(
-        self, destinations: Iterable[str], pdu: EventBase, room_version: RoomVersion
+        self,
+        destinations: Iterable[str],
+        pdu: EventBase,
+        room_version: RoomVersion,
+        partial_state: bool = True,
     ) -> SendJoinResult:
         """Sends a join event to one of a list of homeservers.
 
@@ -1027,6 +1033,10 @@ class FederationClient(FederationBase):
             pdu: event to be sent
             room_version: the version of the room (according to the server that
                 did the make_join)
+            partial_state: whether to ask the remote server to omit membership state
+                events from the response. If the remote server complies,
+                `partial_state` in the send join result will be set. Defaults to
+                `True`.
 
         Returns:
             The result of the send join request.
@@ -1037,7 +1047,9 @@ class FederationClient(FederationBase):
         """
 
         async def send_request(destination: str) -> SendJoinResult:
-            response = await self._do_send_join(room_version, destination, pdu)
+            response = await self._do_send_join(
+                room_version, destination, pdu, omit_members=partial_state
+            )
 
             # If an event was returned (and expected to be returned):
             #
@@ -1142,18 +1154,32 @@ class FederationClient(FederationBase):
                     % (auth_chain_create_events,)
                 )
 
-            if response.partial_state and not response.servers_in_room:
-                raise InvalidResponseError(
-                    "partial_state was set, but no servers were listed in the room"
-                )
+            servers_in_room = None
+            if response.servers_in_room is not None:
+                servers_in_room = set(response.servers_in_room)
+
+            if response.members_omitted:
+                if not servers_in_room:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but no servers were listed in the room"
+                    )
+
+                if not partial_state:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but we asked for full state"
+                    )
+
+                # `servers_in_room` is supposed to be a complete list.
+                # Fix things up in case the remote homeserver is badly behaved.
+                servers_in_room.add(destination)
 
             return SendJoinResult(
                 event=event,
                 state=signed_state,
                 auth_chain=signed_auth,
                 origin=destination,
-                partial_state=response.partial_state,
-                servers_in_room=response.servers_in_room or [],
+                partial_state=response.members_omitted,
+                servers_in_room=servers_in_room or frozenset(),
             )
 
         # MSC3083 defines additional error codes for room joins.
@@ -1177,7 +1203,11 @@ class FederationClient(FederationBase):
         )
 
     async def _do_send_join(
-        self, room_version: RoomVersion, destination: str, pdu: EventBase
+        self,
+        room_version: RoomVersion,
+        destination: str,
+        pdu: EventBase,
+        omit_members: bool,
     ) -> SendJoinResponse:
         time_now = self._clock.time_msec()
 
@@ -1188,6 +1218,7 @@ class FederationClient(FederationBase):
                 room_id=pdu.room_id,
                 event_id=pdu.event_id,
                 content=pdu.get_pdu_json(time_now),
+                omit_members=omit_members,
             )
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
@@ -1660,7 +1691,12 @@ class FederationClient(FederationBase):
         return result
 
     async def timestamp_to_event(
-        self, *, destinations: List[str], room_id: str, timestamp: int, direction: str
+        self,
+        *,
+        destinations: List[str],
+        room_id: str,
+        timestamp: int,
+        direction: Direction,
     ) -> Optional["TimestampToEventResponse"]:
         """
         Calls each remote federating server from `destinations` asking for their closest
@@ -1673,7 +1709,7 @@ class FederationClient(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1718,7 +1754,7 @@ class FederationClient(FederationBase):
             return None
 
     async def _timestamp_to_event_from_destination(
-        self, destination: str, room_id: str, timestamp: int, direction: str
+        self, destination: str, room_id: str, timestamp: int, direction: Direction
     ) -> "TimestampToEventResponse":
         """
         Calls a remote federating server at `destination` asking for their
@@ -1731,7 +1767,7 @@ class FederationClient(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1844,7 +1880,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if not isinstance(origin_server_ts, int):
+        if type(origin_server_ts) is not int:
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

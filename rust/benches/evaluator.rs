@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![feature(test)]
+use std::collections::BTreeSet;
 use synapse::push::{
     evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
 };
@@ -32,6 +33,9 @@ fn bench_match_exact(b: &mut Bencher) {
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
@@ -68,6 +72,9 @@ fn bench_match_word(b: &mut Bencher) {
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
@@ -104,6 +111,9 @@ fn bench_match_word_miss(b: &mut Bencher) {
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
@@ -140,6 +150,9 @@ fn bench_eval_message(b: &mut Bencher) {
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
+        BTreeSet::new(),
+        false,
         10,
         Some(0),
         Default::default(),
@@ -150,8 +163,15 @@ fn bench_eval_message(b: &mut Bencher) {
     )
     .unwrap();
 
-    let rules =
-        FilteredPushRules::py_new(PushRules::new(Vec::new()), Default::default(), false, false);
+    let rules = FilteredPushRules::py_new(
+        PushRules::new(Vec::new()),
+        Default::default(),
+        false,
+        false,
+        false,
+        false,
+        false,
+    );
 
     b.iter(|| eval.run(&rules, Some("bob"), Some("person")));
 }

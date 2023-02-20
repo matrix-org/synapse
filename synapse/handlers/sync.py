@@ -17,7 +17,6 @@ from typing import (
     TYPE_CHECKING,
     AbstractSet,
     Any,
-    Collection,
     Dict,
     FrozenSet,
     List,
@@ -31,7 +30,12 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import (
+    AccountDataTypes,
+    EventContentFields,
+    EventTypes,
+    Membership,
+)
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -57,6 +61,7 @@ from synapse.types import (
     Requester,
     RoomStreamToken,
     StateMap,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -285,7 +290,7 @@ class SyncHandler:
             expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE,
         )
 
-        self.rooms_to_exclude = hs.config.server.rooms_to_exclude_from_sync
+        self.rooms_to_exclude_globally = hs.config.server.rooms_to_exclude_from_sync
 
     async def wait_for_sync_for_user(
         self,
@@ -1191,7 +1196,7 @@ class SyncHandler:
     async def _find_missing_partial_state_memberships(
         self,
         room_id: str,
-        members_to_fetch: Collection[str],
+        members_to_fetch: StrCollection,
         events_with_membership_auth: Mapping[str, EventBase],
         found_state_ids: StateMap[str],
     ) -> StateMap[str]:
@@ -1379,7 +1384,10 @@ class SyncHandler:
         membership_change_events = []
         if since_token:
             membership_change_events = await self.store.get_membership_changes_for_user(
-                user_id, since_token.room_key, now_token.room_key, self.rooms_to_exclude
+                user_id,
+                since_token.room_key,
+                now_token.room_key,
+                self.rooms_to_exclude_globally,
             )
 
             mem_last_change_by_room_id: Dict[str, EventBase] = {}
@@ -1417,12 +1425,49 @@ class SyncHandler:
                 if user_id in user_ids_in_room:
                     mutable_joined_room_ids.add(room_id)
 
+        # Tweak the set of rooms to return to the client for eager (non-lazy) syncs.
+        mutable_rooms_to_exclude = set(self.rooms_to_exclude_globally)
+        if not sync_config.filter_collection.lazy_load_members():
+            # Non-lazy syncs should never include partially stated rooms.
+            # Exclude all partially stated rooms from this sync.
+            results = await self.store.is_partial_state_room_batched(
+                mutable_joined_room_ids
+            )
+            mutable_rooms_to_exclude.update(
+                room_id
+                for room_id, is_partial_state in results.items()
+                if is_partial_state
+            )
+
+        # Incremental eager syncs should additionally include rooms that
+        # - we are joined to
+        # - are full-stated
+        # - became fully-stated at some point during the sync period
+        #   (These rooms will have been omitted during a previous eager sync.)
+        forced_newly_joined_room_ids: Set[str] = set()
+        if since_token and not sync_config.filter_collection.lazy_load_members():
+            un_partial_stated_rooms = (
+                await self.store.get_un_partial_stated_rooms_between(
+                    since_token.un_partial_stated_rooms_key,
+                    now_token.un_partial_stated_rooms_key,
+                    mutable_joined_room_ids,
+                )
+            )
+            results = await self.store.is_partial_state_room_batched(
+                un_partial_stated_rooms
+            )
+            forced_newly_joined_room_ids.update(
+                room_id
+                for room_id, is_partial_state in results.items()
+                if not is_partial_state
+            )
+
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
             (
                 room_id
                 for room_id in mutable_joined_room_ids
-                if room_id not in self.rooms_to_exclude
+                if room_id not in mutable_rooms_to_exclude
             )
         )
 
@@ -1452,6 +1497,8 @@ class SyncHandler:
             since_token=since_token,
             now_token=now_token,
             joined_room_ids=joined_room_ids,
+            excluded_room_ids=frozenset(mutable_rooms_to_exclude),
+            forced_newly_joined_room_ids=frozenset(forced_newly_joined_room_ids),
             membership_change_events=membership_change_events,
         )
 
@@ -1461,38 +1508,66 @@ class SyncHandler:
             sync_result_builder
         )
 
-        logger.debug("Fetching room data")
-
-        (
-            newly_joined_rooms,
-            newly_joined_or_invited_or_knocked_users,
-            newly_left_rooms,
-            newly_left_users,
-        ) = await self._generate_sync_entry_for_rooms(
-            sync_result_builder, account_data_by_room
+        # Presence data is included if the server has it enabled and not filtered out.
+        include_presence_data = bool(
+            self.hs_config.server.use_presence
+            and not sync_config.filter_collection.blocks_all_presence()
         )
+        # Device list updates are sent if a since token is provided.
+        include_device_list_updates = bool(since_token and since_token.device_list_key)
 
-        block_all_presence_data = (
-            since_token is None and sync_config.filter_collection.blocks_all_presence()
-        )
-        if self.hs_config.server.use_presence and not block_all_presence_data:
-            logger.debug("Fetching presence data")
-            await self._generate_sync_entry_for_presence(
-                sync_result_builder,
+        # If we do not care about the rooms or things which depend on the room
+        # data (namely presence and device list updates), then we can skip
+        # this process completely.
+        device_lists = DeviceListUpdates()
+        if (
+            not sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+            or include_presence_data
+            or include_device_list_updates
+        ):
+            logger.debug("Fetching room data")
+
+            # Note that _generate_sync_entry_for_rooms sets sync_result_builder.joined, which
+            # is used in calculate_user_changes below.
+            (
                 newly_joined_rooms,
-                newly_joined_or_invited_or_knocked_users,
+                newly_left_rooms,
+            ) = await self._generate_sync_entry_for_rooms(
+                sync_result_builder, account_data_by_room
             )
+
+            # Work out which users have joined or left rooms we're in. We use this
+            # to build the presence and device_list parts of the sync response in
+            # `_generate_sync_entry_for_presence` and
+            # `_generate_sync_entry_for_device_list` respectively.
+            if include_presence_data or include_device_list_updates:
+                # This uses the sync_result_builder.joined which is set in
+                # `_generate_sync_entry_for_rooms`, if that didn't find any joined
+                # rooms for some reason it is a no-op.
+                (
+                    newly_joined_or_invited_or_knocked_users,
+                    newly_left_users,
+                ) = sync_result_builder.calculate_user_changes()
+
+                if include_presence_data:
+                    logger.debug("Fetching presence data")
+                    await self._generate_sync_entry_for_presence(
+                        sync_result_builder,
+                        newly_joined_rooms,
+                        newly_joined_or_invited_or_knocked_users,
+                    )
+
+                if include_device_list_updates:
+                    device_lists = await self._generate_sync_entry_for_device_list(
+                        sync_result_builder,
+                        newly_joined_rooms=newly_joined_rooms,
+                        newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
+                        newly_left_rooms=newly_left_rooms,
+                        newly_left_users=newly_left_users,
+                    )
 
         logger.debug("Fetching to-device data")
         await self._generate_sync_entry_for_to_device(sync_result_builder)
-
-        device_lists = await self._generate_sync_entry_for_device_list(
-            sync_result_builder,
-            newly_joined_rooms=newly_joined_rooms,
-            newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
-            newly_left_rooms=newly_left_rooms,
-            newly_left_users=newly_left_users,
-        )
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
@@ -1562,6 +1637,7 @@ class SyncHandler:
 
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
+        assert since_token is not None
 
         # Take a copy since these fields will be mutated later.
         newly_joined_or_invited_or_knocked_users = set(
@@ -1569,92 +1645,85 @@ class SyncHandler:
         )
         newly_left_users = set(newly_left_users)
 
-        if since_token and since_token.device_list_key:
-            # We want to figure out what user IDs the client should refetch
-            # device keys for, and which users we aren't going to track changes
-            # for anymore.
-            #
-            # For the first step we check:
-            #   a. if any users we share a room with have updated their devices,
-            #      and
-            #   b. we also check if we've joined any new rooms, or if a user has
-            #      joined a room we're in.
-            #
-            # For the second step we just find any users we no longer share a
-            # room with by looking at all users that have left a room plus users
-            # that were in a room we've left.
+        # We want to figure out what user IDs the client should refetch
+        # device keys for, and which users we aren't going to track changes
+        # for anymore.
+        #
+        # For the first step we check:
+        #   a. if any users we share a room with have updated their devices,
+        #      and
+        #   b. we also check if we've joined any new rooms, or if a user has
+        #      joined a room we're in.
+        #
+        # For the second step we just find any users we no longer share a
+        # room with by looking at all users that have left a room plus users
+        # that were in a room we've left.
 
-            users_that_have_changed = set()
+        users_that_have_changed = set()
 
-            joined_rooms = sync_result_builder.joined_room_ids
+        joined_rooms = sync_result_builder.joined_room_ids
 
-            # Step 1a, check for changes in devices of users we share a room
-            # with
-            #
-            # We do this in two different ways depending on what we have cached.
-            # If we already have a list of all the user that have changed since
-            # the last sync then it's likely more efficient to compare the rooms
-            # they're in with the rooms the syncing user is in.
-            #
-            # If we don't have that info cached then we get all the users that
-            # share a room with our user and check if those users have changed.
-            cache_result = self.store.get_cached_device_list_changes(
-                since_token.device_list_key
-            )
-            if cache_result.hit:
-                changed_users = cache_result.entities
+        # Step 1a, check for changes in devices of users we share a room
+        # with
+        #
+        # We do this in two different ways depending on what we have cached.
+        # If we already have a list of all the user that have changed since
+        # the last sync then it's likely more efficient to compare the rooms
+        # they're in with the rooms the syncing user is in.
+        #
+        # If we don't have that info cached then we get all the users that
+        # share a room with our user and check if those users have changed.
+        cache_result = self.store.get_cached_device_list_changes(
+            since_token.device_list_key
+        )
+        if cache_result.hit:
+            changed_users = cache_result.entities
 
-                result = await self.store.get_rooms_for_users(changed_users)
+            result = await self.store.get_rooms_for_users(changed_users)
 
-                for changed_user_id, entries in result.items():
-                    # Check if the changed user shares any rooms with the user,
-                    # or if the changed user is the syncing user (as we always
-                    # want to include device list updates of their own devices).
-                    if user_id == changed_user_id or any(
-                        rid in joined_rooms for rid in entries
-                    ):
-                        users_that_have_changed.add(changed_user_id)
-            else:
-                users_that_have_changed = (
-                    await self._device_handler.get_device_changes_in_shared_rooms(
-                        user_id,
-                        sync_result_builder.joined_room_ids,
-                        from_token=since_token,
-                    )
-                )
-
-            # Step 1b, check for newly joined rooms
-            for room_id in newly_joined_rooms:
-                joined_users = await self.store.get_users_in_room(room_id)
-                newly_joined_or_invited_or_knocked_users.update(joined_users)
-
-            # TODO: Check that these users are actually new, i.e. either they
-            # weren't in the previous sync *or* they left and rejoined.
-            users_that_have_changed.update(newly_joined_or_invited_or_knocked_users)
-
-            user_signatures_changed = (
-                await self.store.get_users_whose_signatures_changed(
-                    user_id, since_token.device_list_key
-                )
-            )
-            users_that_have_changed.update(user_signatures_changed)
-
-            # Now find users that we no longer track
-            for room_id in newly_left_rooms:
-                left_users = await self.store.get_users_in_room(room_id)
-                newly_left_users.update(left_users)
-
-            # Remove any users that we still share a room with.
-            left_users_rooms = await self.store.get_rooms_for_users(newly_left_users)
-            for user_id, entries in left_users_rooms.items():
-                if any(rid in joined_rooms for rid in entries):
-                    newly_left_users.discard(user_id)
-
-            return DeviceListUpdates(
-                changed=users_that_have_changed, left=newly_left_users
-            )
+            for changed_user_id, entries in result.items():
+                # Check if the changed user shares any rooms with the user,
+                # or if the changed user is the syncing user (as we always
+                # want to include device list updates of their own devices).
+                if user_id == changed_user_id or any(
+                    rid in joined_rooms for rid in entries
+                ):
+                    users_that_have_changed.add(changed_user_id)
         else:
-            return DeviceListUpdates()
+            users_that_have_changed = (
+                await self._device_handler.get_device_changes_in_shared_rooms(
+                    user_id,
+                    sync_result_builder.joined_room_ids,
+                    from_token=since_token,
+                )
+            )
+
+        # Step 1b, check for newly joined rooms
+        for room_id in newly_joined_rooms:
+            joined_users = await self.store.get_users_in_room(room_id)
+            newly_joined_or_invited_or_knocked_users.update(joined_users)
+
+        # TODO: Check that these users are actually new, i.e. either they
+        # weren't in the previous sync *or* they left and rejoined.
+        users_that_have_changed.update(newly_joined_or_invited_or_knocked_users)
+
+        user_signatures_changed = await self.store.get_users_whose_signatures_changed(
+            user_id, since_token.device_list_key
+        )
+        users_that_have_changed.update(user_signatures_changed)
+
+        # Now find users that we no longer track
+        for room_id in newly_left_rooms:
+            left_users = await self.store.get_users_in_room(room_id)
+            newly_left_users.update(left_users)
+
+        # Remove any users that we still share a room with.
+        left_users_rooms = await self.store.get_rooms_for_users(newly_left_users)
+        for user_id, entries in left_users_rooms.items():
+            if any(rid in joined_rooms for rid in entries):
+                newly_left_users.discard(user_id)
+
+        return DeviceListUpdates(changed=users_that_have_changed, left=newly_left_users)
 
     @trace
     async def _generate_sync_entry_for_to_device(
@@ -1731,6 +1800,7 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
+            # TODO Do not fetch room account data if it will be unused.
             (
                 global_account_data,
                 account_data_by_room,
@@ -1747,6 +1817,7 @@ class SyncHandler:
                     sync_config.user
                 )
         else:
+            # TODO Do not fetch room account data if it will be unused.
             (
                 global_account_data,
                 account_data_by_room,
@@ -1829,7 +1900,7 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         account_data_by_room: Dict[str, Dict[str, JsonDict]],
-    ) -> Tuple[AbstractSet[str], AbstractSet[str], AbstractSet[str], AbstractSet[str]]:
+    ) -> Tuple[AbstractSet[str], AbstractSet[str]]:
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.
 
@@ -1842,26 +1913,21 @@ class SyncHandler:
             account_data_by_room: Dictionary of per room account data
 
         Returns:
-            Returns a 4-tuple describing rooms the user has joined or left, and users who've
-            joined or left rooms any rooms the user is in. This gets used later in
-            `_generate_sync_entry_for_device_list`.
+            Returns a 2-tuple describing rooms the user has joined or left.
 
             Its entries are:
             - newly_joined_rooms
-            - newly_joined_or_invited_or_knocked_users
             - newly_left_rooms
-            - newly_left_users
         """
 
         since_token = sync_result_builder.since_token
+        user_id = sync_result_builder.sync_config.user.to_string()
 
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
-        user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
-            since_token is None
-            and sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
+            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+            or sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
-
         if block_all_room_ephemeral:
             ephemeral_by_room: Dict[str, List[JsonDict]] = {}
         else:
@@ -1884,19 +1950,21 @@ class SyncHandler:
                     )
                     if not tags_by_room:
                         logger.debug("no-oping sync")
-                        return set(), set(), set(), set()
+                        return set(), set()
 
         # 3. Work out which rooms need reporting in the sync response.
         ignored_users = await self.store.ignored_users(user_id)
         if since_token:
-            room_changes = await self._get_rooms_changed(
+            room_changes = await self._get_room_changes_for_incremental_sync(
                 sync_result_builder, ignored_users
             )
             tags_by_room = await self.store.get_updated_tags(
                 user_id, since_token.account_data_key
             )
         else:
-            room_changes = await self._get_all_rooms(sync_result_builder, ignored_users)
+            room_changes = await self._get_room_changes_for_initial_sync(
+                sync_result_builder, ignored_users
+            )
             tags_by_room = await self.store.get_tags_for_user(user_id)
 
         log_kv({"rooms_changed": len(room_changes.room_entries)})
@@ -1911,6 +1979,7 @@ class SyncHandler:
         # joined or archived).
         async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             logger.debug("Generating room entry for %s", room_entry.room_id)
+            # Note that this mutates sync_result_builder.{joined,archived}.
             await self._generate_room_entry(
                 sync_result_builder,
                 room_entry,
@@ -1927,20 +1996,7 @@ class SyncHandler:
         sync_result_builder.invited.extend(invited)
         sync_result_builder.knocked.extend(knocked)
 
-        # 5. Work out which users have joined or left rooms we're in. We use this
-        # to build the device_list part of the sync response in
-        # `_generate_sync_entry_for_device_list`.
-        (
-            newly_joined_or_invited_or_knocked_users,
-            newly_left_users,
-        ) = sync_result_builder.calculate_user_changes()
-
-        return (
-            set(newly_joined_rooms),
-            newly_joined_or_invited_or_knocked_users,
-            set(newly_left_rooms),
-            newly_left_users,
-        )
+        return set(newly_joined_rooms), set(newly_left_rooms)
 
     async def _have_rooms_changed(
         self, sync_result_builder: "SyncResultBuilder"
@@ -1955,7 +2011,7 @@ class SyncHandler:
 
         assert since_token
 
-        if membership_change_events:
+        if membership_change_events or sync_result_builder.forced_newly_joined_room_ids:
             return True
 
         stream_id = since_token.room_key.stream
@@ -1964,7 +2020,7 @@ class SyncHandler:
                 return True
         return False
 
-    async def _get_rooms_changed(
+    async def _get_room_changes_for_incremental_sync(
         self,
         sync_result_builder: "SyncResultBuilder",
         ignored_users: FrozenSet[str],
@@ -2002,7 +2058,9 @@ class SyncHandler:
         for event in membership_change_events:
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
-        newly_joined_rooms: List[str] = []
+        newly_joined_rooms: List[str] = list(
+            sync_result_builder.forced_newly_joined_room_ids
+        )
         newly_left_rooms: List[str] = []
         room_entries: List[RoomSyncResultBuilder] = []
         invited: List[InvitedSyncResult] = []
@@ -2214,7 +2272,7 @@ class SyncHandler:
             newly_left_rooms,
         )
 
-    async def _get_all_rooms(
+    async def _get_room_changes_for_initial_sync(
         self,
         sync_result_builder: "SyncResultBuilder",
         ignored_users: FrozenSet[str],
@@ -2239,7 +2297,7 @@ class SyncHandler:
         room_list = await self.store.get_rooms_for_local_user_where_membership_is(
             user_id=user_id,
             membership_list=Membership.LIST,
-            excluded_rooms=self.rooms_to_exclude,
+            excluded_rooms=sync_result_builder.excluded_room_ids,
         )
 
         room_entries = []
@@ -2399,7 +2457,9 @@ class SyncHandler:
 
             account_data_events = []
             if tags is not None:
-                account_data_events.append({"type": "m.tag", "content": {"tags": tags}})
+                account_data_events.append(
+                    {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
+                )
 
             for account_data_type, content in account_data.items():
                 account_data_events.append(
@@ -2641,6 +2701,13 @@ class SyncResultBuilder:
         since_token: The token supplied by user, or None.
         now_token: The token to sync up to.
         joined_room_ids: List of rooms the user is joined to
+        excluded_room_ids: Set of room ids we should omit from the /sync response.
+        forced_newly_joined_room_ids:
+            Rooms that should be presented in the /sync response as if they were
+            newly joined during the sync period, even if that's not the case.
+            (This is useful if the room was previously excluded from a /sync response,
+            and now the client should be made aware of it.)
+            Only used by incremental syncs.
 
         # The following mirror the fields in a sync response
         presence
@@ -2657,6 +2724,8 @@ class SyncResultBuilder:
     since_token: Optional[StreamToken]
     now_token: StreamToken
     joined_room_ids: FrozenSet[str]
+    excluded_room_ids: FrozenSet[str]
+    forced_newly_joined_room_ids: FrozenSet[str]
     membership_change_events: List[EventBase]
 
     presence: List[UserPresenceState] = attr.Factory(list)
