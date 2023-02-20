@@ -549,6 +549,46 @@ oidc_providers:
         display_name_template: "{{ user.preferred_username|capitalize }}"
 ```
 
+### Shibboleth with OIDC Plugin
+
+[Shibboleth](https://www.shibboleth.net/) is an open Standard IdP solution widely used by Universities.
+
+1. Shibboleth needs the [OIDC Plugin](https://shibboleth.atlassian.net/wiki/spaces/IDPPLUGINS/pages/1376878976/OIDC+OP) installed and working correctly.
+2. Create a new config for the new endpoint on IDP Side:
+```yaml
+{
+        "client_id": "SOME-CLIENT-ID",
+        "client_secret": "SOME-SUPER-SECRET-SECRET",
+        "response_types": ["code"],
+        "grant_types": ["authorization_code"],
+        "scope": "openid profile email",
+        "redirect_uris": ["https://[synapse public baseurl]/_synapse/client/oidc/callback"]
+}
+```
+
+Synapse config:
+```yaml
+oidc_providers:
+  # Shibboleth IDP
+  #
+  - idp_id: shibboleth
+    idp_name: "Shibboleth Login"
+    discover: true
+    issuer: "https://YOUR-IDP-URL.TLD"
+    client_id: "YOUR_CLIENT_ID" #Note: not an URL because of Secial Chars
+    client_secret: "YOUR-CLIENT-SECRECT-FROM-YOUR-IDP"
+    scopes: ["openid", "profile", "email"]
+    allow_existing_users: true
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        subject_claim: "sub"
+        localpart_template: "{{ user.sub.split('@')[0] }}"
+        display_name_template: "{{ user.name }}"
+        email_template: "{{ user.email }}"
+```
+
+
 ### Mastodon
 
 [Mastodon](https://docs.joinmastodon.org/) instances provide an [OAuth API](https://docs.joinmastodon.org/spec/oauth/), allowing those instances to be used as a single sign-on provider for Synapse.
