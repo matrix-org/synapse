@@ -15040,7 +15040,7 @@ WHERE room_stats_state.room_id = event_json.room_id&quot; | psql -d synapse -h l
   FROM devices
   WHERE last_seen &lt; DATE_PART('epoch', NOW() - INTERVAL '3 month') * 1000;
 </code></pre>
-<div style="break-before: page; page-break-before: always;"></div><p>This blog post by Victor Berger explains how to use many of the tools listed on this page: https://levans.fr/shrink-synapse-database.html</p>
+<div style="break-before: page; page-break-before: always;"></div><p><em>This <a href="https://jacksonchen666.com/posts/2022-12-03/14-33-00/">blog post by Jackson Chen</a> (Dec 2022) explains how to use many of the tools listed on this page. There is also an <a href="https://levans.fr/shrink-synapse-database.html">earlier blog by Victor Berger</a> (June 2020), though this may be outdated in places.</em></p>
 <h1 id="list-of-useful-tools-and-scripts-for-maintenance-synapse-database"><a class="header" href="#list-of-useful-tools-and-scripts-for-maintenance-synapse-database">List of useful tools and scripts for maintenance Synapse database:</a></h1>
 <h2 id="purge-remote-media-api-1"><a class="header" href="#purge-remote-media-api-1"><a href="usage/administration/../../admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></a></h2>
 <p>The purge remote media API allows server admins to purge old cached remote media.</p>
