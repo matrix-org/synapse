@@ -274,11 +274,11 @@ class AdminHandler:
         limit = 100
         start = 0
         while True:
-            media_ids, total = await self.store.get_local_media_by_user_paginate(
+            media_ids, total = await self._store.get_local_media_by_user_paginate(
                 start, limit, user_id
             )
             for media in media_ids:
-                writer.write_media_id(media.media_id, media)
+                writer.write_media_id(media["media_id"], media)
 
             logger.info("Written %d media_ids of %s", (start + len(media_ids)), total)
             if (start + limit) >= total:
