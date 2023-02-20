@@ -113,6 +113,7 @@ BOOLEAN_COLUMNS = {
     "room_stats_state": ["is_federatable"],
     "rooms": ["is_public", "has_auth_chain_index"],
     "users": ["shadow_banned", "approved"],
+    "un_partial_stated_event_stream": ["rejection_status_changed"],
     "users_who_share_rooms": ["share_private"],
 }
 
@@ -148,6 +149,7 @@ APPEND_ONLY_TABLES = [
     "stream_ordering_to_exterm",
     "topics",
     "transaction_id_to_pdu",
+    "un_partial_stated_event_stream",
     "users",
 ]
 
