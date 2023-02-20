@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.77.0ubuntu1) UNRELEASED; urgency=medium
+
+  * Add `matrix-org-archive-keyring` package as recommended.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 20 Feb 2023 15:41:41 +0000
+
 matrix-synapse-py3 (1.77.0) stable; urgency=medium
 
   * New Synapse release 1.77.0.
