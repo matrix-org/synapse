@@ -258,7 +258,7 @@ POWER_LEVELS_SCHEMA = {
 def _create_power_level_validator() -> Type[jsonschema.Draft7Validator]:
     validator = jsonschema.validators.validator_for(POWER_LEVELS_SCHEMA)
 
-    # by default jsonschema does not consider a frozendict to be an object so
+    # by default jsonschema does not consider a immutabledict to be an object so
     # we need to use a custom type checker
     # https://python-jsonschema.readthedocs.io/en/stable/validate/?highlight=object#validating-with-additional-types
     type_checker = validator.TYPE_CHECKER.redefine(
