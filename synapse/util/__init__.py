@@ -50,7 +50,7 @@ def _handle_immutabledict(obj: Any) -> Dict[Any, Any]:
         # but we don't really want the overhead of copying the dict.
         try:
             # Safety: we catch the AttributeError immediately below.
-            return obj._dict  # type: ignore[attr-defined]
+            return obj._dict
         except AttributeError:
             # If all else fails, resort to making a copy of the immutabledict
             return dict(obj)
