@@ -532,6 +532,7 @@ def _flatten_dict(
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif isinstance(value, bool):
+            # Beeper: we need this for fi.mau.auto_accept_invite boolean
             result[".".join(prefix + [key])] = str(value).lower()
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below

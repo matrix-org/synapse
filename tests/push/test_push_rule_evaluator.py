@@ -58,7 +58,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "fuzz": [],
             "boo": {},
         }
-        self.assertEqual({"woo": "woo"}, _flatten_dict(input))
+        self.assertEqual({"woo": "woo", "foo": "true"}, _flatten_dict(input))
 
     def test_event(self) -> None:
         """Events can also be flattened."""
@@ -836,6 +836,9 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
 
         dm_evaluator = PushRuleEvaluator(
             _flatten_dict(reaction_event),
+            False,
+            set(),
+            False,
             2,
             0,
             {},
@@ -847,18 +850,21 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
 
         # Reaction to Brad's message, should be an action for Brad
         actions = dm_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True, True), "@brad:beeper.com", "Brad"
+            FilteredPushRules(PushRules([]), {}, True, True, True, True, True), "@brad:beeper.com", "Brad"
         )
         self.assertTrue("notify" in actions)
 
         # Reaction to Brad's message, should not be an action for Nick
         actions = dm_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True, True), "@nick:beeper.com", "Nick"
+            FilteredPushRules(PushRules([]), {}, True, True, True, True, True), "@nick:beeper.com", "Nick"
         )
         self.assertEqual(actions, [])
 
         large_room_evaluator = PushRuleEvaluator(
             _flatten_dict(reaction_event),
+            False,
+            set(),
+            False,
             30,
             0,
             {},
@@ -870,11 +876,11 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
 
         # Large rooms should never have emoji reaction notifications
         actions = large_room_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True, True), "@brad:beeper.com", "Brad"
+            FilteredPushRules(PushRules([]), {}, True, True, True, True, True), "@brad:beeper.com", "Brad"
         )
         self.assertEqual(actions, [])
         actions = large_room_evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True, True), "@nick:beeper.com", "Nick"
+            FilteredPushRules(PushRules([]), {}, True, True, True, True, True), "@nick:beeper.com", "Nick"
         )
         self.assertEqual(actions, [])
 
@@ -898,6 +904,9 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
+            False,
+            set(),
+            False,
             0,
             0,
             {},
@@ -908,7 +917,7 @@ class PushRuleEvaluatorBaseRulesTestCase(unittest.TestCase):
         )
 
         actions = evaluator.run(
-            FilteredPushRules(PushRules([]), {}, True, True),
+            FilteredPushRules(PushRules([]), {}, True, True, True, True, True),
             "@brad:beeper.com",
             "Brad Murray",
         )
