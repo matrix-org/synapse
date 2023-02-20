@@ -243,7 +243,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
         media_id_file = os.path.join(file_directory, media_id)
 
         with open(media_id_file, "w") as f:
-            json.dumps(media_metadata, fp=f)
+            json.dump(media_metadata, fp=f)
 
     def finished(self) -> str:
         return self.base_directory

@@ -252,16 +252,19 @@ class AdminHandler:
         profile = await self.get_user(UserID.from_string(user_id))
         if profile is not None:
             writer.write_profile(profile)
+            logger.info("[%s] Written profile", user_id)
 
         # Get all devices the user has
         devices = await self._device_handler.get_devices_by_user(user_id)
         writer.write_devices(devices)
+        logger.info("[%s] Written %s devices", user_id, len(devices))
 
         # Get all connections the user has
         connections = await self.get_whois(UserID.from_string(user_id))
         writer.write_connections(
             connections["devices"][""]["sessions"][0]["connections"]
         )
+        logger.info("[%s] Written %s connections", user_id, len(connections))
 
         # Get all account data the user has global and in rooms
         global_data = await self._store.get_global_account_data_for_user(user_id)
@@ -269,6 +272,7 @@ class AdminHandler:
         writer.write_account_data("global", global_data)
         for room_id in by_room_data:
             writer.write_account_data(room_id, by_room_data[room_id])
+        logger.info("[%s] Written account data for %s rooms", user_id, len(by_room_data))
 
         # Get all media ids the user has
         limit = 100
@@ -280,7 +284,7 @@ class AdminHandler:
             for media in media_ids:
                 writer.write_media_id(media["media_id"], media)
 
-            logger.info("Written %d media_ids of %s", (start + len(media_ids)), total)
+            logger.info("[%s] Written %d media_ids of %s", user_id, (start + len(media_ids)), total)
             if (start + limit) >= total:
                 break
             start += limit

@@ -86,6 +86,39 @@ Furthermore, only the `media_ids` that synapse manages itself are exported.
 If another media repository (eg. [matrix-media-repo](https://github.com/turt2live/matrix-media-repo))
 is used, the data must be exported at this one.
 
+With the `media_ids` the media files can be downloaded.
+Media that have been sent in encrypted rooms are only retrieved in encrypted form.
+The following script can help with this:
+
+```bash
+#!/usr/bin/env bash
+
+# Parameters
+#
+#   source_directory: Directory which contains the export with the media_ids.
+#   target_directory: Directory into which all files are to be downloaded.
+#   repository_url: Address of the media repository resp. media worker
+#   serverName: Name of the server (`server_name` from homeserver.yaml)
+#
+#   Example: ./download_media.sh /tmp/export_data/media_ids/ /tmp/export_data/media_files/ http://localhost:8008 matrix.org
+
+source_directory=$1
+target_directory=$2
+repository_url=$3
+serverName=$4
+
+mkdir -p $target_directory
+
+for file in $source_directory/*; do
+    filename=$(basename ${file})
+    url=$repository_url/_matrix/media/v3/download/$serverName/$filename
+    echo "Downloading $filename - $url"
+    if ! wget -o /dev/null -P $target_directory $url; then
+        echo "Could not download $filename"
+    fi
+done
+```
+
 Manually resetting passwords
 ---
 Users can reset their password through their client. Alternatively, a server admin
