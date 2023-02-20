@@ -70,11 +70,18 @@ output-directory
 │       ├───state
 │       ├───invite_state
 │       └───knock_state
-└───user_data
-    ├───connections
-    ├───devices
-    └───profile
+├───user_data
+│   ├───connections
+│   ├───devices
+│   └───profile
+└───media_ids
+    └───<media_id>
 ```
+
+The `media_ids` folder contains only the metadata of the media, not the media itself.
+Furthermore, only the `media_ids` that synapse manages itself are exported.
+If another media repository (eg. [matrix-media-repo](https://github.com/turt2live/matrix-media-repo))
+is used, the data must be exported at this one.
 
 Manually resetting passwords
 ---
@@ -84,7 +91,7 @@ can reset a user's password using the [admin API](../../admin_api/user_admin_api
 
 I have a problem with my server. Can I just delete my database and start again?
 ---
-Deleting your database is unlikely to make anything better. 
+Deleting your database is unlikely to make anything better.
 
 It's easy to make the mistake of thinking that you can start again from a clean
 slate by dropping your database, but things don't work like that in a federated
@@ -99,7 +106,7 @@ Come and seek help in https://matrix.to/#/#synapse:matrix.org.
 
 There are two exceptions when it might be sensible to delete your database and start again:
 * You have *never* joined any rooms which are federated with other servers. For
-instance, a local deployment which the outside world can't talk to. 
+instance, a local deployment which the outside world can't talk to.
 * You are changing the `server_name` in the homeserver configuration. In effect
 this makes your server a completely new one from the point of view of the network,
 so in this case it makes sense to start with a clean database.
@@ -112,7 +119,7 @@ Using the following curl command:
 curl -H 'Authorization: Bearer <access-token>' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/<room-alias>
 ```
 `<access-token>` - can be obtained in riot by looking in the riot settings, down the bottom is:
-Access Token:\<click to reveal\> 
+Access Token:\<click to reveal\>
 
 `<room-alias>` - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org
 
@@ -149,13 +156,13 @@ What are the biggest rooms on my server?
 ---
 
 ```sql
-SELECT s.canonical_alias, g.room_id, count(*) AS num_rows 
-FROM 
-  state_groups_state AS g, 
-  room_stats_state AS s 
-WHERE g.room_id = s.room_id 
+SELECT s.canonical_alias, g.room_id, count(*) AS num_rows
+FROM
+  state_groups_state AS g,
+  room_stats_state AS s
+WHERE g.room_id = s.room_id
 GROUP BY s.canonical_alias, g.room_id
-ORDER BY num_rows desc 
+ORDER BY num_rows desc
 LIMIT 10;
 ```
 

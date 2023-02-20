@@ -44,6 +44,7 @@ from synapse.storage.databases.main.event_push_actions import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.filtering import FilteringWorkerStore
+from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.profile import ProfileWorkerStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
@@ -86,6 +87,7 @@ class AdminCmdSlavedStore(
     RegistrationWorkerStore,
     RoomWorkerStore,
     ProfileWorkerStore,
+    MediaRepositoryStore,
 ):
     def __init__(
         self,
@@ -221,6 +223,14 @@ class FileExfiltrationWriter(ExfiltrationWriter):
         for connection in connections:
             with open(connection_file, "a") as f:
                 print(json.dumps(connection), file=f)
+
+    def write_media_id(self, media_id: str, media_metadata: JsonDict) -> None:
+        file_directory = os.path.join(self.base_directory, "media_ids")
+        os.makedirs(file_directory, exist_ok=True)
+        media_id_file = os.path.join(file_directory, media_id)
+
+        with open(media_id_file, "w") as f:
+            json.dumps(media_metadata, fp=f)
 
     def finished(self) -> str:
         return self.base_directory

@@ -263,6 +263,21 @@ class AdminHandler:
             connections["devices"][""]["sessions"][0]["connections"]
         )
 
+        # Get all media ids the user has
+        limit = 100
+        start = 0
+        while True:
+            media_ids, total = await self.store.get_local_media_by_user_paginate(
+                start, limit, user_id
+            )
+            for media in media_ids:
+                writer.write_media_id(media.media_id, media)
+
+            logger.info("Written %d media_ids of %s", (start + len(media_ids)), total)
+            if (start + limit) >= total:
+                break
+            start += limit
+
         return writer.finished()
 
 
@@ -339,6 +354,18 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
             connections: The list of connections / sessions.
         """
         raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_media_id(self, media_id: str, media_metadata: JsonDict) -> None:
+        """Write the media's metadata of a user.
+        Exports only the metadata, as this can be fetched from the database via
+        read only. In order to access the files, a connection to the correct
+        media repository would be required.
+
+        Args:
+            media_id: ID of the media.
+            media_metadata: Metadata of one media file.
+        """
 
     @abc.abstractmethod
     def finished(self) -> Any:

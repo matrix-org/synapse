@@ -296,3 +296,27 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(args[0][0]["user_agent"], "user_agent")
         self.assertGreater(args[0][0]["last_seen"], 0)
         self.assertNotIn("access_token", args[0][0])
+
+    def test_media_ids(self) -> None:
+        """Tests that media's metadata get exported."""
+
+        self.get_success(
+            self._store.store_local_media(
+                media_id="media_1",
+                media_type="image/png",
+                time_now_ms=self.clock.time_msec(),
+                upload_name=None,
+                media_length=50,
+                user_id=self.user2,
+            )
+        )
+        self.get_success(
+            self._store.store_local_media(
+                media_id="media_2",
+                media_type="image/png",
+                time_now_ms=self.clock.time_msec(),
+                upload_name=None,
+                media_length=50,
+                user_id=self.user2,
+            )
+        )
