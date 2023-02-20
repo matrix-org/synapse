@@ -94,6 +94,10 @@ reactor = cast(ISynapseReactor, reactor_)
 logger = logging.getLogger("synapse_port_db")
 
 
+# SQLite doesn't have a dedicated boolean type (it stores True/False as 1/0). This means
+# portdb will read sqlite bools as integers, then try to insert them into postgres
+# boolean columns---which fails. Lacking some Python-parseable metaschema, we must
+# specify which integer columns should be inserted as booleans into postgres.
 BOOLEAN_COLUMNS = {
     "access_tokens": ["used"],
     "account_validity": ["email_sent"],
@@ -118,6 +122,19 @@ BOOLEAN_COLUMNS = {
 }
 
 
+# These tables are never deleted from in normal operation [*], so we can resume porting
+# over rows from a previous attempt rather than starting from scratch.
+#
+# [*]: We do delete from many of these tables when purging a room, and
+#      presumably when purging old events. So we might e.g.
+#
+#      1. Run portdb and port half of some table.
+#      2. Stop portdb.
+#      3. Purge something, deleting some of the rows we've ported over.
+#      4. Restart portdb. The rows deleted from sqlite are still present in postgres.
+#
+#      But this isn't the end of the world: we should be able to repeat the purge
+#      on the postgres DB when porting completes.
 APPEND_ONLY_TABLES = [
     "cache_invalidation_stream_by_instance",
     "event_auth",
