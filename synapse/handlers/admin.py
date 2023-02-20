@@ -272,7 +272,9 @@ class AdminHandler:
         writer.write_account_data("global", global_data)
         for room_id in by_room_data:
             writer.write_account_data(room_id, by_room_data[room_id])
-        logger.info("[%s] Written account data for %s rooms", user_id, len(by_room_data))
+        logger.info(
+            "[%s] Written account data for %s rooms", user_id, len(by_room_data)
+        )
 
         # Get all media ids the user has
         limit = 100
@@ -284,7 +286,12 @@ class AdminHandler:
             for media in media_ids:
                 writer.write_media_id(media["media_id"], media)
 
-            logger.info("[%s] Written %d media_ids of %s", user_id, (start + len(media_ids)), total)
+            logger.info(
+                "[%s] Written %d media_ids of %s",
+                user_id,
+                (start + len(media_ids)),
+                total,
+            )
             if (start + limit) >= total:
                 break
             start += limit
