@@ -1,5 +1,4 @@
-This blog post by Jackson Chen explains how to use many of the tools listed on this page: https://jacksonchen666.com/posts/2022-12-03/14-33-00/
-This blog post by Victor Berger is from 2020 & outdated, so please only use as light reference: https://levans.fr/shrink-synapse-database.html
+_This [blog post by Jackson Chen](https://jacksonchen666.com/posts/2022-12-03/14-33-00/) (Dec 2022) explains how to use many of the tools listed on this page. There is also an [earlier blog by Victor Berger](https://levans.fr/shrink-synapse-database.html) (June 2020), though this may be outdated in places._
 
 # List of useful tools and scripts for maintenance Synapse database:
 
