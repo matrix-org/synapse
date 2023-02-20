@@ -82,13 +82,13 @@ output-directory
 ```
 
 The `media_ids` folder contains only the metadata of the media, not the media itself.
-Furthermore, only the `media_ids` that synapse manages itself are exported.
+Furthermore, only the `media_ids` that Synapse manages itself are exported.
 If another media repository (eg. [matrix-media-repo](https://github.com/turt2live/matrix-media-repo))
 is used, the data must be exported at this one.
 
 With the `media_ids` the media files can be downloaded.
 Media that have been sent in encrypted rooms are only retrieved in encrypted form.
-The following script can help with this:
+The following script can help with download the media files:
 
 ```bash
 #!/usr/bin/env bash
@@ -97,10 +97,11 @@ The following script can help with this:
 #
 #   source_directory: Directory which contains the export with the media_ids.
 #   target_directory: Directory into which all files are to be downloaded.
-#   repository_url: Address of the media repository resp. media worker
-#   serverName: Name of the server (`server_name` from homeserver.yaml)
+#   repository_url: Address of the media repository resp. media worker.
+#   serverName: Name of the server (`server_name` from homeserver.yaml).
 #
-#   Example: ./download_media.sh /tmp/export_data/media_ids/ /tmp/export_data/media_files/ http://localhost:8008 matrix.org
+#   Example:
+#       ./download_media.sh /tmp/export_data/media_ids/ /tmp/export_data/media_files/ http://localhost:8008 matrix.example.com
 
 source_directory=$1
 target_directory=$2
