@@ -18,7 +18,7 @@ from typing import List
 from unittest.mock import patch
 
 import jsonschema
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -343,12 +343,12 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-        # check it works with frozendicts too
+        # check it works with immutabledicts too
         event = MockEvent(
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content=frozendict({EventContentFields.LABELS: ["#fun"]}),
+            content=immutabledict({EventContentFields.LABELS: ["#fun"]}),
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 
