@@ -1,1 +1,1 @@
-Allow `health` listener to load.
+Fix a bug introduced in Synapse 1.76 where workers would fail to start if the `health` listener was configured.
