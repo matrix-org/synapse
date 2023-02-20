@@ -1,0 +1,1 @@
+Reduce the likelihood of a rare race condition where rejoining a restricted room over federation would fail.

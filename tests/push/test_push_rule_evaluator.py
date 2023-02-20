@@ -32,6 +32,7 @@ from synapse.storage.databases.main.appservice import _make_exclusive_regex
 from synapse.synapse_rust.push import PushRuleEvaluator
 from synapse.types import JsonDict, JsonMapping, UserID
 from synapse.util import Clock
+from synapse.util.frozenutils import freeze
 
 from tests import unittest
 from tests.test_utils.event_injection import create_event, inject_member_event
@@ -57,17 +58,24 @@ class FlattenDictTestCase(unittest.TestCase):
         )
 
     def test_non_string(self) -> None:
-        """Booleans, ints, and nulls should be kept while other items are dropped."""
+        """String, booleans, ints, nulls and list of those should be kept while other items are dropped."""
         input: Dict[str, Any] = {
             "woo": "woo",
             "foo": True,
             "bar": 1,
             "baz": None,
-            "fuzz": [],
+            "fuzz": ["woo", True, 1, None, [], {}],
             "boo": {},
         }
         self.assertEqual(
-            {"woo": "woo", "foo": True, "bar": 1, "baz": None}, _flatten_dict(input)
+            {
+                "woo": "woo",
+                "foo": True,
+                "bar": 1,
+                "baz": None,
+                "fuzz": ["woo", True, 1, None],
+            },
+            _flatten_dict(input),
         )
 
     def test_event(self) -> None:
@@ -117,6 +125,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
+            "content.org.matrix.msc1767.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
@@ -128,6 +137,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
+            "content.org.matrix.msc1767.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
@@ -139,7 +149,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         *,
         has_mentions: bool = False,
         user_mentions: Optional[Set[str]] = None,
-        room_mention: bool = False,
         related_events: Optional[JsonDict] = None,
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
@@ -160,7 +169,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             _flatten_dict(event),
             has_mentions,
             user_mentions or set(),
-            room_mention,
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
@@ -169,6 +177,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             room_version_feature_flags=event.room_version.msc3931_push_features,
             msc3931_enabled=True,
             msc3758_exact_event_match=True,
+            msc3966_exact_event_property_contains=True,
         )
 
     def test_display_name(self) -> None:
@@ -217,27 +226,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             {}, has_mentions=True, user_mentions={"@another:test", "@user:test"}
         )
         self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
-        # since the BulkPushRuleEvaluator is what handles data sanitisation.
-
-    def test_room_mentions(self) -> None:
-        """Check for room mentions."""
-        condition = {"kind": "org.matrix.msc3952.is_room_mention"}
-
-        # No room mention shouldn't match.
-        evaluator = self._get_evaluator({}, has_mentions=True)
-        self.assertFalse(evaluator.matches(condition, None, None))
-
-        # Room mention should match.
-        evaluator = self._get_evaluator({}, has_mentions=True, room_mention=True)
-        self.assertTrue(evaluator.matches(condition, None, None))
-
-        # A room mention and user mention is valid.
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@another:test"}, room_mention=True
-        )
-        self.assertTrue(evaluator.matches(condition, None, None))
 
         # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
         # since the BulkPushRuleEvaluator is what handles data sanitisation.
@@ -548,6 +536,42 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 {"value": value},
                 "incorrect types should not match",
             )
+
+    def test_exact_event_property_contains(self) -> None:
+        """Check that exact_event_property_contains conditions work as expected."""
+
+        condition = {
+            "kind": "org.matrix.msc3966.exact_event_property_contains",
+            "key": "content.value",
+            "value": "foobaz",
+        }
+        self._assert_matches(
+            condition,
+            {"value": ["foobaz"]},
+            "exact value should match",
+        )
+        self._assert_matches(
+            condition,
+            {"value": ["foobaz", "bugz"]},
+            "extra values should match",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": ["FoobaZ"]},
+            "values should match and be case-sensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "foobaz"},
+            "does not search in a string",
+        )
+
+        # it should work on frozendicts too
+        self._assert_matches(
+            condition,
+            freeze({"value": ["foobaz"]}),
+            "values should match on frozendicts",
+        )
 
     def test_no_body(self) -> None:
         """Not having a body shouldn't break the evaluator."""

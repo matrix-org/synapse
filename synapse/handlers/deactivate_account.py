@@ -106,12 +106,7 @@ class DeactivateAccountHandler:
         for threepid in threepids:
             try:
                 result = await self._identity_handler.try_unbind_threepid(
-                    user_id,
-                    {
-                        "medium": threepid["medium"],
-                        "address": threepid["address"],
-                        "id_server": id_server,
-                    },
+                    user_id, threepid["medium"], threepid["address"], id_server
                 )
                 identity_server_supports_unbinding &= result
             except Exception:

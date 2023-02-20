@@ -179,12 +179,18 @@ class ExperimentalConfig(Config):
             "msc3783_escape_event_match_key", False
         )
 
-        # MSC3952: Intentional mentions
-        self.msc3952_intentional_mentions = experimental.get(
-            "msc3952_intentional_mentions", False
+        # MSC3952: Intentional mentions, this depends on MSC3758.
+        self.msc3952_intentional_mentions = (
+            experimental.get("msc3952_intentional_mentions", False)
+            and self.msc3758_exact_event_match
         )
 
         # MSC3959: Do not generate notifications for edits.
         self.msc3958_supress_edit_notifs = experimental.get(
             "msc3958_supress_edit_notifs", False
+        )
+
+        # MSC3966: exact_event_property_contains push rule condition.
+        self.msc3966_exact_event_property_contains = experimental.get(
+            "msc3966_exact_event_property_contains", False
         )

@@ -1267,7 +1267,7 @@ class MatrixFederationHttpClient:
 def _flatten_response_never_received(e: BaseException) -> str:
     if hasattr(e, "reasons"):
         reasons = ", ".join(
-            _flatten_response_never_received(f.value) for f in e.reasons  # type: ignore[attr-defined]
+            _flatten_response_never_received(f.value) for f in e.reasons
         )
 
         return "%s:[%s]" % (type(e).__name__, reasons)

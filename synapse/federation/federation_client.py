@@ -884,7 +884,7 @@ class FederationClient(FederationBase):
                 if 500 <= e.code < 600:
                     failover = True
 
-                elif e.code == 400 and synapse_error.errcode in failover_errcodes:
+                elif 400 <= e.code < 500 and synapse_error.errcode in failover_errcodes:
                     failover = True
 
                 elif failover_on_unknown_endpoint and self._is_unknown_endpoint(
@@ -999,14 +999,13 @@ class FederationClient(FederationBase):
 
             return destination, ev, room_version
 
+        failover_errcodes = {Codes.NOT_FOUND}
         # MSC3083 defines additional error codes for room joins. Unfortunately
         # we do not yet know the room version, assume these will only be returned
         # by valid room versions.
-        failover_errcodes = (
-            (Codes.UNABLE_AUTHORISE_JOIN, Codes.UNABLE_TO_GRANT_JOIN)
-            if membership == Membership.JOIN
-            else None
-        )
+        if membership == Membership.JOIN:
+            failover_errcodes.add(Codes.UNABLE_AUTHORISE_JOIN)
+            failover_errcodes.add(Codes.UNABLE_TO_GRANT_JOIN)
 
         return await self._try_destination_list(
             "make_" + membership,

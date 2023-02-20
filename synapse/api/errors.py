@@ -108,6 +108,10 @@ class Codes(str, Enum):
 
     USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
 
+    # Attempt to send a second annotation with the same event type & annotation key
+    # MSC2677
+    DUPLICATE_ANNOTATION = "M_DUPLICATE_ANNOTATION"
+
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.

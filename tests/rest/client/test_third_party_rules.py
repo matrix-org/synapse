@@ -425,7 +425,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         async def test_fn(
             event: EventBase, state_events: StateMap[EventBase]
         ) -> Tuple[bool, Optional[JsonDict]]:
-            if event.is_state and event.type == EventTypes.PowerLevels:
+            if event.is_state() and event.type == EventTypes.PowerLevels:
                 await api.create_and_send_event_into_room(
                     {
                         "room_id": event.room_id,

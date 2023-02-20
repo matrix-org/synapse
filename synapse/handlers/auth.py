@@ -201,7 +201,7 @@ class AuthHandler:
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
             if inst.is_enabled():
-                self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
+                self.checkers[inst.AUTH_TYPE] = inst
 
         self.bcrypt_rounds = hs.config.registration.bcrypt_rounds
 
@@ -1593,9 +1593,8 @@ class AuthHandler:
         if medium == "email":
             address = canonicalise_email(address)
 
-        identity_handler = self.hs.get_identity_handler()
-        result = await identity_handler.try_unbind_threepid(
-            user_id, {"medium": medium, "address": address, "id_server": id_server}
+        result = await self.hs.get_identity_handler().try_unbind_threepid(
+            user_id, medium, address, id_server
         )
 
         await self.store.user_delete_threepid(user_id, medium, address)

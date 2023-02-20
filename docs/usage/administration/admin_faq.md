@@ -71,6 +71,9 @@ output-directory
 │       ├───invite_state
 │       └───knock_state
 ├───user_data
+│   ├───account_data
+│   │   ├───global
+│   │   └───<room_id>
 │   ├───connections
 │   ├───devices
 │   └───profile
