@@ -1,0 +1,1 @@
+Add admin API to delete a reported event.
