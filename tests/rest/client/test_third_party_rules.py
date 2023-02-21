@@ -273,6 +273,46 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         ev = channel.json_body
         self.assertEqual(ev["content"]["x"], "y")
 
+    def test_add_event(self) -> None:
+        # needs checking of combo of return conditions, ie replace event and send event
+        async def check(
+            ev: EventBase, state: StateMap[EventBase]
+        ) -> Tuple[bool, Optional[JsonDict], Optional[dict]]:
+            event_dict = {
+                "type": "m.room.test",
+                "room_id": self.room_id,
+                "sender": self.user_id,
+                "content": {
+                    "creator": "test_user",
+                    "body": "message",
+                    "msgtype": "message",
+                },
+            }
+            if ev.type == "message":
+                return True, None, event_dict
+            else:
+                return True, None, None
+
+        self.hs.get_third_party_event_rules()._check_event_allowed_v2_callbacks = [
+            check
+        ]
+
+        channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/message/1" % self.room_id,
+            {"x": "x"},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events = self.get_success(
+            self.hs.get_datastores().main.get_forward_extremities_for_room(self.room_id)
+        )
+        event = events[1]
+
+        e = self.get_success(self.hs.get_datastores().main.get_event(event["event_id"]))
+        self.assertEqual("m.room.test", e.type)
+
     def test_message_edit(self) -> None:
         """Ensure that the module doesn't cause issues with edited messages."""
         # first patch the event checker so that it will modify the event
