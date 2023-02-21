@@ -10,6 +10,66 @@ The available third party rules callbacks are:
 
 ### `check_event_allowed`
 
+_First introduced in Synapse v1.7x.x
+
+```python
+async def check_event_allowed_v2(
+    event: "synapse.events.EventBase",
+    state_events: "synapse.types.StateMap",
+) -> Tuple[bool, Optional[dict], Optional[dict]]
+```
+
+**<span style="color:red">
+This callback is very experimental and can and will break without notice. Module developers
+are encouraged to implement `check_event_for_spam` from the spam checker category instead.
+</span>**
+
+Called when processing any incoming event, with the event and a `StateMap`
+representing the current state of the room the event is being sent into. A `StateMap` is
+a dictionary that maps tuples containing an event type and a state key to the
+corresponding state event. For example retrieving the room's `m.room.create` event from
+the `state_events` argument would look like this: `state_events.get(("m.room.create", ""))`.
+The module must return a boolean indicating whether the event can be allowed.
+
+Note that this callback function processes incoming events coming via federation
+traffic (on top of client traffic). This means denying an event might cause the local
+copy of the room's history to diverge from that of remote servers. This may cause
+federation issues in the room. It is strongly recommended to only deny events using this
+callback function if the sender is a local user, or in a private federation in which all
+servers are using the same module, with the same configuration.
+
+If the boolean returned by the module is `True`, it may also tell Synapse to replace the
+event with new data by returning the new event's data as a dictionary. In order to do
+that, it is recommended the module calls `event.get_dict()` to get the current event as a
+dictionary, and modify the returned dictionary accordingly.
+
+Module writers may also wish to use this check to send an event into the room concurrent
+with the event being checked, if this is the case the module writer must provide a dict that 
+will form the basis of the event that is to be added to the room must be returned by `check_event_allowed_v2`.
+This dict will then be turned into an event at the appropriate time and it will be persisted after the event
+that triggered it, and if the event that triggered it is in a batch of events for persisting, it will be added to the 
+end of that batch. 
+
+If `check_event_allowed_v2` raises an exception, the module is assumed to have failed.
+The event will not be accepted but is not treated as explicitly rejected, either.
+An HTTP request causing the module check will likely result in a 500 Internal
+Server Error.
+
+When the boolean returned by the module is `False`, the event is rejected.
+(Module developers should not use exceptions for rejection.)
+
+Note that replacing the event or adding an event only works for events sent by local users, not for events
+received over federation.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. This callback cannot be used in conjunction with `check_event_allowed`,
+only one of these callbacks may be operational at a time - if both `check_event_allowed` and `check_event_allowed_v2`
+active only `check_event_allowed` will be executed.
+
+### `check_event_allowed`
+
 _First introduced in Synapse v1.39.0_
 
 ```python
