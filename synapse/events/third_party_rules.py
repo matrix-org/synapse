@@ -32,6 +32,10 @@ logger = logging.getLogger(__name__)
 CHECK_EVENT_ALLOWED_CALLBACK = Callable[
     [EventBase, StateMap[EventBase]], Awaitable[Tuple[bool, Optional[dict]]]
 ]
+CHECK_EVENT_ALLOWED_V2_CALLBACK = Callable[
+    [EventBase, StateMap[EventBase]],
+    Awaitable[Tuple[bool, Optional[dict], Optional[dict]]],
+]
 ON_CREATE_ROOM_CALLBACK = Callable[[Requester, dict, bool], Awaitable]
 CHECK_THREEPID_CAN_BE_INVITED_CALLBACK = Callable[
     [str, str, StateMap[EventBase]], Awaitable[bool]
@@ -155,6 +159,9 @@ class ThirdPartyEventRules:
         self._storage_controllers = hs.get_storage_controllers()
 
         self._check_event_allowed_callbacks: List[CHECK_EVENT_ALLOWED_CALLBACK] = []
+        self._check_event_allowed_v2_callbacks: List[
+            CHECK_EVENT_ALLOWED_V2_CALLBACK
+        ] = []
         self._on_create_room_callbacks: List[ON_CREATE_ROOM_CALLBACK] = []
         self._check_threepid_can_be_invited_callbacks: List[
             CHECK_THREEPID_CAN_BE_INVITED_CALLBACK
@@ -234,7 +241,7 @@ class ThirdPartyEventRules:
         self,
         event: EventBase,
         context: UnpersistedEventContextBase,
-    ) -> Tuple[bool, Optional[dict]]:
+    ) -> Tuple[bool, Optional[dict], Optional[dict]]:
         """Check if a provided event should be allowed in the given context.
 
         The module can return:
@@ -242,7 +249,8 @@ class ThirdPartyEventRules:
             * False: the event is not allowed, and should be rejected with M_FORBIDDEN.
 
         If the event is allowed, the module can also return a dictionary to use as a
-        replacement for the event.
+        replacement for the event, and/or return a dictionary to use as the basis for
+        another event to be sent into the room.
 
         Args:
             event: The event to be checked.
@@ -252,8 +260,11 @@ class ThirdPartyEventRules:
             The result from the ThirdPartyRules module, as above.
         """
         # Bail out early without hitting the store if we don't have any callbacks to run.
-        if len(self._check_event_allowed_callbacks) == 0:
-            return True, None
+        if (
+            len(self._check_event_allowed_callbacks) == 0
+            and len(self._check_event_allowed_v2_callbacks) == 0
+        ):
+            return True, None, None
 
         prev_state_ids = await context.get_prev_state_ids()
 
@@ -266,35 +277,63 @@ class ThirdPartyEventRules:
         # the hashes and signatures.
         event.freeze()
 
-        for callback in self._check_event_allowed_callbacks:
-            try:
-                res, replacement_data = await delay_cancellation(
-                    callback(event, state_events)
-                )
-            except CancelledError:
-                raise
-            except SynapseError as e:
-                # FIXME: Being able to throw SynapseErrors is relied upon by
-                # some modules. PR #10386 accidentally broke this ability.
-                # That said, we aren't keen on exposing this implementation detail
-                # to modules and we should one day have a proper way to do what
-                # is wanted.
-                # This module callback needs a rework so that hacks such as
-                # this one are not necessary.
-                raise e
-            except Exception:
-                raise ModuleFailedException(
-                    "Failed to run `check_event_allowed` module API callback"
-                )
+        if len(self._check_event_allowed_callbacks) != 0:
+            for callback in self._check_event_allowed_callbacks:
+                try:
+                    res, replacement_data = await delay_cancellation(
+                        callback(event, state_events)
+                    )
+                except CancelledError:
+                    raise
+                except SynapseError as e:
+                    # FIXME: Being able to throw SynapseErrors is relied upon by
+                    # some modules. PR #10386 accidentally broke this ability.
+                    # That said, we aren't keen on exposing this implementation detail
+                    # to modules and we should one day have a proper way to do what
+                    # is wanted.
+                    # This module callback needs a rework so that hacks such as
+                    # this one are not necessary.
+                    raise e
+                except Exception:
+                    raise ModuleFailedException(
+                        "Failed to run `check_event_allowed` module API callback"
+                    )
 
-            # Return if the event shouldn't be allowed or if the module came up with a
-            # replacement dict for the event.
-            if res is False:
-                return res, None
-            elif isinstance(replacement_data, dict):
-                return True, replacement_data
+                # Return if the event shouldn't be allowed or if the module came up with a
+                # replacement dict for the event.
+                if res is False:
+                    return res, None, None
+                elif isinstance(replacement_data, dict):
+                    return True, replacement_data, None
+        else:
+            for v2_callback in self._check_event_allowed_v2_callbacks:
+                try:
+                    res, replacement_data, new_event = await delay_cancellation(
+                        v2_callback(event, state_events)
+                    )
+                except CancelledError:
+                    raise
+                except SynapseError as e:
+                    # FIXME: Being able to throw SynapseErrors is relied upon by
+                    # some modules. PR #10386 accidentally broke this ability.
+                    # That said, we aren't keen on exposing this implementation detail
+                    # to modules and we should one day have a proper way to do what
+                    # is wanted.
+                    # This module callback needs a rework so that hacks such as
+                    # this one are not necessary.
+                    raise e
+                except Exception:
+                    raise ModuleFailedException(
+                        "Failed to run `check_event_allowed_v2` module API callback"
+                    )
 
-        return True, None
+                # Return if the event shouldn't be allowed, if the module came up with a
+                # replacement dict for the event, or if the module wants to send a new event
+                if res is False:
+                    return res, None, None
+                else:
+                    return True, replacement_data, new_event
+        return True, None, None
 
     async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
