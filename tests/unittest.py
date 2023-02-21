@@ -718,7 +718,7 @@ class HomeserverTestCase(TestCase):
         event_creator = self.hs.get_event_creation_handler()
         requester = create_requester(user)
 
-        event, context = self.get_success(
+        event, context, _ = self.get_success(
             event_creator.create_event(
                 requester,
                 {

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Tuple
+from typing import Optional, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -79,7 +79,9 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
         return memberEvent, memberEventContext
 
-    def _create_duplicate_event(self, txn_id: str) -> Tuple[EventBase, EventContext]:
+    def _create_duplicate_event(
+        self, txn_id: str
+    ) -> Tuple[EventBase, EventContext, Optional[dict]]:
         """Create a new event with the given transaction ID. All events produced
         by this method will be considered duplicates.
         """
@@ -107,7 +109,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
         txn_id = "something_suitably_random"
 
-        event1, context = self._create_duplicate_event(txn_id)
+        event1, context, _ = self._create_duplicate_event(txn_id)
 
         ret_event1 = self.get_success(
             self.handler.handle_new_client_event(
@@ -119,7 +121,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(event1.event_id, ret_event1.event_id)
 
-        event2, context = self._create_duplicate_event(txn_id)
+        event2, context, _ = self._create_duplicate_event(txn_id)
 
         # We want to test that the deduplication at the persit event end works,
         # so we want to make sure we test with different events.
@@ -140,7 +142,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
         # Let's test that calling `persist_event` directly also does the right
         # thing.
-        event3, context = self._create_duplicate_event(txn_id)
+        event3, context, _ = self._create_duplicate_event(txn_id)
         self.assertNotEqual(event1.event_id, event3.event_id)
 
         ret_event3, event_pos3, _ = self.get_success(
@@ -154,7 +156,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
         # Let's test that calling `persist_events` directly also does the right
         # thing.
-        event4, context = self._create_duplicate_event(txn_id)
+        event4, context, _ = self._create_duplicate_event(txn_id)
         self.assertNotEqual(event1.event_id, event3.event_id)
 
         events, _ = self.get_success(
@@ -174,8 +176,8 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         txn_id = "something_else_suitably_random"
 
         # Create two duplicate events to persist at the same time
-        event1, context1 = self._create_duplicate_event(txn_id)
-        event2, context2 = self._create_duplicate_event(txn_id)
+        event1, context1, _ = self._create_duplicate_event(txn_id)
+        event2, context2, _ = self._create_duplicate_event(txn_id)
 
         # Ensure their event IDs are different to start with
         self.assertNotEqual(event1.event_id, event2.event_id)
@@ -200,7 +202,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         memberEvent, _ = self._create_and_persist_member_event()
 
         # Try to create the event with empty prev_events bit with some auth_events
-        event, _ = self.get_success(
+        event, _, _ = self.get_success(
             self.handler.create_event(
                 self.requester,
                 {

@@ -507,7 +507,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         # Lower the permissions of the inviter.
         event_creation_handler = self.hs.get_event_creation_handler()
         requester = create_requester(inviter)
-        event, context = self.get_success(
+        event, context, _ = self.get_success(
             event_creation_handler.create_event(
                 requester,
                 {

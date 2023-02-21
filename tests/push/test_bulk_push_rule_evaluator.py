@@ -131,7 +131,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
         # Create a new message event, and try to evaluate it under the dodgy
         # power level event.
-        event, context = self.get_success(
+        event, context, _ = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -171,7 +171,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         """Ensure that push rules are not calculated when disabled in the config"""
 
         # Create a new message event which should cause a notification.
-        event, context = self.get_success(
+        event, context, _ = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -201,7 +201,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
     ) -> bool:
         """Returns true iff the `mentions` trigger an event push action."""
         # Create a new message event which should cause a notification.
-        event, context = self.get_success(
+        event, context, _ = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -377,7 +377,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
 
         # Create & persist an event to use as the parent of the relation.
-        event, context = self.get_success(
+        event, context, _ = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {

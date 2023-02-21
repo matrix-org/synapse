@@ -95,6 +95,7 @@ async def create_event(
     (
         event,
         unpersisted_context,
+        _,
     ) = await hs.get_event_creation_handler().create_new_client_event(
         builder, prev_event_ids=prev_event_ids
     )

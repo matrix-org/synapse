@@ -957,7 +957,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, unpersisted_context = self.get_success(
+        event, unpersisted_context, _ = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
 
