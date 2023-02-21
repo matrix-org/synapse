@@ -616,9 +616,15 @@ class DeleteEventReportTestCase(unittest.HomeserverTestCase):
         self.other_user = self.register_user("user", "pass")
         self.other_user_tok = self.login("user", "pass")
 
+        # create report
         self.get_success(
             self._store.add_event_report(
-                "room_id", "event_id", self.other_user, {}, self.clock.time_msec()
+                "room_id",
+                "event_id",
+                self.other_user,
+                "this makes me sad",
+                {},
+                self.clock.time_msec(),
             )
         )
 
@@ -723,4 +729,3 @@ class DeleteEventReportTestCase(unittest.HomeserverTestCase):
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
         self.assertEqual("Event report not found", channel.json_body["error"])
-

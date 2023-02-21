@@ -160,4 +160,4 @@ class EventReportDetailRestServlet(RestServlet):
         if await self._store.delete_event_report(resolved_report_id):
             return HTTPStatus.OK, {}
 
-        raise NotFoundError(f"No such event report: {resolved_report_id}")
+        raise NotFoundError("Event report not found")
