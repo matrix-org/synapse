@@ -375,13 +375,20 @@ pub struct EventMatchCondition {
     pub pattern: Cow<'static, str>,
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum EventMatchPatternType {
+    UserId,
+    UserLocalpart,
+}
+
 /// The body of a [`Condition::EventMatch`] that uses user_id or user_localpart as a pattern.
 #[derive(Serialize, Debug, Clone)]
 pub struct EventMatchTypeCondition {
     pub key: Cow<'static, str>,
     // During serialization, the pattern_type property gets replaced with a
     // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
-    pub pattern_type: Cow<'static, str>,
+    pub pattern_type: Cow<'static, EventMatchPatternType>,
 }
 
 /// The body of a [`Condition::ExactEventMatch`]
@@ -409,7 +416,7 @@ pub struct RelatedEventMatchTypeCondition {
     // This is only used if pattern_type exists (and thus key must exist), so is
     // a bit simpler than RelatedEventMatchCondition.
     pub key: Cow<'static, str>,
-    pub pattern_type: Cow<'static, str>,
+    pub pattern_type: Cow<'static, EventMatchPatternType>,
     pub rel_type: Cow<'static, str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_fallbacks: Option<bool>,

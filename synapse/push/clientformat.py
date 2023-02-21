@@ -42,6 +42,7 @@ def format_push_rules_for_user(
         rulearray.append(template_rule)
 
         pattern_type = template_rule.pop("pattern_type", None)
+        print(pattern_type)
         if pattern_type == "user_id":
             template_rule["pattern"] = user.to_string()
         elif pattern_type == "user_localpart":

@@ -15,7 +15,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::push::JsonValue;
+use crate::push::{EventMatchPatternType, JsonValue};
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -273,9 +273,8 @@ impl PushRuleEvaluator {
                 };
 
                 let pattern = match &*event_match.pattern_type {
-                    "user_id" => user_id,
-                    "user_localpart" => get_localpart_from_id(user_id)?,
-                    _ => return Ok(false),
+                    EventMatchPatternType::UserId => user_id,
+                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
                 };
 
                 self.match_event_match(&self.flattened_keys, &event_match.key.clone(), pattern)?
@@ -300,9 +299,8 @@ impl PushRuleEvaluator {
                 };
 
                 let pattern = match &*event_match.pattern_type {
-                    "user_id" => user_id,
-                    "user_localpart" => get_localpart_from_id(user_id)?,
-                    _ => return Ok(false),
+                    EventMatchPatternType::UserId => user_id,
+                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
                 };
 
                 self.match_related_event_match(

@@ -21,13 +21,13 @@ use lazy_static::lazy_static;
 use serde_json::Value;
 
 use super::KnownCondition;
-use crate::push::EventMatchCondition;
 use crate::push::PushRule;
 use crate::push::RelatedEventMatchTypeCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 use crate::push::{Action, ExactEventMatchCondition, SimpleJsonValue};
 use crate::push::{Condition, EventMatchTypeCondition};
+use crate::push::{EventMatchCondition, EventMatchPatternType};
 
 const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
@@ -106,7 +106,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
             })),
             Condition::Known(KnownCondition::EventMatchType(EventMatchTypeCondition {
                 key: Cow::Borrowed("state_key"),
-                pattern_type: Cow::Borrowed("user_id"),
+                pattern_type: Cow::Borrowed(&EventMatchPatternType::UserId),
             })),
         ]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_FALSE_ACTION, SOUND_ACTION]),
@@ -132,7 +132,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::RelatedEventMatchType(
             RelatedEventMatchTypeCondition {
                 key: Cow::Borrowed("sender"),
-                pattern_type: Cow::Borrowed("user_id"),
+                pattern_type: Cow::Borrowed(&EventMatchPatternType::UserId),
                 rel_type: Cow::Borrowed("m.in_reply_to"),
                 include_fallbacks: None,
             },
@@ -257,7 +257,7 @@ pub const BASE_APPEND_CONTENT_RULES: &[PushRule] = &[PushRule {
     conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatchType(
         EventMatchTypeCondition {
             key: Cow::Borrowed("content.body"),
-            pattern_type: Cow::Borrowed("user_localpart"),
+            pattern_type: Cow::Borrowed(&EventMatchPatternType::UserLocalpart),
         },
     ))]),
     actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
