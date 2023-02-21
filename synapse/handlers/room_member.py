@@ -414,7 +414,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         max_retries = 5
         for i in range(max_retries):
             try:
-                event, context = await self.event_creation_handler.create_event(
+                (
+                    event,
+                    context,
+                    third_party_event,
+                ) = await self.event_creation_handler.create_event(
                     requester,
                     {
                         "type": EventTypes.Member,
@@ -468,6 +472,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                             ratelimit=ratelimit,
                         )
                     )
+                    if third_party_event:
+                        (
+                            tp_event,
+                            tp_unpersisted_context,
+                            _,
+                        ) = await self.event_creation_handler.create_event(
+                            requester,
+                            third_party_event,
+                            prev_event_ids=[result_event.event_id],
+                        )
+                        tp_context = await tp_unpersisted_context.persist(tp_event)
+                        await self.event_creation_handler.handle_new_client_event(
+                            requester, events_and_context=[(tp_event, tp_context)]
+                        )
 
                 if event.membership == Membership.LEAVE:
                     if prev_member_event_id:
@@ -1944,7 +1962,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         max_retries = 5
         for i in range(max_retries):
             try:
-                event, context = await self.event_creation_handler.create_event(
+                (
+                    event,
+                    context,
+                    third_party_event_dict,
+                ) = await self.event_creation_handler.create_event(
                     requester,
                     event_dict,
                     txn_id=txn_id,
@@ -1954,10 +1976,24 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 )
                 event.internal_metadata.out_of_band_membership = True
 
+                events_and_context = [(event, context)]
+                if third_party_event_dict:
+                    (
+                        third_party_event,
+                        third_party_unpersisted_context,
+                        _,
+                    ) = await self.event_creation_handler.create_event(
+                        requester, third_party_event_dict
+                    )
+                    third_party_context = await third_party_unpersisted_context.persist(
+                        event
+                    )
+                    events_and_context.append((third_party_event, third_party_context))
+
                 result_event = (
                     await self.event_creation_handler.handle_new_client_event(
                         requester,
-                        events_and_context=[(event, context)],
+                        events_and_context=events_and_context,
                         extra_users=[UserID.from_string(target_user)],
                     )
                 )

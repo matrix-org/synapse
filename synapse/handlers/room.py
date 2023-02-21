@@ -212,6 +212,7 @@ class RoomCreationHandler:
                 (
                     tombstone_event,
                     tombstone_context,
+                    _,
                 ) = await self.event_creation_handler.create_event(
                     requester,
                     {
@@ -1091,7 +1092,7 @@ class RoomCreationHandler:
             content: JsonDict,
             for_batch: bool,
             **kwargs: Any,
-        ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
+        ) -> Tuple[EventBase, synapse.events.snapshot.EventContext, Optional[dict]]:
             """
             Creates an event and associated event context.
             Args:
@@ -1110,7 +1111,11 @@ class RoomCreationHandler:
 
             event_dict = create_event_dict(etype, content, **kwargs)
 
-            new_event, new_context = await self.event_creation_handler.create_event(
+            (
+                new_event,
+                new_context,
+                third_party_event,
+            ) = await self.event_creation_handler.create_event(
                 creator,
                 event_dict,
                 prev_event_ids=prev_event,
@@ -1123,7 +1128,7 @@ class RoomCreationHandler:
             prev_event = [new_event.event_id]
             state_map[(new_event.type, new_event.state_key)] = new_event.event_id
 
-            return new_event, new_context
+            return new_event, new_context, third_party_event
 
         try:
             config = self._presets_dict[preset_config]
@@ -1133,7 +1138,7 @@ class RoomCreationHandler:
             )
 
         creation_content.update({"creator": creator_id})
-        creation_event, creation_context = await create_event(
+        creation_event, creation_context, _ = await create_event(
             EventTypes.Create, creation_content, False
         )
 
@@ -1173,15 +1178,18 @@ class RoomCreationHandler:
         current_state_group = event_to_state[member_event_id]
 
         events_to_send = []
+        third_party_events_to_append = []
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
-            power_event, power_context = await create_event(
+            power_event, power_context, power_tp_event = await create_event(
                 EventTypes.PowerLevels, pl_content, True
             )
             current_state_group = power_context._state_group
             events_to_send.append((power_event, power_context))
+            if power_tp_event:
+                third_party_events_to_append.append(power_tp_event)
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1224,64 +1232,98 @@ class RoomCreationHandler:
             # apply those.
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
-            pl_event, pl_context = await create_event(
+            pl_event, pl_context, pl_tp_event = await create_event(
                 EventTypes.PowerLevels,
                 power_level_content,
                 True,
             )
             current_state_group = pl_context._state_group
             events_to_send.append((pl_event, pl_context))
+            if pl_tp_event:
+                third_party_events_to_append.append(pl_tp_event)
 
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
-            room_alias_event, room_alias_context = await create_event(
+            room_alias_event, room_alias_context, ra_tp_event = await create_event(
                 EventTypes.CanonicalAlias, {"alias": room_alias.to_string()}, True
             )
             current_state_group = room_alias_context._state_group
             events_to_send.append((room_alias_event, room_alias_context))
+            if ra_tp_event:
+                third_party_events_to_append.append(ra_tp_event)
 
         if (EventTypes.JoinRules, "") not in initial_state:
-            join_rules_event, join_rules_context = await create_event(
+            join_rules_event, join_rules_context, jr_tp_event = await create_event(
                 EventTypes.JoinRules,
                 {"join_rule": config["join_rules"]},
                 True,
             )
             current_state_group = join_rules_context._state_group
             events_to_send.append((join_rules_event, join_rules_context))
+            if jr_tp_event:
+                third_party_events_to_append.append(jr_tp_event)
 
         if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
-            visibility_event, visibility_context = await create_event(
+            visibility_event, visibility_context, vis_tp_event = await create_event(
                 EventTypes.RoomHistoryVisibility,
                 {"history_visibility": config["history_visibility"]},
                 True,
             )
             current_state_group = visibility_context._state_group
             events_to_send.append((visibility_event, visibility_context))
+            if vis_tp_event:
+                third_party_events_to_append.append(vis_tp_event)
 
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
-                guest_access_event, guest_access_context = await create_event(
+                (
+                    guest_access_event,
+                    guest_access_context,
+                    ga_tp_event,
+                ) = await create_event(
                     EventTypes.GuestAccess,
                     {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
                     True,
                 )
                 current_state_group = guest_access_context._state_group
                 events_to_send.append((guest_access_event, guest_access_context))
+                if ga_tp_event:
+                    third_party_events_to_append.append(ga_tp_event)
 
         for (etype, state_key), content in initial_state.items():
-            event, context = await create_event(
+            event, context, tp_event = await create_event(
                 etype, content, True, state_key=state_key
             )
             current_state_group = context._state_group
             events_to_send.append((event, context))
+            if tp_event:
+                third_party_events_to_append.append(tp_event)
 
         if config["encrypted"]:
-            encryption_event, encryption_context = await create_event(
+            encryption_event, encryption_context, encrypt_tp_event = await create_event(
                 EventTypes.RoomEncryption,
                 {"algorithm": RoomEncryptionAlgorithms.DEFAULT},
                 True,
                 state_key="",
             )
             events_to_send.append((encryption_event, encryption_context))
+            if encrypt_tp_event:
+                third_party_events_to_append.append(encrypt_tp_event)
+
+        for event_dict in third_party_events_to_append:
+            (
+                event,
+                unpersisted_context,
+                _,
+            ) = await self.event_creation_handler.create_event(
+                creator,
+                event_dict,
+                prev_event_ids=prev_event,
+                state_map=state_map,
+                for_batch=True,
+                current_state_group=current_state_group,
+            )
+            context = await unpersisted_context.persist(event)
+            events_to_send.append((event, context))
 
         last_event = await self.event_creation_handler.handle_new_client_event(
             creator,

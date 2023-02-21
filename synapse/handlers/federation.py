@@ -993,6 +993,7 @@ class FederationHandler:
             (
                 event,
                 unpersisted_context,
+                _,
             ) = await self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
@@ -1183,7 +1184,7 @@ class FederationHandler:
             },
         )
 
-        event, _ = await self.event_creation_handler.create_new_client_event(
+        event, _, _ = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
 
@@ -1236,9 +1237,10 @@ class FederationHandler:
         (
             event,
             unpersisted_context,
+            _,
         ) = await self.event_creation_handler.create_new_client_event(builder=builder)
 
-        event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
+        event_allowed, _, _ = await self.third_party_event_rules.check_event_allowed(
             event, unpersisted_context
         )
         if not event_allowed:
@@ -1413,6 +1415,7 @@ class FederationHandler:
                     (
                         event,
                         unpersisted_context,
+                        _,
                     ) = await self.event_creation_handler.create_new_client_event(
                         builder=builder
                     )
@@ -1495,6 +1498,7 @@ class FederationHandler:
                 (
                     event,
                     unpersisted_context,
+                    _,
                 ) = await self.event_creation_handler.create_new_client_event(
                     builder=builder
                 )
@@ -1577,6 +1581,7 @@ class FederationHandler:
         (
             event,
             unpersisted_context,
+            _,
         ) = await self.event_creation_handler.create_new_client_event(builder=builder)
 
         EventValidator().validate_new(event, self.config)
