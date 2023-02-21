@@ -1,0 +1,1 @@
+Upper-bound frozendict dependency. This works around us being unable to test installing our wheels against Python 3.11 in CI.
