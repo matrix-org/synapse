@@ -370,7 +370,7 @@ class ReplicationDataHandler:
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):
             logger.info(
-                "Waiting for repl stream %r to reach %s (%s)" "; currently at: %s",
+                "Waiting for repl stream %r to reach %s (%s); currently at: %s",
                 stream_name,
                 position,
                 instance_name,
