@@ -1,1 +1,0 @@
-Refactor arguments of `try_unbind_threepid` and `_try_unbind_threepid_with_id_server` to not use dictionaries.

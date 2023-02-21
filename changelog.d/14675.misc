@@ -1,1 +1,0 @@
-Add a class UnpersistedEventContext to allow for the batching up of storing state groups.
