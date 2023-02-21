@@ -31,13 +31,13 @@ from tests.test_utils import get_awaitable_result
 class _StubEventSourceStore:
     """A stub implementation of the EventSourceStore"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._store: Dict[str, EventBase] = {}
 
-    def add_event(self, event: EventBase):
+    def add_event(self, event: EventBase) -> None:
         self._store[event.event_id] = event
 
-    def add_events(self, events: Iterable[EventBase]):
+    def add_events(self, events: Iterable[EventBase]) -> None:
         for event in events:
             self._store[event.event_id] = event
 
@@ -59,7 +59,7 @@ class _StubEventSourceStore:
 
 
 class EventAuthTestCase(unittest.TestCase):
-    def test_rejected_auth_events(self):
+    def test_rejected_auth_events(self) -> None:
         """
         Events that refer to rejected events in their auth events are rejected
         """
@@ -109,7 +109,7 @@ class EventAuthTestCase(unittest.TestCase):
                 )
             )
 
-    def test_create_event_with_prev_events(self):
+    def test_create_event_with_prev_events(self) -> None:
         """A create event with prev_events should be rejected
 
         https://spec.matrix.org/v1.3/rooms/v9/#authorization-rules
@@ -150,7 +150,7 @@ class EventAuthTestCase(unittest.TestCase):
                 event_auth.check_state_independent_auth_rules(event_store, bad_event)
             )
 
-    def test_duplicate_auth_events(self):
+    def test_duplicate_auth_events(self) -> None:
         """Events with duplicate auth_events should be rejected
 
         https://spec.matrix.org/v1.3/rooms/v9/#authorization-rules
@@ -196,7 +196,7 @@ class EventAuthTestCase(unittest.TestCase):
                 event_auth.check_state_independent_auth_rules(event_store, bad_event2)
             )
 
-    def test_unexpected_auth_events(self):
+    def test_unexpected_auth_events(self) -> None:
         """Events with excess auth_events should be rejected
 
         https://spec.matrix.org/v1.3/rooms/v9/#authorization-rules
@@ -236,7 +236,7 @@ class EventAuthTestCase(unittest.TestCase):
                 event_auth.check_state_independent_auth_rules(event_store, bad_event)
             )
 
-    def test_random_users_cannot_send_state_before_first_pl(self):
+    def test_random_users_cannot_send_state_before_first_pl(self) -> None:
         """
         Check that, before the first PL lands, the creator is the only user
         that can send a state event.
@@ -263,7 +263,7 @@ class EventAuthTestCase(unittest.TestCase):
             auth_events,
         )
 
-    def test_state_default_level(self):
+    def test_state_default_level(self) -> None:
         """
         Check that users above the state_default level can send state and
         those below cannot
@@ -298,7 +298,7 @@ class EventAuthTestCase(unittest.TestCase):
             auth_events,
         )
 
-    def test_alias_event(self):
+    def test_alias_event(self) -> None:
         """Alias events have special behavior up through room version 6."""
         creator = "@creator:example.com"
         other = "@other:example.com"
@@ -333,7 +333,7 @@ class EventAuthTestCase(unittest.TestCase):
             auth_events,
         )
 
-    def test_msc2432_alias_event(self):
+    def test_msc2432_alias_event(self) -> None:
         """After MSC2432, alias events have no special behavior."""
         creator = "@creator:example.com"
         other = "@other:example.com"
@@ -366,7 +366,9 @@ class EventAuthTestCase(unittest.TestCase):
             )
 
     @parameterized.expand([(RoomVersions.V1, True), (RoomVersions.V6, False)])
-    def test_notifications(self, room_version: RoomVersion, allow_modification: bool):
+    def test_notifications(
+        self, room_version: RoomVersion, allow_modification: bool
+    ) -> None:
         """
         Notifications power levels get checked due to MSC2209.
         """
@@ -395,7 +397,7 @@ class EventAuthTestCase(unittest.TestCase):
             with self.assertRaises(AuthError):
                 event_auth.check_state_dependent_auth_rules(pl_event, auth_events)
 
-    def test_join_rules_public(self):
+    def test_join_rules_public(self) -> None:
         """
         Test joining a public room.
         """
@@ -460,7 +462,7 @@ class EventAuthTestCase(unittest.TestCase):
             auth_events.values(),
         )
 
-    def test_join_rules_invite(self):
+    def test_join_rules_invite(self) -> None:
         """
         Test joining an invite only room.
         """
@@ -835,7 +837,7 @@ def _power_levels_event(
     )
 
 
-def _alias_event(room_version: RoomVersion, sender: str, **kwargs) -> EventBase:
+def _alias_event(room_version: RoomVersion, sender: str, **kwargs: Any) -> EventBase:
     data = {
         "room_id": TEST_ROOM_ID,
         **_maybe_get_event_id_dict_for_room_version(room_version),

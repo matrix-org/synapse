@@ -296,3 +296,30 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(args[0][0]["user_agent"], "user_agent")
         self.assertGreater(args[0][0]["last_seen"], 0)
         self.assertNotIn("access_token", args[0][0])
+
+    def test_account_data(self) -> None:
+        """Tests that user account data get exported."""
+        # add account data
+        self.get_success(
+            self._store.add_account_data_for_user(self.user2, "m.global", {"a": 1})
+        )
+        self.get_success(
+            self._store.add_account_data_to_room(
+                self.user2, "test_room", "m.per_room", {"b": 2}
+            )
+        )
+
+        writer = Mock()
+
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
+
+        # two calls, one call for user data and one call for room data
+        writer.write_account_data.assert_called()
+
+        args = writer.write_account_data.call_args_list[0][0]
+        self.assertEqual(args[0], "global")
+        self.assertEqual(args[1]["m.global"]["a"], 1)
+
+        args = writer.write_account_data.call_args_list[1][0]
+        self.assertEqual(args[0], "test_room")
+        self.assertEqual(args[1]["m.per_room"]["b"], 2)

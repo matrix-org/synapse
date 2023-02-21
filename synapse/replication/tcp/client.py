@@ -370,15 +370,23 @@ class ReplicationDataHandler:
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):
             logger.info(
-                "Waiting for repl stream %r to reach %s (%s)",
+                "Waiting for repl stream %r to reach %s (%s); currently at: %s",
                 stream_name,
                 position,
                 instance_name,
+                current_position,
             )
             try:
                 await make_deferred_yieldable(deferred)
             except defer.TimeoutError:
-                logger.error("Timed out waiting for stream %s", stream_name)
+                logger.error(
+                    "Timed out waiting for repl stream %r to reach %s (%s)"
+                    "; currently at: %s",
+                    stream_name,
+                    position,
+                    instance_name,
+                    self._streams[stream_name].current_token(instance_name),
+                )
                 return
 
             logger.info(

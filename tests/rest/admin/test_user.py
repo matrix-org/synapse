@@ -2913,7 +2913,8 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         other_user_tok = self.login("user", "pass")
         event_builder_factory = self.hs.get_event_builder_factory()
         event_creation_handler = self.hs.get_event_creation_handler()
-        storage_controllers = self.hs.get_storage_controllers()
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
 
         # Create two rooms, one with a local user only and one with both a local
         # and remote user.
@@ -2934,11 +2935,13 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(storage_controllers.persistence.persist_event(event, context))
+        context = self.get_success(unpersisted_context.persist(event))
+
+        self.get_success(persistence.persist_event(event, context))
 
         # Now get rooms
         url = "/_synapse/admin/v1/users/@joiner:remote_hs/joined_rooms"

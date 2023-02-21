@@ -30,7 +30,7 @@ from twisted.internet.interfaces import (
     IOpenSSLClientConnectionCreator,
     IProtocolFactory,
 )
-from twisted.internet.protocol import Factory
+from twisted.internet.protocol import Factory, Protocol
 from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web._newclient import ResponseNeverReceived
 from twisted.web.client import Agent
@@ -63,7 +63,7 @@ from tests.http import (
     get_test_ca_cert_file,
 )
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
-from tests.utils import default_config
+from tests.utils import checked_cast, default_config
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +146,10 @@ class MatrixFederationAgentTests(unittest.TestCase):
         #
         # Normally this would be done by the TCP socket code in Twisted, but we are
         # stubbing that out here.
-        client_protocol = client_factory.buildProtocol(dummy_address)
-        assert isinstance(client_protocol, _WrappingProtocol)
+        # NB: we use a checked_cast here to workaround https://github.com/Shoobx/mypy-zope/issues/91)
+        client_protocol = checked_cast(
+            _WrappingProtocol, client_factory.buildProtocol(dummy_address)
+        )
         client_protocol.makeConnection(
             FakeTransport(server_protocol, self.reactor, client_protocol)
         )
@@ -446,7 +448,6 @@ class MatrixFederationAgentTests(unittest.TestCase):
         server_ssl_protocol = _wrap_server_factory_for_tls(
             _get_test_protocol_factory()
         ).buildProtocol(dummy_address)
-        assert isinstance(server_ssl_protocol, TLSMemoryBIOProtocol)
 
         # Tell the HTTP server to send outgoing traffic back via the proxy's transport.
         proxy_server_transport = proxy_server.transport
@@ -465,7 +466,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         else:
             assert isinstance(proxy_server_transport, FakeTransport)
             client_protocol = proxy_server_transport.other
-            c2s_transport = client_protocol.transport
+            assert isinstance(client_protocol, Protocol)
+            c2s_transport = checked_cast(FakeTransport, client_protocol.transport)
             c2s_transport.other = server_ssl_protocol
 
         self.reactor.advance(0)
@@ -1529,7 +1531,7 @@ def _check_logcontext(context: LoggingContextOrSentinel) -> None:
 
 def _wrap_server_factory_for_tls(
     factory: IProtocolFactory, sanlist: Optional[List[bytes]] = None
-) -> IProtocolFactory:
+) -> TLSMemoryBIOFactory:
     """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
     The resultant factory will create a TLS server which presents a certificate
     signed by our test CA, valid for the domains in `sanlist`

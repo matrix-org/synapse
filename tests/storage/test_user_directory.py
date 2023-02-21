@@ -25,6 +25,11 @@ from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.background_updates import _BackgroundUpdateHandler
+from synapse.storage.databases.main import user_directory
+from synapse.storage.databases.main.user_directory import (
+    _parse_words_with_icu,
+    _parse_words_with_regex,
+)
 from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
@@ -42,7 +47,7 @@ ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
 # The localpart isn't 'Bela' on purpose so we can test looking up display names.
-BELA = "@somenickname:a"
+BELA = "@somenickname:example.org"
 
 
 class GetUserDirectoryTables:
@@ -423,6 +428,8 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
+    use_icu = False
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
@@ -433,6 +440,12 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         self.get_success(self.store.update_profile_in_user_dir(BOBBY, "bobby", None))
         self.get_success(self.store.update_profile_in_user_dir(BELA, "Bela", None))
         self.get_success(self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB)))
+
+        self._restore_use_icu = user_directory.USE_ICU
+        user_directory.USE_ICU = self.use_icu
+
+    def tearDown(self) -> None:
+        user_directory.USE_ICU = self._restore_use_icu
 
     def test_search_user_dir(self) -> None:
         # normally when alice searches the directory she should just find
@@ -478,6 +491,26 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
             {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
         )
 
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_start_of_user_id(self) -> None:
+        """Tests that a user can look up another user by searching for the start
+        of their user ID.
+        """
+        r = self.get_success(self.store.search_user_dir(ALICE, "somenickname:exa", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
+        )
+
+
+class UserDirectoryStoreTestCaseWithIcu(UserDirectoryStoreTestCase):
+    use_icu = True
+
+    if not icu:
+        skip = "Requires PyICU"
+
 
 class UserDirectoryICUTestCase(HomeserverTestCase):
     if not icu:
@@ -512,4 +545,32 @@ class UserDirectoryICUTestCase(HomeserverTestCase):
         self.assertDictEqual(
             r["results"][0],
             {"user_id": ALICE, "display_name": display_name, "avatar_url": None},
+        )
+
+    def test_icu_word_boundary_punctuation(self) -> None:
+        """
+        Tests the behaviour of punctuation with the ICU tokeniser.
+
+        Seems to depend on underlying version of ICU.
+        """
+
+        # Note: either tokenisation is fine, because Postgres actually splits
+        # words itself afterwards.
+        self.assertIn(
+            _parse_words_with_icu("lazy'fox jumped:over the.dog"),
+            (
+                # ICU 66 on Ubuntu 20.04
+                ["lazy'fox", "jumped", "over", "the", "dog"],
+                # ICU 70 on Ubuntu 22.04
+                ["lazy'fox", "jumped:over", "the.dog"],
+            ),
+        )
+
+    def test_regex_word_boundary_punctuation(self) -> None:
+        """
+        Tests the behaviour of punctuation with the non-ICU tokeniser
+        """
+        self.assertEqual(
+            _parse_words_with_regex("lazy'fox jumped:over the.dog"),
+            ["lazy", "fox", "jumped", "over", "the", "dog"],
         )
