@@ -1,0 +1,1 @@
+Add a new third party callback `check_event_allowed_v2` that is compatible with new batch persisting mechanisms.
