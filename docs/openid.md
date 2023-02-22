@@ -595,7 +595,8 @@ Note that the fields `client_id` and `client_secret` are taken from the CURL res
 [Shibboleth](https://www.shibboleth.net/) is an open Standard IdP solution widely used by Universities.
 
 1. Shibboleth needs the [OIDC Plugin](https://shibboleth.atlassian.net/wiki/spaces/IDPPLUGINS/pages/1376878976/OIDC+OP) installed and working correctly.
-2. Create a new config for the new endpoint on IDP Side:
+2. Create a new config on the IdP Side, ensure that the `client_id` and `client_secret`
+   are randomly generated data.
 ```json
 {
     "client_id": "SOME-CLIENT-ID",
