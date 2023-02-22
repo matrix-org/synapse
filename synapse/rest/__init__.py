@@ -140,7 +140,7 @@ class ClientRestResource(JsonResource):
         relations.register_servlets(hs, client_resource)
         if is_main_process:
             password_policy.register_servlets(hs, client_resource)
-            knock.register_servlets(hs, client_resource)
+        knock.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
         if is_main_process:

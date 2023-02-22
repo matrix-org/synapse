@@ -926,7 +926,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server: HttpServer) -> None:
-        # /rooms/$roomid/[invite|join|leave]
+        # /rooms/$roomid/[join|invite|leave|ban|unban|kick]
         PATTERNS = (
             "/rooms/(?P<room_id>[^/]*)/"
             "(?P<membership_action>join|invite|leave|ban|unban|kick)"
