@@ -264,7 +264,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             groups, self._state_group_cache, state_filter=non_member_filter
         )
 
-        (member_state, incomplete_groups_m,) = self._get_state_for_groups_using_cache(
+        (
+            member_state,
+            incomplete_groups_m,
+        ) = self._get_state_for_groups_using_cache(
             groups, self._state_group_members_cache, state_filter=member_filter
         )
 

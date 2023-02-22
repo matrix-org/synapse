@@ -97,7 +97,6 @@ class AuthRestServlet(RestServlet):
         return None
 
     async def on_POST(self, request: Request, stagetype: str) -> None:
-
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")

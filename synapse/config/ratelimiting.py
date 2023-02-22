@@ -46,7 +46,6 @@ class RatelimitConfig(Config):
     section = "ratelimiting"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-
         # Load the new-style messages config if it exists. Otherwise fall back
         # to the old method.
         if "rc_message" in config:

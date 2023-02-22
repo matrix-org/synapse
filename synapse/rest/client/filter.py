@@ -79,7 +79,6 @@ class CreateFilterRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
 

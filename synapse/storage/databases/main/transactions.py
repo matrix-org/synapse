@@ -573,7 +573,6 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         def get_destination_rooms_paginate_txn(
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
-
             if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:

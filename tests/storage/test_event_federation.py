@@ -672,7 +672,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         complete_event_dict_map: Dict[str, JsonDict] = {}
         stream_ordering = 0
-        for (event_id, prev_event_ids) in event_graph.items():
+        for event_id, prev_event_ids in event_graph.items():
             depth = depth_map[event_id]
 
             complete_event_dict_map[event_id] = {

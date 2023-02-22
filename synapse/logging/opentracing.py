@@ -524,6 +524,7 @@ def whitelisted_homeserver(destination: str) -> bool:
 
 # Start spans and scopes
 
+
 # Could use kwargs but I want these to be explicit
 def start_active_span(
     operation_name: str,

@@ -563,7 +563,7 @@ def _apply_module_schemas(
     """
     # This is the old way for password_auth_provider modules to make changes
     # to the database. This should instead be done using the module API
-    for (mod, _config) in config.authproviders.password_providers:
+    for mod, _config in config.authproviders.password_providers:
         if not hasattr(mod, "get_db_schema_files"):
             continue
         modname = ".".join((mod.__module__, mod.__name__))
@@ -591,7 +591,7 @@ def _apply_module_schema_files(
         (modname,),
     )
     applied_deltas = {d for d, in cur}
-    for (name, stream) in names_and_streams:
+    for name, stream in names_and_streams:
         if name in applied_deltas:
             continue
 

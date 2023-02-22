@@ -29,7 +29,6 @@ _Repr = Callable[[], str]
 def recursive_repr(fillvalue: str = ...) -> Callable[[_Repr], _Repr]: ...
 
 class SortedList(MutableSequence[_T]):
-
     DEFAULT_LOAD_FACTOR: int = ...
     def __init__(
         self,

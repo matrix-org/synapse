@@ -98,7 +98,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     async def _populate_user_directory_createtables(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-
         # Get all the rooms that we want to process.
         def _make_staging_area(txn: LoggingTransaction) -> None:
             sql = (

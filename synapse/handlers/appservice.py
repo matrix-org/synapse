@@ -737,7 +737,7 @@ class ApplicationServicesHandler:
         )
 
         ret = []
-        for (success, result) in results:
+        for success, result in results:
             if success:
                 ret.extend(result)
 

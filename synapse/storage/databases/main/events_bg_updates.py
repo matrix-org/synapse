@@ -709,7 +709,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             nbrows = 0
             last_row_event_id = ""
-            for (event_id, event_json_raw) in results:
+            for event_id, event_json_raw in results:
                 try:
                     event_json = db_to_json(event_json_raw)
 
@@ -1167,7 +1167,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             results = list(txn)
             # (event_id, parent_id, rel_type) for each relation
             relations_to_insert: List[Tuple[str, str, str]] = []
-            for (event_id, event_json_raw) in results:
+            for event_id, event_json_raw in results:
                 try:
                     event_json = db_to_json(event_json_raw)
                 except Exception as e:

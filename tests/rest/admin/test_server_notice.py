@@ -28,7 +28,6 @@ from tests.unittest import override_config
 
 
 class ServerNoticeTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,

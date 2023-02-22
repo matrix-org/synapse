@@ -25,7 +25,6 @@ PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
-
     user_id = "@apple:test"
     hijack_auth = True
     EXAMPLE_FILTER = {"room": {"timeline": {"types": ["m.room.message"]}}}

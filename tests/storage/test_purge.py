@@ -23,7 +23,6 @@ from tests.unittest import HomeserverTestCase
 
 
 class PurgeTests(HomeserverTestCase):
-
     user_id = "@red:server"
     servlets = [room.register_servlets]
 

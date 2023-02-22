@@ -868,9 +868,11 @@ class RoomCreationHandler:
         )
 
         # Check whether this visibility value is blocked by a third party module
-        allowed_by_third_party_rules = await (
-            self.third_party_event_rules.check_visibility_can_be_modified(
-                room_id, visibility
+        allowed_by_third_party_rules = (
+            await (
+                self.third_party_event_rules.check_visibility_can_be_modified(
+                    room_id, visibility
+                )
             )
         )
         if not allowed_by_third_party_rules:
