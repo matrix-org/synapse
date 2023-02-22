@@ -1105,7 +1105,7 @@ This setting should only be used in very specific cases, such as
 federation over Tor hidden services and similar. For private networks
 of homeservers, you likely want to use a private CA instead.
 
-Only effective if `federation_verify_certicates` is `true`.
+Only effective if `federation_verify_certificates` is `true`.
 
 Example configuration:
 ```yaml
