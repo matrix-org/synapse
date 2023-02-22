@@ -253,9 +253,7 @@ _First introduced in Synapse v1.56.0_
 
 **<span style="color:red">
 This callback is deprecated in favour of the `on_add_user_third_party_identifier` callback, which
-features nearly the same functionality. The only difference is that while `on_threepid_bind`
-was called *after* a third-party ID was associated with a user's account on the homeserver,
-`on_add_user_third_party_identifier` is called just *before* a third-party ID is associated.
+features the same functionality. The only difference is in name.
 </span>**
 
 ```python
@@ -274,13 +272,13 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `on_add_user_third_party_identifier`
 
-_First introduced in Synapse v1.78.0_
+_First introduced in Synapse v1.79.0_
 
 ```python
 async def on_add_user_third_party_identifier(user_id: str, medium: str, address: str) -> None:
 ```
 
-Called just before creating an association between a user and a third-party identifier
+Called after successfully creating an association between a user and a third-party identifier
 (email address, phone number). The module is given the Matrix ID of the user the
 association is for, as well as the medium (`email` or `msisdn`) and address of the
 third-party identifier (i.e. an email address).
@@ -293,13 +291,13 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `on_remove_user_third_party_identifier`
 
-_First introduced in Synapse v1.78.0_
+_First introduced in Synapse v1.79.0_
 
 ```python
 async def on_remove_user_third_party_identifier(user_id: str, medium: str, address: str) -> None:
 ```
 
-Called just before removing an association between a user and a third-party identifier
+Called after successfully removing an association between a user and a third-party identifier
 (email address, phone number). The module is given the Matrix ID of the user the
 association is for, as well as the medium (`email` or `msisdn`) and address of the
 third-party identifier (i.e. an email address).

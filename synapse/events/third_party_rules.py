@@ -552,10 +552,10 @@ class ThirdPartyEventRules:
         self, user_id: str, medium: str, address: str
     ) -> None:
         """Called when an association between a user's Matrix ID and a third-party ID
-        (email, phone number) is about to be registered on the homeserver.
+        (email, phone number) has successfully been registered on the homeserver.
 
         Args:
-            user_id: The User ID to include in the association.
+            user_id: The User ID included in the association.
             medium: The medium of the third-party ID (email, msisdn).
             address: The address of the third-party ID (i.e. an email address).
         """
@@ -571,12 +571,13 @@ class ThirdPartyEventRules:
         self, user_id: str, medium: str, address: str
     ) -> None:
         """Called when an association between a user's Matrix ID and a third-party ID
-        (email, phone number) is about to be removed on the homeserver. This is called
-        *after* any known bindings on identity servers for this association have been
-        removed.
+        (email, phone number) has been successfully removed on the homeserver.
+
+        This is called *after* any known bindings on identity servers for this
+        association have been removed.
 
         Args:
-            user_id: The User ID including in the association to remove.
+            user_id: The User ID included in the removed association.
             medium: The medium of the third-party ID (email, msisdn).
             address: The address of the third-party ID (i.e. an email address).
         """

@@ -1574,22 +1574,14 @@ class AuthHandler:
         if medium == "email":
             address = canonicalise_email(address)
 
-        # Inform Synapse modules that a 3PID association is about to be created.
+        await self.store.user_add_threepid(
+            user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
+        )
+
+        # Inform Synapse modules that a 3PID association has been created.
         await self._third_party_rules.on_add_user_third_party_identifier(
             user_id, medium, address
         )
-
-        try:
-            await self.store.user_add_threepid(
-                user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
-            )
-        except Exception:
-            # We failed to store the association, but told Synapse modules otherwise.
-            # Tell them that the association was deleted.
-            await self._third_party_rules.on_remove_user_third_party_identifier(
-                user_id, medium, address
-            )
-            raise
 
         # Deprecated method for informing Synapse modules that a 3PID association
         # has successfully been created.
@@ -1613,20 +1605,12 @@ class AuthHandler:
         if medium == "email":
             address = canonicalise_email(address)
 
-        # Inform Synapse modules that a 3PID association is about to be deleted.
+        await self.store.user_delete_threepid(user_id, medium, address)
+
+        # Inform Synapse modules that a 3PID association has been deleted.
         await self._third_party_rules.on_remove_user_third_party_identifier(
             user_id, medium, address
         )
-
-        try:
-            await self.store.user_delete_threepid(user_id, medium, address)
-        except Exception:
-            # We failed to store the association, but told Synapse modules otherwise.
-            # Tell them that the association has come back.
-            await self._third_party_rules.on_add_user_third_party_identifier(
-                user_id, medium, address
-            )
-            raise
 
         if medium == "email":
             await self.store.delete_pusher_by_app_id_pushkey_user_id(
