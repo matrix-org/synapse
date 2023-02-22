@@ -555,16 +555,15 @@ oidc_providers:
 
 1. Shibboleth needs the [OIDC Plugin](https://shibboleth.atlassian.net/wiki/spaces/IDPPLUGINS/pages/1376878976/OIDC+OP) installed and working correctly.
 2. Create a new config for the new endpoint on IDP Side:
-```yaml
+```json
 {
-        "client_id": "SOME-CLIENT-ID",
-        "client_secret": "SOME-SUPER-SECRET-SECRET",
-        "response_types": ["code"],
-        "grant_types": ["authorization_code"],
-        "scope": "openid profile email",
-        "redirect_uris": ["https://[synapse public baseurl]/_synapse/client/oidc/callback"]
+    "client_id": "SOME-CLIENT-ID",
+    "client_secret": "SOME-SUPER-SECRET-SECRET",
+    "response_types": ["code"],
+    "grant_types": ["authorization_code"],
+    "scope": "openid profile email",
+    "redirect_uris": ["https://[synapse public baseurl]/_synapse/client/oidc/callback"]
 }
-```
 
 Synapse config:
 ```yaml
