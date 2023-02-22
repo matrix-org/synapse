@@ -50,12 +50,14 @@ class ReceiptTestCase(HomeserverTestCase):
         self.otherRequester = create_requester(self.otherUser)
 
         # Create a test room
-        info, _ = self.get_success(self.room_creator.create_room(self.ourRequester, {}))
-        self.room_id1 = info["room_id"]
+        self.room_id1, _, _ = self.get_success(
+            self.room_creator.create_room(self.ourRequester, {})
+        )
 
         # Create a second test room
-        info, _ = self.get_success(self.room_creator.create_room(self.ourRequester, {}))
-        self.room_id2 = info["room_id"]
+        self.room_id2, _, _ = self.get_success(
+            self.room_creator.create_room(self.ourRequester, {})
+        )
 
         # Join the second user to the first room
         memberEvent, memberEventContext = self.get_success(

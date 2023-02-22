@@ -177,6 +177,7 @@ KNOWN_RESOURCES = {
     "client",
     "consent",
     "federation",
+    "health",
     "keys",
     "media",
     "metrics",

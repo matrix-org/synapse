@@ -146,6 +146,9 @@ Note that this callback is called when the event has already been processed and 
 into the room, which means this callback cannot be used to deny persisting the event. To
 deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#check_event_for_spam) instead.
 
+For any given event, this callback will be called on every worker process, even if that worker will not end up
+acting on that event. This callback will not be called for events that are marked as rejected.
+
 If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `check_can_shutdown_room`
