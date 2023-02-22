@@ -631,8 +631,6 @@ oidc_providers:
         email_template: "{{ user.email }}"
 ```
 
-Hint: In my case using a URL like https://myawesomeservice.org as Client_ID lead to an error, so maybe better use something else with fewer special chars.
-
 ### Twitch
 
 1. Setup a developer account on [Twitch](https://dev.twitch.tv/)
