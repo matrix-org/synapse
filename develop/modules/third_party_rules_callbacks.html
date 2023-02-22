@@ -253,6 +253,8 @@ it will be included in this state.</p>
 <p>Note that this callback is called when the event has already been processed and stored
 into the room, which means this callback cannot be used to deny persisting the event. To
 deny an incoming event, see <a href="spam_checker_callbacks.html#check_event_for_spam"><code>check_event_for_spam</code></a> instead.</p>
+<p>For any given event, this callback will be called on every worker process, even if that worker will not end up
+acting on that event. This callback will not be called for events that are marked as rejected.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h3 id="check_can_shutdown_room"><a class="header" href="#check_can_shutdown_room"><code>check_can_shutdown_room</code></a></h3>
 <p><em>First introduced in Synapse v1.55.0</em></p>
