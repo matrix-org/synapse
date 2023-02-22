@@ -1,1 +1,0 @@
-Add a schema dump symlinks inside `contrib`, to make it easier for IDEs to interrogate Synapse's database schema.

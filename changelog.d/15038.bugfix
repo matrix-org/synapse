@@ -1,1 +1,0 @@
-Fix a long-standing bug where the room aliases returned could be corrupted.
