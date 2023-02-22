@@ -83,8 +83,8 @@ output-directory
 
 The `media_ids` folder contains only the metadata of the media, not the media itself.
 Furthermore, only the `media_ids` that Synapse manages itself are exported.
-If another media repository (eg. [matrix-media-repo](https://github.com/turt2live/matrix-media-repo))
-is used, the data must be exported at this one.
+If another media repository (e.g. [matrix-media-repo](https://github.com/turt2live/matrix-media-repo))
+is used, the data must be exported separately.
 
 With the `media_ids` the media files can be downloaded.
 Media that have been sent in encrypted rooms are only retrieved in encrypted form.
