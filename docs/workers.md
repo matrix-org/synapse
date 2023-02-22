@@ -160,7 +160,18 @@ recommend the use of `systemd` where available: for information on setting up
 [Systemd with Workers](systemd-with-workers/). To use `synctl`, see
 [Using synctl with Workers](synctl_workers.md).
 
+## Start Synapse with Poetry
 
+The following applies to Synapse installations that have been installed from source using `poetry`.
+
+You can start the main Synapse process with Poetry by running the following command:
+```console
+poetry run synapse_homeserver -c [your homeserver.yaml]
+```
+For worker setups, you can run the following command
+```console
+poetry run synapse_worker -c [your worker.yaml]
+```
 ## Available worker applications
 
 ### `synapse.app.generic_worker`

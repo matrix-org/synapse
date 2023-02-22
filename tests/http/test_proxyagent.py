@@ -28,7 +28,7 @@ from twisted.internet.endpoints import (
     _WrappingProtocol,
 )
 from twisted.internet.interfaces import IProtocol, IProtocolFactory
-from twisted.internet.protocol import Factory
+from twisted.internet.protocol import Factory, Protocol
 from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.http import HTTPChannel
 
@@ -644,7 +644,8 @@ class MatrixFederationAgentTests(TestCase):
         else:
             assert isinstance(proxy_server_transport, FakeTransport)
             client_protocol = proxy_server_transport.other
-            c2s_transport = client_protocol.transport
+            assert isinstance(client_protocol, Protocol)
+            c2s_transport = checked_cast(FakeTransport, client_protocol.transport)
             c2s_transport.other = server_ssl_protocol
 
         self.reactor.advance(0)

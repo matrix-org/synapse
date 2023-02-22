@@ -918,11 +918,19 @@ def _parse_query_postgres(search_term: str) -> Tuple[str, str, str]:
     We use this so that we can add prefix matching, which isn't something
     that is supported by default.
     """
-    results = _parse_words(search_term)
+    escaped_words = []
+    for word in _parse_words(search_term):
+        # Postgres tsvector and tsquery quoting rules:
+        # words potentially containing punctuation should be quoted
+        # and then existing quotes and backslashes should be doubled
+        # See: https://www.postgresql.org/docs/current/datatype-textsearch.html#DATATYPE-TSQUERY
 
-    both = " & ".join("(%s:* | %s)" % (result, result) for result in results)
-    exact = " & ".join("%s" % (result,) for result in results)
-    prefix = " & ".join("%s:*" % (result,) for result in results)
+        quoted_word = word.replace("'", "''").replace("\\", "\\\\")
+        escaped_words.append(f"'{quoted_word}'")
+
+    both = " & ".join("(%s:* | %s)" % (word, word) for word in escaped_words)
+    exact = " & ".join("%s" % (word,) for word in escaped_words)
+    prefix = " & ".join("%s:*" % (word,) for word in escaped_words)
 
     return both, exact, prefix
 
@@ -944,6 +952,14 @@ def _parse_words(search_term: str) -> List[str]:
     if USE_ICU:
         return _parse_words_with_icu(search_term)
 
+    return _parse_words_with_regex(search_term)
+
+
+def _parse_words_with_regex(search_term: str) -> List[str]:
+    """
+    Break down search term into words, when we don't have ICU available.
+    See: `_parse_words`
+    """
     return re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
 

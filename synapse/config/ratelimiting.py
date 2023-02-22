@@ -87,9 +87,18 @@ class RatelimitConfig(Config):
             defaults={"per_second": 0.1, "burst_count": 5},
         )
 
+        # It is reasonable to login with a bunch of devices at once (i.e. when
+        # setting up an account), but it is *not* valid to continually be
+        # logging into new devices.
         rc_login_config = config.get("rc_login", {})
-        self.rc_login_address = RatelimitSettings(rc_login_config.get("address", {}))
-        self.rc_login_account = RatelimitSettings(rc_login_config.get("account", {}))
+        self.rc_login_address = RatelimitSettings(
+            rc_login_config.get("address", {}),
+            defaults={"per_second": 0.003, "burst_count": 5},
+        )
+        self.rc_login_account = RatelimitSettings(
+            rc_login_config.get("account", {}),
+            defaults={"per_second": 0.003, "burst_count": 5},
+        )
         self.rc_login_failed_attempts = RatelimitSettings(
             rc_login_config.get("failed_attempts", {})
         )

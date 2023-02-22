@@ -1708,7 +1708,7 @@ files = [
 cffi = ">=1.4.1"
 
 [package.extras]
-docs = ["sphinx (>=1.6.5)", "sphinx_rtd_theme"]
+docs = ["sphinx (>=1.6.5)", "sphinx-rtd-theme"]
 tests = ["hypothesis (>=3.27.0)", "pytest (>=3.2.1,!=3.3.0)"]
 
 [[package]]
@@ -2548,14 +2548,14 @@ files = [
 
 [[package]]
 name = "types-bleach"
-version = "5.0.3.1"
+version = "6.0.0.0"
 description = "Typing stubs for bleach"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-bleach-5.0.3.1.tar.gz", hash = "sha256:ce8772ea5126dab1883851b41e3aeff229aa5213ced36096990344e632e92373"},
-    {file = "types_bleach-5.0.3.1-py3-none-any.whl", hash = "sha256:af5f1b3a54ff279f54c29eccb2e6988ebb6718bc4061469588a5fd4880a79287"},
+    {file = "types-bleach-6.0.0.0.tar.gz", hash = "sha256:770ce9c7ea6173743ef1a4a70f2619bb1819bf53c7cd0336d939af93f488fbe2"},
+    {file = "types_bleach-6.0.0.0-py3-none-any.whl", hash = "sha256:75f55f035837c5fce2cd0bd5162a2a90057680a89c9275588a5c12f5f597a14a"},
 ]
 
 [[package]]
@@ -2624,14 +2624,14 @@ files = [
 
 [[package]]
 name = "types-jsonschema"
-version = "4.17.0.3"
+version = "4.17.0.5"
 description = "Typing stubs for jsonschema"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-jsonschema-4.17.0.3.tar.gz", hash = "sha256:746aa466ffed9a1acc7bdbd0ac0b5e068f00be2ee008c1d1e14b0944a8c8b24b"},
-    {file = "types_jsonschema-4.17.0.3-py3-none-any.whl", hash = "sha256:c8d5b26b7c8da6a48d7fb1ce029b97e0ff6e74db3727efb968c69f39ad013685"},
+    {file = "types-jsonschema-4.17.0.5.tar.gz", hash = "sha256:7adc7bfca4afe291de0c93eca9367aa72a4fbe8ce87fe15642c600ad97d45dd6"},
+    {file = "types_jsonschema-4.17.0.5-py3-none-any.whl", hash = "sha256:79ac8a7763fe728947af90a24168b91621edf7e8425bf3670abd4ea0d4758fba"},
 ]
 
 [[package]]
@@ -2648,14 +2648,14 @@ files = [
 
 [[package]]
 name = "types-pillow"
-version = "9.4.0.10"
+version = "9.4.0.13"
 description = "Typing stubs for Pillow"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-Pillow-9.4.0.10.tar.gz", hash = "sha256:341c2345610bba452d1724757c7b997a60f593cf003c101ba239db003a0ae389"},
-    {file = "types_Pillow-9.4.0.10-py3-none-any.whl", hash = "sha256:302ce81cfb61aacc8983a3a2ec682cbef66522a2fe8e640f648ac2e3d6f6af53"},
+    {file = "types-Pillow-9.4.0.13.tar.gz", hash = "sha256:4510aa98a28947bf63f2b29edebbd11b7cff8647d90b867cec9b3674c0a8c321"},
+    {file = "types_Pillow-9.4.0.13-py3-none-any.whl", hash = "sha256:14a8a19021b8fe569a9fef9edc64a8d8a4aef340e38669d4fb3dc05cfd941130"},
 ]
 
 [[package]]
@@ -2714,14 +2714,14 @@ types-urllib3 = "<1.27"
 
 [[package]]
 name = "types-setuptools"
-version = "67.1.0.0"
+version = "67.3.0.1"
 description = "Typing stubs for setuptools"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-setuptools-67.1.0.0.tar.gz", hash = "sha256:162a39d22e3a5eb802197c84f16b19e798101bbd33d9437837fbb45627da5627"},
-    {file = "types_setuptools-67.1.0.0-py3-none-any.whl", hash = "sha256:5bd7a10d93e468bfcb10d24cb8ea5e12ac4f4ac91267293959001f1448cf0619"},
+    {file = "types-setuptools-67.3.0.1.tar.gz", hash = "sha256:1a26d373036c720e566823b6edd664a2db4d138b6eeba856721ec1254203474f"},
+    {file = "types_setuptools-67.3.0.1-py3-none-any.whl", hash = "sha256:a7e0f0816b5b449f5bcdc0efa43da91ff81dbe6941f293a6490d68a450e130a1"},
 ]
 
 [package.dependencies]
@@ -3030,4 +3030,4 @@ user-search = ["pyicu"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7.1"
-content-hash = "95cb043fa56e1e3275ba7f74b68b2191bd5886eea3e06b8cd370d7fc9fea3c07"
+content-hash = "e12077711e5ff83f3c6038ea44c37bd49773799ec8245035b01094b7800c5c92"
