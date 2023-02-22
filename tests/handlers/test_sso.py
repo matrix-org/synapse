@@ -113,7 +113,6 @@ async def mock_get_file(
     headers: Optional[RawHeaders] = None,
     is_allowed_content_type: Optional[Callable[[str], bool]] = None,
 ) -> Tuple[int, Dict[bytes, List[bytes]], str, int]:
-
     fake_response = FakeResponse(code=404)
     if url == "http://my.server/me.png":
         fake_response = FakeResponse(

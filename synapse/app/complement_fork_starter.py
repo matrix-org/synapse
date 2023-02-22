@@ -219,7 +219,7 @@ def main() -> None:
     # memory space and don't need to repeat the work of loading the code!
     # Instead of using fork() directly, we use the multiprocessing library,
     # which uses fork() on Unix platforms.
-    for (func, worker_args) in zip(worker_functions, args_by_worker):
+    for func, worker_args in zip(worker_functions, args_by_worker):
         process = multiprocessing.Process(
             target=_worker_entrypoint, args=(func, proxy_reactor, worker_args)
         )

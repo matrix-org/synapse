@@ -330,7 +330,6 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
-
         if (
             not event.internal_metadata.is_notifiable()
             or event.internal_metadata.is_historical()

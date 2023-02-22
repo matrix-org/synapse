@@ -24,7 +24,6 @@ from tests.test_utils import make_awaitable
 
 
 class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
@@ -37,7 +36,6 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         return config
 
     def test_complexity_simple(self) -> None:
-
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
 
@@ -71,7 +69,6 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(complexity, 1.23)
 
     def test_join_too_large(self) -> None:
-
         u1 = self.register_user("u1", "pass")
 
         handler = self.hs.get_room_member_handler()
@@ -131,7 +128,6 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def test_join_too_large_once_joined(self) -> None:
-
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
 

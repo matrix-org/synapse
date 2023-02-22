@@ -1205,7 +1205,6 @@ class CursesProgress(Progress):
         if self.finished:
             status = "Time spent: %s (Done!)" % (duration_str,)
         else:
-
             if self.total_processed > 0:
                 left = float(self.total_remaining) / self.total_processed
 
