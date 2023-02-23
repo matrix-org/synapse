@@ -19,10 +19,10 @@ from prometheus_client import Counter, Histogram
 
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable
-from synapse.replication.tcp.redis.connection import IRedisConnection
 from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
+    from synapse.replication.tcp.redis.connection import IRedisConnection
     from synapse.server import HomeServer
 
 set_counter = Counter(
