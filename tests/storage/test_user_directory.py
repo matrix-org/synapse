@@ -504,6 +504,86 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
             {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
         )
 
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_ascii_case_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name in a
+        different case.
+        """
+        CHARLIE = "@someuser:example.org"
+        self.get_success(
+            self.store.update_profile_in_user_dir(CHARLIE, "Charlie", None)
+        )
+
+        r = self.get_success(self.store.search_user_dir(ALICE, "cHARLIE", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": CHARLIE, "display_name": "Charlie", "avatar_url": None},
+        )
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_unicode_case_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name in a
+        different case.
+        """
+        IVAN = "@someuser:example.org"
+        self.get_success(self.store.update_profile_in_user_dir(IVAN, "Иван", None))
+
+        r = self.get_success(self.store.search_user_dir(ALICE, "иВАН", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": IVAN, "display_name": "Иван", "avatar_url": None},
+        )
+
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_dotted_dotless_i_case_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name in a
+        different case, when their name contains dotted or dotless "i"s.
+
+        Some languages have dotted and dotless versions of "i", which are considered to
+        be different letters: i <-> İ, ı <-> I. To make things difficult, they reuse the
+        ASCII "i" and "I" characters, despite having different lowercase / uppercase
+        forms.
+        """
+        USER = "@someuser:example.org"
+
+        expected_matches = [
+            # (search_term, display_name)
+            # A search for "i" should match "İ".
+            ("iiiii", "İİİİİ"),
+            # A search for "I" should match "ı".
+            ("IIIII", "ııııı"),
+            # A search for "ı" should match "I".
+            ("ııııı", "IIIII"),
+            # A search for "İ" should match "i".
+            ("İİİİİ", "iiiii"),
+        ]
+
+        for search_term, display_name in expected_matches:
+            self.get_success(
+                self.store.update_profile_in_user_dir(USER, display_name, None)
+            )
+
+            r = self.get_success(self.store.search_user_dir(ALICE, search_term, 10))
+            self.assertFalse(r["limited"])
+            self.assertEqual(
+                1,
+                len(r["results"]),
+                f"searching for {search_term!r} did not match {display_name!r}",
+            )
+            self.assertDictEqual(
+                r["results"][0],
+                {"user_id": USER, "display_name": display_name, "avatar_url": None},
+            )
+
+        # We don't test for negative matches, to allow implementations that consider all
+        # the i variants to be the same.
+
+    test_search_user_dir_dotted_dotless_i_case_insensitivity.skip = "not supported"  # type: ignore
+
 
 class UserDirectoryStoreTestCaseWithIcu(UserDirectoryStoreTestCase):
     use_icu = True
