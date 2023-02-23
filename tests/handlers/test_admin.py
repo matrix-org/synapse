@@ -23,6 +23,7 @@ from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client import knock, login, room
 from synapse.server import HomeServer
+from synapse.types import UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -323,3 +324,31 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         args = writer.write_account_data.call_args_list[1][0]
         self.assertEqual(args[0], "test_room")
         self.assertEqual(args[1]["m.per_room"]["b"], 2)
+
+    def test_media_ids(self) -> None:
+        """Tests that media's metadata get exported."""
+
+        self.get_success(
+            self._store.store_local_media(
+                media_id="media_1",
+                media_type="image/png",
+                time_now_ms=self.clock.time_msec(),
+                upload_name=None,
+                media_length=50,
+                user_id=UserID.from_string(self.user2),
+            )
+        )
+
+        writer = Mock()
+
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
+
+        writer.write_media_id.assert_called_once()
+
+        args = writer.write_media_id.call_args[0]
+        self.assertEqual(args[0], "media_1")
+        self.assertEqual(args[1]["media_id"], "media_1")
+        self.assertEqual(args[1]["media_length"], 50)
+        self.assertGreater(args[1]["created_ts"], 0)
+        self.assertIsNone(args[1]["upload_name"])
+        self.assertIsNone(args[1]["last_access_ts"])
