@@ -913,6 +913,13 @@ def _filter_text_for_index(text: str) -> str:
     Note that the user directory search table needs to be rebuilt whenever this function
     changes.
     """
+    # Lowercase the text, to make searches case-insensitive.
+    # This is necessary for both PostgreSQL and SQLite. PostgreSQL's
+    # `to_tsquery/to_tsvector` functions don't lowercase non-ASCII characters when using
+    # the "C" collation, while SQLite just doesn't lowercase non-ASCII characters at
+    # all.
+    text = text.lower()
+
     return text
 
 
