@@ -34,7 +34,6 @@ INVALID_TIMESTAMP_IN_S = 1893456000  # 2030-01-01 in seconds
 
 
 class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,
@@ -196,7 +195,6 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
 
 class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,
@@ -594,7 +592,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
 
 class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,
@@ -724,7 +721,6 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
 
 class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,
@@ -821,7 +817,6 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
 
 class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         synapse.rest.admin.register_servlets_for_media_repo,

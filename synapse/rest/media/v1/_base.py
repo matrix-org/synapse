@@ -270,7 +270,6 @@ async def respond_with_responder(
         logger.debug("Responding to media request with responder %s", responder)
         add_file_headers(request, media_type, file_size, upload_name)
         try:
-
             await responder.write_to_consumer(request)
         except Exception as e:
             # The majority of the time this will be due to the client having gone

@@ -265,7 +265,6 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(user_id: str, room_id: str, tag: str) -> JsonDict:  # type: ignore[override]
-
         return {}
 
     async def _handle_request(  # type: ignore[override]

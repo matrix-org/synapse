@@ -58,7 +58,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     )
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["url_preview_enabled"] = True
         config["max_spider_size"] = 9999999
@@ -118,7 +117,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
         self.media_repo = hs.get_media_repository_resource()
         self.preview_url = self.media_repo.children[b"preview_url"]
 
@@ -133,7 +131,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 addressTypes: Optional[Sequence[Type[IAddress]]] = None,
                 transportSemantics: str = "TCP",
             ) -> IResolutionReceiver:
-
                 resolution = HostResolution(hostName)
                 resolutionReceiver.resolutionBegan(resolution)
                 if hostName not in self.lookups:

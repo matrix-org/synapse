@@ -297,7 +297,6 @@ class RedisReplicationFactory(SynapseRedisFactory):
         outbound_redis_connection: IRedisConnection,
         channel_names: List[str],
     ):
-
         super().__init__(
             hs,
             uuid="subscriber",

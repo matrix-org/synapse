@@ -37,6 +37,7 @@ Depends:
 # so we put perl:Depends in Suggests rather than Depends.
 Recommends:
  ${shlibs1:Recommends},
+ matrix-org-archive-keyring,
 Suggests:
  sqlite3,
  ${perl:Depends},
