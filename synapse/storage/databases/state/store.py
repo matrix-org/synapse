@@ -457,13 +457,14 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             )
 
             sg_before = prev_group
-            for index, (event, context) in enumerate(events_and_context):
+            state_group_iter = iter(state_groups)
+            for event, context in events_and_context:
                 if not event.is_state():
                     context.state_group_after_event = sg_before
                     context.state_group_before_event = sg_before
-                    pass
+                    continue
 
-                sg_after = state_groups[index]
+                sg_after = next(state_group_iter)
                 context.state_group_after_event = sg_after
                 context.state_group_before_event = sg_before
                 context.state_delta_due_to_event = {
@@ -478,6 +479,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 values=[
                     (context.state_group_after_event, room_id, event.event_id)
                     for event, context in events_and_context
+                    if event.is_state()
                 ],
             )
 
@@ -490,32 +492,27 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                         context.state_group_after_event,
                         context.state_group_before_event,
                     )
-                    for _, context in events_and_context
+                    for event, context in events_and_context
+                    if event.is_state()
                 ],
             )
-
-            values = []
-            for _, context in events_and_context:
-                assert context.state_delta_due_to_event is not None
-                for (
-                    key,
-                    state_id,
-                ) in context.state_delta_due_to_event.items():
-                    values.append(
-                        (
-                            context.state_group_after_event,
-                            room_id,
-                            key[0],
-                            key[1],
-                            state_id,
-                        )
-                    )
 
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="state_groups_state",
                 keys=("state_group", "room_id", "type", "state_key", "event_id"),
-                values=values,
+                values=[
+                    (
+                        context.state_group_after_event,
+                        room_id,
+                        key[0],
+                        key[1],
+                        state_id,
+                    )
+                    for event, context in events_and_context
+                    if context.state_delta_due_to_event is not None
+                    for key, state_id in context.state_delta_due_to_event.items()
+                ],
             )
             return events_and_context
 
