@@ -81,7 +81,8 @@ output-directory
     └───<media_id>
 ```
 
-The `media_ids` folder contains only the metadata of the media, not the media itself.
+The `media_ids` folder contains only the metadata of the media uploaded by the user.
+It does not contain the media itself.
 Furthermore, only the `media_ids` that Synapse manages itself are exported.
 If another media repository (e.g. [matrix-media-repo](https://github.com/turt2live/matrix-media-repo))
 is used, the data must be exported separately.
