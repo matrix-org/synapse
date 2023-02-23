@@ -26,7 +26,7 @@ from twisted.internet.interfaces import IAddress, IResolutionReceiver
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactor
 
 from synapse.config.oembed import OEmbedEndpointConfig
-from synapse.rest.media.v1.media_repository import MediaRepositoryResource
+from synapse.rest.media.v1.media_repository_resource import MediaRepositoryResource
 from synapse.rest.media.v1.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -82,7 +82,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         config["media_store_path"] = self.media_store_path
 
         provider_config = {
-            "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
+            "module": "synapse.media.storage_provider.FileStorageProviderBackend",
             "store_local": True,
             "store_synchronous": False,
             "store_remote": True,

@@ -46,7 +46,7 @@ from ._base import FileInfo, Responder
 from .filepath import MediaFilePaths
 
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.storage_provider import StorageProvider
+    from synapse.media.storage_provider import StorageProvider
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)

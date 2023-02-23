@@ -34,13 +34,13 @@ from synapse.events import EventBase
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
+from synapse.media._base import FileInfo
+from synapse.media.filepath import MediaFilePaths
+from synapse.media.media_storage import MediaStorage, ReadableFileWrapper
+from synapse.media.storage_provider import FileStorageProviderBackend
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login
-from synapse.rest.media.v1._base import FileInfo
-from synapse.rest.media.v1.filepath import MediaFilePaths
-from synapse.rest.media.v1.media_storage import MediaStorage, ReadableFileWrapper
-from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
 from synapse.server import HomeServer
 from synapse.types import JsonDict, RoomAlias
 from synapse.util import Clock
@@ -253,7 +253,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         config["max_image_pixels"] = 2000000
 
         provider_config = {
-            "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
+            "module": "synapse.media.storage_provider.FileStorageProviderBackend",
             "store_local": True,
             "store_synchronous": False,
             "store_remote": True,
