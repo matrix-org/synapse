@@ -69,7 +69,8 @@ class ThumbnailResource(DirectServeJsonResource):
         width = parse_integer(request, "width", required=True)
         height = parse_integer(request, "height", required=True)
         method = parse_string(request, "method", "scale")
-        m_type = parse_string(request, "type", "image/png")
+        # TODO Parse the Accept header to get an prioritised list of thumbnail types.
+        m_type = "image/png"
 
         if server_name == self.server_name:
             if self.dynamic_thumbnails:
