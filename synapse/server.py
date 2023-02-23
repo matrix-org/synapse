@@ -116,7 +116,7 @@ from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
-from synapse.rest.media.v1.media_repository_resource import MediaRepositoryResource
+from synapse.rest.media.media_repository_resource import MediaRepositoryResource
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
