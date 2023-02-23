@@ -14,6 +14,7 @@
 
 import logging
 import re
+import unicodedata
 from typing import (
     TYPE_CHECKING,
     Iterable,
@@ -919,6 +920,16 @@ def _filter_text_for_index(text: str) -> str:
     # the "C" collation, while SQLite just doesn't lowercase non-ASCII characters at
     # all.
     text = text.lower()
+
+    # Normalize the text. NFKC normalization has two effects:
+    #  1. It canonicalizes the text, ie. maps all visually identical strings to the same
+    #     string. For example, ["e", "◌́"] is mapped to ["é"].
+    #  2. It maps strings that are roughly equivalent to the same string.
+    #     For example, ["ǆ"] is mapped to ["d", "ž"], ["①"] to ["1"] and ["i⁹"] to
+    #     ["i", "9"].
+    text = unicodedata.normalize("NFKC", text)
+
+    # Note that nothing is done to make searches accent-insensitive.
 
     return text
 
