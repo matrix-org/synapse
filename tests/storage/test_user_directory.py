@@ -584,6 +584,36 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
 
     test_search_user_dir_dotted_dotless_i_case_insensitivity.skip = "not supported"  # type: ignore
 
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_unicode_normalization(self) -> None:
+        """Tests that a user can look up another user by searching for their name with
+        either composed or decomposed accents.
+        """
+        AMELIE = "@someuser:example.org"
+
+        expected_matches = [
+            # (search_term, display_name)
+            ("Ame\u0301lie", "Amélie"),
+            ("Amélie", "Ame\u0301lie"),
+        ]
+
+        for search_term, display_name in expected_matches:
+            self.get_success(
+                self.store.update_profile_in_user_dir(AMELIE, display_name, None)
+            )
+
+            r = self.get_success(self.store.search_user_dir(ALICE, search_term, 10))
+            self.assertFalse(r["limited"])
+            self.assertEqual(
+                1,
+                len(r["results"]),
+                f"searching for {search_term!r} did not match {display_name!r}",
+            )
+            self.assertDictEqual(
+                r["results"][0],
+                {"user_id": AMELIE, "display_name": display_name, "avatar_url": None},
+            )
+
 
 class UserDirectoryStoreTestCaseWithIcu(UserDirectoryStoreTestCase):
     use_icu = True
