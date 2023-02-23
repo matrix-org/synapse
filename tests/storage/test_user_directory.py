@@ -614,6 +614,29 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
                 {"user_id": AMELIE, "display_name": display_name, "avatar_url": None},
             )
 
+    @override_config({"user_directory": {"search_all_users": True}})
+    def test_search_user_dir_accent_insensitivity(self) -> None:
+        """Tests that a user can look up another user by searching for their name
+        without any accents.
+        """
+        AMELIE = "@someuser:example.org"
+        self.get_success(self.store.update_profile_in_user_dir(AMELIE, "Amélie", None))
+
+        r = self.get_success(self.store.search_user_dir(ALICE, "amelie", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": AMELIE, "display_name": "Amélie", "avatar_url": None},
+        )
+
+        # It may be desirable for "é"s in search terms to not match plain "e"s and we
+        # really don't want "é"s in search terms to match "e"s with different accents.
+        # But we don't test for this to allow implementations that consider all
+        # "e"-lookalikes to be the same.
+
+    test_search_user_dir_accent_insensitivity.skip = "not supported yet"  # type: ignore
+
 
 class UserDirectoryStoreTestCaseWithIcu(UserDirectoryStoreTestCase):
     use_icu = True

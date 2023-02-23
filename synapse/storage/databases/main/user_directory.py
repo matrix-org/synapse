@@ -930,6 +930,14 @@ def _filter_text_for_index(text: str) -> str:
     text = unicodedata.normalize("NFKC", text)
 
     # Note that nothing is done to make searches accent-insensitive.
+    # That could be achieved by converting to NFKD form instead (with combining accents
+    # split out) and filtering out combining accents using `unicodedata.combining(c)`.
+    # The downside of this may be noisier search results, since search terms with
+    # explicit accents will match characters with no accents, or completely different
+    # accents.
+    #
+    # text = unicodedata.normalize("NFKD", text)
+    # text = "".join([c for c in text if not unicodedata.combining(c)])
 
     return text
 
