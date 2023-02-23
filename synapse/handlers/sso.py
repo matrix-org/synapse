@@ -224,7 +224,7 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
-        self._registration_enabled = hs.config.registration.enable_registration
+        self._registration_enabled = hs.config.odic.enable_registration
 
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
