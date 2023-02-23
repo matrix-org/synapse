@@ -193,19 +193,57 @@ a temporary directory (which starts with &quot;synapse-exfiltrate&quot;) in <cod
 │       ├───state
 │       ├───invite_state
 │       └───knock_state
-└───user_data
-    ├───account_data
-    │   ├───global
-    │   └───&lt;room_id&gt;
-    ├───connections
-    ├───devices
-    └───profile
+├───user_data
+│   ├───account_data
+│   │   ├───global
+│   │   └───&lt;room_id&gt;
+│   ├───connections
+│   ├───devices
+│   └───profile
+└───media_ids
+    └───&lt;media_id&gt;
+</code></pre>
+<p>The <code>media_ids</code> folder contains only the metadata of the media uploaded by the user.
+It does not contain the media itself.
+Furthermore, only the <code>media_ids</code> that Synapse manages itself are exported.
+If another media repository (e.g. <a href="https://github.com/turt2live/matrix-media-repo">matrix-media-repo</a>)
+is used, the data must be exported separately.</p>
+<p>With the <code>media_ids</code> the media files can be downloaded.
+Media that have been sent in encrypted rooms are only retrieved in encrypted form.
+The following script can help with download the media files:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+
+# Parameters
+#
+#   source_directory: Directory which contains the export with the media_ids.
+#   target_directory: Directory into which all files are to be downloaded.
+#   repository_url: Address of the media repository resp. media worker.
+#   serverName: Name of the server (`server_name` from homeserver.yaml).
+#
+#   Example:
+#       ./download_media.sh /tmp/export_data/media_ids/ /tmp/export_data/media_files/ http://localhost:8008 matrix.example.com
+
+source_directory=$1
+target_directory=$2
+repository_url=$3
+serverName=$4
+
+mkdir -p $target_directory
+
+for file in $source_directory/*; do
+    filename=$(basename ${file})
+    url=$repository_url/_matrix/media/v3/download/$serverName/$filename
+    echo &quot;Downloading $filename - $url&quot;
+    if ! wget -o /dev/null -P $target_directory $url; then
+        echo &quot;Could not download $filename&quot;
+    fi
+done
 </code></pre>
 <h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords</a></h2>
 <p>Users can reset their password through their client. Alternatively, a server admin
 can reset a user's password using the <a href="../../admin_api/user_admin_api.html#reset-password">admin API</a>.</p>
 <h2 id="i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again"><a class="header" href="#i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again">I have a problem with my server. Can I just delete my database and start again?</a></h2>
-<p>Deleting your database is unlikely to make anything better. </p>
+<p>Deleting your database is unlikely to make anything better.</p>
 <p>It's easy to make the mistake of thinking that you can start again from a clean
 slate by dropping your database, but things don't work like that in a federated
 network: lots of other servers have information about your server.</p>
@@ -217,7 +255,7 @@ Come and seek help in https://matrix.to/#/#synapse:matrix.org.</p>
 <p>There are two exceptions when it might be sensible to delete your database and start again:</p>
 <ul>
 <li>You have <em>never</em> joined any rooms which are federated with other servers. For
-instance, a local deployment which the outside world can't talk to. </li>
+instance, a local deployment which the outside world can't talk to.</li>
 <li>You are changing the <code>server_name</code> in the homeserver configuration. In effect
 this makes your server a completely new one from the point of view of the network,
 so in this case it makes sense to start with a clean database.
@@ -228,7 +266,7 @@ so in this case it makes sense to start with a clean database.
 <pre><code class="language-console">curl -H 'Authorization: Bearer &lt;access-token&gt;' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/&lt;room-alias&gt;
 </code></pre>
 <p><code>&lt;access-token&gt;</code> - can be obtained in riot by looking in the riot settings, down the bottom is:
-Access Token:&lt;click to reveal&gt; </p>
+Access Token:&lt;click to reveal&gt;</p>
 <p><code>&lt;room-alias&gt;</code> - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
 <h2 id="how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log"><a class="header" href="#how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log">How can I find the lines corresponding to a given HTTP request in my homeserver log?</a></h2>
 <p>Synapse tags each log line according to the HTTP request it is processing. When
@@ -247,13 +285,13 @@ remember to surround it with triple-backticks (```) to make it legible
 <h2 id="what-do-all-those-fields-in-the-processed-line-mean"><a class="header" href="#what-do-all-those-fields-in-the-processed-line-mean">What do all those fields in the 'Processed' line mean?</a></h2>
 <p>See <a href="request_log.html">Request log format</a>.</p>
 <h2 id="what-are-the-biggest-rooms-on-my-server"><a class="header" href="#what-are-the-biggest-rooms-on-my-server">What are the biggest rooms on my server?</a></h2>
-<pre><code class="language-sql">SELECT s.canonical_alias, g.room_id, count(*) AS num_rows 
-FROM 
-  state_groups_state AS g, 
-  room_stats_state AS s 
-WHERE g.room_id = s.room_id 
+<pre><code class="language-sql">SELECT s.canonical_alias, g.room_id, count(*) AS num_rows
+FROM
+  state_groups_state AS g,
+  room_stats_state AS s
+WHERE g.room_id = s.room_id
 GROUP BY s.canonical_alias, g.room_id
-ORDER BY num_rows desc 
+ORDER BY num_rows desc
 LIMIT 10;
 </code></pre>
 <p>You can also use the <a href="../../admin_api/rooms.html#list-room-api">List Room API</a>
