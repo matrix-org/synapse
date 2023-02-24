@@ -399,7 +399,7 @@ class Keyring:
         # We now convert the returned list of results into a map from server
         # name to key ID to FetchKeyResult, to return.
         to_return: Dict[str, Dict[str, FetchKeyResult]] = {}
-        for (request, results) in zip(deduped_requests, results_per_request):
+        for request, results in zip(deduped_requests, results_per_request):
             to_return_by_server = to_return.setdefault(request.server_name, {})
             for key_id, key_result in results.items():
                 existing = to_return_by_server.get(key_id)

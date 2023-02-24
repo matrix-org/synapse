@@ -154,7 +154,6 @@ class DatabaseConfig(Config):
             logger.warning(NON_SQLITE_DATABASE_PATH_WARNING)
 
     def set_databasepath(self, database_path: str) -> None:
-
         if database_path != ":memory:":
             database_path = self.abspath(database_path)
 

@@ -175,8 +175,8 @@ class ExperimentalConfig(Config):
         )
 
         # MSC3873: Disambiguate event_match keys.
-        self.msc3783_escape_event_match_key = experimental.get(
-            "msc3783_escape_event_match_key", False
+        self.msc3873_escape_event_match_key = experimental.get(
+            "msc3873_escape_event_match_key", False
         )
 
         # MSC3952: Intentional mentions, this depends on MSC3758.

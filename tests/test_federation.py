@@ -47,7 +47,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             room_creator.create_room(
                 our_user, room_creator._presets_dict["public_chat"], ratelimit=False
             )
-        )[0]["room_id"]
+        )[0]
 
         self.store = self.hs.get_datastores().main
 

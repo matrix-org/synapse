@@ -1451,7 +1451,6 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         def _get_event_report_txn(
             txn: LoggingTransaction, report_id: int
         ) -> Optional[Dict[str, Any]]:
-
             sql = """
                 SELECT
                     er.id,

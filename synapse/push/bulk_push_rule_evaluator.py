@@ -276,7 +276,7 @@ class BulkPushRuleEvaluator:
                 if related_event is not None:
                     related_events[relation_type] = _flatten_dict(
                         related_event,
-                        msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+                        msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
                     )
 
             reply_event_id = (
@@ -294,7 +294,7 @@ class BulkPushRuleEvaluator:
                 if related_event is not None:
                     related_events["m.in_reply_to"] = _flatten_dict(
                         related_event,
-                        msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+                        msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
                     )
 
                     # indicate that this is from a fallback relation.
@@ -330,7 +330,6 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
-
         if (
             not event.internal_metadata.is_notifiable()
             or event.internal_metadata.is_historical()
@@ -413,7 +412,7 @@ class BulkPushRuleEvaluator:
         evaluator = PushRuleEvaluator(
             _flatten_dict(
                 event,
-                msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
+                msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
             ),
             has_mentions,
             user_mentions,
@@ -508,7 +507,7 @@ def _flatten_dict(
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, JsonValue]] = None,
     *,
-    msc3783_escape_event_match_key: bool = False,
+    msc3873_escape_event_match_key: bool = False,
 ) -> Dict[str, JsonValue]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
@@ -537,7 +536,7 @@ def _flatten_dict(
     if result is None:
         result = {}
     for key, value in d.items():
-        if msc3783_escape_event_match_key:
+        if msc3873_escape_event_match_key:
             # Escape periods in the key with a backslash (and backslashes with an
             # extra backslash). This is since a period is used as a separator between
             # nested fields.
@@ -553,7 +552,7 @@ def _flatten_dict(
                 value,
                 prefix=(prefix + [key]),
                 result=result,
-                msc3783_escape_event_match_key=msc3783_escape_event_match_key,
+                msc3873_escape_event_match_key=msc3873_escape_event_match_key,
             )
 
     # `room_version` should only ever be set when looking at the top level of an event

@@ -40,7 +40,6 @@ from tests.unittest import override_config
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         login.register_servlets,
         register.register_servlets,
@@ -797,7 +796,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         register.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -913,7 +911,6 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
 
 class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         register.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -1132,7 +1129,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
 
 class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
-
     servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
