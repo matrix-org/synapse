@@ -174,7 +174,10 @@ class WorkerConfig(Config):
             "synapse.app.federation_sender",
             "federation_sender_instances",
         )
-        self.send_federation = self.instance_name in federation_sender_instances
+        self.send_federation = (self.instance_name in federation_sender_instances) or (
+            not federation_sender_instances and self.instance_name == "master"
+        )
+
         self.federation_shard_config = ShardedWorkerHandlingConfig(
             federation_sender_instances
         )
