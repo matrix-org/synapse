@@ -41,6 +41,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.config import ConfigError
 from synapse.config.key import TrustedKeyServer
 from synapse.crypto.types import _FetchKeyRequest
 from synapse.events import EventBase
@@ -927,6 +928,8 @@ class InternalWorkerRequestKeyFetcher(KeyFetcher):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self._federation_shard_config = hs.config.worker.federation_shard_config
+        if not self._federation_shard_config.instances:
+            raise ConfigError("No federation senders configured")
         self._client = ReplicationFetchKeysEndpoint.make_client(hs)
 
     async def _fetch_keys(
