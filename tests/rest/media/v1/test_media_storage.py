@@ -52,7 +52,6 @@ from tests.utils import default_config
 
 
 class MediaStorageTests(unittest.HomeserverTestCase):
-
     needs_threadpool = True
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -207,7 +206,6 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     user_id = "@test:user"
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         self.fetches: List[
             Tuple[
                 "Deferred[Tuple[bytes, Tuple[int, Dict[bytes, List[bytes]]]]]",
@@ -268,7 +266,6 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
         media_resource = hs.get_media_repository_resource()
         self.download_resource = media_resource.children[b"download"]
         self.thumbnail_resource = media_resource.children[b"thumbnail"]

@@ -1,1 +1,0 @@
-Avoid mutating a cached value in `get_user_devices_from_cache`.

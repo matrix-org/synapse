@@ -116,7 +116,6 @@ class ContentRepositoryConfig(Config):
     section = "media"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-
         # Only enable the media repo if either the media repo is enabled or the
         # current worker app is the media repo.
         if (

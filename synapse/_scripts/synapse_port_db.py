@@ -94,61 +94,80 @@ reactor = cast(ISynapseReactor, reactor_)
 logger = logging.getLogger("synapse_port_db")
 
 
+# SQLite doesn't have a dedicated boolean type (it stores True/False as 1/0). This means
+# portdb will read sqlite bools as integers, then try to insert them into postgres
+# boolean columns---which fails. Lacking some Python-parseable metaschema, we must
+# specify which integer columns should be inserted as booleans into postgres.
 BOOLEAN_COLUMNS = {
-    "events": ["processed", "outlier", "contains_url"],
-    "rooms": ["is_public", "has_auth_chain_index"],
+    "access_tokens": ["used"],
+    "account_validity": ["email_sent"],
+    "device_lists_changes_in_room": ["converted_to_destinations"],
+    "device_lists_outbound_pokes": ["sent"],
+    "devices": ["hidden"],
+    "e2e_fallback_keys_json": ["used"],
+    "e2e_room_keys": ["is_verified"],
     "event_edges": ["is_state"],
+    "events": ["processed", "outlier", "contains_url"],
+    "local_media_repository": ["safe_from_quarantine"],
     "presence_list": ["accepted"],
     "presence_stream": ["currently_active"],
     "public_room_list_stream": ["visibility"],
-    "devices": ["hidden"],
-    "device_lists_outbound_pokes": ["sent"],
-    "users_who_share_rooms": ["share_private"],
-    "e2e_room_keys": ["is_verified"],
-    "account_validity": ["email_sent"],
+    "pushers": ["enabled"],
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
-    "local_media_repository": ["safe_from_quarantine"],
+    "rooms": ["is_public", "has_auth_chain_index"],
     "users": ["shadow_banned", "approved"],
-    "e2e_fallback_keys_json": ["used"],
-    "access_tokens": ["used"],
-    "device_lists_changes_in_room": ["converted_to_destinations"],
-    "pushers": ["enabled"],
+    "un_partial_stated_event_stream": ["rejection_status_changed"],
+    "users_who_share_rooms": ["share_private"],
 }
 
 
+# These tables are never deleted from in normal operation [*], so we can resume porting
+# over rows from a previous attempt rather than starting from scratch.
+#
+# [*]: We do delete from many of these tables when purging a room, and
+#      presumably when purging old events. So we might e.g.
+#
+#      1. Run portdb and port half of some table.
+#      2. Stop portdb.
+#      3. Purge something, deleting some of the rows we've ported over.
+#      4. Restart portdb. The rows deleted from sqlite are still present in postgres.
+#
+#      But this isn't the end of the world: we should be able to repeat the purge
+#      on the postgres DB when porting completes.
 APPEND_ONLY_TABLES = [
-    "event_reference_hashes",
-    "events",
+    "cache_invalidation_stream_by_instance",
+    "event_auth",
+    "event_edges",
     "event_json",
-    "state_events",
-    "room_memberships",
-    "topics",
-    "room_names",
-    "rooms",
+    "event_reference_hashes",
+    "event_search",
+    "event_to_state_groups",
+    "events",
+    "ex_outlier_stream",
     "local_media_repository",
     "local_media_repository_thumbnails",
+    "presence_stream",
+    "public_room_list_stream",
+    "push_rules_stream",
+    "received_transactions",
+    "redactions",
+    "rejections",
     "remote_media_cache",
     "remote_media_cache_thumbnails",
-    "redactions",
-    "event_edges",
-    "event_auth",
-    "received_transactions",
+    "room_memberships",
+    "room_names",
+    "rooms",
     "sent_transactions",
-    "transaction_id_to_pdu",
-    "users",
+    "state_events",
+    "state_group_edges",
     "state_groups",
     "state_groups_state",
-    "event_to_state_groups",
-    "rejections",
-    "event_search",
-    "presence_stream",
-    "push_rules_stream",
-    "ex_outlier_stream",
-    "cache_invalidation_stream_by_instance",
-    "public_room_list_stream",
-    "state_group_edges",
     "stream_ordering_to_exterm",
+    "topics",
+    "transaction_id_to_pdu",
+    "un_partial_stated_event_stream",
+    "users",
 ]
 
 
@@ -1186,7 +1205,6 @@ class CursesProgress(Progress):
         if self.finished:
             status = "Time spent: %s (Done!)" % (duration_str,)
         else:
-
             if self.total_processed > 0:
                 left = float(self.total_remaining) / self.total_processed
 
