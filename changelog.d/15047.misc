@@ -1,1 +1,0 @@
-Avoid mutating cached values in `_generate_sync_entry_for_account_data`.

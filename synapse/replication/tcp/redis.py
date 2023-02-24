@@ -328,7 +328,6 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
         outbound_redis_connection: txredisapi.ConnectionHandler,
         channel_names: List[str],
     ):
-
         super().__init__(
             hs,
             uuid="subscriber",

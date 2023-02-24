@@ -38,7 +38,6 @@ class ThumbnailError(Exception):
 
 
 class Thumbnailer:
-
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 
     @staticmethod

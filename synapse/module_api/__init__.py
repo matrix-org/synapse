@@ -1576,14 +1576,14 @@ class ModuleApi:
             )
 
         requester = create_requester(user_id)
-        room_id_and_alias, _ = await self._hs.get_room_creation_handler().create_room(
+        room_id, room_alias, _ = await self._hs.get_room_creation_handler().create_room(
             requester=requester,
             config=config,
             ratelimit=ratelimit,
             creator_join_profile=creator_join_profile,
         )
-
-        return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
+        room_alias_str = room_alias.to_string() if room_alias else None
+        return room_id, room_alias_str
 
     async def set_displayname(
         self,

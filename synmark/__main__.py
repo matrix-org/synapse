@@ -34,12 +34,10 @@ def make_test(main):
     """
 
     def _main(loops):
-
         reactor = make_reactor()
 
         file_out = StringIO()
         with redirect_stderr(file_out):
-
             d = Deferred()
             d.addCallback(lambda _: ensureDeferred(main(reactor, loops)))
 
