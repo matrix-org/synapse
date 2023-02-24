@@ -471,6 +471,8 @@ class Keyring:
 
 
 class KeyFetcher(metaclass=abc.ABCMeta):
+    """Abstract gadget for fetching keys to validate other homeservers' signatures."""
+
     def __init__(self, hs: "HomeServer"):
         self._queue = BatchingQueue(
             self.__class__.__name__, hs.get_clock(), self._fetch_keys
@@ -492,11 +494,15 @@ class KeyFetcher(metaclass=abc.ABCMeta):
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]
     ) -> Dict[str, Dict[str, FetchKeyResult]]:
+        """
+        Returns:
+            Map from server_name -> key_id -> FetchKeyResult
+        """
         pass
 
 
 class StoreKeyFetcher(KeyFetcher):
-    """KeyFetcher impl which fetches keys from our data store"""
+    """Try to retrieve a previously-fetched key from the DB."""
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -520,6 +526,8 @@ class StoreKeyFetcher(KeyFetcher):
 
 
 class BaseV2KeyFetcher(KeyFetcher):
+    """Abstract helper. Fetch keys by requesting it from some server."""
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
@@ -622,7 +630,10 @@ class BaseV2KeyFetcher(KeyFetcher):
 
 
 class PerspectivesKeyFetcher(BaseV2KeyFetcher):
-    """KeyFetcher impl which fetches keys from the "perspectives" servers"""
+    """Fetch keys for some homeserver X by requesting them from a trusted key server Y.
+
+    These trusted key servers were seemingly once known as "perspectives" servers.
+    """
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -805,7 +816,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
 
 class ServerKeyFetcher(BaseV2KeyFetcher):
-    """KeyFetcher impl which fetches keys from the origin servers"""
+    """Fetch keys for some homeserver X by requesting them directly from X."""
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
