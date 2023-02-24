@@ -47,7 +47,6 @@ def request_registration(
     _print: Callable[[str], None] = print,
     exit: Callable[[int], None] = sys.exit,
 ) -> None:
-
     url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
 
     # Get the nonce
@@ -154,7 +153,6 @@ def register_new_user(
 
 
 def main() -> None:
-
     logging.captureWarnings(True)
 
     parser = argparse.ArgumentParser(

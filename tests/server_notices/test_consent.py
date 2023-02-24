@@ -25,7 +25,6 @@ from tests import unittest
 
 
 class ConsentNoticesTests(unittest.HomeserverTestCase):
-
     servlets = [
         sync.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -34,7 +33,6 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         tmpdir = self.mktemp()
         os.mkdir(tmpdir)
         self.consent_notice_message = "consent %(consent_uri)s"

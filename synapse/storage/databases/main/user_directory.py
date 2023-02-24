@@ -14,6 +14,7 @@
 
 import logging
 import re
+import unicodedata
 from typing import (
     TYPE_CHECKING,
     Iterable,
@@ -98,7 +99,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     async def _populate_user_directory_createtables(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-
         # Get all the rooms that we want to process.
         def _make_staging_area(txn: LoggingTransaction) -> None:
             sql = (
@@ -491,6 +491,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 values={"display_name": display_name, "avatar_url": avatar_url},
             )
 
+            # The display name that goes into the database index.
+            index_display_name = display_name
+            if index_display_name is not None:
+                index_display_name = _filter_text_for_index(index_display_name)
+
             if isinstance(self.database_engine, PostgresEngine):
                 # We weight the localpart most highly, then display name and finally
                 # server name
@@ -508,11 +513,15 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         user_id,
                         get_localpart_from_id(user_id),
                         get_domain_from_id(user_id),
-                        display_name,
+                        index_display_name,
                     ),
                 )
             elif isinstance(self.database_engine, Sqlite3Engine):
-                value = "%s %s" % (user_id, display_name) if display_name else user_id
+                value = (
+                    "%s %s" % (user_id, index_display_name)
+                    if index_display_name
+                    else user_id
+                )
                 self.db_pool.simple_upsert_txn(
                     txn,
                     table="user_directory_search",
@@ -897,6 +906,41 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         return {"limited": limited, "results": results[0:limit]}
 
 
+def _filter_text_for_index(text: str) -> str:
+    """Transforms text before it is inserted into the user directory index, or searched
+    for in the user directory index.
+
+    Note that the user directory search table needs to be rebuilt whenever this function
+    changes.
+    """
+    # Lowercase the text, to make searches case-insensitive.
+    # This is necessary for both PostgreSQL and SQLite. PostgreSQL's
+    # `to_tsquery/to_tsvector` functions don't lowercase non-ASCII characters when using
+    # the "C" collation, while SQLite just doesn't lowercase non-ASCII characters at
+    # all.
+    text = text.lower()
+
+    # Normalize the text. NFKC normalization has two effects:
+    #  1. It canonicalizes the text, ie. maps all visually identical strings to the same
+    #     string. For example, ["e", "◌́"] is mapped to ["é"].
+    #  2. It maps strings that are roughly equivalent to the same string.
+    #     For example, ["ǆ"] is mapped to ["d", "ž"], ["①"] to ["1"] and ["i⁹"] to
+    #     ["i", "9"].
+    text = unicodedata.normalize("NFKC", text)
+
+    # Note that nothing is done to make searches accent-insensitive.
+    # That could be achieved by converting to NFKD form instead (with combining accents
+    # split out) and filtering out combining accents using `unicodedata.combining(c)`.
+    # The downside of this may be noisier search results, since search terms with
+    # explicit accents will match characters with no accents, or completely different
+    # accents.
+    #
+    # text = unicodedata.normalize("NFKD", text)
+    # text = "".join([c for c in text if not unicodedata.combining(c)])
+
+    return text
+
+
 def _parse_query_sqlite(search_term: str) -> str:
     """Takes a plain unicode string from the user and converts it into a form
     that can be passed to database.
@@ -906,6 +950,7 @@ def _parse_query_sqlite(search_term: str) -> str:
     We specifically add both a prefix and non prefix matching term so that
     exact matches get ranked higher.
     """
+    search_term = _filter_text_for_index(search_term)
 
     # Pull out the individual words, discarding any non-word characters.
     results = _parse_words(search_term)
@@ -918,6 +963,8 @@ def _parse_query_postgres(search_term: str) -> Tuple[str, str, str]:
     We use this so that we can add prefix matching, which isn't something
     that is supported by default.
     """
+    search_term = _filter_text_for_index(search_term)
+
     escaped_words = []
     for word in _parse_words(search_term):
         # Postgres tsvector and tsquery quoting rules:

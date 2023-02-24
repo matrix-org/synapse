@@ -52,7 +52,6 @@ class DummyRecaptchaChecker(UserInteractiveAuthChecker):
 
 
 class FallbackAuthTests(unittest.HomeserverTestCase):
-
     servlets = [
         auth.register_servlets,
         register.register_servlets,
@@ -60,7 +59,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
     hijack_auth = False
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
 
         config["enable_registration_captcha"] = True

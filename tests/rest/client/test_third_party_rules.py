@@ -137,6 +137,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         """Tests that a forbidden event is forbidden from being sent, but an allowed one
         can be sent.
         """
+
         # patch the rules module with a Mock which will return False for some event
         # types
         async def check(
@@ -243,6 +244,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
     def test_modify_event(self) -> None:
         """The module can return a modified version of the event"""
+
         # first patch the event checker so that it will modify the event
         async def check(
             ev: EventBase, state: StateMap[EventBase]
@@ -275,6 +277,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
     def test_message_edit(self) -> None:
         """Ensure that the module doesn't cause issues with edited messages."""
+
         # first patch the event checker so that it will modify the event
         async def check(
             ev: EventBase, state: StateMap[EventBase]

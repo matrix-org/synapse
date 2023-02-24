@@ -242,7 +242,7 @@ class StateStoreTestCase(HomeserverTestCase):
 
         # test _get_state_for_group_using_cache correctly filters out members
         # with types=[]
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
@@ -259,7 +259,7 @@ class StateStoreTestCase(HomeserverTestCase):
             state_dict,
         )
 
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
@@ -272,7 +272,7 @@ class StateStoreTestCase(HomeserverTestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with wildcard types
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
@@ -289,7 +289,7 @@ class StateStoreTestCase(HomeserverTestCase):
             state_dict,
         )
 
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
@@ -309,7 +309,7 @@ class StateStoreTestCase(HomeserverTestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
@@ -327,7 +327,7 @@ class StateStoreTestCase(HomeserverTestCase):
             state_dict,
         )
 
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
@@ -341,7 +341,7 @@ class StateStoreTestCase(HomeserverTestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
@@ -392,7 +392,7 @@ class StateStoreTestCase(HomeserverTestCase):
         # test _get_state_for_group_using_cache correctly filters out members
         # with types=[]
         room_id = self.room.to_string()
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
@@ -404,7 +404,7 @@ class StateStoreTestCase(HomeserverTestCase):
         self.assertDictEqual({}, state_dict)
 
         room_id = self.room.to_string()
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
@@ -417,7 +417,7 @@ class StateStoreTestCase(HomeserverTestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # wildcard types
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
@@ -428,7 +428,7 @@ class StateStoreTestCase(HomeserverTestCase):
         self.assertEqual(is_all, False)
         self.assertDictEqual({}, state_dict)
 
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
@@ -447,7 +447,7 @@ class StateStoreTestCase(HomeserverTestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
@@ -459,7 +459,7 @@ class StateStoreTestCase(HomeserverTestCase):
         self.assertEqual(is_all, False)
         self.assertDictEqual({}, state_dict)
 
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
@@ -473,7 +473,7 @@ class StateStoreTestCase(HomeserverTestCase):
 
         # test _get_state_for_group_using_cache correctly filters in members
         # with specific types
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
@@ -485,7 +485,7 @@ class StateStoreTestCase(HomeserverTestCase):
         self.assertEqual(is_all, False)
         self.assertDictEqual({}, state_dict)
 
-        (state_dict, is_all,) = self.state_datastore._get_state_for_group_using_cache(
+        state_dict, is_all = self.state_datastore._get_state_for_group_using_cache(
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(

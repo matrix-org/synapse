@@ -178,7 +178,7 @@ class ServerNoticesManager:
                 "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
-        info, _ = await self._room_creation_handler.create_room(
+        room_id, _, _ = await self._room_creation_handler.create_room(
             requester,
             config={
                 "preset": RoomCreationPreset.PRIVATE_CHAT,
@@ -188,7 +188,6 @@ class ServerNoticesManager:
             ratelimit=False,
             creator_join_profile=join_profile,
         )
-        room_id = info["room_id"]
 
         self.maybe_get_notice_room_for_user.invalidate((user_id,))
 

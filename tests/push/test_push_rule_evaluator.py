@@ -54,7 +54,7 @@ class FlattenDictTestCase(unittest.TestCase):
         self.assertEqual({"m.foo.b\\ar": "abc"}, _flatten_dict(input))
         self.assertEqual(
             {"m\\.foo.b\\\\ar": "abc"},
-            _flatten_dict(input, msc3783_escape_event_match_key=True),
+            _flatten_dict(input, msc3873_escape_event_match_key=True),
         )
 
     def test_non_string(self) -> None:

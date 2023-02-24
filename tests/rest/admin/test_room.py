@@ -1990,7 +1990,6 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         room.register_servlets,

@@ -149,7 +149,7 @@ class BlacklistingAgentTest(TestCase):
         self.allowed_domain, self.allowed_ip = b"allowed.test", b"5.1.1.1"
 
         # Configure the reactor's DNS resolver.
-        for (domain, ip) in (
+        for domain, ip in (
             (self.safe_domain, self.safe_ip),
             (self.unsafe_domain, self.unsafe_ip),
             (self.allowed_domain, self.allowed_ip),

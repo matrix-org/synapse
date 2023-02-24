@@ -33,7 +33,6 @@ from tests.unittest import HomeserverTestCase, override_config
 
 
 class TestBulkPushRuleEvaluator(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         room.register_servlets,

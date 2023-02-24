@@ -183,7 +183,7 @@ def check_requirements(extra: Optional[str] = None) -> None:
     deps_unfulfilled = []
     errors = []
 
-    for (requirement, must_be_installed) in dependencies:
+    for requirement, must_be_installed in dependencies:
         try:
             dist: metadata.Distribution = metadata.distribution(requirement.name)
         except metadata.PackageNotFoundError:

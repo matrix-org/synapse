@@ -417,7 +417,6 @@ class EventChainStoreTestCase(HomeserverTestCase):
     def fetch_chains(
         self, events: List[EventBase]
     ) -> Tuple[Dict[str, Tuple[int, int]], _LinkMap]:
-
         # Fetch the map from event ID -> (chain ID, sequence number)
         rows = self.get_success(
             self.store.db_pool.simple_select_many_batch(
@@ -492,7 +491,6 @@ class LinkMapTestCase(unittest.TestCase):
 
 
 class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,

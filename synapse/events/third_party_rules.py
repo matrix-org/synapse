@@ -78,7 +78,6 @@ def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
         # correctly, we need to await its result. Therefore it doesn't make a lot of
         # sense to make it go through the run() wrapper.
         if f.__name__ == "check_event_allowed":
-
             # We need to wrap check_event_allowed because its old form would return either
             # a boolean or a dict, but now we want to return the dict separately from the
             # boolean.
@@ -100,7 +99,6 @@ def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
             return wrap_check_event_allowed
 
         if f.__name__ == "on_create_room":
-
             # We need to wrap on_create_room because its old form would return a boolean
             # if the room creation is denied, but now we just want it to raise an
             # exception.
