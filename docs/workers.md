@@ -590,9 +590,17 @@ It is likely this option will be deprecated in the future and not recommended fo
 new installations. Instead, [use `synapse.app.generic_worker` with the `federation_sender_instances`](usage/configuration/config_documentation.md#federation_sender_instances).
 
 Handles sending federation traffic to other servers. Doesn't handle any
-REST endpoints itself, but you should set
+client-facing REST endpoints itself, but you should set
 [`send_federation: false`](usage/configuration/config_documentation.md#send_federation)
 in the shared configuration file to stop the main synapse sending this traffic.
+
+Federation senders should have a replication [`http` listener](
+usage/configuration/config_documentation.md#listeners
+) configured, and
+should be present in the [`instance_map`](
+usage/configuration/config_documentation.md#instance_map
+) so that other workers can make internal
+http requests to the federation senders.
 
 If running multiple federation senders then you must list each
 instance in the
@@ -607,6 +615,13 @@ send_federation: false
 federation_sender_instances:
     - federation_sender1
     - federation_sender2
+instance_map:
+    - federation_sender1:
+        - host: localhost
+        - port: 1001
+    - federation_sender2:
+         - host: localhost
+         - port: 1002
 ```
 
 An example for a federation sender instance:
@@ -614,6 +629,9 @@ An example for a federation sender instance:
 ```yaml
 {{#include systemd-with-workers/workers/federation_sender.yaml}}
 ```
+
+_Changed in Synapse 1.79: Federation senders should now have an http listener
+listening for `replication`, and should be present in the `instance_map`._
 
 ### `synapse.app.media_repository`
 

@@ -87,6 +87,29 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+# Upgrading to v1.79.0
+
+## Changes to federation sender config
+
+_This notice only applies to deployments using multiple workers. Deployments
+not using workers are not affected._
+
+From Synapse 1.79, only [federation senders](
+https://matrix-org.github.io/synapse/release-v1.79/usage/configuration/config_documentation.html#federation_sender_instances
+) will make outgoing key requests to homeservers and [trusted key servers](
+https://matrix-org.github.io/synapse/release-v1.79/usage/configuration/config_documentation.html#trusted_key_servers
+). This will make it easier for server operators to reason about how Synapse
+communicates with the wider federation. As a consequence, all other workers now 
+ask federation senders to fetch keys on their behalf.
+
+To facilitate this,
+
+- federation senders must now be present in the [instance map](
+  https://matrix-org.github.io/synapse/release-v1.79/usage/configuration/config_documentation.html#instance_map
+  ), and
+- federation senders must now run an [http listener](
+  https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#listeners 
+  ) which includes the `replication` resource.
 
 # Upgrading to v1.78.0
 

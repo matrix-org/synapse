@@ -3811,7 +3811,7 @@ send_federation: false
 ### `federation_sender_instances`
 
 It is possible to scale the processes that handle sending outbound federation requests
-by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
+by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding its [`worker_name`](#worker_name) to
 a `federation_sender_instances` map. Doing so will remove handling of this function from
 the main process. Multiple workers can be added to this map, in which case the work is
 balanced across them.
@@ -3820,6 +3820,10 @@ This configuration setting must be shared between all workers handling federatio
 sending, and if changed all federation sender workers must be stopped at the same time
 and then started, to ensure that all instances are running with the same config (otherwise
 events may be dropped).
+
+Federation senders should have a replication [`http` listener](#listeners)
+configured, and should be present in the [`instance_map`](#instance_map)
+so that other workers can make internal http requests to the federation senders.
 
 Example configuration for a single worker:
 ```yaml
@@ -3832,6 +3836,10 @@ federation_sender_instances:
   - federation_sender1
   - federation_sender2
 ```
+
+_Changed in Synapse 1.79: Federation senders should now have an http listener
+listening for `replication`, and should be present in the `instance_map`._
+
 ---
 ### `instance_map`
 
