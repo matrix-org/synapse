@@ -545,7 +545,7 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
 
         Some languages have dotted and dotless versions of "i", which are considered to
         be different letters: i <-> İ, ı <-> I. To make things difficult, they reuse the
-        ASCII "i" and "I" characters, despite having different lowercase / uppercase
+        ASCII "i" and "I" code points, despite having different lowercase / uppercase
         forms.
         """
         USER = "@someuser:example.org"
