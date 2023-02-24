@@ -125,7 +125,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         ret = await self._remote_knock_client(
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
-            user=user,
+            user_id=user.to_string,
             content=content,
         )
         return ret["event_id"], ret["stream_id"]
