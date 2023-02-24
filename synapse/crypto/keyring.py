@@ -140,14 +140,22 @@ class Keyring:
         self.clock = hs.get_clock()
 
         if key_fetchers is None:
-            key_fetchers = (
-                # Fetch keys from the database.
-                StoreKeyFetcher(hs),
-                # Fetch keys from a configured Perspectives server.
-                PerspectivesKeyFetcher(hs),
-                # Fetch keys from the origin server directly.
-                ServerKeyFetcher(hs),
-            )
+            if hs.config.worker.send_federation:
+                key_fetchers = (
+                    # Fetch keys from the database.
+                    StoreKeyFetcher(hs),
+                    # Fetch keys from a configured Perspectives server.
+                    PerspectivesKeyFetcher(hs),
+                    # Fetch keys from the origin server directly.
+                    ServerKeyFetcher(hs),
+                )
+            else:
+                key_fetchers = (
+                    # Fetch keys from the database.
+                    StoreKeyFetcher(hs),
+                    # Ask a federation sender to fetch the keys for us.
+                    InternalWorkerRequestKeyFetcher(hs),
+                )
         self._key_fetchers = key_fetchers
 
         self._fetch_keys_queue: BatchingQueue[
