@@ -113,6 +113,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,
@@ -123,6 +124,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         Implements RoomMemberHandler.remote_knock
         """
         ret = await self._remote_knock_client(
+            requester=requester,
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
             user_id=user.to_string,
