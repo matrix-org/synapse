@@ -100,7 +100,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "federation_sender": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": [],
+        "listener_resources": ["replication"],
         "endpoint_patterns": [],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -345,7 +345,13 @@ def add_worker_roles_to_shared_config(
         shared_config.setdefault("pusher_instances", []).append(worker_name)
 
     elif worker_type == "federation_sender":
+        # Some outbound federation requests can be routed via federation senders,
+        # so federation senders need to be accessible by other workers.
         shared_config.setdefault("federation_sender_instances", []).append(worker_name)
+        instance_map[worker_name] = {
+            "host": "localhost",
+            "port": worker_port,
+        }
 
     elif worker_type == "event_persister":
         # Event persisters write to the events stream, so we need to update
