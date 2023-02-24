@@ -163,6 +163,10 @@ class PreviewUrlResource(DirectServeJsonResource):
        7. Stores the result in the database cache.
     4. Returns the result.
 
+    If any additional requests (e.g. from oEmbed autodiscovery, step 5.3 or
+    image thumbnailing, step 5.4 or 6.4) fails then the URL preview as a whole
+    does not fail. As much information as possible is returned.
+
     The in-memory cache expires after 1 hour.
 
     Expired entries in the database cache (and their associated media files) are
@@ -364,16 +368,25 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
-                    oembed_info = await self._handle_url(
-                        oembed_url, user, allow_data_urls=True
-                    )
-                    (
-                        og_from_oembed,
-                        author_name,
-                        expiration_ms,
-                    ) = await self._handle_oembed_response(
-                        url, oembed_info, expiration_ms
-                    )
+                    try:
+                        oembed_info = await self._handle_url(
+                            oembed_url, user, allow_data_urls=True
+                        )
+                    except Exception as e:
+                        # Fetching the oEmbed info failed, don't block the entire URL preview.
+                        logger.warning(
+                            "oEmbed fetch failed during URL preview: %s errored with %s",
+                            oembed_url,
+                            e,
+                        )
+                    else:
+                        (
+                            og_from_oembed,
+                            author_name,
+                            expiration_ms,
+                        ) = await self._handle_oembed_response(
+                            url, oembed_info, expiration_ms
+                        )
 
                 # Parse Open Graph information from the HTML in case the oEmbed
                 # response failed or is incomplete.

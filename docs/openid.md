@@ -590,6 +590,47 @@ oidc_providers:
 
 Note that the fields `client_id` and `client_secret` are taken from the CURL response above.
 
+### Shibboleth with OIDC Plugin
+
+[Shibboleth](https://www.shibboleth.net/) is an open Standard IdP solution widely used by Universities.
+
+1. Shibboleth needs the [OIDC Plugin](https://shibboleth.atlassian.net/wiki/spaces/IDPPLUGINS/pages/1376878976/OIDC+OP) installed and working correctly.
+2. Create a new config on the IdP Side, ensure that the `client_id` and `client_secret`
+   are randomly generated data.
+```json
+{
+    "client_id": "SOME-CLIENT-ID",
+    "client_secret": "SOME-SUPER-SECRET-SECRET",
+    "response_types": ["code"],
+    "grant_types": ["authorization_code"],
+    "scope": "openid profile email",
+    "redirect_uris": ["https://[synapse public baseurl]/_synapse/client/oidc/callback"]
+}
+```
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  # Shibboleth IDP
+  #
+  - idp_id: shibboleth
+    idp_name: "Shibboleth Login"
+    discover: true
+    issuer: "https://YOUR-IDP-URL.TLD"
+    client_id: "YOUR_CLIENT_ID"
+    client_secret: "YOUR-CLIENT-SECRECT-FROM-YOUR-IDP"
+    scopes: ["openid", "profile", "email"]
+    allow_existing_users: true
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        subject_claim: "sub"
+        localpart_template: "{{ user.sub.split('@')[0] }}"
+        display_name_template: "{{ user.name }}"
+        email_template: "{{ user.email }}"
+```
+
 ### Twitch
 
 1. Setup a developer account on [Twitch](https://dev.twitch.tv/)
