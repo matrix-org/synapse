@@ -182,8 +182,7 @@ class ChannelsTestCase(BaseMultiWorkerStreamTestCase):
         self.assertFalse(d.called)
 
         # Insert an entry into the cache stream with token `next_token1`, but
-        # not `next_token2`. The master should still get told about
-        # `next_token2` via a `POSITION`
+        # not `next_token2`.
         self.get_success(
             store.db_pool.simple_insert(
                 table="cache_invalidation_stream_by_instance",
@@ -197,7 +196,9 @@ class ChannelsTestCase(BaseMultiWorkerStreamTestCase):
             )
         )
 
-        # ... but worker1 finishing (and so sending an update) should.
+        # Finish the context manager, triggering the data to be sent to master.
         self.get_success(ctx_worker1.__aexit__(None, None, None))
 
+        # Master should get told about `next_token2`, so the deferred should
+        # resolve.
         self.assertTrue(d.called)
