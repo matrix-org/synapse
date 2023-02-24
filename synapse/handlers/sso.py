@@ -224,8 +224,6 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
-        self._registration_enabled = hs.config.odic.enable_registration
-
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
         assert p_id not in self._identity_providers
@@ -385,6 +383,7 @@ class SsoHandler:
         grandfather_existing_users: Callable[[], Awaitable[Optional[str]]],
         extra_login_attributes: Optional[JsonDict] = None,
         auth_provider_session_id: Optional[str] = None,
+        registration_enabled: bool = True,
     ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -437,6 +436,10 @@ class SsoHandler:
 
             auth_provider_session_id: An optional session ID from the IdP.
 
+            registration_enabled: An optional boolean to enable/disable automatic
+            registrations of new users. If false and the user does not exist then the
+            flow is aborted. Defaults to true.
+
         Raises:
             MappingException if there was a problem mapping the response to a user.
             RedirectException: if the mapping provider needs to redirect the user
@@ -464,7 +467,7 @@ class SsoHandler:
                         auth_provider_id, remote_user_id, user_id
                     )
 
-            if not user_id and not self._registration_enabled:
+            if not user_id and not registration_enabled:
                 logger.info(
                     "User does not exist and registration are disabled for IdP '%s' and remote_user_id '%s'",
                     auth_provider_id,

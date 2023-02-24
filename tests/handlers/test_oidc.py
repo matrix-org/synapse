@@ -922,7 +922,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             auth_provider_session_id=None,
         )
 
-    @override_config({"oidc_config": DEFAULT_CONFIG, "enable_registration": True})
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "enable_registration": True}})
     def test_map_userinfo_to_user(self) -> None:
         """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""
         userinfo: dict = {
@@ -975,7 +975,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "Mapping provider does not support de-duplicating Matrix IDs",
         )
 
-    @override_config({"oidc_config": DEFAULT_CONFIG, "enable_registration": False})
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "enable_registration": False}})
     def test_map_userinfo_to_user_does_not_register_new_user(self) -> None:
         """Ensures new users are not registered if the enabled registration flag is disabled."""
         userinfo: dict = {
