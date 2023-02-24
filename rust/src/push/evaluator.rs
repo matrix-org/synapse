@@ -259,8 +259,8 @@ impl PushRuleEvaluator {
         let result = match known_condition {
             KnownCondition::EventMatch(event_match) => self.match_event_match(
                 &self.flattened_keys,
-                &event_match.key.clone(),
-                &event_match.pattern.clone(),
+                &event_match.key,
+                &event_match.pattern,
             )?,
             KnownCondition::EventMatchType(event_match) => {
                 // The `pattern_type` can either be "user_id" or "user_localpart",
@@ -277,7 +277,7 @@ impl PushRuleEvaluator {
                     EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
                 };
 
-                self.match_event_match(&self.flattened_keys, &event_match.key.clone(), pattern)?
+                self.match_event_match(&self.flattened_keys, &event_match.key, pattern)?
             }
             KnownCondition::ExactEventMatch(exact_event_match) => {
                 self.match_exact_event_match(exact_event_match)?
