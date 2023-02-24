@@ -443,22 +443,14 @@ impl PushRuleEvaluator {
             return Ok(false);
         }
 
-        // if we have no key, accept the event as matching, if it existed without matching any
-        // fields.
-        let key = if let Some(key) = key {
-            key
-        } else {
-            return Ok(true);
-        };
-
-        // There was a key, so we *must* have a pattern to go with it.
-        let pattern = if let Some(pattern) = pattern {
-            pattern
-        } else {
-            return Ok(false);
-        };
-
-        self.match_event_match(event, &key, &pattern)
+        match (key, pattern) {
+            // if we have no key, accept the event as matching.
+            (None, _) => Ok(true),
+            // There was a key, so we *must* have a pattern to go with it.
+            (Some(_), None) => Ok(false),
+            // If there is a key & pattern, check if they're in the flattened event (given by rel_type).
+            (Some(key), Some(pattern)) => self.match_event_match(event, &key, &pattern),
+        }
     }
 
     /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
