@@ -768,7 +768,9 @@ class ThreepidDeleteRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         try:
-            ret = await self.auth_handler.delete_threepid(
+            # Attempt to remove any known bindings of this third-party ID
+            # and user ID from identity servers.
+            ret = await self.hs.get_identity_handler().try_unbind_threepid(
                 user_id, body.medium, body.address, body.id_server
             )
         except Exception:
@@ -782,6 +784,11 @@ class ThreepidDeleteRestServlet(RestServlet):
             id_server_unbind_result = "success"
         else:
             id_server_unbind_result = "no-support"
+
+        # Delete the local association of this user ID and third-party ID.
+        await self.auth_handler.delete_local_threepid(
+            user_id, body.medium, body.address
+        )
 
         return 200, {"id_server_unbind_result": id_server_unbind_result}
 
