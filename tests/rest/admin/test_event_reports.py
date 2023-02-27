@@ -617,7 +617,7 @@ class DeleteEventReportTestCase(unittest.HomeserverTestCase):
         self.other_user_tok = self.login("user", "pass")
 
         # create report
-        self.get_success(
+        event_id = self.get_success(
             self._store.add_event_report(
                 "room_id",
                 "event_id",
@@ -628,8 +628,7 @@ class DeleteEventReportTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        # first created event report gets `id`=2
-        self.url = "/_synapse/admin/v1/event_reports/2"
+        self.url = f"/_synapse/admin/v1/event_reports/{event_id}"
 
     def test_no_auth(self) -> None:
         """
@@ -667,6 +666,16 @@ class DeleteEventReportTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual({}, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+
+        # check that report was deleted
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_invalid_report_id(self) -> None:
         """
