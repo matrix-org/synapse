@@ -363,3 +363,5 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationRemoteJoinRestServlet(hs).register(http_server)
     ReplicationRemoteRejectInviteRestServlet(hs).register(http_server)
     ReplicationUserJoinedLeftRoomRestServlet(hs).register(http_server)
+    ReplicationRemoteKnockRestServlet(hs).register(http_server)
+    ReplicationRemoteRescindKnockRestServlet(hs).register(http_server)
