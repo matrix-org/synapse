@@ -44,7 +44,6 @@ from twisted.internet.interfaces import (
     IAddress,
     IDelayedCall,
     IHostResolution,
-    IOpenSSLClientConnectionCreator,
     IOpenSSLContextFactory,
     IReactorCore,
     IReactorPluggableNameResolver,
