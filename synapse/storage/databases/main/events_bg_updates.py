@@ -1513,7 +1513,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         def _populate_membership_event_stream_ordering(
             txn: LoggingTransaction,
         ) -> bool:
-
             if "max_stream_ordering" in progress:
                 max_stream_ordering = progress["max_stream_ordering"]
             else:
