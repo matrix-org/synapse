@@ -156,7 +156,7 @@ jsonschema = ">=3.0.0"
 # frozendict 2.1.2 is broken on Debian 10: https://github.com/Marco-Sulla/python-frozendict/issues/41
 # We cannot test our wheels against the 2.3.5 release in CI. Putting in an upper bound for this
 # because frozendict has been more trouble than it's worth; we would like to move to immutabledict.
-frozendict = ">=1,!=2.1.2,<2.3.5"
+frozendict = ">=1,!=2.1.2,<2.3.6"
 # We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
 unpaddedbase64 = ">=2.1.0"
 # We require 1.5.0 to work around an issue when running against the C implementation of
