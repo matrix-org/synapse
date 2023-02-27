@@ -1779,6 +1779,24 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1790"><a class="header" href="#upgrading-to-v1790">Upgrading to v1.79.0</a></h1>
+<h2 id="the-on_threepid_bind-module-callback-method-has-been-deprecated"><a class="header" href="#the-on_threepid_bind-module-callback-method-has-been-deprecated">The <code>on_threepid_bind</code> module callback method has been deprecated</a></h2>
+<p>Synapse v1.79.0 deprecates the
+<a href="modules/third_party_rules_callbacks.html#on_threepid_bind"><code>on_threepid_bind</code></a>
+&quot;third-party rules&quot; Synapse module callback method in favour of a new module method,
+<a href="modules/third_party_rules_callbacks.html#on_add_user_third_party_identifier"><code>on_add_user_third_party_identifier</code></a>.
+<code>on_threepid_bind</code> will be removed in a future version of Synapse. You should check whether any Synapse
+modules in use in your deployment are making use of <code>on_threepid_bind</code>, and update them where possible.</p>
+<p>The arguments and functionality of the new method are the same.</p>
+<p>The justification behind the name change is that the old method's name, <code>on_threepid_bind</code>, was
+misleading. A user is considered to &quot;bind&quot; their third-party ID to their Matrix ID only if they
+do so via an <a href="https://spec.matrix.org/latest/identity-service-api/">identity server</a>
+(so that users on other homeservers may find them). But this method was not called in that case -
+it was only called when a user added a third-party identifier on the local homeserver.</p>
+<p>Module developers may also be interested in the related
+<a href="modules/third_party_rules_callbacks.html#on_remove_user_third_party_identifier"><code>on_remove_user_third_party_identifier</code></a>
+module callback method that was also added in Synapse v1.79.0. This new method is called when a
+user removes a third-party identifier from their account.</p>
 <h1 id="upgrading-to-v1780"><a class="header" href="#upgrading-to-v1780">Upgrading to v1.78.0</a></h1>
 <h2 id="deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api"><a class="header" href="#deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api">Deprecate the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code> admin API</a></h2>
 <p>Synapse 1.78.0 replaces the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code>
@@ -9890,6 +9908,10 @@ admin API.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h3 id="on_threepid_bind"><a class="header" href="#on_threepid_bind"><code>on_threepid_bind</code></a></h3>
 <p><em>First introduced in Synapse v1.56.0</em></p>
+<p><strong><span style="color:red">
+This callback is deprecated in favour of the <code>on_add_user_third_party_identifier</code> callback, which
+features the same functionality. The only difference is in name.
+</span></strong></p>
 <pre><code class="language-python">async def on_threepid_bind(user_id: str, medium: str, address: str) -&gt; None:
 </code></pre>
 <p>Called after creating an association between a local user and a third-party identifier
@@ -9898,6 +9920,28 @@ association is for, as well as the medium (<code>email</code> or <code>msisdn</c
 third-party identifier.</p>
 <p>Note that this callback is <em>not</em> called after a successful association on an <em>identity
 server</em>.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_add_user_third_party_identifier"><a class="header" href="#on_add_user_third_party_identifier"><code>on_add_user_third_party_identifier</code></a></h3>
+<p><em>First introduced in Synapse v1.79.0</em></p>
+<pre><code class="language-python">async def on_add_user_third_party_identifier(user_id: str, medium: str, address: str) -&gt; None:
+</code></pre>
+<p>Called after successfully creating an association between a user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (<code>email</code> or <code>msisdn</code>) and address of the
+third-party identifier (i.e. an email address).</p>
+<p>Note that this callback is <em>not</em> called if a user attempts to bind their third-party identifier
+to an identity server (via a call to <a href="https://spec.matrix.org/v1.5/client-server-api/#post_matrixclientv3account3pidbind"><code>POST /_matrix/client/v3/account/3pid/bind</code></a>).</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_remove_user_third_party_identifier"><a class="header" href="#on_remove_user_third_party_identifier"><code>on_remove_user_third_party_identifier</code></a></h3>
+<p><em>First introduced in Synapse v1.79.0</em></p>
+<pre><code class="language-python">async def on_remove_user_third_party_identifier(user_id: str, medium: str, address: str) -&gt; None:
+</code></pre>
+<p>Called after successfully removing an association between a user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (<code>email</code> or <code>msisdn</code>) and address of the
+third-party identifier (i.e. an email address).</p>
+<p>Note that this callback is <em>not</em> called if a user attempts to unbind their third-party
+identifier from an identity server (via a call to <a href="https://spec.matrix.org/v1.5/client-server-api/#post_matrixclientv3account3pidunbind"><code>POST /_matrix/client/v3/account/3pid/unbind</code></a>).</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h2 id="example-1"><a class="header" href="#example-1">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
