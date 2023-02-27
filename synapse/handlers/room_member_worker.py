@@ -127,7 +127,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             requester=requester,
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
-            user_id=user.to_string,
+            user_id=user.to_string(),
             content=content,
         )
         return ret["event_id"], ret["stream_id"]
