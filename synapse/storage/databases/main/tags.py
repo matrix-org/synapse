@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, Iterable, List, Mapping, Tuple, cast
+from typing import AbstractSet, Any, Dict, Iterable, List, Mapping, Set, Tuple, cast
 
 from synapse.api.constants import AccountDataTypes
 from synapse.replication.tcp.streams import AccountDataStream
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class TagsWorkerStore(AccountDataWorkerStore):
-    @cached()
+    @cached(iterable=True)
     async def get_tags_for_user(
         self, user_id: str
     ) -> Mapping[str, Mapping[str, JsonDict]]:
@@ -54,6 +54,27 @@ class TagsWorkerStore(AccountDataWorkerStore):
             room_tags = tags_by_room.setdefault(row["room_id"], {})
             room_tags[row["tag"]] = db_to_json(row["content"])
         return tags_by_room
+
+    @cached(iterable=True)
+    async def get_all_users_tags_for_room(
+        self, room_id: str
+    ) -> Mapping[str, AbstractSet[str]]:
+        """Get all the tags for a room.
+
+        Args:
+            room_id: The room to get the tags for.
+
+        Returns:
+            A mapping from user IDs to a list of room tags.
+        """
+
+        rows = await self.db_pool.simple_select_list(
+            "room_tags", {"room_id": room_id}, ["user_id", "tag"]
+        )
+        tags_by_user: Dict[str, Set[str]] = {}
+        for row in rows:
+            tags_by_user.setdefault(row["user_id"], set()).add(row["tag"])
+        return tags_by_user
 
     async def get_all_updated_tags(
         self, instance_name: str, last_id: int, current_id: int, limit: int

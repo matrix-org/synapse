@@ -409,6 +409,12 @@ class BulkPushRuleEvaluator:
                     filter(lambda item: isinstance(item, str), user_mentions_raw)
                 )
 
+        # Fetch the room's tags for each user.
+        if self.hs.config.experimental.msc3964_notifications_for_room_tags:
+            tags_by_user = await self.store.get_all_users_tags_for_room(event.room_id)
+        else:
+            tags_by_user = {}
+
         evaluator = PushRuleEvaluator(
             _flatten_dict(
                 event,
@@ -419,6 +425,7 @@ class BulkPushRuleEvaluator:
             room_member_count,
             sender_power_level,
             notification_levels,
+            tags_by_user,
             related_events,
             self._related_event_match_enabled,
             event.room_version.msc3931_push_features,

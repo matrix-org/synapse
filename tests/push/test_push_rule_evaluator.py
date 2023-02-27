@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional, Set, Union, cast
+from typing import AbstractSet, Any, Dict, List, Optional, Set, Union, cast
 
 import frozendict
 
@@ -149,6 +149,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         *,
         has_mentions: bool = False,
         user_mentions: Optional[Set[str]] = None,
+        tags_by_user: Optional[Dict[str, AbstractSet[str]]] = None,
         related_events: Optional[JsonDict] = None,
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
@@ -172,6 +173,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
+            tags_by_user or {},
             {} if related_events is None else related_events,
             related_event_match_enabled=True,
             room_version_feature_flags=event.room_version.msc3931_push_features,
@@ -843,6 +845,24 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 "display_name",
             )
         )
+
+    def test_room_tags(self) -> None:
+        """Ensure that matching by room tag works."""
+        condition = {"kind": "org.matrix.msc3964.room_tag", "tag": "foo"}
+
+        # If the user has no tags it should not match.
+        evaluator = self._get_evaluator({})
+        self.assertFalse(evaluator.matches(condition, "@user:test", "display_name"))
+        evaluator = self._get_evaluator({}, tags_by_user={"@user:test": set()})
+        self.assertFalse(evaluator.matches(condition, "@user:test", "display_name"))
+
+        # If the user has *other* tags it should not match.
+        evaluator = self._get_evaluator({}, tags_by_user={"@user:test": {"bar"}})
+        self.assertFalse(evaluator.matches(condition, "@user:test", "display_name"))
+
+        # If the user has at least the given tag it should match.
+        evaluator = self._get_evaluator({}, tags_by_user={"@user:test": {"foo", "bar"}})
+        self.assertTrue(evaluator.matches(condition, "@user:test", "display_name"))
 
 
 class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):

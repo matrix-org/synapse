@@ -194,3 +194,8 @@ class ExperimentalConfig(Config):
         self.msc3966_exact_event_property_contains = experimental.get(
             "msc3966_exact_event_property_contains", False
         )
+
+        # MSC3964: Notifications for room tags.
+        self.msc3964_notifications_for_room_tags = experimental.get(
+            "msc3964_notifications_for_room_tags", False
+        )

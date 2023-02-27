@@ -347,6 +347,10 @@ pub enum KnownCondition {
         #[serde(skip_serializing_if = "Option::is_none")]
         is: Option<Cow<'static, str>>,
     },
+    #[serde(rename = "org.matrix.msc3964.room_tag")]
+    RoomTag {
+        tag: Cow<'static, str>,
+    },
     SenderNotificationPermission {
         key: Cow<'static, str>,
     },

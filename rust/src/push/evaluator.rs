@@ -85,6 +85,9 @@ pub struct PushRuleEvaluator {
     /// outlier.
     sender_power_level: Option<i64>,
 
+    // User's tags for this event's room.
+    tags_by_user: BTreeMap<String, BTreeSet<String>>,
+
     /// The related events, indexed by relation type. Flattened in the same manner as
     /// `flattened_keys`.
     related_events_flattened: BTreeMap<String, BTreeMap<String, JsonValue>>,
@@ -118,6 +121,7 @@ impl PushRuleEvaluator {
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
+        tags_by_user: BTreeMap<String, BTreeSet<String>>,
         related_events_flattened: BTreeMap<String, BTreeMap<String, JsonValue>>,
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
@@ -138,6 +142,7 @@ impl PushRuleEvaluator {
             room_member_count,
             notification_power_levels,
             sender_power_level,
+            tags_by_user,
             related_events_flattened,
             related_event_match_enabled,
             room_version_feature_flags,
@@ -340,6 +345,10 @@ impl PushRuleEvaluator {
                     false
                 }
             }
+            KnownCondition::RoomTag { tag } => match (user_id, tag) {
+                (Some(user_id), tag) => self.match_tag(user_id, tag)?,
+                _ => false,
+            },
             KnownCondition::SenderNotificationPermission { key } => {
                 if let Some(sender_power_level) = &self.sender_power_level {
                     let required_level = self
@@ -498,6 +507,15 @@ impl PushRuleEvaluator {
 
         Ok(matches)
     }
+
+    /// Match if any of the room's tags for the given user exist.
+    fn match_tag(&self, user_id: &str, tag: &str) -> Result<bool, Error> {
+        if let Some(tags) = self.tags_by_user.get(user_id) {
+            Ok(tags.contains(tag))
+        } else {
+            Ok(false)
+        }
+    }
 }
 
 #[test]
@@ -513,6 +531,7 @@ fn push_rule_evaluator() {
         BTreeSet::new(),
         10,
         Some(0),
+        BTreeMap::new(),
         BTreeMap::new(),
         BTreeMap::new(),
         true,
@@ -545,6 +564,7 @@ fn test_requires_room_version_supports_condition() {
         BTreeSet::new(),
         10,
         Some(0),
+        BTreeMap::new(),
         BTreeMap::new(),
         BTreeMap::new(),
         false,
