@@ -90,18 +90,11 @@ process, for example:
 
 # Upgrading to v1.79.0
 
-## Deprecate the `/_synapse/admin/v1/media/<server_name>/delete` admin API
-
-Synapse 1.78.0 replaces the `/_synapse/admin/v1/media/<server_name>/delete`
-admin API with an identical endpoint at `/_synapse/admin/v1/media/delete`. Please
-update your tooling to use the new endpoint. The deprecated version will be removed
-in a future release.
-
 ## The `on_threepid_bind` module callback method has been deprecated
 
-The [`on_threepid_bind`](modules/third_party_rules_callbacks.md#on_threepid_bind) "third-party rules"
-Synapse module callback method has been deprecated
-in favour of a new module method,
+Synapse v1.79.0 deprecates the
+[`on_threepid_bind`](modules/third_party_rules_callbacks.md#on_threepid_bind)
+"third-party rules" Synapse module callback method in favour of a new module method,
 [`on_add_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_add_user_third_party_identifier).
 `on_threepid_bind` will be removed in a future version of Synapse. You should check whether any Synapse
 modules in use in your deployment are making use of `on_threepid_bind`, and update them where possible.
@@ -118,6 +111,15 @@ Module developers may also be interested in the related
 [`on_remove_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_remove_user_third_party_identifier)
 module callback method that was also added in Synapse v1.79.0. This new method is called when a
 user removes a third-party identifier from their account.
+
+# Upgrading to v1.78.0
+
+## Deprecate the `/_synapse/admin/v1/media/<server_name>/delete` admin API
+
+Synapse 1.78.0 replaces the `/_synapse/admin/v1/media/<server_name>/delete`
+admin API with an identical endpoint at `/_synapse/admin/v1/media/delete`. Please
+update your tooling to use the new endpoint. The deprecated version will be removed
+in a future release.
 
 # Upgrading to v1.76.0
 
