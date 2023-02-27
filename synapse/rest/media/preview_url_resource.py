@@ -40,21 +40,19 @@ from synapse.http.server import (
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.media._base import FileInfo, get_filename_from_headers
+from synapse.media.media_storage import MediaStorage
+from synapse.media.oembed import OEmbedProvider
+from synapse.media.preview_html import decode_body, parse_html_to_open_graph
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.rest.media.v1._base import get_filename_from_headers
-from synapse.rest.media.v1.media_storage import MediaStorage
-from synapse.rest.media.v1.oembed import OEmbedProvider
-from synapse.rest.media.v1.preview_html import decode_body, parse_html_to_open_graph
 from synapse.types import JsonDict, UserID
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.stringutils import random_string
 
-from ._base import FileInfo
-
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.media.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
