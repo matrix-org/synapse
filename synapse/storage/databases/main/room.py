@@ -2169,7 +2169,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             user_id: User who reports the event.
             reason: Description that the user specifies.
             content: Report request body (score and reason).
-            received_ts: Time when the user submitted the report.
+            received_ts: Time when the user submitted the report (milliseconds).
         Returns:
             Id of the event report.
         """
