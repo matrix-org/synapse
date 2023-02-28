@@ -1128,9 +1128,10 @@ class UserDirectoryRemoteProfileTestCase(unittest.HomeserverTestCase):
         self.user_dir_handler = hs.get_user_directory_handler()
         self.profile_handler = hs.get_profile_handler()
 
-        # Cancel the startup call: in the steady-state case we can't rely on it anyway.
-        assert self.user_dir_handler._refresh_remote_profiles_call_later is not None
-        self.user_dir_handler._refresh_remote_profiles_call_later.cancel()
+        if self.user_dir_handler._refresh_remote_profiles_call_later is not None:
+            # Cancel the startup call: in the steady-state case we can't rely on
+            # it anyway.
+            self.user_dir_handler._refresh_remote_profiles_call_later.cancel()
 
     def test_public_rooms_have_profiles_collected(self) -> None:
         """
