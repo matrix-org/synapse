@@ -2023,8 +2023,8 @@ however, the interface is <a href="../../admin_api/register_api.html">documented
 <p>An alternative to <a href="#registration_shared_secret"><code>registration_shared_secret</code></a>:
 allows the shared secret to be specified in an external file.</p>
 <p>The file should be a plain text file, containing only the shared secret.</p>
-<p>If this file does not exist, Synapse will create a new signing
-key on startup and store it in this file.</p>
+<p>If this file does not exist, Synapse will create a new shared
+secret on startup and store it in this file.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_shared_secret_path: /path/to/secrets/file
 </code></pre>
