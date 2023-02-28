@@ -299,6 +299,16 @@ was reported.</li>
 have a canonical alias set.</li>
 <li><code>event_json</code>: object - Details of the original event that was reported.</li>
 </ul>
+<h1 id="delete-a-specific-event-report"><a class="header" href="#delete-a-specific-event-report">Delete a specific event report</a></h1>
+<p>This API deletes a specific event report. If the request is successful, the response body
+will be an empty JSON object.</p>
+<p>The api is:</p>
+<pre><code>DELETE /_synapse/admin/v1/event_reports/&lt;report_id&gt;
+</code></pre>
+<p><strong>URL parameters:</strong></p>
+<ul>
+<li><code>report_id</code>: string - The ID of the event report.</li>
+</ul>
 
                     </main>
 
