@@ -78,7 +78,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         """
         Try to get an event report without authentication.
         """
-        channel = self.make_request("GET", self.url, b"{}")
+        channel = self.make_request("GET", self.url, {})
 
         self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -473,7 +473,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         """
         Try to get event report without authentication.
         """
-        channel = self.make_request("GET", self.url, b"{}")
+        channel = self.make_request("GET", self.url, {})
 
         self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
@@ -599,3 +599,142 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertIn("room_id", content["event_json"])
         self.assertIn("sender", content["event_json"])
         self.assertIn("content", content["event_json"])
+
+
+class DeleteEventReportTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self._store = hs.get_datastores().main
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+
+        # create report
+        event_id = self.get_success(
+            self._store.add_event_report(
+                "room_id",
+                "event_id",
+                self.other_user,
+                "this makes me sad",
+                {},
+                self.clock.time_msec(),
+            )
+        )
+
+        self.url = f"/_synapse/admin/v1/event_reports/{event_id}"
+
+    def test_no_auth(self) -> None:
+        """
+        Try to delete event report without authentication.
+        """
+        channel = self.make_request("DELETE", self.url)
+
+        self.assertEqual(401, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_no_admin(self) -> None:
+        """
+        If the user is not a server admin, an error 403 is returned.
+        """
+
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            access_token=self.other_user_tok,
+        )
+
+        self.assertEqual(403, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_delete_success(self) -> None:
+        """
+        Testing delete a report.
+        """
+
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual({}, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+
+        # check that report was deleted
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_invalid_report_id(self) -> None:
+        """
+        Testing that an invalid `report_id` returns a 400.
+        """
+
+        # `report_id` is negative
+        channel = self.make_request(
+            "DELETE",
+            "/_synapse/admin/v1/event_reports/-123",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "The report_id parameter must be a string representing a positive integer.",
+            channel.json_body["error"],
+        )
+
+        # `report_id` is a non-numerical string
+        channel = self.make_request(
+            "DELETE",
+            "/_synapse/admin/v1/event_reports/abcdef",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "The report_id parameter must be a string representing a positive integer.",
+            channel.json_body["error"],
+        )
+
+        # `report_id` is undefined
+        channel = self.make_request(
+            "DELETE",
+            "/_synapse/admin/v1/event_reports/",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "The report_id parameter must be a string representing a positive integer.",
+            channel.json_body["error"],
+        )
+
+    def test_report_id_not_found(self) -> None:
+        """
+        Testing that a not existing `report_id` returns a 404.
+        """
+
+        channel = self.make_request(
+            "DELETE",
+            "/_synapse/admin/v1/event_reports/123",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+        self.assertEqual("Event report not found", channel.json_body["error"])

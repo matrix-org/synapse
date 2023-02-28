@@ -18,7 +18,7 @@ from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.rest.media.v1.oembed import OEmbedProvider, OEmbedResult
+from synapse.media.oembed import OEmbedProvider, OEmbedResult
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock

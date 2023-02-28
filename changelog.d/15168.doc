@@ -1,0 +1,1 @@
+Correct the description of the behavior of `registration_shared_secret_path` on startup.

@@ -178,11 +178,13 @@ class ContentRepositoryConfig(Config):
         for i, provider_config in enumerate(storage_providers):
             # We special case the module "file_system" so as not to need to
             # expose FileStorageProviderBackend
-            if provider_config["module"] == "file_system":
-                provider_config["module"] = (
-                    "synapse.rest.media.v1.storage_provider"
-                    ".FileStorageProviderBackend"
-                )
+            if (
+                provider_config["module"] == "file_system"
+                or provider_config["module"] == "synapse.rest.media.v1.storage_provider"
+            ):
+                provider_config[
+                    "module"
+                ] = "synapse.media.storage_provider.FileStorageProviderBackend"
 
             provider_class, parsed_config = load_module(
                 provider_config, ("media_storage_providers", "<item %i>" % i)
