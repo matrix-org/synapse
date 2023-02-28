@@ -2227,8 +2227,8 @@ allows the shared secret to be specified in an external file.
 
 The file should be a plain text file, containing only the shared secret.
 
-If this file does not exist, Synapse will create a new signing
-key on startup and store it in this file.
+If this file does not exist, Synapse will create a new shared
+secret on startup and store it in this file.
 
 Example configuration:
 ```yaml
