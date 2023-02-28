@@ -2026,7 +2026,7 @@ allows the shared secret to be specified in an external file.</p>
 <p>If this file does not exist, Synapse will create a new signing
 key on startup and store it in this file.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">registration_shared_secret_file: /path/to/secrets/file
+<pre><code class="language-yaml">registration_shared_secret_path: /path/to/secrets/file
 </code></pre>
 <p><em>Added in Synapse 1.67.0.</em></p>
 <hr />
@@ -3501,10 +3501,20 @@ this defaults to the main process or your single <code>media_repository</code> w
 <p>Configuration for Redis when using workers. This <em>must</em> be enabled when using workers.
 This setting has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>: whether to use Redis support. Defaults to false.</li>
-<li><code>host</code> and <code>port</code>: Optional host and port to use to connect to redis. Defaults to
-localhost and 6379</li>
-<li><code>password</code>: Optional password if configured on the Redis instance.</li>
+<li>
+<p><code>enabled</code>: whether to use Redis support. Defaults to false.</p>
+</li>
+<li>
+<p><code>host</code> and <code>port</code>: Optional host and port to use to connect to redis. Defaults to
+localhost and 6379</p>
+</li>
+<li>
+<p><code>password</code>: Optional password if configured on the Redis instance.</p>
+</li>
+<li>
+<p><code>dbid</code>: Optional redis dbid if needs to connect to specific redis logical db.</p>
+<p><em>Added in Synapse 1.78.0.</em></p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">redis:
@@ -3512,6 +3522,7 @@ localhost and 6379</li>
   host: localhost
   port: 6379
   password: &lt;secret_password&gt;
+  dbid: &lt;dbid&gt;
 </code></pre>
 <hr />
 <h2 id="individual-worker-configuration"><a class="header" href="#individual-worker-configuration">Individual worker configuration</a></h2>

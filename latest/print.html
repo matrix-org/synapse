@@ -1666,6 +1666,14 @@ generally not suitable if Synapse is hosted at a subdomain such as
 <p>It is also possible to do delegation using a SRV DNS record. However, that is generally
 not recommended, as it can be difficult to configure the TLS certificates correctly in
 this case, and it offers little advantage over <code>.well-known</code> delegation.</p>
+<p>Please keep in mind that server delegation is a function of server-server communication,
+and as such using SRV DNS records will not cover use cases involving client-server comms.
+This means setting global client settings (such as a Jitsi endpoint, or disabling
+creating new rooms as encrypted by default, etc) will still require that you serve a file
+from the <code>https://&lt;server_name&gt;/.well-known/</code> endpoints defined in the spec! If you are
+considering using SRV DNS delegation to avoid serving files from this endpoint, consider
+the impact that you will not be able to change those client-based default values globally,
+and will be relegated to the featureset of the configuration of each individual client.</p>
 <p>However, if you really need it, you can find some documentation on what such a
 record should look like and how Synapse will use it in <a href="https://matrix.org/docs/spec/server_server/latest#resolving-server-names">the Matrix
 specification</a>.</p>
@@ -1771,6 +1779,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1780"><a class="header" href="#upgrading-to-v1780">Upgrading to v1.78.0</a></h1>
+<h2 id="deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api"><a class="header" href="#deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api">Deprecate the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code> admin API</a></h2>
+<p>Synapse 1.78.0 replaces the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code>
+admin API with an identical endpoint at <code>/_synapse/admin/v1/media/delete</code>. Please
+update your tooling to use the new endpoint. The deprecated version will be removed
+in a future release.</p>
 <h1 id="upgrading-to-v1760"><a class="header" href="#upgrading-to-v1760">Upgrading to v1.76.0</a></h1>
 <h2 id="faster-joins-are-enabled-by-default"><a class="header" href="#faster-joins-are-enabled-by-default">Faster joins are enabled by default</a></h2>
 <p>When joining a room for the first time, Synapse 1.76.0 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.</p>
@@ -5384,7 +5398,7 @@ allows the shared secret to be specified in an external file.</p>
 <p>If this file does not exist, Synapse will create a new signing
 key on startup and store it in this file.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">registration_shared_secret_file: /path/to/secrets/file
+<pre><code class="language-yaml">registration_shared_secret_path: /path/to/secrets/file
 </code></pre>
 <p><em>Added in Synapse 1.67.0.</em></p>
 <hr />
@@ -6859,10 +6873,20 @@ this defaults to the main process or your single <code>media_repository</code> w
 <p>Configuration for Redis when using workers. This <em>must</em> be enabled when using workers.
 This setting has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>: whether to use Redis support. Defaults to false.</li>
-<li><code>host</code> and <code>port</code>: Optional host and port to use to connect to redis. Defaults to
-localhost and 6379</li>
-<li><code>password</code>: Optional password if configured on the Redis instance.</li>
+<li>
+<p><code>enabled</code>: whether to use Redis support. Defaults to false.</p>
+</li>
+<li>
+<p><code>host</code> and <code>port</code>: Optional host and port to use to connect to redis. Defaults to
+localhost and 6379</p>
+</li>
+<li>
+<p><code>password</code>: Optional password if configured on the Redis instance.</p>
+</li>
+<li>
+<p><code>dbid</code>: Optional redis dbid if needs to connect to specific redis logical db.</p>
+<p><em>Added in Synapse 1.78.0.</em></p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">redis:
@@ -6870,6 +6894,7 @@ localhost and 6379</li>
   host: localhost
   port: 6379
   password: &lt;secret_password&gt;
+  dbid: &lt;dbid&gt;
 </code></pre>
 <hr />
 <h2 id="individual-worker-configuration"><a class="header" href="#individual-worker-configuration">Individual worker configuration</a></h2>
@@ -10505,6 +10530,14 @@ recommend the use of <code>systemd</code> where available: for information on se
 <code>systemd</code> to start synapse workers, see
 <a href="systemd-with-workers/">Systemd with Workers</a>. To use <code>synctl</code>, see
 <a href="synctl_workers.html">Using synctl with Workers</a>.</p>
+<h2 id="start-synapse-with-poetry"><a class="header" href="#start-synapse-with-poetry">Start Synapse with Poetry</a></h2>
+<p>The following applies to Synapse installations that have been installed from source using <code>poetry</code>.</p>
+<p>You can start the main Synapse process with Poetry by running the following command:</p>
+<pre><code class="language-console">poetry run synapse_homeserver -c [your homeserver.yaml]
+</code></pre>
+<p>For worker setups, you can run the following command</p>
+<pre><code class="language-console">poetry run synapse_worker -c [your worker.yaml]
+</code></pre>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
 <p>This worker can handle API requests matching the following regular expressions.
@@ -11569,13 +11602,18 @@ See also <a href="admin_api/media_admin_api.html#purge-remote-media-api">Purge R
 </ul>
 <h2 id="delete-local-media-by-date-or-size"><a class="header" href="#delete-local-media-by-date-or-size">Delete local media by date or size</a></h2>
 <p>Request:</p>
+<pre><code>POST /_synapse/admin/v1/media/delete?before_ts=&lt;before_ts&gt;
+
+{}
+</code></pre>
+<p><em>Deprecated in Synapse v1.78.0:</em> This API is available at the deprecated endpoint:</p>
 <pre><code>POST /_synapse/admin/v1/media/&lt;server_name&gt;/delete?before_ts=&lt;before_ts&gt;
 
 {}
 </code></pre>
 <p>URL Parameters</p>
 <ul>
-<li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>).</li>
+<li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>). <em>Deprecated in Synapse v1.78.0.</em></li>
 <li><code>before_ts</code>: string representing a positive integer - Unix timestamp in milliseconds.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
 last access, not the timestamp when the file was created.</li>
@@ -15002,7 +15040,7 @@ WHERE room_stats_state.room_id = event_json.room_id&quot; | psql -d synapse -h l
   FROM devices
   WHERE last_seen &lt; DATE_PART('epoch', NOW() - INTERVAL '3 month') * 1000;
 </code></pre>
-<div style="break-before: page; page-break-before: always;"></div><p>This blog post by Victor Berger explains how to use many of the tools listed on this page: https://levans.fr/shrink-synapse-database.html</p>
+<div style="break-before: page; page-break-before: always;"></div><p><em>This <a href="https://jacksonchen666.com/posts/2022-12-03/14-33-00/">blog post by Jackson Chen</a> (Dec 2022) explains how to use many of the tools listed on this page. There is also an <a href="https://levans.fr/shrink-synapse-database.html">earlier blog by Victor Berger</a> (June 2020), though this may be outdated in places.</em></p>
 <h1 id="list-of-useful-tools-and-scripts-for-maintenance-synapse-database"><a class="header" href="#list-of-useful-tools-and-scripts-for-maintenance-synapse-database">List of useful tools and scripts for maintenance Synapse database:</a></h1>
 <h2 id="purge-remote-media-api-1"><a class="header" href="#purge-remote-media-api-1"><a href="usage/administration/../../admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></a></h2>
 <p>The purge remote media API allows server admins to purge old cached remote media.</p>
@@ -15110,6 +15148,9 @@ a temporary directory (which starts with &quot;synapse-exfiltrate&quot;) in <cod
 │       ├───invite_state
 │       └───knock_state
 └───user_data
+    ├───account_data
+    │   ├───global
+    │   └───&lt;room_id&gt;
     ├───connections
     ├───devices
     └───profile
@@ -15281,6 +15322,13 @@ for other installation methods.</p>
 poetry install --extras all
 </code></pre>
 <p>This will install the runtime and developer dependencies for the project.</p>
+<h2 id="running-synapse-via-poetry"><a class="header" href="#running-synapse-via-poetry">Running Synapse via poetry</a></h2>
+<p>To start a local instance of Synapse in the locked poetry environment, create a config file:</p>
+<pre><code class="language-sh">cp docs/sample_config.yaml homeserver.yaml
+</code></pre>
+<p>Now edit homeserver.yaml, and run Synapse with:</p>
+<pre><code class="language-sh">poetry run python -m synapse.app.homeserver -c homeserver.yaml
+</code></pre>
 <h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
 <p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
 <h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
