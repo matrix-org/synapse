@@ -237,6 +237,37 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         else:
             return None
 
+    async def get_latest_stream_id_for_global_account_data_by_type_for_user(
+        self, user_id: str, data_type: str
+    ) -> Optional[int]:
+        """
+        Returns:
+            The stream ID of the account data,
+            or None if there is no such account data.
+        """
+
+        def get_latest_stream_id_for_global_account_data_by_type_for_user_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[int]:
+            sql = """
+                SELECT stream_id FROM account_data
+                WHERE user_id = ? AND account_data_type = ?
+                ORDER BY stream_id DESC
+                LIMIT 1
+            """
+            txn.execute(sql, (user_id, data_type))
+
+            row = txn.fetchone()
+            if row:
+                return row[0]
+            else:
+                return None
+
+        return await self.db_pool.runInteraction(
+            "get_latest_stream_id_for_global_account_data_by_type_for_user",
+            get_latest_stream_id_for_global_account_data_by_type_for_user_txn,
+        )
+
     @cached(num_args=2, tree=True)
     async def get_account_data_for_room(
         self, user_id: str, room_id: str
