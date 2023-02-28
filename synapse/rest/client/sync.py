@@ -139,7 +139,7 @@ class SyncRestServlet(RestServlet):
             device_id,
         )
 
-        # ID of the last ignored users account data event for this user,
+        # Stream position of the last ignored users account data event for this user,
         # if we're initial syncing.
         # We include this in the request key to invalidate an initial sync
         # in the response cache once the set of ignored users has changed.
