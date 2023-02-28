@@ -413,8 +413,8 @@ this callback.</p>
 <p><em>First introduced in Synapse v1.37.0</em></p>
 <p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
 <pre><code class="language-python">async def check_media_file_for_spam(
-    file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
-    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
+    file_wrapper: &quot;synapse.media.media_storage.ReadableFileWrapper&quot;,
+    file_info: &quot;synapse.media._base.FileInfo&quot;,
 ) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
 </code></pre>
 <p>Called when storing a local or remote file.</p>
