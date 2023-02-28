@@ -115,24 +115,27 @@ class MyModule:
         self.api.register_cached_function(self.get_user_from_id)
 
     @cached()
-    async def get_user_from_id(self, user_id: str) -> str:
+    async def get_department_for_user(self, user_id: str) -> str:
         """A function with a cache."""
-        return await self.get_user(user_id)
+        # Request a department from an external service.
+        return await self.http_client.get_json(
+            "https://int.example.com/users", {"user_id": user_id)
+        )["department"]
 
     async def do_something_with_users(self) -> None:
         """Calls the cached function and then invalidates an entry in its cache."""
         
         user_id = "@alice:example.com"
         
-        # Get the user. Since get_user_from_id is wrapped with a cache, the return
-        # value for this user_id will be cached.
-        user = await self.get_user_from_id(user_id)
+        # Get the user. Since get_department_for_user is wrapped with a cache,
+        # the return value for this user_id will be cached.
+        department = await self.get_department_for_user(user_id)
         
-        # Do something with `user`...
+        # Do something with `department`...
         
         # Let's say something has changed with our user, and the entry we have for
         # them in the cache is out of date, so we want to invalidate it.
-        await self.api.invalidate_cache(self.get_user_from_id, (user_id,))
+        await self.api.invalidate_cache(self.get_department_for_user, (user_id,))
 ```
 
 See the [`cached` docstring](https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L190) for more details.
