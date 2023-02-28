@@ -608,6 +608,9 @@ class UserDirectoryHandler(StateDeltasHandler):
         if not servers_to_refresh:
             # Do we have any backing-off servers that we should try again
             # for eventually?
+            # By setting `now` is a point in the far future, we can ask for
+            # which server/user is next to be refreshed, even though it is
+            # not actually refreshable *now*.
             end_of_time = 1 << 62
             backing_off_servers = (
                 await self.store.get_remote_servers_with_profiles_to_refresh(
