@@ -232,6 +232,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
+    ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
 
     # Encryption requests
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
