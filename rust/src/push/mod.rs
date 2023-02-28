@@ -614,7 +614,33 @@ fn test_serialize_condition() {
 fn test_deserialize_condition() {
     let json = r#"{"kind":"event_match","key":"content.body","pattern":"coffee"}"#;
 
-    let _: Condition = serde_json::from_str(json).unwrap();
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::EventMatch(_))
+    ));
+}
+
+#[test]
+fn test_serialize_event_match_condition_with_pattern_type() {
+    let condition = Condition::Known(KnownCondition::EventMatchType(EventMatchTypeCondition {
+        key: "content.body".into(),
+        pattern_type: Cow::Owned(EventMatchPatternType::UserId),
+    }));
+
+    let json = serde_json::to_string(&condition).unwrap();
+    assert_eq!(
+        json,
+        r#"{"kind":"event_match","key":"content.body","pattern_type":"user_id"}"#
+    )
+}
+
+#[test]
+fn test_cannot_deserialize_event_match_condition_with_pattern_type() {
+    let json = r#"{"kind":"event_match","key":"content.body","pattern_type":"user_id"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(condition, Condition::Unknown(_)));
 }
 
 #[test]
@@ -622,6 +648,37 @@ fn test_deserialize_unstable_msc3664_condition() {
     let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern":"coffee","rel_type":"m.in_reply_to"}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::RelatedEventMatch(_))
+    ));
+}
+
+#[test]
+fn test_serialize_unstable_msc3664_condition_with_pattern_type() {
+    let condition = Condition::Known(KnownCondition::RelatedEventMatchType(
+        RelatedEventMatchTypeCondition {
+            key: "content.body".into(),
+            pattern_type: Cow::Owned(EventMatchPatternType::UserId),
+            rel_type: "m.in_reply_to".into(),
+            include_fallbacks: Some(true),
+        },
+    ));
+
+    let json = serde_json::to_string(&condition).unwrap();
+    assert_eq!(
+        json,
+        r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern_type":"user_id","rel_type":"m.in_reply_to","include_fallbacks":true}"#
+    )
+}
+
+#[test]
+fn test_cannot_deserialize_unstable_msc3664_condition_with_pattern_type() {
+    let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern_type":"user_id","rel_type":"m.in_reply_to"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    // Since pattern is optional on RelatedEventMatch it deserializes it to that
+    // instead of RelatedEventMatchType.
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::RelatedEventMatch(_))
