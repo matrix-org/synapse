@@ -20,6 +20,7 @@ import attr
 from synapse.api.constants import Direction, EventTypes, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase, relation_from_event
+from synapse.events.utils import SerializeEventConfig
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import trace
 from synapse.storage.databases.main.relations import ThreadsNextBatch, _RelatedEvent
@@ -152,16 +153,23 @@ class RelationsHandler:
         )
 
         now = self._clock.time_msec()
+        serialize_options = SerializeEventConfig(requester=requester)
         return_value: JsonDict = {
             "chunk": self._event_serializer.serialize_events(
-                events, now, bundle_aggregations=aggregations
+                events,
+                now,
+                bundle_aggregations=aggregations,
+                config=serialize_options,
             ),
         }
         if include_original_event:
             # Do not bundle aggregations when retrieving the original event because
             # we want the content before relations are applied to it.
             return_value["original_event"] = self._event_serializer.serialize_event(
-                event, now, bundle_aggregations=None
+                event,
+                now,
+                bundle_aggregations=None,
+                config=serialize_options,
             )
 
         if next_token:

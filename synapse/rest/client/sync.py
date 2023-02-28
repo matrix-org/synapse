@@ -14,7 +14,7 @@
 import itertools
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
 
 from synapse.api.constants import EduTypes, Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
@@ -38,7 +38,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import trace_with_opname
-from synapse.types import JsonDict, StreamToken
+from synapse.types import JsonDict, Requester, StreamToken
 from synapse.util import json_decoder
 
 from ._base import client_patterns, set_timeline_upper_limit
@@ -205,7 +205,7 @@ class SyncRestServlet(RestServlet):
         # We know that the the requester has an access token since appservices
         # cannot use sync.
         response_content = await self.encode_response(
-            time_now, sync_result, requester.access_token_id, filter_collection
+            time_now, sync_result, requester, filter_collection
         )
 
         logger.debug("Event formatting complete")
@@ -216,7 +216,7 @@ class SyncRestServlet(RestServlet):
         self,
         time_now: int,
         sync_result: SyncResult,
-        access_token_id: Optional[int],
+        requester: Requester,
         filter: FilterCollection,
     ) -> JsonDict:
         logger.debug("Formatting events in sync response")
@@ -229,12 +229,12 @@ class SyncRestServlet(RestServlet):
 
         serialize_options = SerializeEventConfig(
             event_format=event_formatter,
-            token_id=access_token_id,
+            requester=requester,
             only_event_fields=filter.event_fields,
         )
         stripped_serialize_options = SerializeEventConfig(
             event_format=event_formatter,
-            token_id=access_token_id,
+            requester=requester,
             include_stripped_room_state=True,
         )
 
