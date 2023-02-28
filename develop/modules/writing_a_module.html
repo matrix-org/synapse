@@ -207,6 +207,54 @@ the callback name as the argument name and the function as its value. A
 <code>register_[...]_callbacks</code> method exists for each category.</p>
 <p>Callbacks for each category can be found on their respective page of the
 <a href="https://matrix-org.github.io/synapse">Synapse documentation website</a>.</p>
+<h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
+<p><em>Added in Synapse 1.74.0.</em></p>
+<p>Modules can leverage Synapse's caching tools to manage their own cached functions. This
+can be helpful for modules that need to repeatedly request the same data from the database
+or a remote service.</p>
+<p>Functions that need to be wrapped with a cache need to be decorated with a <code>@cached()</code>
+decorator (which can be imported from <code>synapse.module_api</code>) and registered with the
+<a href="https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L888"><code>ModuleApi.register_cached_function</code></a>
+API when initialising the module. If the module needs to invalidate an entry in a cache,
+it needs to use the <a href="https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L904"><code>ModuleApi.invalidate_cache</code></a>
+API, with the function to invalidate the cache of and the key(s) of the entry to
+invalidate.</p>
+<p>Below is an example of a simple module using a cached function:</p>
+<pre><code class="language-python">from typing import Any
+from synapse.module_api import cached, ModuleApi
+
+class MyModule:
+    def __init__(self, config: Any, api: ModuleApi):
+        self.api = api
+        
+        # Register the cached function so Synapse knows how to correctly invalidate
+        # entries for it.
+        self.api.register_cached_function(self.get_user_from_id)
+
+    @cached()
+    async def get_department_for_user(self, user_id: str) -&gt; str:
+        &quot;&quot;&quot;A function with a cache.&quot;&quot;&quot;
+        # Request a department from an external service.
+        return await self.http_client.get_json(
+            &quot;https://int.example.com/users&quot;, {&quot;user_id&quot;: user_id)
+        )[&quot;department&quot;]
+
+    async def do_something_with_users(self) -&gt; None:
+        &quot;&quot;&quot;Calls the cached function and then invalidates an entry in its cache.&quot;&quot;&quot;
+        
+        user_id = &quot;@alice:example.com&quot;
+        
+        # Get the user. Since get_department_for_user is wrapped with a cache,
+        # the return value for this user_id will be cached.
+        department = await self.get_department_for_user(user_id)
+        
+        # Do something with `department`...
+        
+        # Let's say something has changed with our user, and the entry we have for
+        # them in the cache is out of date, so we want to invalidate it.
+        await self.api.invalidate_cache(self.get_department_for_user, (user_id,))
+</code></pre>
+<p>See the <a href="https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L190"><code>cached</code> docstring</a> for more details.</p>
 
                     </main>
 
