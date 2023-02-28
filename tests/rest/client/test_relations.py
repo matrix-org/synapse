@@ -403,7 +403,7 @@ class RelationsTestCase(BaseRelationsTestCase):
 
     def test_edit(self) -> None:
         """Test that a simple edit works."""
-
+        orig_body = {"body": "Hi!", "msgtype": "m.text"}
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
         edit_event_content = {
             "msgtype": "m.text",
@@ -424,9 +424,7 @@ class RelationsTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(
-            channel.json_body["content"], {"body": "Hi!", "msgtype": "m.text"}
-        )
+        self.assertEqual(channel.json_body["content"], orig_body)
         self._assert_edit_bundle(channel.json_body, edit_event_id, edit_event_content)
 
         # Request the room messages.
@@ -443,7 +441,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
 
         # Request the room context.
-        # /context should return the edited event.
+        # /context should return the event.
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/context/{self.parent_id}",
@@ -453,7 +451,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         self._assert_edit_bundle(
             channel.json_body["event"], edit_event_id, edit_event_content
         )
-        self.assertEqual(channel.json_body["event"]["content"], new_body)
+        self.assertEqual(channel.json_body["event"]["content"], orig_body)
 
         # Request sync, but limit the timeline so it becomes limited (and includes
         # bundled aggregations).
@@ -491,45 +489,11 @@ class RelationsTestCase(BaseRelationsTestCase):
             edit_event_content,
         )
 
-    @override_config({"experimental_features": {"msc3925_inhibit_edit": True}})
-    def test_edit_inhibit_replace(self) -> None:
-        """
-        If msc3925_inhibit_edit is enabled, then the original event should not be
-        replaced.
-        """
-
-        new_body = {"msgtype": "m.text", "body": "I've been edited!"}
-        edit_event_content = {
-            "msgtype": "m.text",
-            "body": "foo",
-            "m.new_content": new_body,
-        }
-        channel = self._send_relation(
-            RelationTypes.REPLACE,
-            "m.room.message",
-            content=edit_event_content,
-        )
-        edit_event_id = channel.json_body["event_id"]
-
-        # /context should return the *original* event.
-        channel = self.make_request(
-            "GET",
-            f"/rooms/{self.room}/context/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(
-            channel.json_body["event"]["content"], {"body": "Hi!", "msgtype": "m.text"}
-        )
-        self._assert_edit_bundle(
-            channel.json_body["event"], edit_event_id, edit_event_content
-        )
-
     def test_multi_edit(self) -> None:
         """Test that multiple edits, including attempts by people who
         shouldn't be allowed, are correctly handled.
         """
-
+        orig_body = orig_body = {"body": "Hi!", "msgtype": "m.text"}
         self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
@@ -570,7 +534,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
-        self.assertEqual(channel.json_body["event"]["content"], new_body)
+        self.assertEqual(channel.json_body["event"]["content"], orig_body)
         self._assert_edit_bundle(
             channel.json_body["event"], edit_event_id, edit_event_content
         )
@@ -642,6 +606,7 @@ class RelationsTestCase(BaseRelationsTestCase):
 
     def test_edit_edit(self) -> None:
         """Test that an edit cannot be edited."""
+        orig_body = {"body": "Hi!", "msgtype": "m.text"}
         new_body = {"msgtype": "m.text", "body": "Initial edit"}
         edit_event_content = {
             "msgtype": "m.text",
@@ -675,14 +640,12 @@ class RelationsTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(
-            channel.json_body["content"], {"body": "Hi!", "msgtype": "m.text"}
-        )
+        self.assertEqual(channel.json_body["content"], orig_body)
 
         # The relations information should not include the edit to the edit.
         self._assert_edit_bundle(channel.json_body, edit_event_id, edit_event_content)
 
-        # /context should return the event updated for the *first* edit
+        # /context should return the bundled edit for the *first* edit
         # (The edit to the edit should be ignored.)
         channel = self.make_request(
             "GET",
@@ -690,7 +653,7 @@ class RelationsTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(channel.json_body["event"]["content"], new_body)
+        self.assertEqual(channel.json_body["event"]["content"], orig_body)
         self._assert_edit_bundle(
             channel.json_body["event"], edit_event_id, edit_event_content
         )
@@ -1287,7 +1250,6 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         thread_summary = relations_dict[RelationTypes.THREAD]
         self.assertIn("latest_event", thread_summary)
         latest_event_in_thread = thread_summary["latest_event"]
-        self.assertEqual(latest_event_in_thread["content"]["body"], "I've been edited!")
         # The latest event in the thread should have the edit appear under the
         # bundled aggregations.
         self.assertDictContainsSubset(
