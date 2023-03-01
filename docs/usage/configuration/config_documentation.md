@@ -433,9 +433,16 @@ See the docs [request log format](../administration/request_log.md).
 
 * `type`: the type of listener. Normally `http`, but other valid options are:
 
-   * `manhole`: (see the docs [here](../../manhole.md)),
+   * `manhole`: see the docs [here](../../manhole.md).
 
-   * `metrics`: (see the docs [here](../../metrics-howto.md)),
+   * `metrics`: see the docs [here](../../metrics-howto.md).
+
+   * `outbound_federation_proxy`: for use with worker deployments only. Allows
+     this worker to make federation requests on behalf of other workers. This
+     should only be used with [`outbound_federation_proxied_via`](#outbound_federation_proxied_via),
+     matching the port number for the host specified there.
+
+     _New in Synapse 1.79._
 
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
@@ -3832,6 +3839,38 @@ federation_sender_instances:
   - federation_sender1
   - federation_sender2
 ```
+---
+### `outbound_federation_proxied_via`
+
+A map from worker names to objects specifying hostnames and port numbers.
+
+By default, Synapse workers make
+[federation requests](https://spec.matrix.org/v1.6/server-server-api/)
+on-demand. This option lets server operators limit this ability to a subset of
+"proxy" workers. Non-proxy workers will not make federation requests directly;
+they will do so indirectly via a proxy worker.
+
+By default this mapping is empty, which means that every worker can make federation
+requests for themselves.
+
+Example configuration:
+```yaml
+outbound_federation_proxied_via:
+  # Master and fed serders can make federation requests freely.
+  # All other workers must proxy via one of those three.
+  master:
+    host: localhost
+    port: 8001
+  federation_sender1:
+    host: localhost
+    port: 8002
+  federation_sender2:
+    host: localhost
+    port: 8003
+```
+
+_New in Synapse 1.79._
+
 ---
 ### `instance_map`
 
