@@ -329,7 +329,6 @@ class RedisReplicationFactory(SynapseRedisFactory):
 
 
 class RedisSentinelReplicationFactory(SentinelConnectionFactory):
-
     maxDelay = 5
     protocol = SentinelRedisSubscriber
 
@@ -343,7 +342,6 @@ class RedisSentinelReplicationFactory(SentinelConnectionFactory):
         channel_names: List[str],
         **connection_kwargs: Any,
     ):
-
         super().__init__(
             sentinel_manager,
             service_name,
