@@ -108,8 +108,7 @@ class ClientRestResource(JsonResource):
         if is_main_process:
             logout.register_servlets(hs, client_resource)
         sync.register_servlets(hs, client_resource)
-        if is_main_process:
-            filter.register_servlets(hs, client_resource)
+        filter.register_servlets(hs, client_resource)
         account.register_servlets(hs, client_resource)
         register.register_servlets(hs, client_resource)
         if is_main_process:

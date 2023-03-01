@@ -20,8 +20,8 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
+from synapse.media.filepath import MediaFilePaths
 from synapse.rest.client import login, profile, room
-from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.server import HomeServer
 from synapse.util import Clock
 

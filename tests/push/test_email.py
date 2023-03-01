@@ -369,10 +369,8 @@ class EmailPusherTests(HomeserverTestCase):
 
         # disassociate the user's email address
         self.get_success(
-            self.auth_handler.delete_threepid(
-                user_id=self.user_id,
-                medium="email",
-                address="a@example.com",
+            self.auth_handler.delete_local_threepid(
+                user_id=self.user_id, medium="email", address="a@example.com"
             )
         )
 
