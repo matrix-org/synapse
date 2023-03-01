@@ -550,3 +550,29 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         await self.db_pool.runInteraction(
             "delete_e2e_room_keys_version", _delete_e2e_room_keys_version_txn
         )
+
+    async def bulk_delete_backup_keys_and_versions_for_user(self, user_id: str) -> None:
+        """
+        Bulk deletes all backup room keys and versions for a given user.
+
+        Args:
+            user_id: the user whose backup keys and versions we're deleting
+        """
+
+        def _delete_all_e2e_room_keys_and_versions_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="e2e_room_keys",
+                keyvalues={"user_id": user_id},
+            )
+
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="e2e_room_keys_versions",
+                keyvalues={"user_id": user_id},
+            )
+
+        await self.db_pool.runInteraction(
+            "delete_all_e2e_room_keys_and_versions",
+            _delete_all_e2e_room_keys_and_versions_txn,
+        )
