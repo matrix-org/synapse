@@ -222,7 +222,7 @@ class GenericWorkerServer(HomeServer):
 
         root_resource = create_resource_tree(resources, OptionsResource())
 
-        _base.listen_http(
+        _base.listen_http_for_resource(
             listener_config,
             root_resource,
             self.version_string,

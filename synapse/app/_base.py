@@ -351,7 +351,7 @@ def listen_tcp(
     return r  # type: ignore[return-value]
 
 
-def listen_http(
+def listen_http_for_resource(
     listener_config: ListenerConfig,
     root_resource: Resource,
     version_string: str,
@@ -360,7 +360,6 @@ def listen_http(
     reactor: ISynapseReactor = reactor,
 ) -> List[Port]:
     port = listener_config.port
-    bind_addresses = listener_config.bind_addresses
     tls = listener_config.tls
 
     assert listener_config.http_options is not None
@@ -369,7 +368,7 @@ def listen_http(
     if site_tag is None:
         site_tag = str(port)
 
-    site = SynapseSite(
+    factory = SynapseSite(
         "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
         site_tag,
         listener_config,
@@ -378,13 +377,26 @@ def listen_http(
         max_request_body_size=max_request_body_size,
         reactor=reactor,
     )
+    return listen_http(listener_config, factory, context_factory, reactor)
+
+
+def listen_http(
+    listener_config: ListenerConfig,
+    factory: ServerFactory,
+    context_factory: Optional[IOpenSSLContextFactory],
+    reactor: ISynapseReactor = reactor,
+) -> List[Port]:
+    port = listener_config.port
+    bind_addresses = listener_config.bind_addresses
+    tls = listener_config.tls
+
     if tls:
         # refresh_certificate should have been called before this.
         assert context_factory is not None
         ports = listen_ssl(
             bind_addresses,
             port,
-            site,
+            factory,
             context_factory,
             reactor=reactor,
         )
@@ -393,7 +405,7 @@ def listen_http(
         ports = listen_tcp(
             bind_addresses,
             port,
-            site,
+            factory,
             reactor=reactor,
         )
         logger.info("Synapse now listening on TCP port %d", port)

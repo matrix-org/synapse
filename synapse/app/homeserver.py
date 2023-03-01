@@ -37,7 +37,7 @@ from synapse.api.urls import (
 from synapse.app import _base
 from synapse.app._base import (
     handle_startup_exception,
-    listen_http,
+    listen_http_for_resource,
     max_request_body_size,
     redirect_stdio_to_logs,
     register_start,
@@ -139,7 +139,7 @@ class SynapseHomeServer(HomeServer):
         else:
             root_resource = OptionsResource()
 
-        ports = listen_http(
+        ports = listen_http_for_resource(
             listener_config,
             create_resource_tree(resources, root_resource),
             self.version_string,
