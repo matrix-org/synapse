@@ -49,7 +49,7 @@ from twisted.internet.interfaces import IReactorTime
 from twisted.internet.task import Cooperator
 from twisted.web.client import ResponseFailed
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IBodyProducer, IResponse
+from twisted.web.iweb import IAgent, IBodyProducer, IResponse
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -70,7 +70,10 @@ from synapse.http.client import (
     encode_query_args,
     read_body_with_max_size,
 )
-from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.http.federation.matrix_federation_agent import (
+    InternalProxyMatrixFederationAgent,
+    MatrixFederationAgent,
+)
 from synapse.http.types import QueryParams
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -348,13 +351,29 @@ class MatrixFederationHttpClient:
         if hs.config.server.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
 
-        federation_agent = MatrixFederationAgent(
-            self.reactor,
-            tls_client_options_factory,
-            user_agent.encode("ascii"),
-            hs.config.server.federation_ip_range_whitelist,
-            hs.config.server.federation_ip_range_blacklist,
-        )
+        if (
+            hs.config.worker.outbound_fed_restricted_to
+            and hs.get_instance_name()
+            not in hs.config.worker.outbound_fed_restricted_to
+        ):
+            logger.warning("DMR: Using InternalProxyMatrixFederationAgent")
+            # We must
+            federation_agent: IAgent = InternalProxyMatrixFederationAgent(
+                self.reactor,
+                user_agent.encode("ascii"),
+                hs.config.server.federation_ip_range_whitelist,
+                hs.config.server.federation_ip_range_blacklist,
+                hs.config.worker.outbound_fed_restricted_to,
+            )
+        else:
+            logger.warning("DMR: Using MatrixFederationAgent")
+            federation_agent = MatrixFederationAgent(
+                self.reactor,
+                tls_client_options_factory,
+                user_agent.encode("ascii"),
+                hs.config.server.federation_ip_range_whitelist,
+                hs.config.server.federation_ip_range_blacklist,
+            )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
