@@ -18,6 +18,7 @@ for port in 8080 8081 8082; do
     echo "Starting server on port $port... "
 
     https_port=$((port + 400))
+    proxy_port=$((port + 100))
     mkdir -p demo/$port
     pushd demo/$port || exit
 
@@ -65,10 +66,20 @@ for port in 8080 8081 8082; do
 			    resources:
 			      - names: [client, federation]
 			        compress: false
+
+			  - port: $proxy_port
+			    bind_addresses: ['::1', '127.0.0.1']
+			    type: outbound_federation_proxy
+
 			PORTLISTENERS
 			)
 
             echo "${listeners}"
+
+            echo "outbound_federation_proxied_via:"
+            echo "  master:"
+            echo "    host: localhost"
+            echo "    port: $proxy_port"
 
             # Disable TLS for the servers
             printf '\n\n# Disable TLS for the servers.'
