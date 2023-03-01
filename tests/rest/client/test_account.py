@@ -476,6 +476,72 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(memberships), 1, memberships)
         self.assertEqual(memberships[0].room_id, room_id, memberships)
 
+    def test_deactivate_account_deletes_server_side_backup_keys(self) -> None:
+        key_handler = self.hs.get_e2e_room_keys_handler()
+        room_keys = {
+            "rooms": {
+                "!abc:matrix.org": {
+                    "sessions": {
+                        "c0ff33": {
+                            "first_message_index": 1,
+                            "forwarded_count": 1,
+                            "is_verified": False,
+                            "session_data": "SSBBTSBBIEZJU0gK",
+                        }
+                    }
+                }
+            }
+        }
+
+        user_id = self.register_user("missPiggy", "test")
+        tok = self.login("missPiggy", "test")
+
+        # add some backup keys/versions
+        version = self.get_success(
+            key_handler.create_version(
+                user_id,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
+        )
+
+        self.get_success(key_handler.upload_room_keys(user_id, version, room_keys))
+
+        version2 = self.get_success(
+            key_handler.create_version(
+                user_id,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "second_version_auth_data",
+                },
+            )
+        )
+
+        self.get_success(key_handler.upload_room_keys(user_id, version2, room_keys))
+
+        self.deactivate(user_id, tok)
+        store = self.hs.get_datastores().main
+
+        # Check that the user has been marked as deactivated.
+        self.assertTrue(self.get_success(store.get_user_deactivated_status(user_id)))
+
+        # Check that there are no entries in 'e2e_room_keys` and `e2e_room_keys_versions`
+        res = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys", {"user_id": user_id}, "*", "simple_select"
+            )
+        )
+        self.assertEqual(len(res), 0)
+
+        res2 = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys_versions", {"user_id": user_id}, "*", "simple_select"
+            )
+        )
+        self.assertEqual(len(res2), 0)
+
     def deactivate(self, user_id: str, tok: str) -> None:
         request_data = {
             "auth": {
