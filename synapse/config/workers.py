@@ -15,7 +15,7 @@
 
 import argparse
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Mapping, Union
 
 import attr
 
@@ -276,6 +276,8 @@ class WorkerConfig(Config):
             new_option_name="update_user_directory_from_worker",
         )
 
+        self.outbound_fed_restricted_to = self._get_outbound_fed_restrictions(config)
+
     def _should_this_worker_perform_duty(
         self,
         config: Dict[str, Any],
@@ -425,6 +427,39 @@ class WorkerConfig(Config):
                 worker_instances = [self.worker_name]
 
         return worker_instances
+
+    def _get_outbound_fed_restrictions(
+        self, config: Dict[str, Any]
+    ) -> Mapping[str, InstanceLocationConfig]:
+        proxied_via = config.get("outbound_federation_proxied_via", {})
+        if not isinstance(proxied_via, dict):
+            raise ConfigError(
+                f"outbound_federation_restricted_to should be a mapping, "
+                f"not {type(proxied_via)}"
+            )
+
+        for instance_name, listener_location in proxied_via.items():
+            if "host" not in listener_location:
+                raise ConfigError(
+                    f"outbound_federation_restricted_to/{instance_name} is missing a host"
+                )
+            if "port" not in listener_location:
+                raise ConfigError(
+                    f"outbound_federation_restricted_to/{instance_name} is missing a port"
+                )
+            if not isinstance(listener_location["host"], str):
+                raise ConfigError(
+                    f"outbound_federation_restricted_to/{instance_name} should be a string"
+                )
+            if not isinstance(listener_location["port"], int):
+                raise ConfigError(
+                    f"outbound_federation_restricted_to/{instance_name} should be an integer"
+                )
+
+        return {
+            instance_name: InstanceLocationConfig(listener["host"], listener["port"])
+            for instance_name, listener in proxied_via.items()
+        }
 
     def read_arguments(self, args: argparse.Namespace) -> None:
         # We support a bunch of command line arguments that override options in

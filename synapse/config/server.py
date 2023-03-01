@@ -171,6 +171,7 @@ KNOWN_LISTENER_TYPES = {
     "http",
     "metrics",
     "manhole",
+    "outbound_federation_proxy",
 }
 
 KNOWN_RESOURCES = {
