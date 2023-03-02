@@ -142,6 +142,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases",
             "^/_matrix/client/v1/rooms/.*/timestamp_to_event$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/search",
+            "^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",

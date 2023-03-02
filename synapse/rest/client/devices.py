@@ -255,7 +255,7 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
-    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device", releases=())
+    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device$", releases=())
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

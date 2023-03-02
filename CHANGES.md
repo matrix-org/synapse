@@ -1,3 +1,12 @@
+Synapse 1.78.0 (2023-02-28)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.76 where 5s delays would occasionally occur in deployments using workers. ([\#15150](https://github.com/matrix-org/synapse/issues/15150))
+
+
 Synapse 1.78.0rc1 (2023-02-21)
 ==============================
 

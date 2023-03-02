@@ -1,0 +1,1 @@
+Fix a long-standing bug where an initial sync would not respond to changes to the list of ignored users if there was an initial sync cached.

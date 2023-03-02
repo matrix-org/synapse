@@ -2024,10 +2024,6 @@ class PersistEventsStore:
         self.store._invalidate_cache_and_stream(
             txn, self.store.get_relations_for_event, (redacted_relates_to,)
         )
-        if rel_type == RelationTypes.ANNOTATION:
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
-            )
         if rel_type == RelationTypes.REFERENCE:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_references_for_event, (redacted_relates_to,)
