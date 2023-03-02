@@ -340,8 +340,12 @@ pub enum KnownCondition {
     RelatedEventMatchType(RelatedEventMatchTypeCondition),
     #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
     ExactEventPropertyContains(ExactEventMatchCondition),
-    #[serde(rename = "org.matrix.msc3952.is_user_mention")]
-    IsUserMention,
+    // Identical to exact_event_property_contains but gives predefined patterns. Cannot be added by users.
+    #[serde(
+        skip_deserializing,
+        rename = "org.matrix.msc3966.exact_event_property_contains"
+    )]
+    ExactEventPropertyContainsType(ExactEventMatchTypeCondition),
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -396,6 +400,15 @@ pub struct EventMatchTypeCondition {
 pub struct ExactEventMatchCondition {
     pub key: Cow<'static, str>,
     pub value: Cow<'static, SimpleJsonValue>,
+}
+
+/// The body of a [`Condition::ExactEventMatch`] that uses user_id or user_localpart as a pattern.
+#[derive(Serialize, Debug, Clone)]
+pub struct ExactEventMatchTypeCondition {
+    pub key: Cow<'static, str>,
+    // During serialization, the pattern_type property gets replaced with a
+    // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
+    pub value_type: Cow<'static, EventMatchPatternType>,
 }
 
 /// The body of a [`Condition::RelatedEventMatch`]
@@ -736,17 +749,6 @@ fn test_deserialize_unstable_msc3758_condition() {
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::ExactEventMatch(_))
-    ));
-}
-
-#[test]
-fn test_deserialize_unstable_msc3952_user_condition() {
-    let json = r#"{"kind":"org.matrix.msc3952.is_user_mention"}"#;
-
-    let condition: Condition = serde_json::from_str(json).unwrap();
-    assert!(matches!(
-        condition,
-        Condition::Known(KnownCondition::IsUserMention)
     ));
 }
 

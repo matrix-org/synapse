@@ -21,13 +21,13 @@ use lazy_static::lazy_static;
 use serde_json::Value;
 
 use super::KnownCondition;
-use crate::push::PushRule;
 use crate::push::RelatedEventMatchTypeCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
 use crate::push::{Action, ExactEventMatchCondition, SimpleJsonValue};
 use crate::push::{Condition, EventMatchTypeCondition};
 use crate::push::{EventMatchCondition, EventMatchPatternType};
+use crate::push::{ExactEventMatchTypeCondition, PushRule};
 
 const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
@@ -144,7 +144,12 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed(".org.matrix.msc3952.is_user_mention"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::IsUserMention)]),
+        conditions: Cow::Borrowed(&[Condition::Known(
+            KnownCondition::ExactEventPropertyContainsType(ExactEventMatchTypeCondition {
+                key: Cow::Borrowed("content.org.matrix.msc3952.mentions.user_ids"),
+                value_type: Cow::Borrowed(&EventMatchPatternType::UserId),
+            }),
+        )]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
         default: true,
         default_enabled: true,

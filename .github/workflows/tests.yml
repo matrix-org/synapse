@@ -368,6 +368,7 @@ jobs:
         SYTEST_BRANCH: ${{ github.head_ref }}
         POSTGRES: ${{ matrix.job.postgres && 1}}
         MULTI_POSTGRES: ${{ (matrix.job.postgres == 'multi-postgres') && 1}}
+        ASYNCIO_REACTOR: ${{ (matrix.job.reactor == 'asyncio') && 1 }}
         WORKERS: ${{ matrix.job.workers && 1 }}
         BLACKLIST: ${{ matrix.job.workers && 'synapse-blacklist-with-workers' }}
         TOP: ${{ github.workspace }}
