@@ -27,6 +27,7 @@ except ImportError:
 
 class MediaDomainBlockingTests(unittest.HomeserverTestCase):
     remote_media_id = "doesnotmatter"
+    remote_server_name = "evil.com"
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
