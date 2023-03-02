@@ -388,6 +388,17 @@ def generate_base_homeserver_config() -> None:
     subprocess.run(["/usr/local/bin/python", "/start.py", "migrate_config"], check=True)
 
 
+# Start worker ports from this arbitrary port
+_worker_port = 18009
+
+
+def claim_port() -> int:
+    global _worker_port
+    port = _worker_port
+    _worker_port += 1
+    return port
+
+
 def generate_worker_files(
     environ: Mapping[str, str], config_path: str, data_dir: str
 ) -> None:
@@ -465,9 +476,6 @@ def generate_worker_files(
     # Create the worker configuration directory if it doesn't already exist
     os.makedirs("/conf/workers", exist_ok=True)
 
-    # Start worker ports from this arbitrary port
-    worker_port = 18009
-
     # A counter of worker_type -> int. Used for determining the name for a given
     # worker type when generating its config file, as each worker's name is just
     # worker_type + instance #
@@ -479,6 +487,7 @@ def generate_worker_files(
 
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
+        worker_port = claim_port()
         worker_config = WORKERS_CONFIG.get(worker_type)
         if worker_config:
             worker_config = worker_config.copy()
@@ -537,8 +546,6 @@ def generate_worker_files(
             **worker_config,
             worker_log_config_filepath=log_config_filepath,
         )
-
-        worker_port += 1
 
     # Build the nginx location config blocks
     nginx_location_config = ""
