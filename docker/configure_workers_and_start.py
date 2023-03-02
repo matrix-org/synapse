@@ -675,17 +675,21 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     if not os.path.exists(config_path):
         log("Generating base homeserver config")
         generate_base_homeserver_config()
-
+    else:
+        log("Base homeserver config exists—not regenerating")
     # This script may be run multiple times (mostly by Complement, see note at top of file).
     # Don't re-configure workers in this instance.
     mark_filepath = "/conf/workers_have_been_configured"
     if not os.path.exists(mark_filepath):
         # Always regenerate all other config files
+        log("Generating worker config files")
         generate_worker_files(environ, config_path, data_dir)
 
         # Mark workers as being configured
         with open(mark_filepath, "w") as f:
             f.write("")
+    else:
+        log("Worker config exists—not regenerating")
 
     # Lifted right out of start.py
     jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
