@@ -174,11 +174,6 @@ class ExperimentalConfig(Config):
             "msc3758_exact_event_match", False
         )
 
-        # MSC3873: Disambiguate event_match keys.
-        self.msc3873_escape_event_match_key = experimental.get(
-            "msc3873_escape_event_match_key", False
-        )
-
         # MSC3966: exact_event_property_contains push rule condition.
         self.msc3966_exact_event_property_contains = experimental.get(
             "msc3966_exact_event_property_contains", False

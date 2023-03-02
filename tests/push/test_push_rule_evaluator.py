@@ -51,11 +51,7 @@ class FlattenDictTestCase(unittest.TestCase):
 
         # If a field has a dot in it, escape it.
         input = {"m.foo": {"b\\ar": "abc"}}
-        self.assertEqual({"m.foo.b\\ar": "abc"}, _flatten_dict(input))
-        self.assertEqual(
-            {"m\\.foo.b\\\\ar": "abc"},
-            _flatten_dict(input, msc3873_escape_event_match_key=True),
-        )
+        self.assertEqual({"m\\.foo.b\\\\ar": "abc"}, _flatten_dict(input))
 
     def test_non_string(self) -> None:
         """String, booleans, ints, nulls and list of those should be kept while other items are dropped."""
@@ -125,7 +121,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
-            "content.org.matrix.msc1767.markup": [],
+            "content.org\\.matrix\\.msc1767\\.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
@@ -137,7 +133,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
-            "content.org.matrix.msc1767.markup": [],
+            "content.org\\.matrix\\.msc1767\\.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
