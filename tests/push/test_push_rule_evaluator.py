@@ -173,7 +173,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             related_event_match_enabled=True,
             room_version_feature_flags=event.room_version.msc3931_push_features,
             msc3931_enabled=True,
-            msc3758_exact_event_match=True,
             msc3966_exact_event_property_contains=True,
         )
 
@@ -404,7 +403,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # Test against a string value.
         condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
+            "kind": "event_property_is",
             "key": "content.value",
             "value": "foobaz",
         }
@@ -442,11 +441,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         """Check that exact_event_match conditions work as expected for booleans."""
 
         # Test against a True boolean value.
-        condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
-            "key": "content.value",
-            "value": True,
-        }
+        condition = {"kind": "event_property_is", "key": "content.value", "value": True}
         self._assert_matches(
             condition,
             {"value": True},
@@ -466,7 +461,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # Test against a False boolean value.
         condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
+            "kind": "event_property_is",
             "key": "content.value",
             "value": False,
         }
@@ -491,11 +486,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
     def test_exact_event_match_null(self) -> None:
         """Check that exact_event_match conditions work as expected for null."""
 
-        condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
-            "key": "content.value",
-            "value": None,
-        }
+        condition = {"kind": "event_property_is", "key": "content.value", "value": None}
         self._assert_matches(
             condition,
             {"value": None},
@@ -511,11 +502,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
     def test_exact_event_match_integer(self) -> None:
         """Check that exact_event_match conditions work as expected for integers."""
 
-        condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
-            "key": "content.value",
-            "value": 1,
-        }
+        condition = {"kind": "event_property_is", "key": "content.value", "value": 1}
         self._assert_matches(
             condition,
             {"value": 1},

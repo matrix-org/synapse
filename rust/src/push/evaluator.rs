@@ -24,7 +24,7 @@ use regex::Regex;
 
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
-    Action, Condition, ExactEventMatchCondition, FilteredPushRules, KnownCondition,
+    Action, Condition, EventPropertyIsCondition, FilteredPushRules, KnownCondition,
     SimpleJsonValue,
 };
 
@@ -97,9 +97,6 @@ pub struct PushRuleEvaluator {
     /// flag as MSC1767 (extensible events core).
     msc3931_enabled: bool,
 
-    /// If MSC3758 (exact_event_match push rule condition) is enabled.
-    msc3758_exact_event_match: bool,
-
     /// If MSC3966 (exact_event_property_contains push rule condition) is enabled.
     msc3966_exact_event_property_contains: bool,
 }
@@ -119,7 +116,6 @@ impl PushRuleEvaluator {
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
         msc3931_enabled: bool,
-        msc3758_exact_event_match: bool,
         msc3966_exact_event_property_contains: bool,
     ) -> Result<Self, Error> {
         let body = match flattened_keys.get("content.body") {
@@ -138,7 +134,6 @@ impl PushRuleEvaluator {
             related_event_match_enabled,
             room_version_feature_flags,
             msc3931_enabled,
-            msc3758_exact_event_match,
             msc3966_exact_event_property_contains,
         })
     }
@@ -275,8 +270,8 @@ impl PushRuleEvaluator {
 
                 self.match_event_match(&self.flattened_keys, &event_match.key, pattern)?
             }
-            KnownCondition::ExactEventMatch(exact_event_match) => {
-                self.match_exact_event_match(exact_event_match)?
+            KnownCondition::EventPropertyIs(event_property_is) => {
+                self.match_event_property_is(event_property_is)?
             }
             KnownCondition::RelatedEventMatch(event_match) => self.match_related_event_match(
                 &event_match.rel_type.clone(),
@@ -306,10 +301,10 @@ impl PushRuleEvaluator {
                     Some(Cow::Borrowed(pattern)),
                 )?
             }
-            KnownCondition::ExactEventPropertyContains(exact_event_match) => self
+            KnownCondition::ExactEventPropertyContains(event_property_is) => self
                 .match_exact_event_property_contains(
-                    exact_event_match.key.clone(),
-                    exact_event_match.value.clone(),
+                    event_property_is.key.clone(),
+                    event_property_is.value.clone(),
                 )?,
             KnownCondition::ExactEventPropertyContainsType(exact_event_match) => {
                 // The `pattern_type` can either be "user_id" or "user_localpart",
@@ -405,20 +400,15 @@ impl PushRuleEvaluator {
         compiled_pattern.is_match(haystack)
     }
 
-    /// Evaluates a `exact_event_match` condition. (MSC3758)
-    fn match_exact_event_match(
+    /// Evaluates a `event_property_is` condition.
+    fn match_event_property_is(
         &self,
-        exact_event_match: &ExactEventMatchCondition,
+        event_property_is: &EventPropertyIsCondition,
     ) -> Result<bool, Error> {
-        // First check if the feature is enabled.
-        if !self.msc3758_exact_event_match {
-            return Ok(false);
-        }
-
-        let value = &exact_event_match.value;
+        let value = &event_property_is.value;
 
         let haystack = if let Some(JsonValue::Value(haystack)) =
-            self.flattened_keys.get(&*exact_event_match.key)
+            self.flattened_keys.get(&*event_property_is.key)
         {
             haystack
         } else {
@@ -464,7 +454,7 @@ impl PushRuleEvaluator {
         }
     }
 
-    /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
+    /// Evaluates a `exact_event_property_contains` condition. (MSC3966)
     fn match_exact_event_property_contains(
         &self,
         key: Cow<str>,
@@ -526,7 +516,6 @@ fn push_rule_evaluator() {
         vec![],
         true,
         true,
-        true,
     )
     .unwrap();
 
@@ -555,7 +544,6 @@ fn test_requires_room_version_supports_condition() {
         BTreeMap::new(),
         false,
         flags,
-        true,
         true,
         true,
     )
