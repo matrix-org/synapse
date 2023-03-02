@@ -20,6 +20,11 @@ worker_listeners:
         - {{ resource }}
 {%- endfor %}
 {% endif %}
+{% if outbound_federation_proxy_port %}
+  - type: outbound_federation_proxy
+    port: {{ outbound_federation_proxy_port }}
+{% endif %}
+
 
 worker_log_config: {{ worker_log_config_filepath }}
 

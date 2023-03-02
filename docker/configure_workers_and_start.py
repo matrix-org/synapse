@@ -328,6 +328,7 @@ def add_worker_roles_to_shared_config(
     worker_type: str,
     worker_name: str,
     worker_port: int,
+    worker_proxy_port: int,
 ) -> None:
     """Given a dictionary representing a config file shared across all workers,
     append appropriate worker information to it for the current worker_type instance.
@@ -340,6 +341,7 @@ def add_worker_roles_to_shared_config(
     """
     # The instance_map config field marks the workers that write to various replication streams
     instance_map = shared_config.setdefault("instance_map", {})
+    proxied_via = shared_config.setdefault("outbound_federation_proxied_via", {})
 
     # Worker-type specific sharding config
     if worker_type == "pusher":
@@ -347,6 +349,7 @@ def add_worker_roles_to_shared_config(
 
     elif worker_type == "federation_sender":
         shared_config.setdefault("federation_sender_instances", []).append(worker_name)
+        proxied_via[worker_name] = {"host": "localhost", "port": worker_proxy_port}
 
     elif worker_type == "event_persister":
         # Event persisters write to the events stream, so we need to update
@@ -488,6 +491,7 @@ def generate_worker_files(
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
         worker_port = claim_port()
+        worker_proxy_port = claim_port()
         worker_config = WORKERS_CONFIG.get(worker_type)
         if worker_config:
             worker_config = worker_config.copy()
@@ -504,6 +508,9 @@ def generate_worker_files(
             {"name": worker_name, "port": str(worker_port), "config_path": config_path}
         )
 
+        if worker_type == "federation_sender":
+            worker_config["outbound_federation_proxy_port"] = worker_proxy_port
+
         # Update the shared config with any worker-type specific options
         shared_config.update(worker_config["shared_extra_conf"])
 
@@ -514,7 +521,7 @@ def generate_worker_files(
 
         # Update the shared config with sharding-related options if necessary
         add_worker_roles_to_shared_config(
-            shared_config, worker_type, worker_name, worker_port
+            shared_config, worker_type, worker_name, worker_port, worker_proxy_port
         )
 
         # Enable the worker in supervisord
