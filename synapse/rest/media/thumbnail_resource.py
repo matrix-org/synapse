@@ -60,6 +60,7 @@ class ThumbnailResource(DirectServeJsonResource):
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
         self.server_name = hs.hostname
+        self.prevent_downloads_from = hs.config.media.prevent_downloads_from
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
@@ -82,6 +83,14 @@ class ThumbnailResource(DirectServeJsonResource):
                 )
             self.media_repo.mark_recently_accessed(None, media_id)
         else:
+            # Don't let users download media from domains listed in the config, even
+            # if we might have the media to serve. This is Trust & Safety tooling to
+            # block some servers' media from being accessible to local users.
+            # See `prevent_downloads_from` config docs for more info.
+            if server_name in self.prevent_downloads_from:
+                respond_404(request)
+                return
+
             if self.dynamic_thumbnails:
                 await self._select_or_generate_remote_thumbnail(
                     request, server_name, media_id, width, height, method, m_type

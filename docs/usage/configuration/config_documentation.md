@@ -1764,6 +1764,28 @@ Example configuration:
 max_image_pixels: 35M
 ```
 ---
+### `prevent_downloads_from`
+
+A list of domains where users will be unable to download media from. If
+media from these domains is already cached, it will not be deleted but
+also not able to be downloaded. This option does not affect admin APIs
+trying to download/operate on media.
+
+This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.
+
+This will have no effect on media originating from the local server.
+
+Defaults to an empty list (nothing blocked).
+
+Example configuration:
+```yaml
+prevent_downloads_from:
+  - evil.example.org
+  - evil2.example.org
+```
+---
 ### `dynamic_thumbnails`
 
 Whether to generate new thumbnails on the fly to precisely match
