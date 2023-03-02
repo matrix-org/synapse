@@ -135,6 +135,8 @@ class EventContext(UnpersistedEventContextBase):
     delta_ids: Optional[StateMap[str]] = None
     app_service: Optional[ApplicationService] = None
 
+    _state_map_before_event: Optional[StateMap[str]] = None
+
     partial_state: bool = False
 
     @staticmethod
@@ -293,6 +295,11 @@ class EventContext(UnpersistedEventContextBase):
             Maps a (type, state_key) to the event ID of the state event matching
             this tuple.
         """
+        if self._state_map_before_event is not None:
+            if state_filter is not None:
+                return state_filter.filter_state(self._state_map_before_event)
+            return self._state_map_before_event
+
         assert self.state_group_before_event is not None
         return await self._storage.state.get_state_ids_for_group(
             self.state_group_before_event, state_filter
