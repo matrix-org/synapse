@@ -96,9 +96,6 @@ pub struct PushRuleEvaluator {
     /// If MSC3931 (room version feature flags) is enabled. Usually controlled by the same
     /// flag as MSC1767 (extensible events core).
     msc3931_enabled: bool,
-
-    /// If MSC3966 (exact_event_property_contains push rule condition) is enabled.
-    msc3966_exact_event_property_contains: bool,
 }
 
 #[pymethods]
@@ -116,7 +113,6 @@ impl PushRuleEvaluator {
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
         msc3931_enabled: bool,
-        msc3966_exact_event_property_contains: bool,
     ) -> Result<Self, Error> {
         let body = match flattened_keys.get("content.body") {
             Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone(),
@@ -134,7 +130,6 @@ impl PushRuleEvaluator {
             related_event_match_enabled,
             room_version_feature_flags,
             msc3931_enabled,
-            msc3966_exact_event_property_contains,
         })
     }
 
@@ -301,8 +296,8 @@ impl PushRuleEvaluator {
                     Some(Cow::Borrowed(pattern)),
                 )?
             }
-            KnownCondition::ExactEventPropertyContains(event_property_is) => self
-                .match_exact_event_property_contains(
+            KnownCondition::EventPropertyContains(event_property_is) => self
+                .match_event_property_contains(
                     event_property_is.key.clone(),
                     event_property_is.value.clone(),
                 )?,
@@ -321,7 +316,7 @@ impl PushRuleEvaluator {
                     EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
                 };
 
-                self.match_exact_event_property_contains(
+                self.match_event_property_contains(
                     exact_event_match.key.clone(),
                     Cow::Borrowed(&SimpleJsonValue::Str(pattern.to_string())),
                 )?
@@ -454,17 +449,12 @@ impl PushRuleEvaluator {
         }
     }
 
-    /// Evaluates a `exact_event_property_contains` condition. (MSC3966)
-    fn match_exact_event_property_contains(
+    /// Evaluates a `event_property_contains` condition.
+    fn match_event_property_contains(
         &self,
         key: Cow<str>,
         value: Cow<SimpleJsonValue>,
     ) -> Result<bool, Error> {
-        // First check if the feature is enabled.
-        if !self.msc3966_exact_event_property_contains {
-            return Ok(false);
-        }
-
         let haystack = if let Some(JsonValue::Array(haystack)) = self.flattened_keys.get(&*key) {
             haystack
         } else {
@@ -515,7 +505,6 @@ fn push_rule_evaluator() {
         true,
         vec![],
         true,
-        true,
     )
     .unwrap();
 
@@ -544,7 +533,6 @@ fn test_requires_room_version_supports_condition() {
         BTreeMap::new(),
         false,
         flags,
-        true,
         true,
     )
     .unwrap();
