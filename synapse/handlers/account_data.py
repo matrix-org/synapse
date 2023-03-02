@@ -155,9 +155,6 @@ class AccountDataHandler:
             max_stream_id = await self._store.remove_account_data_for_room(
                 user_id, room_id, account_data_type
             )
-            if max_stream_id is None:
-                # The referenced account data did not exist, so no delete occurred.
-                return None
 
             self._notifier.on_new_event(
                 StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
@@ -230,9 +227,6 @@ class AccountDataHandler:
             max_stream_id = await self._store.remove_account_data_for_user(
                 user_id, account_data_type
             )
-            if max_stream_id is None:
-                # The referenced account data did not exist, so no delete occurred.
-                return None
 
             self._notifier.on_new_event(
                 StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
