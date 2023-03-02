@@ -1220,9 +1220,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                         txn, self.get_relations_for_event, cache_tuple  # type: ignore[attr-defined]
                     )
                     self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_aggregation_groups_for_event, cache_tuple  # type: ignore[attr-defined]
-                    )
-                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                         txn, self.get_thread_summary, cache_tuple  # type: ignore[attr-defined]
                     )
 

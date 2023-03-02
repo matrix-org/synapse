@@ -328,10 +328,16 @@ pub enum Condition {
 #[serde(tag = "kind")]
 pub enum KnownCondition {
     EventMatch(EventMatchCondition),
+    // Identical to event_match but gives predefined patterns. Cannot be added by users.
+    #[serde(skip_deserializing, rename = "event_match")]
+    EventMatchType(EventMatchTypeCondition),
     #[serde(rename = "com.beeper.msc3758.exact_event_match")]
     ExactEventMatch(ExactEventMatchCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
+    // Identical to related_event_match but gives predefined patterns. Cannot be added by users.
+    #[serde(skip_deserializing, rename = "im.nheko.msc3664.related_event_match")]
+    RelatedEventMatchType(RelatedEventMatchTypeCondition),
     #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
     ExactEventPropertyContains(ExactEventMatchCondition),
     #[serde(rename = "org.matrix.msc3952.is_user_mention")]
@@ -362,14 +368,27 @@ impl<'source> FromPyObject<'source> for Condition {
     }
 }
 
-/// The body of a [`Condition::EventMatch`]
+/// The body of a [`Condition::EventMatch`] with a pattern.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventMatchCondition {
     pub key: Cow<'static, str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern: Option<Cow<'static, str>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern_type: Option<Cow<'static, str>>,
+    pub pattern: Cow<'static, str>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum EventMatchPatternType {
+    UserId,
+    UserLocalpart,
+}
+
+/// The body of a [`Condition::EventMatch`] that uses user_id or user_localpart as a pattern.
+#[derive(Serialize, Debug, Clone)]
+pub struct EventMatchTypeCondition {
+    pub key: Cow<'static, str>,
+    // During serialization, the pattern_type property gets replaced with a
+    // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
+    pub pattern_type: Cow<'static, EventMatchPatternType>,
 }
 
 /// The body of a [`Condition::ExactEventMatch`]
@@ -386,8 +405,18 @@ pub struct RelatedEventMatchCondition {
     pub key: Option<Cow<'static, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern: Option<Cow<'static, str>>,
+    pub rel_type: Cow<'static, str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern_type: Option<Cow<'static, str>>,
+    pub include_fallbacks: Option<bool>,
+}
+
+/// The body of a [`Condition::RelatedEventMatch`] that uses user_id or user_localpart as a pattern.
+#[derive(Serialize, Debug, Clone)]
+pub struct RelatedEventMatchTypeCondition {
+    // This is only used if pattern_type exists (and thus key must exist), so is
+    // a bit simpler than RelatedEventMatchCondition.
+    pub key: Cow<'static, str>,
+    pub pattern_type: Cow<'static, EventMatchPatternType>,
     pub rel_type: Cow<'static, str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_fallbacks: Option<bool>,
@@ -571,8 +600,7 @@ impl FilteredPushRules {
 fn test_serialize_condition() {
     let condition = Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
         key: "content.body".into(),
-        pattern: Some("coffee".into()),
-        pattern_type: None,
+        pattern: "coffee".into(),
     }));
 
     let json = serde_json::to_string(&condition).unwrap();
@@ -586,7 +614,33 @@ fn test_serialize_condition() {
 fn test_deserialize_condition() {
     let json = r#"{"kind":"event_match","key":"content.body","pattern":"coffee"}"#;
 
-    let _: Condition = serde_json::from_str(json).unwrap();
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::EventMatch(_))
+    ));
+}
+
+#[test]
+fn test_serialize_event_match_condition_with_pattern_type() {
+    let condition = Condition::Known(KnownCondition::EventMatchType(EventMatchTypeCondition {
+        key: "content.body".into(),
+        pattern_type: Cow::Owned(EventMatchPatternType::UserId),
+    }));
+
+    let json = serde_json::to_string(&condition).unwrap();
+    assert_eq!(
+        json,
+        r#"{"kind":"event_match","key":"content.body","pattern_type":"user_id"}"#
+    )
+}
+
+#[test]
+fn test_cannot_deserialize_event_match_condition_with_pattern_type() {
+    let json = r#"{"kind":"event_match","key":"content.body","pattern_type":"user_id"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(condition, Condition::Unknown(_)));
 }
 
 #[test]
@@ -594,6 +648,37 @@ fn test_deserialize_unstable_msc3664_condition() {
     let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern":"coffee","rel_type":"m.in_reply_to"}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
+    assert!(matches!(
+        condition,
+        Condition::Known(KnownCondition::RelatedEventMatch(_))
+    ));
+}
+
+#[test]
+fn test_serialize_unstable_msc3664_condition_with_pattern_type() {
+    let condition = Condition::Known(KnownCondition::RelatedEventMatchType(
+        RelatedEventMatchTypeCondition {
+            key: "content.body".into(),
+            pattern_type: Cow::Owned(EventMatchPatternType::UserId),
+            rel_type: "m.in_reply_to".into(),
+            include_fallbacks: Some(true),
+        },
+    ));
+
+    let json = serde_json::to_string(&condition).unwrap();
+    assert_eq!(
+        json,
+        r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern_type":"user_id","rel_type":"m.in_reply_to","include_fallbacks":true}"#
+    )
+}
+
+#[test]
+fn test_cannot_deserialize_unstable_msc3664_condition_with_pattern_type() {
+    let json = r#"{"kind":"im.nheko.msc3664.related_event_match","key":"content.body","pattern_type":"user_id","rel_type":"m.in_reply_to"}"#;
+
+    let condition: Condition = serde_json::from_str(json).unwrap();
+    // Since pattern is optional on RelatedEventMatch it deserializes it to that
+    // instead of RelatedEventMatchType.
     assert!(matches!(
         condition,
         Condition::Known(KnownCondition::RelatedEventMatch(_))
