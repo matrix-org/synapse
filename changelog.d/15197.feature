@@ -1,0 +1,1 @@
+Add config option to prevent media downloads from listed domains.
