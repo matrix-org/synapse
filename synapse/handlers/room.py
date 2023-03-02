@@ -1123,7 +1123,7 @@ class RoomCreationHandler:
                 event_dict,
                 prev_event_ids=prev_event,
                 depth=depth,
-                state_map=state_map,
+                state_map=dict(state_map),
                 for_batch=for_batch,
             )
 
