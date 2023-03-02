@@ -194,3 +194,6 @@ class ExperimentalConfig(Config):
         self.msc3966_exact_event_property_contains = experimental.get(
             "msc3966_exact_event_property_contains", False
         )
+
+        # MSC3967: Do not require UIA when first uploading cross signing keys
+        self.msc3967_enabled = experimental.get("msc3967_enabled", False)
