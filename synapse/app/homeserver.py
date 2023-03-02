@@ -269,6 +269,19 @@ class SynapseHomeServer(HomeServer):
                         listener.bind_addresses,
                         listener.port,
                     )
+            elif listener.type == "outbound_federation_proxy":
+                if (
+                    self.get_instance_name()
+                    not in self.config.worker.outbound_fed_restricted_to
+                ):
+                    logger.warning(
+                        "Outbound federation proxy listener configured, but this "
+                        "worker is not permitted to send outgoing federation traffic!"
+                    )
+                else:
+                    _base.listen_outbound_fed_proxy(
+                        listener, self.tls_server_context_factory
+                    )
             else:
                 # this shouldn't happen, as the listener type should have been checked
                 # during parsing

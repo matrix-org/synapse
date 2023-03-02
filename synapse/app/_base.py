@@ -47,6 +47,8 @@ from twisted.internet.tcp import Port
 from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.python.threadpool import ThreadPool
+from twisted.web.http import HTTPFactory
+from twisted.web.proxy import Proxy
 from twisted.web.resource import Resource
 
 import synapse.util.caches
@@ -378,6 +380,15 @@ def listen_http_for_resource(
         reactor=reactor,
     )
     return listen_http(listener_config, factory, context_factory, reactor)
+
+
+def listen_outbound_fed_proxy(
+    listener_config: ListenerConfig,
+    context_factory: Optional[IOpenSSLContextFactory],
+    reactor: ISynapseReactor = reactor,
+) -> None:
+    factory = HTTPFactory.forProtocol(Proxy)
+    listen_http(listener_config, factory, context_factory, reactor)
 
 
 def listen_http(
