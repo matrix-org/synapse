@@ -349,7 +349,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             "get_room_summary", _get_room_summary_txn
         )
 
-    @cached()
+    @cached(max_entries=100000)
     async def get_number_joined_users_in_room(self, room_id: str) -> int:
         return await self.db_pool.simple_select_one_onecol(
             table="current_state_events",
