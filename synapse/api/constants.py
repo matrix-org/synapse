@@ -276,6 +276,7 @@ class ReceiptTypes:
     FULLY_READ: Final = "m.fully_read"
     BEEPER_INBOX_DONE: Final = "com.beeper.inbox.done"
 
+RECEIPTS_MAX_ROOM_SIZE = 100
 
 class PublicRoomsFilterFields:
     """Fields in the search filter for `/publicRooms` that we understand.

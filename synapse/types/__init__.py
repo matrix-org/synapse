@@ -853,6 +853,22 @@ class ReadReceipt:
     thread_id: Optional[str]
     data: JsonDict
 
+    # Beeper: we don't want to alter the frozen attr, but
+    # do occasionally need to make a private copy to
+    # avoid traffic to large rooms.
+    def copy_with_modification(self, **mods):
+        new_attrs = {
+            'room_id': self.room_id,
+            'receipt_type': self.receipt_type,
+            'user_id': self.user_id,
+            'event_ids': self.event_ids,
+            'thread_id': self.thread_id,
+            'data': self.data,
+            **mods
+        }
+        return ReadReceipt(**new_attrs)
+
+
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class DeviceListUpdates:

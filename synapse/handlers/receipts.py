@@ -14,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
-from synapse.api.constants import EduTypes, ReceiptTypes
+from synapse.api.constants import EduTypes, RECEIPTS_MAX_ROOM_SIZE, ReceiptTypes
 from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import (
@@ -116,6 +116,15 @@ class ReceiptsHandler:
         min_batch_id: Optional[int] = None
         max_batch_id: Optional[int] = None
 
+        # Beeper: we don't want to send read receipts to large rooms,
+        # so we convert messages to private, that are over RECEIPT_MAX_ROOM_SIZE.
+        for r in receipts:
+            if r.receipt_type != ReceiptTypes.READ_PRIVATE:
+                num_users = await self.store.get_number_joined_users_in_room(r.room_id)
+                if num_users > RECEIPTS_MAX_ROOM_SIZE:
+                    r = r.copy_with_modification(receipt_type=ReceiptTypes.READ_PRIVATE)
+
+
         for receipt in receipts:
             res = await self.store.insert_receipt(
                 receipt.room_id,
@@ -179,8 +188,17 @@ class ReceiptsHandler:
         if not is_new:
             return
 
-        if self.federation_sender and receipt_type != ReceiptTypes.READ_PRIVATE:
-            await self.federation_sender.send_read_receipt(receipt)
+        if receipt_type == ReceiptTypes.READ_PRIVATE:
+            return
+
+        if not self.federation_sender:
+            return
+
+        num_users = await self.store.get_number_joined_users_in_room(room_id)
+        if num_users > RECEIPTS_MAX_ROOM_SIZE:
+            return
+
+        await self.federation_sender.send_read_receipt(receipt)
 
 
 class ReceiptEventSource(EventSource[int, JsonDict]):
