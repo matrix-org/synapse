@@ -60,7 +60,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         """
         response = self.make_request(
             "GET",
-            f"/_matrix/media/v3/download/evil.com/${self.remote_media_id}",
+            f"/_matrix/media/v3/download/evil.com/{self.remote_media_id}",
             shorthand=False,
         )
         self.assertEqual(response.code, 404)
@@ -79,7 +79,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         """
         response = self.make_request(
             "GET",
-            f"/_matrix/media/v3/download/evil.com/${self.remote_media_id}",
+            f"/_matrix/media/v3/download/evil.com/{self.remote_media_id}",
             shorthand=False,
         )
         self.assertEqual(response.code, 200)
@@ -97,7 +97,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         """
         response = self.make_request(
             "GET",
-            f"/_matrix/media/v3/thumbnail/evil.com/${self.remote_media_id}",
+            f"/_matrix/media/v3/thumbnail/evil.com/{self.remote_media_id}",
             shorthand=False,
         )
         self.assertEqual(response.code, 404)
@@ -115,7 +115,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         """
         response = self.make_request(
             "GET",
-            f"/_matrix/media/v3/thumbnail/evil.com/${self.remote_media_id}",
+            f"/_matrix/media/v3/thumbnail/evil.com/{self.remote_media_id}",
             shorthand=False,
         )
         self.assertEqual(response.code, 200)
