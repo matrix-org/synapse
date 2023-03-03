@@ -64,6 +64,7 @@ from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
+from synapse.http.outbound_federation_proxy import OutboundFederationProxyFactory
 from synapse.http.site import SynapseSite
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.opentracing import init_tracer
@@ -387,8 +388,7 @@ def listen_outbound_fed_proxy(
     context_factory: Optional[IOpenSSLContextFactory],
     reactor: ISynapseReactor = reactor,
 ) -> None:
-    factory = HTTPFactory.forProtocol(Proxy)
-    listen_http(listener_config, factory, context_factory, reactor)
+    listen_http(listener_config, OutboundFederationProxyFactory, context_factory, reactor)
 
 
 def listen_http(
