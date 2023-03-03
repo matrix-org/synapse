@@ -337,15 +337,14 @@ class InitialSyncHandler:
             )
 
         account_data_events = []
-        tags = await self.store.get_tags_for_room(requester.user.to_string(), room_id)
+        user_id = requester.user.to_string()
+        tags = await self.store.get_tags_for_room(user_id, room_id)
         if tags:
             account_data_events.append(
                 {"type": AccountDataTypes.TAG, "content": {"tags": tags}}
             )
 
-        account_data = await self.store.get_account_data_for_room(
-            requester.user.to_string(), room_id
-        )
+        account_data = await self.store.get_account_data_for_room(user_id, room_id)
         for account_data_type, content in account_data.items():
             account_data_events.append({"type": account_data_type, "content": content})
 

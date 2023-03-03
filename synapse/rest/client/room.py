@@ -814,17 +814,14 @@ class RoomEventServlet(RestServlet):
                 [event], requester.user.to_string()
             )
 
-            serializer_options = SerializeEventConfig(requester=requester)
-
-            time_now = self.clock.time_msec()
             # per MSC2676, /rooms/{roomId}/event/{eventId}, should return the
             # *original* event, rather than the edited version
             event_dict = self._event_serializer.serialize_event(
                 event,
-                time_now,
+                self.clock.time_msec(),
                 bundle_aggregations=aggregations,
                 apply_edits=False,
-                config=serializer_options,
+                config=SerializeEventConfig(requester=requester),
             )
             return 200, event_dict
 

@@ -377,14 +377,12 @@ def serialize_event(
     # they sent.
     txn_id = getattr(e.internal_metadata, "txn_id", None)
     if txn_id is not None and config.requester is not None:
-        requester: Requester = config.requester
         event_token_id = getattr(e.internal_metadata, "token_id", None)
-        event_user_id = getattr(e, "user_id", None)
-        if requester.user.to_string() == event_user_id and (
+        if config.requester.user.to_string() == e.sender and (
             (
                 event_token_id is not None
-                and requester.access_token_id is not None
-                and event_token_id == requester.access_token_id
+                and config.requester.access_token_id is not None
+                and event_token_id == config.requester.access_token_id
             )
             or config.requester.is_guest
         ):

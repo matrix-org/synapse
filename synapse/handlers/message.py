@@ -245,10 +245,10 @@ class MessageHandler:
                 )
                 room_state = room_state_events[membership_event_id]
 
-        now = self.clock.time_msec()
-        serialize_options = SerializeEventConfig(requester=requester)
         events = self._event_serializer.serialize_events(
-            room_state.values(), now, config=serialize_options
+            room_state.values(),
+            self.clock.time_msec(),
+            config=SerializeEventConfig(requester=requester),
         )
         return events
 
