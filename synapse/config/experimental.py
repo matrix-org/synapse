@@ -84,7 +84,7 @@ class ExperimentalConfig(Config):
         # experimental support for faster joins over federation
         # (MSC2775, MSC3706, MSC3895)
         # requires a target server that can provide a partial join response (MSC3706)
-        self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
+        self.faster_joins_enabled: bool = experimental.get("faster_joins", True)
 
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
@@ -146,6 +146,13 @@ class ExperimentalConfig(Config):
                 "required to communicate account data deletions to clients."
             )
 
+        # MSC3381: Polls.
+        # In practice, supporting polls in Synapse only requires an implementation of
+        # MSC3930: Push rules for MSC3391 polls; which is what this option enables.
+        self.msc3381_polls_enabled: bool = experimental.get(
+            "msc3381_polls_enabled", False
+        )
+
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
 
@@ -161,3 +168,38 @@ class ExperimentalConfig(Config):
 
         # MSC3925: do not replace events with their edits
         self.msc3925_inhibit_edit = experimental.get("msc3925_inhibit_edit", False)
+
+        # MSC3758: exact_event_match push rule condition
+        self.msc3758_exact_event_match = experimental.get(
+            "msc3758_exact_event_match", False
+        )
+
+        # MSC3873: Disambiguate event_match keys.
+        self.msc3873_escape_event_match_key = experimental.get(
+            "msc3873_escape_event_match_key", False
+        )
+
+        # MSC3966: exact_event_property_contains push rule condition.
+        self.msc3966_exact_event_property_contains = experimental.get(
+            "msc3966_exact_event_property_contains", False
+        )
+
+        # MSC3952: Intentional mentions, this depends on MSC3758 and MSC3966.
+        self.msc3952_intentional_mentions = (
+            experimental.get("msc3952_intentional_mentions", False)
+            and self.msc3758_exact_event_match
+            and self.msc3966_exact_event_property_contains
+        )
+
+        # MSC3959: Do not generate notifications for edits.
+        self.msc3958_supress_edit_notifs = experimental.get(
+            "msc3958_supress_edit_notifs", False
+        )
+
+        # MSC3966: exact_event_property_contains push rule condition.
+        self.msc3966_exact_event_property_contains = experimental.get(
+            "msc3966_exact_event_property_contains", False
+        )
+
+        # MSC3967: Do not require UIA when first uploading cross signing keys
+        self.msc3967_enabled = experimental.get("msc3967_enabled", False)

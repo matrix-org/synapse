@@ -1,0 +1,1 @@
+Fix a long-standing bug where a URL preview would break if the discovered oEmbed failed to download.

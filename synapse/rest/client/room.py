@@ -26,7 +26,7 @@ from prometheus_client.core import Histogram
 from twisted.web.server import Request
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -44,6 +44,7 @@ from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_boolean,
+    parse_enum,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -159,11 +160,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        info, _ = await self._room_creation_handler.create_room(
+        room_id, _, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
-        return 200, info
+        return 200, {"room_id": room_id}
 
     def get_room_config(self, request: Request) -> JsonDict:
         user_supplied_config = parse_json_object_from_request(request)
@@ -925,7 +926,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server: HttpServer) -> None:
-        # /rooms/$roomid/[invite|join|leave]
+        # /rooms/$roomid/[join|invite|leave|ban|unban|kick]
         PATTERNS = (
             "/rooms/(?P<room_id>[^/]*)/"
             "(?P<membership_action>join|invite|leave|ban|unban|kick)"
@@ -1297,7 +1298,7 @@ class TimestampLookupRestServlet(RestServlet):
         await self._auth.check_user_in_room_or_world_readable(room_id, requester)
 
         timestamp = parse_integer(request, "ts", required=True)
-        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
 
         (
             event_id,

@@ -160,7 +160,18 @@ recommend the use of `systemd` where available: for information on setting up
 [Systemd with Workers](systemd-with-workers/). To use `synctl`, see
 [Using synctl with Workers](synctl_workers.md).
 
+## Start Synapse with Poetry
 
+The following applies to Synapse installations that have been installed from source using `poetry`.
+
+You can start the main Synapse process with Poetry by running the following command:
+```console
+poetry run synapse_homeserver -c [your homeserver.yaml]
+```
+For worker setups, you can run the following command
+```console
+poetry run synapse_worker -c [your worker.yaml]
+```
 ## Available worker applications
 
 ### `synapse.app.generic_worker`
@@ -221,6 +232,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
+    ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
 
     # Encryption requests
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
@@ -240,6 +252,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/knock/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
     # Account data requests

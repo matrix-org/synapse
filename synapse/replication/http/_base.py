@@ -352,7 +352,6 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         instance_name=instance_name,
                         stream_name=stream_name,
                         position=position,
-                        raise_on_timeout=False,
                     )
 
                 return result
@@ -414,7 +413,6 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 instance_name=content[_STREAM_POSITION_KEY]["instance_name"],
                 stream_name=stream_name,
                 position=position,
-                raise_on_timeout=False,
             )
 
         if self.CACHE:
@@ -428,6 +426,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             code, response = await self.response_cache.wrap(
                 txn_id, self._handle_request, request, content, **kwargs
             )
+            # Take a copy so we don't mutate things in the cache.
+            response = dict(response)
         else:
             # The `@cancellable` decorator may be applied to `_handle_request`. But we
             # told `HttpServer.register_paths` that our handler is `_check_auth_and_handle`,

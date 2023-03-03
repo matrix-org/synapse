@@ -95,6 +95,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             for row in rows:
                 assert isinstance(row, UnPartialStatedEventStreamRow)
                 self._get_state_group_for_event.invalidate((row.event_id,))
+                self.is_partial_state_event.invalidate((row.event_id,))
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
 
@@ -485,10 +486,10 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 "rejection_status_changed": rejection_status_changed,
             },
         )
+        txn.call_after(self.hs.get_notifier().on_new_replication_data)
 
 
 class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
-
     CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
     EVENT_STATE_GROUP_INDEX_UPDATE_NAME = "event_to_state_groups_sg_index"
     DELETE_CURRENT_STATE_UPDATE_NAME = "delete_old_current_state_events"

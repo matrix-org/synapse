@@ -219,28 +219,31 @@ class IdentityHandler:
             data = json_decoder.decode(e.msg)  # XXX WAT?
             return data
 
-    async def try_unbind_threepid(self, mxid: str, threepid: dict) -> bool:
-        """Attempt to remove a 3PID from an identity server, or if one is not provided, all
-        identity servers we're aware the binding is present on
+    async def try_unbind_threepid(
+        self, mxid: str, medium: str, address: str, id_server: Optional[str]
+    ) -> bool:
+        """Attempt to remove a 3PID from one or more identity servers.
 
         Args:
             mxid: Matrix user ID of binding to be removed
-            threepid: Dict with medium & address of binding to be
-                removed, and an optional id_server.
+            medium: The medium of the third-party ID.
+            address: The address of the third-party ID.
+            id_server: An identity server to attempt to unbind from. If None,
+                attempt to remove the association from all identity servers
+                known to potentially have it.
 
         Raises:
-            SynapseError: If we failed to contact the identity server
+            SynapseError: If we failed to contact one or more identity servers.
 
         Returns:
-            True on success, otherwise False if the identity
-            server doesn't support unbinding (or no identity server found to
-            contact).
+            True on success, otherwise False if the identity server doesn't
+            support unbinding (or no identity server to contact was found).
         """
-        if threepid.get("id_server"):
-            id_servers = [threepid["id_server"]]
+        if id_server:
+            id_servers = [id_server]
         else:
             id_servers = await self.store.get_id_servers_user_bound(
-                user_id=mxid, medium=threepid["medium"], address=threepid["address"]
+                mxid, medium, address
             )
 
         # We don't know where to unbind, so we don't have a choice but to return
@@ -249,20 +252,21 @@ class IdentityHandler:
 
         changed = True
         for id_server in id_servers:
-            changed &= await self.try_unbind_threepid_with_id_server(
-                mxid, threepid, id_server
+            changed &= await self._try_unbind_threepid_with_id_server(
+                mxid, medium, address, id_server
             )
 
         return changed
 
-    async def try_unbind_threepid_with_id_server(
-        self, mxid: str, threepid: dict, id_server: str
+    async def _try_unbind_threepid_with_id_server(
+        self, mxid: str, medium: str, address: str, id_server: str
     ) -> bool:
         """Removes a binding from an identity server
 
         Args:
             mxid: Matrix user ID of binding to be removed
-            threepid: Dict with medium & address of binding to be removed
+            medium: The medium of the third-party ID
+            address: The address of the third-party ID
             id_server: Identity server to unbind from
 
         Raises:
@@ -286,7 +290,7 @@ class IdentityHandler:
 
         content = {
             "mxid": mxid,
-            "threepid": {"medium": threepid["medium"], "address": threepid["address"]},
+            "threepid": {"medium": medium, "address": address},
         }
 
         # we abuse the federation http client to sign the request, but we have to send it
@@ -319,12 +323,7 @@ class IdentityHandler:
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
-        await self.store.remove_user_bound_threepid(
-            user_id=mxid,
-            medium=threepid["medium"],
-            address=threepid["address"],
-            id_server=id_server,
-        )
+        await self.store.remove_user_bound_threepid(mxid, medium, address, id_server)
 
         return changed
 

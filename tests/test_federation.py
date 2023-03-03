@@ -12,53 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Collection, List, Optional, Union
 from unittest.mock import Mock
 
-from twisted.internet.defer import succeed
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import FederationError
-from synapse.api.room_versions import RoomVersions
-from synapse.events import make_event_from_dict
+from synapse.api.room_versions import RoomVersion, RoomVersions
+from synapse.events import EventBase, make_event_from_dict
+from synapse.events.snapshot import EventContext
 from synapse.federation.federation_base import event_from_pdu_json
+from synapse.handlers.device import DeviceListUpdater
+from synapse.http.types import QueryParams
 from synapse.logging.context import LoggingContext
-from synapse.types import UserID, create_requester
+from synapse.server import HomeServer
+from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
 from tests import unittest
-from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
 from tests.test_utils import make_awaitable
 
 
 class MessageAcceptTests(unittest.HomeserverTestCase):
-    def setUp(self):
-
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.http_client = Mock()
-        self.reactor = ThreadedMemoryReactorClock()
-        self.hs_clock = Clock(self.reactor)
-        self.homeserver = setup_test_homeserver(
-            self.addCleanup,
-            federation_http_client=self.http_client,
-            clock=self.hs_clock,
-            reactor=self.reactor,
-        )
+        return self.setup_test_homeserver(federation_http_client=self.http_client)
 
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         user_id = UserID("us", "test")
         our_user = create_requester(user_id)
-        room_creator = self.homeserver.get_room_creation_handler()
+        room_creator = self.hs.get_room_creation_handler()
         self.room_id = self.get_success(
             room_creator.create_room(
                 our_user, room_creator._presets_dict["public_chat"], ratelimit=False
             )
-        )[0]["room_id"]
+        )[0]
 
-        self.store = self.homeserver.get_datastores().main
+        self.store = self.hs.get_datastores().main
 
         # Figure out what the most recent event is
         most_recent = self.get_success(
-            self.homeserver.get_datastores().main.get_latest_event_ids_in_room(
-                self.room_id
-            )
+            self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )[0]
 
         join_event = make_event_from_dict(
@@ -78,17 +73,23 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
-        self.handler = self.homeserver.get_federation_handler()
-        federation_event_handler = self.homeserver.get_federation_event_handler()
+        self.handler = self.hs.get_federation_handler()
+        federation_event_handler = self.hs.get_federation_event_handler()
 
-        async def _check_event_auth(origin, event, context):
+        async def _check_event_auth(
+            origin: Optional[str], event: EventBase, context: EventContext
+        ) -> None:
             pass
 
-        federation_event_handler._check_event_auth = _check_event_auth
-        self.client = self.homeserver.get_federation_client()
-        self.client._check_sigs_and_hash_for_pulled_events_and_fetch = (
-            lambda dest, pdus, **k: succeed(pdus)
-        )
+        federation_event_handler._check_event_auth = _check_event_auth  # type: ignore[assignment]
+        self.client = self.hs.get_federation_client()
+
+        async def _check_sigs_and_hash_for_pulled_events_and_fetch(
+            dest: str, pdus: Collection[EventBase], room_version: RoomVersion
+        ) -> List[EventBase]:
+            return list(pdus)
+
+        self.client._check_sigs_and_hash_for_pulled_events_and_fetch = _check_sigs_and_hash_for_pulled_events_and_fetch  # type: ignore[assignment]
 
         # Send the join, it should return None (which is not an error)
         self.assertEqual(
@@ -104,16 +105,25 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             "$join:test.serv",
         )
 
-    def test_cant_hide_direct_ancestors(self):
+    def test_cant_hide_direct_ancestors(self) -> None:
         """
         If you send a message, you must be able to provide the direct
         prev_events that said event references.
         """
 
-        async def post_json(destination, path, data, headers=None, timeout=0):
+        async def post_json(
+            destination: str,
+            path: str,
+            data: Optional[JsonDict] = None,
+            long_retries: bool = False,
+            timeout: Optional[int] = None,
+            ignore_backoff: bool = False,
+            args: Optional[QueryParams] = None,
+        ) -> Union[JsonDict, list]:
             # If it asks us for new missing events, give them NOTHING
             if path.startswith("/_matrix/federation/v1/get_missing_events/"):
                 return {"events": []}
+            return {}
 
         self.http_client.post_json = post_json
 
@@ -138,7 +148,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
-        federation_event_handler = self.homeserver.get_federation_event_handler()
+        federation_event_handler = self.hs.get_federation_event_handler()
         with LoggingContext("test-context"):
             failure = self.get_failure(
                 federation_event_handler.on_receive_pdu("test.serv", lying_event),
@@ -158,7 +168,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         extrem = self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))
         self.assertEqual(extrem[0], "$join:test.serv")
 
-    def test_retry_device_list_resync(self):
+    def test_retry_device_list_resync(self) -> None:
         """Tests that device lists are marked as stale if they couldn't be synced, and
         that stale device lists are retried periodically.
         """
@@ -171,24 +181,27 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         # When this function is called, increment the number of resync attempts (only if
         # we're querying devices for the right user ID), then raise a
         # NotRetryingDestination error to fail the resync gracefully.
-        def query_user_devices(destination, user_id):
+        def query_user_devices(
+            destination: str, user_id: str, timeout: int = 30000
+        ) -> JsonDict:
             if user_id == remote_user_id:
                 self.resync_attempts += 1
 
             raise NotRetryingDestination(0, 0, destination)
 
         # Register the mock on the federation client.
-        federation_client = self.homeserver.get_federation_client()
-        federation_client.query_user_devices = Mock(side_effect=query_user_devices)
+        federation_client = self.hs.get_federation_client()
+        federation_client.query_user_devices = Mock(side_effect=query_user_devices)  # type: ignore[assignment]
 
         # Register a mock on the store so that the incoming update doesn't fail because
         # we don't share a room with the user.
-        store = self.homeserver.get_datastores().main
+        store = self.hs.get_datastores().main
         store.get_rooms_for_user = Mock(return_value=make_awaitable(["!someroom:test"]))
 
         # Manually inject a fake device list update. We need this update to include at
         # least one prev_id so that the user's device list will need to be retried.
-        device_list_updater = self.homeserver.get_device_handler().device_list_updater
+        device_list_updater = self.hs.get_device_handler().device_list_updater
+        assert isinstance(device_list_updater, DeviceListUpdater)
         self.get_success(
             device_list_updater.incoming_device_list_update(
                 origin=remote_origin,
@@ -218,7 +231,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.reactor.advance(30)
         self.assertEqual(self.resync_attempts, 2)
 
-    def test_cross_signing_keys_retry(self):
+    def test_cross_signing_keys_retry(self) -> None:
         """Tests that resyncing a device list correctly processes cross-signing keys from
         the remote server.
         """
@@ -227,8 +240,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
 
         # Register mock device list retrieval on the federation client.
-        federation_client = self.homeserver.get_federation_client()
-        federation_client.query_user_devices = Mock(
+        federation_client = self.hs.get_federation_client()
+        federation_client.query_user_devices = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(
                 {
                     "user_id": remote_user_id,
@@ -252,7 +265,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         # Resync the device list.
-        device_handler = self.homeserver.get_device_handler()
+        device_handler = self.hs.get_device_handler()
         self.get_success(
             device_handler.device_list_updater.user_device_resync(remote_user_id),
         )
@@ -261,16 +274,18 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         keys = self.get_success(
             self.store.get_e2e_cross_signing_keys_bulk(user_ids=[remote_user_id]),
         )
-        self.assertTrue(remote_user_id in keys)
+        self.assertIn(remote_user_id, keys)
+        key = keys[remote_user_id]
+        assert key is not None
 
         # Check that the master key is the one returned by the mock.
-        master_key = keys[remote_user_id]["master"]
+        master_key = key["master"]
         self.assertEqual(len(master_key["keys"]), 1)
         self.assertTrue("ed25519:" + remote_master_key in master_key["keys"].keys())
         self.assertTrue(remote_master_key in master_key["keys"].values())
 
         # Check that the self-signing key is the one returned by the mock.
-        self_signing_key = keys[remote_user_id]["self_signing"]
+        self_signing_key = key["self_signing"]
         self.assertEqual(len(self_signing_key["keys"]), 1)
         self.assertTrue(
             "ed25519:" + remote_self_signing_key in self_signing_key["keys"].keys(),
@@ -279,7 +294,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
 
 class StripUnsignedFromEventsTestCase(unittest.TestCase):
-    def test_strip_unauthorized_unsigned_values(self):
+    def test_strip_unauthorized_unsigned_values(self) -> None:
         event1 = {
             "sender": "@baduser:test.serv",
             "state_key": "@baduser:test.serv",
@@ -296,7 +311,7 @@ class StripUnsignedFromEventsTestCase(unittest.TestCase):
         # Make sure unauthorized fields are stripped from unsigned
         self.assertNotIn("more warez", filtered_event.unsigned)
 
-    def test_strip_event_maintains_allowed_fields(self):
+    def test_strip_event_maintains_allowed_fields(self) -> None:
         event2 = {
             "sender": "@baduser:test.serv",
             "state_key": "@baduser:test.serv",
@@ -323,7 +338,7 @@ class StripUnsignedFromEventsTestCase(unittest.TestCase):
         self.assertIn("invite_room_state", filtered_event2.unsigned)
         self.assertEqual([], filtered_event2.unsigned["invite_room_state"])
 
-    def test_strip_event_removes_fields_based_on_event_type(self):
+    def test_strip_event_removes_fields_based_on_event_type(self) -> None:
         event3 = {
             "sender": "@baduser:test.serv",
             "state_key": "@baduser:test.serv",

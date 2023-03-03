@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Tuple
+from typing import Any, Tuple
 from unittest.mock import Mock, patch
 from urllib.parse import quote
 
@@ -24,7 +24,7 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client import login, register, room, user_directory
 from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import create_requester
+from synapse.types import UserProfile, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -32,6 +32,12 @@ from tests.storage.test_user_directory import GetUserDirectoryTables
 from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import override_config
+
+
+# A spam checker which doesn't implement anything, so create a bare object.
+class UselessSpamChecker:
+    def __init__(self, config: Any):
+        pass
 
 
 class UserDirectoryTestCase(unittest.HomeserverTestCase):
@@ -185,6 +191,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         room = self.helper.create_room_as(user, is_public=True, tok=token)
         self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
         self._check_only_one_user_in_directory(user, room)
+
+    def test_search_term_with_colon_in_it_does_not_raise(self) -> None:
+        """
+        Regression test: Test that search terms with colons in them are acceptable.
+        """
+        u1 = self.register_user("user1", "pass")
+        self.get_success(self.handler.search_users(u1, "haha:paamayim-nekudotayim", 10))
 
     def test_user_not_in_users_table(self) -> None:
         """Unclear how it happens, but on matrix.org we've seen join events
@@ -773,7 +786,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
-        async def allow_all(user_profile: ProfileInfo) -> bool:
+        async def allow_all(user_profile: UserProfile) -> bool:
             # Allow all users.
             return False
 
@@ -787,7 +800,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        async def block_all(user_profile: ProfileInfo) -> bool:
+        async def block_all(user_profile: UserProfile) -> bool:
             # All users are spammy.
             return True
 
@@ -797,6 +810,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
+    @override_config(
+        {
+            "spam_checker": {
+                "module": "tests.handlers.test_user_directory.UselessSpamChecker"
+            }
+        }
+    )
     def test_legacy_spam_checker(self) -> None:
         """
         A spam checker without the expected method should be ignored.
@@ -824,11 +844,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
         self.assertEqual(public_users, set())
-
-        # Configure a spam checker.
-        spam_checker = self.hs.get_spam_checker()
-        # The spam checker doesn't need any methods, so create a bare object.
-        spam_checker.spam_checker = object()
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -949,13 +964,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(
-            self.hs.get_storage_controllers().persistence.persist_event(event, context)
-        )
+        context = self.get_success(unpersisted_context.persist(event))
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self.get_success(persistence.persist_event(event, context))
 
     def test_local_user_leaving_room_remains_in_user_directory(self) -> None:
         """We've chosen to simplify the user directory's implementation by

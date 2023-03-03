@@ -57,6 +57,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
 )
@@ -364,7 +365,7 @@ class _TransactionController:
     async def send(
         self,
         service: ApplicationService,
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: Optional[List[JsonDict]] = None,
         to_device_messages: Optional[List[JsonDict]] = None,
         one_time_keys_count: Optional[TransactionOneTimeKeysCount] = None,

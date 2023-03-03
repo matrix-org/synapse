@@ -157,7 +157,6 @@ class GenericWorkerServer(HomeServer):
     DATASTORE_CLASS = GenericWorkerSlavedStore  # type: ignore
 
     def _listen_http(self, listener_config: ListenerConfig) -> None:
-
         assert listener_config.http_options is not None
 
         # We always include a health resource.
@@ -281,13 +280,6 @@ def start(config_options: List[str]) -> None:
         "synapse.app.synchrotron",
         "synapse.app.user_dir",
     )
-
-    if config.experimental.faster_joins_enabled:
-        raise ConfigError(
-            "You have enabled the experimental `faster_joins` config option, but it is "
-            "not compatible with worker deployments yet. Please disable `faster_joins` "
-            "or run Synapse as a single process deployment instead."
-        )
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage

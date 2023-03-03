@@ -25,7 +25,6 @@ PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
-
     user_id = "@apple:test"
     hijack_auth = True
     EXAMPLE_FILTER = {"room": {"timeline": {"types": ["m.room.message"]}}}
@@ -63,14 +62,14 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def test_add_filter_non_local_user(self) -> None:
         _is_mine = self.hs.is_mine
-        self.hs.is_mine = lambda target_user: False
+        self.hs.is_mine = lambda target_user: False  # type: ignore[assignment]
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/user/%s/filter" % (self.user_id),
             self.EXAMPLE_FILTER_JSON,
         )
 
-        self.hs.is_mine = _is_mine
+        self.hs.is_mine = _is_mine  # type: ignore[assignment]
         self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 

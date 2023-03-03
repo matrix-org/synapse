@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import attr
@@ -22,12 +23,56 @@ from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
     from synapse.storage.controllers import StorageControllers
+    from synapse.storage.databases import StateGroupDataStore
     from synapse.storage.databases.main import DataStore
     from synapse.types.state import StateFilter
 
 
+class UnpersistedEventContextBase(ABC):
+    """
+    This is a base class for EventContext and UnpersistedEventContext, objects which
+    hold information relevant to storing an associated event. Note that an
+    UnpersistedEventContexts must be converted into an EventContext before it is
+    suitable to send to the db with its associated event.
+
+    Attributes:
+        _storage: storage controllers for interfacing with the database
+        app_service: If the associated event is being sent by a (local) application service, that
+            app service.
+    """
+
+    def __init__(self, storage_controller: "StorageControllers"):
+        self._storage: "StorageControllers" = storage_controller
+        self.app_service: Optional[ApplicationService] = None
+
+    @abstractmethod
+    async def persist(
+        self,
+        event: EventBase,
+    ) -> "EventContext":
+        """
+        A method to convert an UnpersistedEventContext to an EventContext, suitable for
+        sending to the database with the associated event.
+        """
+        pass
+
+    @abstractmethod
+    async def get_prev_state_ids(
+        self, state_filter: Optional["StateFilter"] = None
+    ) -> StateMap[str]:
+        """
+        Gets the room state at the event (ie not including the event if the event is a
+        state event).
+
+        Args:
+            state_filter: specifies the type of state event to fetch from DB, example:
+            EventTypes.JoinRules
+        """
+        pass
+
+
 @attr.s(slots=True, auto_attribs=True)
-class EventContext:
+class EventContext(UnpersistedEventContextBase):
     """
     Holds information relevant to persisting an event
 
@@ -77,9 +122,6 @@ class EventContext:
         delta_ids: If ``prev_group`` is not None, the state delta between ``prev_group``
             and ``state_group``.
 
-        app_service: If this event is being sent by a (local) application service, that
-            app service.
-
         partial_state: if True, we may be storing this event with a temporary,
             incomplete state.
     """
@@ -121,6 +163,9 @@ class EventContext:
     ) -> "EventContext":
         """Return an EventContext instance suitable for persisting an outlier event"""
         return EventContext(storage=storage)
+
+    async def persist(self, event: EventBase) -> "EventContext":
+        return self
 
     async def serialize(self, event: EventBase, store: "DataStore") -> JsonDict:
         """Converts self to a type that can be serialized as JSON, and then
@@ -251,6 +296,176 @@ class EventContext:
         assert self.state_group_before_event is not None
         return await self._storage.state.get_state_ids_for_group(
             self.state_group_before_event, state_filter
+        )
+
+
+@attr.s(slots=True, auto_attribs=True)
+class UnpersistedEventContext(UnpersistedEventContextBase):
+    """
+    The event context holds information about the state groups for an event. It is important
+    to remember that an event technically has two state groups: the state group before the
+    event, and the state group after the event. If the event is not a state event, the state
+    group will not change (ie the state group before the event will be the same as the state
+    group after the event), but if it is a state event the state group before the event
+    will differ from the state group after the event.
+    This is a version of an EventContext before the new state group (if any) has been
+    computed and stored. It contains information about the state before the event (which
+    also may be the information after the event, if the event is not a state event). The
+    UnpersistedEventContext must be converted into an EventContext by calling the method
+    'persist' on it before it is suitable to be sent to the DB for processing.
+
+        state_group_after_event:
+             The state group after the event. This will always be None until it is persisted.
+             If the event is not a state event, this will be the same as
+             state_group_before_event.
+
+        state_group_before_event:
+            The ID of the state group representing the state of the room before this event.
+
+        state_delta_due_to_event:
+            If the event is a state event, then this is the delta of the state between
+             `state_group` and `state_group_before_event`
+
+        prev_group_for_state_group_before_event:
+            If it is known, ``state_group_before_event``'s previous state group.
+
+        delta_ids_to_state_group_before_event:
+             If ``prev_group_for_state_group_before_event`` is not None, the state delta
+             between ``prev_group_for_state_group_before_event`` and ``state_group_before_event``.
+
+        partial_state:
+            Whether the event has partial state.
+
+        state_map_before_event:
+            A map of the state before the event, i.e. the state at `state_group_before_event`
+    """
+
+    _storage: "StorageControllers"
+    state_group_before_event: Optional[int]
+    state_group_after_event: Optional[int]
+    state_delta_due_to_event: Optional[dict]
+    prev_group_for_state_group_before_event: Optional[int]
+    delta_ids_to_state_group_before_event: Optional[StateMap[str]]
+    partial_state: bool
+    state_map_before_event: Optional[StateMap[str]] = None
+
+    @classmethod
+    async def batch_persist_unpersisted_contexts(
+        cls,
+        events_and_context: List[Tuple[EventBase, "UnpersistedEventContextBase"]],
+        room_id: str,
+        last_known_state_group: int,
+        datastore: "StateGroupDataStore",
+    ) -> List[Tuple[EventBase, EventContext]]:
+        """
+        Takes a list of events and their associated unpersisted contexts and persists
+        the unpersisted contexts, returning a list of events and persisted contexts.
+        Note that all the events must be in a linear chain (ie a <- b <- c).
+
+        Args:
+            events_and_context: A list of events and their unpersisted contexts
+            room_id: the room_id for the events
+            last_known_state_group: the last persisted state group
+            datastore: a state datastore
+        """
+        amended_events_and_context = await datastore.store_state_deltas_for_batched(
+            events_and_context, room_id, last_known_state_group
+        )
+
+        events_and_persisted_context = []
+        for event, unpersisted_context in amended_events_and_context:
+            if event.is_state():
+                context = EventContext(
+                    storage=unpersisted_context._storage,
+                    state_group=unpersisted_context.state_group_after_event,
+                    state_group_before_event=unpersisted_context.state_group_before_event,
+                    state_delta_due_to_event=unpersisted_context.state_delta_due_to_event,
+                    partial_state=unpersisted_context.partial_state,
+                    prev_group=unpersisted_context.state_group_before_event,
+                    delta_ids=unpersisted_context.state_delta_due_to_event,
+                )
+            else:
+                context = EventContext(
+                    storage=unpersisted_context._storage,
+                    state_group=unpersisted_context.state_group_after_event,
+                    state_group_before_event=unpersisted_context.state_group_before_event,
+                    state_delta_due_to_event=unpersisted_context.state_delta_due_to_event,
+                    partial_state=unpersisted_context.partial_state,
+                    prev_group=unpersisted_context.prev_group_for_state_group_before_event,
+                    delta_ids=unpersisted_context.delta_ids_to_state_group_before_event,
+                )
+            events_and_persisted_context.append((event, context))
+        return events_and_persisted_context
+
+    async def get_prev_state_ids(
+        self, state_filter: Optional["StateFilter"] = None
+    ) -> StateMap[str]:
+        """
+        Gets the room state map, excluding this event.
+
+        Args:
+            state_filter: specifies the type of state event to fetch from DB
+
+        Returns:
+            Maps a (type, state_key) to the event ID of the state event matching
+            this tuple.
+        """
+        if self.state_map_before_event:
+            return self.state_map_before_event
+
+        assert self.state_group_before_event is not None
+        return await self._storage.state.get_state_ids_for_group(
+            self.state_group_before_event, state_filter
+        )
+
+    async def persist(self, event: EventBase) -> EventContext:
+        """
+        Creates a full `EventContext` for the event, persisting any referenced state that
+        has not yet been persisted.
+
+        Args:
+             event: event that the EventContext is associated with.
+
+        Returns: An EventContext suitable for sending to the database with the event
+        for persisting
+        """
+        assert self.partial_state is not None
+
+        # If we have a full set of state for before the event but don't have a state
+        # group for that state, we need to get one
+        if self.state_group_before_event is None:
+            assert self.state_map_before_event
+            state_group_before_event = await self._storage.state.store_state_group(
+                event.event_id,
+                event.room_id,
+                prev_group=self.prev_group_for_state_group_before_event,
+                delta_ids=self.delta_ids_to_state_group_before_event,
+                current_state_ids=self.state_map_before_event,
+            )
+            self.state_group_before_event = state_group_before_event
+
+        # if the event isn't a state event the state group doesn't change
+        if not self.state_delta_due_to_event:
+            state_group_after_event = self.state_group_before_event
+
+        # otherwise if it is a state event we need to get a state group for it
+        else:
+            state_group_after_event = await self._storage.state.store_state_group(
+                event.event_id,
+                event.room_id,
+                prev_group=self.state_group_before_event,
+                delta_ids=self.state_delta_due_to_event,
+                current_state_ids=None,
+            )
+
+        return EventContext.with_state(
+            storage=self._storage,
+            state_group=state_group_after_event,
+            state_group_before_event=self.state_group_before_event,
+            state_delta_due_to_event=self.state_delta_due_to_event,
+            partial_state=self.partial_state,
+            prev_group=self.state_group_before_event,
+            delta_ids=self.state_delta_due_to_event,
         )
 
 

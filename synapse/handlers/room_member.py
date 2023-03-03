@@ -26,7 +26,13 @@ from synapse.api.constants import (
     GuestAccess,
     Membership,
 )
-from synapse.api.errors import AuthError, Codes, ShadowBanError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    PartialStateConflictError,
+    ShadowBanError,
+    SynapseError,
+)
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
@@ -34,7 +40,6 @@ from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.logging import opentracing
 from synapse.module_api import NOT_SPAM
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.types import (
     JsonDict,
     Requester,
@@ -54,6 +59,13 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+class NoKnownServersError(SynapseError):
+    """No server already resident to the room was provided to the join/knock operation."""
+
+    def __init__(self, msg: str = "No known servers"):
+        super().__init__(404, msg)
 
 
 class RoomMemberHandler(metaclass=abc.ABCMeta):
@@ -185,12 +197,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             room_id: Room that we are trying to join
             user: User who is trying to join
             content: A dict that should be used as the content of the join event.
+
+        Raises:
+            NoKnownServersError: if remote_room_hosts does not contain a server joined to
+                the room.
         """
         raise NotImplementedError()
 
     @abc.abstractmethod
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,
@@ -398,7 +415,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         max_retries = 5
         for i in range(max_retries):
             try:
-                event, context = await self.event_creation_handler.create_event(
+                (
+                    event,
+                    unpersisted_context,
+                ) = await self.event_creation_handler.create_event(
                     requester,
                     {
                         "type": EventTypes.Member,
@@ -419,7 +439,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     outlier=outlier,
                     historical=historical,
                 )
-
+                context = await unpersisted_context.persist(event)
                 prev_state_ids = await context.get_prev_state_ids(
                     StateFilter.from_types([(EventTypes.Member, None)])
                 )
@@ -484,7 +504,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             user_id: The user's ID.
         """
         # Retrieve user account data for predecessor room
-        user_account_data, _ = await self.store.get_account_data_for_user(user_id)
+        user_account_data = await self.store.get_global_account_data_for_user(user_id)
 
         # Copy direct message state if applicable
         direct_rooms = user_account_data.get(AccountDataTypes.DIRECT, {})
@@ -823,14 +843,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
 
-        state_before_join = await self.state_handler.compute_state_after_events(
-            room_id, latest_event_ids
+        is_partial_state_room = await self.store.is_partial_state_room(room_id)
+        partial_state_before_join = await self.state_handler.compute_state_after_events(
+            room_id, latest_event_ids, await_full_state=False
         )
+        # `is_partial_state_room` also indicates whether `partial_state_before_join` is
+        # partial.
 
         # TODO: Refactor into dictionary of explicitly allowed transitions
         # between old and new state, with specific error messages for some
         # transitions and generic otherwise
-        old_state_id = state_before_join.get((EventTypes.Member, target.to_string()))
+        old_state_id = partial_state_before_join.get(
+            (EventTypes.Member, target.to_string())
+        )
         if old_state_id:
             old_state = await self.store.get_event(old_state_id, allow_none=True)
             old_membership = old_state.content.get("membership") if old_state else None
@@ -881,11 +906,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if action == "kick":
                 raise AuthError(403, "The target user is not in the room")
 
-        is_host_in_room = await self._is_host_in_room(state_before_join)
+        is_host_in_room = await self._is_host_in_room(partial_state_before_join)
 
         if effective_membership_state == Membership.JOIN:
             if requester.is_guest:
-                guest_can_join = await self._can_guest_join(state_before_join)
+                guest_can_join = await self._can_guest_join(partial_state_before_join)
                 if not guest_can_join:
                     # This should be an auth check, but guests are a local concept,
                     # so don't really fit into the general auth process.
@@ -927,8 +952,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 room_id,
                 remote_room_hosts,
                 content,
+                is_partial_state_room,
                 is_host_in_room,
-                state_before_join,
+                partial_state_before_join,
             )
             if remote_join:
                 if ratelimit:
@@ -1048,7 +1074,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
 
                 return await self.remote_knock(
-                    remote_room_hosts, room_id, target, content
+                    requester, remote_room_hosts, room_id, target, content
                 )
 
         return await self._local_membership_update(
@@ -1073,8 +1099,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: str,
         remote_room_hosts: List[str],
         content: JsonDict,
+        is_partial_state_room: bool,
         is_host_in_room: bool,
-        state_before_join: StateMap[str],
+        partial_state_before_join: StateMap[str],
     ) -> Tuple[bool, List[str]]:
         """
         Check whether the server should do a remote join (as opposed to a local
@@ -1093,9 +1120,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             remote_room_hosts: A list of remote room hosts.
             content: The content to use as the event body of the join. This may
                 be modified.
-            is_host_in_room: True if the host is in the room.
-            state_before_join: The state before the join event (i.e. the resolution of
-                the states after its parent events).
+            is_partial_state_room: `True` if the server currently doesn't hold the full
+                state of the room.
+            is_host_in_room: `True` if the host is in the room.
+            partial_state_before_join: The state before the join event (i.e. the
+                resolution of the states after its parent events). May be full or
+                partial state, depending on `is_partial_state_room`.
 
         Returns:
             A tuple of:
@@ -1109,6 +1139,23 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if not is_host_in_room:
             return True, remote_room_hosts
 
+        prev_member_event_id = partial_state_before_join.get(
+            (EventTypes.Member, user_id), None
+        )
+        previous_membership = None
+        if prev_member_event_id:
+            prev_member_event = await self.store.get_event(prev_member_event_id)
+            previous_membership = prev_member_event.membership
+
+        # If we are not fully joined yet, and the target is not already in the room,
+        # let's do a remote join so another server with the full state can validate
+        # that the user has not been banned for example.
+        # We could just accept the join and wait for state res to resolve that later on
+        # but we would then leak room history to this person until then, which is pretty
+        # bad.
+        if is_partial_state_room and previous_membership != Membership.JOIN:
+            return True, remote_room_hosts
+
         # If the host is in the room, but not one of the authorised hosts
         # for restricted join rules, a remote join must be used.
         room_version = await self.store.get_room_version(room_id)
@@ -1116,21 +1163,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # If restricted join rules are not being used, a local join can always
         # be used.
         if not await self.event_auth_handler.has_restricted_join_rules(
-            state_before_join, room_version
+            partial_state_before_join, room_version
         ):
             return False, []
 
         # If the user is invited to the room or already joined, the join
         # event can always be issued locally.
-        prev_member_event_id = state_before_join.get((EventTypes.Member, user_id), None)
-        prev_member_event = None
-        if prev_member_event_id:
-            prev_member_event = await self.store.get_event(prev_member_event_id)
-            if prev_member_event.membership in (
-                Membership.JOIN,
-                Membership.INVITE,
-            ):
-                return False, []
+        if previous_membership in (Membership.JOIN, Membership.INVITE):
+            return False, []
+
+        # All the partial state cases are covered above. We have been given the full
+        # state of the room.
+        assert not is_partial_state_room
+        state_before_join = partial_state_before_join
 
         # If the local host has a user who can issue invites, then a local
         # join can be done.
@@ -1154,7 +1199,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # Ensure the member should be allowed access via membership in a room.
         await self.event_auth_handler.check_restricted_join_rules(
-            state_before_join, room_version, user_id, prev_member_event
+            state_before_join, room_version, user_id, previous_membership
         )
 
         # If this is going to be a local join, additional information must
@@ -1304,11 +1349,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target_user, room_id)
 
-    async def _can_guest_join(self, current_state_ids: StateMap[str]) -> bool:
+    async def _can_guest_join(self, partial_current_state_ids: StateMap[str]) -> bool:
         """
         Returns whether a guest can join a room based on its current state.
+
+        Args:
+            partial_current_state_ids: The current state of the room. May be full or
+                partial state.
         """
-        guest_access_id = current_state_ids.get((EventTypes.GuestAccess, ""), None)
+        guest_access_id = partial_current_state_ids.get(
+            (EventTypes.GuestAccess, ""), None
+        )
         if not guest_access_id:
             return False
 
@@ -1634,19 +1685,25 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         )
         return event, stream_id
 
-    async def _is_host_in_room(self, current_state_ids: StateMap[str]) -> bool:
+    async def _is_host_in_room(self, partial_current_state_ids: StateMap[str]) -> bool:
+        """Returns whether the homeserver is in the room based on its current state.
+
+        Args:
+            partial_current_state_ids: The current state of the room. May be full or
+                partial state.
+        """
         # Have we just created the room, and is this about to be the very
         # first member event?
-        create_event_id = current_state_ids.get(("m.room.create", ""))
-        if len(current_state_ids) == 1 and create_event_id:
+        create_event_id = partial_current_state_ids.get(("m.room.create", ""))
+        if len(partial_current_state_ids) == 1 and create_event_id:
             # We can only get here if we're in the process of creating the room
             return True
 
-        for etype, state_key in current_state_ids:
+        for etype, state_key in partial_current_state_ids:
             if etype != EventTypes.Member or not self.hs.is_mine_id(state_key):
                 continue
 
-            event_id = current_state_ids[(etype, state_key)]
+            event_id = partial_current_state_ids[(etype, state_key)]
             event = await self.store.get_event(event_id, allow_none=True)
             if not event:
                 continue
@@ -1715,8 +1772,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         ]
 
         if len(remote_room_hosts) == 0:
-            raise SynapseError(
-                404,
+            raise NoKnownServersError(
                 "Can't join remote room because no servers "
                 "that are in the room have been provided.",
             )
@@ -1892,7 +1948,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         max_retries = 5
         for i in range(max_retries):
             try:
-                event, context = await self.event_creation_handler.create_event(
+                (
+                    event,
+                    unpersisted_context,
+                ) = await self.event_creation_handler.create_event(
                     requester,
                     event_dict,
                     txn_id=txn_id,
@@ -1900,6 +1959,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                     auth_event_ids=auth_event_ids,
                     outlier=True,
                 )
+                context = await unpersisted_context.persist(event)
                 event.internal_metadata.out_of_band_membership = True
 
                 result_event = (
@@ -1925,6 +1985,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,
@@ -1947,7 +2008,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         ]
 
         if len(remote_room_hosts) == 0:
-            raise SynapseError(404, "No known servers")
+            raise NoKnownServersError()
 
         return await self.federation_handler.do_knock(
             remote_room_hosts, room_id, user.to_string(), content=content

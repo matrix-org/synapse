@@ -33,8 +33,8 @@ from typing_extensions import Literal
 import synapse
 from synapse.api.errors import Codes
 from synapse.logging.opentracing import trace
-from synapse.rest.media.v1._base import FileInfo
-from synapse.rest.media.v1.media_storage import ReadableFileWrapper
+from synapse.media._base import FileInfo
+from synapse.media.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import JsonDict, RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable

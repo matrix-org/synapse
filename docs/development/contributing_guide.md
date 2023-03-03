@@ -78,6 +78,19 @@ poetry install --extras all
 
 This will install the runtime and developer dependencies for the project.
 
+## Running Synapse via poetry
+
+To start a local instance of Synapse in the locked poetry environment, create a config file:
+
+```sh
+cp docs/sample_config.yaml homeserver.yaml
+```
+
+Now edit homeserver.yaml, and run Synapse with:
+
+```sh
+poetry run python -m synapse.app.homeserver -c homeserver.yaml
+```
 
 # 5. Get in touch.
 
@@ -332,6 +345,7 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
     [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
     A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
     See the [worker documentation](../workers.md) for additional information on workers.
+- Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh

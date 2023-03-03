@@ -33,7 +33,7 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
         If time doesn't move, don't error out.
         """
         past_stats = [
-            (self.hs.get_clock().time(), resource.getrusage(resource.RUSAGE_SELF))
+            (int(self.hs.get_clock().time()), resource.getrusage(resource.RUSAGE_SELF))
         ]
         stats: JsonDict = {}
         self.get_success(phone_stats_home(self.hs, stats, past_stats))

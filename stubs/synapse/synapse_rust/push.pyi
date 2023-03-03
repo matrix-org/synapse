@@ -14,7 +14,7 @@
 
 from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
 
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonValue
 
 class PushRule:
     @property
@@ -43,8 +43,11 @@ class FilteredPushRules:
         self,
         push_rules: PushRules,
         enabled_map: Dict[str, bool],
-        msc3664_enabled: bool,
         msc1767_enabled: bool,
+        msc3381_polls_enabled: bool,
+        msc3664_enabled: bool,
+        msc3952_intentional_mentions: bool,
+        msc3958_suppress_edits_enabled: bool,
     ): ...
     def rules(self) -> Collection[Tuple[PushRule, bool]]: ...
 
@@ -53,14 +56,17 @@ def get_base_rule_ids() -> Collection[str]: ...
 class PushRuleEvaluator:
     def __init__(
         self,
-        flattened_keys: Mapping[str, str],
+        flattened_keys: Mapping[str, JsonValue],
+        has_mentions: bool,
         room_member_count: int,
         sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],
-        related_events_flattened: Mapping[str, Mapping[str, str]],
+        related_events_flattened: Mapping[str, Mapping[str, JsonValue]],
         related_event_match_enabled: bool,
         room_version_feature_flags: Tuple[str, ...],
         msc3931_enabled: bool,
+        msc3758_exact_event_match: bool,
+        msc3966_exact_event_property_contains: bool,
     ): ...
     def run(
         self,

@@ -14,9 +14,12 @@
 
 from unittest.mock import Mock
 
-from twisted.test.proto_helpers import MemoryReactorClock
+from twisted.internet.interfaces import IReactorTime
+from twisted.test.proto_helpers import MemoryReactor, MemoryReactorClock
 
 from synapse.rest.client.register import register_servlets
+from synapse.server import HomeServer
+from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
@@ -25,7 +28,7 @@ from tests import unittest
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
         config.update(
             {
@@ -40,17 +43,21 @@ class TermsTestCase(unittest.HomeserverTestCase):
         )
         return config
 
-    def prepare(self, reactor, clock, hs):
-        self.clock = MemoryReactorClock()
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
+        # type-ignore: mypy-zope doesn't seem to recognise that MemoryReactorClock
+        # implements IReactorTime, via inheritance from twisted.internet.testing.Clock
+        self.clock: IReactorTime = MemoryReactorClock()  # type: ignore[assignment]
         self.hs_clock = Clock(self.clock)
         self.url = "/_matrix/client/r0/register"
         self.registration_handler = Mock()
         self.auth_handler = Mock()
         self.device_handler = Mock()
 
-    def test_ui_auth(self):
+    def test_ui_auth(self) -> None:
         # Do a UI auth request
-        request_data = {"username": "kermit", "password": "monkey"}
+        request_data: JsonDict = {"username": "kermit", "password": "monkey"}
         channel = self.make_request(b"POST", self.url, request_data)
 
         self.assertEqual(channel.code, 401, channel.result)

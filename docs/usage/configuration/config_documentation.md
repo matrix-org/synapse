@@ -1105,7 +1105,7 @@ This setting should only be used in very specific cases, such as
 federation over Tor hidden services and similar. For private networks
 of homeservers, you likely want to use a private CA instead.
 
-Only effective if `federation_verify_certicates` is `true`.
+Only effective if `federation_verify_certificates` is `true`.
 
 Example configuration:
 ```yaml
@@ -1518,11 +1518,11 @@ rc_registration_token_validity:
 
 This option specifies several limits for login:
 * `address` ratelimits login requests based on the client's IP
-      address. Defaults to `per_second: 0.17`, `burst_count: 3`.
+      address. Defaults to `per_second: 0.003`, `burst_count: 5`.
 
 * `account` ratelimits login requests based on the account the
-  client is attempting to log into. Defaults to `per_second: 0.17`,
-  `burst_count: 3`.
+  client is attempting to log into. Defaults to `per_second: 0.03`,
+  `burst_count: 5`.
 
 * `failed_attempts` ratelimits login requests based on the account the
   client is attempting to log into, based on the amount of failed login
@@ -2227,12 +2227,12 @@ allows the shared secret to be specified in an external file.
 
 The file should be a plain text file, containing only the shared secret.
 
-If this file does not exist, Synapse will create a new signing
-key on startup and store it in this file.
+If this file does not exist, Synapse will create a new shared
+secret on startup and store it in this file.
 
 Example configuration:
 ```yaml
-registration_shared_secret_file: /path/to/secrets/file
+registration_shared_secret_path: /path/to/secrets/file
 ```
 
 _Added in Synapse 1.67.0._
@@ -3927,6 +3927,9 @@ This setting has the following sub-options:
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
+* `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+
+  _Added in Synapse 1.78.0._
 
 Example configuration:
 ```yaml
@@ -3935,6 +3938,7 @@ redis:
   host: localhost
   port: 6379
   password: <secret_password>
+  dbid: <dbid>
 ```
 ---
 ## Individual worker configuration

@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Union,
@@ -30,7 +31,7 @@ from typing import (
 
 import attr
 
-from synapse.api.constants import MAIN_TIMELINE, RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, Direction, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
@@ -40,9 +41,13 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_in_list_sql_clause,
 )
-from synapse.storage.databases.main.stream import generate_pagination_where_clause
+from synapse.storage.databases.main.stream import (
+    generate_next_token,
+    generate_pagination_bounds,
+    generate_pagination_where_clause,
+)
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
+from synapse.types import JsonDict, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
@@ -164,10 +169,10 @@ class RelationsWorkerStore(SQLBaseStore):
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
         limit: int = 5,
-        direction: str = "b",
+        direction: Direction = Direction.BACKWARDS,
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
-    ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
+    ) -> Tuple[Sequence[_RelatedEvent], Optional[StreamToken]]:
         """Get a list of relations for an event, ordered by topological ordering.
 
         Args:
@@ -177,8 +182,8 @@ class RelationsWorkerStore(SQLBaseStore):
             relation_type: Only fetch events with this relation type, if given.
             event_type: Only fetch events with this event type, if given.
             limit: Only fetch the most recent `limit` events.
-            direction: Whether to fetch the most recent first (`"b"`) or the
-                oldest first (`"f"`).
+            direction: Whether to fetch the most recent first (backwards) or the
+                oldest first (forwards).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
 
@@ -207,23 +212,22 @@ class RelationsWorkerStore(SQLBaseStore):
             where_clause.append("type = ?")
             where_args.append(event_type)
 
+        order, from_bound, to_bound = generate_pagination_bounds(
+            direction,
+            from_token.room_key if from_token else None,
+            to_token.room_key if to_token else None,
+        )
+
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=from_token.room_key.as_historical_tuple()
-            if from_token
-            else None,
-            to_token=to_token.room_key.as_historical_tuple() if to_token else None,
+            from_token=from_bound,
+            to_token=to_bound,
             engine=self.database_engine,
         )
 
         if pagination_clause:
             where_clause.append(pagination_clause)
-
-        if direction == "b":
-            order = "DESC"
-        else:
-            order = "ASC"
 
         sql = """
             SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
@@ -266,16 +270,9 @@ class RelationsWorkerStore(SQLBaseStore):
                 topo_orderings = topo_orderings[:limit]
                 stream_orderings = stream_orderings[:limit]
 
-                topo = topo_orderings[-1]
-                token = stream_orderings[-1]
-                if direction == "b":
-                    # Tokens are positions between events.
-                    # This token points *after* the last event in the chunk.
-                    # We need it to point to the event before it in the chunk
-                    # when we are going backwards so we subtract one from the
-                    # stream part.
-                    token -= 1
-                next_key = RoomStreamToken(topo, token)
+                next_key = generate_next_token(
+                    direction, topo_orderings[-1], stream_orderings[-1]
+                )
 
                 if from_token:
                     next_token = from_token.copy_and_replace(
@@ -292,6 +289,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         to_device_key=0,
                         device_list_key=0,
                         groups_key=0,
+                        un_partial_stated_rooms_key=0,
                     )
 
             return events[:limit], next_token
@@ -398,141 +396,6 @@ class RelationsWorkerStore(SQLBaseStore):
             desc="event_is_target_of_relation",
         )
         return result is not None
-
-    @cached()
-    async def get_aggregation_groups_for_event(self, event_id: str) -> List[JsonDict]:
-        raise NotImplementedError()
-
-    @cachedList(
-        cached_method_name="get_aggregation_groups_for_event", list_name="event_ids"
-    )
-    async def get_aggregation_groups_for_events(
-        self, event_ids: Collection[str]
-    ) -> Mapping[str, Optional[List[JsonDict]]]:
-        """Get a list of annotations on the given events, grouped by event type and
-        aggregation key, sorted by count.
-
-        This is used e.g. to get the what and how many reactions have happend
-        on an event.
-
-        Args:
-            event_ids: Fetch events that relate to these event IDs.
-
-        Returns:
-            A map of event IDs to a list of groups of annotations that match.
-            Each entry is a dict with `type`, `key` and `count` fields.
-        """
-        # The number of entries to return per event ID.
-        limit = 5
-
-        clause, args = make_in_list_sql_clause(
-            self.database_engine, "relates_to_id", event_ids
-        )
-        args.append(RelationTypes.ANNOTATION)
-
-        sql = f"""
-            SELECT
-                relates_to_id,
-                annotation.type,
-                aggregation_key,
-                COUNT(DISTINCT annotation.sender)
-            FROM events AS annotation
-            INNER JOIN event_relations USING (event_id)
-            INNER JOIN events AS parent ON
-                parent.event_id = relates_to_id
-                AND parent.room_id = annotation.room_id
-            WHERE
-                {clause}
-                AND relation_type = ?
-            GROUP BY relates_to_id, annotation.type, aggregation_key
-            ORDER BY relates_to_id, COUNT(*) DESC
-        """
-
-        def _get_aggregation_groups_for_events_txn(
-            txn: LoggingTransaction,
-        ) -> Mapping[str, List[JsonDict]]:
-            txn.execute(sql, args)
-
-            result: Dict[str, List[JsonDict]] = {}
-            for event_id, type, key, count in cast(
-                List[Tuple[str, str, str, int]], txn
-            ):
-                event_results = result.setdefault(event_id, [])
-
-                # Limit the number of results per event ID.
-                if len(event_results) == limit:
-                    continue
-
-                event_results.append({"type": type, "key": key, "count": count})
-
-            return result
-
-        return await self.db_pool.runInteraction(
-            "get_aggregation_groups_for_events", _get_aggregation_groups_for_events_txn
-        )
-
-    async def get_aggregation_groups_for_users(
-        self, event_ids: Collection[str], users: FrozenSet[str]
-    ) -> Dict[str, Dict[Tuple[str, str], int]]:
-        """Fetch the partial aggregations for an event for specific users.
-
-        This is used, in conjunction with get_aggregation_groups_for_event, to
-        remove information from the results for ignored users.
-
-        Args:
-            event_ids: Fetch events that relate to these event IDs.
-            users: The users to fetch information for.
-
-        Returns:
-            A map of event ID to a map of (event type, aggregation key) to a
-            count of users.
-        """
-
-        if not users:
-            return {}
-
-        events_sql, args = make_in_list_sql_clause(
-            self.database_engine, "relates_to_id", event_ids
-        )
-
-        users_sql, users_args = make_in_list_sql_clause(
-            self.database_engine, "annotation.sender", users
-        )
-        args.extend(users_args)
-        args.append(RelationTypes.ANNOTATION)
-
-        sql = f"""
-            SELECT
-                relates_to_id,
-                annotation.type,
-                aggregation_key,
-                COUNT(DISTINCT annotation.sender)
-            FROM events AS annotation
-            INNER JOIN event_relations USING (event_id)
-            INNER JOIN events AS parent ON
-                parent.event_id = relates_to_id
-                AND parent.room_id = annotation.room_id
-            WHERE {events_sql} AND {users_sql} AND relation_type = ?
-            GROUP BY relates_to_id, annotation.type, aggregation_key
-            ORDER BY relates_to_id, COUNT(*) DESC
-        """
-
-        def _get_aggregation_groups_for_users_txn(
-            txn: LoggingTransaction,
-        ) -> Dict[str, Dict[Tuple[str, str], int]]:
-            txn.execute(sql, args)
-
-            result: Dict[str, Dict[Tuple[str, str], int]] = {}
-            for event_id, type, key, count in cast(
-                List[Tuple[str, str, str, int]], txn
-            ):
-                result.setdefault(event_id, {})[(type, key)] = count
-
-            return result
-
-        return await self.db_pool.runInteraction(
-            "get_aggregation_groups_for_users", _get_aggregation_groups_for_users_txn
-        )
 
     @cached()
     async def get_references_for_event(self, event_id: str) -> List[JsonDict]:

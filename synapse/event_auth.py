@@ -16,18 +16,7 @@
 import collections.abc
 import logging
 import typing
-from typing import (
-    Any,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -56,7 +45,13 @@ from synapse.api.room_versions import (
     RoomVersions,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.types import MutableStateMap, StateMap, UserID, get_domain_from_id
+from synapse.types import (
+    MutableStateMap,
+    StateMap,
+    StrCollection,
+    UserID,
+    get_domain_from_id,
+)
 
 if typing.TYPE_CHECKING:
     # conditional imports to avoid import cycle
@@ -69,7 +64,7 @@ logger = logging.getLogger(__name__)
 class _EventSourceStore(Protocol):
     async def get_events(
         self,
-        event_ids: Collection[str],
+        event_ids: StrCollection,
         redact_behaviour: EventRedactBehaviour,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
@@ -875,11 +870,11 @@ def _check_power_levels(
                 "kick",
                 "invite",
             }:
-                if not isinstance(v, int):
+                if type(v) is not int:
                     raise SynapseError(400, f"{v!r} must be an integer.")
             if k in {"events", "notifications", "users"}:
                 if not isinstance(v, collections.abc.Mapping) or not all(
-                    isinstance(v, int) for v in v.values()
+                    type(v) is int for v in v.values()
                 ):
                     raise SynapseError(
                         400,

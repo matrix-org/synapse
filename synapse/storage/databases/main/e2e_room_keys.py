@@ -108,7 +108,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             raise StoreError(404, "No backup with that version exists")
 
         values = []
-        for (room_id, session_id, room_key) in room_keys:
+        for room_id, session_id, room_key in room_keys:
             values.append(
                 (
                     user_id,

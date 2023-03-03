@@ -15,7 +15,7 @@
 
 import atexit
 import os
-from typing import Any, Callable, Dict, List, Tuple, Union, overload
+from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union, overload
 
 import attr
 from typing_extensions import Literal, ParamSpec
@@ -335,6 +335,33 @@ async def create_room(hs: HomeServer, room_id: str, creator_id: str) -> None:
         },
     )
 
-    event, context = await event_creation_handler.create_new_client_event(builder)
+    event, unpersisted_context = await event_creation_handler.create_new_client_event(
+        builder
+    )
+    context = await unpersisted_context.persist(event)
 
     await persistence_store.persist_event(event, context)
+
+
+T = TypeVar("T")
+
+
+def checked_cast(type: Type[T], x: object) -> T:
+    """A version of typing.cast that is checked at runtime.
+
+    We have our own function for this for two reasons:
+
+    1. typing.cast itself is deliberately a no-op at runtime, see
+       https://docs.python.org/3/library/typing.html#typing.cast
+    2. To help workaround a mypy-zope bug https://github.com/Shoobx/mypy-zope/issues/91
+       where mypy would erroneously consider `isinstance(x, type)` to be false in all
+       circumstances.
+
+    For this to make sense, `T` needs to be something that `isinstance` can check; see
+        https://docs.python.org/3/library/functions.html?highlight=isinstance#isinstance
+        https://docs.python.org/3/glossary.html#term-abstract-base-class
+        https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+    for more details.
+    """
+    assert isinstance(x, type)
+    return x
