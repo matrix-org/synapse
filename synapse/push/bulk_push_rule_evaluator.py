@@ -23,7 +23,6 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
-    Set,
     Tuple,
     Union,
 )
@@ -396,18 +395,10 @@ class BulkPushRuleEvaluator:
                         del notification_levels[key]
 
         # Pull out any user and room mentions.
-        mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
-        has_mentions = self._intentional_mentions_enabled and isinstance(mentions, dict)
-        user_mentions: Set[str] = set()
-        if has_mentions:
-            # mypy seems to have lost the type even though it must be a dict here.
-            assert isinstance(mentions, dict)
-            # Remove out any non-string items and convert to a set.
-            user_mentions_raw = mentions.get("user_ids")
-            if isinstance(user_mentions_raw, list):
-                user_mentions = set(
-                    filter(lambda item: isinstance(item, str), user_mentions_raw)
-                )
+        has_mentions = (
+            self._intentional_mentions_enabled
+            and EventContentFields.MSC3952_MENTIONS in event.content
+        )
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(
@@ -415,7 +406,6 @@ class BulkPushRuleEvaluator:
                 msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
             ),
             has_mentions,
-            user_mentions,
             room_member_count,
             sender_power_level,
             notification_levels,

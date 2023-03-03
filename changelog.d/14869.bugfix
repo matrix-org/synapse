@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.75.0rc1 that caused experimental support for deleting account data to raise an internal server error while using an account data writer worker.

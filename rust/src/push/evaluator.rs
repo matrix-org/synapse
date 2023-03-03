@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use crate::push::{EventMatchPatternType, JsonValue};
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -27,6 +26,7 @@ use super::{
     Action, Condition, ExactEventMatchCondition, FilteredPushRules, KnownCondition,
     SimpleJsonValue,
 };
+use crate::push::{EventMatchPatternType, JsonValue};
 
 lazy_static! {
     /// Used to parse the `is` clause in the room member count condition.
@@ -72,8 +72,6 @@ pub struct PushRuleEvaluator {
 
     /// True if the event has a mentions property and MSC3952 support is enabled.
     has_mentions: bool,
-    /// The user mentions that were part of the message.
-    user_mentions: BTreeSet<String>,
 
     /// The number of users in the room.
     room_member_count: u64,
@@ -114,7 +112,6 @@ impl PushRuleEvaluator {
     pub fn py_new(
         flattened_keys: BTreeMap<String, JsonValue>,
         has_mentions: bool,
-        user_mentions: BTreeSet<String>,
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
@@ -134,7 +131,6 @@ impl PushRuleEvaluator {
             flattened_keys,
             body,
             has_mentions,
-            user_mentions,
             room_member_count,
             notification_power_levels,
             sender_power_level,
@@ -310,15 +306,30 @@ impl PushRuleEvaluator {
                     Some(Cow::Borrowed(pattern)),
                 )?
             }
-            KnownCondition::ExactEventPropertyContains(exact_event_match) => {
-                self.match_exact_event_property_contains(exact_event_match)?
-            }
-            KnownCondition::IsUserMention => {
-                if let Some(uid) = user_id {
-                    self.user_mentions.contains(uid)
+            KnownCondition::ExactEventPropertyContains(exact_event_match) => self
+                .match_exact_event_property_contains(
+                    exact_event_match.key.clone(),
+                    exact_event_match.value.clone(),
+                )?,
+            KnownCondition::ExactEventPropertyContainsType(exact_event_match) => {
+                // The `pattern_type` can either be "user_id" or "user_localpart",
+                // either way if we don't have a `user_id` then the condition can't
+                // match.
+                let user_id = if let Some(user_id) = user_id {
+                    user_id
                 } else {
-                    false
-                }
+                    return Ok(false);
+                };
+
+                let pattern = match &*exact_event_match.value_type {
+                    EventMatchPatternType::UserId => user_id,
+                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
+                };
+
+                self.match_exact_event_property_contains(
+                    exact_event_match.key.clone(),
+                    Cow::Borrowed(&SimpleJsonValue::Str(pattern.to_string())),
+                )?
             }
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
@@ -456,24 +467,21 @@ impl PushRuleEvaluator {
     /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
     fn match_exact_event_property_contains(
         &self,
-        exact_event_match: &ExactEventMatchCondition,
+        key: Cow<str>,
+        value: Cow<SimpleJsonValue>,
     ) -> Result<bool, Error> {
         // First check if the feature is enabled.
         if !self.msc3966_exact_event_property_contains {
             return Ok(false);
         }
 
-        let value = &exact_event_match.value;
-
-        let haystack = if let Some(JsonValue::Array(haystack)) =
-            self.flattened_keys.get(&*exact_event_match.key)
-        {
+        let haystack = if let Some(JsonValue::Array(haystack)) = self.flattened_keys.get(&*key) {
             haystack
         } else {
             return Ok(false);
         };
 
-        Ok(haystack.contains(&**value))
+        Ok(haystack.contains(&value))
     }
 
     /// Match the member count against an 'is' condition
@@ -510,7 +518,6 @@ fn push_rule_evaluator() {
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         BTreeMap::new(),
@@ -542,7 +549,6 @@ fn test_requires_room_version_supports_condition() {
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         BTreeMap::new(),

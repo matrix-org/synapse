@@ -530,11 +530,6 @@ class EventClientSerializer:
         # being serialized.
         serialized_aggregations = {}
 
-        if event_aggregations.annotations:
-            serialized_aggregations[
-                RelationTypes.ANNOTATION
-            ] = event_aggregations.annotations
-
         if event_aggregations.references:
             serialized_aggregations[
                 RelationTypes.REFERENCE

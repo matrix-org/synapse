@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
@@ -24,8 +24,6 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import set_tag
-from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict, RoomAlias, RoomID
 
 if TYPE_CHECKING:
@@ -45,7 +43,6 @@ class KnockRoomAliasServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.txns = HttpTransactionCache(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -53,7 +50,6 @@ class KnockRoomAliasServlet(RestServlet):
         self,
         request: SynapseRequest,
         room_identifier: str,
-        txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
@@ -67,7 +63,6 @@ class KnockRoomAliasServlet(RestServlet):
 
             # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
             args: Dict[bytes, List[bytes]] = request.args  # type: ignore
-
             remote_room_hosts = parse_strings_from_args(
                 args, "server_name", required=False
             )
@@ -86,22 +81,12 @@ class KnockRoomAliasServlet(RestServlet):
             target=requester.user,
             room_id=room_id,
             action=Membership.KNOCK,
-            txn_id=txn_id,
             third_party_signed=None,
             remote_room_hosts=remote_room_hosts,
             content=event_content,
         )
 
         return 200, {"room_id": room_id}
-
-    def on_PUT(
-        self, request: SynapseRequest, room_identifier: str, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
-
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_identifier, txn_id
-        )
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

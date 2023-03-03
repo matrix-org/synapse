@@ -1,0 +1,1 @@
+Fix test_icu_word_boundary_punctuation for alpine / macos installed ICU versions.

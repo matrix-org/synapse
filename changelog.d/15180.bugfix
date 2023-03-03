@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.78.0 where requests to claim dehydrated devices would fail with a `405` error.

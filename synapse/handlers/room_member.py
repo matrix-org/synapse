@@ -207,6 +207,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,
@@ -1073,7 +1074,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
 
                 return await self.remote_knock(
-                    remote_room_hosts, room_id, target, content
+                    requester, remote_room_hosts, room_id, target, content
                 )
 
         return await self._local_membership_update(
@@ -1984,6 +1985,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,
