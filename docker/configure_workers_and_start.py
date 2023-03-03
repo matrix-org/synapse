@@ -168,6 +168,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases",
             "^/_matrix/client/v1/rooms/.*/timestamp_to_event$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/search",
+            "^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -230,6 +231,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/join/",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/knock/",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/profile/",
             "^/_matrix/client/(v1|unstable/org.matrix.msc2716)/rooms/.*/batch_send",
         ],
@@ -1051,7 +1053,8 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     if not os.path.exists(config_path):
         log("Generating base homeserver config")
         generate_base_homeserver_config()
-
+    else:
+        log("Base homeserver config exists—not regenerating")
     # This script may be run multiple times (mostly by Complement, see note at top of
     # file). Don't re-configure workers in this instance.
     mark_filepath = "/conf/workers_have_been_configured"
@@ -1070,11 +1073,14 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
             requested_worker_types = process_worker_types(worker_types)
 
         # Always regenerate all other config files
+        log("Generating worker config files")
         generate_worker_files(environ, config_path, data_dir, requested_worker_types)
 
         # Mark workers as being configured
         with open(mark_filepath, "w") as f:
             f.write("")
+    else:
+        log("Worker config exists—not regenerating")
 
     # Lifted right out of start.py
     jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)

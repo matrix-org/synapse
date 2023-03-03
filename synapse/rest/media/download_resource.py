@@ -22,11 +22,10 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_boolean
 from synapse.http.site import SynapseRequest
-
-from ._base import parse_media_id, respond_404
+from synapse.media._base import parse_media_id, respond_404
 
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.media.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)

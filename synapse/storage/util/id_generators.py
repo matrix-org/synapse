@@ -158,6 +158,15 @@ class AbstractStreamIdGenerator(AbstractStreamIdTracker):
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    def get_next_txn(self, txn: LoggingTransaction) -> int:
+        """
+        Usage:
+            stream_id_gen.get_next_txn(txn)
+            # ... persist events ...
+        """
+        raise NotImplementedError()
+
 
 class StreamIdGenerator(AbstractStreamIdGenerator):
     """Generates and tracks stream IDs for a stream with a single writer.
@@ -262,6 +271,40 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
                 self._notifier.notify_replication()
 
         return _AsyncCtxManagerWrapper(manager())
+
+    def get_next_txn(self, txn: LoggingTransaction) -> int:
+        """
+        Retrieve the next stream ID from within a database transaction.
+
+        Clean-up functions will be called when the transaction finishes.
+
+        Args:
+            txn: The database transaction object.
+
+        Returns:
+            The next stream ID.
+        """
+        if not self._is_writer:
+            raise Exception("Tried to allocate stream ID on non-writer")
+
+        # Get the next stream ID.
+        with self._lock:
+            self._current += self._step
+            next_id = self._current
+
+            self._unfinished_ids[next_id] = next_id
+
+        def clear_unfinished_id(id_to_clear: int) -> None:
+            """A function to mark processing this ID as finished"""
+            with self._lock:
+                self._unfinished_ids.pop(id_to_clear)
+
+        # Mark this ID as finished once the database transaction itself finishes.
+        txn.call_after(clear_unfinished_id, next_id)
+        txn.call_on_exception(clear_unfinished_id, next_id)
+
+        # Return the new ID.
+        return next_id
 
     def get_current_token(self) -> int:
         if not self._is_writer:
@@ -568,7 +611,7 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
         """
         Usage:
 
-            stream_id = stream_id_gen.get_next(txn)
+            stream_id = stream_id_gen.get_next_txn(txn)
             # ... persist event ...
         """
 

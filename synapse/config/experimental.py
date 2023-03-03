@@ -179,10 +179,16 @@ class ExperimentalConfig(Config):
             "msc3873_escape_event_match_key", False
         )
 
-        # MSC3952: Intentional mentions, this depends on MSC3758.
+        # MSC3966: exact_event_property_contains push rule condition.
+        self.msc3966_exact_event_property_contains = experimental.get(
+            "msc3966_exact_event_property_contains", False
+        )
+
+        # MSC3952: Intentional mentions, this depends on MSC3758 and MSC3966.
         self.msc3952_intentional_mentions = (
             experimental.get("msc3952_intentional_mentions", False)
             and self.msc3758_exact_event_match
+            and self.msc3966_exact_event_property_contains
         )
 
         # MSC3959: Do not generate notifications for edits.
@@ -194,3 +200,6 @@ class ExperimentalConfig(Config):
         self.msc3966_exact_event_property_contains = experimental.get(
             "msc3966_exact_event_property_contains", False
         )
+
+        # MSC3967: Do not require UIA when first uploading cross signing keys
+        self.msc3967_enabled = experimental.get("msc3967_enabled", False)
