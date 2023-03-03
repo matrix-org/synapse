@@ -15,7 +15,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
-use crate::push::{EventMatchPatternType, JsonValue};
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -27,6 +26,7 @@ use super::{
     Action, Condition, ExactEventMatchCondition, FilteredPushRules, KnownCondition,
     SimpleJsonValue,
 };
+use crate::push::{EventMatchPatternType, JsonValue};
 
 lazy_static! {
     /// Used to parse the `is` clause in the room member count condition.
