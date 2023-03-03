@@ -21,10 +21,10 @@ from typing_extensions import ParamSpec
 
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
-from twisted.web.server import Request
+from twisted.web.iweb import IRequest
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.types import JsonDict
+from synapse.types import JsonDict, Requester
 from synapse.util.async_helpers import ObservableDeferred
 
 if TYPE_CHECKING:
@@ -41,7 +41,6 @@ P = ParamSpec("P")
 class HttpTransactionCache:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.auth = self.hs.get_auth()
         self.clock = self.hs.get_clock()
         # $txn_key: (ObservableDeferred<(res_code, res_json_body)>, timestamp)
         self.transactions: Dict[
@@ -51,7 +50,7 @@ class HttpTransactionCache:
         # for at *LEAST* 30 mins, and at *MOST* 60 mins.
         self.cleaner = self.clock.looping_call(self._cleanup, CLEANUP_PERIOD_MS)
 
-    def _get_transaction_key(self, request: Request) -> str:
+    def _get_transaction_key(self, request: IRequest, requester: Requester) -> str:
         """A helper function which returns a transaction key that can be used
         with TransactionCache for idempotent requests.
 
@@ -65,45 +64,42 @@ class HttpTransactionCache:
             A transaction key
         """
         assert request.path is not None
-        token = self.auth.get_access_token_from_request(request)
-        return request.path.decode("utf8") + "/" + token
+        if requester.is_guest:
+            assert requester.user is not None, "Guest requester must have a user ID set"
+            return request.path.decode("utf8") + "/guest/" + requester.user.to_string()
+        elif requester.app_service is not None:
+            return (
+                request.path.decode("utf8") + "/appservice/" + requester.app_service.id
+            )
+        else:
+            assert (
+                requester.access_token_id is not None
+            ), "Requester must have an access_token_id"
+            return (
+                request.path.decode("utf8") + "/user/" + str(requester.access_token_id)
+            )
 
     def fetch_or_execute_request(
         self,
-        request: Request,
-        fn: Callable[P, Awaitable[Tuple[int, JsonDict]]],
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> Awaitable[Tuple[int, JsonDict]]:
-        """A helper function for fetch_or_execute which extracts
-        a transaction key from the given request.
-
-        See:
-            fetch_or_execute
-        """
-        return self.fetch_or_execute(
-            self._get_transaction_key(request), fn, *args, **kwargs
-        )
-
-    def fetch_or_execute(
-        self,
-        txn_key: str,
+        request: IRequest,
+        requester: Requester,
         fn: Callable[P, Awaitable[Tuple[int, JsonDict]]],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> "Deferred[Tuple[int, JsonDict]]":
-        """Fetches the response for this transaction, or executes the given function
-        to produce a response for this transaction.
+        """A helper function for fetch_or_execute which extracts
+        a transaction key from the given request.
 
         Args:
-            txn_key: A key to ensure idempotency should fetch_or_execute be
-                called again at a later point in time.
+            request:
+            requester:
             fn: A function which returns a tuple of (response_code, response_dict).
             *args: Arguments to pass to fn.
             **kwargs: Keyword arguments to pass to fn.
         Returns:
             Deferred which resolves to a tuple of (response_code, response_dict).
         """
+        txn_key = self._get_transaction_key(request, requester)
         if txn_key in self.transactions:
             observable = self.transactions[txn_key][0]
         else:
