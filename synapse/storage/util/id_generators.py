@@ -93,8 +93,11 @@ def _load_current_id(
     return res
 
 
-class AbstractStreamIdTracker(metaclass=abc.ABCMeta):
-    """Tracks the "current" stream ID of a stream that may have multiple writers.
+class AbstractStreamIdGenerator(metaclass=abc.ABCMeta):
+    """Generates or tracks stream IDs for a stream that may have multiple writers.
+
+    Each stream ID represents a write transaction, whose completion is tracked
+    so that the "current" stream ID of the stream can be determined.
 
     Stream IDs are monotonically increasing or decreasing integers representing write
     transactions. The "current" stream ID is the stream ID such that all transactions
@@ -129,16 +132,6 @@ class AbstractStreamIdTracker(metaclass=abc.ABCMeta):
         For streams with single writers this is equivalent to `get_current_token`.
         """
         raise NotImplementedError()
-
-
-class AbstractStreamIdGenerator(AbstractStreamIdTracker):
-    """Generates stream IDs for a stream that may have multiple writers.
-
-    Each stream ID represents a write transaction, whose completion is tracked
-    so that the "current" stream ID of the stream can be determined.
-
-    See `AbstractStreamIdTracker` for more details.
-    """
 
     @abc.abstractmethod
     def get_next(self) -> AsyncContextManager[int]:
