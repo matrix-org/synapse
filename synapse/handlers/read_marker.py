@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
+from synapse.api.constants import RECEIPTS_MAX_ROOM_SIZE
 from synapse.types import JsonDict
 from synapse.util.async_helpers import Linearizer
 
@@ -58,8 +59,11 @@ class ReadMarkerHandler:
                     event_id, existing_read_marker["event_id"]
                 )
 
+            num_users = await self.store.get_number_joined_users_in_room(room_id)
+            should_send_reciepts = num_users <= RECEIPTS_MAX_ROOM_SIZE
+
             if should_update:
                 content = {"event_id": event_id, **(extra_content or {})}
                 await self.account_data_handler.add_account_data_to_room(
-                    user_id, room_id, "m.fully_read", content
+                    user_id, room_id, "m.fully_read", content, notify_ephemeral=should_send_reciepts
                 )

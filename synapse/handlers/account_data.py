@@ -99,7 +99,12 @@ class AccountDataHandler:
                 logger.exception("Failed to run module callback %s: %s", callback, e)
 
     async def add_account_data_to_room(
-        self, user_id: str, room_id: str, account_data_type: str, content: JsonDict
+        self,
+        user_id: str,
+        room_id: str,
+        account_data_type: str,
+        content: JsonDict,
+        notify_ephemeral: bool = True,
     ) -> int:
         """Add some account_data to a room for a user.
 
@@ -108,6 +113,7 @@ class AccountDataHandler:
             room_id: The room to add a tag for.
             account_data_type: The type of account_data to add.
             content: A json object to associate with the tag.
+            notify_ephemeral: Should ephemeral events be notified.
 
         Returns:
             The maximum stream ID.
@@ -116,6 +122,8 @@ class AccountDataHandler:
             max_stream_id = await self._store.add_account_data_to_room(
                 user_id, room_id, account_data_type, content
             )
+            if not notify_ephemeral:
+                return max_stream_id
 
             self._notifier.on_new_event(
                 StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
@@ -125,12 +133,15 @@ class AccountDataHandler:
 
             return max_stream_id
         else:
+            # TODO: beeper - work out how to test this? is only one instance supported?
+            # https://github.com/beeper/synapse/blob/14f26a62d45f7de100070f3ae54b311a69200022/synapse/config/workers.py#L60
             response = await self._add_room_data_client(
                 instance_name=random.choice(self._account_data_writers),
                 user_id=user_id,
                 room_id=room_id,
                 account_data_type=account_data_type,
                 content=content,
+                notify_ephemeral=notify_ephemeral
             )
             return response["max_stream_id"]
 
