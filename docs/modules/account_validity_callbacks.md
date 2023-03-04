@@ -42,3 +42,16 @@ operations to keep track of them. (e.g. add them to a database table). The user 
 represented by their Matrix user ID.
 
 If multiple modules implement this callback, Synapse runs them all in order.
+
+### `on_sso_login`
+
+_First introduced in Synapse < TODO >
+
+```python
+async def on_sso_login(user: str) -> None
+```
+
+Called after successfully login or registration of a user using SSO for cases when module needs to perform extra operations after SSO auth.
+represented by their Matrix user ID.
+
+If multiple modules implement this callback, Synapse runs them all in order.

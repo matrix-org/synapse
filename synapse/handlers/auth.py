@@ -213,6 +213,7 @@ class AuthHandler:
         self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
         self._third_party_rules = hs.get_third_party_event_rules()
+        self._account_validity_handler = hs.get_account_validity_handler()
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -1778,6 +1779,9 @@ class AuthHandler:
         redirect_url = self.add_query_param_to_url(
             client_redirect_url, "loginToken", login_token
         )
+
+        # Run post-login module callback handlers
+        await self._account_validity_handler.on_sso_login(registered_user_id)
 
         # if the client is whitelisted, we can redirect straight to it
         if client_redirect_url.startswith(self._whitelisted_sso_clients):

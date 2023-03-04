@@ -79,6 +79,7 @@ from synapse.handlers.account_validity import (
     ON_LEGACY_RENEW_CALLBACK,
     ON_LEGACY_SEND_MAIL_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
+    ON_SSO_LOGIN_CALLBACK,
 )
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
@@ -324,6 +325,7 @@ class ModuleApi:
         *,
         is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
         on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
+        on_sso_login: Optional[ON_SSO_LOGIN_CALLBACK] = None,
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
         on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
         on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
@@ -335,6 +337,7 @@ class ModuleApi:
         return self._account_validity_handler.register_account_validity_callbacks(
             is_user_expired=is_user_expired,
             on_user_registration=on_user_registration,
+            on_sso_login=on_sso_login,
             on_legacy_send_mail=on_legacy_send_mail,
             on_legacy_renew=on_legacy_renew,
             on_legacy_admin_request=on_legacy_admin_request,

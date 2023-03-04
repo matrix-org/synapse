@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Types for callbacks to be registered via the module api
 IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[Optional[bool]]]
 ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
+ON_SSO_LOGIN_CALLBACK = Callable[[str], Awaitable]
 # Temporary hooks to allow for a transition from `/_matrix/client` endpoints
 # to `/_synapse/client/account_validity`. See `register_account_validity_callbacks`.
 ON_LEGACY_SEND_MAIL_CALLBACK = Callable[[str], Awaitable]
@@ -80,6 +81,7 @@ class AccountValidityHandler:
 
         self._is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []
         self._on_user_registration_callbacks: List[ON_USER_REGISTRATION_CALLBACK] = []
+        self._on_sso_login_callbacks: List[ON_SSO_LOGIN_CALLBACK] = []
         self._on_legacy_send_mail_callback: Optional[
             ON_LEGACY_SEND_MAIL_CALLBACK
         ] = None
@@ -93,6 +95,7 @@ class AccountValidityHandler:
         self,
         is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
         on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
+        on_sso_login: Optional[ON_SSO_LOGIN_CALLBACK] = None,
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
         on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
         on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
@@ -103,6 +106,9 @@ class AccountValidityHandler:
 
         if on_user_registration is not None:
             self._on_user_registration_callbacks.append(on_user_registration)
+        
+        if on_sso_login is not None:
+            self._on_sso_login_callbacks.append(on_sso_login)
 
         # The builtin account validity feature exposes 3 endpoints (send_mail, renew, and
         # an admin one). As part of moving the feature into a module, we need to change
@@ -169,6 +175,15 @@ class AccountValidityHandler:
             user_id: The ID of the newly registered user.
         """
         for callback in self._on_user_registration_callbacks:
+            await callback(user_id)
+
+    async def on_sso_login(self, user_id: str) -> None:
+        """Tell third-party modules about a user's SSO logins.
+
+        Args:
+            user_id: The mxID of the user.
+        """
+        for callback in self._on_sso_login_callbacks:
             await callback(user_id)
 
     @wrap_as_background_process("send_renewals")
