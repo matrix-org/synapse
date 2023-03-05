@@ -554,7 +554,7 @@ def generate_base_homeserver_config() -> None:
     subprocess.run(["/usr/local/bin/python", "/start.py", "migrate_config"], check=True)
 
 
-def process_worker_types(
+def parse_worker_types_from_env(
     requested_worker_types: List[str],
 ) -> Dict[str, Dict[str, Any]]:
     """Read the desired list of worker from environment variables and prepare the data
@@ -564,11 +564,10 @@ def process_worker_types(
         requested_worker_types: The string pulled from the environment containing
             the worker requested data.
 
-    Returns: A tuple of a complex dict of all information needed to generate worker
-        files and the total count of a given set of worker types. Format:
-
+    Returns: A  dict of all information needed to generate worker files. Format:
         {'worker_name':
             {'worker_base_name': 'base_name'},
+
             {'worker_roles_set':
                 Set{'worker_type', 'other_worker_type'}
             }
@@ -1070,7 +1069,7 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         else:
             # Split type names by comma, ignoring whitespace.
             worker_types = split_and_strip_string(worker_types_env, ",")
-            requested_worker_types = process_worker_types(worker_types)
+            requested_worker_types = parse_worker_types_from_env(worker_types)
 
         # Always regenerate all other config files
         log("Generating worker config files")
