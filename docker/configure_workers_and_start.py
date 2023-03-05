@@ -352,7 +352,7 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
 
 def add_worker_roles_to_shared_config(
     shared_config: dict,
-    worker_type_set: Set[str],
+    worker_types_set: Set[str],
     worker_name: str,
     worker_port: int,
 ) -> None:
@@ -362,7 +362,7 @@ def add_worker_roles_to_shared_config(
     Args:
         shared_config: The config dict that all worker instances share (after being
             converted to YAML)
-        worker_type_set: The type of worker (one of those defined in WORKERS_CONFIG).
+        worker_types_set: The type of worker (one of those defined in WORKERS_CONFIG).
             This list can be a single worker type or multiple.
         worker_name: The name of the worker instance.
         worker_port: The HTTP replication port that the worker instance is listening on.
@@ -383,13 +383,13 @@ def add_worker_roles_to_shared_config(
 
     # Worker-type specific sharding config. Now a single worker can fulfill multiple
     # roles, check each.
-    if "pusher" in worker_type_set:
+    if "pusher" in worker_types_set:
         shared_config.setdefault("pusher_instances", []).append(worker_name)
 
-    if "federation_sender" in worker_type_set:
+    if "federation_sender" in worker_types_set:
         shared_config.setdefault("federation_sender_instances", []).append(worker_name)
 
-    if "event_persister" in worker_type_set:
+    if "event_persister" in worker_types_set:
         # Event persisters write to the events stream, so we need to update
         # the list of event stream writers
         shared_config.setdefault("stream_writers", {}).setdefault("events", []).append(
@@ -405,7 +405,7 @@ def add_worker_roles_to_shared_config(
     # Update the list of stream writers. It's convenient that the name of the worker
     # type is the same as the stream to write. Iterate over the whole list in case there
     # is more than one.
-    for worker in worker_type_set:
+    for worker in worker_types_set:
         if worker in singular_stream_writers:
             shared_config.setdefault("stream_writers", {}).setdefault(
                 worker, []
@@ -568,7 +568,7 @@ def parse_worker_types_from_env(
         {'worker_name':
             {'worker_base_name': 'base_name'},
 
-            {'worker_roles_set':
+            {'worker_types_set':
                 Set{'worker_type', 'other_worker_type'}
             }
         }
@@ -643,8 +643,8 @@ def parse_worker_types_from_env(
         # Split the worker_type_string on "+", remove whitespace from ends then make
         # the list a set so it's deduplicated. Hopefully no one tries to put 2
         # pushers on the same worker(as it would consolidate into one).
-        workers_roles_list = split_and_strip_string(new_worker_type_string, "+")
-        workers_roles_set: Set[str] = set(workers_roles_list)
+        worker_types_list = split_and_strip_string(new_worker_type_string, "+")
+        worker_types_set: Set[str] = set(worker_types_list)
 
         # Shortcut this here, then it only has to survive intact(most of the time it
         # will just pass right through)
@@ -656,7 +656,7 @@ def parse_worker_types_from_env(
             # logs for blueprint construction(which are not collected).
             log(
                 f"Worker name request found: '{requested_worker_name}'"
-                f", for: {workers_roles_set}"
+                f", for: {worker_types_set}"
             )
 
         else:
@@ -665,8 +665,8 @@ def parse_worker_types_from_env(
             # it will error on startup. Recombine worker_types without spaces and log.
             # Allows for human readability while declaring a complex worker type, e.g.
             # 'event_persister + federation_reader + federation_sender + pusher'
-            if (len(workers_roles_set) > 1) and (" " in worker_base_name):
-                worker_base_name = "+".join(sorted(workers_roles_set))
+            if (len(worker_types_set) > 1) and (" " in worker_base_name):
+                worker_base_name = "+".join(sorted(worker_types_set))
                 log(
                     "Default worker name would have contained spaces, which is not "
                     f"allowed: '{worker_type_string}'. Reformed name to not contain "
@@ -676,7 +676,7 @@ def parse_worker_types_from_env(
         # At this point, we have:
         #   worker_base_name which might be identical to
         #   new_worker_type_string which might still be what it was when it came in
-        #   worker_roles_set which is a Set of what worker_types are requested
+        #   worker_types_set which is a Set of what worker_types are requested
 
         # Uncommon mistake that will cause problems. Name string containing quotes
         # or spaces will do Bad Things to filenames and probably nginx too.
@@ -704,42 +704,42 @@ def parse_worker_types_from_env(
         # issues, it will be added to the counter. This will prevent accidentally
         # naming a worker by a worker_type. e.g. 'pusher, pusher=user_dir'
         # Make sure the worker types being checked are deterministic.
-        deterministic_worker_role_string = "+".join(sorted(workers_roles_set))
+        deterministic_worker_type_string = "+".join(sorted(worker_types_set))
         check_worker_type = worker_name_checklist.get(worker_base_name)
         # Either this doesn't exist yet, or it matches with a twin
         if (check_worker_type is None) or (
-            check_worker_type == deterministic_worker_role_string
+            check_worker_type == deterministic_worker_type_string
         ):
             # This is a no-op if it exists, which is expected to avoid the else block
             worker_name_checklist.setdefault(
-                worker_base_name, deterministic_worker_role_string
+                worker_base_name, deterministic_worker_type_string
             )
 
         else:
             error(
-                f"Can not use {worker_name} for {deterministic_worker_role_string}. It "
+                f"Can not use {worker_name} for {deterministic_worker_type_string}. It "
                 f"is already in use by {check_worker_type}"
             )
 
         # Make sure we don't allow sharding for a worker type that doesn't support it.
         # Will error and stop if it is a problem, e.g. 'background_worker'.
-        for worker_role in workers_roles_set:
-            if worker_role in worker_type_shard_counter:
-                if not is_sharding_allowed_for_worker_type(worker_role):
+        for worker_type in worker_types_set:
+            if worker_type in worker_type_shard_counter:
+                if not is_sharding_allowed_for_worker_type(worker_type):
                     error(
-                        f"There can be only a single worker with {worker_role} "
+                        f"There can be only a single worker with {worker_type} "
                         "type. Please recount and remove."
                     )
             # Not in shard counter, must not have seen it yet, add it.
-            worker_type_shard_counter[worker_role] += 1
+            worker_type_shard_counter[worker_type] += 1
 
         # The worker has survived the gauntlet of why it can't exist. Add it to the pile
         dict_to_return.setdefault(worker_name, {}).setdefault(
             "worker_base_name", worker_base_name
         )
         dict_to_return.setdefault(worker_name, {}).setdefault(
-            "worker_roles_set", set()
-        ).update(workers_roles_set)
+            "worker_types_set", set()
+        ).update(worker_types_set)
 
     return dict_to_return
 
@@ -823,13 +823,13 @@ def generate_worker_files(
     # For each worker type specified by the user, create config values and write it's
     # yaml config file
     for worker_name, worker_type_data in requested_worker_types.items():
-        worker_type_set = worker_type_data.get("worker_roles_set")
+        worker_types_set = worker_type_data.get("worker_types_set")
 
         # The collected and processed data will live here.
         worker_config: Dict[str, Any] = {}
 
         # Merge all worker config templates for this worker into a single config
-        for worker_type in worker_type_set:
+        for worker_type in worker_types_set:
             # Verify this is a real defined worker type. If it's not, stop everything so
             # it can be fixed.
             copy_of_template_config = WORKERS_CONFIG.get(worker_type)
@@ -839,7 +839,7 @@ def generate_worker_files(
             else:
                 error(
                     f"{worker_type} is an unknown worker type! Was found in "
-                    f"{worker_type_set}. Please fix!"
+                    f"{worker_types_set}. Please fix!"
                 )
 
             # Merge worker type template configuration data. It's a combination of lists
@@ -864,7 +864,7 @@ def generate_worker_files(
 
         # Update the shared config with sharding-related options if necessary
         add_worker_roles_to_shared_config(
-            shared_config, worker_type_set, worker_name, worker_port
+            shared_config, worker_types_set, worker_name, worker_port
         )
 
         # Enable the worker in supervisord
