@@ -581,7 +581,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
 
     async def remove_account_data_for_room(
         self, user_id: str, room_id: str, account_data_type: str
-    ) -> Optional[int]:
+    ) -> int:
         """Delete the room account data for the user of a given type.
 
         Args:
@@ -632,15 +632,13 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 next_id,
             )
 
-            if not row_updated:
-                return None
-
-            self._account_data_stream_cache.entity_has_changed(user_id, next_id)
-            self.get_room_account_data_for_user.invalidate((user_id,))
-            self.get_account_data_for_room.invalidate((user_id, room_id))
-            self.get_account_data_for_room_and_type.prefill(
-                (user_id, room_id, account_data_type), {}
-            )
+            if row_updated:
+                self._account_data_stream_cache.entity_has_changed(user_id, next_id)
+                self.get_room_account_data_for_user.invalidate((user_id,))
+                self.get_account_data_for_room.invalidate((user_id, room_id))
+                self.get_account_data_for_room_and_type.prefill(
+                    (user_id, room_id, account_data_type), {}
+                )
 
         return self._account_data_id_gen.get_current_token()
 
@@ -747,7 +745,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         self,
         user_id: str,
         account_data_type: str,
-    ) -> Optional[int]:
+    ) -> int:
         """
         Delete a single piece of user account data by type.
 
@@ -833,14 +831,12 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 next_id,
             )
 
-            if not row_updated:
-                return None
-
-            self._account_data_stream_cache.entity_has_changed(user_id, next_id)
-            self.get_global_account_data_for_user.invalidate((user_id,))
-            self.get_global_account_data_by_type_for_user.prefill(
-                (user_id, account_data_type), {}
-            )
+            if row_updated:
+                self._account_data_stream_cache.entity_has_changed(user_id, next_id)
+                self.get_global_account_data_for_user.invalidate((user_id,))
+                self.get_global_account_data_by_type_for_user.prefill(
+                    (user_id, account_data_type), {}
+                )
 
         return self._account_data_id_gen.get_current_token()
 

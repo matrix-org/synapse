@@ -231,7 +231,6 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
     @override_config(
         {
             "experimental_features": {
-                "msc3758_exact_event_match": True,
                 "msc3952_intentional_mentions": True,
                 "msc3966_exact_event_property_contains": True,
             }
@@ -335,7 +334,6 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
     @override_config(
         {
             "experimental_features": {
-                "msc3758_exact_event_match": True,
                 "msc3952_intentional_mentions": True,
                 "msc3966_exact_event_property_contains": True,
             }
