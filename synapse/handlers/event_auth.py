@@ -65,6 +65,7 @@ class EventAuthHandler:
         auth_event_ids = event.auth_event_ids()
 
         if batched_auth_events:
+            # Copy the batched auth events to avoid mutating them.
             auth_events_by_id = dict(batched_auth_events)
             needed_auth_event_ids = set(auth_event_ids) - set(batched_auth_events)
             if needed_auth_event_ids:

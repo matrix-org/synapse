@@ -1123,6 +1123,8 @@ class RoomCreationHandler:
                 event_dict,
                 prev_event_ids=prev_event,
                 depth=depth,
+                # Take a copy to ensure each event gets a unique copy of
+                # state_map since it is modified below.
                 state_map=dict(state_map),
                 for_batch=for_batch,
             )
