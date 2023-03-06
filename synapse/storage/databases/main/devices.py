@@ -1626,7 +1626,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         # ... but we also cap the maximum number of devices the user can have to
         # 50.
         if num_devices > 50:
-            # Chose a last seen that ensures we keep at most 50 devices.
+            # Choose a last seen that ensures we keep at most 50 devices.
             sql = """
                 SELECT last_seen FROM devices
                 LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
