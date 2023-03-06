@@ -24,6 +24,15 @@ This callback is very experimental and can and will break without notice. Module
 are encouraged to implement `check_event_for_spam` from the spam checker category instead.
 </span>**
 
+Returns:
+    
+- A tuple consisting of:
+        
+  - a boolean representing whether or not the event is allowed
+  - an optional dict to form the basis of a replacement event for the event
+  - an optional dict to form the basis of an additional event to be sent into the
+          room
+
 Called when processing any incoming event, with the event and a `StateMap`
 representing the current state of the room the event is being sent into. A `StateMap` is
 a dictionary that maps tuples containing an event type and a state key to the
@@ -38,14 +47,14 @@ federation issues in the room. It is strongly recommended to only deny events us
 callback function if the sender is a local user, or in a private federation in which all
 servers are using the same module, with the same configuration.
 
-If the boolean returned by the module is `True`, it may also tell Synapse to replace the
+If the boolean returned by the module is `True`, it may tell Synapse to replace the
 event with new data by returning the new event's data as a dictionary. In order to do
 that, it is recommended the module calls `event.get_dict()` to get the current event as a
 dictionary, and modify the returned dictionary accordingly.
 
 Module writers may also wish to use this check to send an event into the room concurrent
 with the event being checked, if this is the case the module writer must provide a dict that 
-will form the basis of the event that is to be added to the room must be returned by `check_event_allowed_v2`.
+will form the basis of the event that is to be added to the room and it must be returned by `check_event_allowed_v2`.
 This dict will then be turned into an event at the appropriate time and it will be persisted after the event
 that triggered it, and if the event that triggered it is in a batch of events for persisting, it will be added to the 
 end of that batch. 
