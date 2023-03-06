@@ -2586,46 +2586,6 @@ files = [
 ]
 
 [[package]]
-name = "types-cryptography"
-version = "3.3.15"
-description = "Typing stubs for cryptography"
-category = "dev"
-optional = false
-python-versions = "*"
-files = [
-    {file = "types-cryptography-3.3.15.tar.gz", hash = "sha256:a7983a75a7b88a18f88832008f0ef140b8d1097888ec1a0824ec8fb7e105273b"},
-    {file = "types_cryptography-3.3.15-py3-none-any.whl", hash = "sha256:d9b0dd5465d7898d400850e7f35e5518aa93a7e23d3e11757cd81b4777089046"},
-]
-
-[package.dependencies]
-types-enum34 = "*"
-types-ipaddress = "*"
-
-[[package]]
-name = "types-enum34"
-version = "1.1.8"
-description = "Typing stubs for enum34"
-category = "dev"
-optional = false
-python-versions = "*"
-files = [
-    {file = "types-enum34-1.1.8.tar.gz", hash = "sha256:6f9c769641d06d73a55e11c14d38ac76fcd37eb545ce79cebb6eec9d50a64110"},
-    {file = "types_enum34-1.1.8-py3-none-any.whl", hash = "sha256:05058c7a495f6bfaaca0be4aeac3cce5cdd80a2bad2aab01fd49a20bf4a0209d"},
-]
-
-[[package]]
-name = "types-ipaddress"
-version = "1.0.8"
-description = "Typing stubs for ipaddress"
-category = "dev"
-optional = false
-python-versions = "*"
-files = [
-    {file = "types-ipaddress-1.0.8.tar.gz", hash = "sha256:a03df3be5935e50ba03fa843daabff539a041a28e73e0fce2c5705bee54d3841"},
-    {file = "types_ipaddress-1.0.8-py3-none-any.whl", hash = "sha256:4933b74da157ba877b1a705d64f6fa7742745e9ffd65e51011f370c11ebedb55"},
-]
-
-[[package]]
 name = "types-jsonschema"
 version = "4.17.0.5"
 description = "Typing stubs for jsonschema"
@@ -2675,18 +2635,18 @@ files = [
 
 [[package]]
 name = "types-pyopenssl"
-version = "22.1.0.2"
+version = "23.0.0.4"
 description = "Typing stubs for pyOpenSSL"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-pyOpenSSL-22.1.0.2.tar.gz", hash = "sha256:7a350e29e55bc3ee4571f996b4b1c18c4e4098947db45f7485b016eaa35b44bc"},
-    {file = "types_pyOpenSSL-22.1.0.2-py3-none-any.whl", hash = "sha256:54606a6afb203eb261e0fca9b7f75fa6c24d5ff71e13903c162ffb951c2c64c6"},
+    {file = "types-pyOpenSSL-23.0.0.4.tar.gz", hash = "sha256:8b3550b6e19d51ce78aabd724b0d8ebd962081a5fce95e7f85a592dfcdbc16bf"},
+    {file = "types_pyOpenSSL-23.0.0.4-py3-none-any.whl", hash = "sha256:ad49e15bb8bb2f251b8fc24776f414d877629e44b1b049240063ab013b5a6a7d"},
 ]
 
 [package.dependencies]
-types-cryptography = "*"
+cryptography = ">=35.0.0"
 
 [[package]]
 name = "types-pyyaml"
