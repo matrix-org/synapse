@@ -2575,14 +2575,14 @@ files = [
 
 [[package]]
 name = "types-commonmark"
-version = "0.9.2.1"
+version = "0.9.2.2"
 description = "Typing stubs for commonmark"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-commonmark-0.9.2.1.tar.gz", hash = "sha256:db8277e6aeb83429265eccece98a24954a9a502dde7bc7cf840a8741abd96b86"},
-    {file = "types_commonmark-0.9.2.1-py3-none-any.whl", hash = "sha256:9d5f500cb7eced801bde728137b0a10667bd853d328db641d03141f189e3aab4"},
+    {file = "types-commonmark-0.9.2.2.tar.gz", hash = "sha256:f3259350634c2ce68ae503398430482f7cf44e5cae3d344995e916fbf453b4be"},
+    {file = "types_commonmark-0.9.2.2-py3-none-any.whl", hash = "sha256:d3d878692615e7fbe47bf19ba67497837b135812d665012a3d42219c1f2c3a61"},
 ]
 
 [[package]]
