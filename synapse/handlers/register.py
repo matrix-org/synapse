@@ -113,7 +113,7 @@ class RegistrationHandler:
         self._server_name = hs.hostname
 
         # The set of users that we're currently pruning devices for. Ensures
-        # that we don't have two such jobs running at once.
+        # that we don't have two such jobs for the same user running at once.
         self._currently_pruning_devices_for_users: Set[str] = set()
 
         self.spam_checker = hs.get_spam_checker()
