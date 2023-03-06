@@ -24,10 +24,10 @@ use super::KnownCondition;
 use crate::push::RelatedEventMatchTypeCondition;
 use crate::push::SetTweak;
 use crate::push::TweakValue;
-use crate::push::{Action, ExactEventMatchCondition, SimpleJsonValue};
+use crate::push::{Action, EventPropertyIsCondition, SimpleJsonValue};
 use crate::push::{Condition, EventMatchTypeCondition};
 use crate::push::{EventMatchCondition, EventMatchPatternType};
-use crate::push::{ExactEventMatchTypeCondition, PushRule};
+use crate::push::{EventPropertyIsTypeCondition, PushRule};
 
 const HIGHLIGHT_ACTION: Action = Action::SetTweak(SetTweak {
     set_tweak: Cow::Borrowed("highlight"),
@@ -145,7 +145,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         rule_id: Cow::Borrowed(".org.matrix.msc3952.is_user_mention"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(
-            KnownCondition::ExactEventPropertyContainsType(ExactEventMatchTypeCondition {
+            KnownCondition::ExactEventPropertyContainsType(EventPropertyIsTypeCondition {
                 key: Cow::Borrowed("content.org\\.matrix\\.msc3952\\.mentions.user_ids"),
                 value_type: Cow::Borrowed(&EventMatchPatternType::UserId),
             }),
@@ -166,7 +166,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         rule_id: Cow::Borrowed(".org.matrix.msc3952.is_room_mention"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[
-            Condition::Known(KnownCondition::ExactEventMatch(ExactEventMatchCondition {
+            Condition::Known(KnownCondition::EventPropertyIs(EventPropertyIsCondition {
                 key: Cow::Borrowed("content.org\\.matrix\\.msc3952\\.mentions.room"),
                 value: Cow::Borrowed(&SimpleJsonValue::Bool(true)),
             })),
