@@ -38,7 +38,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
-from synapse.types import JsonDict
+from synapse.types import JsonDict, Requester
 
 from . import EventBase
 
@@ -316,8 +316,9 @@ class SerializeEventConfig:
     as_client_event: bool = True
     # Function to convert from federation format to client format
     event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1
-    # ID of the user's auth token - used for namespacing of transaction IDs
-    token_id: Optional[int] = None
+    # The entity that requested the event. This is used to determine whether to include
+    # the transaction_id in the unsigned section of the event.
+    requester: Optional[Requester] = None
     # List of event fields to include. If empty, all fields will be returned.
     only_event_fields: Optional[List[str]] = None
     # Some events can have stripped room state stored in the `unsigned` field.
@@ -367,11 +368,24 @@ def serialize_event(
             e.unsigned["redacted_because"], time_now_ms, config=config
         )
 
-    if config.token_id is not None:
-        if config.token_id == getattr(e.internal_metadata, "token_id", None):
-            txn_id = getattr(e.internal_metadata, "txn_id", None)
-            if txn_id is not None:
-                d["unsigned"]["transaction_id"] = txn_id
+    # If we have a txn_id saved in the internal_metadata, we should include it in the
+    # unsigned section of the event if it was sent by the same session as the one
+    # requesting the event.
+    # There is a special case for guests, because they only have one access token
+    # without associated access_token_id, so we always include the txn_id for events
+    # they sent.
+    txn_id = getattr(e.internal_metadata, "txn_id", None)
+    if txn_id is not None and config.requester is not None:
+        event_token_id = getattr(e.internal_metadata, "token_id", None)
+        if config.requester.user.to_string() == e.sender and (
+            (
+                event_token_id is not None
+                and config.requester.access_token_id is not None
+                and event_token_id == config.requester.access_token_id
+            )
+            or config.requester.is_guest
+        ):
+            d["unsigned"]["transaction_id"] = txn_id
 
     # invite_room_state and knock_room_state are a list of stripped room state events
     # that are meant to provide metadata about a room to an invitee/knocker. They are
