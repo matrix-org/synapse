@@ -1620,12 +1620,13 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         if num_devices <= 10:
             return []
 
-        # We prune everything older than N days.
+        # We always prune devices not seen in the last 14 days...
         max_last_seen = self._clock.time_msec() - 14 * 24 * 60 * 60 * 1000
 
+        # ... but we also cap the maximum number of devices the user can have to
+        # 50.
         if num_devices > 50:
-            # If the user has more than 50 devices, then we chose a last seen
-            # that ensures we keep at most 50 devices.
+            # Chose a last seen that ensures we keep at most 50 devices.
             sql = """
                 SELECT last_seen FROM devices
                 LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
@@ -1645,7 +1646,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             if rows:
                 max_last_seen = max(rows[0][0], max_last_seen)
 
-        # Now fetch the devices to delete.
+        # Fetch the devices to delete.
         sql = """
             SELECT DISTINCT device_id FROM devices
             LEFT JOIN e2e_device_keys_json USING (user_id, device_id)

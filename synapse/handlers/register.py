@@ -855,7 +855,7 @@ class RegistrationHandler:
         assert isinstance(self.device_handler, DeviceHandler)
 
         # Prune the user's device list if they already have a lot of devices.
-        await self._prune_too_many_devices(user_id)
+        await self._maybe_prune_too_many_devices(user_id)
 
         registered_device_id = await self.device_handler.check_device_registered(
             user_id,
@@ -925,7 +925,7 @@ class RegistrationHandler:
             "refresh_token": refresh_token,
         }
 
-    async def _prune_too_many_devices(self, user_id: str) -> None:
+    async def _maybe_prune_too_many_devices(self, user_id: str) -> None:
         """Delete any excess old devices this user may have."""
 
         if user_id in self._currently_pruning_devices_for_users:
