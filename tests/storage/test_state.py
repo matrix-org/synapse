@@ -521,7 +521,7 @@ class StateStoreTestCase(HomeserverTestCase):
             },
         )
 
-        event1, unpersisted_context1 = self.get_success(
+        event1, unpersisted_context1, _ = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
         events_and_context.append((event1, unpersisted_context1))
@@ -537,7 +537,7 @@ class StateStoreTestCase(HomeserverTestCase):
             },
         )
 
-        event2, unpersisted_context2 = self.get_success(
+        event2, unpersisted_context2, _ = self.get_success(
             self.event_creation_handler.create_new_client_event(builder2)
         )
         events_and_context.append((event2, unpersisted_context2))
@@ -552,7 +552,7 @@ class StateStoreTestCase(HomeserverTestCase):
             },
         )
 
-        event3, unpersisted_context3 = self.get_success(
+        event3, unpersisted_context3, _ = self.get_success(
             self.event_creation_handler.create_new_client_event(builder3)
         )
         events_and_context.append((event3, unpersisted_context3))
@@ -568,7 +568,7 @@ class StateStoreTestCase(HomeserverTestCase):
             },
         )
 
-        event4, unpersisted_context4 = self.get_success(
+        event4, unpersisted_context4, _ = self.get_success(
             self.event_creation_handler.create_new_client_event(builder4)
         )
         events_and_context.append((event4, unpersisted_context4))
