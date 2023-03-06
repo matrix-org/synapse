@@ -331,21 +331,20 @@ pub enum KnownCondition {
     // Identical to event_match but gives predefined patterns. Cannot be added by users.
     #[serde(skip_deserializing, rename = "event_match")]
     EventMatchType(EventMatchTypeCondition),
-    #[serde(rename = "com.beeper.msc3758.exact_event_match")]
-    ExactEventMatch(ExactEventMatchCondition),
+    EventPropertyIs(EventPropertyIsCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
     // Identical to related_event_match but gives predefined patterns. Cannot be added by users.
     #[serde(skip_deserializing, rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatchType(RelatedEventMatchTypeCondition),
     #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
-    ExactEventPropertyContains(ExactEventMatchCondition),
+    ExactEventPropertyContains(EventPropertyIsCondition),
     // Identical to exact_event_property_contains but gives predefined patterns. Cannot be added by users.
     #[serde(
         skip_deserializing,
         rename = "org.matrix.msc3966.exact_event_property_contains"
     )]
-    ExactEventPropertyContainsType(ExactEventMatchTypeCondition),
+    ExactEventPropertyContainsType(EventPropertyIsTypeCondition),
     ContainsDisplayName,
     RoomMemberCount {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -395,16 +394,16 @@ pub struct EventMatchTypeCondition {
     pub pattern_type: Cow<'static, EventMatchPatternType>,
 }
 
-/// The body of a [`Condition::ExactEventMatch`]
+/// The body of a [`Condition::EventPropertyIs`]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ExactEventMatchCondition {
+pub struct EventPropertyIsCondition {
     pub key: Cow<'static, str>,
     pub value: Cow<'static, SimpleJsonValue>,
 }
 
-/// The body of a [`Condition::ExactEventMatch`] that uses user_id or user_localpart as a pattern.
+/// The body of a [`Condition::EventPropertyIs`] that uses user_id or user_localpart as a pattern.
 #[derive(Serialize, Debug, Clone)]
-pub struct ExactEventMatchTypeCondition {
+pub struct EventPropertyIsTypeCondition {
     pub key: Cow<'static, str>,
     // During serialization, the pattern_type property gets replaced with a
     // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
@@ -711,44 +710,41 @@ fn test_deserialize_unstable_msc3931_condition() {
 }
 
 #[test]
-fn test_deserialize_unstable_msc3758_condition() {
+fn test_deserialize_event_property_is_condition() {
     // A string condition should work.
-    let json =
-        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":"foo"}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":"foo"}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 
     // A boolean condition should work.
-    let json =
-        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":true}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":true}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 
     // An integer condition should work.
-    let json = r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":1}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":1}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 
     // A null condition should work
-    let json =
-        r#"{"kind":"com.beeper.msc3758.exact_event_match","key":"content.value","value":null}"#;
+    let json = r#"{"kind":"event_property_is","key":"content.value","value":null}"#;
 
     let condition: Condition = serde_json::from_str(json).unwrap();
     assert!(matches!(
         condition,
-        Condition::Known(KnownCondition::ExactEventMatch(_))
+        Condition::Known(KnownCondition::EventPropertyIs(_))
     ));
 }
 
