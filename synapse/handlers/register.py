@@ -931,6 +931,11 @@ class RegistrationHandler:
         if user_id in self._currently_pruning_devices_for_users:
             return
 
+        # We also cap the number of users whose devices we prune at the same
+        # time, to avoid performance problems.
+        if len(self._currently_pruning_devices_for_users) > 5:
+            return
+
         device_ids = await self.store.check_too_many_devices_for_user(user_id)
         if not device_ids:
             return
