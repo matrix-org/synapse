@@ -1,0 +1,1 @@
+Fix a long-standing bug where Synapse handled an unspecced field on push rules.

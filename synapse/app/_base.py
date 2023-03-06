@@ -213,7 +213,7 @@ def handle_startup_exception(e: Exception) -> NoReturn:
 def redirect_stdio_to_logs() -> None:
     streams = [("stdout", LogLevel.info), ("stderr", LogLevel.error)]
 
-    for (stream, level) in streams:
+    for stream, level in streams:
         oldStream = getattr(sys, stream)
         loggingFile = LoggingFile(
             logger=twisted.logger.Logger(namespace=stream),

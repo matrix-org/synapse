@@ -1,0 +1,1 @@
+Remove the undocumented and unspecced `type` parameter to the `/thumbnail` endpoint.

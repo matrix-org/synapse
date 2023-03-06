@@ -207,6 +207,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,
@@ -416,7 +417,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             try:
                 (
                     event,
-                    context,
+                    unpersisted_context,
                     third_party_event,
                 ) = await self.event_creation_handler.create_event(
                     requester,
@@ -439,7 +440,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     outlier=outlier,
                     historical=historical,
                 )
-
+                context = await unpersisted_context.persist(event)
                 prev_state_ids = await context.get_prev_state_ids(
                     StateFilter.from_types([(EventTypes.Member, None)])
                 )
@@ -1088,7 +1089,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
 
                 return await self.remote_knock(
-                    remote_room_hosts, room_id, target, content
+                    requester, remote_room_hosts, room_id, target, content
                 )
 
         return await self._local_membership_update(
@@ -1964,7 +1965,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             try:
                 (
                     event,
-                    context,
+                    unpersisted_context,
                     third_party_event_dict,
                 ) = await self.event_creation_handler.create_event(
                     requester,
@@ -1974,6 +1975,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                     auth_event_ids=auth_event_ids,
                     outlier=True,
                 )
+                context = await unpersisted_context.persist(event)
                 event.internal_metadata.out_of_band_membership = True
 
                 events_and_context = [(event, context)]
@@ -2013,6 +2015,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,

@@ -39,7 +39,6 @@ class _User:
 
 
 class EmailPusherTests(HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -48,7 +47,6 @@ class EmailPusherTests(HomeserverTestCase):
     hijack_auth = False
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["email"] = {
             "enable_notifs": True,
@@ -371,10 +369,8 @@ class EmailPusherTests(HomeserverTestCase):
 
         # disassociate the user's email address
         self.get_success(
-            self.auth_handler.delete_threepid(
-                user_id=self.user_id,
-                medium="email",
-                address="a@example.com",
+            self.auth_handler.delete_local_threepid(
+                user_id=self.user_id, medium="email", address="a@example.com"
             )
         )
 

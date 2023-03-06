@@ -1,0 +1,1 @@
+Move `get_event_report` and `get_event_reports_paginate` from `RoomStore` to `RoomWorkerStore`.

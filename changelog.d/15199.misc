@@ -1,0 +1,1 @@
+Remove unspecced and buggy `PUT` method on the unstable `/rooms/<room_id>/batch_send` endpoint.
