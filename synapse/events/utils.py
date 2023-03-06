@@ -375,9 +375,9 @@ def serialize_event(
     # There is a special case for guests, because they only have one access token
     # without associated access_token_id, so we always include the txn_id for events
     # they sent.
-    txn_id = e.internal_metadata.txn_id
+    txn_id = getattr(e.internal_metadata, "txn_id", None)
     if txn_id is not None and config.requester is not None:
-        event_token_id = e.internal_metadata.token_id
+        event_token_id = getattr(e.internal_metadata, "token_id", None)
         if config.requester.user.to_string() == e.sender and (
             (
                 event_token_id is not None
