@@ -39,7 +39,6 @@ from synapse.api.constants import (
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.types import JsonDict, Requester
-from synapse.util.frozenutils import unfreeze
 
 from . import EventBase
 
@@ -417,14 +416,6 @@ class EventClientSerializer:
     clients.
     """
 
-    def __init__(self, inhibit_replacement_via_edits: bool = False):
-        """
-        Args:
-            inhibit_replacement_via_edits: If this is set to True, then events are
-               never replaced by their edits.
-        """
-        self._inhibit_replacement_via_edits = inhibit_replacement_via_edits
-
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
@@ -432,7 +423,6 @@ class EventClientSerializer:
         *,
         config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
         bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
-        apply_edits: bool = True,
     ) -> JsonDict:
         """Serializes a single event.
 
@@ -442,10 +432,7 @@ class EventClientSerializer:
             config: Event serialization config
             bundle_aggregations: A map from event_id to the aggregations to be bundled
                into the event.
-            apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `bundle_aggregations[<event_id>].replace`.
-               See also the `inhibit_replacement_via_edits` constructor arg: if that is
-               set to True, then this argument is ignored.
+
         Returns:
             The serialized event
         """
@@ -464,37 +451,9 @@ class EventClientSerializer:
                     config,
                     bundle_aggregations,
                     serialized_event,
-                    apply_edits=apply_edits,
                 )
 
         return serialized_event
-
-    def _apply_edit(
-        self, orig_event: EventBase, serialized_event: JsonDict, edit: EventBase
-    ) -> None:
-        """Replace the content, preserving existing relations of the serialized event.
-
-        Args:
-            orig_event: The original event.
-            serialized_event: The original event, serialized. This is modified.
-            edit: The event which edits the above.
-        """
-
-        # Ensure we take copies of the edit content, otherwise we risk modifying
-        # the original event.
-        edit_content = edit.content.copy()
-
-        # Unfreeze the event content if necessary, so that we may modify it below
-        edit_content = unfreeze(edit_content)
-        serialized_event["content"] = edit_content.get("m.new_content", {})
-
-        # Check for existing relations
-        relates_to = orig_event.content.get("m.relates_to")
-        if relates_to:
-            # Keep the relations, ensuring we use a dict copy of the original
-            serialized_event["content"]["m.relates_to"] = relates_to.copy()
-        else:
-            serialized_event["content"].pop("m.relates_to", None)
 
     def _inject_bundled_aggregations(
         self,
@@ -503,7 +462,6 @@ class EventClientSerializer:
         config: SerializeEventConfig,
         bundled_aggregations: Dict[str, "BundledAggregations"],
         serialized_event: JsonDict,
-        apply_edits: bool,
     ) -> None:
         """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
 
@@ -518,9 +476,6 @@ class EventClientSerializer:
                 While serializing the bundled aggregations this map may be searched
                 again for additional events in a recursive manner.
             serialized_event: The serialized event which may be modified.
-            apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `aggregations.replace` (subject to the
-               `inhibit_replacement_via_edits` constructor arg).
         """
 
         # We have already checked that aggregations exist for this event.
@@ -536,11 +491,6 @@ class EventClientSerializer:
             ] = event_aggregations.references
 
         if event_aggregations.replace:
-            # If there is an edit, optionally apply it to the event.
-            edit = event_aggregations.replace
-            if apply_edits and not self._inhibit_replacement_via_edits:
-                self._apply_edit(event, serialized_event, edit)
-
             # Include information about it in the relations dict.
             #
             # Matrix spec v1.5 (https://spec.matrix.org/v1.5/client-server-api/#server-side-aggregation-of-mreplace-relationships)
@@ -548,10 +498,7 @@ class EventClientSerializer:
             # `sender` of the edit; however MSC3925 proposes extending it to the whole
             # of the edit, which is what we do here.
             serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
-                edit,
-                time_now,
-                config=config,
-                apply_edits=False,
+                event_aggregations.replace, time_now, config=config
             )
 
         # Include any threaded replies to this event.

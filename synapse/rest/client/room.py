@@ -820,7 +820,6 @@ class RoomEventServlet(RestServlet):
                 event,
                 self.clock.time_msec(),
                 bundle_aggregations=aggregations,
-                apply_edits=False,
                 config=SerializeEventConfig(requester=requester),
             )
             return 200, event_dict
