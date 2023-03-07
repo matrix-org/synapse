@@ -1,0 +1,1 @@
+Refactor database transaction for query users' devices to reduce database pool contention.
