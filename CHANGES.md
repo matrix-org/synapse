@@ -1,3 +1,98 @@
+Synapse 1.79.0rc1 (2023-03-07)
+==============================
+
+Features
+--------
+
+- Add two new Third Party Rules module API callbacks: [`on_add_user_third_party_identifier`](https://matrix-org.github.io/synapse/v1.79/modules/third_party_rules_callbacks.html#on_add_user_third_party_identifier) and [`on_remove_user_third_party_identifier`](https://matrix-org.github.io/synapse/v1.79/modules/third_party_rules_callbacks.html#on_remove_user_third_party_identifier). ([\#15044](https://github.com/matrix-org/synapse/issues/15044))
+- Experimental support for MSC3967 to not require UIA for setting up cross-signing on first use. ([\#15077](https://github.com/matrix-org/synapse/issues/15077))
+- Add media information to the command line [user data export tool](https://matrix-org.github.io/synapse/v1.79/usage/administration/admin_faq.html#how-can-i-export-user-data). ([\#15107](https://github.com/matrix-org/synapse/issues/15107))
+- Add an [admin API](https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/index.html) to delete a [specific event report](https://spec.matrix.org/v1.6/client-server-api/#reporting-content). ([\#15116](https://github.com/matrix-org/synapse/issues/15116))
+- Add support for knocking to workers. ([\#15133](https://github.com/matrix-org/synapse/issues/15133))
+- Allow use of the `/filter` Client-Server APIs on workers. ([\#15134](https://github.com/matrix-org/synapse/issues/15134))
+- Remove support for server-side aggregation of reactions. ([\#15172](https://github.com/matrix-org/synapse/issues/15172))
+- Stabilise support for [MSC3758](https://github.com/matrix-org/matrix-spec-proposals/pull/3758): `event_property_is` push condition. ([\#15185](https://github.com/matrix-org/synapse/issues/15185))
+
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.75 that caused experimental support for deleting account data to raise an internal server error while using an account data writer worker. ([\#14869](https://github.com/matrix-org/synapse/issues/14869))
+- Fix a long-standing bug where Synapse handled an unspecced field on push rules. ([\#15088](https://github.com/matrix-org/synapse/issues/15088))
+- Fix a long-standing bug where a URL preview would break if the discovered oEmbed failed to download. ([\#15092](https://github.com/matrix-org/synapse/issues/15092))
+- Remove the unspecced `room_alias` field from the [`/createRoom`](https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3createroom) response. ([\#15093](https://github.com/matrix-org/synapse/issues/15093))
+- Fix a long-standing bug where an initial sync would not respond to changes to the list of ignored users if there was an initial sync cached. ([\#15163](https://github.com/matrix-org/synapse/issues/15163))
+- Add the `transaction_id` in the events included in many endpoints' responses. ([\#15174](https://github.com/matrix-org/synapse/issues/15174))
+- Fix `test_icu_word_boundary_punctuation` for Alpine acos installed ICU versions. ([\#15177](https://github.com/matrix-org/synapse/issues/15177))
+- Fix a bug introduced in Synapse 1.78.0 where requests to claim dehydrated devices would fail with a `405` error. ([\#15180](https://github.com/matrix-org/synapse/issues/15180))
+- Stop applying edits when bundling aggregations, per [MSC3925](https://github.com/matrix-org/matrix-spec-proposals/pull/3925). ([\#15193](https://github.com/matrix-org/synapse/issues/15193))
+- Fix a long-standing bug where the user directory search was not case-insensitive for accented characters. ([\#15143](https://github.com/matrix-org/synapse/issues/15143))
+
+
+Updates to the Docker image
+---------------------------
+
+- Improve startup logging in the with-workers Docker image. ([\#15186](https://github.com/matrix-org/synapse/issues/15186))
+
+
+Improved Documentation
+----------------------
+
+- Document how to use caches in a module. ([\#14026](https://github.com/matrix-org/synapse/issues/14026))
+- Clarify which worker processes the ThirdPartyRules' [`on_new_event`](https://matrix-org.github.io/synapse/v1.78/modules/third_party_rules_callbacks.html#on_new_event) module API callback runs on. ([\#15071](https://github.com/matrix-org/synapse/issues/15071))
+- Document using [Shibboleth](https://www.shibboleth.net/) as an OpenID Provider. ([\#15112](https://github.com/matrix-org/synapse/issues/15112))
+- Correct reference to `federation_verify_certificates` in configuration documentation. ([\#15139](https://github.com/matrix-org/synapse/issues/15139))
+- Correct small documentation errors in some `MatrixFederationHttpClient` methods. ([\#15148](https://github.com/matrix-org/synapse/issues/15148))
+- Correct the description of the behavior of `registration_shared_secret_path` on startup. ([\#15168](https://github.com/matrix-org/synapse/issues/15168))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove the undocumented and unspecced `type` parameter to the `/thumbnail` endpoint. ([\#15137](https://github.com/matrix-org/synapse/issues/15137))
+
+
+Internal Changes
+----------------
+
+- Run the integration test suites with the asyncio reactor enabled in CI. ([\#14101](https://github.com/matrix-org/synapse/issues/14101))
+- Batch up storing state groups when creating a new room. ([\#14918](https://github.com/matrix-org/synapse/issues/14918))
+- Update [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952) support based on changes to the MSC. ([\#15051](https://github.com/matrix-org/synapse/issues/15051))
+- Refactor writing json data in `FileExfiltrationWriter`. ([\#15095](https://github.com/matrix-org/synapse/issues/15095))
+- Tighten the login ratelimit defaults. ([\#15135](https://github.com/matrix-org/synapse/issues/15135))
+- Fix a typo in an experimental config setting. ([\#15138](https://github.com/matrix-org/synapse/issues/15138))
+- Refactor the media modules. ([\#15146](https://github.com/matrix-org/synapse/issues/15146), [\#15175](https://github.com/matrix-org/synapse/issues/15175))
+- Improve type hints. ([\#15164](https://github.com/matrix-org/synapse/issues/15164))
+- Move `get_event_report` and `get_event_reports_paginate` from `RoomStore` to `RoomWorkerStore`. ([\#15165](https://github.com/matrix-org/synapse/issues/15165))
+- Remove dangling reference to being a reference implementation in docstring. ([\#15167](https://github.com/matrix-org/synapse/issues/15167))
+- Add an option to force a rebuild of the "editable" complement image. ([\#15184](https://github.com/matrix-org/synapse/issues/15184))
+- Use nightly rustfmt in CI. ([\#15188](https://github.com/matrix-org/synapse/issues/15188))
+- Add a `get_next_txn` method to `StreamIdGenerator` to match `MultiWriterIdGenerator`. ([\#15191](https://github.com/matrix-org/synapse/issues/15191))
+- Combine `AbstractStreamIdTracker` and `AbstractStreamIdGenerator`. ([\#15192](https://github.com/matrix-org/synapse/issues/15192))
+- Automatically fix errors with `ruff`. ([\#15194](https://github.com/matrix-org/synapse/issues/15194))
+- Remove the unspecced `PUT` on the `/knock/{roomIdOrAlias}` endpoint. ([\#15189](https://github.com/matrix-org/synapse/issues/15189))
+- Remove unspecced and buggy `PUT` method on the unstable `/rooms/<room_id>/batch_send` endpoint. ([\#15199](https://github.com/matrix-org/synapse/issues/15199))
+- Refactor database transaction for query users' devices to reduce database pool contention. ([\#15215](https://github.com/matrix-org/synapse/issues/15215))
+- Correct `test_icu_word_boundary_punctuation` so that it passes with the ICU versions available in Alpine and macOS. ([\#15177](https://github.com/matrix-org/synapse/issues/15177))
+- <details><summary>Locked dependency updates</summary>
+    - Bump actions/checkout from 2 to 3. ([\#15155](https://github.com/matrix-org/synapse/issues/15155))
+    - Bump black from 22.12.0 to 23.1.0. ([\#15103](https://github.com/matrix-org/synapse/issues/15103))
+    - Bump dawidd6/action-download-artifact from 2.25.0 to 2.26.0. ([\#15152](https://github.com/matrix-org/synapse/issues/15152))
+    - Bump docker/login-action from 1 to 2. ([\#15154](https://github.com/matrix-org/synapse/issues/15154))
+    - Bump matrix-org/backend-meta from 1 to 2. ([\#15156](https://github.com/matrix-org/synapse/issues/15156))
+    - Bump ruff from 0.0.237 to 0.0.252. ([\#15159](https://github.com/matrix-org/synapse/issues/15159))
+    - Bump serde_json from 1.0.93 to 1.0.94. ([\#15214](https://github.com/matrix-org/synapse/issues/15214))
+    - Bump types-commonmark from 0.9.2.1 to 0.9.2.2. ([\#15209](https://github.com/matrix-org/synapse/issues/15209))
+    - Bump types-opentracing from 2.4.10.1 to 2.4.10.3. ([\#15158](https://github.com/matrix-org/synapse/issues/15158))
+    - Bump types-pillow from 9.4.0.13 to 9.4.0.17. ([\#15211](https://github.com/matrix-org/synapse/issues/15211))
+    - Bump types-psycopg2 from 2.9.21.4 to 2.9.21.8. ([\#15210](https://github.com/matrix-org/synapse/issues/15210))
+    - Bump types-pyopenssl from 22.1.0.2 to 23.0.0.4. ([\#15213](https://github.com/matrix-org/synapse/issues/15213))
+    - Bump types-setuptools from 67.3.0.1 to 67.4.0.3. ([\#15160](https://github.com/matrix-org/synapse/issues/15160))
+    - Bump types-setuptools from 67.4.0.3 to 67.5.0.0. ([\#15212](https://github.com/matrix-org/synapse/issues/15212))
+    - Bump typing-extensions from 4.4.0 to 4.5.0. ([\#15157](https://github.com/matrix-org/synapse/issues/15157))
+</details>
+
+
 Synapse 1.78.0 (2023-02-28)
 ===========================
 
