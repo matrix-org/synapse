@@ -33,7 +33,6 @@ from tests.unittest import HomeserverTestCase, override_config
 
 
 class TestBulkPushRuleEvaluator(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -131,7 +130,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
         # Create a new message event, and try to evaluate it under the dodgy
         # power level event.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -146,6 +145,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 prev_event_ids=[pl_event_id],
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # should not raise
@@ -171,7 +171,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         """Ensure that push rules are not calculated when disabled in the config"""
 
         # Create a new message event which should cause a notification.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -185,6 +185,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # Mock the method which calculates push rules -- we do this instead of
@@ -201,7 +202,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
     ) -> bool:
         """Returns true iff the `mentions` trigger an event push action."""
         # Create a new message event which should cause a notification.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -212,7 +213,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
-
+        context = self.get_success(unpersisted_context.persist(event))
         # Execute the push rule machinery.
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
 
@@ -230,8 +231,8 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
     @override_config(
         {
             "experimental_features": {
-                "msc3758_exact_event_match": True,
                 "msc3952_intentional_mentions": True,
+                "msc3966_exact_event_property_contains": True,
             }
         }
     )
@@ -333,8 +334,8 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
     @override_config(
         {
             "experimental_features": {
-                "msc3758_exact_event_match": True,
                 "msc3952_intentional_mentions": True,
+                "msc3966_exact_event_property_contains": True,
             }
         }
     )
@@ -391,7 +392,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
 
         # Create & persist an event to use as the parent of the relation.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -405,6 +406,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
             self.event_creation_handler.handle_new_client_event(
                 self.requester, events_and_context=[(event, context)]

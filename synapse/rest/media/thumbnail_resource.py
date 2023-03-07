@@ -27,9 +27,7 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
-from synapse.rest.media.v1.media_storage import MediaStorage
-
-from ._base import (
+from synapse.media._base import (
     FileInfo,
     ThumbnailInfo,
     parse_media_id,
@@ -37,9 +35,10 @@ from ._base import (
     respond_with_file,
     respond_with_responder,
 )
+from synapse.media.media_storage import MediaStorage
 
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.media.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -69,7 +68,8 @@ class ThumbnailResource(DirectServeJsonResource):
         width = parse_integer(request, "width", required=True)
         height = parse_integer(request, "height", required=True)
         method = parse_string(request, "method", "scale")
-        m_type = parse_string(request, "type", "image/png")
+        # TODO Parse the Accept header to get an prioritised list of thumbnail types.
+        m_type = "image/png"
 
         if server_name == self.server_name:
             if self.dynamic_thumbnails:

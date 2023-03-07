@@ -15,7 +15,7 @@ import inspect
 import os
 from typing import Iterable
 
-from synapse.rest.media.v1.filepath import MediaFilePaths, _wrap_with_jail_check
+from synapse.media.filepath import MediaFilePaths, _wrap_with_jail_check
 
 from tests import unittest
 

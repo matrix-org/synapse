@@ -37,7 +37,7 @@ from synapse.api.errors import (
     UnredactedContentDeletedError,
 )
 from synapse.api.filtering import Filter
-from synapse.events.utils import format_event_for_client_v2
+from synapse.events.utils import SerializeEventConfig, format_event_for_client_v2
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
@@ -160,11 +160,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        info, _ = await self._room_creation_handler.create_room(
+        room_id, _, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
-        return 200, info
+        return 200, {"room_id": room_id}
 
     def get_room_config(self, request: Request) -> JsonDict:
         user_supplied_config = parse_json_object_from_request(request)
@@ -814,11 +814,13 @@ class RoomEventServlet(RestServlet):
                 [event], requester.user.to_string()
             )
 
-            time_now = self.clock.time_msec()
             # per MSC2676, /rooms/{roomId}/event/{eventId}, should return the
             # *original* event, rather than the edited version
             event_dict = self._event_serializer.serialize_event(
-                event, time_now, bundle_aggregations=aggregations, apply_edits=False
+                event,
+                self.clock.time_msec(),
+                bundle_aggregations=aggregations,
+                config=SerializeEventConfig(requester=requester),
             )
             return 200, event_dict
 
@@ -863,24 +865,30 @@ class RoomEventContextServlet(RestServlet):
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
+        serializer_options = SerializeEventConfig(requester=requester)
         results = {
             "events_before": self._event_serializer.serialize_events(
                 event_context.events_before,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
+                config=serializer_options,
             ),
             "event": self._event_serializer.serialize_event(
                 event_context.event,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
+                config=serializer_options,
             ),
             "events_after": self._event_serializer.serialize_events(
                 event_context.events_after,
                 time_now,
                 bundle_aggregations=event_context.aggregations,
+                config=serializer_options,
             ),
             "state": self._event_serializer.serialize_events(
-                event_context.state, time_now
+                event_context.state,
+                time_now,
+                config=serializer_options,
             ),
             "start": event_context.start,
             "end": event_context.end,
@@ -926,7 +934,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server: HttpServer) -> None:
-        # /rooms/$roomid/[invite|join|leave]
+        # /rooms/$roomid/[join|invite|leave|ban|unban|kick]
         PATTERNS = (
             "/rooms/(?P<room_id>[^/]*)/"
             "(?P<membership_action>join|invite|leave|ban|unban|kick)"
@@ -1192,7 +1200,7 @@ class SearchRestServlet(RestServlet):
         content = parse_json_object_from_request(request)
 
         batch = parse_string(request, "next_batch")
-        results = await self.search_handler.search(requester.user, content, batch)
+        results = await self.search_handler.search(requester, content, batch)
 
         return 200, results
 

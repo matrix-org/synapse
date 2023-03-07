@@ -656,7 +656,6 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
 
 class ClientIpAuthTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional, Set, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 
 import frozendict
 
@@ -54,7 +54,7 @@ class FlattenDictTestCase(unittest.TestCase):
         self.assertEqual({"m.foo.b\\ar": "abc"}, _flatten_dict(input))
         self.assertEqual(
             {"m\\.foo.b\\\\ar": "abc"},
-            _flatten_dict(input, msc3783_escape_event_match_key=True),
+            _flatten_dict(input, msc3873_escape_event_match_key=True),
         )
 
     def test_non_string(self) -> None:
@@ -147,8 +147,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self,
         content: JsonMapping,
         *,
-        has_mentions: bool = False,
-        user_mentions: Optional[Set[str]] = None,
         related_events: Optional[JsonDict] = None,
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
@@ -167,8 +165,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluator(
             _flatten_dict(event),
-            has_mentions,
-            user_mentions or set(),
+            False,
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
@@ -176,7 +173,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             related_event_match_enabled=True,
             room_version_feature_flags=event.room_version.msc3931_push_features,
             msc3931_enabled=True,
-            msc3758_exact_event_match=True,
             msc3966_exact_event_property_contains=True,
         )
 
@@ -203,32 +199,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # A display name with spaces should work fine.
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo bar"))
-
-    def test_user_mentions(self) -> None:
-        """Check for user mentions."""
-        condition = {"kind": "org.matrix.msc3952.is_user_mention"}
-
-        # No mentions shouldn't match.
-        evaluator = self._get_evaluator({}, has_mentions=True)
-        self.assertFalse(evaluator.matches(condition, "@user:test", None))
-
-        # An empty set shouldn't match
-        evaluator = self._get_evaluator({}, has_mentions=True, user_mentions=set())
-        self.assertFalse(evaluator.matches(condition, "@user:test", None))
-
-        # The Matrix ID appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@user:test"}
-        )
-        self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@another:test", "@user:test"}
-        )
-        self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
-        # since the BulkPushRuleEvaluator is what handles data sanitisation.
 
     def _assert_matches(
         self, condition: JsonDict, content: JsonMapping, msg: Optional[str] = None
@@ -401,12 +371,39 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "pattern should not match before a newline",
         )
 
+    def test_event_match_pattern(self) -> None:
+        """Check that event_match conditions do not use a "pattern_type" from user data."""
+
+        # The pattern_type should not be deserialized into anything valid.
+        condition = {
+            "kind": "event_match",
+            "key": "content.value",
+            "pattern_type": "user_id",
+        }
+        self._assert_not_matches(
+            condition,
+            {"value": "@user:test"},
+            "should not be possible to pass a pattern_type in",
+        )
+
+        # This is an internal-only condition which shouldn't get deserialized.
+        condition = {
+            "kind": "event_match_type",
+            "key": "content.value",
+            "pattern_type": "user_id",
+        }
+        self._assert_not_matches(
+            condition,
+            {"value": "@user:test"},
+            "should not be possible to pass a pattern_type in",
+        )
+
     def test_exact_event_match_string(self) -> None:
         """Check that exact_event_match conditions work as expected for strings."""
 
         # Test against a string value.
         condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
+            "kind": "event_property_is",
             "key": "content.value",
             "value": "foobaz",
         }
@@ -444,11 +441,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         """Check that exact_event_match conditions work as expected for booleans."""
 
         # Test against a True boolean value.
-        condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
-            "key": "content.value",
-            "value": True,
-        }
+        condition = {"kind": "event_property_is", "key": "content.value", "value": True}
         self._assert_matches(
             condition,
             {"value": True},
@@ -468,7 +461,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # Test against a False boolean value.
         condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
+            "kind": "event_property_is",
             "key": "content.value",
             "value": False,
         }
@@ -493,11 +486,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
     def test_exact_event_match_null(self) -> None:
         """Check that exact_event_match conditions work as expected for null."""
 
-        condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
-            "key": "content.value",
-            "value": None,
-        }
+        condition = {"kind": "event_property_is", "key": "content.value", "value": None}
         self._assert_matches(
             condition,
             {"value": None},
@@ -513,11 +502,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
     def test_exact_event_match_integer(self) -> None:
         """Check that exact_event_match conditions work as expected for integers."""
 
-        condition = {
-            "kind": "com.beeper.msc3758.exact_event_match",
-            "key": "content.value",
-            "value": 1,
-        }
+        condition = {"kind": "event_property_is", "key": "content.value", "value": 1}
         self._assert_matches(
             condition,
             {"value": 1},

@@ -26,8 +26,8 @@ from twisted.internet.interfaces import IAddress, IResolutionReceiver
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactor
 
 from synapse.config.oembed import OEmbedEndpointConfig
-from synapse.rest.media.v1.media_repository import MediaRepositoryResource
-from synapse.rest.media.v1.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
+from synapse.rest.media.media_repository_resource import MediaRepositoryResource
+from synapse.rest.media.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -58,7 +58,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     )
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["url_preview_enabled"] = True
         config["max_spider_size"] = 9999999
@@ -83,7 +82,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         config["media_store_path"] = self.media_store_path
 
         provider_config = {
-            "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
+            "module": "synapse.media.storage_provider.FileStorageProviderBackend",
             "store_local": True,
             "store_synchronous": False,
             "store_remote": True,
@@ -118,7 +117,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
         self.media_repo = hs.get_media_repository_resource()
         self.preview_url = self.media_repo.children[b"preview_url"]
 
@@ -133,7 +131,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 addressTypes: Optional[Sequence[Type[IAddress]]] = None,
                 transportSemantics: str = "TCP",
             ) -> IResolutionReceiver:
-
                 resolution = HostResolution(hostName)
                 resolutionReceiver.resolutionBegan(resolution)
                 if hostName not in self.lookups:
@@ -660,7 +657,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """If the preview image doesn't exist, ensure some data is returned."""
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
-        end_content = (
+        result = (
             b"""<html><body><img src="http://cdn.matrix.org/foo.jpg"></body></html>"""
         )
 
@@ -681,8 +678,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
                 b'Content-Type: text/html; charset="utf8"\r\n\r\n'
             )
-            % (len(end_content),)
-            + end_content
+            % (len(result),)
+            + result
         )
 
         self.pump()
@@ -690,6 +687,44 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # The image should not be in the result.
         self.assertNotIn("og:image", channel.json_body)
+
+    def test_oembed_failure(self) -> None:
+        """If the autodiscovered oEmbed URL fails, ensure some data is returned."""
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+
+        result = b"""
+        <title>oEmbed Autodiscovery Fail</title>
+        <link rel="alternate" type="application/json+oembed"
+            href="http://example.com/oembed?url=http%3A%2F%2Fmatrix.org&format=json"
+            title="matrixdotorg" />
+        """
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+            )
+            % (len(result),)
+            + result
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # The image should not be in the result.
+        self.assertEqual(channel.json_body["og:title"], "oEmbed Autodiscovery Fail")
 
     def test_data_url(self) -> None:
         """

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.rest.media.v1._base import get_filename_from_headers
+from synapse.media._base import get_filename_from_headers
 
 from tests import unittest
 

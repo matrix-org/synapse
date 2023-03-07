@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 
-use crate::push::JsonValue;
 use anyhow::{Context, Error};
 use lazy_static::lazy_static;
 use log::warn;
@@ -23,9 +23,10 @@ use regex::Regex;
 
 use super::{
     utils::{get_glob_matcher, get_localpart_from_id, GlobMatchType},
-    Action, Condition, EventMatchCondition, ExactEventMatchCondition, FilteredPushRules,
-    KnownCondition, RelatedEventMatchCondition, SimpleJsonValue,
+    Action, Condition, EventPropertyIsCondition, FilteredPushRules, KnownCondition,
+    SimpleJsonValue,
 };
+use crate::push::{EventMatchPatternType, JsonValue};
 
 lazy_static! {
     /// Used to parse the `is` clause in the room member count condition.
@@ -71,8 +72,6 @@ pub struct PushRuleEvaluator {
 
     /// True if the event has a mentions property and MSC3952 support is enabled.
     has_mentions: bool,
-    /// The user mentions that were part of the message.
-    user_mentions: BTreeSet<String>,
 
     /// The number of users in the room.
     room_member_count: u64,
@@ -98,9 +97,6 @@ pub struct PushRuleEvaluator {
     /// flag as MSC1767 (extensible events core).
     msc3931_enabled: bool,
 
-    /// If MSC3758 (exact_event_match push rule condition) is enabled.
-    msc3758_exact_event_match: bool,
-
     /// If MSC3966 (exact_event_property_contains push rule condition) is enabled.
     msc3966_exact_event_property_contains: bool,
 }
@@ -113,7 +109,6 @@ impl PushRuleEvaluator {
     pub fn py_new(
         flattened_keys: BTreeMap<String, JsonValue>,
         has_mentions: bool,
-        user_mentions: BTreeSet<String>,
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
@@ -121,7 +116,6 @@ impl PushRuleEvaluator {
         related_event_match_enabled: bool,
         room_version_feature_flags: Vec<String>,
         msc3931_enabled: bool,
-        msc3758_exact_event_match: bool,
         msc3966_exact_event_property_contains: bool,
     ) -> Result<Self, Error> {
         let body = match flattened_keys.get("content.body") {
@@ -133,7 +127,6 @@ impl PushRuleEvaluator {
             flattened_keys,
             body,
             has_mentions,
-            user_mentions,
             room_member_count,
             notification_power_levels,
             sender_power_level,
@@ -141,7 +134,6 @@ impl PushRuleEvaluator {
             related_event_match_enabled,
             room_version_feature_flags,
             msc3931_enabled,
-            msc3758_exact_event_match,
             msc3966_exact_event_property_contains,
         })
     }
@@ -256,24 +248,83 @@ impl PushRuleEvaluator {
         };
 
         let result = match known_condition {
-            KnownCondition::EventMatch(event_match) => {
-                self.match_event_match(event_match, user_id)?
-            }
-            KnownCondition::ExactEventMatch(exact_event_match) => {
-                self.match_exact_event_match(exact_event_match)?
-            }
-            KnownCondition::RelatedEventMatch(event_match) => {
-                self.match_related_event_match(event_match, user_id)?
-            }
-            KnownCondition::ExactEventPropertyContains(exact_event_match) => {
-                self.match_exact_event_property_contains(exact_event_match)?
-            }
-            KnownCondition::IsUserMention => {
-                if let Some(uid) = user_id {
-                    self.user_mentions.contains(uid)
+            KnownCondition::EventMatch(event_match) => self.match_event_match(
+                &self.flattened_keys,
+                &event_match.key,
+                &event_match.pattern,
+            )?,
+            KnownCondition::EventMatchType(event_match) => {
+                // The `pattern_type` can either be "user_id" or "user_localpart",
+                // either way if we don't have a `user_id` then the condition can't
+                // match.
+                let user_id = if let Some(user_id) = user_id {
+                    user_id
                 } else {
-                    false
-                }
+                    return Ok(false);
+                };
+
+                let pattern = match &*event_match.pattern_type {
+                    EventMatchPatternType::UserId => user_id,
+                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
+                };
+
+                self.match_event_match(&self.flattened_keys, &event_match.key, pattern)?
+            }
+            KnownCondition::EventPropertyIs(event_property_is) => {
+                self.match_event_property_is(event_property_is)?
+            }
+            KnownCondition::RelatedEventMatch(event_match) => self.match_related_event_match(
+                &event_match.rel_type.clone(),
+                event_match.include_fallbacks,
+                event_match.key.clone(),
+                event_match.pattern.clone(),
+            )?,
+            KnownCondition::RelatedEventMatchType(event_match) => {
+                // The `pattern_type` can either be "user_id" or "user_localpart",
+                // either way if we don't have a `user_id` then the condition can't
+                // match.
+                let user_id = if let Some(user_id) = user_id {
+                    user_id
+                } else {
+                    return Ok(false);
+                };
+
+                let pattern = match &*event_match.pattern_type {
+                    EventMatchPatternType::UserId => user_id,
+                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
+                };
+
+                self.match_related_event_match(
+                    &event_match.rel_type.clone(),
+                    event_match.include_fallbacks,
+                    Some(event_match.key.clone()),
+                    Some(Cow::Borrowed(pattern)),
+                )?
+            }
+            KnownCondition::ExactEventPropertyContains(event_property_is) => self
+                .match_exact_event_property_contains(
+                    event_property_is.key.clone(),
+                    event_property_is.value.clone(),
+                )?,
+            KnownCondition::ExactEventPropertyContainsType(exact_event_match) => {
+                // The `pattern_type` can either be "user_id" or "user_localpart",
+                // either way if we don't have a `user_id` then the condition can't
+                // match.
+                let user_id = if let Some(user_id) = user_id {
+                    user_id
+                } else {
+                    return Ok(false);
+                };
+
+                let pattern = match &*exact_event_match.value_type {
+                    EventMatchPatternType::UserId => user_id,
+                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
+                };
+
+                self.match_exact_event_property_contains(
+                    exact_event_match.key.clone(),
+                    Cow::Borrowed(&SimpleJsonValue::Str(pattern.to_string())),
+                )?
             }
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
@@ -325,134 +376,17 @@ impl PushRuleEvaluator {
     /// Evaluates a `event_match` condition.
     fn match_event_match(
         &self,
-        event_match: &EventMatchCondition,
-        user_id: Option<&str>,
+        flattened_event: &BTreeMap<String, JsonValue>,
+        key: &str,
+        pattern: &str,
     ) -> Result<bool, Error> {
-        let pattern = if let Some(pattern) = &event_match.pattern {
-            pattern
-        } else if let Some(pattern_type) = &event_match.pattern_type {
-            // The `pattern_type` can either be "user_id" or "user_localpart",
-            // either way if we don't have a `user_id` then the condition can't
-            // match.
-            let user_id = if let Some(user_id) = user_id {
-                user_id
-            } else {
-                return Ok(false);
-            };
-
-            match &**pattern_type {
-                "user_id" => user_id,
-                "user_localpart" => get_localpart_from_id(user_id)?,
-                _ => return Ok(false),
-            }
-        } else {
-            return Ok(false);
-        };
-
         let haystack = if let Some(JsonValue::Value(SimpleJsonValue::Str(haystack))) =
-            self.flattened_keys.get(&*event_match.key)
+            flattened_event.get(key)
         {
             haystack
         } else {
             return Ok(false);
         };
-
-        // For the content.body we match against "words", but for everything
-        // else we match against the entire value.
-        let match_type = if event_match.key == "content.body" {
-            GlobMatchType::Word
-        } else {
-            GlobMatchType::Whole
-        };
-
-        let mut compiled_pattern = get_glob_matcher(pattern, match_type)?;
-        compiled_pattern.is_match(haystack)
-    }
-
-    /// Evaluates a `exact_event_match` condition. (MSC3758)
-    fn match_exact_event_match(
-        &self,
-        exact_event_match: &ExactEventMatchCondition,
-    ) -> Result<bool, Error> {
-        // First check if the feature is enabled.
-        if !self.msc3758_exact_event_match {
-            return Ok(false);
-        }
-
-        let value = &exact_event_match.value;
-
-        let haystack = if let Some(JsonValue::Value(haystack)) =
-            self.flattened_keys.get(&*exact_event_match.key)
-        {
-            haystack
-        } else {
-            return Ok(false);
-        };
-
-        Ok(haystack == &**value)
-    }
-
-    /// Evaluates a `related_event_match` condition. (MSC3664)
-    fn match_related_event_match(
-        &self,
-        event_match: &RelatedEventMatchCondition,
-        user_id: Option<&str>,
-    ) -> Result<bool, Error> {
-        // First check if related event matching is enabled...
-        if !self.related_event_match_enabled {
-            return Ok(false);
-        }
-
-        // get the related event, fail if there is none.
-        let event = if let Some(event) = self.related_events_flattened.get(&*event_match.rel_type) {
-            event
-        } else {
-            return Ok(false);
-        };
-
-        // If we are not matching fallbacks, don't match if our special key indicating this is a
-        // fallback relation is not present.
-        if !event_match.include_fallbacks.unwrap_or(false)
-            && event.contains_key("im.vector.is_falling_back")
-        {
-            return Ok(false);
-        }
-
-        // if we have no key, accept the event as matching, if it existed without matching any
-        // fields.
-        let key = if let Some(key) = &event_match.key {
-            key
-        } else {
-            return Ok(true);
-        };
-
-        let pattern = if let Some(pattern) = &event_match.pattern {
-            pattern
-        } else if let Some(pattern_type) = &event_match.pattern_type {
-            // The `pattern_type` can either be "user_id" or "user_localpart",
-            // either way if we don't have a `user_id` then the condition can't
-            // match.
-            let user_id = if let Some(user_id) = user_id {
-                user_id
-            } else {
-                return Ok(false);
-            };
-
-            match &**pattern_type {
-                "user_id" => user_id,
-                "user_localpart" => get_localpart_from_id(user_id)?,
-                _ => return Ok(false),
-            }
-        } else {
-            return Ok(false);
-        };
-
-        let haystack =
-            if let Some(JsonValue::Value(SimpleJsonValue::Str(haystack))) = event.get(&**key) {
-                haystack
-            } else {
-                return Ok(false);
-            };
 
         // For the content.body we match against "words", but for everything
         // else we match against the entire value.
@@ -466,27 +400,78 @@ impl PushRuleEvaluator {
         compiled_pattern.is_match(haystack)
     }
 
-    /// Evaluates a `exact_event_property_contains` condition. (MSC3758)
-    fn match_exact_event_property_contains(
+    /// Evaluates a `event_property_is` condition.
+    fn match_event_property_is(
         &self,
-        exact_event_match: &ExactEventMatchCondition,
+        event_property_is: &EventPropertyIsCondition,
     ) -> Result<bool, Error> {
-        // First check if the feature is enabled.
-        if !self.msc3966_exact_event_property_contains {
-            return Ok(false);
-        }
+        let value = &event_property_is.value;
 
-        let value = &exact_event_match.value;
-
-        let haystack = if let Some(JsonValue::Array(haystack)) =
-            self.flattened_keys.get(&*exact_event_match.key)
+        let haystack = if let Some(JsonValue::Value(haystack)) =
+            self.flattened_keys.get(&*event_property_is.key)
         {
             haystack
         } else {
             return Ok(false);
         };
 
-        Ok(haystack.contains(&**value))
+        Ok(haystack == &**value)
+    }
+
+    /// Evaluates a `related_event_match` condition. (MSC3664)
+    fn match_related_event_match(
+        &self,
+        rel_type: &str,
+        include_fallbacks: Option<bool>,
+        key: Option<Cow<str>>,
+        pattern: Option<Cow<str>>,
+    ) -> Result<bool, Error> {
+        // First check if related event matching is enabled...
+        if !self.related_event_match_enabled {
+            return Ok(false);
+        }
+
+        // get the related event, fail if there is none.
+        let event = if let Some(event) = self.related_events_flattened.get(rel_type) {
+            event
+        } else {
+            return Ok(false);
+        };
+
+        // If we are not matching fallbacks, don't match if our special key indicating this is a
+        // fallback relation is not present.
+        if !include_fallbacks.unwrap_or(false) && event.contains_key("im.vector.is_falling_back") {
+            return Ok(false);
+        }
+
+        match (key, pattern) {
+            // if we have no key, accept the event as matching.
+            (None, _) => Ok(true),
+            // There was a key, so we *must* have a pattern to go with it.
+            (Some(_), None) => Ok(false),
+            // If there is a key & pattern, check if they're in the flattened event (given by rel_type).
+            (Some(key), Some(pattern)) => self.match_event_match(event, &key, &pattern),
+        }
+    }
+
+    /// Evaluates a `exact_event_property_contains` condition. (MSC3966)
+    fn match_exact_event_property_contains(
+        &self,
+        key: Cow<str>,
+        value: Cow<SimpleJsonValue>,
+    ) -> Result<bool, Error> {
+        // First check if the feature is enabled.
+        if !self.msc3966_exact_event_property_contains {
+            return Ok(false);
+        }
+
+        let haystack = if let Some(JsonValue::Array(haystack)) = self.flattened_keys.get(&*key) {
+            haystack
+        } else {
+            return Ok(false);
+        };
+
+        Ok(haystack.contains(&value))
     }
 
     /// Match the member count against an 'is' condition
@@ -523,14 +508,12 @@ fn push_rule_evaluator() {
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         BTreeMap::new(),
         BTreeMap::new(),
         true,
         vec![],
-        true,
         true,
         true,
     )
@@ -555,14 +538,12 @@ fn test_requires_room_version_supports_condition() {
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         BTreeMap::new(),
         BTreeMap::new(),
         false,
         flags,
-        true,
         true,
         true,
     )

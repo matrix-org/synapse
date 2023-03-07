@@ -44,6 +44,7 @@ from twisted.internet.interfaces import (
     IAddress,
     IDelayedCall,
     IHostResolution,
+    IOpenSSLContextFactory,
     IReactorCore,
     IReactorPluggableNameResolver,
     IReactorTime,
@@ -958,8 +959,8 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
         self._context.set_verify(VERIFY_NONE, lambda *_: False)
 
-    def getContext(self, hostname=None, port=None):
+    def getContext(self) -> SSL.Context:
         return self._context
 
-    def creatorForNetloc(self, hostname: bytes, port: int):
+    def creatorForNetloc(self, hostname: bytes, port: int) -> IOpenSSLContextFactory:
         return self

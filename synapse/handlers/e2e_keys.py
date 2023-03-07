@@ -1301,6 +1301,20 @@ class E2eKeysHandler:
 
         return desired_key_data
 
+    async def is_cross_signing_set_up_for_user(self, user_id: str) -> bool:
+        """Checks if the user has cross-signing set up
+
+        Args:
+            user_id: The user to check
+
+        Returns:
+            True if the user has cross-signing set up, False otherwise
+        """
+        existing_master_key = await self.store.get_e2e_cross_signing_key(
+            user_id, "master"
+        )
+        return existing_master_key is not None
+
 
 def _check_cross_signing_key(
     key: JsonDict, user_id: str, key_type: str, signing_key: Optional[VerifyKey] = None

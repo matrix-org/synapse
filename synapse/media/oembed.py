@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 import attr
 
-from synapse.rest.media.v1.preview_html import parse_html_description
+from synapse.media.preview_html import parse_html_description
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 

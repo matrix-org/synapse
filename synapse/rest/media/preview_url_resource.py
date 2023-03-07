@@ -40,21 +40,19 @@ from synapse.http.server import (
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.media._base import FileInfo, get_filename_from_headers
+from synapse.media.media_storage import MediaStorage
+from synapse.media.oembed import OEmbedProvider
+from synapse.media.preview_html import decode_body, parse_html_to_open_graph
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.rest.media.v1._base import get_filename_from_headers
-from synapse.rest.media.v1.media_storage import MediaStorage
-from synapse.rest.media.v1.oembed import OEmbedProvider
-from synapse.rest.media.v1.preview_html import decode_body, parse_html_to_open_graph
 from synapse.types import JsonDict, UserID
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.stringutils import random_string
 
-from ._base import FileInfo
-
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.media.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -162,6 +160,10 @@ class PreviewUrlResource(DirectServeJsonResource):
              3. Updates the Open Graph response based on image properties.
        7. Stores the result in the database cache.
     4. Returns the result.
+
+    If any additional requests (e.g. from oEmbed autodiscovery, step 5.3 or
+    image thumbnailing, step 5.4 or 6.4) fails then the URL preview as a whole
+    does not fail. As much information as possible is returned.
 
     The in-memory cache expires after 1 hour.
 
@@ -364,16 +366,25 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
-                    oembed_info = await self._handle_url(
-                        oembed_url, user, allow_data_urls=True
-                    )
-                    (
-                        og_from_oembed,
-                        author_name,
-                        expiration_ms,
-                    ) = await self._handle_oembed_response(
-                        url, oembed_info, expiration_ms
-                    )
+                    try:
+                        oembed_info = await self._handle_url(
+                            oembed_url, user, allow_data_urls=True
+                        )
+                    except Exception as e:
+                        # Fetching the oEmbed info failed, don't block the entire URL preview.
+                        logger.warning(
+                            "oEmbed fetch failed during URL preview: %s errored with %s",
+                            oembed_url,
+                            e,
+                        )
+                    else:
+                        (
+                            og_from_oembed,
+                            author_name,
+                            expiration_ms,
+                        ) = await self._handle_oembed_response(
+                            url, oembed_info, expiration_ms
+                        )
 
                 # Parse Open Graph information from the HTML in case the oEmbed
                 # response failed or is incomplete.
