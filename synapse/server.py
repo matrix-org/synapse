@@ -762,7 +762,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(
+            msc3970_enabled=self.config.experimental.msc3970_enabled
+        )
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
