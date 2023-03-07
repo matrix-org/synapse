@@ -509,6 +509,17 @@ class PerDestinationQueue:
                 # servers, but the remote will correctly deduplicate them and
                 # handle it only once.
 
+                # TEMPORARY HACK: the loop body below can block during partial state
+                # resyncs. This is bad---other, fully joined rooms have their federation
+                # sending nobbled. As a stopgap, ignore partial state rooms here.
+                # Any queued messages in rooms that we skip won't be sent to this
+                # destination; they'll wait for us to send a new event in the room.
+                if await self._store.is_partial_state_room(pdu.room_id):
+                    logger.warning(
+                        "SKIPPING CATCHUP FOR PARTIAL STATE ROOM: %s", pdu.room_id
+                    )
+                    continue
+
                 # Step 1, fetch the current extremities
                 extrems = await self._store.get_prev_events_for_room(pdu.room_id)
 
