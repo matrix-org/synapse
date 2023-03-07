@@ -337,13 +337,9 @@ pub enum KnownCondition {
     // Identical to related_event_match but gives predefined patterns. Cannot be added by users.
     #[serde(skip_deserializing, rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatchType(RelatedEventMatchTypeCondition),
-    #[serde(rename = "org.matrix.msc3966.exact_event_property_contains")]
-    ExactEventPropertyContains(EventPropertyIsCondition),
+    EventPropertyContains(EventPropertyIsCondition),
     // Identical to exact_event_property_contains but gives predefined patterns. Cannot be added by users.
-    #[serde(
-        skip_deserializing,
-        rename = "org.matrix.msc3966.exact_event_property_contains"
-    )]
+    #[serde(skip_deserializing, rename = "event_property_contains")]
     ExactEventPropertyContainsType(EventPropertyIsTypeCondition),
     ContainsDisplayName,
     RoomMemberCount {

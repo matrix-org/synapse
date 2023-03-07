@@ -579,7 +579,9 @@ class PaginationHandler:
 
         time_now = self.clock.time_msec()
 
-        serialize_options = SerializeEventConfig(as_client_event=as_client_event)
+        serialize_options = SerializeEventConfig(
+            as_client_event=as_client_event, requester=requester
+        )
 
         chunk = {
             "chunk": (

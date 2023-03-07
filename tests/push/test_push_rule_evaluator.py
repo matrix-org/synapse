@@ -169,7 +169,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             related_event_match_enabled=True,
             room_version_feature_flags=event.room_version.msc3931_push_features,
             msc3931_enabled=True,
-            msc3966_exact_event_property_contains=True,
         )
 
     def test_display_name(self) -> None:
@@ -522,7 +521,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         """Check that exact_event_property_contains conditions work as expected."""
 
         condition = {
-            "kind": "org.matrix.msc3966.exact_event_property_contains",
+            "kind": "event_property_contains",
             "key": "content.value",
             "value": "foobaz",
         }
