@@ -71,7 +71,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
             EventMatchCondition {
-                key: Cow::Borrowed("content.m.relates_to.rel_type"),
+                key: Cow::Borrowed("content.m\\.relates_to.rel_type"),
                 pattern: Cow::Borrowed("m.replace"),
             },
         ))]),
@@ -146,7 +146,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(
             KnownCondition::ExactEventPropertyContainsType(EventPropertyIsTypeCondition {
-                key: Cow::Borrowed("content.org.matrix.msc3952.mentions.user_ids"),
+                key: Cow::Borrowed("content.org\\.matrix\\.msc3952\\.mentions.user_ids"),
                 value_type: Cow::Borrowed(&EventMatchPatternType::UserId),
             }),
         )]),
@@ -167,7 +167,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::EventPropertyIs(EventPropertyIsCondition {
-                key: Cow::Borrowed("content.org.matrix.msc3952.mentions.room"),
+                key: Cow::Borrowed("content.org\\.matrix\\.msc3952\\.mentions.room"),
                 value: Cow::Borrowed(&SimpleJsonValue::Bool(true)),
             })),
             Condition::Known(KnownCondition::SenderNotificationPermission {
