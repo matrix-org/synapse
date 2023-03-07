@@ -805,12 +805,14 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             state_groups_to_delete: State groups to delete
         """
 
+        logger.info("[purge] Starting state purge for %s", room_id)
         await self.db_pool.runInteraction(
             "purge_room_state",
             self._purge_room_state_txn,
             room_id,
             state_groups_to_delete,
         )
+        logger.info("[purge] Done with state purge of %s", room_id)
 
     def _purge_room_state_txn(
         self,

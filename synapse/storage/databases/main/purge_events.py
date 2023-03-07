@@ -325,6 +325,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # We then run the same purge a second time without this isolation level to
         # purge any of those rows which were added during the first.
 
+        logger.info("[purge] Starting initial main purge of %s [1/2]]", room_id)
         state_groups_to_delete = await self.db_pool.runInteraction(
             "purge_room",
             self._purge_room_txn,
@@ -332,6 +333,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
+        logger.info("[purge] Starting secondary main purge of %s [2/2]]", room_id)
         state_groups_to_delete.extend(
             await self.db_pool.runInteraction(
                 "purge_room",
@@ -339,6 +341,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 room_id=room_id,
             ),
         )
+        logger.info("[purge] Done with main purge of %s", room_id)
 
         return state_groups_to_delete
 
@@ -485,7 +488,5 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # XXX: as with purge_history, this is racy, but no worse than other races
         #   that already exist.
         self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
-
-        logger.info("[purge] done purging %s", room_id)
 
         return state_groups
