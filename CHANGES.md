@@ -47,7 +47,7 @@ Improved Documentation
 Deprecations and Removals
 -------------------------
 
-- Deprecate the `on_threepid_bind` module callback, to be replaced by [`on_add_user_third_party_identifier`](https://matrix-org.github.io/synapse/v1.79/modules/third_party_rules_callbacks.html#on_add_user_third_party_identifier). See [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.79/docs/upgrade.md#upgrading-to-v1790). ([\#15044]
+- Deprecate the `on_threepid_bind` module callback, to be replaced by [`on_add_user_third_party_identifier`](https://matrix-org.github.io/synapse/v1.79/modules/third_party_rules_callbacks.html#on_add_user_third_party_identifier). See [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.79/docs/upgrade.md#upgrading-to-v1790). ([\#15044](https://github.com/matrix-org/synapse/issues/15044))
 - Remove the unspecced `room_alias` field from the [`/createRoom`](https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3createroom) response. ([\#15093](https://github.com/matrix-org/synapse/issues/15093))
 - Remove the unspecced `PUT` on the `/knock/{roomIdOrAlias}` endpoint. ([\#15189](https://github.com/matrix-org/synapse/issues/15189))
 - Remove the undocumented and unspecced `type` parameter to the `/thumbnail` endpoint. ([\#15137](https://github.com/matrix-org/synapse/issues/15137))
