@@ -3685,6 +3685,16 @@ default_power_level_content_override:
    trusted_private_chat: null
    public_chat: null
 ```
+---
+### `forget_rooms_on_leave`
+
+Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.
+
+Example configuration:
+```yaml
+forget_rooms_on_leave: false
+```
 
 ---
 ## Opentracing
