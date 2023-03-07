@@ -376,7 +376,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         )
         referenced_chain_id_tuples = list(txn)
 
-        logger.info("[purge] removing events from event_auth_chain_links")
+        logger.info("[purge] removing %s from event_auth_chain_links", room_id)
         txn.executemany(
             """
             DELETE FROM event_auth_chain_links WHERE
@@ -486,6 +486,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         #   that already exist.
         self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
 
-        logger.info("[purge] done")
+        logger.info("[purge] done purging %s", room_id)
 
         return state_groups
