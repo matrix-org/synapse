@@ -653,6 +653,7 @@ async def filter_events_for_server(
     # this check but would base the filtering on an outdated view of the membership events.
 
     partial_state_invisible_event_ids: Set[str] = set()
+    maybe_visible_events: List[EventBase] = []
     for e in events:
         sender_domain = get_domain_from_id(e.sender)
         if (
@@ -660,18 +661,20 @@ async def filter_events_for_server(
             and await storage.main.is_partial_state_room(e.room_id)
         ):
             partial_state_invisible_event_ids.add(e.event_id)
+        else:
+            maybe_visible_events.append(e)
 
     # Let's check to see if all the events have a history visibility
     # of "shared" or "world_readable". If that's the case then we don't
     # need to check membership (as we know the server is in the room).
-    event_to_history_vis = await _event_to_history_vis(storage, events)
+    event_to_history_vis = await _event_to_history_vis(storage, maybe_visible_events)
 
     # for any with restricted vis, we also need the memberships
     event_to_memberships = await _event_to_memberships(
         storage,
         [
             e
-            for e in events
+            for e in maybe_visible_events
             if event_to_history_vis[e.event_id]
             not in (HistoryVisibility.SHARED, HistoryVisibility.WORLD_READABLE)
         ],
@@ -679,13 +682,13 @@ async def filter_events_for_server(
     )
 
     def include_event_in_output(e: EventBase) -> bool:
+        if e.event_id in partial_state_invisible_event_ids:
+            return False
+
         erased = is_sender_erased(e, erased_senders)
         visible = check_event_is_visible(
             event_to_history_vis[e.event_id], event_to_memberships.get(e.event_id, {})
         )
-
-        if e.event_id in partial_state_invisible_event_ids:
-            visible = False
 
         return visible and not erased
 
