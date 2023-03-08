@@ -105,6 +105,7 @@ class _PoolConnection(Connection):
     """
     A Connection from twisted.enterprise.adbapi.Connection.
     """
+
     def reconnect(self) -> None:
         ...
 
