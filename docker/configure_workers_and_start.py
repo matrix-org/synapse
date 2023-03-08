@@ -904,30 +904,25 @@ def generate_worker_files(
     # Re process all nginx upstream data. Worker_descriptors contains all the port data,
     # cross-reference that with the worker_base_name in requested_worker_types.
     for pattern, port_set in nginx_preprocessed_locations.items():
-        if len(port_set) > 1:
-            # Only process upstreams for multiple port arrangements
-            upstream_name: Set[str] = set()
-            for worker in worker_descriptors:
-                # Find the port we want
-                if int(worker["port"]) in port_set:
-                    # Capture the name. We want the base name as they will be grouped
-                    # together.
-                    upstream_name.add(
-                        requested_worker_types[worker["name"]].get("worker_base_name")
-                    )
+        upstream_name: Set[str] = set()
+        for worker in worker_descriptors:
+            # Find the port we want
+            if int(worker["port"]) in port_set:
+                # Capture the name. We want the base name as they will be grouped
+                # together.
+                upstream_name.add(
+                    requested_worker_types[worker["name"]].get("worker_base_name")
+                )
 
-            # Join it all up nice and pretty with a double underscore
-            upstream = "__".join(sorted(upstream_name))
-            upstream_location = "http://" + upstream
-            # And save the port numbers for writing out below
-            nginx_upstreams[upstream] = port_set
+        # Join it all up nice and pretty with a double underscore
+        upstream = "__".join(sorted(upstream_name))
+        upstream_location = "http://" + upstream
 
-        else:
-            # Only a single port, just use that
-            (unpacked_port,) = port_set
-            upstream_location = "http://localhost:%d" % unpacked_port
-
+        # Save the upstream location to it's associated pattern
         nginx_locations[pattern] = upstream_location
+
+        # And save the port numbers for writing out below
+        nginx_upstreams[upstream] = port_set
 
     # Build the nginx location config blocks
     nginx_location_config = ""
