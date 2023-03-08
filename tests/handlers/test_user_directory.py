@@ -791,8 +791,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             return False
 
         # Configure a spam checker that does not filter any users.
-        spam_checker = self.hs.get_spam_checker()
-        spam_checker._check_username_for_spam_callbacks = [allow_all]
+        spam_checker_callbacks = self.hs.get_module_api_callbacks().spam_checker
+        spam_checker_callbacks.check_username_for_spam_callbacks = [allow_all]
 
         # The results do not change:
         # We get one search result when searching for user2 by user1.
@@ -804,7 +804,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             # All users are spammy.
             return True
 
-        spam_checker._check_username_for_spam_callbacks = [block_all]
+        spam_checker_callbacks.check_username_for_spam_callbacks = [block_all]
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))

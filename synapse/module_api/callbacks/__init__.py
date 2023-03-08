@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from .account_validity_callbacks import AccountValidityModuleApiCallbacks
+from .spam_checker_callbacks import SpamCheckerModuleApiCallbacks
 
 __all__ = [
     "ModuleApiCallbacks",
@@ -22,3 +23,4 @@ __all__ = [
 class ModuleApiCallbacks:
     def __init__(self) -> None:
         self.account_validity = AccountValidityModuleApiCallbacks()
+        self.spam_checker = SpamCheckerModuleApiCallbacks()
