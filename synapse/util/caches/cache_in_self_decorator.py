@@ -1,9 +1,11 @@
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, cast
+import functools
+from typing import Callable, TypeVar
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 
-def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer"], T]:
+def cache_in_self(builder: Callable[[T], U]) -> Callable[[T], U]:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -22,7 +24,7 @@ def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer
     building = [False]
 
     @functools.wraps(builder)
-    def _get(self: "HomeServer") -> T:
+    def _get(self: T) -> U:
         try:
             return getattr(self, depname)
         except AttributeError:
