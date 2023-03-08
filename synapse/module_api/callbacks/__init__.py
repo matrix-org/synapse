@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 from .account_validity_callbacks import AccountValidityModuleApiCallbacks
 from .spamchecker_callbacks import SpamCheckerModuleApiCallbacks
+from .third_party_event_rules import ThirdPartyEventRulesModuleApiCallbacks
 
 __all__ = [
     "AccountValidityModuleApiCallbacks",
@@ -30,3 +31,4 @@ class ModuleApiCallbacks:
     def __init__(self, hs: "HomeServer") -> None:
         self.account_validity = AccountValidityModuleApiCallbacks()
         self.spam_checker = SpamCheckerModuleApiCallbacks(hs)
+        self.third_party_event_rules = ThirdPartyEventRulesModuleApiCallbacks(hs)
