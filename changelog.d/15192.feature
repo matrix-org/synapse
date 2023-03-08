@@ -1,1 +1,1 @@
-Adds on_sso_login ModuleAPI callback allowing to execute custom code on SSO Auth
+Adds on_sso_login ModuleAPI callback allowing to execute custom code on SSO Auth.
