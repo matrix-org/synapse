@@ -14,16 +14,21 @@
 # limitations under the License.
 
 import argparse
-import itertools
 import logging
 import re
-from typing import Pattern
+from dataclasses import dataclass
+from typing import Dict, Iterable, Optional, Pattern, Set, Tuple
 
 import yaml
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.federation.transport.server import TransportLayerServer
+from synapse.federation.transport.server import (
+    TransportLayerServer,
+    register_servlets as register_federation_servlets,
+)
+from synapse.http.server import HttpServer, ServletCallback
 from synapse.rest import ClientRestResource
+from synapse.rest.key.v2 import RemoteKey
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 
@@ -31,16 +36,138 @@ logger = logging.getLogger("generate_workers_map")
 
 
 class MockHomeserver(HomeServer):
-    DATASTORE_CLASS = DataStore
+    DATASTORE_CLASS = DataStore  # type: ignore
 
-    def __init__(self, config):
+    def __init__(self, config: HomeServerConfig, worker_app: Optional[str]) -> None:
         super().__init__(config.server.server_name, config=config)
+        self.config.worker.worker_app = worker_app
 
 
 GROUP_PATTERN = re.compile(r"\(\?P<[^>]+?>(.+?)\)")
 
 
-def main():
+@dataclass
+class EndpointDescription:
+    """
+    Describes an endpoint and how it should be routed.
+    """
+
+    servlet_class: object
+
+    # TODO:
+    #  - does it need to be routed based on a stream writer config?
+    #  - does it benefit from any optimised, but optional, routing?
+    #  - what documentation category does it go in?
+    #  - what 'opinionated synapse worker class' does it go in?
+
+
+class EnumerationResource(HttpServer):
+    """
+    Enumerates all servlets for the purposes of
+    """
+
+    def __init__(self, is_worker: bool) -> None:
+        self.registrations: Dict[Tuple[str, str], EndpointDescription] = {}
+        self._is_worker = is_worker
+
+    def register_paths(
+        self,
+        method: str,
+        path_patterns: Iterable[Pattern],
+        callback: ServletCallback,
+        servlet_classname: str,
+    ) -> None:
+        # federation servlet callbacks are wrapped, so unwrap them.
+        callback = getattr(callback, "__wrapped__", callback)
+
+        # fish out the servlet class
+        servlet_class = callback.__self__.__class__  # type: ignore
+
+        if self._is_worker and method in getattr(
+            servlet_class, "WORKERS_DENIED_METHODS", ()
+        ):
+            # This endpoint would cause an error if called on a worker, so pretend it
+            # was never registered!
+            return
+
+        sd = EndpointDescription(servlet_class=servlet_class)
+
+        for pat in path_patterns:
+            self.registrations[(method, pat.pattern)] = sd
+
+
+def get_registered_paths_for_hs(
+    hs: HomeServer, is_worker: bool
+) -> Dict[Tuple[str, str], EndpointDescription]:
+    enumerator = EnumerationResource(is_worker)
+    ClientRestResource.register_servlets(enumerator, hs)
+    federation_server = TransportLayerServer(hs)
+
+    # we can't use `federation_server.register_servlets` but this line does the
+    # same thing, only it uses this enumerator
+    register_federation_servlets(
+        federation_server.hs,
+        resource=enumerator,
+        ratelimiter=federation_server.ratelimiter,
+        authenticator=federation_server.authenticator,
+        servlet_groups=federation_server.servlet_groups,
+    )
+
+    # the key server endpoints are separate again
+    RemoteKey(hs).register(enumerator)
+
+    return enumerator.registrations
+
+
+def get_registered_paths_for_default(
+    worker_app: Optional[str], base_config: HomeServerConfig
+) -> Dict[Tuple[str, str], EndpointDescription]:
+    """
+    TODO Don't require passing in a config
+    """
+
+    hs = MockHomeserver(base_config, worker_app)
+    # TODO We only do this to avoid an error, but don't need the database etc
+    hs.setup()
+    return get_registered_paths_for_hs(hs, is_worker=worker_app is not None)
+
+
+def elide_http_methods_if_unconflicting(
+    registrations: Dict[Tuple[str, str], EndpointDescription],
+    all_possible_registrations: Dict[Tuple[str, str], EndpointDescription],
+) -> Dict[Tuple[str, str], EndpointDescription]:
+    """
+    Elides HTTP methods (by replacing them with `*`) if all possible registered methods
+    can be handled by the worker whose registration map is `registrations`.
+    """
+
+    def paths_to_methods_dict(
+        methods_and_paths: Iterable[Tuple[str, str]]
+    ) -> Dict[str, Set[str]]:
+        result: Dict[str, Set[str]] = {}
+        for method, path in methods_and_paths:
+            result.setdefault(path, set()).add(method)
+        return result
+
+    all_possible_reg_methods = paths_to_methods_dict(all_possible_registrations)
+    reg_methods = paths_to_methods_dict(registrations)
+
+    output = {}
+
+    for path, handleable_methods in reg_methods.items():
+        if handleable_methods == all_possible_reg_methods[path]:
+            any_method = next(iter(handleable_methods))
+            # TODO This assumes that all methods have the same servlet.
+            #      I suppose that's possibly dubious?
+            output[("*", path)] = registrations[(any_method, path)]
+        else:
+            for method in handleable_methods:
+                output[(method, path)] = registrations[(method, path)]
+
+    return output
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Updates a synapse database to the latest schema and optionally runs background updates"
@@ -57,10 +184,6 @@ def main():
 
     args = parser.parse_args()
 
-    logging_config = {
-        "level": logging.DEBUG if args.v else logging.INFO,
-        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
-    }
     # TODO
     # logging.basicConfig(**logging_config)
 
@@ -70,55 +193,23 @@ def main():
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")
 
-    hs = MockHomeserver(config)
+    master_paths = get_registered_paths_for_default(None, config)
+    worker_paths = get_registered_paths_for_default(
+        "synapse.app.generic_worker", config
+    )
 
-    # Setup instantiates the store within the homeserver object and updates the
-    # DB.
-    #
-    # TODO This doesn't really need to access the database.
-    hs.setup()
+    all_paths = {**master_paths, **worker_paths}
 
-    client_resource = ClientRestResource(hs)
-    federation_server = TransportLayerServer(hs)
+    elided_worker_paths = elide_http_methods_if_unconflicting(worker_paths, all_paths)
+    elide_http_methods_if_unconflicting(master_paths, all_paths)
 
-    # The resulting paths that workers can handle.
-    results = []
+    # TODO SSO endpoints (pick_idp etc) NOT REGISTERED BY THIS SCRIPT
 
-    # Avoid re-processing servlets (as they might have multiple paths registered separately).
-    servlet_names = set()
-    for path_entry in itertools.chain(*client_resource.path_regexs.values()):
-        if path_entry.servlet_classname in servlet_names:
-            continue
-        servlet_names.add(path_entry.servlet_classname)
-
-        # This assumes the servlet is attached to a class.
-        worker_patterns = getattr(path_entry.callback.__self__, "WORKER_PATTERNS", [])
-        for worker_pattern in worker_patterns:
-            # Remove any capturing groups and replace with wildcards.
-            pattern = GROUP_PATTERN.sub(".*", worker_pattern.pattern)
-            results.append(pattern)
-
-    # Federation resources follow slightly different rules.
-    for path_entry in itertools.chain(*federation_server.path_regexs.values()):
-        if path_entry.servlet_classname in servlet_names:
-            continue
-        servlet_names.add(path_entry.servlet_classname)
-
-        # This assumes the servlet is attached to a class.
-        servlet = path_entry.callback.__wrapped__.__self__
-        worker_path = getattr(servlet, "WORKER_PATH", None)
-        if worker_path:
-            # See synapse.federation.transport.server._base.BaseFederationServlet.register.
-            pattern = "^" + servlet.PREFIX + worker_path
-            results.append(pattern)
-
-    # Add the /key resources manually since those are directly registered (not
-    # via servlets).
-    results.append("^/_matrix/key/v2/query")
-
-    # Print the results after sorting (to give a stable output).
-    for result in sorted(results):
-        print(result)
+    for ln in sorted(p for m, p in elided_worker_paths if m == "*"):
+        print(ln)
+    print()
+    for ln in sorted(f"{m:6} {p}" for m, p in elided_worker_paths if m != "*"):
+        print(ln)
 
 
 if __name__ == "__main__":
