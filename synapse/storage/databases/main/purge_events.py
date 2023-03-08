@@ -325,7 +325,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # We then run the same purge a second time without this isolation level to
         # purge any of those rows which were added during the first.
 
-        logger.info("[purge] Starting initial main purge of [1/2]]")
+        logger.info("[purge] Starting initial main purge of [1/2]")
         state_groups_to_delete = await self.db_pool.runInteraction(
             "purge_room",
             self._purge_room_txn,
@@ -333,7 +333,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
-        logger.info("[purge] Starting secondary main purge of [2/2]]")
+        logger.info("[purge] Starting secondary main purge of [2/2]")
         state_groups_to_delete.extend(
             await self.db_pool.runInteraction(
                 "purge_room",
