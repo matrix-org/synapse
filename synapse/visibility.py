@@ -567,7 +567,7 @@ async def filter_events_for_server(
     local_server_name: str,
     events: Sequence[EventBase],
     redact: bool = True,
-    check_history_visibility_only: bool = False,
+    filter_out_erased_senders: bool = True,
 ) -> List[EventBase]:
     """Filter a list of events based on whether the target server is allowed to
     see them.
@@ -590,8 +590,7 @@ async def filter_events_for_server(
         events
         redact: Controls what to do with events which have been filtered out.
             If True, include their redacted forms; if False, omit them entirely.
-        check_history_visibility_only: Whether to only check the
-            history visibility, rather than things like if the sender has been
+        filter_out_erased_senders: If true, also filter out events whose sender has been
             erased. This is used e.g. during pagination to decide whether to
             backfill or not.
 
@@ -628,7 +627,7 @@ async def filter_events_for_server(
         # server has no users in the room: redact
         return False
 
-    if not check_history_visibility_only:
+    if filter_out_erased_senders:
         erased_senders = await storage.main.are_users_erased(e.sender for e in events)
     else:
         # We don't want to check whether users are erased, which is equivalent
@@ -644,7 +643,7 @@ async def filter_events_for_server(
     # this check but would base the filtering on an outdated view of the membership events.
 
     partial_state_invisible_events = set()
-    if not check_history_visibility_only:
+    if filter_out_erased_senders:
         for e in events:
             sender_domain = get_domain_from_id(e.sender)
             if (

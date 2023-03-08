@@ -392,7 +392,7 @@ class FederationHandler:
                 get_prev_content=False,
             )
 
-            # We set `check_history_visibility_only` as we might otherwise get false
+            # We unset `filter_out_erased_senders` as we might otherwise get false
             # positives from users having been erased.
             filtered_extremities = await filter_events_for_server(
                 self._storage_controllers,
@@ -400,7 +400,7 @@ class FederationHandler:
                 self.server_name,
                 events_to_check,
                 redact=False,
-                check_history_visibility_only=True,
+                filter_out_erased_senders=False,
             )
             if filtered_extremities:
                 extremities_to_request.append(bp.event_id)
