@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.module_api.callbacks.account_validity_callbacks import (
-    AccountValidityModuleApiCallbacks,
-)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
+from .account_validity_callbacks import AccountValidityModuleApiCallbacks
+from .spamchecker_callbacks import SpamCheckerModuleApiCallbacks
 
 
 class ModuleApiCallbacks:
-    def __init__(self) -> None:
+    def __init__(self, hs: "HomeServer") -> None:
         self.account_validity = AccountValidityModuleApiCallbacks()
+        self.spam_checker = SpamCheckerModuleApiCallbacks(hs)
