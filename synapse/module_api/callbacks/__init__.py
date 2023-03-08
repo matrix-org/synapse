@@ -14,6 +14,7 @@
 
 from .account_validity_callbacks import AccountValidityModuleApiCallbacks
 from .spam_checker_callbacks import SpamCheckerModuleApiCallbacks
+from .third_party_event_rules_callbacks import ThirdPartyEventRulesModuleApiCallbacks
 
 __all__ = [
     "ModuleApiCallbacks",
@@ -24,3 +25,4 @@ class ModuleApiCallbacks:
     def __init__(self) -> None:
         self.account_validity = AccountValidityModuleApiCallbacks()
         self.spam_checker = SpamCheckerModuleApiCallbacks()
+        self.third_party_event_rules = ThirdPartyEventRulesModuleApiCallbacks()
