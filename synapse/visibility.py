@@ -669,8 +669,7 @@ async def filter_events_for_server(
         target_server_name,
     )
 
-    to_return = []
-    for e in events:
+    def include_event_in_output(e: EventBase) -> bool:
         erased = is_sender_erased(e, erased_senders)
         visible = check_event_is_visible(
             event_to_history_vis[e.event_id], event_to_memberships.get(e.event_id, {})
@@ -679,7 +678,11 @@ async def filter_events_for_server(
         if e in partial_state_invisible_events:
             visible = False
 
-        if visible and not erased:
+        return visible and not erased
+
+    to_return = []
+    for e in events:
+        if include_event_in_output(e):
             to_return.append(e)
         elif redact:
             to_return.append(prune_event(e))
