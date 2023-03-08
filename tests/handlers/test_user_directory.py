@@ -792,7 +792,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             return False
 
         # Configure a spam checker that does not filter any users.
-        spam_checker = self.hs.get_spam_checker()
+        spam_checker = self.hs.get_module_api_callbacks().spam_checker
         spam_checker._check_username_for_spam_callbacks = [allow_all]
 
         # The results do not change:

@@ -96,7 +96,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.servernotices.server_notices_mxid
         self._enable_lookup = hs.config.registration.enable_3pid_lookup
@@ -806,7 +806,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
                     block_invite_result = (Codes.FORBIDDEN, {})
 
-                spam_check = await self.spam_checker.user_may_invite(
+                spam_check = await self._spam_checker_module_callbacks.user_may_invite(
                     requester.user.to_string(), target_id, room_id
                 )
                 if spam_check != NOT_SPAM:
@@ -940,8 +940,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # a room then they're allowed to join it.
                 and not new_room
             ):
-                spam_check = await self.spam_checker.user_may_join_room(
-                    target.to_string(), room_id, is_invited=inviter is not None
+                spam_check = (
+                    await self._spam_checker_module_callbacks.user_may_join_room(
+                        target.to_string(), room_id, is_invited=inviter is not None
+                    )
                 )
                 if spam_check != NOT_SPAM:
                     raise SynapseError(
@@ -1550,11 +1552,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
         else:
             # Check if the spamchecker(s) allow this invite to go through.
-            spam_check = await self.spam_checker.user_may_send_3pid_invite(
-                inviter_userid=requester.user.to_string(),
-                medium=medium,
-                address=address,
-                room_id=room_id,
+            spam_check = (
+                await self._spam_checker_module_callbacks.user_may_send_3pid_invite(
+                    inviter_userid=requester.user.to_string(),
+                    medium=medium,
+                    address=address,
+                    room_id=room_id,
+                )
             )
             if spam_check != NOT_SPAM:
                 raise SynapseError(
