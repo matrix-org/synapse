@@ -1015,18 +1015,33 @@ class RoomCreationHandler:
 
         Rate limiting should already have been applied by this point.
 
+        Args:
+            creator:
+                the user requesting the room creation
+            room_id:
+                room id for the room being created
+            room_config:
+                A dict of configuration options. This will be the body of
+                a /createRoom request; see
+                https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
+            invite_list:
+                a list of user ids to invite to the room
+            initial_state:
+                A list of state events to set in the new room.
+            creation_content:
+                Extra keys, such as m.federate, to be added to the content of the m.room.create event.
+            room_alias:
+                alias for the room
+            power_level_content_override:
+                The power level content to override in the default power level event.
+            creator_join_profile:
+                Set to override the displayname and avatar for the creating
+                user in this room.
+
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
             event sent to the room.
         """
-        visibility = room_config.get("visibility", "private")
-        preset_config = room_config.get(
-            "preset",
-            RoomCreationPreset.PRIVATE_CHAT
-            if visibility == "private"
-            else RoomCreationPreset.PUBLIC_CHAT,
-        )
-
         creator_id = creator.user.to_string()
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
@@ -1089,6 +1104,14 @@ class RoomCreationHandler:
             state_map[(new_event.type, new_event.state_key)] = new_event.event_id
 
             return new_event, new_unpersisted_context
+
+        visibility = room_config.get("visibility", "private")
+        preset_config = room_config.get(
+            "preset",
+            RoomCreationPreset.PRIVATE_CHAT
+            if visibility == "private"
+            else RoomCreationPreset.PUBLIC_CHAT,
+        )
 
         try:
             config = self._presets_dict[preset_config]
@@ -1247,9 +1270,6 @@ class RoomCreationHandler:
                 EventTypes.Name,
                 {"name": name},
                 True,
-                room_id=room_id,
-                sender=creator.user.to_string(),
-                state_key="",
             )
             events_to_send.append((name_event, name_context))
 
@@ -1259,9 +1279,6 @@ class RoomCreationHandler:
                 EventTypes.Topic,
                 {"topic": topic},
                 True,
-                room_id=room_id,
-                sender=creator.user.to_string(),
-                state_key="",
             )
             events_to_send.append((topic_event, topic_context))
 
