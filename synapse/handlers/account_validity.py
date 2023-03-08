@@ -106,7 +106,7 @@ class AccountValidityHandler:
 
         if on_user_registration is not None:
             self._on_user_registration_callbacks.append(on_user_registration)
-        
+
         if on_sso_login is not None:
             self._on_sso_login_callbacks.append(on_sso_login)
 

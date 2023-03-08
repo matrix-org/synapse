@@ -78,8 +78,8 @@ from synapse.handlers.account_validity import (
     ON_LEGACY_ADMIN_REQUEST,
     ON_LEGACY_RENEW_CALLBACK,
     ON_LEGACY_SEND_MAIL_CALLBACK,
-    ON_USER_REGISTRATION_CALLBACK,
     ON_SSO_LOGIN_CALLBACK,
+    ON_USER_REGISTRATION_CALLBACK,
 )
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
