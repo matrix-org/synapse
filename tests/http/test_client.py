@@ -210,8 +210,8 @@ class BlacklistingAgentTest(TestCase):
         """Apply the blacklisting agent and ensure it properly blocks connections to particular IPs."""
         agent = BlacklistingAgentWrapper(
             Agent(self.reactor),
-            ip_whitelist=self.ip_whitelist,
             ip_blacklist=self.ip_blacklist,
+            ip_whitelist=self.ip_whitelist,
         )
 
         # The unsafe IPs should be rejected.
