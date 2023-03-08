@@ -39,11 +39,11 @@ class DeactivateAccountHandler:
         self._profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self._server_name = hs.hostname
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).

@@ -97,7 +97,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         self.clock = hs.get_clock()
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
         self._server_notices_mxid = self.config.servernotices.server_notices_mxid
         self._enable_lookup = hs.config.registration.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.server.allow_per_room_profiles
@@ -1513,7 +1515,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # can't just rely on the standard ratelimiting of events.
         await self._third_party_invite_limiter.ratelimit(requester)
 
-        can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
+        can_invite = await self._third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id
         )
         if not can_invite:

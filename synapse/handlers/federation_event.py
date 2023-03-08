@@ -154,7 +154,9 @@ class FederationEventHandler:
         self._get_room_member_handler = hs.get_room_member_handler
 
         self._federation_client = hs.get_federation_client()
-        self._third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
         self._notifier = hs.get_notifier()
 
         self._is_mine_id = hs.is_mine_id

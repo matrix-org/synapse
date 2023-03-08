@@ -169,7 +169,9 @@ class FederationHandler:
 
         self._room_backfill = Linearizer("room_backfill")
 
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
 
         # Tracks running partial state syncs by room ID.
         # Partial state syncs currently only run on the main process, so it's okay to
@@ -1252,7 +1254,7 @@ class FederationHandler:
             unpersisted_context,
         ) = await self.event_creation_handler.create_new_client_event(builder=builder)
 
-        event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
+        event_allowed, _ = await self._third_party_event_rules.check_event_allowed(
             event, unpersisted_context
         )
         if not event_allowed:

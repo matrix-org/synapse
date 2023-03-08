@@ -61,7 +61,7 @@ class ProfileHandler:
 
         self.server_name = hs.config.server.server_name
 
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
     async def get_profile(self, user_id: str) -> JsonDict:
         target_user = UserID.from_string(user_id)
