@@ -167,6 +167,17 @@ def elide_http_methods_if_unconflicting(
     return output
 
 
+def simplify_path_regexes(
+    registrations: Dict[Tuple[str, str], EndpointDescription]
+) -> Dict[Tuple[str, str], EndpointDescription]:
+    def simplify_path_regex(path: str) -> str:
+        # TODO it's hard to choose between these two
+        # return GROUP_PATTERN.sub(r"\1", path)
+        return GROUP_PATTERN.sub(r".*", path)
+
+    return {(m, simplify_path_regex(p)): v for (m, p), v in registrations.items()}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -205,10 +216,14 @@ def main() -> None:
 
     # TODO SSO endpoints (pick_idp etc) NOT REGISTERED BY THIS SCRIPT
 
-    for ln in sorted(p for m, p in elided_worker_paths if m == "*"):
+    for ln in sorted(
+        p for m, p in simplify_path_regexes(elided_worker_paths) if m == "*"
+    ):
         print(ln)
     print()
-    for ln in sorted(f"{m:6} {p}" for m, p in elided_worker_paths if m != "*"):
+    for ln in sorted(
+        f"{m:6} {p}" for m, p in simplify_path_regexes(elided_worker_paths) if m != "*"
+    ):
         print(ln)
 
 
