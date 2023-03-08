@@ -23,7 +23,7 @@ from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.presence import format_user_presence_state
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, Requester, UserID
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -46,13 +46,12 @@ class EventStreamHandler:
 
     async def get_stream(
         self,
-        auth_user_id: str,
+        requester: Requester,
         pagin_config: PaginationConfig,
         timeout: int = 0,
         as_client_event: bool = True,
         affect_presence: bool = True,
         room_id: Optional[str] = None,
-        is_guest: bool = False,
     ) -> JsonDict:
         """Fetches the events stream for a given user."""
 
@@ -62,13 +61,12 @@ class EventStreamHandler:
                 raise SynapseError(403, "This room has been blocked on this server")
 
         # send any outstanding server notices to the user.
-        await self._server_notices_sender.on_user_syncing(auth_user_id)
+        await self._server_notices_sender.on_user_syncing(requester.user.to_string())
 
-        auth_user = UserID.from_string(auth_user_id)
         presence_handler = self.hs.get_presence_handler()
 
         context = await presence_handler.user_syncing(
-            auth_user_id,
+            requester.user.to_string(),
             affect_presence=affect_presence,
             presence_state=PresenceState.ONLINE,
         )
@@ -82,10 +80,10 @@ class EventStreamHandler:
                 timeout = random.randint(int(timeout * 0.9), int(timeout * 1.1))
 
             stream_result = await self.notifier.get_events_for(
-                auth_user,
+                requester.user,
                 pagin_config,
                 timeout,
-                is_guest=is_guest,
+                is_guest=requester.is_guest,
                 explicit_room_id=room_id,
             )
             events = stream_result.events
@@ -102,7 +100,7 @@ class EventStreamHandler:
                     if event.membership != Membership.JOIN:
                         continue
                     # Send down presence.
-                    if event.state_key == auth_user_id:
+                    if event.state_key == requester.user.to_string():
                         # Send down presence for everyone in the room.
                         users: Iterable[str] = await self.store.get_users_in_room(
                             event.room_id
@@ -124,7 +122,9 @@ class EventStreamHandler:
             chunks = self._event_serializer.serialize_events(
                 events,
                 time_now,
-                config=SerializeEventConfig(as_client_event=as_client_event),
+                config=SerializeEventConfig(
+                    as_client_event=as_client_event, requester=requester
+                ),
             )
 
             chunk = {

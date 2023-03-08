@@ -672,7 +672,15 @@ class DatabasePool:
             f = cast(types.FunctionType, func)  # type: ignore[redundant-cast]
             if f.__closure__:
                 for i, cell in enumerate(f.__closure__):
-                    if inspect.isgenerator(cell.cell_contents):
+                    try:
+                        contents = cell.cell_contents
+                    except ValueError:
+                        # cell.cell_contents can raise if the "cell" is empty,
+                        # which indicates that the variable is currently
+                        # unbound.
+                        continue
+
+                    if inspect.isgenerator(contents):
                         logger.error(
                             "Programming error: function %s references generator %s "
                             "via its closure",
