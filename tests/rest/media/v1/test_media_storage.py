@@ -31,10 +31,10 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import Codes
 from synapse.events import EventBase
-from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
 from synapse.module_api import ModuleApi
+from synapse.module_api.callbacks.spamchecker_callbacks import load_legacy_spam_checkers
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.rest.media.v1._base import FileInfo

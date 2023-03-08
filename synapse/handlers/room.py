@@ -105,7 +105,7 @@ class RoomCreationHandler:
         self.auth_blocking = hs.get_auth_blocking()
         self.clock = hs.get_clock()
         self.hs = hs
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -445,7 +445,9 @@ class RoomCreationHandler:
         """
         user_id = requester.user.to_string()
 
-        spam_check = await self.spam_checker.user_may_create_room(user_id)
+        spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+            user_id
+        )
         if spam_check != NOT_SPAM:
             raise SynapseError(
                 403,
@@ -756,7 +758,9 @@ class RoomCreationHandler:
                 )
 
         if not is_requester_admin:
-            spam_check = await self.spam_checker.user_may_create_room(user_id)
+            spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+                user_id
+            )
             if spam_check != NOT_SPAM:
                 raise SynapseError(
                     403,

@@ -63,7 +63,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.worker.should_update_user_directory
         self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
 
@@ -101,7 +101,9 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Remove any spammy users from the results.
         non_spammy_users = []
         for user in results["results"]:
-            if not await self.spam_checker.check_username_for_spam(user):
+            if not await self._spam_checker_module_callbacks.check_username_for_spam(
+                user
+            ):
                 non_spammy_users.append(user)
         results["results"] = non_spammy_users
 

@@ -36,7 +36,6 @@ from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 
-import synapse
 from synapse.api.errors import NotFoundError
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
 from synapse.util import Clock
@@ -74,7 +73,7 @@ class MediaStorage:
         self.local_media_directory = local_media_directory
         self.filepaths = filepaths
         self.storage_providers = storage_providers
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.clock = hs.get_clock()
 
     async def store_file(self, source: IO, file_info: FileInfo) -> str:
@@ -145,10 +144,10 @@ class MediaStorage:
                     f.flush()
                     f.close()
 
-                    spam_check = await self.spam_checker.check_media_file_for_spam(
+                    spam_check = await self._spam_checker_module_callbacks.check_media_file_for_spam(
                         ReadableFileWrapper(self.clock, fname), file_info
                     )
-                    if spam_check != synapse.module_api.NOT_SPAM:
+                    if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                         logger.info("Blocking media due to spam checker")
                         # Note that we'll delete the stored media, due to the
                         # try/except below. The media also won't be stored in
