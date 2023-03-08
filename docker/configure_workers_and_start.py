@@ -536,7 +536,17 @@ def is_sharding_allowed_for_worker_type(worker_type: str) -> bool:
 
 def split_and_strip_string(
     given_string: str, split_char: str, max_split: SupportsIndex = -1
-) -> List:
+) -> List[str]:
+    """
+    Helper to split a string on split_char and strip whitespace from each end of each
+        element.
+    Args:
+        given_string: The string to split
+        split_char: The character to split the string on
+        max_split: kwarg for split() to limit how many times the split() happens
+    Returns:
+        A List of strings
+    """
     # Removes whitespace from ends of result strings before adding to list. Allow for
     # overriding 'maxsplit' kwarg, default being -1 to signify no maximum.
     return [x.strip() for x in given_string.split(split_char, maxsplit=max_split)]
@@ -554,15 +564,15 @@ def generate_base_homeserver_config() -> None:
     subprocess.run(["/usr/local/bin/python", "/start.py", "migrate_config"], check=True)
 
 
-def parse_worker_types_from_env(
+def parse_worker_types(
     requested_worker_types: List[str],
 ) -> Dict[str, Dict[str, Any]]:
-    """Read the desired list of worker from environment variables and prepare the data
-    for use in generating worker config files while also checking for potential gotchas.
+    """Read the desired list of requested workers and prepare the data for use in
+        generating worker config files while also checking for potential gotchas.
 
     Args:
-        requested_worker_types: The string pulled from the environment containing
-            the worker requested data.
+        requested_worker_types: The list formed from the split environment variable
+            containing the unprocessed requests for workers.
 
     Returns: A  dict of all information needed to generate worker files. Format:
         {'worker_name':
@@ -587,11 +597,15 @@ def parse_worker_types_from_env(
     # more than a single worker for cases where multiples would be bad(e.g. presence).
     worker_type_shard_counter: Dict[str, int] = defaultdict(int)
 
-    # Dict of worker name's. This is used to check that a name requested doesn't clash
-    # with an existing name in the context of a differing worker_type, as it will error
-    # with 'Address in use'(e.g. "to_device, to_device=typing" would not work).
+    # Dict of worker_base_name's -> worker_type. The worker_type(s) in this case is a
+    # sorted set turned into a string. Use this as a reference that a given
+    # worker_base_name is used only for this worker_type(s). Preventing silly typos.
+    # e.g.
+    # 'bob=user_dir+event_creator, bob=event_creator+user_dir' would be fine and resolve
+    #   correctly
+    # 'bob=user_dir+event_creator, bob=user_dir+frontend_proxy' would not be fine.
     # Follows the pattern:
-    # ["worker_name": "worker_type(s)"]
+    # ["worker_base_name": "worker_type(s)"]
     worker_name_checklist: Dict[str, str] = {}
 
     # The final result of all this processing
@@ -602,10 +616,9 @@ def parse_worker_types_from_env(
         requested_worker_types
     )
 
-    # Check each requested worker for a requested name
+    # Check each requested worker_type_string for a user-requested name and parse it
+    # out if present.
     for worker_type_string in multiple_processed_worker_types:
-        # Shortcut these to avoid processing and skip an 'else' block when no worker
-        # name is actually requested.
         requested_worker_name = ""
         new_worker_type_string = worker_type_string
         # First, check if a name is requested
@@ -641,13 +654,10 @@ def parse_worker_types_from_env(
         #   new_worker_type_string which might still be what it was when it came in
 
         # Split the worker_type_string on "+", remove whitespace from ends then make
-        # the list a set so it's deduplicated. Hopefully no one tries to put 2
-        # pushers on the same worker(as it would consolidate into one).
+        # the list a set so it's deduplicated.
         worker_types_list = split_and_strip_string(new_worker_type_string, "+")
         worker_types_set: Set[str] = set(worker_types_list)
 
-        # Shortcut this here, then it only has to survive intact(most of the time it
-        # will just pass right through)
         worker_base_name = new_worker_type_string
         if requested_worker_name:
             worker_base_name = requested_worker_name
@@ -699,11 +709,9 @@ def parse_worker_types_from_env(
         # incrementing number. e.g. federation_reader1 or event_creator+event_persister1
         worker_name = worker_base_name + str(worker_type_counter[worker_base_name])
 
-        # Now that the worker name is settled, check this name isn't used for a
-        # different worker_type. If it's not allowed, will error and stop. If no
-        # issues, it will be added to the counter. This will prevent accidentally
-        # naming a worker by a worker_type. e.g. 'pusher, pusher=user_dir'
-        # Make sure the worker types being checked are deterministic.
+        # Now that the worker name is settled, check this worker_base_name isn't used
+        # for a different worker_type. Make sure the worker types being checked are
+        # deterministic.
         deterministic_worker_type_string = "+".join(sorted(worker_types_set))
         check_worker_type = worker_name_checklist.get(worker_base_name)
         # Either this doesn't exist yet, or it matches with a twin
@@ -717,8 +725,9 @@ def parse_worker_types_from_env(
 
         else:
             error(
-                f"Can not use {worker_name} for {deterministic_worker_type_string}. It "
-                f"is already in use by {check_worker_type}"
+                f"Can not use worker_name: '{worker_name}' for worker_type(s): "
+                f"'{deterministic_worker_type_string}'. It is already in use by "
+                f"worker_type(s): '{check_worker_type}'"
             )
 
         # Make sure we don't allow sharding for a worker type that doesn't support it.
@@ -800,7 +809,10 @@ def generate_worker_files(
     # and will be used to construct 'upstream' nginx directives.
     nginx_upstreams: Dict[str, Set[int]] = {}
 
-    # A temporary location dict that will help assemble port data for load-balancing
+    # A map that will collect port data for load-balancing upstreams before being
+    # reprocessed into nginx_locations. Unfortunately, we cannot just use
+    # nginx_locations as there is a typing clash.
+    # Format: {"endpoint": {1234, 1235, ...}}
     nginx_preprocessed_locations: Dict[str, Set[int]] = {}
 
     # A map of: {"endpoint": "upstream"}, where "upstream" is a str representing what
@@ -1069,7 +1081,7 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         else:
             # Split type names by comma, ignoring whitespace.
             worker_types = split_and_strip_string(worker_types_env, ",")
-            requested_worker_types = parse_worker_types_from_env(worker_types)
+            requested_worker_types = parse_worker_types(worker_types)
 
         # Always regenerate all other config files
         log("Generating worker config files")
