@@ -34,6 +34,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -98,6 +99,14 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "receipts_linearized": "receipts_linearized_unique_index",
     "receipts_graph": "receipts_graph_unique_index",
 }
+
+
+class _PoolConnection(Connection):
+    """
+    A Connection from twisted.enterprise.adbapi.Connection.
+    """
+    def reconnect(self) -> None:
+        ...
 
 
 def make_pool(
@@ -892,7 +901,7 @@ class DatabasePool:
 
     async def runWithConnection(
         self,
-        func: Callable[..., R],
+        func: Callable[Concatenate[LoggingDatabaseConnection, P], R],
         *args: Any,
         db_autocommit: bool = False,
         isolation_level: Optional[int] = None,
@@ -926,7 +935,7 @@ class DatabasePool:
 
         start_time = monotonic_time()
 
-        def inner_func(conn, *args, **kwargs):
+        def inner_func(conn: _PoolConnection, *args: P.args, **kwargs: P.kwargs) -> R:
             # We shouldn't be in a transaction. If we are then something
             # somewhere hasn't committed after doing work. (This is likely only
             # possible during startup, as `run*` will ensure changes are
@@ -1019,7 +1028,7 @@ class DatabasePool:
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
         *args: Any,
-    ) -> R:
+    ) -> Union[List[Tuple[Any, ...]], R]:
         """Runs a single query for a result set.
 
         Args:
@@ -1032,7 +1041,7 @@ class DatabasePool:
             The result of decoder(results)
         """
 
-        def interaction(txn):
+        def interaction(txn: LoggingTransaction) -> Union[List[Tuple[Any, ...]], R]:
             txn.execute(query, args)
             if decoder:
                 return decoder(txn)
