@@ -14,7 +14,17 @@
 # limitations under the License.
 import logging
 from enum import Enum, auto
-from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
+from typing import (
+    Collection,
+    Dict,
+    FrozenSet,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+)
 
 import attr
 from typing_extensions import Final
@@ -642,7 +652,7 @@ async def filter_events_for_server(
     # otherwise a room could be fully joined after we retrieve those, which would then bypass
     # this check but would base the filtering on an outdated view of the membership events.
 
-    partial_state_invisible_events = set()
+    partial_state_invisible_event_ids: Set[str] = set()
     if filter_out_erased_senders:
         for e in events:
             sender_domain = get_domain_from_id(e.sender)
@@ -650,7 +660,7 @@ async def filter_events_for_server(
                 sender_domain != local_server_name
                 and await storage.main.is_partial_state_room(e.room_id)
             ):
-                partial_state_invisible_events.add(e)
+                partial_state_invisible_event_ids.add(e.event_id)
 
     # Let's check to see if all the events have a history visibility
     # of "shared" or "world_readable". If that's the case then we don't
@@ -675,7 +685,7 @@ async def filter_events_for_server(
             event_to_history_vis[e.event_id], event_to_memberships.get(e.event_id, {})
         )
 
-        if e in partial_state_invisible_events:
+        if e.event_id in partial_state_invisible_event_ids:
             visible = False
 
         return visible and not erased
