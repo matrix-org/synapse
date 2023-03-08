@@ -71,13 +71,6 @@ from synapse.events.third_party_rules import (
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
-from synapse.handlers.account_validity import (
-    IS_USER_EXPIRED_CALLBACK,
-    ON_LEGACY_ADMIN_REQUEST,
-    ON_LEGACY_RENEW_CALLBACK,
-    ON_LEGACY_SEND_MAIL_CALLBACK,
-    ON_USER_REGISTRATION_CALLBACK,
-)
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
@@ -103,6 +96,13 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api.callbacks.account_validity_callbacks import (
+    IS_USER_EXPIRED_CALLBACK,
+    ON_LEGACY_ADMIN_REQUEST,
+    ON_LEGACY_RENEW_CALLBACK,
+    ON_LEGACY_SEND_MAIL_CALLBACK,
+    ON_USER_REGISTRATION_CALLBACK,
+)
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -248,6 +248,7 @@ class ModuleApi:
         self._push_rules_handler = hs.get_push_rules_handler()
         self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
+        self._callbacks = hs.get_module_api_callbacks()
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -269,7 +270,6 @@ class ModuleApi:
         self._account_data_manager = AccountDataManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
-        self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
@@ -330,7 +330,7 @@ class ModuleApi:
 
         Added in Synapse v1.39.0.
         """
-        return self._account_validity_handler.register_account_validity_callbacks(
+        return self._callbacks.account_validity.register_callbacks(
             is_user_expired=is_user_expired,
             on_user_registration=on_user_registration,
             on_legacy_send_mail=on_legacy_send_mail,
