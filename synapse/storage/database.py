@@ -865,7 +865,8 @@ class DatabasePool:
             try:
                 with opentracing.start_active_span(f"db.{desc}"):
                     result = await self.runWithConnection(
-                        self.new_transaction,
+                        # mypy seems to have an issue with this, maybe a bug?
+                        self.new_transaction,  # type: ignore[arg-type]
                         desc,
                         after_callbacks,
                         async_after_callbacks,
