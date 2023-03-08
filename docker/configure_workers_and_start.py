@@ -867,10 +867,10 @@ def generate_worker_files(
             {"name": worker_name, "port": str(worker_port), "config_path": config_path}
         )
 
-        # Update the shared config with any worker-type specific options. Do a dance so
-        # the first of a given worker type gets to stay assigned.
+        # Update the shared config with any worker_type specific options. The first of a
+        # given worker_type needs to stay assigned and not be replaced.
         worker_config["shared_extra_conf"].update(shared_config)
-        shared_config.update(worker_config["shared_extra_conf"])
+        shared_config = worker_config["shared_extra_conf"]
 
         healthcheck_urls.append("http://localhost:%d/health" % (worker_port,))
 
