@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 from enum import Enum, auto
-from typing import Collection, Dict, FrozenSet, List, Optional, Tuple
+from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
 import attr
 from typing_extensions import Final
@@ -565,19 +565,31 @@ async def filter_events_for_server(
     storage: StorageControllers,
     target_server_name: str,
     local_server_name: str,
-    events: List[EventBase],
+    events: Sequence[EventBase],
     redact: bool = True,
     check_history_visibility_only: bool = False,
 ) -> List[EventBase]:
-    """Filter a list of events based on whether given server is allowed to
+    """Filter a list of events based on whether the target server is allowed to
     see them.
+
+    For a fully stated room, the target server is allowed to see an event E if:
+      - the state at E has world readable or shared history vis, OR
+      - the state at E says that the target server is in the room.
+
+    For a partially stated room, the target server is allowed to see E if:
+      - E was created by this homeserver, AND:
+          - the partial state at E has world readable or shared history vis, OR
+          - the partial state at E says that the target server is in the room.
+
+    TODO: state before or state after?
 
     Args:
         storage
-        server_name
+        target_server_name
+        local_server_name
         events
-        redact: Whether to return a redacted version of the event, or
-            to filter them out entirely.
+        redact: Controls what to do with events which have been filtered out.
+            If True, include their redacted forms; if False, omit them entirely.
         check_history_visibility_only: Whether to only check the
             history visibility, rather than things like if the sender has been
             erased. This is used e.g. during pagination to decide whether to
@@ -587,7 +599,7 @@ async def filter_events_for_server(
         The filtered events.
     """
 
-    def is_sender_erased(event: EventBase, erased_senders: Dict[str, bool]) -> bool:
+    def is_sender_erased(event: EventBase, erased_senders: Mapping[str, bool]) -> bool:
         if erased_senders and erased_senders[event.sender]:
             logger.info("Sender of %s has been erased, redacting", event.event_id)
             return True
