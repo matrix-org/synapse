@@ -63,9 +63,18 @@ class EventAuthHandler:
             self._store, event, batched_auth_events
         )
         auth_event_ids = event.auth_event_ids()
-        auth_events_by_id = await self._store.get_events(auth_event_ids)
+
         if batched_auth_events:
-            auth_events_by_id.update(batched_auth_events)
+            # Copy the batched auth events to avoid mutating them.
+            auth_events_by_id = dict(batched_auth_events)
+            needed_auth_event_ids = set(auth_event_ids) - set(batched_auth_events)
+            if needed_auth_event_ids:
+                auth_events_by_id.update(
+                    await self._store.get_events(needed_auth_event_ids)
+                )
+        else:
+            auth_events_by_id = await self._store.get_events(auth_event_ids)
+
         check_state_dependent_auth_rules(event, auth_events_by_id.values())
 
     def compute_auth_events(

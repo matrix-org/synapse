@@ -569,7 +569,7 @@ class RoomCreationHandler:
             new_room_id,
             # we expect to override all the presets with initial_state, so this is
             # somewhat arbitrary.
-            preset_config=RoomCreationPreset.PRIVATE_CHAT,
+            room_config={"preset": RoomCreationPreset.PRIVATE_CHAT},
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
@@ -904,13 +904,6 @@ class RoomCreationHandler:
                 check_membership=False,
             )
 
-        preset_config = config.get(
-            "preset",
-            RoomCreationPreset.PRIVATE_CHAT
-            if visibility == "private"
-            else RoomCreationPreset.PUBLIC_CHAT,
-        )
-
         raw_initial_state = config.get("initial_state", [])
 
         initial_state = OrderedDict()
@@ -929,7 +922,7 @@ class RoomCreationHandler:
         ) = await self._send_events_for_new_room(
             requester,
             room_id,
-            preset_config=preset_config,
+            room_config=config,
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
@@ -937,48 +930,6 @@ class RoomCreationHandler:
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
         )
-
-        if "name" in config:
-            name = config["name"]
-            (
-                name_event,
-                last_stream_id,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
-                {
-                    "type": EventTypes.Name,
-                    "room_id": room_id,
-                    "sender": user_id,
-                    "state_key": "",
-                    "content": {"name": name},
-                },
-                ratelimit=False,
-                prev_event_ids=[last_sent_event_id],
-                depth=depth,
-            )
-            last_sent_event_id = name_event.event_id
-            depth += 1
-
-        if "topic" in config:
-            topic = config["topic"]
-            (
-                topic_event,
-                last_stream_id,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
-                {
-                    "type": EventTypes.Topic,
-                    "room_id": room_id,
-                    "sender": user_id,
-                    "state_key": "",
-                    "content": {"topic": topic},
-                },
-                ratelimit=False,
-                prev_event_ids=[last_sent_event_id],
-                depth=depth,
-            )
-            last_sent_event_id = topic_event.event_id
-            depth += 1
 
         # we avoid dropping the lock between invites, as otherwise joins can
         # start coming in and making the createRoom slow.
@@ -1047,7 +998,7 @@ class RoomCreationHandler:
         self,
         creator: Requester,
         room_id: str,
-        preset_config: str,
+        room_config: JsonDict,
         invite_list: List[str],
         initial_state: MutableStateMap,
         creation_content: JsonDict,
@@ -1064,11 +1015,33 @@ class RoomCreationHandler:
 
         Rate limiting should already have been applied by this point.
 
+        Args:
+            creator:
+                the user requesting the room creation
+            room_id:
+                room id for the room being created
+            room_config:
+                A dict of configuration options. This will be the body of
+                a /createRoom request; see
+                https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
+            invite_list:
+                a list of user ids to invite to the room
+            initial_state:
+                A list of state events to set in the new room.
+            creation_content:
+                Extra keys, such as m.federate, to be added to the content of the m.room.create event.
+            room_alias:
+                alias for the room
+            power_level_content_override:
+                The power level content to override in the default power level event.
+            creator_join_profile:
+                Set to override the displayname and avatar for the creating
+                user in this room.
+
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
             event sent to the room.
         """
-
         creator_id = creator.user.to_string()
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
@@ -1079,9 +1052,6 @@ class RoomCreationHandler:
         # created (but not persisted to the db) to determine state for future created events
         # (as this info can't be pulled from the db)
         state_map: MutableStateMap[str] = {}
-        # current_state_group of last event created. Used for computing event context of
-        # events to be batched
-        current_state_group: Optional[int] = None
 
         def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
@@ -1123,7 +1093,9 @@ class RoomCreationHandler:
                 event_dict,
                 prev_event_ids=prev_event,
                 depth=depth,
-                state_map=state_map,
+                # Take a copy to ensure each event gets a unique copy of
+                # state_map since it is modified below.
+                state_map=dict(state_map),
                 for_batch=for_batch,
             )
 
@@ -1132,6 +1104,14 @@ class RoomCreationHandler:
             state_map[(new_event.type, new_event.state_key)] = new_event.event_id
 
             return new_event, new_unpersisted_context
+
+        visibility = room_config.get("visibility", "private")
+        preset_config = room_config.get(
+            "preset",
+            RoomCreationPreset.PRIVATE_CHAT
+            if visibility == "private"
+            else RoomCreationPreset.PUBLIC_CHAT,
+        )
 
         try:
             config = self._presets_dict[preset_config]
@@ -1283,6 +1263,24 @@ class RoomCreationHandler:
                 state_key="",
             )
             events_to_send.append((encryption_event, encryption_context))
+
+        if "name" in room_config:
+            name = room_config["name"]
+            name_event, name_context = await create_event(
+                EventTypes.Name,
+                {"name": name},
+                True,
+            )
+            events_to_send.append((name_event, name_context))
+
+        if "topic" in room_config:
+            topic = room_config["topic"]
+            topic_event, topic_context = await create_event(
+                EventTypes.Topic,
+                {"topic": topic},
+                True,
+            )
+            events_to_send.append((topic_event, topic_context))
 
         datastore = self.hs.get_datastores().state
         events_and_context = (

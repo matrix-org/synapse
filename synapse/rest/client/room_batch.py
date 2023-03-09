@@ -15,9 +15,7 @@
 import logging
 import re
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Awaitable, Tuple
-
-from twisted.web.server import Request
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import AuthError, Codes, SynapseError
@@ -30,7 +28,6 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
-from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -79,7 +76,6 @@ class RoomBatchSendEventRestServlet(RestServlet):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
         self.room_batch_handler = hs.get_room_batch_handler()
-        self.txns = HttpTransactionCache(hs)
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str
@@ -248,16 +244,6 @@ class RoomBatchSendEventRestServlet(RestServlet):
             response_dict["base_insertion_event_id"] = base_insertion_event.event_id
 
         return HTTPStatus.OK, response_dict
-
-    def on_GET(self, request: Request, room_id: str) -> Tuple[int, str]:
-        return HTTPStatus.NOT_IMPLEMENTED, "Not implemented"
-
-    def on_PUT(
-        self, request: SynapseRequest, room_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, room_id
-        )
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

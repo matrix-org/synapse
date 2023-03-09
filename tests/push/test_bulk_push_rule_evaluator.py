@@ -228,15 +228,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
         return len(result) > 0
 
-    @override_config(
-        {
-            "experimental_features": {
-                "msc3758_exact_event_match": True,
-                "msc3952_intentional_mentions": True,
-                "msc3966_exact_event_property_contains": True,
-            }
-        }
-    )
+    @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
     def test_user_mentions(self) -> None:
         """Test the behavior of an event which includes invalid user mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -332,15 +324,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-    @override_config(
-        {
-            "experimental_features": {
-                "msc3758_exact_event_match": True,
-                "msc3952_intentional_mentions": True,
-                "msc3966_exact_event_property_contains": True,
-            }
-        }
-    )
+    @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
     def test_room_mentions(self) -> None:
         """Test the behavior of an event which includes invalid room mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
