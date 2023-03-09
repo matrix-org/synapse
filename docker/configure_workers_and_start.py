@@ -656,6 +656,14 @@ def parse_worker_types(
         # Make sure we don't allow sharding for a worker type that doesn't support it.
         # Will error and stop if it is a problem, e.g. 'background_worker'.
         for worker_type in worker_types_set:
+            # Verify this is a real defined worker type. If it's not, stop everything so
+            # it can be fixed.
+            if worker_type not in WORKERS_CONFIG:
+                error(
+                    f"{worker_type} is an unknown worker type! Was found in "
+                    f"'{worker_type_string}'. Please fix!"
+                )
+
             if worker_type in worker_type_shard_counter:
                 if not is_sharding_allowed_for_worker_type(worker_type):
                     error(
@@ -775,17 +783,7 @@ def generate_worker_files(
 
         # Merge all worker config templates for this worker into a single config
         for worker_type in worker_types_set:
-            # Verify this is a real defined worker type. If it's not, stop everything so
-            # it can be fixed.
-            copy_of_template_config = WORKERS_CONFIG.get(worker_type)
-            if copy_of_template_config:
-                # So it's not a reference pointer
-                copy_of_template_config = copy_of_template_config.copy()
-            else:
-                error(
-                    f"{worker_type} is an unknown worker type! Was found in "
-                    f"{worker_types_set}. Please fix!"
-                )
+            copy_of_template_config = WORKERS_CONFIG[worker_type].copy()
 
             # Merge worker type template configuration data. It's a combination of lists
             # and dicts, so use this helper.
@@ -842,7 +840,6 @@ def generate_worker_files(
 
     # Determine the load-balancing upstreams to configure
     nginx_upstream_config = ""
-
     for upstream_worker_base_name, upstream_worker_ports in nginx_upstreams.items():
         body = ""
         for port in upstream_worker_ports:
