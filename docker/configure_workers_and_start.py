@@ -567,7 +567,7 @@ def generate_base_homeserver_config() -> None:
 
 def parse_worker_types(
     requested_worker_types: List[str],
-) -> Dict[str, Dict[str, Any]]:
+) -> Dict[str, Set[str]]:
     """Read the desired list of requested workers and prepare the data for use in
         generating worker config files while also checking for potential gotchas.
 
@@ -575,13 +575,9 @@ def parse_worker_types(
         requested_worker_types: The list formed from the split environment variable
             containing the unprocessed requests for workers.
 
-    Returns: A  dict of all information needed to generate worker files. Format:
+    Returns: A dict of worker names to set of worker types. Format:
         {'worker_name':
-            {'worker_base_name': 'base_name'},
-
-            {'worker_types_set':
-                Set{'worker_type', 'other_worker_type'}
-            }
+            {'worker_type', 'worker_type2'}
         }
     """
     # Checking performed:
@@ -589,153 +585,72 @@ def parse_worker_types(
     #   2. If a requested name contains either kind of quote mark
     #   3. If a requested name ends with a digit
 
-    # A counter of worker_type -> int. Used for determining the name for a given
-    # worker type(s) when generating its config file, as each worker's name is just
-    # worker_(name|type(s)) + instance #
-    worker_type_counter: Dict[str, int] = defaultdict(int)
+    # A counter of worker_base_name -> int. Used for determining the name for a given
+    # worker when generating its config file, as each worker's name is just
+    # worker_base_name followed by instance number
+    worker_base_name_counter: Dict[str, int] = defaultdict(int)
 
     # Similar to above, but more finely grained. This is used to determine we don't have
     # more than a single worker for cases where multiples would be bad(e.g. presence).
     worker_type_shard_counter: Dict[str, int] = defaultdict(int)
 
-    # Dict of worker_base_name's -> worker_type. The worker_type(s) in this case is a
-    # sorted set turned into a string. Use this as a reference that a given
-    # worker_base_name is used only for this worker_type(s). Preventing silly typos.
-    # e.g.
-    # 'bob=user_dir+event_creator, bob=event_creator+user_dir' would be fine and resolve
-    #   correctly
-    # 'bob=user_dir+event_creator, bob=user_dir+frontend_proxy' would not be fine.
-    # Follows the pattern:
-    # ["worker_base_name": "worker_type(s)"]
-    worker_name_checklist: Dict[str, str] = {}
-
     # The final result of all this processing
-    dict_to_return: Dict[str, Any] = {}
+    dict_to_return: Dict[str, Set[str]] = {}
 
-    # Handle any multipliers requested for a given worker.
+    # Handle any multipliers requested for given workers.
     multiple_processed_worker_types = apply_requested_multiplier_for_worker(
         requested_worker_types
     )
 
-    # Check each requested worker_type_string for a user-requested name and parse it
-    # out if present.
+    # Process each worker_type_string
+    # Examples of expected formats:
+    #  - requested_name=type1+type2+type3
+    #  - synchrotron
+    #  - event_creator+event_persister
     for worker_type_string in multiple_processed_worker_types:
-        requested_worker_name = ""
-        new_worker_type_string = worker_type_string
-        # First, check if a name is requested
+        # First, if a name is requested, use that — otherwise generate one.
+        worker_base_name: str = ""
         if "=" in worker_type_string:
             # Split on "=", remove extra whitespace from ends then make list
             worker_type_split = split_and_strip_string(worker_type_string, "=")
             if len(worker_type_split) > 2:
                 error(
-                    "To many worker names requested for a single worker, or to many "
-                    f"'='. Please fix: {worker_type_string}"
+                    "There should only be one '=' in the worker type string. "
+                    f"Please fix: {worker_type_string}"
                 )
+
             # Assign the name
-            # Hopefully, no one will actually use whitespace in a requested worker name,
-            # but if they do, replace it with an underscore to maintain readability.
-            requested_worker_name = worker_type_split[0].replace(" ", "_")
+            worker_base_name = worker_type_split[0]
 
-            # If there was no name given, this will still be an empty string. If we got
-            # here, it's because there was a name requested with a '='. They must have
-            # forgotten to actually type in a name. e.g. '=type'
-            if not requested_worker_name:
+            if not re.match(r"^[a-zA-Z0-9_+-]*[a-zA-Z0-9_+-]$", worker_base_name):
+                # Apply a fairly narrow regex to the worker names. Some characters
+                # aren't safe for use in file paths or nginx configurations.
+                # Don't allow to end with a number because we'll add a number
+                # ourselves in a moment.
                 error(
-                    "Worker name requested but not actually found at: "
-                    f"'{worker_type_string}'. Please fix."
+                    "Invalid worker name; please choose a name consisting of"
+                    "alphanumeric letters, _ + -, but not ending with a digit: "
+                    f"{worker_base_name!r}"
                 )
 
-            # Check the last character of a requested name is not a number. This can
-            # cause an error that comes across during startup as an exception in
-            # 'startListening' and ends with 'Address already in use' for the port.
-            # This only seems to occur when requesting more than 10 of a given
-            # worker_type, otherwise it would be ok. Check this separately from the
-            # regex below, as otherwise digits are ok in a name
-            if requested_worker_name[-1].isdigit():
-                error(
-                    "Found a number at the end of the requested worker name: "
-                    f"{requested_worker_name}. This is not allowed as it will cause "
-                    "exceptions with 'Address already in use'. Recommend appending an "
-                    "underscore after the number if this what you really want to do."
-                )
-
-            # Uncommon mistake that will cause problems. Name string containing any of a
-            # range of nasties will do Bad Things to filenames and probably nginx too.
-            if not re.match(r"^[a-zA-Z0-9_+-]*[a-zA-Z0-9_+-]$", requested_worker_name):
-                error(
-                    "Requesting a worker name containing an invalid character is not "
-                    "allowed, as it would raise a FileNotFoundError. Please only use "
-                    "a-z, A-Z, 0-9, or '_', '+', '-' when forming your name: "
-                    f"{requested_worker_name}"
-                )
-
-            # Reassign the worker_type string with no name on it.
-            new_worker_type_string = worker_type_split[1]
-
-        # At this point, we have:
-        #   requested_worker_name which might be an empty string or a requested name
-        #   new_worker_type_string which needs to be split into it's worker_type parts
+            # Continue processing the remainder of the worker_type string
+            # with the name override removed.
+            worker_type_string = worker_type_split[1]
 
         # Split the worker_type_string on "+", remove whitespace from ends then make
         # the list a set so it's deduplicated.
-        worker_types_list = split_and_strip_string(new_worker_type_string, "+")
-        worker_types_set: Set[str] = set(worker_types_list)
+        worker_types_set: Set[str] = set(
+            split_and_strip_string(worker_type_string, "+")
+        )
 
-        # Settle on a base name for this worker
-        worker_base_name: str
-        if requested_worker_name:
-            worker_base_name = requested_worker_name
-            # It'll be useful to have this in the log in case it's a complex of many
-            # workers merged together. Note for Complement: it would only be seen in the
-            # logs for blueprint construction(which are not collected).
-            log(
-                f"Worker name request found: '{requested_worker_name}'"
-                f", for: {worker_types_set}"
-            )
-
-        else:
-            # The worker name will be the worker_type(s), however the potential for
-            # whitespace could still exist if we use the new_worker_type_string from
-            # above. Use the set of worker_type(s), sort it alphabetically(for
-            # determinism) and concatenate with a "-" instead of a "+" as it came in
-            # with.
-            # 'event_persister + federation_reader + federation_sender + pusher'
-            # would become
-            # 'event_persister-federation_reader-federation_sender-pusher'
-            # This is later checked for sanity when pulling from WORKERS_CONFIG.
-            worker_base_name = "-".join(sorted(worker_types_set))
-            log(
-                "Default worker name might have contained spaces, which is not "
-                f"allowed: '{new_worker_type_string}'. Reformed name to not contain "
-                f"spaces and be sorted alphabetically by type: '{worker_base_name}'"
-            )
+        if not worker_base_name:
+            # No base name specified: generate one deterministically from set of
+            # types
+            worker_base_name = "+".join(sorted(worker_types_set))
 
         # At this point, we have:
-        #   worker_base_name and
-        #   worker_types_set which is a Set of what worker_types are requested
-
-        # Now that the worker name is settled, check this worker_base_name isn't used
-        # for a different worker_type. Make sure the worker types being checked are
-        # deterministic.
-        deterministic_worker_type_string = "+".join(sorted(worker_types_set))
-        check_worker_type = worker_name_checklist.get(worker_base_name)
-        # Either this doesn't exist yet, which means it's being seen for the first time,
-        # or it matches with a previously seen worker_type(s) combination.
-        if (check_worker_type is None) or (
-            check_worker_type == deterministic_worker_type_string
-        ):
-            # This is either setting the base name for the first time, or a no-op if it
-            # exists(e.g. 'event_persister:2').
-            worker_name_checklist.setdefault(
-                worker_base_name, deterministic_worker_type_string
-            )
-
-        else:
-            error(
-                f"Can not use worker_name: '{worker_base_name}' for worker_type(s): "
-                f"'{deterministic_worker_type_string}'. It is already in use by "
-                f"worker_type(s): '{check_worker_type}'"
-            )
+        #   worker_base_name which is the name for the worker, without counter.
+        #   worker_types_set which is the set of worker types for this worker.
 
         # Make sure we don't allow sharding for a worker type that doesn't support it.
         # Will error and stop if it is a problem, e.g. 'background_worker'.
@@ -749,21 +664,23 @@ def parse_worker_types(
             # Not in shard counter, must not have seen it yet, add it.
             worker_type_shard_counter[worker_type] += 1
 
-        # This counter is used for naming workers with an incrementing number. Use the
-        # worker_base_name for the index
-        worker_type_counter[worker_base_name] += 1
+        # Generate the number for the worker using incrementing counter
+        worker_base_name_counter[worker_base_name] += 1
+        worker_number = worker_base_name_counter[worker_base_name]
+        worker_name = f"{worker_base_name}{worker_number}"
 
-        # Name workers by their type or requested name concatenated with an
-        # incrementing number. e.g. federation_reader1 or event_creator+event_persister1
-        worker_name = worker_base_name + str(worker_type_counter[worker_base_name])
+        if worker_number > 1:
+            # If this isn't the first worker, check that we don't have a confusing
+            # mixture of worker types with the same base name.
+            first_worker_with_base_name = dict_to_return[f"{worker_base_name}1"]
+            if first_worker_with_base_name != worker_types_set:
+                error(
+                    f"Can not use worker_name: '{worker_name}' for worker_type(s): "
+                    f"{worker_types_set!r}. It is already in use by "
+                    f"worker_type(s): {first_worker_with_base_name!r}"
+                )
 
-        # The worker has survived the gauntlet of why it can't exist. Add it to the pile
-        dict_to_return.setdefault(worker_name, {}).setdefault(
-            "worker_base_name", worker_base_name
-        )
-        dict_to_return.setdefault(worker_name, {}).setdefault(
-            "worker_types_set", set()
-        ).update(worker_types_set)
+        dict_to_return[worker_name] = worker_types_set
 
     return dict_to_return
 
@@ -772,7 +689,7 @@ def generate_worker_files(
     environ: Mapping[str, str],
     config_path: str,
     data_dir: str,
-    requested_worker_types: Dict[str, Any],
+    requested_worker_types: Dict[str, Set[str]],
 ) -> None:
     """Read the desired workers(if any) that is passed in and generate shared
         homeserver, nginx and supervisord configs.
@@ -849,9 +766,7 @@ def generate_worker_files(
 
     # For each worker type specified by the user, create config values and write it's
     # yaml config file
-    for worker_name, worker_type_data in requested_worker_types.items():
-        worker_types_set = worker_type_data.get("worker_types_set")
-
+    for worker_name, worker_types_set in requested_worker_types.items():
         # The collected and processed data will live here.
         worker_config: Dict[str, Any] = {}
 
