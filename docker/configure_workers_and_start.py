@@ -704,11 +704,14 @@ def parse_worker_types(
             # 'event_persister-federation_reader-federation_sender-pusher'
             # This is later checked for sanity when pulling from WORKERS_CONFIG.
             worker_base_name = "-".join(sorted(worker_types_set))
-            log(
-                "Default worker name might have contained spaces, which is not "
-                f"allowed: '{new_worker_type_string}'. Reformed name to not contain "
-                f"spaces and be sorted alphabetically by type: '{worker_base_name}'"
-            )
+            if len(worker_types_set) > 1:
+                # Log that if there was more than one worker_type for a requested worker
+                # then the name they might be expecting might be different
+                log(
+                    "No name was requested for this combination of worker types: "
+                    f"'{worker_types_set}'. Using worker types sorted alphabetically as "
+                    f"the name '{worker_base_name}'."
+                )
 
         # At this point, we have:
         #   worker_base_name and
