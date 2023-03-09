@@ -40,7 +40,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         file_info = FileInfo(server_name=self.remote_server_name, file_id=file_id)
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             f.write("something")
-            await finish()
+            self.get_success(finish())
         self.get_success(
             self.store.store_cached_remote_media(
                 origin=self.remote_server_name,
