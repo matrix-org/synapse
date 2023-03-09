@@ -714,14 +714,6 @@ def parse_worker_types(
         #   worker_base_name and
         #   worker_types_set which is a Set of what worker_types are requested
 
-        # This counter is used for naming workers with an incrementing number. Use the
-        # worker_base_name for the index
-        worker_type_counter[worker_base_name] += 1
-
-        # Name workers by their type or requested name concatenated with an
-        # incrementing number. e.g. federation_reader1 or event_creator+event_persister1
-        worker_name = worker_base_name + str(worker_type_counter[worker_base_name])
-
         # Now that the worker name is settled, check this worker_base_name isn't used
         # for a different worker_type. Make sure the worker types being checked are
         # deterministic.
@@ -740,7 +732,7 @@ def parse_worker_types(
 
         else:
             error(
-                f"Can not use worker_name: '{worker_name}' for worker_type(s): "
+                f"Can not use worker_name: '{worker_base_name}' for worker_type(s): "
                 f"'{deterministic_worker_type_string}'. It is already in use by "
                 f"worker_type(s): '{check_worker_type}'"
             )
@@ -756,6 +748,14 @@ def parse_worker_types(
                     )
             # Not in shard counter, must not have seen it yet, add it.
             worker_type_shard_counter[worker_type] += 1
+
+        # This counter is used for naming workers with an incrementing number. Use the
+        # worker_base_name for the index
+        worker_type_counter[worker_base_name] += 1
+
+        # Name workers by their type or requested name concatenated with an
+        # incrementing number. e.g. federation_reader1 or event_creator+event_persister1
+        worker_name = worker_base_name + str(worker_type_counter[worker_base_name])
 
         # The worker has survived the gauntlet of why it can't exist. Add it to the pile
         dict_to_return.setdefault(worker_name, {}).setdefault(
