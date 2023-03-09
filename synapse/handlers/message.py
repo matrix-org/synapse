@@ -987,10 +987,11 @@ class EventCreationHandler:
         # a situation where event persistence can't keep up, causing
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
-        async with self.limiter.queue(event_dict["room_id"]):
+        room_id = event_dict["room_id"]
+        async with self.limiter.queue(room_id):
             if txn_id:
                 event = await self.get_event_from_transaction(
-                    requester, txn_id, event_dict["room_id"]
+                    requester, txn_id, room_id
                 )
                 if event:
                     # we know it was persisted, so must have a stream ordering
@@ -999,6 +1000,14 @@ class EventCreationHandler:
                         event,
                         event.internal_metadata.stream_ordering,
                     )
+        # If we don't have any prev event IDs specified then we need to
+        # check that the host is in the room (as otherwise populating the
+        # prev events will fail), at which point we may as well check the
+        # local user is in the room.
+        user_id = requester.user.to_string()
+        is_user_in_room = await self.store.check_local_user_in_room(user_id, room_id)
+        if not is_user_in_room:
+            raise AuthError(403, f"User {user_id} not in room {room_id}")
 
         # Try several times, it could fail with PartialStateConflictError
         # in handle_new_client_event, cf comment in except block.
@@ -1169,18 +1178,6 @@ class EventCreationHandler:
                 len(prev_event_ids),
             )
         else:
-            # If we don't have any prev event IDs specified then we need to
-            # check that the host is in the room (as otherwise populating the
-            # prev events will fail), at which point we may as well check the
-            # local user is in the room.
-            is_user_in_room = await self.store.check_local_user_in_room(
-                builder.sender, builder.room_id
-            )
-            if not is_user_in_room:
-                raise AuthError(
-                    403, f"User {builder.sender} not in room {builder.room_id}"
-                )
-
             prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
 
         # Do a quick sanity check here, rather than waiting until we've created the
