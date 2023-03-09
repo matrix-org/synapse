@@ -116,7 +116,6 @@ from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
-from synapse.replication.tcp.redis.connection import IRedisConnection
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
 from synapse.rest.media.media_repository_resource import MediaRepositoryResource
@@ -139,6 +138,7 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from synapse.replication.tcp.redis.connection import IRedisConnection
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
 
