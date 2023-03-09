@@ -443,7 +443,9 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
                 delta_ids=self.state_delta_due_to_event,
                 current_state_ids=None,
             )
-        state_group_deltas = {
+        state_group_deltas: Optional[
+            Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]
+        ] = {
             (
                 self.state_group_before_event,
                 self.state_group_after_event,
