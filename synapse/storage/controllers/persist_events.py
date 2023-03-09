@@ -827,8 +827,6 @@ class EventsPersistenceStorageController:
             the new current state is only returned if we've already calculated
             it.
         """
-        # Map from (prev state group, new state group) -> delta state dict
-        state_group_deltas = {}
 
         for ev, ctx in events_context:
             if ctx.state_group is None:
@@ -839,9 +837,6 @@ class EventsPersistenceStorageController:
                         "group" % (ev.event_id,)
                     )
                 continue
-
-            if ctx.prev_group:
-                state_group_deltas[(ctx.prev_group, ctx.state_group)] = ctx.delta_ids
 
         # We need to map the event_ids to their state groups. First, let's
         # check if the event is one we're persisting, in which case we can
@@ -894,7 +889,10 @@ class EventsPersistenceStorageController:
             new_state_group = next(iter(new_state_groups))
             old_state_group = next(iter(old_state_groups))
 
-            delta_ids = state_group_deltas.get((old_state_group, new_state_group), None)
+            assert ctx.state_group_deltas is not None
+            delta_ids = ctx.state_group_deltas.get(
+                (old_state_group, new_state_group), None
+            )
             if delta_ids is not None:
                 # We have a delta from the existing to new current state,
                 # so lets just return that.
