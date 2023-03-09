@@ -13,6 +13,7 @@
 # limitations under the License.
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.media._base import FileInfo
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -35,6 +36,11 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         # Inject a piece of media. We'll use this to ensure we're returning a sane
         # response when we're not supposed to block it, distinguishing a media block
         # from a regular 404.
+        file_id = "abcdefg12345"
+        file_info = FileInfo(server_name=self.remote_server_name, file_id=file_id)
+        with self.media_storage.store_into_file(file_info) as (f, fname, finish):
+            f.write("something")
+            await finish()
         self.get_success(
             self.store.store_cached_remote_media(
                 origin=self.remote_server_name,
@@ -43,7 +49,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
                 media_length=1,
                 time_now_ms=clock.time_msec(),
                 upload_name="test.txt",
-                filesystem_id="abcdefg12345",
+                filesystem_id=file_id,
             )
         )
 
