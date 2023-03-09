@@ -74,6 +74,11 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
     ON_LEGACY_SEND_MAIL_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
 )
+from synapse.module_api.callbacks.background_updater_callbacks import (
+    DEFAULT_BATCH_SIZE_CALLBACK,
+    MIN_BATCH_SIZE_CALLBACK,
+    ON_UPDATE_CALLBACK,
+)
 from synapse.module_api.callbacks.presence_router_callbacks import (
     GET_INTERESTED_USERS_CALLBACK,
     GET_USERS_FOR_STATES_CALLBACK,
@@ -107,11 +112,6 @@ from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
 )
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
-from synapse.storage.background_updates import (
-    DEFAULT_BATCH_SIZE_CALLBACK,
-    MIN_BATCH_SIZE_CALLBACK,
-    ON_UPDATE_CALLBACK,
-)
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.types import (
@@ -438,12 +438,11 @@ class ModuleApi:
         Added in Synapse v1.49.0.
         """
 
-        for db in self._hs.get_datastores().databases:
-            db.updates.register_update_controller_callbacks(
-                on_update=on_update,
-                default_batch_size=default_batch_size,
-                min_batch_size=min_batch_size,
-            )
+        self._callbacks.background_updater.register_callbacks(
+            on_update=on_update,
+            default_batch_size=default_batch_size,
+            min_batch_size=min_batch_size,
+        )
 
     def register_account_data_callbacks(
         self,

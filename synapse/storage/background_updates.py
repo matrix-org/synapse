@@ -42,11 +42,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-ON_UPDATE_CALLBACK = Callable[[str, str, bool], AsyncContextManager[int]]
-DEFAULT_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
-MIN_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
-
-
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _BackgroundUpdateHandler:
     """A handler for a given background update.
@@ -149,12 +144,10 @@ class BackgroundUpdater:
 
         self._database_name = database.name()
 
+        self._module_api_callbacks = hs.get_module_api_callbacks().background_updater
+
         # if a background update is currently running, its name.
         self._current_background_update: Optional[str] = None
-
-        self._on_update_callback: Optional[ON_UPDATE_CALLBACK] = None
-        self._default_batch_size_callback: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None
-        self._min_batch_size_callback: Optional[MIN_BATCH_SIZE_CALLBACK] = None
 
         self._background_update_performance: Dict[str, BackgroundUpdatePerformance] = {}
         self._background_update_handlers: Dict[str, _BackgroundUpdateHandler] = {}
@@ -174,31 +167,6 @@ class BackgroundUpdater:
         self.update_duration_ms = hs.config.background_updates.update_duration_ms
         self.sleep_duration_ms = hs.config.background_updates.sleep_duration_ms
         self.sleep_enabled = hs.config.background_updates.sleep_enabled
-
-    def register_update_controller_callbacks(
-        self,
-        on_update: ON_UPDATE_CALLBACK,
-        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
-        min_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
-    ) -> None:
-        """Register callbacks from a module for each hook."""
-        if self._on_update_callback is not None:
-            logger.warning(
-                "More than one module tried to register callbacks for controlling"
-                " background updates. Only the callbacks registered by the first module"
-                " (in order of appearance in Synapse's configuration file) that tried to"
-                " do so will be called."
-            )
-
-            return
-
-        self._on_update_callback = on_update
-
-        if default_batch_size is not None:
-            self._default_batch_size_callback = default_batch_size
-
-        if min_batch_size is not None:
-            self._min_batch_size_callback = min_batch_size
 
     def _get_context_manager_for_update(
         self,
@@ -228,8 +196,10 @@ class BackgroundUpdater:
             Note: this is a *target*, and an iteration may take substantially longer or
             shorter.
         """
-        if self._on_update_callback is not None:
-            return self._on_update_callback(update_name, database_name, oneshot)
+        if self._module_api_callbacks.on_update_callback is not None:
+            return self._module_api_callbacks.on_update_callback(
+                update_name, database_name, oneshot
+            )
 
         return _BackgroundUpdateContextManager(
             sleep, self._clock, self.sleep_duration_ms, self.update_duration_ms
@@ -239,8 +209,10 @@ class BackgroundUpdater:
         """The batch size to use for the first iteration of a new background
         update.
         """
-        if self._default_batch_size_callback is not None:
-            return await self._default_batch_size_callback(update_name, database_name)
+        if self._module_api_callbacks.default_batch_size_callback is not None:
+            return await self._module_api_callbacks.default_batch_size_callback(
+                update_name, database_name
+            )
 
         return self.default_background_batch_size
 
@@ -249,8 +221,10 @@ class BackgroundUpdater:
 
         Used to ensure that progress is always made. Must be greater than 0.
         """
-        if self._min_batch_size_callback is not None:
-            return await self._min_batch_size_callback(update_name, database_name)
+        if self._module_api_callbacks.min_batch_size_callback is not None:
+            return await self._module_api_callbacks.min_batch_size_callback(
+                update_name, database_name
+            )
 
         return self.minimum_background_batch_size
 
