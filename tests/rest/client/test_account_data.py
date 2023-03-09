@@ -33,7 +33,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         a user's account data changes.
         """
         mocked_callback = Mock(return_value=make_awaitable(None))
-        self.hs.get_account_data_handler()._on_account_data_updated_callbacks.append(
+        self.hs.get_module_api_callbacks().account_data.on_account_data_updated_callbacks.append(
             mocked_callback
         )
 

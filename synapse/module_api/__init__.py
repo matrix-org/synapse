@@ -41,7 +41,6 @@ from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import PresenceRouter
 from synapse.events.spamcheck import SpamChecker
-from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.auth import AuthHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.push_rules import RuleSpec, check_actions
@@ -59,6 +58,9 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api.callbacks.account_data_callbacks import (
+    ON_ACCOUNT_DATA_UPDATED_CALLBACK,
+)
 from synapse.module_api.callbacks.account_validity_callbacks import (
     IS_USER_EXPIRED_CALLBACK,
     ON_LEGACY_ADMIN_REQUEST,
@@ -271,8 +273,6 @@ class ModuleApi:
         self._public_room_list_manager = PublicRoomListManager(hs)
         self._account_data_manager = AccountDataManager(hs)
 
-        self._account_data_handler = hs.get_account_data_handler()
-
     #################################################################################
     # The following methods should only be called during the module's initialisation.
 
@@ -452,7 +452,7 @@ class ModuleApi:
 
         Added in Synapse 1.57.0.
         """
-        return self._account_data_handler.register_module_callbacks(
+        return self._callbacks.account_data.register_callbacks(
             on_account_data_updated=on_account_data_updated,
         )
 

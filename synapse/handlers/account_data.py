@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.constants import AccountDataTypes
 from synapse.replication.http.account_data import (
@@ -32,10 +32,6 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
-
-ON_ACCOUNT_DATA_UPDATED_CALLBACK = Callable[
-    [str, Optional[str], str, JsonDict], Awaitable
-]
 
 
 class AccountDataHandler:
@@ -60,16 +56,7 @@ class AccountDataHandler:
         self._remove_tag_client = ReplicationRemoveTagRestServlet.make_client(hs)
         self._account_data_writers = hs.config.worker.writers.account_data
 
-        self._on_account_data_updated_callbacks: List[
-            ON_ACCOUNT_DATA_UPDATED_CALLBACK
-        ] = []
-
-    def register_module_callbacks(
-        self, on_account_data_updated: Optional[ON_ACCOUNT_DATA_UPDATED_CALLBACK] = None
-    ) -> None:
-        """Register callbacks from modules."""
-        if on_account_data_updated is not None:
-            self._on_account_data_updated_callbacks.append(on_account_data_updated)
+        self._module_api_callbacks = hs.get_module_api_callbacks().account_data
 
     async def _notify_modules(
         self,
@@ -92,7 +79,7 @@ class AccountDataHandler:
             account_data_type: The type of the account data.
             content: The content that is now associated with this type.
         """
-        for callback in self._on_account_data_updated_callbacks:
+        for callback in self._module_api_callbacks.on_account_data_updated_callbacks:
             try:
                 await callback(user_id, room_id, account_data_type, content)
             except Exception as e:

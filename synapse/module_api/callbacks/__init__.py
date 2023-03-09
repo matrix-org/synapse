@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .account_data_callbacks import AccountDataModuleApiCallbacks
 from .account_validity_callbacks import AccountValidityModuleApiCallbacks
 from .background_updater_callbacks import BackgroundUpdaterModuleApiCallbacks
 from .password_auth_provider_callbacks import PasswordAuthProviderModuleApiCallbacks
@@ -26,6 +27,7 @@ __all__ = [
 
 class ModuleApiCallbacks:
     def __init__(self) -> None:
+        self.account_data = AccountDataModuleApiCallbacks()
         self.account_validity = AccountValidityModuleApiCallbacks()
         self.background_updater = BackgroundUpdaterModuleApiCallbacks()
         self.password_auth_provider = PasswordAuthProviderModuleApiCallbacks()
