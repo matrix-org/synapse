@@ -47,6 +47,7 @@
 
 import os
 import platform
+import re
 import subprocess
 import sys
 from collections import defaultdict
@@ -630,14 +631,26 @@ def parse_worker_types(
                     "To many worker names requested for a single worker, or to many "
                     f"'='. Please fix: {worker_type_string}"
                 )
-            # if there was no name given, this will still be an empty string
-            requested_worker_name = worker_type_split[0]
+            # Assign the name
+            # Hopefully, no one will actually use whitespace in a requested worker name,
+            # but if they do, replace it with an underscore to maintain readability.
+            requested_worker_name = worker_type_split[0].replace(" ", "_")
+
+            # If there was no name given, this will still be an empty string. If we got
+            # here, it's because there was a name requested with a '='. They must have
+            # forgotten to actually type in a name. e.g. '=type'
+            if not requested_worker_name:
+                error(
+                    "Worker name requested but not actually found at: "
+                    f"'{worker_type_string}'. Please fix."
+                )
 
             # Check the last character of a requested name is not a number. This can
             # cause an error that comes across during startup as an exception in
             # 'startListening' and ends with 'Address already in use' for the port.
             # This only seems to occur when requesting more than 10 of a given
-            # worker_type, otherwise it would be ok.
+            # worker_type, otherwise it would be ok. Check this separately from the
+            # regex below, as otherwise digits are ok in a name
             if requested_worker_name[-1].isdigit():
                 error(
                     "Found a number at the end of the requested worker name: "
@@ -646,19 +659,30 @@ def parse_worker_types(
                     "underscore after the number if this what you really want to do."
                 )
 
+            # Uncommon mistake that will cause problems. Name string containing any of a
+            # range of nasties will do Bad Things to filenames and probably nginx too.
+            if not re.match(r"^[a-zA-Z0-9_+-]*[a-zA-Z0-9_+-]$", requested_worker_name):
+                error(
+                    "Requesting a worker name containing an invalid character is not "
+                    "allowed, as it would raise a FileNotFoundError. Please only use "
+                    "a-z, A-Z, 0-9, or '_', '+', '-' when forming your name: "
+                    f"{requested_worker_name}"
+                )
+
             # Reassign the worker_type string with no name on it.
             new_worker_type_string = worker_type_split[1]
 
         # At this point, we have:
-        #   requested_worker_name which might be an empty string
-        #   new_worker_type_string which might still be what it was when it came in
+        #   requested_worker_name which might be an empty string or a requested name
+        #   new_worker_type_string which needs to be split into it's worker_type parts
 
         # Split the worker_type_string on "+", remove whitespace from ends then make
         # the list a set so it's deduplicated.
         worker_types_list = split_and_strip_string(new_worker_type_string, "+")
         worker_types_set: Set[str] = set(worker_types_list)
 
-        worker_base_name = new_worker_type_string
+        # Settle on a base name for this worker
+        worker_base_name: str
         if requested_worker_name:
             worker_base_name = requested_worker_name
             # It'll be useful to have this in the log in case it's a complex of many
@@ -670,36 +694,25 @@ def parse_worker_types(
             )
 
         else:
-            # The worker name will be the worker_type, however if spaces exist
-            # between concatenated worker_types and the "+" because of readability,
-            # it will error on startup. Recombine worker_types without spaces and log.
-            # Allows for human readability while declaring a complex worker type, e.g.
+            # The worker name will be the worker_type(s), however the potential for
+            # whitespace could still exist if we use the new_worker_type_string from
+            # above. Use the set of worker_type(s), sort it alphabetically(for
+            # determinism) and concatenate with a "-" instead of a "+" as it came in
+            # with.
             # 'event_persister + federation_reader + federation_sender + pusher'
-            if (len(worker_types_set) > 1) and (" " in worker_base_name):
-                worker_base_name = "+".join(sorted(worker_types_set))
-                log(
-                    "Default worker name would have contained spaces, which is not "
-                    f"allowed: '{worker_type_string}'. Reformed name to not contain "
-                    f"spaces: '{worker_base_name}'"
-                )
+            # would become
+            # 'event_persister-federation_reader-federation_sender-pusher'
+            # This is later checked for sanity when pulling from WORKERS_CONFIG.
+            worker_base_name = "-".join(sorted(worker_types_set))
+            log(
+                "Default worker name might have contained spaces, which is not "
+                f"allowed: '{new_worker_type_string}'. Reformed name to not contain "
+                f"spaces and be sorted alphabetically by type: '{worker_base_name}'"
+            )
 
         # At this point, we have:
-        #   worker_base_name which might be identical to
-        #   new_worker_type_string which might still be what it was when it came in
+        #   worker_base_name and
         #   worker_types_set which is a Set of what worker_types are requested
-
-        # Uncommon mistake that will cause problems. Name string containing quotes
-        # or spaces will do Bad Things to filenames and probably nginx too.
-        if (
-            (" " in worker_base_name)
-            or ('"' in worker_base_name)
-            or ("'" in worker_base_name)
-        ):
-            error(
-                "Requesting a worker name containing a quote mark or a space is "
-                "not allowed, as it would raise a FileNotFoundError. Please fix: "
-                f"{worker_base_name}"
-            )
 
         # This counter is used for naming workers with an incrementing number. Use the
         # worker_base_name for the index
@@ -714,11 +727,13 @@ def parse_worker_types(
         # deterministic.
         deterministic_worker_type_string = "+".join(sorted(worker_types_set))
         check_worker_type = worker_name_checklist.get(worker_base_name)
-        # Either this doesn't exist yet, or it matches with a twin
+        # Either this doesn't exist yet, which means it's being seen for the first time,
+        # or it matches with a previously seen worker_type(s) combination.
         if (check_worker_type is None) or (
             check_worker_type == deterministic_worker_type_string
         ):
-            # This is a no-op if it exists, which is expected to avoid the else block
+            # This is either setting the base name for the first time, or a no-op if it
+            # exists(e.g. 'event_persister:2').
             worker_name_checklist.setdefault(
                 worker_base_name, deterministic_worker_type_string
             )
