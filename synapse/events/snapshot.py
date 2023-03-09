@@ -178,7 +178,6 @@ class EventContext(UnpersistedEventContextBase):
             "partial_state": self.partial_state,
         }
 
-
     @staticmethod
     def deserialize(storage: "StorageControllers", input: JsonDict) -> "EventContext":
         """Converts a dict that was produced by `serialize` back into a
