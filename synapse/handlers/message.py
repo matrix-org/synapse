@@ -1169,6 +1169,17 @@ class EventCreationHandler:
                 len(prev_event_ids),
             )
         else:
+            # If we don't have any prev event IDs specified then we need to
+            # check that the host is in the room (as otherwise populating the
+            # prev events will fail), at which point we may as well check the
+            # local user is in the room.
+            user_id = requester.user.to_string()
+            is_user_in_room = await self.store.check_local_user_in_room(
+                requester.user.to_string(), builder.room_id
+            )
+            if not is_user_in_room:
+                raise AuthError(403, f"User {user_id} not in room {builder.room_id}")
+
             prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
 
         # Do a quick sanity check here, rather than waiting until we've created the
