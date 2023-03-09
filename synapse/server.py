@@ -21,7 +21,16 @@
 import abc
 import functools
 import logging
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TypeAlias,
+    TypeVar,
+    cast,
+)
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
@@ -142,10 +151,31 @@ if TYPE_CHECKING:
     from synapse.handlers.saml import SamlHandler
 
 
-T = TypeVar("T")
+# The annotation for `cache_in_self` used to be
+#     def (builder: Callable[["HomeServer"],T]) -> Callable[["HomeServer"],T]
+# which mypy was happy with.
+#
+# But PyCharm was confused by this. If `foo` was decorated by `@cache_in_self`, then
+# an expression like `hs.foo()`
+#
+# - would erroneously warn that we hadn't provided a `hs` argument to foo (PyCharm
+#   confused about boundmethods and unbound methods?), and
+# - would be considered to have type `Any`, making for a poor autocomplete and
+#   cross-referencing experience.
+#
+# Instead, use a typevar `F` to express that `@cache_in_self` returns exactly the
+# same type it receives. This isn't strictly true [*], but it's more than good
+# enough to keep PyCharm and mypy happy.
+#
+# [*]: (e.g. `builder` could be an object with a __call__ attribute rather than a
+#      types.FunctionType instance, whereas the return value is always a
+#      types.FunctionType instance.)
+
+T: TypeAlias = object
+F = TypeVar("F", bound=Callable[["HomeServer"], T])
 
 
-def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer"], T]:
+def cache_in_self(builder: F) -> F:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -183,7 +213,7 @@ def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer
 
         return dep
 
-    return _get
+    return cast(F, _get)
 
 
 class HomeServer(metaclass=abc.ABCMeta):
