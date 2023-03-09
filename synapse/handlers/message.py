@@ -1000,14 +1000,18 @@ class EventCreationHandler:
                         event,
                         event.internal_metadata.stream_ordering,
                     )
+
         # If we don't have any prev event IDs specified then we need to
         # check that the host is in the room (as otherwise populating the
         # prev events will fail), at which point we may as well check the
         # local user is in the room.
-        user_id = requester.user.to_string()
-        is_user_in_room = await self.store.check_local_user_in_room(user_id, room_id)
-        if not is_user_in_room:
-            raise AuthError(403, f"User {user_id} not in room {room_id}")
+        if not prev_event_ids:
+            user_id = requester.user.to_string()
+            is_user_in_room = await self.store.check_local_user_in_room(
+                user_id, room_id
+            )
+            if not is_user_in_room:
+                raise AuthError(403, f"User {user_id} not in room {room_id}")
 
         # Try several times, it could fail with PartialStateConflictError
         # in handle_new_client_event, cf comment in except block.
