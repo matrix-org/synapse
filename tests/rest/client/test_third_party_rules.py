@@ -1011,7 +1011,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         )
         third_party_rules = self.hs.get_third_party_event_rules()
         third_party_rules.register_third_party_rules_callbacks(
-            on_threepid_bind=on_remove_user_third_party_identifier_callback_mock,
+            on_remove_user_third_party_identifier=on_remove_user_third_party_identifier_callback_mock,
         )
 
         # Register an admin user.
