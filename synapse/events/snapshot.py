@@ -166,18 +166,18 @@ class EventContext(UnpersistedEventContextBase):
         Returns:
             The serialized event.
         """
-
         return {
             "state_group": self._state_group,
             "state_group_before_event": self.state_group_before_event,
             "rejected": self.rejected,
-            "state_group_deltas": self.state_group_deltas,
+            "state_group_deltas": _encode_state_group_delta(self.state_group_deltas),
             "state_delta_due_to_event": _encode_state_dict(
                 self._state_delta_due_to_event
             ),
             "app_service_id": self.app_service.id if self.app_service else None,
             "partial_state": self.partial_state,
         }
+
 
     @staticmethod
     def deserialize(storage: "StorageControllers", input: JsonDict) -> "EventContext":
@@ -197,7 +197,7 @@ class EventContext(UnpersistedEventContextBase):
             storage=storage,
             state_group=input["state_group"],
             state_group_before_event=input["state_group_before_event"],
-            state_group_deltas=input["state_group_deltas"],
+            state_group_deltas=_decode_state_group_delta(input["state_group_deltas"]),
             state_delta_due_to_event=_decode_state_dict(
                 input["state_delta_due_to_event"]
             ),
@@ -476,6 +476,38 @@ def _encode_state_dict(
         return None
 
     return [(etype, state_key, v) for (etype, state_key), v in state_dict.items()]
+
+
+def _encode_state_group_delta(
+    state_group_delta: Optional[
+        Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]
+    ]
+) -> Optional[
+    List[Tuple[Optional[int], Optional[int], Optional[List[Tuple[str, str, str]]]]]
+]:
+    if state_group_delta is None:
+        return None
+
+    state_group_delta_encoded = []
+    for key, value in state_group_delta.items():
+        state_group_delta_encoded.append((key[0], key[1], _encode_state_dict(value)))
+
+    return state_group_delta_encoded
+
+
+def _decode_state_group_delta(
+    input: Optional[
+        List[Tuple[Optional[int], Optional[int], Optional[List[Tuple[str, str, str]]]]]
+    ]
+) -> Optional[Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]]:
+    if input is None:
+        return None
+
+    state_group_deltas = {}
+    for element in input:
+        state_group_deltas[(element[0], element[1])] = _decode_state_dict(element[2])
+
+    return state_group_deltas
 
 
 def _decode_state_dict(
