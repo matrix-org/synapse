@@ -674,7 +674,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_password_auth_provider(self) -> PasswordAuthProvider:
-        return PasswordAuthProvider()
+        return PasswordAuthProvider(self)
 
     @cache_in_self
     def get_room_member_handler(self) -> RoomMemberHandler:

@@ -42,15 +42,7 @@ from synapse.events import EventBase
 from synapse.events.presence_router import PresenceRouter
 from synapse.events.spamcheck import SpamChecker
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
-from synapse.handlers.auth import (
-    CHECK_3PID_AUTH_CALLBACK,
-    CHECK_AUTH_CALLBACK,
-    GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK,
-    GET_USERNAME_FOR_REGISTRATION_CALLBACK,
-    IS_3PID_ALLOWED_CALLBACK,
-    ON_LOGGED_OUT_CALLBACK,
-    AuthHandler,
-)
+from synapse.handlers.auth import AuthHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
@@ -78,6 +70,14 @@ from synapse.module_api.callbacks.background_updater_callbacks import (
     DEFAULT_BATCH_SIZE_CALLBACK,
     MIN_BATCH_SIZE_CALLBACK,
     ON_UPDATE_CALLBACK,
+)
+from synapse.module_api.callbacks.password_auth_provider_callbacks import (
+    CHECK_3PID_AUTH_CALLBACK,
+    CHECK_AUTH_CALLBACK,
+    GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK,
+    GET_USERNAME_FOR_REGISTRATION_CALLBACK,
+    IS_3PID_ALLOWED_CALLBACK,
+    ON_LOGGED_OUT_CALLBACK,
 )
 from synapse.module_api.callbacks.presence_router_callbacks import (
     GET_INTERESTED_USERS_CALLBACK,
@@ -271,7 +271,6 @@ class ModuleApi:
         self._public_room_list_manager = PublicRoomListManager(hs)
         self._account_data_manager = AccountDataManager(hs)
 
-        self._password_auth_provider = hs.get_password_auth_provider()
         self._account_data_handler = hs.get_account_data_handler()
 
     #################################################################################
@@ -417,7 +416,7 @@ class ModuleApi:
 
         Added in Synapse v1.46.0.
         """
-        return self._password_auth_provider.register_password_auth_provider_callbacks(
+        return self._callbacks.password_auth_provider.register_callbacks(
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,
             is_3pid_allowed=is_3pid_allowed,

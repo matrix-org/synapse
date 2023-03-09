@@ -727,7 +727,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             self.called = True
 
         on_logged_out = Mock(side_effect=on_logged_out)
-        self.hs.get_password_auth_provider().on_logged_out_callbacks.append(
+        self.hs.get_module_api_callbacks().password_auth_provider.on_logged_out_callbacks.append(
             on_logged_out
         )
 
@@ -857,7 +857,9 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         )
 
         m = Mock(return_value=make_awaitable(False))
-        self.hs.get_password_auth_provider().is_3pid_allowed_callbacks = [m]
+        self.hs.get_module_api_callbacks().password_auth_provider.is_3pid_allowed_callbacks = [
+            m
+        ]
 
         self.register_user(username, "password")
         tok = self.login(username, "password")
@@ -887,7 +889,9 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         m.assert_called_once_with("email", "foo@test.com", registration)
 
         m = Mock(return_value=make_awaitable(True))
-        self.hs.get_password_auth_provider().is_3pid_allowed_callbacks = [m]
+        self.hs.get_module_api_callbacks().password_auth_provider.is_3pid_allowed_callbacks = [
+            m
+        ]
 
         channel = self.make_request(
             "POST",
