@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from .account_validity_callbacks import AccountValidityModuleApiCallbacks
+from .presence_router_callbacks import PresenceRouterModuleApiCallbacks
 from .spam_checker_callbacks import SpamCheckerModuleApiCallbacks
 from .third_party_event_rules_callbacks import ThirdPartyEventRulesModuleApiCallbacks
 
@@ -26,3 +27,4 @@ class ModuleApiCallbacks:
         self.account_validity = AccountValidityModuleApiCallbacks()
         self.spam_checker = SpamCheckerModuleApiCallbacks()
         self.third_party_event_rules = ThirdPartyEventRulesModuleApiCallbacks()
+        self.presence_router = PresenceRouterModuleApiCallbacks()

@@ -71,10 +71,12 @@ from twisted.web.server import Request, Site
 
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
-from synapse.events.presence_router import load_legacy_presence_router
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import ContextResourceUsage
+from synapse.module_api.callbacks.presence_router_callbacks import (
+    load_legacy_presence_router,
+)
 from synapse.module_api.callbacks.spam_checker_callbacks import (
     load_legacy_spam_checkers,
 )

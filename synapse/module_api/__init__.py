@@ -39,11 +39,7 @@ from twisted.web.resource import Resource
 from synapse.api import errors
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
-from synapse.events.presence_router import (
-    GET_INTERESTED_USERS_CALLBACK,
-    GET_USERS_FOR_STATES_CALLBACK,
-    PresenceRouter,
-)
+from synapse.events.presence_router import PresenceRouter
 from synapse.events.spamcheck import SpamChecker
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.auth import (
@@ -77,6 +73,10 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
     ON_LEGACY_RENEW_CALLBACK,
     ON_LEGACY_SEND_MAIL_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
+)
+from synapse.module_api.callbacks.presence_router_callbacks import (
+    GET_INTERESTED_USERS_CALLBACK,
+    GET_USERS_FOR_STATES_CALLBACK,
 )
 from synapse.module_api.callbacks.spam_checker_callbacks import (
     CHECK_EVENT_FOR_SPAM_CALLBACK,
@@ -272,7 +272,6 @@ class ModuleApi:
         self._account_data_manager = AccountDataManager(hs)
 
         self._password_auth_provider = hs.get_password_auth_provider()
-        self._presence_router = hs.get_presence_router()
         self._account_data_handler = hs.get_account_data_handler()
 
     #################################################################################
@@ -393,7 +392,7 @@ class ModuleApi:
 
         Added in Synapse v1.42.0.
         """
-        return self._presence_router.register_presence_router_callbacks(
+        return self._callbacks.presence_router.register_callbacks(
             get_users_for_states=get_users_for_states,
             get_interested_users=get_interested_users,
         )

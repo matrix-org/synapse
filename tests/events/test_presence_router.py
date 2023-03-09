@@ -19,10 +19,13 @@ import attr
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EduTypes
-from synapse.events.presence_router import PresenceRouter, load_legacy_presence_router
+from synapse.events.presence_router import PresenceRouter
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
+from synapse.module_api.callbacks.presence_router_callbacks import (
+    load_legacy_presence_router,
+)
 from synapse.rest import admin
 from synapse.rest.client import login, presence, room
 from synapse.server import HomeServer

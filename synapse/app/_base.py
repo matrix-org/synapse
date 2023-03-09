@@ -58,7 +58,6 @@ from synapse.config._base import format_config_error
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ListenerConfig, ManholeConfig
 from synapse.crypto import context_factory
-from synapse.events.presence_router import load_legacy_presence_router
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseSite
 from synapse.logging.context import PreserveLoggingContext
@@ -66,6 +65,9 @@ from synapse.logging.opentracing import init_tracer
 from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
+from synapse.module_api.callbacks.presence_router_callbacks import (
+    load_legacy_presence_router,
+)
 from synapse.module_api.callbacks.spam_checker_callbacks import (
     load_legacy_spam_checkers,
 )
