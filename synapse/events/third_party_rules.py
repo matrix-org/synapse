@@ -247,6 +247,11 @@ class ThirdPartyEventRules:
                 on_add_user_third_party_identifier
             )
 
+        if on_remove_user_third_party_identifier is not None:
+            self._on_remove_user_third_party_identifier_callbacks.append(
+                on_remove_user_third_party_identifier
+            )
+
     async def check_event_allowed(
         self,
         event: EventBase,
