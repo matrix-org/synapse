@@ -618,13 +618,13 @@ def parse_worker_types(
             # Assign the name
             worker_base_name = worker_type_split[0]
 
-            if not re.match(r"^[a-zA-Z0-9_+-]*[a-zA-Z0-9_+-]$", worker_base_name):
+            if not re.match(r"^[a-zA-Z0-9_+-]*[a-zA-Z_+-]$", worker_base_name):
                 # Apply a fairly narrow regex to the worker names. Some characters
                 # aren't safe for use in file paths or nginx configurations.
                 # Don't allow to end with a number because we'll add a number
                 # ourselves in a moment.
                 error(
-                    "Invalid worker name; please choose a name consisting of"
+                    "Invalid worker name; please choose a name consisting of "
                     "alphanumeric letters, _ + -, but not ending with a digit: "
                     f"{worker_base_name!r}"
                 )
