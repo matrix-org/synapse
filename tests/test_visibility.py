@@ -63,7 +63,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "test_server", "hs", events_to_filter
+                self._storage_controllers,
+                "test_server",
+                "hs",
+                events_to_filter,
+                redact=True,
+                filter_out_erased_senders=True,
             )
         )
 
@@ -85,7 +90,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             self.get_success(
                 filter_events_for_server(
-                    self._storage_controllers, "remote_hs", "hs", [outlier]
+                    self._storage_controllers,
+                    "remote_hs",
+                    "hs",
+                    [outlier],
+                    redact=True,
+                    filter_out_erased_senders=True,
                 )
             ),
             [outlier],
@@ -96,7 +106,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "remote_hs", "local_hs", [outlier, evt]
+                self._storage_controllers,
+                "remote_hs",
+                "local_hs",
+                [outlier, evt],
+                redact=True,
+                filter_out_erased_senders=True,
             )
         )
         self.assertEqual(len(filtered), 2, f"expected 2 results, got: {filtered}")
@@ -108,7 +123,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # be redacted)
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "other_server", "local_hs", [outlier, evt]
+                self._storage_controllers,
+                "other_server",
+                "local_hs",
+                [outlier, evt],
+                redact=True,
+                filter_out_erased_senders=True,
             )
         )
         self.assertEqual(filtered[0], outlier)
@@ -143,7 +163,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # ... and the filtering happens.
         filtered = self.get_success(
             filter_events_for_server(
-                self._storage_controllers, "test_server", "local_hs", events_to_filter
+                self._storage_controllers,
+                "test_server",
+                "local_hs",
+                events_to_filter,
+                redact=True,
+                filter_out_erased_senders=True,
             )
         )
 

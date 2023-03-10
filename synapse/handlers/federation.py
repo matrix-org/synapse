@@ -1331,7 +1331,12 @@ class FederationHandler:
         )
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            events,
+            redact=True,
+            filter_out_erased_senders=True,
         )
 
         return events
@@ -1362,7 +1367,12 @@ class FederationHandler:
         await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, [event]
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            [event],
+            redact=True,
+            filter_out_erased_senders=True,
         )
         event = events[0]
         return event
@@ -1390,7 +1400,12 @@ class FederationHandler:
         )
 
         missing_events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, missing_events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            missing_events,
+            redact=True,
+            filter_out_erased_senders=True,
         )
 
         return missing_events

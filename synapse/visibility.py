@@ -576,8 +576,9 @@ async def filter_events_for_server(
     target_server_name: str,
     local_server_name: str,
     events: Sequence[EventBase],
-    redact: bool = True,
-    filter_out_erased_senders: bool = True,
+    *,
+    redact: bool,
+    filter_out_erased_senders: bool,
 ) -> List[EventBase]:
     """Filter a list of events based on whether the target server is allowed to
     see them.
