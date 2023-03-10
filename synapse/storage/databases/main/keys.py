@@ -36,15 +36,16 @@ class KeyStore(SQLBaseStore):
     """Persistence for signature verification keys"""
 
     @cached()
-    def _get_server_verify_key(
+    def _get_server_signature_key(
         self, server_name_and_key_id: Tuple[str, str]
     ) -> FetchKeyResult:
         raise NotImplementedError()
 
     @cachedList(
-        cached_method_name="_get_server_verify_key", list_name="server_name_and_key_ids"
+        cached_method_name="_get_server_signature_key",
+        list_name="server_name_and_key_ids",
     )
-    async def get_server_verify_keys(
+    async def get_server_signature_keys(
         self, server_name_and_key_ids: Iterable[Tuple[str, str]]
     ) -> Dict[Tuple[str, str], FetchKeyResult]:
         """
@@ -89,9 +90,9 @@ class KeyStore(SQLBaseStore):
                 _get_keys(txn, batch)
             return keys
 
-        return await self.db_pool.runInteraction("get_server_verify_keys", _txn)
+        return await self.db_pool.runInteraction("get_server_signature_keys", _txn)
 
-    async def store_server_verify_keys(
+    async def store_server_signature_keys(
         self,
         from_server: str,
         ts_added_ms: int,
@@ -119,7 +120,7 @@ class KeyStore(SQLBaseStore):
                 )
             )
             # invalidate takes a tuple corresponding to the params of
-            # _get_server_verify_key. _get_server_verify_key only takes one
+            # _get_server_signature_key. _get_server_signature_key only takes one
             # param, which is itself the 2-tuple (server_name, key_id).
             invalidations.append((server_name, key_id))
 
@@ -134,10 +135,10 @@ class KeyStore(SQLBaseStore):
                 "verify_key",
             ),
             value_values=value_values,
-            desc="store_server_verify_keys",
+            desc="store_server_signature_keys",
         )
 
-        invalidate = self._get_server_verify_key.invalidate
+        invalidate = self._get_server_signature_key.invalidate
         for i in invalidations:
             invalidate((i,))
 

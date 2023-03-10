@@ -510,7 +510,7 @@ class StoreKeyFetcher(KeyFetcher):
             for key_id in queue_value.key_ids
         )
 
-        res = await self.store.get_server_verify_keys(key_ids_to_fetch)
+        res = await self.store.get_server_signature_keys(key_ids_to_fetch)
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
@@ -757,7 +757,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             )
             keys.setdefault(server_name, {}).update(processed_response)
 
-        await self.store.store_server_verify_keys(
+        await self.store.store_server_signature_keys(
             perspective_name, time_now_ms, added_keys
         )
 

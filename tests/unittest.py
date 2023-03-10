@@ -790,7 +790,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
         verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
         self.get_success(
-            hs.get_datastores().main.store_server_verify_keys(
+            hs.get_datastores().main.store_server_signature_keys(
                 from_server=self.OTHER_SERVER_NAME,
                 ts_added_ms=clock.time_msec(),
                 verify_keys=[
