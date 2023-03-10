@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2022 The Matrix.org Foundation C.I.C.
+# Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,19 +53,24 @@ class EndpointDescription:
     Describes an endpoint and how it should be routed.
     """
 
+    # The servlet class that handles this endpoint
     servlet_class: object
+
+    # The category of this endpoint. Is read from the `CATEGORY` constant in the servlet
+    # class.
     category: Optional[str]
 
     # TODO:
     #  - does it need to be routed based on a stream writer config?
     #  - does it benefit from any optimised, but optional, routing?
-    #  - what documentation category does it go in?
-    #  - what 'opinionated synapse worker class' does it go in?
+    #  - what 'opinionated synapse worker class' (event_creator, synchrotron, etc) does
+    #    it go in?
 
 
 class EnumerationResource(HttpServer):
     """
-    Enumerates all servlets for the purposes of
+    Accepts servlet registrations for the purposes of building up a description of
+    all endpoints.
     """
 
     def __init__(self, is_worker: bool) -> None:
@@ -102,9 +107,13 @@ class EnumerationResource(HttpServer):
 
 
 def get_registered_paths_for_hs(
-    hs: HomeServer, is_worker: bool
+    hs: HomeServer,
 ) -> Dict[Tuple[str, str], EndpointDescription]:
-    enumerator = EnumerationResource(is_worker)
+    """
+    Given a homeserver, get all registered endpoints and their descriptions.
+    """
+
+    enumerator = EnumerationResource(is_worker=hs.config.worker.worker_app is not None)
     ClientRestResource.register_servlets(enumerator, hs)
     federation_server = TransportLayerServer(hs)
 
@@ -128,13 +137,18 @@ def get_registered_paths_for_default(
     worker_app: Optional[str], base_config: HomeServerConfig
 ) -> Dict[Tuple[str, str], EndpointDescription]:
     """
+    Given the name of a worker application and a base homeserver configuration,
+    returns:
+
+        Dict from (method, path) to EndpointDescription
+
     TODO Don't require passing in a config
     """
 
     hs = MockHomeserver(base_config, worker_app)
     # TODO We only do this to avoid an error, but don't need the database etc
     hs.setup()
-    return get_registered_paths_for_hs(hs, is_worker=worker_app is not None)
+    return get_registered_paths_for_hs(hs)
 
 
 def elide_http_methods_if_unconflicting(
@@ -144,11 +158,18 @@ def elide_http_methods_if_unconflicting(
     """
     Elides HTTP methods (by replacing them with `*`) if all possible registered methods
     can be handled by the worker whose registration map is `registrations`.
+
+    i.e. the only endpoints left with methods (other than `*`) should be the ones where
+    the worker can't handle all possible methods for that path.
     """
 
     def paths_to_methods_dict(
         methods_and_paths: Iterable[Tuple[str, str]]
     ) -> Dict[str, Set[str]]:
+        """
+        Given (method, path) pairs, produces a dict from path to set of methods
+        available at that path.
+        """
         result: Dict[str, Set[str]] = {}
         for method, path in methods_and_paths:
             result.setdefault(path, set()).add(method)
@@ -175,8 +196,20 @@ def elide_http_methods_if_unconflicting(
 def simplify_path_regexes(
     registrations: Dict[Tuple[str, str], EndpointDescription]
 ) -> Dict[Tuple[str, str], EndpointDescription]:
+    """
+    Simplify all the path regexes for the dict of endpoint descriptions,
+    so that we don't use the Python-specific regex extensions
+    (and also to remove needlessly specific detail).
+    """
+
     def simplify_path_regex(path: str) -> str:
-        # TODO it's hard to choose between these two
+        """
+        Given a regex pattern, replaces all named capturing groups (e.g. `(?P<blah>xyz)`)
+        with a simpler version available in more common regex dialects (e.g. `.*`).
+        """
+
+        # TODO it's hard to choose between these two;
+        #      `.*` is a vague simplification
         # return GROUP_PATTERN.sub(r"\1", path)
         return GROUP_PATTERN.sub(r".*", path)
 
@@ -236,6 +269,18 @@ def print_category(
     category_name: Optional[str],
     elided_worker_paths: Dict[Tuple[str, str], EndpointDescription],
 ) -> None:
+    """
+    Prints out a category, in documentation page style.
+
+    Example:
+    ```
+    # Category name
+    /path/xyz
+
+    GET /path/abc
+    ```
+    """
+
     if category_name:
         print(f"# {category_name}")
     else:
