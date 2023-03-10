@@ -35,7 +35,6 @@ class SendToDeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_patterns(
         "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$"
     )
-    WORKER_PATTERNS = client_patterns("/sendToDevice/")
     CATEGORY = "The to_device stream"
 
     def __init__(self, hs: "HomeServer"):

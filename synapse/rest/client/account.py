@@ -577,7 +577,6 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
 class ThreepidRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid$")
     # This is used as a proxy for all the 3pid endpoints.
-    WORKER_PATTERNS = client_patterns("/account/3pid")
 
     CATEGORY = "Client API requests"
 

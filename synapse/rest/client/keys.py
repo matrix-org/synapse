@@ -183,7 +183,6 @@ class KeyQueryServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/query$")
-    WORKER_PATTERNS = PATTERNS
     CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
@@ -228,7 +227,6 @@ class KeyChangesServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/changes$")
-    WORKER_PATTERNS = PATTERNS
     CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
@@ -279,7 +277,6 @@ class OneTimeKeyServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/claim$")
-    WORKER_PATTERNS = PATTERNS
     CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):

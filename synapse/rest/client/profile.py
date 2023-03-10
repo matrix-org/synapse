@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 class ProfileDisplaynameRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
-    WORKER_PATTERNS = client_patterns("/profile/", v1=True)
     CATEGORY = "Event sending requests"
 
     def __init__(self, hs: "HomeServer"):

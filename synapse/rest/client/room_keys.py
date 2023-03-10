@@ -37,7 +37,6 @@ class RoomKeysServlet(RestServlet):
     PATTERNS = client_patterns(
         "/room_keys/keys(/(?P<room_id>[^/]+))?(/(?P<session_id>[^/]+))?$"
     )
-    WORKER_PATTERNS = client_patterns("/room_keys/")
     CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):

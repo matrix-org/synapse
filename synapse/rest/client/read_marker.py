@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 class ReadMarkerRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
-    WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers")
     CATEGORY = "Receipts requests"
 
     def __init__(self, hs: "HomeServer"):

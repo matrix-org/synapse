@@ -37,7 +37,6 @@ class TagListServlet(RestServlet):
     PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags$"
     )
-    WORKER_PATTERNS = client_patterns("/(?P<user_id_and_room_id>[^/]*)/tags")
     CATEGORY = "Account data requests"
 
     def __init__(self, hs: "HomeServer"):

@@ -36,7 +36,6 @@ class ReceiptRestServlet(RestServlet):
         "/receipt/(?P<receipt_type>[^/]*)"
         "/(?P<event_id>[^/]*)$"
     )
-    WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/receipt")
     CATEGORY = "Receipts requests"
 
     def __init__(self, hs: "HomeServer"):

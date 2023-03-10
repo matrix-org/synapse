@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 class PresenceStatusRestServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
-    WORKER_PATTERNS = client_patterns("/presence/", v1=True)
     CATEGORY = "Presence requests"
 
     def __init__(self, hs: "HomeServer"):
