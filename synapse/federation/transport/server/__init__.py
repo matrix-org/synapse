@@ -214,6 +214,7 @@ class OpenIdUserInfo(BaseFederationServlet):
     """
 
     PATH = "/openid/userinfo"
+    CATEGORY = "Federation requests"
 
     REQUIRE_AUTH = False
 

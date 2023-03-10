@@ -563,6 +563,7 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
 
 class FederationClientKeysQueryServlet(BaseFederationServerServlet):
     PATH = "/user/keys/query"
+    CATEGORY = "Federation requests"
 
     async def on_POST(
         self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
@@ -587,6 +588,7 @@ class FederationUserDevicesQueryServlet(BaseFederationServerServlet):
 
 class FederationClientKeysClaimServlet(BaseFederationServerServlet):
     PATH = "/user/keys/claim"
+    CATEGORY = "Federation requests"
 
     async def on_POST(
         self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
@@ -624,6 +626,7 @@ class FederationGetMissingEventsServlet(BaseFederationServerServlet):
 
 class On3pidBindServlet(BaseFederationServerServlet):
     PATH = "/3pid/onbind"
+    CATEGORY = "Federation requests"
 
     REQUIRE_AUTH = False
 
@@ -713,6 +716,7 @@ class RoomComplexityServlet(BaseFederationServlet):
 
     PATH = "/rooms/(?P<room_id>[^/]*)/complexity"
     PREFIX = FEDERATION_UNSTABLE_PREFIX
+    CATEGORY = "Federation requests (unstable)"
 
     def __init__(
         self,

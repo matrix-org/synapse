@@ -671,6 +671,10 @@ class JoinedRoomMemberListRestServlet(RestServlet):
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$", v1=True)
+    # TODO The routing information should be exposed programatically.
+    #      I want to do this but for now I felt bad about leaving this without
+    #      at least a visible warning on it.
+    CATEGORY = "Client API requests (ALL FOR SAME ROOM MUST GO TO SAME WORKER)"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1257,6 +1261,7 @@ class RoomAliasListServlet(RestServlet):
             r"/rooms/(?P<room_id>[^/]*)/aliases"
         ),
     ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

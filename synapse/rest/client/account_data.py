@@ -138,6 +138,7 @@ class RoomAccountDataServlet(RestServlet):
         "/rooms/(?P<room_id>[^/]*)"
         "/account_data/(?P<account_data_type>[^/]*)"
     )
+    CATEGORY = "Account data requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
