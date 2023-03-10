@@ -598,8 +598,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         #   - e1: message from u1
         #   - e2: remote user u2:host2 joins
         #   - e3: message from u1
-        #   - e4: u1 accidentally kicks user u2:host2
-        #   - e5: u1 invites user u2:host2
+        #   - e4: message from u1
+        #   - e5: u1 kicks user u2:host2
         # - catchup to begin for host2, after having last successfully sent them e3
         per_dest_queue, sent_pdus = self.make_fake_destination_queue()
 
@@ -622,19 +622,13 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             event_injection.inject_member_event(self.hs, room, "@u2:host2", "join")
         ).event_id
         event_id_3 = self.helper.send(room, "Nicholas,", tok=u1_token)["event_id"]
-        event_id_4 = self.helper.change_membership(
-            room,
-            src="@u1:test",
-            targ="@u2:host2",
-            membership="leave",
-            tok=u1_token,
-        )["event_id"]
+        event_id_4 = self.helper.send(room, "how's the hand?", tok=u1_token)["event_id"]
         event_id_5 = self.get_success(
             event_injection.inject_member_event(
                 self.hs,
                 room,
                 sender="@u1:test",
-                target="@u2:host2",
+                target="@u3:host2",
                 membership="invite",
             )
         ).event_id
