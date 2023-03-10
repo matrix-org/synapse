@@ -648,8 +648,9 @@ def parse_worker_types(
         #   worker_base_name which is the name for the worker, without counter.
         #   worker_types_set which is the set of worker types for this worker.
 
-        # Make sure we don't allow sharding for a worker type that doesn't support it.
-        # Will error and stop if it is a problem, e.g. 'background_worker'.
+        # Validate worker_type and make sure we don't allow sharding for a worker type
+        # that doesn't support it. Will error and stop if it is a problem,
+        # e.g. 'background_worker'.
         for worker_type in worker_types_set:
             # Verify this is a real defined worker type. If it's not, stop everything so
             # it can be fixed.
