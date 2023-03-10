@@ -279,7 +279,7 @@ class RestHelper:
         expect_code: int = HTTPStatus.OK,
         expect_errcode: Optional[str] = None,
         expect_additional_fields: Optional[dict] = None,
-    ) -> None:
+    ) -> JsonDict:
         """
         Send a membership state event into a room.
 
@@ -353,6 +353,7 @@ class RestHelper:
                 )
 
         self.auth_user_id = temp_id
+        return channel.json_body
 
     def send(
         self,
