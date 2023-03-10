@@ -585,3 +585,99 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             per_dest_queue._last_successful_stream_ordering,
             event_2.internal_metadata.stream_ordering,
         )
+
+    def test_catch_up_is_not_blocked_by_local_event_in_partial_state_room(
+        self,
+    ) -> None:
+        """Detects (part of?) https://github.com/matrix-org/synapse/issues/15220."""
+        # ARRANGE:
+        # - a local user (u1)
+        # - a room which initially contains u1 and u3:other
+        # - events in that room such that
+        #   - history visibility is restricted
+        #   - e1: message from u1
+        #   - e2: remote user u2:host2 joins
+        #   - e3: message from u1
+        #   - e4: u1 accidentally kicks user u2:host2
+        #   - e5: u1 invites user u2:host2
+        # - catchup to begin for host2, after having last successfully sent them e3
+        per_dest_queue, sent_pdus = self.make_fake_destination_queue()
+
+        self.register_user("u1", "you the one")
+        u1_token = self.login("u1", "you the one")
+        room = self.helper.create_room_as("u1", tok=u1_token)
+        self.helper.send_state(
+            room_id=room,
+            event_type="m.room.history_visibility",
+            body={"history_visibility": "joined"},
+            tok=u1_token,
+        )
+        self.get_success(
+            event_injection.inject_member_event(self.hs, room, "@u3:other", "join")
+        )
+
+        # create some events
+        event_id_1 = self.helper.send(room, "Hello", tok=u1_token)["event_id"]
+        event_id_2 = self.get_success(
+            event_injection.inject_member_event(self.hs, room, "@u2:host2", "join")
+        ).event_id
+        event_id_3 = self.helper.send(room, "Nicholas,", tok=u1_token)["event_id"]
+        event_id_4 = self.helper.change_membership(
+            room,
+            src="@u1:test",
+            targ="@u2:host2",
+            membership="leave",
+            tok=u1_token,
+        )["event_id"]
+        event_id_5 = self.get_success(
+            event_injection.inject_member_event(
+                self.hs,
+                room,
+                sender="@u1:test",
+                target="@u2:host2",
+                membership="invite",
+            )
+        ).event_id
+
+        # Mock all numbered events as having partial state
+        numbered_events_ids = (
+            event_id_1,
+            event_id_2,
+            event_id_3,
+            event_id_4,
+            event_id_5,
+        )
+        for event_id in numbered_events_ids:
+            self.get_success(
+                event_injection.mark_event_as_partial_state(self.hs, event_id, room)
+            )
+
+        # Fail the test if we block on full state for any of these events.
+        async def mock_await_full_state(event_ids: Collection[str]) -> None:
+            for i, e in enumerate(numbered_events_ids, start=1):
+                if e in event_ids:
+                    raise AssertionError(f"Tried to await full state for event_id_{i}")
+
+        # Pretend we have sent e3 to host2.
+        event_3 = self.get_success(self.hs.get_datastores().main.get_event(event_id_3))
+        assert event_3.internal_metadata.stream_ordering is not None
+        self.get_success(
+            self.hs.get_datastores().main.set_destination_last_successful_stream_ordering(
+                "host2",
+                event_3.internal_metadata.stream_ordering,
+            )
+        )
+
+        # ACT
+        with mock.patch.object(
+            self.hs.get_storage_controllers().state._partial_state_events_tracker,
+            "await_full_state",
+            mock_await_full_state,
+        ):
+            self.get_success(per_dest_queue._catch_up_transmission_loop())
+
+        # ASSERT
+        # TODO summarise this
+        self.assertEqual(len(sent_pdus), 1)
+        self.assertEqual(sent_pdus[0].event_id, event_id_5)
+        self.assertFalse(per_dest_queue._catching_up)
