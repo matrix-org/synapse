@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 from synapse.api.errors import SynapseError
+from synapse.events.utils import SerializeEventConfig
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_string
 from synapse.http.site import SynapseRequest
@@ -43,9 +44,8 @@ class EventStreamRestServlet(RestServlet):
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        is_guest = requester.is_guest
         args: Dict[bytes, List[bytes]] = request.args  # type: ignore
-        if is_guest:
+        if requester.is_guest:
             if b"room_id" not in args:
                 raise SynapseError(400, "Guest users must specify room_id param")
         room_id = parse_string(request, "room_id")
@@ -63,13 +63,12 @@ class EventStreamRestServlet(RestServlet):
         as_client_event = b"raw" not in args
 
         chunk = await self.event_stream_handler.get_stream(
-            requester.user.to_string(),
+            requester,
             pagin_config,
             timeout=timeout,
             as_client_event=as_client_event,
-            affect_presence=(not is_guest),
+            affect_presence=(not requester.is_guest),
             room_id=room_id,
-            is_guest=is_guest,
         )
 
         return 200, chunk
@@ -91,9 +90,12 @@ class EventRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         event = await self.event_handler.get_event(requester.user, None, event_id)
 
-        time_now = self.clock.time_msec()
         if event:
-            result = self._event_serializer.serialize_event(event, time_now)
+            result = self._event_serializer.serialize_event(
+                event,
+                self.clock.time_msec(),
+                config=SerializeEventConfig(requester=requester),
+            )
             return 200, result
         else:
             return 404, "Event not found."

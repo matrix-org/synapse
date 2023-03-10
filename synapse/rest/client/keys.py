@@ -312,15 +312,29 @@ class SigningKeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
-        await self.auth_handler.validate_user_via_ui_auth(
-            requester,
-            request,
-            body,
-            "add a device signing key to your account",
-            # Allow skipping of UI auth since this is frequently called directly
-            # after login and it is silly to ask users to re-auth immediately.
-            can_skip_ui_auth=True,
-        )
+        if self.hs.config.experimental.msc3967_enabled:
+            if await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id):
+                # If we already have a master key then cross signing is set up and we require UIA to reset
+                await self.auth_handler.validate_user_via_ui_auth(
+                    requester,
+                    request,
+                    body,
+                    "reset the device signing key on your account",
+                    # Do not allow skipping of UIA auth.
+                    can_skip_ui_auth=False,
+                )
+            # Otherwise we don't require UIA since we are setting up cross signing for first time
+        else:
+            # Previous behaviour is to always require UIA but allow it to be skipped
+            await self.auth_handler.validate_user_via_ui_auth(
+                requester,
+                request,
+                body,
+                "add a device signing key to your account",
+                # Allow skipping of UI auth since this is frequently called directly
+                # after login and it is silly to ask users to re-auth immediately.
+                can_skip_ui_auth=True,
+            )
 
         result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)
         return 200, result

@@ -14,6 +14,7 @@
 
 #![feature(test)]
 use std::collections::BTreeSet;
+
 use synapse::push::{
     evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, JsonValue,
     PushRules, SimpleJsonValue,
@@ -44,15 +45,12 @@ fn bench_match_exact(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
-        false,
-        false,
         false,
     )
     .unwrap();
@@ -92,15 +90,12 @@ fn bench_match_word(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
-        false,
-        false,
         false,
     )
     .unwrap();
@@ -140,15 +135,12 @@ fn bench_match_word_miss(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
-        false,
-        false,
         false,
     )
     .unwrap();
@@ -188,15 +180,12 @@ fn bench_eval_message(b: &mut Bencher) {
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
         false,
-        BTreeSet::new(),
         10,
         Some(0),
         Default::default(),
         Default::default(),
         true,
         vec![],
-        false,
-        false,
         false,
     )
     .unwrap();
