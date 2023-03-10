@@ -109,6 +109,7 @@ class PublicRoomList(BaseFederationServlet):
 
     PATH = "/publicRooms"
     WORKER_PATH = PATH
+    CATEGORY = "Federation requests"
 
     def __init__(
         self,
