@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 class EventStreamRestServlet(RestServlet):
     PATTERNS = client_patterns("/events$", v1=True)
+    CATEGORY = "Sync requests"
 
     DEFAULT_LONGPOLL_TIME_MS = 30000
 

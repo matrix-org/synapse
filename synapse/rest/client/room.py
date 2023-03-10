@@ -182,6 +182,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(RestServlet):
     WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state/")
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -752,6 +753,7 @@ class RoomStateRestServlet(RestServlet):
 # TODO: Needs unit testing
 class RoomInitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$", v1=True)
+    CATEGORY = "Sync requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
