@@ -16,6 +16,7 @@
 import argparse
 import logging
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional, Pattern, Set, Tuple
 
@@ -53,6 +54,7 @@ class EndpointDescription:
     """
 
     servlet_class: object
+    category: Optional[str]
 
     # TODO:
     #  - does it need to be routed based on a stream writer config?
@@ -90,7 +92,10 @@ class EnumerationResource(HttpServer):
             # was never registered!
             return
 
-        sd = EndpointDescription(servlet_class=servlet_class)
+        sd = EndpointDescription(
+            servlet_class=servlet_class,
+            category=getattr(servlet_class, "CATEGORY", None),
+        )
 
         for pat in path_patterns:
             self.registrations[(method, pat.pattern)] = sd
@@ -216,6 +221,26 @@ def main() -> None:
 
     # TODO SSO endpoints (pick_idp etc) NOT REGISTERED BY THIS SCRIPT
 
+    categories_to_methods_and_paths: Dict[
+        Optional[str], Dict[Tuple[str, str], EndpointDescription]
+    ] = defaultdict(dict)
+
+    for (method, path), desc in elided_worker_paths.items():
+        categories_to_methods_and_paths[desc.category][method, path] = desc
+
+    for category, contents in categories_to_methods_and_paths.items():
+        print_category(category, contents)
+
+
+def print_category(
+    category_name: Optional[str],
+    elided_worker_paths: Dict[Tuple[str, str], EndpointDescription],
+) -> None:
+    if category_name:
+        print(f"# {category_name}")
+    else:
+        print("# (Uncategorised requests)")
+
     for ln in sorted(
         p for m, p in simplify_path_regexes(elided_worker_paths) if m == "*"
     ):
@@ -225,6 +250,7 @@ def main() -> None:
         f"{m:6} {p}" for m, p in simplify_path_regexes(elided_worker_paths) if m != "*"
     ):
         print(ln)
+    print()
 
 
 if __name__ == "__main__":
