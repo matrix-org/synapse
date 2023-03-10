@@ -89,6 +89,7 @@ class KeyUploadServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -183,6 +184,7 @@ class KeyQueryServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/query$")
     WORKER_PATTERNS = PATTERNS
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -227,6 +229,7 @@ class KeyChangesServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/changes$")
     WORKER_PATTERNS = PATTERNS
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -277,6 +280,7 @@ class OneTimeKeyServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/claim$")
     WORKER_PATTERNS = PATTERNS
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

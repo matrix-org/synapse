@@ -143,6 +143,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
 class ProfileRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)", v1=True)
+    CATEGORY = "Event sending requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

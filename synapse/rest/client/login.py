@@ -73,6 +73,7 @@ class LoginResponse(TypedDict, total=False):
 class LoginRestServlet(RestServlet):
     PATTERNS = client_patterns("/login$", v1=True)
     WORKER_PATTERNS = PATTERNS
+    CATEGORY = "Registration/login requests"
 
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"

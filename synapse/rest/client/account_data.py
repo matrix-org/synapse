@@ -39,6 +39,7 @@ class AccountDataServlet(RestServlet):
         "/user/(?P<user_id>[^/]*)/account_data/(?P<account_data_type>[^/]*)"
     )
     WORKER_PATTERNS = client_patterns("/(?P<user_id_and_room_id>[^/]*)/account_data")
+    CATEGORY = "Account data requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

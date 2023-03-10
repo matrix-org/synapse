@@ -45,6 +45,7 @@ class PushRuleRestServlet(RestServlet):
     )
 
     WORKERS_DENIED_METHODS = ["PUT", "DELETE"]
+    CATEGORY = "Push rule requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

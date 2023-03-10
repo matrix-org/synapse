@@ -368,6 +368,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         releases=("v1",),
     )
     WORKER_PATTERNS = PATTERNS
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -397,6 +398,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
 class RegisterRestServlet(RestServlet):
     PATTERNS = client_patterns("/register$")
     WORKER_PATTERNS = PATTERNS
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
