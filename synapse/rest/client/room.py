@@ -787,6 +787,7 @@ class RoomEventServlet(RestServlet):
         "/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)$", v1=True
     )
     WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/event/")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1195,6 +1196,7 @@ class RoomTypingRestServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$", v1=True
     )
+    CATEGORY = "The typing stream"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

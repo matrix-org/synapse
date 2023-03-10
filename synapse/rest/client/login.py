@@ -593,6 +593,7 @@ class SsoRedirectServlet(RestServlet):
             + "/(r0|v3)/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$"
         )
     ]
+    CATEGORY = "SSO requests needed for all SSO providers"
 
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
