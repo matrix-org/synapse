@@ -401,6 +401,7 @@ class FederationHandler:
                 events_to_check,
                 redact=False,
                 filter_out_erased_senders=False,
+                filter_out_partial_state_rooms=False,
             )
             if filtered_extremities:
                 extremities_to_request.append(bp.event_id)
@@ -1337,6 +1338,7 @@ class FederationHandler:
             events,
             redact=True,
             filter_out_erased_senders=True,
+            filter_out_partial_state_rooms=True,
         )
 
         return events
@@ -1373,6 +1375,7 @@ class FederationHandler:
             [event],
             redact=True,
             filter_out_erased_senders=True,
+            filter_out_partial_state_rooms=True,
         )
         event = events[0]
         return event
@@ -1406,6 +1409,7 @@ class FederationHandler:
             missing_events,
             redact=True,
             filter_out_erased_senders=True,
+            filter_out_partial_state_rooms=True,
         )
 
         return missing_events
