@@ -547,6 +547,8 @@ class PerDestinationQueue:
                         self._server_name,
                         new_pdus,
                         redact=False,
+                        filter_out_erased_senders=True,
+                        filter_out_remote_partial_state_events=True,
                     )
 
                     # If we've filtered out all the extremities, fall back to
