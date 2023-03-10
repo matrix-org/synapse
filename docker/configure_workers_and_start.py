@@ -581,11 +581,6 @@ def parse_worker_types(
             {'worker_type', 'worker_type2'}
         }
     """
-    # Checking performed:
-    #   1. If a requested name contains a space
-    #   2. If a requested name contains either kind of quote mark
-    #   3. If a requested name ends with a digit
-
     # A counter of worker_base_name -> int. Used for determining the name for a given
     # worker when generating its config file, as each worker's name is just
     # worker_base_name followed by instance number
