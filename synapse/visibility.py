@@ -579,7 +579,7 @@ async def filter_events_for_server(
     *,
     redact: bool,
     filter_out_erased_senders: bool,
-    filter_out_partial_state_rooms: bool,
+    filter_out_remote_partial_state_events: bool,
 ) -> List[EventBase]:
     """Filter a list of events based on whether the target server is allowed to
     see them.
@@ -605,8 +605,8 @@ async def filter_events_for_server(
         filter_out_erased_senders: If true, also filter out events whose sender has been
             erased. This is used e.g. during pagination to decide whether to
             backfill or not.
-        filter_out_partial_state_rooms: If True, also filter out events in partial state
-            rooms.
+        filter_out_remote_partial_state_events: If True, also filter out events in
+            partial state rooms created by other homeservers.
     Returns
         The filtered events.
     """
@@ -656,7 +656,7 @@ async def filter_events_for_server(
     # this check but would base the filtering on an outdated view of the membership events.
 
     partial_state_invisible_event_ids: Set[str] = set()
-    if filter_out_partial_state_rooms:
+    if filter_out_remote_partial_state_events:
         for e in events:
             sender_domain = get_domain_from_id(e.sender)
             if (

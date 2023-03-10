@@ -69,7 +69,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                 events_to_filter,
                 redact=True,
                 filter_out_erased_senders=True,
-                filter_out_partial_state_rooms=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
 
@@ -97,7 +97,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                     [outlier],
                     redact=True,
                     filter_out_erased_senders=True,
-                    filter_out_partial_state_rooms=True,
+                    filter_out_remote_partial_state_events=True,
                 )
             ),
             [outlier],
@@ -114,7 +114,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                 [outlier, evt],
                 redact=True,
                 filter_out_erased_senders=True,
-                filter_out_partial_state_rooms=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
         self.assertEqual(len(filtered), 2, f"expected 2 results, got: {filtered}")
@@ -132,7 +132,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                 [outlier, evt],
                 redact=True,
                 filter_out_erased_senders=True,
-                filter_out_partial_state_rooms=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
         self.assertEqual(filtered[0], outlier)
@@ -173,7 +173,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                 events_to_filter,
                 redact=True,
                 filter_out_erased_senders=True,
-                filter_out_partial_state_rooms=True,
+                filter_out_remote_partial_state_events=True,
             )
         )
 
