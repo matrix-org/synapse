@@ -138,9 +138,9 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from synapse.replication.tcp.redis.connection import IRedisConnection
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
+    from synapse.replication.tcp.redis.connection import IRedisConnection
 
 
 # The annotation for `cache_in_self` used to be
