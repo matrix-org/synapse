@@ -15,7 +15,7 @@
 import logging
 import time
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Tuple, Dict, Any
 
 from synapse.api.errors import (
     CodeMessageException,
@@ -77,7 +77,7 @@ class AppservicePingRestServlet(RestServlet):
                 Codes.AS_PING_CONNECTION_TIMEOUT,
             )
         except CodeMessageException as e:
-            additional_fields = {"status": e.code}
+            additional_fields: Dict[str, Any] = {"status": e.code}
             if isinstance(e, HttpResponseException):
                 try:
                     additional_fields["body"] = e.response.decode("utf-8")
