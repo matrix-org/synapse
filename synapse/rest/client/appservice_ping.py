@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 class AppservicePingRestServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/fi.mau.msc2659/appservice/ping",
+        "/fi.mau.msc2659/appservice/(?P<appservice_id>[^/]*)/ping",
         unstable=True,
         releases=(),
     )
@@ -49,13 +49,21 @@ class AppservicePingRestServlet(RestServlet):
         self.as_api = hs.get_application_service_api()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+    async def on_POST(
+        self, request: SynapseRequest, appservice_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
         if not requester.app_service:
             raise SynapseError(
                 HTTPStatus.FORBIDDEN,
                 "Only application services can use the /appservice/ping endpoint",
+                Codes.FORBIDDEN,
+            )
+        elif requester.app_service.id != appservice_id:
+            raise SynapseError(
+                HTTPStatus.FORBIDDEN,
+                "Mismatching application service ID in path",
                 Codes.FORBIDDEN,
             )
         elif not requester.app_service.url:
@@ -65,11 +73,12 @@ class AppservicePingRestServlet(RestServlet):
                 Codes.AS_PING_URL_NOT_SET,
             )
 
-        parse_json_object_from_request(request)
+        content = parse_json_object_from_request(request)
+        txn_id = content.get("transaction_id", None)
 
         start = time.monotonic()
         try:
-            await self.as_api.ping(requester.app_service)
+            await self.as_api.ping(requester.app_service, txn_id)
         except RequestTimedOutError as e:
             raise SynapseError(
                 HTTPStatus.GATEWAY_TIMEOUT,

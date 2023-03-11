@@ -266,7 +266,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         key = (service.id, protocol)
         return await self.protocol_meta_cache.wrap(key, _get)
 
-    async def ping(self, service: "ApplicationService") -> None:
+    async def ping(self, service: "ApplicationService", txn_id: Optional[str]) -> None:
         # The caller should check that url is set
         assert service.url is not None, "ping called without URL being set"
 
@@ -275,7 +275,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         await self.post_json_get_json(
             uri=service.url + "/_matrix/app/unstable/fi.mau.msc2659/ping",
-            post_json={},
+            post_json={"transaction_id": txn_id},
             headers={"Authorization": [f"Bearer {service.hs_token}"]},
         )
 
