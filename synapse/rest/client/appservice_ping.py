@@ -15,7 +15,7 @@
 import logging
 import time
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Tuple, Dict, Any
+from typing import TYPE_CHECKING, Any, Dict, Tuple
 
 from synapse.api.errors import (
     CodeMessageException,
