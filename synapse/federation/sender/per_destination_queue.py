@@ -497,7 +497,7 @@ class PerDestinationQueue:
             #
             # Note: `catchup_pdus` will have exactly one PDU per room.
             for pdu in catchup_pdus:
-                # The PDU from the DB will be the oldest PDU in the room from
+                # The PDU from the DB will be the newest PDU in the room from
                 # *this server* that we tried---but were unable---to send to the remote.
                 # servers may have sent lots of events since then, and we want
                 # to try and tell the remote only about the *latest* events in
@@ -519,7 +519,7 @@ class PerDestinationQueue:
                 elif self._store.is_partial_state_room(pdu.room_id):
                     # We can't be sure which events the destination should
                     # see using only partial state. Avoid doing so, and just retry
-                    # sending our the oldest PDU the remote is missing from us.
+                    # sending our the newest PDU the remote is missing from us.
                     room_catchup_pdus = [pdu]
                 else:
                     # If not, fetch the extremities and figure out which we can
