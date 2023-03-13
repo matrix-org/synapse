@@ -1,1 +1,1 @@
-Enable unused-awaitable error for mypy since it is really easy to miss an async keyword.
+Have mypy report `Awaitable`s that are not `await`ed or otherwise consumed.
