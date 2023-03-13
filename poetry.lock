@@ -1722,7 +1722,7 @@ files = [
 cffi = ">=1.4.1"
 
 [package.extras]
-docs = ["sphinx (>=1.6.5)", "sphinx_rtd_theme"]
+docs = ["sphinx (>=1.6.5)", "sphinx-rtd-theme"]
 tests = ["hypothesis (>=3.27.0)", "pytest (>=3.2.1,!=3.3.0)"]
 
 [[package]]
@@ -1777,26 +1777,25 @@ files = [
 
 [[package]]
 name = "pysaml2"
-version = "7.2.1"
+version = "7.3.1"
 description = "Python implementation of SAML Version 2 Standard"
 category = "main"
 optional = true
-python-versions = "<4,>=3.6"
+python-versions = ">=3.6.2,<4.0.0"
 files = [
-    {file = "pysaml2-7.2.1-py2.py3-none-any.whl", hash = "sha256:2ca155f4eeb1471b247a7b0cc79ccfd5780046d33d0b201e1199a00698dce795"},
-    {file = "pysaml2-7.2.1.tar.gz", hash = "sha256:f40f9576dce9afef156469179277ffeeca36829248be333252af0517a26d0b1f"},
+    {file = "pysaml2-7.3.1-py3-none-any.whl", hash = "sha256:2cc66e7a371d3f5ff9601f0ed93b5276cca816fce82bb38447d5a0651f2f5193"},
+    {file = "pysaml2-7.3.1.tar.gz", hash = "sha256:eab22d187c6dd7707c58b5bb1688f9b8e816427667fc99d77f54399e15cd0a0a"},
 ]
 
 [package.dependencies]
 cryptography = ">=3.1"
 defusedxml = "*"
+importlib-metadata = {version = ">=1.7.0", markers = "python_version < \"3.8\""}
 importlib-resources = {version = "*", markers = "python_version < \"3.9\""}
-pyOpenSSL = "*"
+pyopenssl = "*"
 python-dateutil = "*"
 pytz = "*"
-requests = ">=1.0.0"
-setuptools = "*"
-six = "*"
+requests = ">=2,<3"
 xmlschema = ">=1.2.1"
 
 [package.extras]
