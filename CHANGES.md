@@ -1,3 +1,19 @@
+Synapse 1.79.0rc2 (2023-03-13)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.79.0rc1 where attempting to register a `on_remove_user_third_party_identifier` module API callback would be a no-op. ([\#15227](https://github.com/matrix-org/synapse/issues/15227))
+- Fix a rare bug introduced in Synapse 1.73 where events could remain unsent to other homeservers after a faster-join to a room. ([\#15248](https://github.com/matrix-org/synapse/issues/15248))
+
+
+Internal Changes
+----------------
+
+- Refactor `filter_events_for_server`. ([\#15240](https://github.com/matrix-org/synapse/issues/15240))
+
+
 Synapse 1.79.0rc1 (2023-03-07)
 ==============================
 

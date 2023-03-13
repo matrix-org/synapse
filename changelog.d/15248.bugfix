@@ -1,1 +1,0 @@
-Fix a rare bug introduced in Synapse 1.73 where events could remain unsent to other homeservers after a faster-join to a room.
