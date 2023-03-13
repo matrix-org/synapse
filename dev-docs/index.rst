@@ -10,6 +10,8 @@ Welcome to the Synapse Developer Documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   modules/federation_sender
+
 
 
 Indices and tables
