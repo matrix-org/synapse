@@ -24,8 +24,11 @@ from synapse.module_api.callbacks.spamchecker_callbacks import (
     SpamCheckerModuleApiCallbacks,
 )
 
+from .public_rooms_callbacks import PublicRoomsModuleApiCallbacks
+
 
 class ModuleApiCallbacks:
     def __init__(self, hs: "HomeServer") -> None:
         self.account_validity = AccountValidityModuleApiCallbacks()
         self.spam_checker = SpamCheckerModuleApiCallbacks(hs)
+        self.public_rooms = PublicRoomsModuleApiCallbacks()
