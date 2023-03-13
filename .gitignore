@@ -53,6 +53,7 @@ __pycache__/
 /coverage.*
 /dist/
 /docs/build/
+/dev-docs/_build/
 /htmlcov
 /pip-wheel-metadata/
 
