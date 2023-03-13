@@ -211,7 +211,6 @@ def _check_yield_points(
                 result = Failure()
 
             if current_context() != expected_context:
-
                 # This happens because the context is lost sometime *after* the
                 # previous yield and *after* the current yield. E.g. the
                 # deferred we waited on didn't follow the rules, or we forgot to

@@ -1,1 +1,0 @@
-Faster room joins: Refactor internal handling of servers in room to never store an empty list.

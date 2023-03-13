@@ -31,7 +31,11 @@ from synapse.util import Clock
 
 from tests.handlers.test_sync import generate_sync_config
 from tests.test_utils import simple_async_mock
-from tests.unittest import FederatingHomeserverTestCase, override_config
+from tests.unittest import (
+    FederatingHomeserverTestCase,
+    HomeserverTestCase,
+    override_config,
+)
 
 
 @attr.s
@@ -152,11 +156,11 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # Mock out the calls over federation.
-        fed_transport_client = Mock(spec=["send_transaction"])
-        fed_transport_client.send_transaction = simple_async_mock({})
+        self.fed_transport_client = Mock(spec=["send_transaction"])
+        self.fed_transport_client.send_transaction = simple_async_mock({})
 
         hs = self.setup_test_homeserver(
-            federation_transport_client=fed_transport_client,
+            federation_transport_client=self.fed_transport_client,
         )
 
         load_legacy_presence_router(hs)
@@ -418,7 +422,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         #
         # Thus we reset the mock, and try sending all online local user
         # presence again
-        self.hs.get_federation_transport_client().send_transaction.reset_mock()
+        self.fed_transport_client.send_transaction.reset_mock()
 
         # Broadcast local user online presence
         self.get_success(
@@ -443,9 +447,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         }
         found_users = set()
 
-        calls = (
-            self.hs.get_federation_transport_client().send_transaction.call_args_list
-        )
+        calls = self.fed_transport_client.send_transaction.call_args_list
         for call in calls:
             call_args = call[0]
             federation_transaction: Transaction = call_args[0]
@@ -470,7 +472,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
 
 
 def send_presence_update(
-    testcase: FederatingHomeserverTestCase,
+    testcase: HomeserverTestCase,
     user_id: str,
     access_token: str,
     presence_state: str,
@@ -491,7 +493,7 @@ def send_presence_update(
 
 
 def sync_presence(
-    testcase: FederatingHomeserverTestCase,
+    testcase: HomeserverTestCase,
     user_id: str,
     since_token: Optional[StreamToken] = None,
 ) -> Tuple[List[UserPresenceState], StreamToken]:

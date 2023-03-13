@@ -64,9 +64,11 @@ from synapse.events.third_party_rules import (
     CHECK_EVENT_ALLOWED_CALLBACK,
     CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
     CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
+    ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
+    ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
     ON_THREEPID_BIND_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
@@ -357,6 +359,12 @@ class ModuleApi:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+        on_add_user_third_party_identifier: Optional[
+            ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
+        on_remove_user_third_party_identifier: Optional[
+            ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -373,6 +381,8 @@ class ModuleApi:
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
             on_threepid_bind=on_threepid_bind,
+            on_add_user_third_party_identifier=on_add_user_third_party_identifier,
+            on_remove_user_third_party_identifier=on_remove_user_third_party_identifier,
         )
 
     def register_presence_router_callbacks(
@@ -1576,14 +1586,14 @@ class ModuleApi:
             )
 
         requester = create_requester(user_id)
-        room_id_and_alias, _ = await self._hs.get_room_creation_handler().create_room(
+        room_id, room_alias, _ = await self._hs.get_room_creation_handler().create_room(
             requester=requester,
             config=config,
             ratelimit=ratelimit,
             creator_join_profile=creator_join_profile,
         )
-
-        return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
+        room_alias_str = room_alias.to_string() if room_alias else None
+        return room_id, room_alias_str
 
     async def set_displayname(
         self,

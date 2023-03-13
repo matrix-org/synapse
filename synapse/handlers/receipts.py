@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Tuple
 
 from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.appservice import ApplicationService
@@ -189,7 +189,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
     @staticmethod
     def filter_out_private_receipts(
-        rooms: List[JsonDict], user_id: str
+        rooms: Sequence[JsonDict], user_id: str
     ) -> List[JsonDict]:
         """
         Filters a list of serialized receipts (as returned by /sync and /initialSync)

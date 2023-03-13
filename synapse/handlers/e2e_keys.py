@@ -159,19 +159,22 @@ class E2eKeysHandler:
             # A map of destination -> user ID -> device IDs.
             remote_queries_not_in_cache: Dict[str, Dict[str, Iterable[str]]] = {}
             if remote_queries:
-                query_list: List[Tuple[str, Optional[str]]] = []
+                user_ids = set()
+                user_and_device_ids: List[Tuple[str, str]] = []
                 for user_id, device_ids in remote_queries.items():
                     if device_ids:
-                        query_list.extend(
+                        user_and_device_ids.extend(
                             (user_id, device_id) for device_id in device_ids
                         )
                     else:
-                        query_list.append((user_id, None))
+                        user_ids.add(user_id)
 
                 (
                     user_ids_not_in_cache,
                     remote_results,
-                ) = await self.store.get_user_devices_from_cache(query_list)
+                ) = await self.store.get_user_devices_from_cache(
+                    user_ids, user_and_device_ids
+                )
 
                 # Check that the homeserver still shares a room with all cached users.
                 # Note that this check may be slightly racy when a remote user leaves a
@@ -1297,6 +1300,20 @@ class E2eKeysHandler:
             )
 
         return desired_key_data
+
+    async def is_cross_signing_set_up_for_user(self, user_id: str) -> bool:
+        """Checks if the user has cross-signing set up
+
+        Args:
+            user_id: The user to check
+
+        Returns:
+            True if the user has cross-signing set up, False otherwise
+        """
+        existing_master_key = await self.store.get_e2e_cross_signing_key(
+            user_id, "master"
+        )
+        return existing_master_key is not None
 
 
 def _check_cross_signing_key(

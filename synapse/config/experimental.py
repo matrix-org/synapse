@@ -166,10 +166,7 @@ class ExperimentalConfig(Config):
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
-        # MSC3925: do not replace events with their edits
-        self.msc3925_inhibit_edit = experimental.get("msc3925_inhibit_edit", False)
-
-        # MSC3952: Intentional mentions
+        # MSC3952: Intentional mentions, this depends on MSC3966.
         self.msc3952_intentional_mentions = experimental.get(
             "msc3952_intentional_mentions", False
         )
@@ -178,3 +175,6 @@ class ExperimentalConfig(Config):
         self.msc3958_supress_edit_notifs = experimental.get(
             "msc3958_supress_edit_notifs", False
         )
+
+        # MSC3967: Do not require UIA when first uploading cross signing keys
+        self.msc3967_enabled = experimental.get("msc3967_enabled", False)

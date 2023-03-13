@@ -139,7 +139,6 @@ def install_gc_manager() -> None:
 
 class PyPyGCStats(Collector):
     def collect(self) -> Iterable[Metric]:
-
         # @stats is a pretty-printer object with __str__() returning a nice table,
         # plus some fields that contain data from that table.
         # unfortunately, fields are pretty-printed themselves (i. e. '4.5MB').

@@ -177,6 +177,7 @@ KNOWN_RESOURCES = {
     "client",
     "consent",
     "federation",
+    "health",
     "keys",
     "media",
     "metrics",
@@ -734,7 +735,6 @@ class ServerConfig(Config):
         listeners: Optional[List[dict]],
         **kwargs: Any,
     ) -> str:
-
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400

@@ -1,1 +1,0 @@
-Fix various long-standing bugs in Synapse's config, event and request handling where booleans were unintentionally accepted where an integer was expected.

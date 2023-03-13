@@ -88,6 +88,39 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.79.0
+
+## The `on_threepid_bind` module callback method has been deprecated
+
+Synapse v1.79.0 deprecates the
+[`on_threepid_bind`](modules/third_party_rules_callbacks.md#on_threepid_bind)
+"third-party rules" Synapse module callback method in favour of a new module method,
+[`on_add_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_add_user_third_party_identifier).
+`on_threepid_bind` will be removed in a future version of Synapse. You should check whether any Synapse
+modules in use in your deployment are making use of `on_threepid_bind`, and update them where possible.
+
+The arguments and functionality of the new method are the same.
+
+The justification behind the name change is that the old method's name, `on_threepid_bind`, was
+misleading. A user is considered to "bind" their third-party ID to their Matrix ID only if they
+do so via an [identity server](https://spec.matrix.org/latest/identity-service-api/)
+(so that users on other homeservers may find them). But this method was not called in that case -
+it was only called when a user added a third-party identifier on the local homeserver.
+
+Module developers may also be interested in the related
+[`on_remove_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_remove_user_third_party_identifier)
+module callback method that was also added in Synapse v1.79.0. This new method is called when a
+user removes a third-party identifier from their account.
+
+# Upgrading to v1.78.0
+
+## Deprecate the `/_synapse/admin/v1/media/<server_name>/delete` admin API
+
+Synapse 1.78.0 replaces the `/_synapse/admin/v1/media/<server_name>/delete`
+admin API with an identical endpoint at `/_synapse/admin/v1/media/delete`. Please
+update your tooling to use the new endpoint. The deprecated version will be removed
+in a future release.
+
 # Upgrading to v1.76.0
 
 ## Faster joins are enabled by default
@@ -136,6 +169,7 @@ and then do `pip install matrix-synapse[user-search]` for a PyPI install.
 
 Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.
+
 
 # Upgrading to v1.73.0
 

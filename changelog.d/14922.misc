@@ -1,1 +1,0 @@
-Use `StrCollection` to avoid potential bugs with `Collection[str]`.

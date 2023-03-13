@@ -21,6 +21,7 @@ from synapse.logging import RemoteHandler
 from tests.logging import LoggerCleanupMixin
 from tests.server import FakeTransport, get_clock
 from tests.unittest import TestCase
+from tests.utils import checked_cast
 
 
 def connect_logging_client(
@@ -56,8 +57,8 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
         client, server = connect_logging_client(self.reactor, 0)
 
         # Trigger data being sent
-        assert isinstance(client.transport, FakeTransport)
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # One log message, with a single trailing newline
         logs = server.data.decode("utf8").splitlines()
@@ -89,8 +90,8 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
 
         # Allow the reconnection
         client, server = connect_logging_client(self.reactor, 0)
-        assert isinstance(client.transport, FakeTransport)
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # Only the 7 infos made it through, the debugs were elided
         logs = server.data.splitlines()
@@ -123,8 +124,8 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
 
         # Allow the reconnection
         client, server = connect_logging_client(self.reactor, 0)
-        assert isinstance(client.transport, FakeTransport)
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # The 10 warnings made it through, the debugs and infos were elided
         logs = server.data.splitlines()
@@ -148,8 +149,8 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
 
         # Allow the reconnection
         client, server = connect_logging_client(self.reactor, 0)
-        assert isinstance(client.transport, FakeTransport)
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # The first five and last five warnings made it through, the debugs and
         # infos were elided

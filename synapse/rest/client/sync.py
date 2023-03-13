@@ -16,7 +16,7 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
-from synapse.api.constants import EduTypes, Membership, PresenceState
+from synapse.api.constants import AccountDataTypes, EduTypes, Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
@@ -38,7 +38,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import trace_with_opname
-from synapse.types import JsonDict, StreamToken
+from synapse.types import JsonDict, Requester, StreamToken
 from synapse.util import json_decoder
 
 from ._base import client_patterns, set_timeline_upper_limit
@@ -139,7 +139,28 @@ class SyncRestServlet(RestServlet):
             device_id,
         )
 
-        request_key = (user, timeout, since, filter_id, full_state, device_id)
+        # Stream position of the last ignored users account data event for this user,
+        # if we're initial syncing.
+        # We include this in the request key to invalidate an initial sync
+        # in the response cache once the set of ignored users has changed.
+        # (We filter out ignored users from timeline events, so our sync response
+        # is invalid once the set of ignored users changes.)
+        last_ignore_accdata_streampos: Optional[int] = None
+        if not since:
+            # No `since`, so this is an initial sync.
+            last_ignore_accdata_streampos = await self.store.get_latest_stream_id_for_global_account_data_by_type_for_user(
+                user.to_string(), AccountDataTypes.IGNORED_USER_LIST
+            )
+
+        request_key = (
+            user,
+            timeout,
+            since,
+            filter_id,
+            full_state,
+            device_id,
+            last_ignore_accdata_streampos,
+        )
 
         if filter_id is None:
             filter_collection = self.filtering.DEFAULT_FILTER_COLLECTION
@@ -205,7 +226,7 @@ class SyncRestServlet(RestServlet):
         # We know that the the requester has an access token since appservices
         # cannot use sync.
         response_content = await self.encode_response(
-            time_now, sync_result, requester.access_token_id, filter_collection
+            time_now, sync_result, requester, filter_collection
         )
 
         logger.debug("Event formatting complete")
@@ -216,7 +237,7 @@ class SyncRestServlet(RestServlet):
         self,
         time_now: int,
         sync_result: SyncResult,
-        access_token_id: Optional[int],
+        requester: Requester,
         filter: FilterCollection,
     ) -> JsonDict:
         logger.debug("Formatting events in sync response")
@@ -229,12 +250,12 @@ class SyncRestServlet(RestServlet):
 
         serialize_options = SerializeEventConfig(
             event_format=event_formatter,
-            token_id=access_token_id,
+            requester=requester,
             only_event_fields=filter.event_fields,
         )
         stripped_serialize_options = SerializeEventConfig(
             event_format=event_formatter,
-            token_id=access_token_id,
+            requester=requester,
             include_stripped_room_state=True,
         )
 
