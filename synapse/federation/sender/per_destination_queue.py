@@ -516,7 +516,7 @@ class PerDestinationQueue:
                     # If the event is in the extremities, then great! We can just
                     # use that without having to do further checks.
                     room_catchup_pdus = [pdu]
-                elif self._store.is_partial_state_room(pdu.room_id):
+                elif await self._store.is_partial_state_room(pdu.room_id):
                     # We can't be sure which events the destination should
                     # see using only partial state. Avoid doing so, and just retry
                     # sending our the newest PDU the remote is missing from us.
