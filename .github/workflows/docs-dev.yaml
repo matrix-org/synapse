@@ -30,7 +30,7 @@ jobs:
       - name: Build the documentation
         run: |
           cd dev-docs
-          make html
+          poetry run make html
 
       # Figure out the target directory.
       #
@@ -61,5 +61,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@bd8c6b06eba6b3d25d72b7a1767993c0aeee42e7 # v3.9.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dev-docs/_build
+          publish_dir: ./dev-docs/_build/html
           destination_dir: ./dev-docs/${{ steps.vars.outputs.branch-version }}
