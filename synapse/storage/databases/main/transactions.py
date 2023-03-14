@@ -224,7 +224,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
 
         await self.db_pool.runInteraction(
             "set_destination_retry_timings",
-            self._set_destination_retry_timings_native,
+            self._set_destination_retry_timings_txn,
             destination,
             failure_ts,
             retry_last_ts,
@@ -232,7 +232,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             db_autocommit=True,  # Safe as it's a single upsert
         )
 
-    def _set_destination_retry_timings_native(
+    def _set_destination_retry_timings_txn(
         self,
         txn: LoggingTransaction,
         destination: str,
