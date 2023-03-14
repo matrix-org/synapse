@@ -6,20 +6,20 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Synapse development'
-copyright = '2023, The Synapse Maintainers and Community'
-author = 'The Synapse Maintainers and Community'
+project = "Synapse development"
+copyright = "2023, The Synapse Maintainers and Community"
+author = "The Synapse Maintainers and Community"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'autodoc2',
-    'myst_parser',
+    "autodoc2",
+    "myst_parser",
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 
 # -- Options for Autodoc2 ----------------------------------------------------
@@ -40,11 +40,11 @@ autodoc2_packages = [
 
 # -- Options for MyST (Markdown) ---------------------------------------------
 
-#myst_heading_anchors = 2
+# myst_heading_anchors = 2
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'furo'
-html_static_path = ['_static']
+html_theme = "furo"
+html_static_path = ["_static"]
