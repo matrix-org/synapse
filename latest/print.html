@@ -1779,6 +1779,24 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1790"><a class="header" href="#upgrading-to-v1790">Upgrading to v1.79.0</a></h1>
+<h2 id="the-on_threepid_bind-module-callback-method-has-been-deprecated"><a class="header" href="#the-on_threepid_bind-module-callback-method-has-been-deprecated">The <code>on_threepid_bind</code> module callback method has been deprecated</a></h2>
+<p>Synapse v1.79.0 deprecates the
+<a href="modules/third_party_rules_callbacks.html#on_threepid_bind"><code>on_threepid_bind</code></a>
+&quot;third-party rules&quot; Synapse module callback method in favour of a new module method,
+<a href="modules/third_party_rules_callbacks.html#on_add_user_third_party_identifier"><code>on_add_user_third_party_identifier</code></a>.
+<code>on_threepid_bind</code> will be removed in a future version of Synapse. You should check whether any Synapse
+modules in use in your deployment are making use of <code>on_threepid_bind</code>, and update them where possible.</p>
+<p>The arguments and functionality of the new method are the same.</p>
+<p>The justification behind the name change is that the old method's name, <code>on_threepid_bind</code>, was
+misleading. A user is considered to &quot;bind&quot; their third-party ID to their Matrix ID only if they
+do so via an <a href="https://spec.matrix.org/latest/identity-service-api/">identity server</a>
+(so that users on other homeservers may find them). But this method was not called in that case -
+it was only called when a user added a third-party identifier on the local homeserver.</p>
+<p>Module developers may also be interested in the related
+<a href="modules/third_party_rules_callbacks.html#on_remove_user_third_party_identifier"><code>on_remove_user_third_party_identifier</code></a>
+module callback method that was also added in Synapse v1.79.0. This new method is called when a
+user removes a third-party identifier from their account.</p>
 <h1 id="upgrading-to-v1780"><a class="header" href="#upgrading-to-v1780">Upgrading to v1.78.0</a></h1>
 <h2 id="deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api"><a class="header" href="#deprecate-the-_synapseadminv1mediaserver_namedelete-admin-api">Deprecate the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code> admin API</a></h2>
 <p>Synapse 1.78.0 replaces the <code>/_synapse/admin/v1/media/&lt;server_name&gt;/delete</code>
@@ -4465,7 +4483,7 @@ of domains.</p>
 <p>This setting should only be used in very specific cases, such as
 federation over Tor hidden services and similar. For private networks
 of homeservers, you likely want to use a private CA instead.</p>
-<p>Only effective if <code>federation_verify_certicates</code> is <code>true</code>.</p>
+<p>Only effective if <code>federation_verify_certificates</code> is <code>true</code>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">federation_certificate_verification_whitelist:
   - lon.example.com
@@ -4834,12 +4852,12 @@ Defaults to <code>per_second: 0.1</code>, <code>burst_count: 5</code>.</p>
 <ul>
 <li>
 <p><code>address</code> ratelimits login requests based on the client's IP
-address. Defaults to <code>per_second: 0.17</code>, <code>burst_count: 3</code>.</p>
+address. Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>.</p>
 </li>
 <li>
 <p><code>account</code> ratelimits login requests based on the account the
-client is attempting to log into. Defaults to <code>per_second: 0.17</code>,
-<code>burst_count: 3</code>.</p>
+client is attempting to log into. Defaults to <code>per_second: 0.03</code>,
+<code>burst_count: 5</code>.</p>
 </li>
 <li>
 <p><code>failed_attempts</code> ratelimits login requests based on the account the
@@ -5395,8 +5413,8 @@ however, the interface is <a href="usage/configuration/../../admin_api/register_
 <p>An alternative to <a href="usage/configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a>:
 allows the shared secret to be specified in an external file.</p>
 <p>The file should be a plain text file, containing only the shared secret.</p>
-<p>If this file does not exist, Synapse will create a new signing
-key on startup and store it in this file.</p>
+<p>If this file does not exist, Synapse will create a new shared
+secret on startup and store it in this file.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_shared_secret_path: /path/to/secrets/file
 </code></pre>
@@ -8070,6 +8088,42 @@ This can be optionally enabled by setting <code>backchannel_logout_enabled</code
         subject_claim: &quot;id&quot;
 </code></pre>
 <p>Note that the fields <code>client_id</code> and <code>client_secret</code> are taken from the CURL response above.</p>
+<h3 id="shibboleth-with-oidc-plugin"><a class="header" href="#shibboleth-with-oidc-plugin">Shibboleth with OIDC Plugin</a></h3>
+<p><a href="https://www.shibboleth.net/">Shibboleth</a> is an open Standard IdP solution widely used by Universities.</p>
+<ol>
+<li>Shibboleth needs the <a href="https://shibboleth.atlassian.net/wiki/spaces/IDPPLUGINS/pages/1376878976/OIDC+OP">OIDC Plugin</a> installed and working correctly.</li>
+<li>Create a new config on the IdP Side, ensure that the <code>client_id</code> and <code>client_secret</code>
+are randomly generated data.</li>
+</ol>
+<pre><code class="language-json">{
+    &quot;client_id&quot;: &quot;SOME-CLIENT-ID&quot;,
+    &quot;client_secret&quot;: &quot;SOME-SUPER-SECRET-SECRET&quot;,
+    &quot;response_types&quot;: [&quot;code&quot;],
+    &quot;grant_types&quot;: [&quot;authorization_code&quot;],
+    &quot;scope&quot;: &quot;openid profile email&quot;,
+    &quot;redirect_uris&quot;: [&quot;https://[synapse public baseurl]/_synapse/client/oidc/callback&quot;]
+}
+</code></pre>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  # Shibboleth IDP
+  #
+  - idp_id: shibboleth
+    idp_name: &quot;Shibboleth Login&quot;
+    discover: true
+    issuer: &quot;https://YOUR-IDP-URL.TLD&quot;
+    client_id: &quot;YOUR_CLIENT_ID&quot;
+    client_secret: &quot;YOUR-CLIENT-SECRECT-FROM-YOUR-IDP&quot;
+    scopes: [&quot;openid&quot;, &quot;profile&quot;, &quot;email&quot;]
+    allow_existing_users: true
+    user_profile_method: &quot;userinfo_endpoint&quot;
+    user_mapping_provider:
+      config:
+        subject_claim: &quot;sub&quot;
+        localpart_template: &quot;{{ user.sub.split('@')[0] }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ user.email }}&quot;
+</code></pre>
 <h3 id="twitch"><a class="header" href="#twitch">Twitch</a></h3>
 <ol>
 <li>Setup a developer account on <a href="https://dev.twitch.tv/">Twitch</a></li>
@@ -9319,6 +9373,54 @@ the callback name as the argument name and the function as its value. A
 <code>register_[...]_callbacks</code> method exists for each category.</p>
 <p>Callbacks for each category can be found on their respective page of the
 <a href="https://matrix-org.github.io/synapse">Synapse documentation website</a>.</p>
+<h2 id="caching-1"><a class="header" href="#caching-1">Caching</a></h2>
+<p><em>Added in Synapse 1.74.0.</em></p>
+<p>Modules can leverage Synapse's caching tools to manage their own cached functions. This
+can be helpful for modules that need to repeatedly request the same data from the database
+or a remote service.</p>
+<p>Functions that need to be wrapped with a cache need to be decorated with a <code>@cached()</code>
+decorator (which can be imported from <code>synapse.module_api</code>) and registered with the
+<a href="https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L888"><code>ModuleApi.register_cached_function</code></a>
+API when initialising the module. If the module needs to invalidate an entry in a cache,
+it needs to use the <a href="https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L904"><code>ModuleApi.invalidate_cache</code></a>
+API, with the function to invalidate the cache of and the key(s) of the entry to
+invalidate.</p>
+<p>Below is an example of a simple module using a cached function:</p>
+<pre><code class="language-python">from typing import Any
+from synapse.module_api import cached, ModuleApi
+
+class MyModule:
+    def __init__(self, config: Any, api: ModuleApi):
+        self.api = api
+        
+        # Register the cached function so Synapse knows how to correctly invalidate
+        # entries for it.
+        self.api.register_cached_function(self.get_user_from_id)
+
+    @cached()
+    async def get_department_for_user(self, user_id: str) -&gt; str:
+        &quot;&quot;&quot;A function with a cache.&quot;&quot;&quot;
+        # Request a department from an external service.
+        return await self.http_client.get_json(
+            &quot;https://int.example.com/users&quot;, {&quot;user_id&quot;: user_id)
+        )[&quot;department&quot;]
+
+    async def do_something_with_users(self) -&gt; None:
+        &quot;&quot;&quot;Calls the cached function and then invalidates an entry in its cache.&quot;&quot;&quot;
+        
+        user_id = &quot;@alice:example.com&quot;
+        
+        # Get the user. Since get_department_for_user is wrapped with a cache,
+        # the return value for this user_id will be cached.
+        department = await self.get_department_for_user(user_id)
+        
+        # Do something with `department`...
+        
+        # Let's say something has changed with our user, and the entry we have for
+        # them in the cache is out of date, so we want to invalidate it.
+        await self.api.invalidate_cache(self.get_department_for_user, (user_id,))
+</code></pre>
+<p>See the <a href="https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L190"><code>cached</code> docstring</a> for more details.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h1>
 <p>Spam checker callbacks allow module developers to implement spam mitigation actions for
 Synapse instances. Spam checker callbacks can be registered using the module API's
@@ -9586,8 +9688,8 @@ this callback.</p>
 <p><em>First introduced in Synapse v1.37.0</em></p>
 <p><em>Changed in Synapse v1.62.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean is now deprecated.</em> </p>
 <pre><code class="language-python">async def check_media_file_for_spam(
-    file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
-    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
+    file_wrapper: &quot;synapse.media.media_storage.ReadableFileWrapper&quot;,
+    file_info: &quot;synapse.media._base.FileInfo&quot;,
 ) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, bool]
 </code></pre>
 <p>Called when storing a local or remote file.</p>
@@ -9778,6 +9880,8 @@ it will be included in this state.</p>
 <p>Note that this callback is called when the event has already been processed and stored
 into the room, which means this callback cannot be used to deny persisting the event. To
 deny an incoming event, see <a href="modules/spam_checker_callbacks.html#check_event_for_spam"><code>check_event_for_spam</code></a> instead.</p>
+<p>For any given event, this callback will be called on every worker process, even if that worker will not end up
+acting on that event. This callback will not be called for events that are marked as rejected.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h3 id="check_can_shutdown_room"><a class="header" href="#check_can_shutdown_room"><code>check_can_shutdown_room</code></a></h3>
 <p><em>First introduced in Synapse v1.55.0</em></p>
@@ -9852,6 +9956,10 @@ admin API.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h3 id="on_threepid_bind"><a class="header" href="#on_threepid_bind"><code>on_threepid_bind</code></a></h3>
 <p><em>First introduced in Synapse v1.56.0</em></p>
+<p><strong><span style="color:red">
+This callback is deprecated in favour of the <code>on_add_user_third_party_identifier</code> callback, which
+features the same functionality. The only difference is in name.
+</span></strong></p>
 <pre><code class="language-python">async def on_threepid_bind(user_id: str, medium: str, address: str) -&gt; None:
 </code></pre>
 <p>Called after creating an association between a local user and a third-party identifier
@@ -9860,6 +9968,28 @@ association is for, as well as the medium (<code>email</code> or <code>msisdn</c
 third-party identifier.</p>
 <p>Note that this callback is <em>not</em> called after a successful association on an <em>identity
 server</em>.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_add_user_third_party_identifier"><a class="header" href="#on_add_user_third_party_identifier"><code>on_add_user_third_party_identifier</code></a></h3>
+<p><em>First introduced in Synapse v1.79.0</em></p>
+<pre><code class="language-python">async def on_add_user_third_party_identifier(user_id: str, medium: str, address: str) -&gt; None:
+</code></pre>
+<p>Called after successfully creating an association between a user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (<code>email</code> or <code>msisdn</code>) and address of the
+third-party identifier (i.e. an email address).</p>
+<p>Note that this callback is <em>not</em> called if a user attempts to bind their third-party identifier
+to an identity server (via a call to <a href="https://spec.matrix.org/v1.5/client-server-api/#post_matrixclientv3account3pidbind"><code>POST /_matrix/client/v3/account/3pid/bind</code></a>).</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_remove_user_third_party_identifier"><a class="header" href="#on_remove_user_third_party_identifier"><code>on_remove_user_third_party_identifier</code></a></h3>
+<p><em>First introduced in Synapse v1.79.0</em></p>
+<pre><code class="language-python">async def on_remove_user_third_party_identifier(user_id: str, medium: str, address: str) -&gt; None:
+</code></pre>
+<p>Called after successfully removing an association between a user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (<code>email</code> or <code>msisdn</code>) and address of the
+third-party identifier (i.e. an email address).</p>
+<p>Note that this callback is <em>not</em> called if a user attempts to unbind their third-party
+identifier from an identity server (via a call to <a href="https://spec.matrix.org/v1.5/client-server-api/#post_matrixclientv3account3pidunbind"><code>POST /_matrix/client/v3/account/3pid/unbind</code></a>).</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h2 id="example-1"><a class="header" href="#example-1">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
@@ -10595,6 +10725,7 @@ information.</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
 ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
+^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
 
 # Encryption requests
 ^/_matrix/client/(r0|v3|unstable)/keys/query$
@@ -10614,6 +10745,7 @@ information.</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
+^/_matrix/client/(api/v1|r0|v3|unstable)/knock/
 ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
 # Account data requests
@@ -11444,6 +11576,16 @@ was reported.</li>
 <li><code>canonical_alias</code>: string - The canonical alias of the room. <code>null</code> if the room does not
 have a canonical alias set.</li>
 <li><code>event_json</code>: object - Details of the original event that was reported.</li>
+</ul>
+<h1 id="delete-a-specific-event-report"><a class="header" href="#delete-a-specific-event-report">Delete a specific event report</a></h1>
+<p>This API deletes a specific event report. If the request is successful, the response body
+will be an empty JSON object.</p>
+<p>The api is:</p>
+<pre><code>DELETE /_synapse/admin/v1/event_reports/&lt;report_id&gt;
+</code></pre>
+<p><strong>URL parameters:</strong></p>
+<ul>
+<li><code>report_id</code>: string - The ID of the event report.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
 <p>These APIs allow extracting media information from the homeserver.</p>
@@ -15147,19 +15289,57 @@ a temporary directory (which starts with &quot;synapse-exfiltrate&quot;) in <cod
 │       ├───state
 │       ├───invite_state
 │       └───knock_state
-└───user_data
-    ├───account_data
-    │   ├───global
-    │   └───&lt;room_id&gt;
-    ├───connections
-    ├───devices
-    └───profile
+├───user_data
+│   ├───account_data
+│   │   ├───global
+│   │   └───&lt;room_id&gt;
+│   ├───connections
+│   ├───devices
+│   └───profile
+└───media_ids
+    └───&lt;media_id&gt;
+</code></pre>
+<p>The <code>media_ids</code> folder contains only the metadata of the media uploaded by the user.
+It does not contain the media itself.
+Furthermore, only the <code>media_ids</code> that Synapse manages itself are exported.
+If another media repository (e.g. <a href="https://github.com/turt2live/matrix-media-repo">matrix-media-repo</a>)
+is used, the data must be exported separately.</p>
+<p>With the <code>media_ids</code> the media files can be downloaded.
+Media that have been sent in encrypted rooms are only retrieved in encrypted form.
+The following script can help with download the media files:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+
+# Parameters
+#
+#   source_directory: Directory which contains the export with the media_ids.
+#   target_directory: Directory into which all files are to be downloaded.
+#   repository_url: Address of the media repository resp. media worker.
+#   serverName: Name of the server (`server_name` from homeserver.yaml).
+#
+#   Example:
+#       ./download_media.sh /tmp/export_data/media_ids/ /tmp/export_data/media_files/ http://localhost:8008 matrix.example.com
+
+source_directory=$1
+target_directory=$2
+repository_url=$3
+serverName=$4
+
+mkdir -p $target_directory
+
+for file in $source_directory/*; do
+    filename=$(basename ${file})
+    url=$repository_url/_matrix/media/v3/download/$serverName/$filename
+    echo &quot;Downloading $filename - $url&quot;
+    if ! wget -o /dev/null -P $target_directory $url; then
+        echo &quot;Could not download $filename&quot;
+    fi
+done
 </code></pre>
 <h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords</a></h2>
 <p>Users can reset their password through their client. Alternatively, a server admin
 can reset a user's password using the <a href="usage/administration/../../admin_api/user_admin_api.html#reset-password">admin API</a>.</p>
 <h2 id="i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again"><a class="header" href="#i-have-a-problem-with-my-server-can-i-just-delete-my-database-and-start-again">I have a problem with my server. Can I just delete my database and start again?</a></h2>
-<p>Deleting your database is unlikely to make anything better. </p>
+<p>Deleting your database is unlikely to make anything better.</p>
 <p>It's easy to make the mistake of thinking that you can start again from a clean
 slate by dropping your database, but things don't work like that in a federated
 network: lots of other servers have information about your server.</p>
@@ -15171,7 +15351,7 @@ Come and seek help in https://matrix.to/#/#synapse:matrix.org.</p>
 <p>There are two exceptions when it might be sensible to delete your database and start again:</p>
 <ul>
 <li>You have <em>never</em> joined any rooms which are federated with other servers. For
-instance, a local deployment which the outside world can't talk to. </li>
+instance, a local deployment which the outside world can't talk to.</li>
 <li>You are changing the <code>server_name</code> in the homeserver configuration. In effect
 this makes your server a completely new one from the point of view of the network,
 so in this case it makes sense to start with a clean database.
@@ -15182,7 +15362,7 @@ so in this case it makes sense to start with a clean database.
 <pre><code class="language-console">curl -H 'Authorization: Bearer &lt;access-token&gt;' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/&lt;room-alias&gt;
 </code></pre>
 <p><code>&lt;access-token&gt;</code> - can be obtained in riot by looking in the riot settings, down the bottom is:
-Access Token:&lt;click to reveal&gt; </p>
+Access Token:&lt;click to reveal&gt;</p>
 <p><code>&lt;room-alias&gt;</code> - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
 <h2 id="how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log"><a class="header" href="#how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log">How can I find the lines corresponding to a given HTTP request in my homeserver log?</a></h2>
 <p>Synapse tags each log line according to the HTTP request it is processing. When
@@ -15201,13 +15381,13 @@ remember to surround it with triple-backticks (```) to make it legible
 <h2 id="what-do-all-those-fields-in-the-processed-line-mean"><a class="header" href="#what-do-all-those-fields-in-the-processed-line-mean">What do all those fields in the 'Processed' line mean?</a></h2>
 <p>See <a href="usage/administration/request_log.html">Request log format</a>.</p>
 <h2 id="what-are-the-biggest-rooms-on-my-server"><a class="header" href="#what-are-the-biggest-rooms-on-my-server">What are the biggest rooms on my server?</a></h2>
-<pre><code class="language-sql">SELECT s.canonical_alias, g.room_id, count(*) AS num_rows 
-FROM 
-  state_groups_state AS g, 
-  room_stats_state AS s 
-WHERE g.room_id = s.room_id 
+<pre><code class="language-sql">SELECT s.canonical_alias, g.room_id, count(*) AS num_rows
+FROM
+  state_groups_state AS g,
+  room_stats_state AS s
+WHERE g.room_id = s.room_id
 GROUP BY s.canonical_alias, g.room_id
-ORDER BY num_rows desc 
+ORDER BY num_rows desc
 LIMIT 10;
 </code></pre>
 <p>You can also use the <a href="usage/administration/../../admin_api/rooms.html#list-room-api">List Room API</a>

@@ -1093,7 +1093,7 @@ of domains.</p>
 <p>This setting should only be used in very specific cases, such as
 federation over Tor hidden services and similar. For private networks
 of homeservers, you likely want to use a private CA instead.</p>
-<p>Only effective if <code>federation_verify_certicates</code> is <code>true</code>.</p>
+<p>Only effective if <code>federation_verify_certificates</code> is <code>true</code>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">federation_certificate_verification_whitelist:
   - lon.example.com
@@ -1462,12 +1462,12 @@ Defaults to <code>per_second: 0.1</code>, <code>burst_count: 5</code>.</p>
 <ul>
 <li>
 <p><code>address</code> ratelimits login requests based on the client's IP
-address. Defaults to <code>per_second: 0.17</code>, <code>burst_count: 3</code>.</p>
+address. Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>.</p>
 </li>
 <li>
 <p><code>account</code> ratelimits login requests based on the account the
-client is attempting to log into. Defaults to <code>per_second: 0.17</code>,
-<code>burst_count: 3</code>.</p>
+client is attempting to log into. Defaults to <code>per_second: 0.03</code>,
+<code>burst_count: 5</code>.</p>
 </li>
 <li>
 <p><code>failed_attempts</code> ratelimits login requests based on the account the
@@ -2023,8 +2023,8 @@ however, the interface is <a href="../../admin_api/register_api.html">documented
 <p>An alternative to <a href="#registration_shared_secret"><code>registration_shared_secret</code></a>:
 allows the shared secret to be specified in an external file.</p>
 <p>The file should be a plain text file, containing only the shared secret.</p>
-<p>If this file does not exist, Synapse will create a new signing
-key on startup and store it in this file.</p>
+<p>If this file does not exist, Synapse will create a new shared
+secret on startup and store it in this file.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_shared_secret_path: /path/to/secrets/file
 </code></pre>

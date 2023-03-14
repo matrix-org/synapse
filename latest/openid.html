@@ -672,6 +672,42 @@ This can be optionally enabled by setting <code>backchannel_logout_enabled</code
         subject_claim: &quot;id&quot;
 </code></pre>
 <p>Note that the fields <code>client_id</code> and <code>client_secret</code> are taken from the CURL response above.</p>
+<h3 id="shibboleth-with-oidc-plugin"><a class="header" href="#shibboleth-with-oidc-plugin">Shibboleth with OIDC Plugin</a></h3>
+<p><a href="https://www.shibboleth.net/">Shibboleth</a> is an open Standard IdP solution widely used by Universities.</p>
+<ol>
+<li>Shibboleth needs the <a href="https://shibboleth.atlassian.net/wiki/spaces/IDPPLUGINS/pages/1376878976/OIDC+OP">OIDC Plugin</a> installed and working correctly.</li>
+<li>Create a new config on the IdP Side, ensure that the <code>client_id</code> and <code>client_secret</code>
+are randomly generated data.</li>
+</ol>
+<pre><code class="language-json">{
+    &quot;client_id&quot;: &quot;SOME-CLIENT-ID&quot;,
+    &quot;client_secret&quot;: &quot;SOME-SUPER-SECRET-SECRET&quot;,
+    &quot;response_types&quot;: [&quot;code&quot;],
+    &quot;grant_types&quot;: [&quot;authorization_code&quot;],
+    &quot;scope&quot;: &quot;openid profile email&quot;,
+    &quot;redirect_uris&quot;: [&quot;https://[synapse public baseurl]/_synapse/client/oidc/callback&quot;]
+}
+</code></pre>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  # Shibboleth IDP
+  #
+  - idp_id: shibboleth
+    idp_name: &quot;Shibboleth Login&quot;
+    discover: true
+    issuer: &quot;https://YOUR-IDP-URL.TLD&quot;
+    client_id: &quot;YOUR_CLIENT_ID&quot;
+    client_secret: &quot;YOUR-CLIENT-SECRECT-FROM-YOUR-IDP&quot;
+    scopes: [&quot;openid&quot;, &quot;profile&quot;, &quot;email&quot;]
+    allow_existing_users: true
+    user_profile_method: &quot;userinfo_endpoint&quot;
+    user_mapping_provider:
+      config:
+        subject_claim: &quot;sub&quot;
+        localpart_template: &quot;{{ user.sub.split('@')[0] }}&quot;
+        display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ user.email }}&quot;
+</code></pre>
 <h3 id="twitch"><a class="header" href="#twitch">Twitch</a></h3>
 <ol>
 <li>Setup a developer account on <a href="https://dev.twitch.tv/">Twitch</a></li>
