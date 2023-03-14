@@ -353,7 +353,10 @@ towncrier = ">=18.6.0rc1"
 tomli = ">=1.2.3"
 
 [tool.poetry.group.dev-docs.dependencies]
-sphinx = "^5.0"
+sphinx = {version = "^6.1", python = "^3.8"}
+sphinx-autodoc2 = {version = "^0.4.2", python = "^3.8"}
+myst-parser = {version = "^1.0.0", python = "^3.8"}
+furo = "^2022.12.7"
 
 [build-system]
 # The upper bounds here are defensive, intended to prevent situations like
