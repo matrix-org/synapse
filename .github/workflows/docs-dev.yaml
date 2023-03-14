@@ -1,0 +1,64 @@
+name: Deploy the developer documentation
+
+on:
+  push:
+    branches:
+      # For bleeding-edge documentation
+      - develop
+      # For documentation specific to a release
+      - 'release-v*'
+      # stable docs
+      - master
+
+  workflow_dispatch:
+
+jobs:
+  pages:
+    name: GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: "Set up Sphinx"
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          python-version: "3.x"
+          poetry-version: "1.3.2"
+          extras: "dev-docs"
+
+      - name: Build the documentation
+        run: |
+          cd dev-docs
+          make html
+
+      # Figure out the target directory.
+      #
+      # The target directory depends on the name of the branch
+      #
+      - name: Get the target directory name
+        id: vars
+        run: |
+          # first strip the 'refs/heads/' prefix with some shell foo
+          branch="${GITHUB_REF#refs/heads/}"
+
+          case $branch in
+              release-*)
+                  # strip 'release-' from the name for release branches.
+                  branch="${branch#release-}"
+                  ;;
+              master)
+                  # deploy to "latest" for the master branch.
+                  branch="latest"
+                  ;;
+          esac
+
+          # finally, set the 'branch-version' var.
+          echo "branch-version=$branch" >> "$GITHUB_OUTPUT"
+
+      # Deploy to the target directory.
+      - name: Deploy to gh pages
+        uses: peaceiris/actions-gh-pages@bd8c6b06eba6b3d25d72b7a1767993c0aeee42e7 # v3.9.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dev-docs/_build
+          destination_dir: ./dev-docs/${{ steps.vars.outputs.branch-version }}
