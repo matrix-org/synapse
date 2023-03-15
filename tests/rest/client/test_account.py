@@ -542,6 +542,98 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(len(res2), 0)
 
+    def test_background_update_deletes_deactivated_users_server_side_backup_keys(
+        self,
+    ) -> None:
+
+        key_handler = self.hs.get_e2e_room_keys_handler()
+        room_keys = {
+            "rooms": {
+                "!abc:matrix.org": {
+                    "sessions": {
+                        "c0ff33": {
+                            "first_message_index": 1,
+                            "forwarded_count": 1,
+                            "is_verified": False,
+                            "session_data": "SSBBTSBBIEZJU0gK",
+                        }
+                    }
+                }
+            }
+        }
+        self.store = self.hs.get_datastores().main
+
+        # create a bunch of users and add keys for them
+        users = []
+        for i in range(0, 20):
+            user_id = self.register_user("missPiggy" + str(i), "test")
+            users.append((user_id,))
+
+            # add some backup keys/versions
+            version = self.get_success(
+                key_handler.create_version(
+                    user_id,
+                    {
+                        "algorithm": "m.megolm_backup.v1",
+                        "auth_data": str(i) + "_version_auth_data",
+                    },
+                )
+            )
+
+            self.get_success(key_handler.upload_room_keys(user_id, version, room_keys))
+
+            version2 = self.get_success(
+                key_handler.create_version(
+                    user_id,
+                    {
+                        "algorithm": "m.megolm_backup.v1",
+                        "auth_data": str(i) + "_version_auth_data",
+                    },
+                )
+            )
+
+            self.get_success(key_handler.upload_room_keys(user_id, version2, room_keys))
+
+        # deactivate most of the users by editing DB
+        self.get_success(
+            self.store.db_pool.simple_update_many(
+                table="users",
+                key_names=("name",),
+                key_values=users[0:18],
+                value_names=("deactivated",),
+                value_values=[(1,) for i in range(1, 19)],
+                desc="",
+            )
+        )
+
+        # run background update
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                {
+                    "update_name": "delete_e2e_backup_keys_for_deactivated_users",
+                    "progress_json": "{}",
+                },
+            )
+        )
+        self.store.db_pool.updates._all_done = False
+        self.wait_for_background_updates()
+
+        # check that keys are deleted for the deactivated users but not the others
+        res = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys", None, ("user_id",), "simple_select"
+            )
+        )
+        self.assertEqual(len(res), 4)
+
+        res2 = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys_versions", None, ("user_id",), "simple_select"
+            )
+        )
+        self.assertEqual(len(res2), 4)
+
     def deactivate(self, user_id: str, tok: str) -> None:
         request_data = {
             "auth": {
