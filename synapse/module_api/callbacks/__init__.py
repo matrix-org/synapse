@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from synapse.module_api.callbacks.account_validity_callbacks import (
-    AccountValidityModuleApiCallbacks
+    AccountValidityModuleApiCallbacks,
 )
 
 
