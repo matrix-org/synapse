@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[Optional[bool]]]
 ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
 # Temporary hooks to allow for a transition from `/_matrix/client` endpoints
-# to `/_synapse/client/account_validity`. See `register_account_validity_callbacks`.
+# to `/_synapse/client/account_validity`. See `register_callbacks` below.
 ON_LEGACY_SEND_MAIL_CALLBACK = Callable[[str], Awaitable]
 ON_LEGACY_RENEW_CALLBACK = Callable[[str], Awaitable[Tuple[bool, bool, int]]]
 ON_LEGACY_ADMIN_REQUEST = Callable[[Request], Awaitable]
