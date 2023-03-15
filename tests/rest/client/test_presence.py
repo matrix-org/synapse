@@ -35,7 +35,6 @@ class PresenceTestCase(unittest.HomeserverTestCase):
     servlets = [presence.register_servlets]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         self.presence_handler = Mock(spec=PresenceHandler)
         self.presence_handler.set_state.return_value = make_awaitable(None)
 

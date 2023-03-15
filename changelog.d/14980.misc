@@ -1,1 +1,0 @@
-Skip calculating unread push actions in /sync when enable_push is false.

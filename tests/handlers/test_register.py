@@ -62,7 +62,7 @@ class TestSpamChecker:
         request_info: Collection[Tuple[str, str]],
         auth_provider_id: Optional[str],
     ) -> RegistrationBehaviour:
-        pass
+        return RegistrationBehaviour.ALLOW
 
 
 class DenyAll(TestSpamChecker):
@@ -111,7 +111,7 @@ class TestLegacyRegistrationSpamChecker:
         username: Optional[str],
         request_info: Collection[Tuple[str, str]],
     ) -> RegistrationBehaviour:
-        pass
+        return RegistrationBehaviour.ALLOW
 
 
 class LegacyAllowAll(TestLegacyRegistrationSpamChecker):
@@ -507,7 +507,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         # Lower the permissions of the inviter.
         event_creation_handler = self.hs.get_event_creation_handler()
         requester = create_requester(inviter)
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_creation_handler.create_event(
                 requester,
                 {
@@ -519,6 +519,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
             event_creation_handler.handle_new_client_event(
                 requester, events_and_context=[(event, context)]

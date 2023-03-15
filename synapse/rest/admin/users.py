@@ -304,12 +304,19 @@ class UserRestServletV2(RestServlet):
                 # remove old threepids
                 for medium, address in del_threepids:
                     try:
-                        await self.auth_handler.delete_threepid(
-                            user_id, medium, address, None
+                        # Attempt to remove any known bindings of this third-party ID
+                        # and user ID from identity servers.
+                        await self.hs.get_identity_handler().try_unbind_threepid(
+                            user_id, medium, address, id_server=None
                         )
                     except Exception:
                         logger.exception("Failed to remove threepids")
                         raise SynapseError(500, "Failed to remove threepids")
+
+                    # Delete the local association of this user ID and third-party ID.
+                    await self.auth_handler.delete_local_threepid(
+                        user_id, medium, address
+                    )
 
                 # add new threepids
                 current_time = self.hs.get_clock().time_msec()
@@ -683,8 +690,12 @@ class AccountValidityRenewServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if self.account_activity_handler.on_legacy_admin_request_callback:
-            expiration_ts = await (
-                self.account_activity_handler.on_legacy_admin_request_callback(request)
+            expiration_ts = (
+                await (
+                    self.account_activity_handler.on_legacy_admin_request_callback(
+                        request
+                    )
+                )
             )
         else:
             body = parse_json_object_from_request(request)
