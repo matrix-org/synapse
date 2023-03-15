@@ -139,7 +139,6 @@ class EventsStream(Stream):
         current_token: Token,
         target_row_count: int,
     ) -> StreamUpdateResult:
-
         # the events stream merges together three separate sources:
         #  * new events
         #  * current_state changes

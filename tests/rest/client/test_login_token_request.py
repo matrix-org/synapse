@@ -26,7 +26,6 @@ endpoint = "/_matrix/client/unstable/org.matrix.msc3882/login/token"
 
 
 class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         login.register_servlets,
         admin.register_servlets,

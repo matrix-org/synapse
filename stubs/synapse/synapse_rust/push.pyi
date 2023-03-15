@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Union
 
 from synapse.types import JsonDict, JsonValue
 
@@ -58,8 +58,6 @@ class PushRuleEvaluator:
         self,
         flattened_keys: Mapping[str, JsonValue],
         has_mentions: bool,
-        user_mentions: Set[str],
-        room_mention: bool,
         room_member_count: int,
         sender_power_level: Optional[int],
         notification_power_levels: Mapping[str, int],
@@ -67,8 +65,6 @@ class PushRuleEvaluator:
         related_event_match_enabled: bool,
         room_version_feature_flags: Tuple[str, ...],
         msc3931_enabled: bool,
-        msc3758_exact_event_match: bool,
-        msc3966_exact_event_property_contains: bool,
     ): ...
     def run(
         self,

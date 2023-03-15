@@ -149,7 +149,7 @@ class BlacklistingAgentTest(TestCase):
         self.allowed_domain, self.allowed_ip = b"allowed.test", b"5.1.1.1"
 
         # Configure the reactor's DNS resolver.
-        for (domain, ip) in (
+        for domain, ip in (
             (self.safe_domain, self.safe_ip),
             (self.unsafe_domain, self.unsafe_ip),
             (self.allowed_domain, self.allowed_ip),
@@ -210,8 +210,8 @@ class BlacklistingAgentTest(TestCase):
         """Apply the blacklisting agent and ensure it properly blocks connections to particular IPs."""
         agent = BlacklistingAgentWrapper(
             Agent(self.reactor),
-            ip_whitelist=self.ip_whitelist,
             ip_blacklist=self.ip_blacklist,
+            ip_whitelist=self.ip_whitelist,
         )
 
         # The unsafe IPs should be rejected.

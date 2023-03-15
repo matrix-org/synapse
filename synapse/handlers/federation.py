@@ -392,7 +392,7 @@ class FederationHandler:
                 get_prev_content=False,
             )
 
-            # We set `check_history_visibility_only` as we might otherwise get false
+            # We unset `filter_out_erased_senders` as we might otherwise get false
             # positives from users having been erased.
             filtered_extremities = await filter_events_for_server(
                 self._storage_controllers,
@@ -400,7 +400,8 @@ class FederationHandler:
                 self.server_name,
                 events_to_check,
                 redact=False,
-                check_history_visibility_only=True,
+                filter_out_erased_senders=False,
+                filter_out_remote_partial_state_events=False,
             )
             if filtered_extremities:
                 extremities_to_request.append(bp.event_id)
@@ -952,7 +953,20 @@ class FederationHandler:
         #
         # Note that this requires the /send_join request to come back to the
         # same server.
+        prev_event_ids = None
         if room_version.msc3083_join_rules:
+            # Note that the room's state can change out from under us and render our
+            # nice join rules-conformant event non-conformant by the time we build the
+            # event. When this happens, our validation at the end fails and we respond
+            # to the requesting server with a 403, which is misleading — it indicates
+            # that the user is not allowed to join the room and the joining server
+            # should not bother retrying via this homeserver or any others, when
+            # in fact we've just messed up with building the event.
+            #
+            # To reduce the likelihood of this race, we capture the forward extremities
+            # of the room (prev_event_ids) just before fetching the current state, and
+            # hope that the state we fetch corresponds to the prev events we chose.
+            prev_event_ids = await self.store.get_prev_events_for_room(room_id)
             state_ids = await self._state_storage_controller.get_current_state_ids(
                 room_id
             )
@@ -994,7 +1008,8 @@ class FederationHandler:
                 event,
                 unpersisted_context,
             ) = await self.event_creation_handler.create_new_client_event(
-                builder=builder
+                builder=builder,
+                prev_event_ids=prev_event_ids,
             )
         except SynapseError as e:
             logger.warning("Failed to create join to %s because %s", room_id, e)
@@ -1317,7 +1332,13 @@ class FederationHandler:
         )
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            events,
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
 
         return events
@@ -1348,7 +1369,13 @@ class FederationHandler:
         await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, [event]
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            [event],
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
         event = events[0]
         return event
@@ -1376,7 +1403,13 @@ class FederationHandler:
         )
 
         missing_events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, missing_events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            missing_events,
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
 
         return missing_events

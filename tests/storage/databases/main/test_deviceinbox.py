@@ -23,7 +23,6 @@ from tests.unittest import HomeserverTestCase
 
 
 class DeviceInboxBackgroundUpdateStoreTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         devices.register_servlets,

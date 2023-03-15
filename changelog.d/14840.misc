@@ -1,1 +1,0 @@
-Prevent "WARNING:  there is already a transaction in progress" lines appearing in PostgreSQL's logs on some occasions.

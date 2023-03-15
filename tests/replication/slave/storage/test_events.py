@@ -64,7 +64,6 @@ def patch__eq__(cls: object) -> Callable[[], None]:
 
 
 class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
-
     STORE_TYPE = EventsWorkerStore
 
     def setUp(self) -> None:

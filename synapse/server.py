@@ -23,6 +23,8 @@ import functools
 import logging
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, cast
 
+from typing_extensions import TypeAlias
+
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
 from twisted.web.iweb import IPolicyForHTTPS
@@ -105,6 +107,7 @@ from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.media.media_repository import MediaRepository
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
 from synapse.notifier import Notifier, ReplicationNotifier
@@ -115,10 +118,7 @@ from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
-from synapse.rest.media.v1.media_repository import (
-    MediaRepository,
-    MediaRepositoryResource,
-)
+from synapse.rest.media.media_repository_resource import MediaRepositoryResource
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
@@ -144,10 +144,31 @@ if TYPE_CHECKING:
     from synapse.handlers.saml import SamlHandler
 
 
-T = TypeVar("T")
+# The annotation for `cache_in_self` used to be
+#     def (builder: Callable[["HomeServer"],T]) -> Callable[["HomeServer"],T]
+# which mypy was happy with.
+#
+# But PyCharm was confused by this. If `foo` was decorated by `@cache_in_self`, then
+# an expression like `hs.foo()`
+#
+# - would erroneously warn that we hadn't provided a `hs` argument to foo (PyCharm
+#   confused about boundmethods and unbound methods?), and
+# - would be considered to have type `Any`, making for a poor autocomplete and
+#   cross-referencing experience.
+#
+# Instead, use a typevar `F` to express that `@cache_in_self` returns exactly the
+# same type it receives. This isn't strictly true [*], but it's more than good
+# enough to keep PyCharm and mypy happy.
+#
+# [*]: (e.g. `builder` could be an object with a __call__ attribute rather than a
+#      types.FunctionType instance, whereas the return value is always a
+#      types.FunctionType instance.)
+
+T: TypeAlias = object
+F = TypeVar("F", bound=Callable[["HomeServer"], T])
 
 
-def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer"], T]:
+def cache_in_self(builder: F) -> F:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -185,7 +206,7 @@ def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer
 
         return dep
 
-    return _get
+    return cast(F, _get)
 
 
 class HomeServer(metaclass=abc.ABCMeta):
@@ -745,7 +766,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer(self.config.experimental.msc3925_inhibit_edit)
+        return EventClientSerializer()
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:

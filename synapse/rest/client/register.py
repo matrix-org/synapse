@@ -628,10 +628,12 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            desired_username = await (
-                self.password_auth_provider.get_username_for_registration(
-                    auth_result,
-                    params,
+            desired_username = (
+                await (
+                    self.password_auth_provider.get_username_for_registration(
+                        auth_result,
+                        params,
+                    )
                 )
             )
 
@@ -682,9 +684,11 @@ class RegisterRestServlet(RestServlet):
                 session_id
             )
 
-            display_name = await (
-                self.password_auth_provider.get_displayname_for_registration(
-                    auth_result, params
+            display_name = (
+                await (
+                    self.password_auth_provider.get_displayname_for_registration(
+                        auth_result, params
+                    )
                 )
             )
 
