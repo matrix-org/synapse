@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .account_validity_callbacks import AccountValidityModuleApiCallbacks
+from synapse.module_api.callbacks.account_validity_callbacks import (
+    AccountValidityModuleApiCallbacks
+)
 
 
 class ModuleApiCallbacks:
