@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @attr.s(auto_attribs=True)
-class PublicRoomChunk:
+class PublicRoom:
     room_id: str
     name: str
     topic: str
@@ -36,8 +36,8 @@ class PublicRoomChunk:
 
 # Types for callbacks to be registered via the module api
 FETCH_PUBLIC_ROOMS_CALLBACK = Callable[
-    [int, Optional[int], Optional[dict], Optional[str], Optional[str]],
-    Awaitable[Tuple[Iterable[PublicRoomChunk], bool]],
+    [int, Optional[Tuple[int, bool]], Optional[dict], Optional[str], Optional[str]],
+    Awaitable[Tuple[Iterable[PublicRoom], bool]],
 ]
 
 

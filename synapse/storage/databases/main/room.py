@@ -16,6 +16,7 @@
 import logging
 from abc import abstractmethod
 from enum import Enum
+from synapse.api.constants import HistoryVisibility
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -518,7 +519,26 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         ret_val = await self.db_pool.runInteraction(
             "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
-        return ret_val
+
+        def build_room_entry(room: JsonDict) -> JsonDict:
+            entry = {
+                "room_id": room["room_id"],
+                "name": room["name"],
+                "topic": room["topic"],
+                "canonical_alias": room["canonical_alias"],
+                "num_joined_members": room["joined_members"],
+                "avatar_url": room["avatar"],
+                "world_readable": room["history_visibility"]
+                                  == HistoryVisibility.WORLD_READABLE,
+                "guest_can_join": room["guest_access"] == "can_join",
+                "join_rule": room["join_rules"],
+                "room_type": room["room_type"],
+            }
+
+            # Filter out Nones – rather omit the field altogether
+            return {k: v for k, v in entry.items() if v is not None}
+
+        return [build_room_entry(r) for r in ret_val]
 
     @cached(max_entries=10000)
     async def is_room_blocked(self, room_id: str) -> Optional[bool]:

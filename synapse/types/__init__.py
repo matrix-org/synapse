@@ -936,6 +936,19 @@ class UserInfo:
     is_shadow_banned: bool
 
 
+class PublicRoomsChunk:
+    room_id: str
+    name: str
+    topic: str
+    num_joined_members: int
+    canonical_alias: str
+    avatar_url: str
+    world_readable: bool
+    guest_can_join: bool
+    join_rule: str
+    room_type: str
+
+
 class UserProfile(TypedDict):
     user_id: str
     display_name: Optional[str]

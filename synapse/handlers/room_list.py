@@ -27,6 +27,7 @@ from synapse.api.constants import (
     JoinRules,
     PublicRoomsFilterFields,
 )
+from synapse.types import Requester
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
@@ -60,6 +61,7 @@ class RoomListHandler:
         self.remote_response_cache: ResponseCache[
             Tuple[str, Optional[int], Optional[str], bool, Optional[str]]
         ] = ResponseCache(hs.get_clock(), "remote_room_list", timeout_ms=30 * 1000)
+        self._module_api_callbacks = hs.get_module_api_callbacks().public_rooms
 
     async def get_local_public_room_list(
         self,
@@ -67,7 +69,8 @@ class RoomListHandler:
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
         network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
-        from_federation: bool = False,
+        from_client_mxid: Optional[str] = None,
+        from_remote_server_name: Optional[str] = None,
     ) -> JsonDict:
         """Generate a local public room list.
 
@@ -75,14 +78,20 @@ class RoomListHandler:
         party network. A client can ask for a specific list or to return all.
 
         Args:
-            limit
-            since_token
-            search_filter
+            limit: The maximum number of rooms to return, or None to return all rooms.
+            since_token: A pagination token, or None to return the head of the public
+                rooms list.
+            search_filter: An optional dictionary with the following keys:
+                * generic_search_term: A string to search for in room ...
+                * room_types: A list to filter returned rooms by their type. If None or
+                    an empty list is passed, rooms will not be filtered by type.
             network_tuple: Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
-            from_federation: true iff the request comes from the federation API
+            from_client_mxid: A user's MXID if this request came from a registered user.
+            from_remote_server_name: A remote homeserver's server name, if this
+                request came from the federation API.
         """
         if not self.enable_room_list_search:
             return {"chunk": [], "total_room_count_estimate": 0}
@@ -105,7 +114,8 @@ class RoomListHandler:
                 since_token,
                 search_filter,
                 network_tuple=network_tuple,
-                from_federation=from_federation,
+                from_client_mxid=from_client_mxid,
+                from_remote_server_name=from_remote_server_name,
             )
 
         key = (limit, since_token, network_tuple)
@@ -115,7 +125,8 @@ class RoomListHandler:
             limit,
             since_token,
             network_tuple=network_tuple,
-            from_federation=from_federation,
+            from_client_mxid=from_client_mxid,
+            from_remote_server_name=from_remote_server_name,
         )
 
     async def _get_public_room_list(
@@ -124,7 +135,8 @@ class RoomListHandler:
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
         network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
-        from_federation: bool = False,
+        from_client_mxid: Optional[str] = None,
+        from_remote_server_name: Optional[str] = None,
     ) -> JsonDict:
         """Generate a public room list.
         Args:
@@ -135,8 +147,9 @@ class RoomListHandler:
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
-            from_federation: Whether this request originated from a
-                federating server or a client. Used for room filtering.
+            from_client_mxid: A user's MXID if this request came from a registered user.
+            from_remote_server_name: A remote homeserver's server name, if this
+                request came from the federation API.
         """
 
         # Pagination tokens work by storing the room ID sent in the last batch,
@@ -145,50 +158,38 @@ class RoomListHandler:
 
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
-
-            bounds: Optional[Tuple[int, str]] = (
-                batch_token.last_joined_members,
-                batch_token.last_room_id,
-            )
             forwards = batch_token.direction_is_forward
-            has_batch_token = True
         else:
-            bounds = None
-
+            batch_token = None
             forwards = True
-            has_batch_token = False
 
         # we request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
-        results = await self.store.get_largest_public_rooms(
+        public_rooms = await self.store.get_largest_public_rooms(
             network_tuple,
             search_filter,
             probing_limit,
-            bounds=bounds,
+            bounds=(
+                [batch_token.last_joined_members, batch_token.last_room_id]
+                if batch_token else None
+            ),
             forwards=forwards,
-            ignore_non_federatable=from_federation,
+            ignore_non_federatable=bool(from_remote_server_name),
         )
 
-        def build_room_entry(room: JsonDict) -> JsonDict:
-            entry = {
-                "room_id": room["room_id"],
-                "name": room["name"],
-                "topic": room["topic"],
-                "canonical_alias": room["canonical_alias"],
-                "num_joined_members": room["joined_members"],
-                "avatar_url": room["avatar"],
-                "world_readable": room["history_visibility"]
-                == HistoryVisibility.WORLD_READABLE,
-                "guest_can_join": room["guest_access"] == "can_join",
-                "join_rule": room["join_rules"],
-                "room_type": room["room_type"],
-            }
+        for fetch_public_rooms in self._module_api_callbacks.fetch_public_rooms_callbacks:
+            # Ask each module for a list of public rooms given the last_joined_members
+            # value from the since token and the probing limit.
+            module_public_rooms = await fetch_public_rooms(
+                limit=probing_limit,
+                max_member_count=(
+                    batch_token.last_joined_members
+                    if batch_token else None
+                ),
+            )
 
-            # Filter out Nones – rather omit the field altogether
-            return {k: v for k, v in entry.items() if v is not None}
-
-        results = [build_room_entry(r) for r in results]
+            # Insert the module's reported public rooms into the list
 
         response: JsonDict = {}
         num_results = len(results)
@@ -208,7 +209,7 @@ class RoomListHandler:
             initial_entry = results[0]
 
             if forwards:
-                if has_batch_token:
+                if batch_token is not None:
                     # If there was a token given then we assume that there
                     # must be previous results.
                     response["prev_batch"] = RoomListNextBatch(
@@ -224,7 +225,7 @@ class RoomListHandler:
                         direction_is_forward=True,
                     ).to_token()
             else:
-                if has_batch_token:
+                if batch_token is not None:
                     response["next_batch"] = RoomListNextBatch(
                         last_joined_members=final_entry["num_joined_members"],
                         last_room_id=final_entry["room_id"],
@@ -242,7 +243,7 @@ class RoomListHandler:
 
         response["total_room_count_estimate"] = await self.store.count_public_rooms(
             network_tuple,
-            ignore_non_federatable=from_federation,
+            ignore_non_federatable=bool(from_remote_server_name),
             search_filter=search_filter,
         )
 
