@@ -543,7 +543,6 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
     def test_background_update_deletes_deactivated_users_server_side_backup_keys(
         self,
     ) -> None:
-
         key_handler = self.hs.get_e2e_room_keys_handler()
         room_keys = {
             "rooms": {
