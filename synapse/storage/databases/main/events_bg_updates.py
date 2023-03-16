@@ -1536,9 +1536,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             """
             txn.execute(sql, (start, stop))
 
-            rows: List[Tuple[str, str, int]] = cast(
-                List[Tuple[str, str, int]], txn.fetchall()
-            )
+            rows = cast(List[Tuple[str, str, int]], txn.fetchall())
 
             event_ids: List[Tuple[str]] = []
             event_stream_orderings: List[Tuple[int]] = []
