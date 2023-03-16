@@ -425,14 +425,16 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "partial_state_events",
             "partial_state_rooms_servers",
             "partial_state_rooms",
+            # Note: the _membership(s) tables have foreign keys to the `events` table
+            # so must be deleted first.
+            "local_current_membership",
+            "room_memberships",
             "events",
             "federation_inbound_events_staging",
-            "local_current_membership",
             "receipts_graph",
             "receipts_linearized",
             "room_aliases",
             "room_depth",
-            "room_memberships",
             "room_stats_state",
             "room_stats_current",
             "room_stats_earliest_token",
