@@ -1291,6 +1291,28 @@ class RoomCreationHandler:
             if encrypt_tp_event:
                 third_party_events_to_append.append(encrypt_tp_event)
 
+        if "name" in room_config:
+            name = room_config["name"]
+            name_event, name_context, name_tp_event = await create_event(
+                EventTypes.Name,
+                {"name": name},
+                True,
+            )
+            events_to_send.append((name_event, name_context))
+            if name_tp_event:
+                third_party_events_to_append.append(name_tp_event)
+
+        if "topic" in room_config:
+            topic = room_config["topic"]
+            topic_event, topic_context, topic_tp_event = await create_event(
+                EventTypes.Topic,
+                {"topic": topic},
+                True,
+            )
+            events_to_send.append((topic_event, topic_context))
+            if topic_tp_event:
+                third_party_events_to_append.append(topic_tp_event)
+
         for event_dict in third_party_events_to_append:
             (
                 event,
@@ -1306,24 +1328,6 @@ class RoomCreationHandler:
             )
             context = await unpersisted_context.persist(event)
             events_to_send.append((event, context))
-
-        if "name" in room_config:
-            name = room_config["name"]
-            name_event, name_context = await create_event(
-                EventTypes.Name,
-                {"name": name},
-                True,
-            )
-            events_to_send.append((name_event, name_context))
-
-        if "topic" in room_config:
-            topic = room_config["topic"]
-            topic_event, topic_context = await create_event(
-                EventTypes.Topic,
-                {"topic": topic},
-                True,
-            )
-            events_to_send.append((topic_event, topic_context))
 
         datastore = self.hs.get_datastores().state
         events_and_context = (
