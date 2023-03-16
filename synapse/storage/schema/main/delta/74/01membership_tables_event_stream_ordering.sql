@@ -16,6 +16,3 @@
 ALTER TABLE current_state_events ADD COLUMN event_stream_ordering BIGINT;
 ALTER TABLE local_current_membership ADD COLUMN event_stream_ordering BIGINT;
 ALTER TABLE room_memberships ADD COLUMN event_stream_ordering BIGINT;
-
-INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7401, 'populate_membership_event_stream_ordering', '{}');
