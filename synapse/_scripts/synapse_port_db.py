@@ -283,6 +283,13 @@ class MockHomeserver:
     def get_replication_notifier(self) -> ReplicationNotifier:
         return ReplicationNotifier()
 
+    def get_user_directory_handler(self) -> object:
+        class FakeUserDirectoryHandler:
+            def kick_off_remote_profile_refresh_process(self) -> None:
+                pass
+
+        return FakeUserDirectoryHandler()
+
 
 class Porter:
     def __init__(
