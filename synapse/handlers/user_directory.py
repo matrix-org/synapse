@@ -28,6 +28,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Don't refresh a stale user directory entry, using a Federation /profile request,
+# for 60 seconds. This gives time for other state events to arrive (which will
+# then be coalesced such that only one /profile request is made).
+USER_DIRECTORY_STALE_REFRESH_TIME_MS = 60 * 1000
+
 
 class UserDirectoryHandler(StateDeltasHandler):
     """Handles queries and updates for the user_directory.
@@ -200,8 +205,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             typ = delta["type"]
             state_key = delta["state_key"]
             room_id = delta["room_id"]
-            event_id = delta["event_id"]
-            prev_event_id = delta["prev_event_id"]
+            event_id: Optional[str] = delta["event_id"]
+            prev_event_id: Optional[str] = delta["prev_event_id"]
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
@@ -297,8 +302,8 @@ class UserDirectoryHandler(StateDeltasHandler):
     async def _handle_room_membership_event(
         self,
         room_id: str,
-        prev_event_id: str,
-        event_id: str,
+        prev_event_id: Optional[str],
+        event_id: Optional[str],
         state_key: str,
     ) -> None:
         """Process a single room membershp event.
@@ -348,7 +353,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             # Handle any profile changes for remote users.
             # (For local users the rest of the application calls
             # `handle_local_profile_change`.)
-            if is_remote:
+            # Only process if there is an event_id.
+            if is_remote and event_id is not None:
                 await self._handle_possible_remote_profile_change(
                     state_key, room_id, prev_event_id, event_id
                 )
@@ -356,28 +362,12 @@ class UserDirectoryHandler(StateDeltasHandler):
             # This may be the first time we've seen a remote user. If
             # so, ensure we have a directory entry for them. (For local users,
             # the rest of the application calls `handle_local_profile_change`.)
-            if is_remote:
-                await self._upsert_directory_entry_for_remote_user(state_key, event_id)
+            # Only process if there is an event_id.
+            if is_remote and event_id is not None:
+                await self._handle_possible_remote_profile_change(
+                    state_key, room_id, None, event_id
+                )
             await self._track_user_joined_room(room_id, state_key)
-
-    async def _upsert_directory_entry_for_remote_user(
-        self, user_id: str, event_id: str
-    ) -> None:
-        """A remote user has just joined a room. Ensure they have an entry in
-        the user directory. The caller is responsible for making sure they're
-        remote.
-        """
-        event = await self.store.get_event(event_id, allow_none=True)
-        # It isn't expected for this event to not exist, but we
-        # don't want the entire background process to break.
-        if event is None:
-            return
-
-        logger.debug("Adding new user to dir, %r", user_id)
-
-        await self.store.update_profile_in_user_dir(
-            user_id, event.content.get("displayname"), event.content.get("avatar_url")
-        )
 
     async def _track_user_joined_room(self, room_id: str, joining_user_id: str) -> None:
         """Someone's just joined a room. Update `users_in_public_rooms` or
@@ -460,14 +450,17 @@ class UserDirectoryHandler(StateDeltasHandler):
         user_id: str,
         room_id: str,
         prev_event_id: Optional[str],
-        event_id: Optional[str],
+        event_id: str,
     ) -> None:
         """Check member event changes for any profile changes and update the
         database if there are. This is intended for remote users only. The caller
         is responsible for checking that the given user is remote.
         """
-        if not prev_event_id or not event_id:
-            return
+
+        if not prev_event_id:
+            # If we don't have an older event to fall back on, just fetch the same
+            # event itself.
+            prev_event_id = event_id
 
         prev_event = await self.store.get_event(prev_event_id, allow_none=True)
         event = await self.store.get_event(event_id, allow_none=True)
@@ -478,17 +471,37 @@ class UserDirectoryHandler(StateDeltasHandler):
         if event.membership != Membership.JOIN:
             return
 
+        is_public = await self.store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
+        if not is_public:
+            # Don't collect user profiles from private rooms as they are not guaranteed
+            # to be the same as the user's global profile.
+            now_ts = self.clock.time_msec()
+            await self.store.set_remote_user_profile_in_user_dir_stale(
+                user_id,
+                next_try_at_ms=now_ts + USER_DIRECTORY_STALE_REFRESH_TIME_MS,
+                retry_counter=0,
+            )
+            return
+
         prev_name = prev_event.content.get("displayname")
         new_name = event.content.get("displayname")
-        # If the new name is an unexpected form, do not update the directory.
+        # If the new name is an unexpected form, replace with None.
         if not isinstance(new_name, str):
-            new_name = prev_name
+            new_name = None
 
         prev_avatar = prev_event.content.get("avatar_url")
         new_avatar = event.content.get("avatar_url")
-        # If the new avatar is an unexpected form, do not update the directory.
+        # If the new avatar is an unexpected form, replace with None.
         if not isinstance(new_avatar, str):
-            new_avatar = prev_avatar
+            new_avatar = None
 
-        if prev_name != new_name or prev_avatar != new_avatar:
+        if (
+            prev_name != new_name
+            or prev_avatar != new_avatar
+            or prev_event_id == event_id
+        ):
+            # Only update if something has changed, or we didn't have a previous event
+            # in the first place.
             await self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)

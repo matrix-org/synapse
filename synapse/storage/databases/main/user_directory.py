@@ -54,6 +54,7 @@ from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import (
     JsonDict,
+    UserID,
     UserProfile,
     get_domain_from_id,
     get_localpart_from_id,
@@ -473,11 +474,42 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return False
 
+    async def set_remote_user_profile_in_user_dir_stale(
+        self, user_id: str, next_try_at_ms: int, retry_counter: int
+    ) -> None:
+        """
+        Marks a remote user as having a possibly-stale user directory profile.
+
+        Args:
+            user_id: the remote user who may have a stale profile on this server.
+            next_try_at_ms: timestamp in ms after which the user directory profile can be
+                refreshed.
+            retry_counter: number of failures in refreshing the profile so far. Used for
+                exponential backoff calculations.
+        """
+        assert not self.hs.is_mine_id(
+            user_id
+        ), "Can't mark a local user as a stale remote user."
+
+        server_name = UserID.from_string(user_id).domain
+
+        await self.db_pool.simple_upsert(
+            table="user_directory_stale_remote_users",
+            keyvalues={"user_id": user_id},
+            values={
+                "next_try_at_ts": next_try_at_ms,
+                "retry_counter": retry_counter,
+                "user_server_name": server_name,
+            },
+            desc="set_remote_user_profile_in_user_dir_stale",
+        )
+
     async def update_profile_in_user_dir(
         self, user_id: str, display_name: Optional[str], avatar_url: Optional[str]
     ) -> None:
         """
         Update or add a user's profile in the user directory.
+        If the user is remote, the profile will be marked as not stale.
         """
         # If the display name or avatar URL are unexpected types, replace with None.
         display_name = non_null_str_or_none(display_name)
@@ -490,6 +522,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 keyvalues={"user_id": user_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
             )
+
+            if not self.hs.is_mine_id(user_id):
+                # Remote users: Make sure the profile is not marked as stale anymore.
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    table="user_directory_stale_remote_users",
+                    keyvalues={"user_id": user_id},
+                )
 
             # The display name that goes into the database index.
             index_display_name = display_name
