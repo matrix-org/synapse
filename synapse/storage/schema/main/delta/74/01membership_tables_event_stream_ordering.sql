@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+-- Each of these are denormalised copies of `stream_ordering` from the corresponding row in` events` which
+-- we use to improve database performance by reduring JOINs.
 ALTER TABLE current_state_events ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
 ALTER TABLE local_current_membership ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
 ALTER TABLE room_memberships ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
