@@ -13,6 +13,6 @@
  * limitations under the License.
  */
 
-ALTER TABLE current_state_events ADD COLUMN event_stream_ordering BIGINT;
-ALTER TABLE local_current_membership ADD COLUMN event_stream_ordering BIGINT;
-ALTER TABLE room_memberships ADD COLUMN event_stream_ordering BIGINT;
+ALTER TABLE current_state_events ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
+ALTER TABLE local_current_membership ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
+ALTER TABLE room_memberships ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
