@@ -52,12 +52,12 @@ event with new data by returning the new event's data as a dictionary. In order 
 that, it is recommended the module calls `event.get_dict()` to get the current event as a
 dictionary, and modify the returned dictionary accordingly.
 
-Module writers may also wish to use this check to send an event into the room concurrent
+Module writers may also wish to use this check to send a second event into the room along
 with the event being checked, if this is the case the module writer must provide a dict that 
 will form the basis of the event that is to be added to the room and it must be returned by `check_event_allowed_v2`.
 This dict will then be turned into an event at the appropriate time and it will be persisted after the event
 that triggered it, and if the event that triggered it is in a batch of events for persisting, it will be added to the 
-end of that batch. 
+end of that batch. Note that the event MAY NOT be a membership event. 
 
 If `check_event_allowed_v2` raises an exception, the module is assumed to have failed.
 The event will not be accepted but is not treated as explicitly rejected, either.

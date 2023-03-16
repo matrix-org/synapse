@@ -191,6 +191,7 @@ class ThirdPartyEventRules:
     def register_third_party_rules_callbacks(
         self,
         check_event_allowed: Optional[CHECK_EVENT_ALLOWED_CALLBACK] = None,
+        check_event_allowed_v2: Optional[CHECK_EVENT_ALLOWED_V2_CALLBACK] = None,
         on_create_room: Optional[ON_CREATE_ROOM_CALLBACK] = None,
         check_threepid_can_be_invited: Optional[
             CHECK_THREEPID_CAN_BE_INVITED_CALLBACK
@@ -216,6 +217,9 @@ class ThirdPartyEventRules:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
             self._check_event_allowed_callbacks.append(check_event_allowed)
+
+        if check_event_allowed_v2 is not None:
+            self._check_event_allowed_v2_callbacks.append(check_event_allowed_v2)
 
         if on_create_room is not None:
             self._on_create_room_callbacks.append(on_create_room)
