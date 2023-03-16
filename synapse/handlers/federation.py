@@ -392,7 +392,7 @@ class FederationHandler:
                 get_prev_content=False,
             )
 
-            # We set `check_history_visibility_only` as we might otherwise get false
+            # We unset `filter_out_erased_senders` as we might otherwise get false
             # positives from users having been erased.
             filtered_extremities = await filter_events_for_server(
                 self._storage_controllers,
@@ -400,7 +400,8 @@ class FederationHandler:
                 self.server_name,
                 events_to_check,
                 redact=False,
-                check_history_visibility_only=True,
+                filter_out_erased_senders=False,
+                filter_out_remote_partial_state_events=False,
             )
             if filtered_extremities:
                 extremities_to_request.append(bp.event_id)
@@ -1333,7 +1334,13 @@ class FederationHandler:
         )
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            events,
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
 
         return events
@@ -1364,7 +1371,13 @@ class FederationHandler:
         await self._event_auth_handler.assert_host_in_room(event.room_id, origin)
 
         events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, [event]
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            [event],
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
         event = events[0]
         return event
@@ -1392,7 +1405,13 @@ class FederationHandler:
         )
 
         missing_events = await filter_events_for_server(
-            self._storage_controllers, origin, self.server_name, missing_events
+            self._storage_controllers,
+            origin,
+            self.server_name,
+            missing_events,
+            redact=True,
+            filter_out_erased_senders=True,
+            filter_out_remote_partial_state_events=True,
         )
 
         return missing_events

@@ -1,1 +1,0 @@
-Remove the unspecced `PUT` on the `/knock/{roomIdOrAlias}` endpoint.

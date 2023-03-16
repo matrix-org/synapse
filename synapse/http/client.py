@@ -268,8 +268,8 @@ class BlacklistingAgentWrapper(Agent):
     def __init__(
         self,
         agent: IAgent,
+        ip_blacklist: IPSet,
         ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
     ):
         """
         Args:
@@ -291,7 +291,9 @@ class BlacklistingAgentWrapper(Agent):
         h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
-            ip_address = IPAddress(h.hostname)
+            # h.hostname is Optional[str], None raises an AddrFormatError, so
+            # this is safe even though IPAddress requires a str.
+            ip_address = IPAddress(h.hostname)  # type: ignore[arg-type]
         except AddrFormatError:
             # Not an IP
             pass
@@ -388,8 +390,8 @@ class SimpleHttpClient:
             # by the DNS resolution.
             self.agent = BlacklistingAgentWrapper(
                 self.agent,
-                ip_whitelist=self._ip_whitelist,
                 ip_blacklist=self._ip_blacklist,
+                ip_whitelist=self._ip_whitelist,
             )
 
     async def request(
