@@ -1,0 +1,1 @@
+Fix a bug where email notifications would get disabled after logging out.
