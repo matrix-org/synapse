@@ -509,7 +509,8 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
     async def _set_device_id_for_pushers(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        """Background update to populate the device_id column of the pushers table."""
+        """Background update to populate the device_id column and clear the access_token
+        column for the pushers table."""
         last_pusher_id = progress.get("pusher_id", 0)
 
         def set_device_id_for_pushers_txn(txn: LoggingTransaction) -> int:
@@ -538,8 +539,8 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
                 table="pushers",
                 key_names=("id",),
                 key_values=[(row["id"],) for row in rows],
-                value_names=("device_id",),
-                value_values=[(row["device_id"],) for row in rows],
+                value_names=("device_id", "access_token"),
+                value_values=[(row["device_id"], None) for row in rows],
             )
 
             self.db_pool.updates._background_update_progress_txn(
@@ -598,6 +599,9 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
                     "id": stream_id,
                     "enabled": enabled,
                     "device_id": device_id,
+                    # XXX(quenting): We're only really persisting the access token ID 
+                    # when updating an existing pusher. This is in case the
+                    # 'set_device_id_for_pushers' background update hasn't finished yet.
                     "access_token": access_token_id,
                 },
                 desc="add_pusher",
