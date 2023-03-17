@@ -1,1 +1,1 @@
-Use `immutabledict` instead of `canonicaljson`.
+Use `immutabledict` instead of `frozendict`.
