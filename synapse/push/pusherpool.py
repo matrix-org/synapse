@@ -203,10 +203,10 @@ class PusherPool:
                 )
                 await self.remove_pusher(p.app_id, p.pushkey, p.user_name)
 
-    async def remove_pushers_by_access_tokens(
+    async def remove_http_pushers_by_access_tokens(
         self, user_id: str, access_tokens: Iterable[int]
     ) -> None:
-        """Remove the pushers for a given user corresponding to a set of
+        """Remove the HTTP pushers for a given user corresponding to a set of
         access_tokens.
 
         Args:
@@ -217,7 +217,7 @@ class PusherPool:
         # background update finishes
         tokens = set(access_tokens)
         for p in await self.store.get_pushers_by_user_id(user_id):
-            if p.access_token in tokens:
+            if p.kind == "http" and p.access_token in tokens:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p.app_id,
@@ -226,10 +226,10 @@ class PusherPool:
                 )
                 await self.remove_pusher(p.app_id, p.pushkey, p.user_name)
 
-    async def remove_pushers_by_devices(
+    async def remove_http_pushers_by_devices(
         self, user_id: str, devices: Iterable[str]
     ) -> None:
-        """Remove the pushers for a given user corresponding to a set of devices
+        """Remove the HTTP pushers for a given user corresponding to a set of devices
 
         Args:
             user_id: user to remove pushers for
@@ -237,7 +237,11 @@ class PusherPool:
         """
         device_ids = set(devices)
         for p in await self.store.get_pushers_by_user_id(user_id):
-            if p.device_id is not None and p.device_id in device_ids:
+            if (
+                p.kind == "http"
+                and p.device_id is not None
+                and p.device_id in device_ids
+            ):
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p.app_id,
