@@ -422,7 +422,7 @@ def add_worker_roles_to_shared_config(
 
 
 def merge_worker_template_configs(
-    existing_dict: Dict[str, Any] | None,
+    existing_dict: Optional[Dict[str, Any]],
     to_be_merged_dict: Dict[str, Any],
 ) -> Dict[str, Any]:
     """When given an existing dict of worker template configuration consisting with both
