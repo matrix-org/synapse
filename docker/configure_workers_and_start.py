@@ -566,6 +566,32 @@ def generate_base_homeserver_config() -> None:
     os.environ["SYNAPSE_HTTP_PORT"] = str(MAIN_PROCESS_HTTP_LISTENER_PORT)
     subprocess.run(["/usr/local/bin/python", "/start.py", "migrate_config"], check=True)
 
+    worker_base = "main"
+    mem_limit = os.environ.get(f"MEM_{worker_base}")
+    if mem_limit is None:
+        raise ValueError(
+            f"No memory limit for {worker_base}!")
+
+    extra = {
+        "caches": {
+            "global_factor": 100.0,
+            "sync_response_cache_duration": "2m",
+            "expire_caches": True,
+            "cache_entry_ttl": "30m",
+            "cache_autotuning": {
+                "max_cache_memory_usage": f"{int(mem_limit)}M",
+                "target_cache_memory_usage": f"{int(mem_limit) - 125}M",
+                "min_cache_ttl": "1m",
+            },
+        }
+    }
+
+    # append the memory limit YAML...
+    with open("/conf/homeserver.yaml", "a") as fout:
+        fout.write("\n")
+        yaml.dump(extra, fout)
+        fout.flush()
+
 
 def parse_worker_types(
     requested_worker_types: List[str],
@@ -790,6 +816,23 @@ def generate_worker_files(
 
         # Replace placeholder names in the config template with the actual worker name.
         worker_config = insert_worker_name_for_worker_config(worker_config, worker_name)
+
+        worker_base = re.sub(r"[0-9]+", "", worker_name)
+        mem_limit = os.environ.get(f"MEM_{worker_base}")
+        if mem_limit is None:
+            raise ValueError(f"No memory limit for {worker_base}! of {requested_worker_types}")
+
+        worker_config["caches"] = {
+            "global_factor": 100.0,
+            "sync_response_cache_duration": "2m",
+            "expire_caches": True,
+            "cache_entry_ttl": "30m",
+            "cache_autotuning": {
+                "max_cache_memory_usage": f"{int(mem_limit)}M",
+                "target_cache_memory_usage": f"{int(mem_limit) - 125}M",
+                "min_cache_ttl": "1m",
+            },
+        }
 
         worker_config.update(
             {"name": worker_name, "port": str(worker_port), "config_path": config_path}

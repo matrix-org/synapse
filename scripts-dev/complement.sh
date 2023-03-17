@@ -180,7 +180,7 @@ if [ -z "$skip_docker_build" ]; then
 
         # Build the unified Complement image (from the worker Synapse image we just built).
         echo_if_github "::group::Build Docker image: complement/Dockerfile"
-        docker build -t complement-synapse \
+        docker build -t synapse-pt10k \
             -f "docker/complement/Dockerfile" "docker/complement"
         echo_if_github "::endgroup::"
 
