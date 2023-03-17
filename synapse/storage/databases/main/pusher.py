@@ -599,7 +599,7 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
                     "id": stream_id,
                     "enabled": enabled,
                     "device_id": device_id,
-                    # XXX(quenting): We're only really persisting the access token ID 
+                    # XXX(quenting): We're only really persisting the access token ID
                     # when updating an existing pusher. This is in case the
                     # 'set_device_id_for_pushers' background update hasn't finished yet.
                     "access_token": access_token_id,

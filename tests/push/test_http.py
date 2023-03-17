@@ -917,7 +917,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         pushers: List[PusherConfig] = list(ret)
 
-        # Check that we still have one pusher, and that the device ID associated with 
+        # Check that we still have one pusher, and that the device ID associated with
         # it didn't change.
         self.assertEqual(len(pushers), 1)
         self.assertEqual(pushers[0].device_id, device_id)
