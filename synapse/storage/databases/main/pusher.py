@@ -568,7 +568,6 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
     async def add_pusher(
         self,
         user_id: str,
-        access_token: Optional[int],
         kind: str,
         app_id: str,
         app_display_name: str,
@@ -581,13 +580,13 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
         profile_tag: str = "",
         enabled: bool = True,
         device_id: Optional[str] = None,
+        access_token_id: Optional[int] = None,
     ) -> None:
         async with self._pushers_id_gen.get_next() as stream_id:
             await self.db_pool.simple_upsert(
                 table="pushers",
                 keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
                 values={
-                    "access_token": access_token,
                     "kind": kind,
                     "app_display_name": app_display_name,
                     "device_display_name": device_display_name,
@@ -599,6 +598,7 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
                     "id": stream_id,
                     "enabled": enabled,
                     "device_id": device_id,
+                    "access_token": access_token_id,
                 },
                 desc="add_pusher",
             )

@@ -1503,12 +1503,6 @@ class AuthHandler:
             access_token=access_token,
         )
 
-        # delete pushers associated with this access token
-        if token.token_id is not None:
-            await self.hs.get_pusherpool().remove_pushers_by_access_token(
-                token.user_id, (token.token_id,)
-            )
-
     async def delete_access_tokens_for_user(
         self,
         user_id: str,
@@ -1533,11 +1527,6 @@ class AuthHandler:
             await self.password_auth_provider.on_logged_out(
                 user_id=user_id, device_id=device_id, access_token=token
             )
-
-        # delete pushers associated with the access tokens
-        await self.hs.get_pusherpool().remove_pushers_by_access_token(
-            user_id, (token_id for _, token_id, _ in tokens_and_devices)
-        )
 
     async def add_threepid(
         self, user_id: str, medium: str, address: str, validated_at: int
