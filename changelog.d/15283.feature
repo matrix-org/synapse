@@ -1,0 +1,1 @@
+Add stable unstable feature (`org.matrix.msc3030.stable`) for [MSC3030](https://github.com/matrix-org/matrix-spec-proposals/pull/3030) jump to date [before Matrix `v1.6` is fully supported on Synapse](https://github.com/matrix-org/synapse/issues/15089).
