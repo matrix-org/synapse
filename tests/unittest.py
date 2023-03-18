@@ -16,6 +16,7 @@
 import gc
 import hashlib
 import hmac
+import json
 import logging
 import secrets
 import time
@@ -28,12 +29,14 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Literal,
     NoReturn,
     Optional,
     Tuple,
     Type,
     TypeVar,
     Union,
+    overload,
 )
 from unittest.mock import Mock, patch
 
@@ -53,6 +56,7 @@ from twisted.web.server import Request
 from synapse import events
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.config._base import Config, RootConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.crypto.event_signing import add_hashes_and_signatures
@@ -122,6 +126,68 @@ def around(target: TV) -> Callable[[Callable[Concatenate[S, P], R]], None]:
         setattr(target, name, new)
 
     return _around
+
+
+@overload
+def deepcopy_config(config: RootConfig, root: Literal[True]) -> RootConfig:
+    ...
+
+
+@overload
+def deepcopy_config(config: Config, root: Literal[False]) -> Config:
+    ...
+
+
+def deepcopy_config(config, root):
+    if root:
+        new_config = config.__class__(config.config_files)
+    else:
+        new_config = config.__class__(config.root)
+
+    for attr_name in config.__dict__:
+        if attr_name.startswith("__") or attr_name == "root":
+            continue
+        attr = getattr(config, attr_name)
+        if isinstance(attr, Config):
+            new_attr = deepcopy_config(attr, root=False)
+        else:
+            new_attr = attr
+
+        setattr(new_config, attr_name, new_attr)
+
+    return new_config
+
+
+_make_homeserver_config_obj_cache: Dict[str, Union[RootConfig, Config]] = {}
+
+
+def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
+    """Creates a :class:`HomeServerConfig` instance with the given configuration dict.
+
+    This is equivalent to::
+
+        config_obj = HomeServerConfig()
+        config_obj.parse_config_dict(config, "", "")
+
+    but it keeps a cache of `HomeServerConfig` instances and deepcopies them as needed,
+    to avoid validating the whole configuration every time.
+    """
+    cache_key = json.dumps(config)
+
+    if cache_key in _make_homeserver_config_obj_cache:
+        # Cache hit: reuse the existing instance
+        config_obj = _make_homeserver_config_obj_cache[cache_key]
+    else:
+        # Cache miss; create the actual instance
+        config_obj = HomeServerConfig()
+        config_obj.parse_config_dict(config, "", "")
+
+        # Add to the cache
+        _make_homeserver_config_obj_cache[cache_key] = config_obj
+
+    assert isinstance(config_obj, RootConfig)
+
+    return deepcopy_config(config_obj, root=True)
 
 
 class TestCase(unittest.TestCase):
@@ -518,8 +584,7 @@ class HomeserverTestCase(TestCase):
             config = kwargs["config"]
 
         # Parse the config from a config dict into a HomeServerConfig
-        config_obj = HomeServerConfig()
-        config_obj.parse_config_dict(config, "", "")
+        config_obj = make_homeserver_config_obj(config)
         kwargs["config"] = config_obj
 
         async def run_bg_updates() -> None:
