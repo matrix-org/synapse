@@ -23,6 +23,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.errors import Codes, SynapseError
+from synapse.push.emailpusher import EmailPusher
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.util import Clock
@@ -38,7 +39,6 @@ class _User:
 
 
 class EmailPusherTests(HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -47,7 +47,6 @@ class EmailPusherTests(HomeserverTestCase):
     hijack_auth = False
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["email"] = {
             "enable_notifs": True,
@@ -105,6 +104,7 @@ class EmailPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(self.access_token)
         )
+        assert user_tuple is not None
         self.token_id = user_tuple.token_id
 
         # We need to add email to account before we can create a pusher.
@@ -114,7 +114,7 @@ class EmailPusherTests(HomeserverTestCase):
             )
         )
 
-        self.pusher = self.get_success(
+        pusher = self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=self.user_id,
                 access_token=self.token_id,
@@ -127,6 +127,8 @@ class EmailPusherTests(HomeserverTestCase):
                 data={},
             )
         )
+        assert isinstance(pusher, EmailPusher)
+        self.pusher = pusher
 
         self.auth_handler = hs.get_auth_handler()
         self.store = hs.get_datastores().main
@@ -367,18 +369,19 @@ class EmailPusherTests(HomeserverTestCase):
 
         # disassociate the user's email address
         self.get_success(
-            self.auth_handler.delete_threepid(
-                user_id=self.user_id,
-                medium="email",
-                address="a@example.com",
+            self.auth_handler.delete_local_threepid(
+                user_id=self.user_id, medium="email", address="a@example.com"
             )
         )
 
         # check that the pusher for that email address has been deleted
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
     def test_remove_unlinked_pushers_background_job(self) -> None:
@@ -413,10 +416,13 @@ class EmailPusherTests(HomeserverTestCase):
         self.wait_for_background_updates()
 
         # Check that all pushers with unlinked addresses were deleted
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
     def _check_for_mail(self) -> Tuple[Sequence, Dict]:
@@ -428,10 +434,13 @@ class EmailPusherTests(HomeserverTestCase):
             that notification.
         """
         # Get the stream ordering before it gets sent
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         last_stream_ordering = pushers[0].last_stream_ordering
 
@@ -439,10 +448,13 @@ class EmailPusherTests(HomeserverTestCase):
         self.pump(10)
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual(last_stream_ordering, pushers[0].last_stream_ordering)
 
@@ -458,10 +470,13 @@ class EmailPusherTests(HomeserverTestCase):
         self.assertEqual(len(self.email_attempts), 1)
 
         # The stream ordering has increased
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
 

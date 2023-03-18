@@ -14,7 +14,17 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 from prometheus_client import Counter
 from typing_extensions import TypeGuard
@@ -256,10 +266,23 @@ class ApplicationServiceApi(SimpleHttpClient):
         key = (service.id, protocol)
         return await self.protocol_meta_cache.wrap(key, _get)
 
+    async def ping(self, service: "ApplicationService", txn_id: Optional[str]) -> None:
+        # The caller should check that url is set
+        assert service.url is not None, "ping called without URL being set"
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        await self.post_json_get_json(
+            uri=service.url + "/_matrix/app/unstable/fi.mau.msc2659/ping",
+            post_json={"transaction_id": txn_id},
+            headers={"Authorization": [f"Bearer {service.hs_token}"]},
+        )
+
     async def push_bulk(
         self,
         service: "ApplicationService",
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         one_time_keys_count: TransactionOneTimeKeysCount,

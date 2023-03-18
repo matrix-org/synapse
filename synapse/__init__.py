@@ -1,5 +1,6 @@
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018-9 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2023 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix homeserver.
+""" This is an implementation of a Matrix homeserver.
 """
 
 import json

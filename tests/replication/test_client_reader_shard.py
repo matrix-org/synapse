@@ -33,7 +33,7 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
         config["worker_replication_http_port"] = "8765"
         return config
 
-    def test_register_single_worker(self):
+    def test_register_single_worker(self) -> None:
         """Test that registration works when using a single generic worker."""
         worker_hs = self.make_worker_hs("synapse.app.generic_worker")
         site = self._hs_to_site[worker_hs]
@@ -63,7 +63,7 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
         # We're given a registered user.
         self.assertEqual(channel_2.json_body["user_id"], "@user:test")
 
-    def test_register_multi_worker(self):
+    def test_register_multi_worker(self) -> None:
         """Test that registration works when using multiple generic workers."""
         worker_hs_1 = self.make_worker_hs("synapse.app.generic_worker")
         worker_hs_2 = self.make_worker_hs("synapse.app.generic_worker")

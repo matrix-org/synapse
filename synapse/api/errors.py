@@ -108,6 +108,15 @@ class Codes(str, Enum):
 
     USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
 
+    AS_PING_URL_NOT_SET = "FI.MAU.MSC2659_URL_NOT_SET"
+    AS_PING_BAD_STATUS = "FI.MAU.MSC2659_BAD_STATUS"
+    AS_PING_CONNECTION_TIMEOUT = "FI.MAU.MSC2659_CONNECTION_TIMEOUT"
+    AS_PING_CONNECTION_FAILED = "FI.MAU.MSC2659_CONNECTION_FAILED"
+
+    # Attempt to send a second annotation with the same event type & annotation key
+    # MSC2677
+    DUPLICATE_ANNOTATION = "M_DUPLICATE_ANNOTATION"
+
 
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
@@ -751,3 +760,25 @@ class ModuleFailedException(Exception):
     Raised when a module API callback fails, for example because it raised an
     exception.
     """
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    @staticmethod
+    def message() -> str:
+        return "Cannot persist partial state event in un-partial stated room"
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg=PartialStateConflictError.message(),
+            errcode=Codes.UNKNOWN,
+        )

@@ -69,6 +69,9 @@ StateMap = Mapping[StateKey, T]
 MutableStateMap = MutableMapping[StateKey, T]
 
 # JSON types. These could be made stronger, but will do for now.
+# A "simple" (canonical) JSON value.
+SimpleJsonValue = Optional[Union[str, int, bool]]
+JsonValue = Union[List[SimpleJsonValue], Tuple[SimpleJsonValue, ...], SimpleJsonValue]
 # A JSON-serialisable dict.
 JsonDict = Dict[str, Any]
 # A JSON-serialisable mapping; roughly speaking an immutable JSONDict.

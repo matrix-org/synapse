@@ -59,6 +59,11 @@ Run the complement test suite on Synapse.
         is important.
         Not suitable for use in CI in case the editable environment is impure.
 
+  --rebuild-editable
+        Force a rebuild of the editable build of Synapse.
+        This is occasionally useful if the built-in rebuild detection with
+        --editable fails, e.g. when changing configure_workers_and_start.py.
+
 For help on arguments to 'go test', run 'go help testflag'.
 EOF
 }
@@ -81,6 +86,9 @@ while [ $# -ge 1 ]; do
             ;;
         "-e"|"--editable")
             use_editable_synapse=1
+            ;;
+        "--rebuild-editable")
+            rebuild_editable_synapse=1
             ;;
         *)
             # unknown arg: presumably an argument to gotest. break the loop.
@@ -116,7 +124,9 @@ if [ -n "$use_editable_synapse" ]; then
     fi
 
     editable_mount="$(realpath .):/editable-src:z"
-    if docker inspect complement-synapse-editable &>/dev/null; then
+    if [ -n "$rebuild_editable_synapse" ]; then
+        unset skip_docker_build
+    elif docker inspect complement-synapse-editable &>/dev/null; then
         # complement-synapse-editable already exists: see if we can still use it:
         # - The Rust module must still be importable; it will fail to import if the Rust source has changed.
         # - The Poetry lock file must be the same (otherwise we assume dependencies have changed)
