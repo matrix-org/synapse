@@ -263,9 +263,14 @@ class OptionsResourceTests(unittest.TestCase):
         )
         self.assertEqual(
             channel.headers.getRawHeaders(b"Access-Control-Allow-Headers"),
-            [b"X-Requested-With, Content-Type, Authorization, Date, Synapse-Trace-Id"],
+            [b"X-Requested-With, Content-Type, Authorization, Date"],
             "has correct CORS Headers header",
         )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
+            [b"Synapse-Trace-Id"],
+        )
+
 
     def _check_cors_msc3886_headers(self, channel: FakeChannel) -> None:
         # Ensure the correct CORS headers have been added
