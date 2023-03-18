@@ -271,7 +271,6 @@ class OptionsResourceTests(unittest.TestCase):
             [b"Synapse-Trace-Id"],
         )
 
-
     def _check_cors_msc3886_headers(self, channel: FakeChannel) -> None:
         # Ensure the correct CORS headers have been added
         # as per https://github.com/matrix-org/matrix-spec-proposals/blob/hughns/simple-rendezvous-capability/proposals/3886-simple-rendezvous-capability.md#cors
