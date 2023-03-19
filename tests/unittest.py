@@ -139,7 +139,9 @@ def deepcopy_config(config: Config, root: Literal[False]) -> Config:
     ...
 
 
-def deepcopy_config(config: Union[Config, RootConfig], root: bool) -> Union[RootConfig, Config]:
+def deepcopy_config(
+    config: Union[Config, RootConfig], root: bool
+) -> Union[RootConfig, Config]:
     new_config: Union[Config, RootConfig]
 
     if root:
