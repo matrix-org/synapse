@@ -36,6 +36,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 from unittest.mock import Mock, patch
@@ -138,11 +139,15 @@ def deepcopy_config(config: Config, root: Literal[False]) -> Config:
     ...
 
 
-def deepcopy_config(config, root):
+def deepcopy_config(config: Union[Config, RootConfig], root: bool) -> Union[RootConfig, Config]:
+    new_config: Union[Config, RootConfig]
+
     if root:
-        new_config = config.__class__(config.config_files)
+        typed_rootconfig = cast(RootConfig, config)
+        new_config = typed_rootconfig.__class__(typed_rootconfig.config_files)
     else:
-        new_config = config.__class__(config.root)
+        typed_config = cast(Config, config)
+        new_config = typed_config.__class__(typed_config.root)
 
     for attr_name in config.__dict__:
         if attr_name.startswith("__") or attr_name == "root":
