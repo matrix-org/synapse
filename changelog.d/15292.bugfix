@@ -1,0 +1,1 @@
+Fixed deployment of the database schema using allow_unsafe_locale=true
