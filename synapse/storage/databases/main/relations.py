@@ -472,12 +472,11 @@ class RelationsWorkerStore(SQLBaseStore):
             the event will map to None.
         """
 
-        # We only allow edits for `m.room.message` events that have the same sender
-        # and event type. We can't assert these things during regular event auth so
-        # we have to do the checks post hoc.
+        # We only allow edits for events that have the same sender and event type.
+        # We can't assert these things during regular event auth so we have to do
+        # the checks post hoc.
 
-        # Fetches latest edit that has the same type and sender as the
-        # original, and is an `m.room.message`.
+        # Fetches latest edit that has the same type and sender as the original.
         if isinstance(self.database_engine, PostgresEngine):
             # The `DISTINCT ON` clause will pick the *first* row it encounters,
             # so ordering by origin server ts + event ID desc will ensure we get
@@ -493,7 +492,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     %s
                     AND relation_type = ?
-                    AND edit.type = 'm.room.message'
                 ORDER by original.event_id DESC, edit.origin_server_ts DESC, edit.event_id DESC
             """
         else:
@@ -512,7 +510,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     %s
                     AND relation_type = ?
-                    AND edit.type = 'm.room.message'
                 ORDER by edit.origin_server_ts, edit.event_id
             """
 
