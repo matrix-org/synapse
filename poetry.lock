@@ -2523,14 +2523,14 @@ files = [
 
 [[package]]
 name = "txredisapi"
-version = "1.4.7"
+version = "1.4.9"
 description = "non-blocking redis client for python"
 category = "main"
 optional = true
 python-versions = "*"
 files = [
-    {file = "txredisapi-1.4.7-py3-none-any.whl", hash = "sha256:34c9eba8d34f452d30661f073b67b8cd42b695e3d31678ec1bbf628a65a0f059"},
-    {file = "txredisapi-1.4.7.tar.gz", hash = "sha256:e6cc43f51e35d608abdca8f8c7d20e148fe1d82679f6e584baea613ebec812bb"},
+    {file = "txredisapi-1.4.9-py3-none-any.whl", hash = "sha256:72e6ad09cc5fffe3bec2e55e5bfb74407bd357565fc212e6003f7e26ef7d8f78"},
+    {file = "txredisapi-1.4.9.tar.gz", hash = "sha256:c9607062d05e4d0b8ef84719eb76a3fe7d5ccd606a2acf024429da51d6e84559"},
 ]
 
 [package.dependencies]
