@@ -1,1 +1,1 @@
-Fix a bug introduced in Synapse v1.55.0 which could cause a delay in sending to-device messages.
+Fix a bug introduced in Synapse v1.55.0 which could delay remote homeservers being able to decrypt encrypted messages sent by local users.
