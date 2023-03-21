@@ -24,6 +24,7 @@ from typing import (
     Generic,
     Iterable,
     List,
+    NoReturn,
     Optional,
     Sequence,
     Tuple,
@@ -337,6 +338,9 @@ class EventBase(metaclass=abc.ABCMeta):
     state_key: DictProperty[str] = DictProperty("state_key")
     type: DictProperty[str] = DictProperty("type")
     user_id: DictProperty[str] = DictProperty("sender")
+
+    def __hash__(self) -> NoReturn:
+        raise NotImplementedError()
 
     @property
     def event_id(self) -> str:
