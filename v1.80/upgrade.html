@@ -231,6 +231,14 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1800"><a class="header" href="#upgrading-to-v1800">Upgrading to v1.80.0</a></h1>
+<h2 id="reporting-events-error-code-change"><a class="header" href="#reporting-events-error-code-change">Reporting events error code change</a></h2>
+<p>Before this update, the
+<a href="https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3roomsroomidreporteventid"><code>POST /_matrix/client/v3/rooms/{roomId}/report/{eventId}</code></a>
+endpoint would return a <code>403</code> if a user attempted to report an event that they did not have access to.
+This endpoint will now return a <code>404</code> in this case instead.</p>
+<p>Clients that implement event reporting should check that their error handling code will handle this
+change.</p>
 <h1 id="upgrading-to-v1790"><a class="header" href="#upgrading-to-v1790">Upgrading to v1.79.0</a></h1>
 <h2 id="the-on_threepid_bind-module-callback-method-has-been-deprecated"><a class="header" href="#the-on_threepid_bind-module-callback-method-has-been-deprecated">The <code>on_threepid_bind</code> module callback method has been deprecated</a></h2>
 <p>Synapse v1.79.0 deprecates the
