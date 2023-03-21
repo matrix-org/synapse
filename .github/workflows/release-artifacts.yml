@@ -4,13 +4,15 @@ name: Build release artifacts
 
 on:
   # we build on PRs and develop to (hopefully) get early warning
-  # of things breaking (but only build one set of debs)
+  # of things breaking (but only build one set of debs). PRs skip
+  # building wheels on macOS & ARM.
   pull_request:
   push:
     branches: ["develop", "release-*"]
 
     # we do the full build on tags.
     tags: ["v*"]
+  merge_group:
   workflow_dispatch:
 
 concurrency:

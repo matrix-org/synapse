@@ -110,6 +110,7 @@ from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.media.media_repository import MediaRepository
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
+from synapse.module_api.callbacks import ModuleApiCallbacks
 from synapse.notifier import Notifier, ReplicationNotifier
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
@@ -798,6 +799,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
         return ModuleApi(self, self.get_auth_handler())
+
+    @cache_in_self
+    def get_module_api_callbacks(self) -> ModuleApiCallbacks:
+        return ModuleApiCallbacks()
 
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:

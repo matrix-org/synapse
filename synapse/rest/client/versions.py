@@ -109,6 +109,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3773": self.config.experimental.msc3773_enabled,
                     # Allows moderators to fetch redacted event content as described in MSC2815
                     "fi.mau.msc2815": self.config.experimental.msc2815_enabled,
+                    # Adds a ping endpoint for appservices to check HS->AS connection
+                    "fi.mau.msc2659": self.config.experimental.msc2659_enabled,
                     # Adds support for login token requests as per MSC3882
                     "org.matrix.msc3882": self.config.experimental.msc3882_enabled,
                     # Adds support for remotely enabling/disabling pushers, as per MSC3881
@@ -120,6 +122,8 @@ class VersionsRestServlet(RestServlet):
                     is not None,
                     # Adds support for relation-based redactions as per MSC3912.
                     "org.matrix.msc3912": self.config.experimental.msc3912_enabled,
+                    # Adds support for unstable "intentional mentions" behaviour.
+                    "org.matrix.msc3952_intentional_mentions": self.config.experimental.msc3952_intentional_mentions,
                 },
             },
         )
