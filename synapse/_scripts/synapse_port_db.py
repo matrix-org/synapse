@@ -1329,7 +1329,7 @@ def main() -> None:
     sqlite_config = {
         "name": "sqlite3",
         "args": {
-            "database": "file:{}?mode=rw".format(args.sqlite_database),
+            "database": args.sqlite_database,
             "cp_min": 1,
             "cp_max": 1,
             "check_same_thread": False,
