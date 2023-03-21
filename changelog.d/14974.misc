@@ -1,0 +1,1 @@
+Add `Synapse-Trace-Id` to `access-control-expose-headers` header.

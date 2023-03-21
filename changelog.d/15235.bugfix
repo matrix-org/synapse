@@ -1,0 +1,1 @@
+Fix long-standing error when sending message into deleted room.
