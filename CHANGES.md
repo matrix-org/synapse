@@ -17,7 +17,7 @@ Bugfixes
 - Fix a long-standing bug in which the user directory would assume any remote membership state events represent a profile change. ([\#14755](https://github.com/matrix-org/synapse/issues/14755), [\#14756](https://github.com/matrix-org/synapse/issues/14756))
 - Implement [MSC3873](https://github.com/matrix-org/matrix-spec-proposals/pull/3873) to fix a long-standing bug where properties with dots were handled ambiguously in push rules. ([\#15190](https://github.com/matrix-org/synapse/issues/15190))
 - Faster joins: Fix a bug introduced in Synapse 1.66 where spurious "Failed to find memberships ..." errors would be logged. ([\#15232](https://github.com/matrix-org/synapse/issues/15232))
-- Fix long-standing error when sending message into deleted room. ([\#15235](https://github.com/matrix-org/synapse/issues/15235))
+- Fix a long-standing error when sending message into deleted room. ([\#15235](https://github.com/matrix-org/synapse/issues/15235))
 
 
 Updates to the Docker image
