@@ -113,7 +113,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: 1.58.1
             components: clippy
@@ -135,7 +135,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: nightly-2022-12-01
             components: clippy
@@ -155,7 +155,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
           # We use nightly so that it correctly groups together imports
           toolchain: nightly-2022-12-01
@@ -223,7 +223,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -268,7 +268,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -389,7 +389,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -534,7 +534,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -565,7 +565,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
@@ -588,7 +588,7 @@ jobs:
         # There don't seem to be versioned releases of this action per se: for each rust
         # version there is a branch which gets constantly rebased on top of master.
         # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
         with:
             toolchain: nightly-2022-12-01
       - uses: Swatinem/rust-cache@v2
