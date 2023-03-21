@@ -4,6 +4,7 @@ on:
   push:
     branches: ["develop", "release-*"]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 concurrency:

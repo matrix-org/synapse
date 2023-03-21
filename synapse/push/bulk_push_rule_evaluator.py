@@ -273,10 +273,7 @@ class BulkPushRuleEvaluator:
                     related_event_id, allow_none=True
                 )
                 if related_event is not None:
-                    related_events[relation_type] = _flatten_dict(
-                        related_event,
-                        msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
-                    )
+                    related_events[relation_type] = _flatten_dict(related_event)
 
             reply_event_id = (
                 event.content.get("m.relates_to", {})
@@ -291,10 +288,7 @@ class BulkPushRuleEvaluator:
                 )
 
                 if related_event is not None:
-                    related_events["m.in_reply_to"] = _flatten_dict(
-                        related_event,
-                        msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
-                    )
+                    related_events["m.in_reply_to"] = _flatten_dict(related_event)
 
                     # indicate that this is from a fallback relation.
                     if relation_type == "m.thread" and event.content.get(
@@ -401,10 +395,7 @@ class BulkPushRuleEvaluator:
         )
 
         evaluator = PushRuleEvaluator(
-            _flatten_dict(
-                event,
-                msc3873_escape_event_match_key=self.hs.config.experimental.msc3873_escape_event_match_key,
-            ),
+            _flatten_dict(event),
             has_mentions,
             room_member_count,
             sender_power_level,
@@ -413,7 +404,6 @@ class BulkPushRuleEvaluator:
             self._related_event_match_enabled,
             event.room_version.msc3931_push_features,
             self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
-            self.hs.config.experimental.msc3966_exact_event_property_contains,
         )
 
         users = rules_by_user.keys()
@@ -495,8 +485,6 @@ def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, JsonValue]] = None,
-    *,
-    msc3873_escape_event_match_key: bool = False,
 ) -> Dict[str, JsonValue]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
@@ -525,11 +513,10 @@ def _flatten_dict(
     if result is None:
         result = {}
     for key, value in d.items():
-        if msc3873_escape_event_match_key:
-            # Escape periods in the key with a backslash (and backslashes with an
-            # extra backslash). This is since a period is used as a separator between
-            # nested fields.
-            key = key.replace("\\", "\\\\").replace(".", "\\.")
+        # Escape periods in the key with a backslash (and backslashes with an
+        # extra backslash). This is since a period is used as a separator between
+        # nested fields.
+        key = key.replace("\\", "\\\\").replace(".", "\\.")
 
         if _is_simple_value(value):
             result[".".join(prefix + [key])] = value
@@ -537,12 +524,7 @@ def _flatten_dict(
             result[".".join(prefix + [key])] = [v for v in value if _is_simple_value(v)]
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
-            _flatten_dict(
-                value,
-                prefix=(prefix + [key]),
-                result=result,
-                msc3873_escape_event_match_key=msc3873_escape_event_match_key,
-            )
+            _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
     # `room_version` should only ever be set when looking at the top level of an event
     if (

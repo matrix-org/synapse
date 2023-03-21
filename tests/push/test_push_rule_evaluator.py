@@ -51,11 +51,7 @@ class FlattenDictTestCase(unittest.TestCase):
 
         # If a field has a dot in it, escape it.
         input = {"m.foo": {"b\\ar": "abc"}}
-        self.assertEqual({"m.foo.b\\ar": "abc"}, _flatten_dict(input))
-        self.assertEqual(
-            {"m\\.foo.b\\\\ar": "abc"},
-            _flatten_dict(input, msc3873_escape_event_match_key=True),
-        )
+        self.assertEqual({"m\\.foo.b\\\\ar": "abc"}, _flatten_dict(input))
 
     def test_non_string(self) -> None:
         """String, booleans, ints, nulls and list of those should be kept while other items are dropped."""
@@ -125,7 +121,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
-            "content.org.matrix.msc1767.markup": [],
+            "content.org\\.matrix\\.msc1767\\.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
@@ -137,7 +133,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
-            "content.org.matrix.msc1767.markup": [],
+            "content.org\\.matrix\\.msc1767\\.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
@@ -173,7 +169,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             related_event_match_enabled=True,
             room_version_feature_flags=event.room_version.msc3931_push_features,
             msc3931_enabled=True,
-            msc3966_exact_event_property_contains=True,
         )
 
     def test_display_name(self) -> None:
@@ -526,7 +521,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         """Check that exact_event_property_contains conditions work as expected."""
 
         condition = {
-            "kind": "org.matrix.msc3966.exact_event_property_contains",
+            "kind": "event_property_contains",
             "key": "content.value",
             "value": "foobaz",
         }
