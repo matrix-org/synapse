@@ -5,6 +5,13 @@ on:
     - cron: 0 8 * * *
 
   workflow_dispatch:
+    inputs:
+      twisted_ref:
+        description: Commit, branch or tag to checkout from upstream Twisted.
+        required: false
+        default: 'trunk'
+        type: string
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,7 +36,7 @@ jobs:
           extras: "all"
       - run: |
           poetry remove twisted
-          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#${{ inputs.twisted_ref }}
           poetry install --no-interaction --extras "all test"
       - name: Remove warn_unused_ignores from mypy config
         run: sed '/warn_unused_ignores = True/d' -i mypy.ini
