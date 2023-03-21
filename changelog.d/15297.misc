@@ -1,0 +1,1 @@
+Revert "check sqlite database file exists before porting" PR #14692.
