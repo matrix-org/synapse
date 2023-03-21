@@ -7,6 +7,8 @@ Features
 - Stabilise support for [MSC3966](https://github.com/matrix-org/matrix-spec-proposals/pull/3966): `event_property_contains` push condition. ([\#15187](https://github.com/matrix-org/synapse/issues/15187))
 - Implement [MSC2659](https://github.com/matrix-org/matrix-spec-proposals/pull/2659): application service ping endpoint. Contributed by Tulir @ Beeper. ([\#15249](https://github.com/matrix-org/synapse/issues/15249))
 - Allow loading `/register/available` endpoint on workers. ([\#15268](https://github.com/matrix-org/synapse/issues/15268))
+- Improve performance of creating and authenticating events. ([\#15195](https://github.com/matrix-org/synapse/issues/15195))
+- Add topic and name events to group of events that are batch persisted when creating a room. ([\#15229](https://github.com/matrix-org/synapse/issues/15229))
 
 
 Bugfixes
@@ -36,32 +38,31 @@ Internal Changes
 
 - Add additional functionality to declaring worker types when starting Complement in worker mode. ([\#14921](https://github.com/matrix-org/synapse/issues/14921))
 - Add `Synapse-Trace-Id` to `access-control-expose-headers` header. ([\#14974](https://github.com/matrix-org/synapse/issues/14974))
-- Improve performance of creating and authenticating events. ([\#15195](https://github.com/matrix-org/synapse/issues/15195))
 - Make the `HttpTransactionCache` use the `Requester` in addition of the just the `Request` to build the transaction key. ([\#15200](https://github.com/matrix-org/synapse/issues/15200))
 - Improve log lines when purging rooms. ([\#15222](https://github.com/matrix-org/synapse/issues/15222))
-- Add topic and name events to group of events that are batch persisted when creating a room. ([\#15229](https://github.com/matrix-org/synapse/issues/15229))
 - Improve type hints. ([\#15230](https://github.com/matrix-org/synapse/issues/15230), [\#15231](https://github.com/matrix-org/synapse/issues/15231), [\#15238](https://github.com/matrix-org/synapse/issues/15238))
 - Move various module API callback registration methods to a dedicated class. ([\#15237](https://github.com/matrix-org/synapse/issues/15237))
 - Configure GitHub Actions for merge queues. ([\#15244](https://github.com/matrix-org/synapse/issues/15244))
 - Add schema comments about the `destinations` and `destination_rooms` tables. ([\#15247](https://github.com/matrix-org/synapse/issues/15247))
+- Skip processing of auto-join room behaviour if there are no auto-join rooms configured. ([\#15262](https://github.com/matrix-org/synapse/issues/15262))
+- Remove unused store method `_set_destination_retry_timings_emulated`. ([\#15266](https://github.com/matrix-org/synapse/issues/15266))
+- Reorganize URL preview code. ([\#15269](https://github.com/matrix-org/synapse/issues/15269))
+- Clean-up direct TCP replication code. ([\#15272](https://github.com/matrix-org/synapse/issues/15272), [\#15274](https://github.com/matrix-org/synapse/issues/15274))
+- Make `configure_workers_and_start` script used in Complement tests compatible with older versions of Python. ([\#15275](https://github.com/matrix-org/synapse/issues/15275))
+- Add a `/versions` flag for [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952). ([\#15293](https://github.com/matrix-org/synapse/issues/15293))
 - Bump hiredis from 2.2.1 to 2.2.2. ([\#15252](https://github.com/matrix-org/synapse/issues/15252))
 - Bump serde from 1.0.152 to 1.0.155. ([\#15253](https://github.com/matrix-org/synapse/issues/15253))
 - Bump pysaml2 from 7.2.1 to 7.3.1. ([\#15254](https://github.com/matrix-org/synapse/issues/15254))
 - Bump msgpack from 1.0.4 to 1.0.5. ([\#15255](https://github.com/matrix-org/synapse/issues/15255))
 - Bump gitpython from 3.1.30 to 3.1.31. ([\#15256](https://github.com/matrix-org/synapse/issues/15256))
 - Bump cryptography from 39.0.1 to 39.0.2. ([\#15257](https://github.com/matrix-org/synapse/issues/15257))
-- Skip processing of auto-join room behaviour if there are not auto-join rooms configured. ([\#15262](https://github.com/matrix-org/synapse/issues/15262))
-- Remove unused store method `_set_destination_retry_timings_emulated`. ([\#15266](https://github.com/matrix-org/synapse/issues/15266))
-- Reorganize URL preview code. ([\#15269](https://github.com/matrix-org/synapse/issues/15269))
-- Clean-up direct TCP replication code. ([\#15272](https://github.com/matrix-org/synapse/issues/15272), [\#15274](https://github.com/matrix-org/synapse/issues/15274))
-- Make `configure_workers_and_start` script used in Complement tests compatible with older versions of Python. ([\#15275](https://github.com/matrix-org/synapse/issues/15275))
 - Bump pydantic from 1.10.4 to 1.10.6. ([\#15286](https://github.com/matrix-org/synapse/issues/15286))
 - Bump serde from 1.0.155 to 1.0.157. ([\#15287](https://github.com/matrix-org/synapse/issues/15287))
 - Bump anyhow from 1.0.69 to 1.0.70. ([\#15288](https://github.com/matrix-org/synapse/issues/15288))
 - Bump txredisapi from 1.4.7 to 1.4.9. ([\#15289](https://github.com/matrix-org/synapse/issues/15289))
 - Bump pygithub from 1.57 to 1.58.1. ([\#15290](https://github.com/matrix-org/synapse/issues/15290))
 - Bump types-requests from 2.28.11.12 to 2.28.11.15. ([\#15291](https://github.com/matrix-org/synapse/issues/15291))
-- Add a `/versions` flag for [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952). ([\#15293](https://github.com/matrix-org/synapse/issues/15293))
+
 
 
 Synapse 1.79.0 (2023-03-14)
