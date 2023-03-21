@@ -84,6 +84,11 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
         self.assertEqual(404, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "Unable to report event: it does not exist or you aren't able to see it.",
+            channel.json_body["error"],
+            msg=channel.result["body"],
+        )
 
     def _assert_status(self, response_status: int, data: JsonDict) -> None:
         channel = self.make_request(
