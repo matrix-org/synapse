@@ -1,1 +1,0 @@
-Make the `HttpTransactionCache` use the `Requester` in addition of the just the `Request` to build the transaction key.
