@@ -1,0 +1,3 @@
+Fix a bug introduced in Synapse 1.75.0rc1 where the [SQLite port_db script](https://matrix-org.github.io/synapse/latest/postgres.html#porting-from-sqlite)
+would fail to open the SQLite database.
+
