@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import Iterable, Type, Union, cast
+from typing import Iterable, List, Type, Union, cast
 
 import jsonschema
+from pydantic import Field, StrictBool, StrictStr
 
 from synapse.api.constants import (
     MAX_ALIAS_LENGTH,
@@ -33,6 +34,8 @@ from synapse.events.utils import (
     validate_canonicaljson,
 )
 from synapse.federation.federation_server import server_matches_acl_event
+from synapse.http.servlet import validate_json_object
+from synapse.rest.models import RequestBodyModel
 from synapse.types import EventID, JsonDict, RoomID, UserID
 
 
@@ -135,13 +138,9 @@ class EventValidator:
             EventContentFields.MSC3952_MENTIONS in event.content
             and config.experimental.msc3952_intentional_mentions
         ):
-            mentions = event.content[EventContentFields.MSC3952_MENTIONS]
-            try:
-                jsonschema.validate(
-                    instance=mentions, schema=MENTIONS_SCHEMA, cls=MENTIONS_VALIDATOR
-                )
-            except jsonschema.ValidationError as e:
-                raise SynapseError(400, e.message)
+            validate_json_object(
+                event.content[EventContentFields.MSC3952_MENTIONS], Mentions
+            )
 
     def _validate_retention(self, event: EventBase) -> None:
         """Checks that an event that defines the retention policy for a room respects the
@@ -270,20 +269,10 @@ POWER_LEVELS_SCHEMA = {
     },
 }
 
-MENTIONS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "user_ids": {
-            "type": "array",
-            "items": {
-                "type": "string",
-            },
-        },
-        "room": {
-            "type": "boolean",
-        },
-    },
-}
+
+class Mentions(RequestBodyModel):
+    user_ids: List[StrictStr] = Field(default_factory=list)
+    room: StrictBool = False
 
 
 # This could return something newer than Draft 7, but that's the current "latest"
@@ -302,4 +291,3 @@ def _create_validator(schema: JsonDict) -> Type[jsonschema.Draft7Validator]:
 
 
 POWER_LEVELS_VALIDATOR = _create_validator(POWER_LEVELS_SCHEMA)
-MENTIONS_VALIDATOR = _create_validator(MENTIONS_SCHEMA)
