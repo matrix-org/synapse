@@ -18,6 +18,7 @@
 import argparse
 import curses
 import logging
+import os
 import sys
 import time
 import traceback
@@ -1325,6 +1326,11 @@ def main() -> None:
         format="%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
         filename="port-synapse.log" if args.curses else None,
     )
+
+    if not os.path.isfile(args.sqlite_database):
+        sys.stderr.write("The sqlite database you specified does not exist, please check that you have the" \
+        "correct path.")
+        sys.exit(1)
 
     sqlite_config = {
         "name": "sqlite3",
