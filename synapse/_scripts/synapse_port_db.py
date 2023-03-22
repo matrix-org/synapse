@@ -1328,8 +1328,10 @@ def main() -> None:
     )
 
     if not os.path.isfile(args.sqlite_database):
-        sys.stderr.write("The sqlite database you specified does not exist, please check that you have the" \
-        "correct path.")
+        sys.stderr.write(
+            "The sqlite database you specified does not exist, please check that you have the"
+            "correct path."
+        )
         sys.exit(1)
 
     sqlite_config = {
