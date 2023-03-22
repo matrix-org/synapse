@@ -20,6 +20,7 @@ import attr
 import txredisapi
 from zope.interface import implementer
 
+from twisted.internet import ssl
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import IAddress, IConnector
 from twisted.python.failure import Failure
@@ -386,12 +387,40 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(
-        host,
-        port,
-        factory,
-        timeout=30,
-        bindAddress=None,
-    )
+
+    if (hs.config.redis.redis_use_ssl):
+        ssl_context_factory = ClientContextFactory(hs.config.redis)
+        reactor.connectSSL(
+            host,
+            port,
+            factory,
+            ssl_context_factory,
+            timeout=30,
+            bindAddress=None,
+        )
+    else:
+        reactor.connectTCP(
+            host,
+            port,
+            factory,
+            timeout=30,
+            bindAddress=None,
+        )
 
     return factory.handler
+
+class ClientContextFactory(ssl.ClientContextFactory):
+    def __init__(self, redis_config):
+        self.redis_config = redis_config
+
+    def getContext(self):
+        ctx = ssl.ClientContextFactory.getContext(self)
+        if (self.redis_config.redis_certificate):
+            ctx.use_certificate_file(self.redis_config.redis_certificate))
+        if (self.redis_config.private_key):
+            ctx.use_privatekey_file(self.redis_config.private_key)
+        if (self.redis_config.ca_file):
+            ctx.load_verify_locations(cafile=self.redis_config.ca_file)
+        elif (self.redis_config.ca_path):
+            ctx.load_verify_locationa(capath=self.redis_config.ca_path)
+        return ctx
