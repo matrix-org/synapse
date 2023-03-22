@@ -95,7 +95,7 @@ Changes in SCHEMA_VERSION = 74:
 Changes in SCHEMA_VERSION = 75:
     - The `event_stream_ordering` column in membership tables (`current_state_events`,
       `local_current_membership` & `room_memberships`) is now being populated for new
-      rows. When this the background job to populate historical rows lands this will
+      rows. When the background job to populate historical rows lands this will
       become the compat schema version.
 """
 
