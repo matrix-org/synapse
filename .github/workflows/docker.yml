@@ -30,6 +30,7 @@ jobs:
 
       - name: Log in to DockerHub
         uses: docker/login-action@v2
+        if: false
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -50,7 +51,7 @@ jobs:
       - name: Build and push all platforms
         uses: docker/build-push-action@v4
         with:
-          push: true
+          push: false
           labels: "gitsha1=${{ github.sha }}"
           tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
