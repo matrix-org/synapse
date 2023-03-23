@@ -1,11 +1,25 @@
-from twisted.internet.endpoints import _WrappingProtocol
-from twisted.internet.interfaces import (
-    IProtocolFactory,
-)
+from typing import Optional
 
-from tests.http import (
-    dummy_address,
-)
+from twisted.internet.endpoints import _WrappingProtocol
+from twisted.internet.interfaces import IProtocol
+from zope.interface import Interface, implementer
+
+
+class IAddress(Interface):
+    pass
+
+
+@implementer(IAddress)
+class DummyAddress:
+    pass
+
+
+dummy_address = DummyAddress()
+
+
+class IProtocolFactory(Interface):
+    def buildProtocol(addr: IAddress) -> Optional[IProtocol]:
+        pass
 
 def _make_connection(
     client_factory: IProtocolFactory,
@@ -17,6 +31,3 @@ def _make_connection(
     client_protocol = client_factory.buildProtocol(dummy_address)
     assert isinstance(client_protocol, _WrappingProtocol)
     print("Hello")
-
-
-
