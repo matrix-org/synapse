@@ -82,7 +82,7 @@ from tests.server import (
 )
 from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
-from tests.utils import checked_cast, default_config, setupdb
+from tests.utils import default_config, setupdb
 
 setupdb()
 setup_logging()
@@ -296,9 +296,11 @@ class HomeserverTestCase(TestCase):
 
         from tests.rest.client.utils import RestHelper
 
+        reactor = self.hs.get_reactor()
+        assert isinstance(reactor, MemoryReactorClock)
         self.helper = RestHelper(
             self.hs,
-            checked_cast(MemoryReactorClock, self.hs.get_reactor()),
+            reactor,
             self.site,
             getattr(self, "user_id", None),
         )

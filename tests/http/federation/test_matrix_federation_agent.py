@@ -63,7 +63,7 @@ from tests.http import (
     get_test_ca_cert_file,
 )
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
-from tests.utils import checked_cast, default_config
+from tests.utils import default_config
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +147,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # Normally this would be done by the TCP socket code in Twisted, but we are
         # stubbing that out here.
         # NB: we use a checked_cast here to workaround https://github.com/Shoobx/mypy-zope/issues/91)
-        client_protocol = checked_cast(
-            _WrappingProtocol, client_factory.buildProtocol(dummy_address)
-        )
+        client_protocol = client_factory.buildProtocol(dummy_address)
+        assert isinstance(client_protocol, _WrappingProtocol)
         client_protocol.makeConnection(
             FakeTransport(server_protocol, self.reactor, client_protocol)
         )
@@ -467,7 +466,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
             assert isinstance(proxy_server_transport, FakeTransport)
             client_protocol = proxy_server_transport.other
             assert isinstance(client_protocol, Protocol)
-            c2s_transport = checked_cast(FakeTransport, client_protocol.transport)
+            c2s_transport = client_protocol.transport
+            assert isinstance(c2s_transport, FakeTransport)
             c2s_transport.other = server_ssl_protocol
 
         self.reactor.advance(0)
