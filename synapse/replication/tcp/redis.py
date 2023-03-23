@@ -20,13 +20,10 @@ import attr
 import txredisapi
 from zope.interface import implementer
 
-from OpenSSL.SSL import Context
-from twisted.internet import ssl
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import IAddress, IConnector
 from twisted.python.failure import Failure
 
-from synapse.config.redis import RedisConfig
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import (
     BackgroundProcessLoggingContext,
@@ -38,6 +35,7 @@ from synapse.replication.tcp.commands import (
     ReplicateCommand,
     parse_command_from_line,
 )
+from synapse.replication.tcp.context import ClientContextFactory
 from synapse.replication.tcp.protocol import (
     IReplicationConnection,
     tcp_inbound_commands_counter,
@@ -410,20 +408,3 @@ def lazyConnection(
         )
 
     return factory.handler
-
-
-class ClientContextFactory(ssl.ClientContextFactory):
-    def __init__(self, redis_config: RedisConfig):
-        self.redis_config = redis_config
-
-    def getContext(self) -> Context:
-        ctx = ssl.ClientContextFactory.getContext(self)
-        if self.redis_config.redis_certificate:
-            ctx.use_certificate_file(self.redis_config.redis_certificate)
-        if self.redis_config.redis_private_key:
-            ctx.use_privatekey_file(self.redis_config.redis_private_key)
-        if self.redis_config.redis_ca_file:
-            ctx.load_verify_locations(cafile=self.redis_config.redis_ca_file)
-        elif self.redis_config.redis_ca_path:
-            ctx.load_verify_locationa(capath=self.redis_config.redis_ca_path)
-        return ctx

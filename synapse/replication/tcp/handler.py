@@ -46,8 +46,8 @@ from synapse.replication.tcp.commands import (
     UserIpCommand,
     UserSyncCommand,
 )
+from synapse.replication.tcp.context import ClientContextFactory
 from synapse.replication.tcp.protocol import IReplicationConnection
-from synapse.replication.tcp.redis import ClientContextFactory
 from synapse.replication.tcp.streams import (
     STREAMS_MAP,
     AccountDataStream,
