@@ -140,7 +140,7 @@ class TransactionRestServlet(RestServlet):
 
 
 class RoomCreateRestServlet(TransactionRestServlet):
-    # No PATTERN; we have custom dispatch rules here
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -180,6 +180,8 @@ class RoomCreateRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(RestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -323,6 +325,8 @@ class RoomStateEventRestServlet(RestServlet):
 
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -398,6 +402,8 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         super(ResolveRoomIdMixin, self).__init__(hs)  # ensure the Mixin is set up
@@ -460,6 +466,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
 # TODO: Needs unit testing
 class PublicRoomListRestServlet(RestServlet):
     PATTERNS = client_patterns("/publicRooms$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -578,6 +585,7 @@ class PublicRoomListRestServlet(RestServlet):
 # TODO: Needs unit testing
 class RoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/members$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -633,6 +641,7 @@ class RoomMemberListRestServlet(RestServlet):
 # except it does custom AS logic and has a simpler return format
 class JoinedRoomMemberListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -654,6 +663,10 @@ class JoinedRoomMemberListRestServlet(RestServlet):
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$", v1=True)
+    # TODO The routing information should be exposed programatically.
+    #      I want to do this but for now I felt bad about leaving this without
+    #      at least a visible warning on it.
+    CATEGORY = "Client API requests (ALL FOR SAME ROOM MUST GO TO SAME WORKER)"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -720,6 +733,7 @@ class RoomMessageListRestServlet(RestServlet):
 # TODO: Needs unit testing
 class RoomStateRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -742,6 +756,7 @@ class RoomStateRestServlet(RestServlet):
 # TODO: Needs unit testing
 class RoomInitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$", v1=True)
+    CATEGORY = "Sync requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -766,6 +781,7 @@ class RoomEventServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)$", v1=True
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -858,6 +874,7 @@ class RoomEventContextServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$", v1=True
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -958,6 +975,8 @@ class RoomForgetRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
@@ -1071,6 +1090,8 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
 
 class RoomRedactEventRestServlet(TransactionRestServlet):
+    CATEGORY = "Event sending requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -1164,6 +1185,7 @@ class RoomTypingRestServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$", v1=True
     )
+    CATEGORY = "The typing stream"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1195,7 +1217,7 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
-        # Defer getting the typing handler since it will raise on workers.
+        # Defer getting the typing handler since it will raise on WORKER_PATTERNS.
         typing_handler = self.hs.get_typing_writer_handler()
 
         try:
@@ -1224,6 +1246,7 @@ class RoomAliasListServlet(RestServlet):
             r"/rooms/(?P<room_id>[^/]*)/aliases"
         ),
     ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1244,6 +1267,7 @@ class RoomAliasListServlet(RestServlet):
 
 class SearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/search$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1263,6 +1287,7 @@ class SearchRestServlet(RestServlet):
 
 class JoinedRoomsRestServlet(RestServlet):
     PATTERNS = client_patterns("/joined_rooms$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1334,6 +1359,7 @@ class TimestampLookupRestServlet(RestServlet):
     PATTERNS = (
         re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1365,6 +1391,8 @@ class TimestampLookupRestServlet(RestServlet):
 
 class RoomHierarchyRestServlet(RestServlet):
     PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/hierarchy$"),)
+    WORKERS = PATTERNS
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1405,6 +1433,7 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
             "/rooms/(?P<room_identifier>[^/]*)/summary$"
         ),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
