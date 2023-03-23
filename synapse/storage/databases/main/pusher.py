@@ -509,20 +509,24 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
     async def _set_device_id_for_pushers(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        """Background update to populate the device_id column and clear the access_token
-        column for the pushers table."""
+        """
+        Background update to populate the device_id column and clear the access_token
+        column for the pushers table.
+        """
         last_pusher_id = progress.get("pusher_id", 0)
 
         def set_device_id_for_pushers_txn(txn: LoggingTransaction) -> int:
             txn.execute(
                 """
-                    SELECT p.id, at.device_id
+                    SELECT 
+                        p.id AS pusher_id,
+                        p.device_id AS pusher_device_id,
+                        at.device_id AS token_device_id
                     FROM pushers AS p
-                    INNER JOIN access_tokens AS at
+                    LEFT JOIN access_tokens AS at
                         ON p.access_token = at.id
                     WHERE
                         p.access_token IS NOT NULL
-                        AND at.device_id IS NOT NULL
                         AND p.id > ?
                     ORDER BY p.id
                     LIMIT ?
@@ -534,13 +538,27 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
             if len(rows) == 0:
                 return 0
 
+            # The reason we're clearing the access_token column here is a bit subtle.
+            # When a user logs out, we:
+            #  (1) delete the access token
+            #  (2) delete the device
+            #
+            # Ideally, we would delete the pushers only via its link to the device
+            # during (2), but since this background update might not have fully run yet,
+            # we're still deleting the pushers via the access token during (1).
             self.db_pool.simple_update_many_txn(
                 txn=txn,
                 table="pushers",
                 key_names=("id",),
-                key_values=[(row["id"],) for row in rows],
+                key_values=[(row["pusher_id"],) for row in rows],
                 value_names=("device_id", "access_token"),
-                value_values=[(row["device_id"], None) for row in rows],
+                # If there was already a device_id on the pusher, we only want to clear
+                # the access_token column, so we keep the existing device_id. Otherwise,
+                # we set the device_id we got from joining the access_tokens table.
+                value_values=[
+                    (row["pusher_device_id"] or row["token_device_id"], None)
+                    for row in rows
+                ],
             )
 
             self.db_pool.updates._background_update_progress_txn(

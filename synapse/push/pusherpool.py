@@ -25,7 +25,7 @@ from synapse.metrics.background_process_metrics import (
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.push.pusher import PusherFactory
 from synapse.replication.http.push import ReplicationRemovePusherRestServlet
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StrCollection
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.threepids import canonicalise_email
 
@@ -128,9 +128,9 @@ class PusherPool:
         last_stream_ordering = self.store.get_room_max_stream_ordering()
 
         # Before we actually persist the pusher, we check if the user already has one
-        # this app ID and pushkey. If so, we want to keep the access token and device ID
-        # in place, since this could be one device modifying (e.g. enabling/disabling)
-        # another device's pusher.
+        # for this app ID and pushkey. If so, we want to keep the access token and
+        # device ID in place, since this could be one device modifying
+        # (e.g. enabling/disabling) another device's pusher.
         # XXX(quenting): Even though we're not persisting the access_token_id for new
         # pushers anymore, we still need to copy existing access_token_ids over when
         # updating a pusher, in case the "set_device_id_for_pushers" background update
@@ -203,7 +203,7 @@ class PusherPool:
                 )
                 await self.remove_pusher(p.app_id, p.pushkey, p.user_name)
 
-    async def remove_http_pushers_by_access_tokens(
+    async def remove_pushers_by_access_tokens(
         self, user_id: str, access_tokens: Iterable[int]
     ) -> None:
         """Remove the HTTP pushers for a given user corresponding to a set of
@@ -217,7 +217,7 @@ class PusherPool:
         # background update finishes
         tokens = set(access_tokens)
         for p in await self.store.get_pushers_by_user_id(user_id):
-            if p.kind == "http" and p.access_token in tokens:
+            if p.access_token in tokens:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p.app_id,
@@ -226,8 +226,8 @@ class PusherPool:
                 )
                 await self.remove_pusher(p.app_id, p.pushkey, p.user_name)
 
-    async def remove_http_pushers_by_devices(
-        self, user_id: str, devices: Iterable[str]
+    async def remove_pushers_by_devices(
+        self, user_id: str, devices: StrCollection
     ) -> None:
         """Remove the HTTP pushers for a given user corresponding to a set of devices
 
@@ -237,11 +237,7 @@ class PusherPool:
         """
         device_ids = set(devices)
         for p in await self.store.get_pushers_by_user_id(user_id):
-            if (
-                p.kind == "http"
-                and p.device_id is not None
-                and p.device_id in device_ids
-            ):
+            if p.device_id in device_ids:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p.app_id,

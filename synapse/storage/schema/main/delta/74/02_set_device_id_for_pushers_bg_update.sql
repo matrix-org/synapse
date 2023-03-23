@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
--- Triggers the background update to set the device_id for pushers that don't have one. 
+-- Triggers the background update to set the device_id for pushers
+-- that don't have one, and clear the access_token column.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
     (7402, 'set_device_id_for_pushers', '{}');
