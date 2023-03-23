@@ -1,6 +1,5 @@
 from typing import Optional
 
-from twisted.internet.protocol import Protocol
 from zope.interface import Interface, implementer
 
 
@@ -17,6 +16,11 @@ dummy_address = DummyAddress()
 
 
 class IProtocol(Interface):
+    pass
+
+
+@implementer(IProtocol)
+class Protocol:
     pass
 
 
