@@ -1,0 +1,1 @@
+Add redis SSL configuration options
