@@ -95,9 +95,9 @@ Changes in SCHEMA_VERSION = 74:
 
 
 SCHEMA_COMPAT_VERSION = (
-    # The threads_id column must exist for event_push_actions, event_push_summary,
-    # receipts_linearized, and receipts_graph.
-    73
+    # The threads_id column must written to with non-null values event_push_actions,
+    # event_push_actions_staging, and event_push_summary.
+    74
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 
