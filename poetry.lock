@@ -1209,15 +1209,13 @@ files = [
 
 [[package]]
 name = "mypy-zope"
-version = "0.9.0"
-description = "Plugin for mypy to support zope interfaces"
+version = "0.9.1.dev0"
+description = ""
 category = "dev"
 optional = false
 python-versions = "*"
-files = [
-    {file = "mypy-zope-0.9.0.tar.gz", hash = "sha256:88bf6cd056e38b338e6956055958a7805b4ff84404ccd99e29883a3647a1aeb3"},
-    {file = "mypy_zope-0.9.0-py3-none-any.whl", hash = "sha256:e1bb4b57084f76ff8a154a3e07880a1af2ac6536c491dad4b143d529f72c5d15"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 mypy = "1.0.0"
@@ -1226,6 +1224,12 @@ mypy = "1.0.0"
 
 [package.extras]
 test = ["lxml", "pytest (>=4.6)", "pytest-cov"]
+
+[package.source]
+type = "git"
+url = "https://github.com/Shoobx/mypy-zope.git"
+reference = "fix-unreachable"
+resolved_reference = "96518e2725401adb8ecbe177441971666037fd81"
 
 [[package]]
 name = "netaddr"
@@ -2920,4 +2924,4 @@ user-search = ["pyicu"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7.1"
-content-hash = "0ca92e52a1952f9485172efe25a039351280c28f0a158869557dc2f8855786fe"
+content-hash = "1cec4f31f839c4b7db1a5d03fc96dd17d7c08a17728e66d816880383ef2d1755"
