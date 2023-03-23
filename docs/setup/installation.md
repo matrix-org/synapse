@@ -26,8 +26,8 @@ for most users.
 #### Docker images and Ansible playbooks
 
 There is an official synapse image available at
-<https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
-the docker-compose file available at
+<https://hub.docker.com/r/matrixdotorg/synapse> or at [`ghcr.io/matrix-org/synapse`](https://ghcr.io/matrix-org/synapse)
+which can be used with the docker-compose file available at
 [contrib/docker](https://github.com/matrix-org/synapse/tree/develop/contrib/docker).
 Further information on this including configuration options is available in the README
 on hub.docker.com.

@@ -805,7 +805,6 @@ class EventsWorkerStore(SQLBaseStore):
                 # the events have been redacted, and if so pulling the redaction event
                 # out of the database to check it.
                 #
-                missing_events = {}
                 try:
                     # Try to fetch from any external cache. We already checked the
                     # in-memory cache above.

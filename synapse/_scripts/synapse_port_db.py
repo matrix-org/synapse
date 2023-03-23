@@ -18,6 +18,7 @@
 import argparse
 import curses
 import logging
+import os
 import sys
 import time
 import traceback
@@ -1326,10 +1327,17 @@ def main() -> None:
         filename="port-synapse.log" if args.curses else None,
     )
 
+    if not os.path.isfile(args.sqlite_database):
+        sys.stderr.write(
+            "The sqlite database you specified does not exist, please check that you have the"
+            "correct path."
+        )
+        sys.exit(1)
+
     sqlite_config = {
         "name": "sqlite3",
         "args": {
-            "database": "file:{}?mode=rw".format(args.sqlite_database),
+            "database": args.sqlite_database,
             "cp_min": 1,
             "cp_max": 1,
             "check_same_thread": False,
