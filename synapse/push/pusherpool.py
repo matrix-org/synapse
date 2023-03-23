@@ -206,7 +206,7 @@ class PusherPool:
     async def remove_pushers_by_access_tokens(
         self, user_id: str, access_tokens: Iterable[int]
     ) -> None:
-        """Remove the HTTP pushers for a given user corresponding to a set of
+        """Remove the pushers for a given user corresponding to a set of
         access_tokens.
 
         Args:
@@ -229,7 +229,7 @@ class PusherPool:
     async def remove_pushers_by_devices(
         self, user_id: str, devices: StrCollection
     ) -> None:
-        """Remove the HTTP pushers for a given user corresponding to a set of devices
+        """Remove the pushers for a given user corresponding to a set of devices
 
         Args:
             user_id: user to remove pushers for
