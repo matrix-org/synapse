@@ -91,6 +91,7 @@ else
           "synapse" "docker" "tests"
           "scripts-dev"
           "contrib" "synmark" "stubs" ".ci"
+          "dev-docs"
       )
   fi
 fi
