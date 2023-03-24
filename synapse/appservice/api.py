@@ -444,6 +444,44 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         return response, missing
 
+    async def query_keys(
+        self, service: "ApplicationService", query: Dict[str, List[str]]
+    ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
+        """Query the application service for keys.
+
+        Args:
+            query: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A map of device_keys/master_keys/self_signing_keys/user_signing_keys:
+
+            device_keys is a map of user ID -> a map device ID -> device info.
+        """
+        if service.url is None:
+            return {}
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3984/keys/query"
+        try:
+            response = await self.post_json_get_json(
+                uri,
+                query,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
+        except CodeMessageException as e:
+            # The appservice doesn't support this endpoint.
+            if e.code == 404 or e.code == 405:
+                return {}
+            logger.warning("claim_keys to %s received %s", uri, e.code)
+            return {}
+        except Exception as ex:
+            logger.warning("claim_keys to %s threw exception %s", uri, ex)
+            return {}
+
+        return response
+
     def _serialize(
         self, service: "ApplicationService", events: Iterable[EventBase]
     ) -> List[JsonDict]:
