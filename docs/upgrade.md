@@ -88,6 +88,22 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.81.0
+
+## Application service path & authentication deprecations
+
+Synapse now attempts the versioned appservice paths before falling back to the
+[legacy paths](https://spec.matrix.org/v1.6/application-service-api/#legacy-routes).
+Usage of the legacy routes should be considered deprecated.
+
+Additionally, Synapse has supported sending the application service access token
+via [the `Authorization` header](https://spec.matrix.org/v1.6/application-service-api/#authorization)
+since v1.70.0. For backwards compatibility it is *also* send as the `access_token`
+query parameter. This is insecure and should be considered deprecated.
+
+A future version of Synapse (v1.85.0 or later) will remove support for legacy
+application service routes and query parameter authorization.
+
 # Upgrading to v1.80.0
 
 ## Reporting events error code change
