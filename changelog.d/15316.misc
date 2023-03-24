@@ -1,0 +1,1 @@
+As an optimisation, use `TRUNCATE` on Postgres when clearing the user directory tables.
