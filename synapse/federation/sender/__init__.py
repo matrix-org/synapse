@@ -58,8 +58,9 @@ The loop continues so long as there is anything to send. At each iteration of th
 - make the `/send` request to the destination homeserver with the dequeued PDUs and EDUs.
 - if successful, make note of the fact that we succeeded in transmitting PDUs up to
   the given `stream_ordering` of the latest PDU by
-- if unsuccessful, back off from the remote homeserver for some time, or enter
-  *Catch-Up Mode*, described below, if we have been unsuccessful multiple times [HOW MANY?].
+- if unsuccessful, back off from the remote homeserver for some time.
+  If we have been unsuccessful for too long (when the backoff interval grows to exceed 1 hour),
+  the in-memory queues are emptied and we enter [*Catch-Up Mode*, described below](#catch-up-mode).
 
 
 ### Catch-Up Mode
@@ -94,13 +95,34 @@ will behave according to this principle and therefore avoid sending lots of diff
 at different points in the DAG to a recovering homeserver.
 *This optimisation is not currently valid in rooms which are partial-state on this homeserver,
 since we are unable to determine whether the destination homeserver is eligible to receive
-the latest forward extremities unless this homeserver sent those PDUs.*
+the latest forward extremities unless this homeserver sent those PDUs — in this case, we
+just send the latest PDUs originating from this server and skip this optimisation.*
 
 Whilst PDUs are sent through this mechanism, the position of `last_successful_stream_ordering`
 is advanced as normal.
 Once there are no longer any rooms containing outstanding PDUs to be sent to the destination
 *that are not already in the `PerDestinationQueue` because they arrived since Catch-Up Mode
 was enabled*, Catch-Up Mode is exited and we return to `_transaction_transmission_loop`.
+
+
+#### A note on failures and back-offs
+
+If a remote server is unreachable over federation, we back off from that server,
+with an exponentially-increasing retry interval.
+Whilst we don't automatically retry after the interval, we prevent making new attempts
+until such time as the back-off has cleared.
+Once the back-off is cleared and a new PDU or EDU arrives for transmission, the transmission
+loop resumes and empties the queue by making federation requests.
+
+If the backoff grows too large (> 1 hour), the in-memory queue is emptied (to prevent
+unbounded growth) and Catch-Up Mode is entered.
+
+It is worth noting that the back-off for a remote server is cleared once an inbound
+request from that remote server is received (see `notify_remote_server_up`).
+At this point, the transaction transmission loop is also started up, to proactively
+send missed PDUs and EDUs to the destination (i.e. you don't need to wait for a new PDU
+or EDU, destined for that destination, to be created in order to send out missed PDUs and
+EDUs).
 """
 
 import abc
