@@ -98,7 +98,7 @@ Usage of the legacy routes should be considered deprecated.
 
 Additionally, Synapse has supported sending the application service access token
 via [the `Authorization` header](https://spec.matrix.org/v1.6/application-service-api/#authorization)
-since v1.70.0. For backwards compatibility it is *also* send as the `access_token`
+since v1.70.0. For backwards compatibility it is *also* sent as the `access_token`
 query parameter. This is insecure and should be considered deprecated.
 
 A future version of Synapse (v1.85.0 or later) will remove support for legacy
