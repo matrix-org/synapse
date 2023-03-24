@@ -62,7 +62,7 @@ book/
 
 # complement
 /complement-*
-/master.tar.gz
+/main.tar.gz
 
 # rust
 /target/
