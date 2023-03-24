@@ -30,7 +30,7 @@ remote homeserver that is in the room at that point in the DAG.
 There is one `PerDestinationQueue` per 'destination' homeserver.
 The `PerDestinationQueue` maintains the following information about the destination:
 
-- whether the destination is currently in catch-up mode (see below);
+- whether the destination is currently in [catch-up mode (see below)](#catch-up-mode);
 - a queue of PDUs to be sent to the destination; and
 - a queue of EDUs to be sent to the destination (not considered in this section).
 
