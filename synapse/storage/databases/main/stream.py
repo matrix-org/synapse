@@ -50,7 +50,7 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 from typing_extensions import Literal
 
 from twisted.internet import defer
@@ -557,7 +557,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 if p > min_pos
             }
 
-        return RoomStreamToken(None, min_pos, frozendict(positions))
+        return RoomStreamToken(None, min_pos, immutabledict(positions))
 
     async def get_room_events_stream_for_rooms(
         self,

@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   build:
@@ -34,11 +35,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Calculate docker image tag
         id: set-tag
         uses: docker/metadata-action@master
         with:
-          images: matrixdotorg/synapse
+          images: |
+            docker.io/matrixdotorg/synapse
+            ghcr.io/matrix-org/synapse
           flavor: |
             latest=false
           tags: |

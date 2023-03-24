@@ -345,7 +345,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 _outgoing_request_counter.labels(cls.NAME, 200).inc()
 
                 # Wait on any streams that the remote may have written to.
-                for stream_name, position in result.get(
+                for stream_name, position in result.pop(
                     _STREAM_POSITION_KEY, {}
                 ).items():
                     await replication.wait_for_stream_position(
