@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Synapse development"
-copyright = "2023, The Synapse Maintainers and Community"
+copyright = "2023, The Matrix.org Foundation C.I.C."
 author = "The Synapse Maintainers and Community"
 
 # -- General configuration ---------------------------------------------------
