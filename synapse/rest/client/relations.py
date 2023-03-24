@@ -42,6 +42,7 @@ class RelationPaginationServlet(RestServlet):
         "(/(?P<relation_type>[^/]*)(/(?P<event_type>[^/]*))?)?$",
         releases=("v1",),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -84,6 +85,7 @@ class RelationPaginationServlet(RestServlet):
 
 class ThreadsServlet(RestServlet):
     PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/threads"),)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

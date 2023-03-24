@@ -896,7 +896,7 @@ class FederationSender(AbstractFederationSender):
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
         if destination == self.server_name:
             logger.warning("Not sending device update to ourselves")
             return

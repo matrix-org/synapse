@@ -178,3 +178,6 @@ class ExperimentalConfig(Config):
 
         # MSC3967: Do not require UIA when first uploading cross signing keys
         self.msc3967_enabled = experimental.get("msc3967_enabled", False)
+
+        # MSC2659: Application service ping endpoint
+        self.msc2659_enabled = experimental.get("msc2659_enabled", False)

@@ -69,6 +69,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
             "/rooms/(?P<room_id>[^/]*)/batch_send$"
         ),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

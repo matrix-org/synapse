@@ -159,15 +159,16 @@ class EventHandler:
         Returns:
             An event, or None if there is no event matching this ID.
         Raises:
-            SynapseError if there was a problem retrieving this event, or
-            AuthError if the user does not have the rights to inspect this
-            event.
+            AuthError: if the user does not have the rights to inspect this event.
         """
         redact_behaviour = (
             EventRedactBehaviour.as_is if show_redacted else EventRedactBehaviour.redact
         )
         event = await self.store.get_event(
-            event_id, check_room_id=room_id, redact_behaviour=redact_behaviour
+            event_id,
+            check_room_id=room_id,
+            redact_behaviour=redact_behaviour,
+            allow_none=True,
         )
 
         if not event:

@@ -244,7 +244,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
 
         self.notifier.on_new_replication_data()
 
-    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
         """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.

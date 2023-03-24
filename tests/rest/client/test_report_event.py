@@ -84,6 +84,48 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
         self.assertEqual(404, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "Unable to report event: it does not exist or you aren't able to see it.",
+            channel.json_body["error"],
+            msg=channel.result["body"],
+        )
+
+    def test_cannot_report_event_if_not_in_room(self) -> None:
+        """
+        Tests that we don't accept event reports for events that exist, but for which
+        the reporter should not be able to view (because they are not in the room).
+        """
+        # Have the admin user create a room (the "other" user will not join this room).
+        new_room_id = self.helper.create_room_as(tok=self.admin_user_tok)
+
+        # Have the admin user send an event in this room.
+        response = self.helper.send_event(
+            new_room_id,
+            "m.room.message",
+            content={
+                "msgtype": "m.text",
+                "body": "This event has some bad words in it! Flip!",
+            },
+            tok=self.admin_user_tok,
+        )
+        event_id = response["event_id"]
+
+        # Have the "other" user attempt to report it. Perhaps they found the event ID
+        # in a screenshot or something...
+        channel = self.make_request(
+            "POST",
+            f"rooms/{new_room_id}/report/{event_id}",
+            {"reason": "I'm not in this room but I have opinions anyways!"},
+            access_token=self.other_user_tok,
+        )
+
+        # The "other" user is not in the room, so their report should be rejected.
+        self.assertEqual(404, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "Unable to report event: it does not exist or you aren't able to see it.",
+            channel.json_body["error"],
+            msg=channel.result["body"],
+        )
 
     def _assert_status(self, response_status: int, data: JsonDict) -> None:
         channel = self.make_request(
