@@ -54,7 +54,7 @@ This is useful for *Catch-Up Mode*, described later.)
 
 The loop continues so long as there is anything to send. At each iteration of the loop, we:
 
-- dequeue up to 50 PDUs (and some EDUs).
+- dequeue up to 50 PDUs (and up to 100 EDUs).
 - make the `/send` request to the destination homeserver with the dequeued PDUs and EDUs.
 - if successful, make note of the fact that we succeeded in transmitting PDUs up to
   the given `stream_ordering` of the latest PDU by
