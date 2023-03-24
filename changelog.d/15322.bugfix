@@ -1,0 +1,1 @@
+Fix OAuth2 compatibility with Mattermost as an OIDC provider and add example configuration for it.

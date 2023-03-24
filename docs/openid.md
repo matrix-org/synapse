@@ -590,6 +590,37 @@ oidc_providers:
 
 Note that the fields `client_id` and `client_secret` are taken from the CURL response above.
 
+### Mattermost
+
+[Mattermost](https://mattermost.com) is not an OpenID provider but works with Synapse as an Oauth2 provider.
+
+Follow [the documentation](https://developers.mattermost.com/integrate/apps/authentication/oauth2/)
+to create a new application. Your callback URL should be `[synapse public baseurl]/_synapse/client/oidc/callback`.
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: my_mattermost
+    idp_name: "Mattermost example"
+    discover: false
+    issuer: "https://your.mattermost.domain"
+    client_id: "someclientid_123"
+    client_secret: "someclientsecret_123"
+    client_auth_method: "client_secret_post"
+    scopes: []  # Scopes not supported
+    authorization_endpoint: "https://your.mattermost.domain/oauth/authorize"
+    token_endpoint: "https://your.mattermost.domain/oauth/access_token"
+    userinfo_endpoint: "https://your.mattermost.domain/api/v4/users/me"
+    user_mapping_provider:
+      config:
+        subject_template: "{{ user.id }}"
+        localpart_template: "{{ user.username }}"
+        # Optionally display name and email
+        display_name_template: "{{ user.first_name + ' ' + user.last_name }}"
+        email_template: "{{ user.email }}"
+```
+
 ### Shibboleth with OIDC Plugin
 
 [Shibboleth](https://www.shibboleth.net/) is an open Standard IdP solution widely used by Universities.

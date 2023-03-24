@@ -1053,7 +1053,7 @@ class OidcProvider:
 
         # If there is an id_token, it should be validated, regardless of the
         # userinfo endpoint is used or not.
-        if token.get("id_token") is not None:
+        if token.get("id_token"):
             try:
                 id_token = await self._parse_id_token(token, nonce=session_data.nonce)
                 sid = id_token.get("sid")
