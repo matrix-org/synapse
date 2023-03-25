@@ -1,0 +1,1 @@
+Fix joining rooms you have been unbanned from over federation. Introduced before Synapse bugs were tracked on Github. Contributed by Nico.
