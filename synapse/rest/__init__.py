@@ -100,8 +100,7 @@ class ClientRestResource(JsonResource):
         login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
-        if is_main_process:
-            directory.register_servlets(hs, client_resource)
+        directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
         if is_main_process:
             pusher.register_servlets(hs, client_resource)
