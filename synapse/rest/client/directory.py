@@ -45,6 +45,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
 
 class ClientDirectoryServer(RestServlet):
     PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
