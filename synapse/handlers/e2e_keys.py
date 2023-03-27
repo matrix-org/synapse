@@ -544,7 +544,7 @@ class E2eKeysHandler:
 
     async def claim_local_one_time_keys(
         self, local_query: List[Tuple[str, str, str]]
-    ) -> Iterable[Dict[str, Dict[str, Dict[str, str]]]]:
+    ) -> Iterable[Dict[str, Dict[str, Dict[str, JsonDict]]]]:
         """Claim one time keys for local users.
 
         1. Attempt to claim OTKs from the database.
@@ -587,14 +587,11 @@ class E2eKeysHandler:
 
         # A map of user ID -> device ID -> key ID -> key.
         json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
-        failures: Dict[str, JsonDict] = {}
         for result in results:
             for user_id, device_keys in result.items():
                 for device_id, keys in device_keys.items():
-                    for key_id, json_str in keys.items():
-                        json_result.setdefault(user_id, {})[device_id] = {
-                            key_id: json_decoder.decode(json_str)
-                        }
+                    for key_id, key in keys.items():
+                        json_result.setdefault(user_id, {})[device_id] = {key_id: key}
 
         @trace
         async def claim_client_keys(destination: str) -> None:
