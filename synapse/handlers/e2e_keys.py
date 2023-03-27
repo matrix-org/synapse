@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
@@ -53,6 +52,7 @@ class E2eKeysHandler:
         self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.device_handler = hs.get_device_handler()
+        self._appservice_handler = hs.get_application_service_handler()
         self.is_mine = hs.is_mine
         self.clock = hs.get_clock()
 
@@ -86,6 +86,10 @@ class E2eKeysHandler:
         self._query_devices_linearizer = Linearizer(
             name="query_devices",
             max_count=10,
+        )
+
+        self._query_appservices_for_otks = (
+            hs.config.experimental.msc3983_appservice_otk_claims
         )
 
     @trace
@@ -548,7 +552,8 @@ class E2eKeysHandler:
         """Claim one time keys for local users.
 
         1. Attempt to claim OTKs from the database.
-        2. Attempt to fetch fallback keys from the database.
+        2. Ask application services if they provide OTKs.
+        3. Attempt to fetch fallback keys from the database.
 
         Args:
             local_query: An iterable of tuples of (user ID, device ID, algorithm).
@@ -559,10 +564,21 @@ class E2eKeysHandler:
 
         otk_results, not_found = await self.store.claim_e2e_one_time_keys(local_query)
 
+        # If the application services have not provided any keys via the C-S
+        # API, query it directly.
+        if self._query_appservices_for_otks:
+            # Query the appservices for any OTKs.
+            (
+                appservice_results,
+                not_found,
+            ) = await self._appservice_handler.claim_e2e_one_time_keys(not_found)
+        else:
+            appservice_results = []
+
         # For any *still* remaining users, try fall-back keys.
         fallback_results = await self.store.claim_e2e_fallback_keys(not_found)
 
-        return (otk_results, fallback_results)
+        return (otk_results, *appservice_results, fallback_results)
 
     @trace
     async def claim_one_time_keys(
@@ -592,6 +608,9 @@ class E2eKeysHandler:
                 for device_id, keys in device_keys.items():
                     for key_id, key in keys.items():
                         json_result.setdefault(user_id, {})[device_id] = {key_id: key}
+
+        # Remote failures.
+        failures: Dict[str, JsonDict] = {}
 
         @trace
         async def claim_client_keys(destination: str) -> None:
