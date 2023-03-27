@@ -1521,7 +1521,7 @@ files = [
 [[package]]
 name = "mypy-zope"
 version = "0.9.1.dev0"
-description = ""
+description = "Plugin for mypy to support zope interfaces"
 category = "dev"
 optional = false
 python-versions = "*"
@@ -1529,7 +1529,7 @@ files = []
 develop = false
 
 [package.dependencies]
-mypy = ">=1.0.0,<1.1.0"
+mypy = "1.0.0"
 "zope.interface" = "*"
 "zope.schema" = "*"
 
@@ -1540,7 +1540,7 @@ test = ["lxml", "pytest (>=4.6)", "pytest-cov"]
 type = "git"
 url = "https://github.com/Shoobx/mypy-zope.git"
 reference = "fix-unreachable"
-resolved_reference = "96518e2725401adb8ecbe177441971666037fd81"
+resolved_reference = "282269e484cdece7aa024639f763927015cfdac5"
 
 [[package]]
 name = "myst-parser"
