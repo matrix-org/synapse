@@ -63,7 +63,7 @@ class ProfileHandler:
 
         self._third_party_rules = hs.get_third_party_event_rules()
 
-    async def get_profile(self, user_id: str) -> JsonDict:
+    async def get_profile(self, user_id: str, ignore_backoff: bool = True) -> JsonDict:
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
@@ -81,7 +81,7 @@ class ProfileHandler:
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": user_id},
-                    ignore_backoff=True,
+                    ignore_backoff=ignore_backoff,
                 )
                 return result
             except RequestSendFailed as e:
@@ -307,7 +307,11 @@ class ProfileHandler:
         if not self.max_avatar_size and not self.allowed_avatar_mimetypes:
             return True
 
-        server_name, _, media_id = parse_and_validate_mxc_uri(mxc)
+        host, port, media_id = parse_and_validate_mxc_uri(mxc)
+        if port is not None:
+            server_name = host + ":" + str(port)
+        else:
+            server_name = host
 
         if server_name == self.server_name:
             media_info = await self.store.get_local_media(media_id)

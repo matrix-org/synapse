@@ -26,7 +26,7 @@ from typing import (
 
 from typing_extensions import Literal
 
-from synapse.api.constants import EduTypes
+from synapse.api.constants import Direction, EduTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX, FEDERATION_V2_PREFIX
@@ -70,6 +70,7 @@ class BaseFederationServerServlet(BaseFederationServlet):
 
 class FederationSendServlet(BaseFederationServerServlet):
     PATH = "/send/(?P<transaction_id>[^/]*)/?"
+    CATEGORY = "Inbound federation transaction request"
 
     # We ratelimit manually in the handler as we queue up the requests and we
     # don't want to fill up the ratelimiter with blocked requests.
@@ -138,6 +139,7 @@ class FederationSendServlet(BaseFederationServerServlet):
 
 class FederationEventServlet(BaseFederationServerServlet):
     PATH = "/event/(?P<event_id>[^/]*)/?"
+    CATEGORY = "Federation requests"
 
     # This is when someone asks for a data item for a given server data_id pair.
     async def on_GET(
@@ -152,6 +154,7 @@ class FederationEventServlet(BaseFederationServerServlet):
 
 class FederationStateV1Servlet(BaseFederationServerServlet):
     PATH = "/state/(?P<room_id>[^/]*)/?"
+    CATEGORY = "Federation requests"
 
     # This is when someone asks for all data for a given room.
     async def on_GET(
@@ -170,6 +173,7 @@ class FederationStateV1Servlet(BaseFederationServerServlet):
 
 class FederationStateIdsServlet(BaseFederationServerServlet):
     PATH = "/state_ids/(?P<room_id>[^/]*)/?"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -187,6 +191,7 @@ class FederationStateIdsServlet(BaseFederationServerServlet):
 
 class FederationBackfillServlet(BaseFederationServerServlet):
     PATH = "/backfill/(?P<room_id>[^/]*)/?"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -218,14 +223,14 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
     `dir` can be `f` or `b` to indicate forwards and backwards in time from the
     given timestamp.
 
-    GET /_matrix/federation/unstable/org.matrix.msc3030/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
+    GET /_matrix/federation/v1/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
     {
         "event_id": ...
     }
     """
 
     PATH = "/timestamp_to_event/(?P<room_id>[^/]*)/?"
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3030"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -235,9 +240,10 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
         room_id: str,
     ) -> Tuple[int, JsonDict]:
         timestamp = parse_integer_from_args(query, "ts", required=True)
-        direction = parse_string_from_args(
-            query, "dir", default="f", allowed_values=["f", "b"], required=True
+        direction_str = parse_string_from_args(
+            query, "dir", allowed_values=["f", "b"], required=True
         )
+        direction = Direction(direction_str)
 
         return await self.handler.on_timestamp_to_event_request(
             origin, room_id, timestamp, direction
@@ -246,6 +252,7 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
 
 class FederationQueryServlet(BaseFederationServerServlet):
     PATH = "/query/(?P<query_type>[^/]*)"
+    CATEGORY = "Federation requests"
 
     # This is when we receive a server-server Query
     async def on_GET(
@@ -262,6 +269,7 @@ class FederationQueryServlet(BaseFederationServerServlet):
 
 class FederationMakeJoinServlet(BaseFederationServerServlet):
     PATH = "/make_join/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -297,6 +305,7 @@ class FederationMakeJoinServlet(BaseFederationServerServlet):
 
 class FederationMakeLeaveServlet(BaseFederationServerServlet):
     PATH = "/make_leave/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -312,6 +321,7 @@ class FederationMakeLeaveServlet(BaseFederationServerServlet):
 
 class FederationV1SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_PUT(
         self,
@@ -327,6 +337,7 @@ class FederationV1SendLeaveServlet(BaseFederationServerServlet):
 
 class FederationV2SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     PREFIX = FEDERATION_V2_PREFIX
 
@@ -344,6 +355,7 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
 
 class FederationMakeKnockServlet(BaseFederationServerServlet):
     PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -366,6 +378,7 @@ class FederationMakeKnockServlet(BaseFederationServerServlet):
 
 class FederationV1SendKnockServlet(BaseFederationServerServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_PUT(
         self,
@@ -381,6 +394,7 @@ class FederationV1SendKnockServlet(BaseFederationServerServlet):
 
 class FederationEventAuthServlet(BaseFederationServerServlet):
     PATH = "/event_auth/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -395,6 +409,7 @@ class FederationEventAuthServlet(BaseFederationServerServlet):
 
 class FederationV1SendJoinServlet(BaseFederationServerServlet):
     PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_PUT(
         self,
@@ -412,6 +427,7 @@ class FederationV1SendJoinServlet(BaseFederationServerServlet):
 
 class FederationV2SendJoinServlet(BaseFederationServerServlet):
     PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     PREFIX = FEDERATION_V2_PREFIX
 
@@ -423,7 +439,7 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self._msc3706_enabled = hs.config.experimental.msc3706_enabled
+        self._read_msc3706_query_param = hs.config.experimental.msc3706_enabled
 
     async def on_PUT(
         self,
@@ -437,10 +453,16 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
         #   match those given in content
 
         partial_state = False
-        if self._msc3706_enabled:
+        # The stable query parameter wins, if it disagrees with the unstable
+        # parameter for some reason.
+        stable_param = parse_boolean_from_args(query, "omit_members", default=None)
+        if stable_param is not None:
+            partial_state = stable_param
+        elif self._read_msc3706_query_param:
             partial_state = parse_boolean_from_args(
                 query, "org.matrix.msc3706.partial_state", default=False
             )
+
         result = await self.handler.on_send_join_request(
             origin, content, room_id, caller_supports_partial_state=partial_state
         )
@@ -449,6 +471,7 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 
 class FederationV1InviteServlet(BaseFederationServerServlet):
     PATH = "/invite/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_PUT(
         self,
@@ -473,6 +496,7 @@ class FederationV1InviteServlet(BaseFederationServerServlet):
 
 class FederationV2InviteServlet(BaseFederationServerServlet):
     PATH = "/invite/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     PREFIX = FEDERATION_V2_PREFIX
 
@@ -489,7 +513,7 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 
         room_version = content["room_version"]
         event = content["event"]
-        invite_room_state = content["invite_room_state"]
+        invite_room_state = content.get("invite_room_state", [])
 
         # Synapse expects invite_room_state to be in unsigned, as it is in v1
         # API
@@ -499,11 +523,17 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
         result = await self.handler.on_invite_request(
             origin, event, room_version_id=room_version
         )
+
+        # We only store invite_room_state for internal use, so remove it before
+        # returning the event to the remote homeserver.
+        result["event"].get("unsigned", {}).pop("invite_room_state", None)
+
         return 200, result
 
 
 class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
     PATH = "/exchange_third_party_invite/(?P<room_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_PUT(
         self,
@@ -518,6 +548,7 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
 
 class FederationClientKeysQueryServlet(BaseFederationServerServlet):
     PATH = "/user/keys/query"
+    CATEGORY = "Federation requests"
 
     async def on_POST(
         self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
@@ -527,6 +558,7 @@ class FederationClientKeysQueryServlet(BaseFederationServerServlet):
 
 class FederationUserDevicesQueryServlet(BaseFederationServerServlet):
     PATH = "/user/devices/(?P<user_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_GET(
         self,
@@ -540,6 +572,7 @@ class FederationUserDevicesQueryServlet(BaseFederationServerServlet):
 
 class FederationClientKeysClaimServlet(BaseFederationServerServlet):
     PATH = "/user/keys/claim"
+    CATEGORY = "Federation requests"
 
     async def on_POST(
         self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
@@ -550,6 +583,7 @@ class FederationClientKeysClaimServlet(BaseFederationServerServlet):
 
 class FederationGetMissingEventsServlet(BaseFederationServerServlet):
     PATH = "/get_missing_events/(?P<room_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     async def on_POST(
         self,
@@ -575,6 +609,7 @@ class FederationGetMissingEventsServlet(BaseFederationServerServlet):
 
 class On3pidBindServlet(BaseFederationServerServlet):
     PATH = "/3pid/onbind"
+    CATEGORY = "Federation requests"
 
     REQUIRE_AUTH = False
 
@@ -607,6 +642,7 @@ class On3pidBindServlet(BaseFederationServerServlet):
 
 class FederationVersionServlet(BaseFederationServlet):
     PATH = "/version"
+    CATEGORY = "Federation requests"
 
     REQUIRE_AUTH = False
 
@@ -629,6 +665,7 @@ class FederationVersionServlet(BaseFederationServlet):
 
 class FederationRoomHierarchyServlet(BaseFederationServlet):
     PATH = "/hierarchy/(?P<room_id>[^/]*)"
+    CATEGORY = "Federation requests"
 
     def __init__(
         self,
@@ -661,6 +698,7 @@ class RoomComplexityServlet(BaseFederationServlet):
 
     PATH = "/rooms/(?P<room_id>[^/]*)/complexity"
     PREFIX = FEDERATION_UNSTABLE_PREFIX
+    CATEGORY = "Federation requests (unstable)"
 
     def __init__(
         self,

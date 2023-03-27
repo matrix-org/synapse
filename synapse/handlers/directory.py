@@ -14,7 +14,9 @@
 
 import logging
 import string
-from typing import TYPE_CHECKING, Iterable, List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence
+
+from typing_extensions import Literal
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
@@ -83,7 +85,7 @@ class DirectoryHandler:
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            servers = await self._storage_controllers.state.get_current_hosts_in_room(
+            servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
                 room_id
             )
 
@@ -288,7 +290,7 @@ class DirectoryHandler:
                 Codes.NOT_FOUND,
             )
 
-        extra_servers = await self._storage_controllers.state.get_current_hosts_in_room(
+        extra_servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
             room_id
         )
         servers_set = set(extra_servers) | set(servers)
@@ -429,7 +431,10 @@ class DirectoryHandler:
         return await self.auth.check_can_change_room_list(room_id, requester)
 
     async def edit_published_room_list(
-        self, requester: Requester, room_id: str, visibility: str
+        self,
+        requester: Requester,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> None:
         """Edit the entry of the room in the published room list.
 
@@ -450,9 +455,6 @@ class DirectoryHandler:
 
         if requester.is_guest:
             raise AuthError(403, "Guests cannot edit the published room list")
-
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
 
         if visibility == "public" and not self.enable_room_list_search:
             # The room list has been disabled.
@@ -483,7 +485,8 @@ class DirectoryHandler:
                 )
             )
             if canonical_alias:
-                room_aliases.append(canonical_alias)
+                # Ensure we do not mutate room_aliases.
+                room_aliases = list(room_aliases) + [canonical_alias]
 
             if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
@@ -494,9 +497,11 @@ class DirectoryHandler:
                 raise SynapseError(403, "Not allowed to publish room")
 
             # Check if publishing is blocked by a third party module
-            allowed_by_third_party_rules = await (
-                self.third_party_event_rules.check_visibility_can_be_modified(
-                    room_id, visibility
+            allowed_by_third_party_rules = (
+                await (
+                    self.third_party_event_rules.check_visibility_can_be_modified(
+                        room_id, visibility
+                    )
                 )
             )
             if not allowed_by_third_party_rules:
@@ -505,7 +510,11 @@ class DirectoryHandler:
         await self.store.set_room_is_public(room_id, making_public)
 
     async def edit_published_appservice_room_list(
-        self, appservice_id: str, network_id: str, room_id: str, visibility: str
+        self,
+        appservice_id: str,
+        network_id: str,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> None:
         """Add or remove a room from the appservice/network specific public
         room list.
@@ -516,16 +525,13 @@ class DirectoryHandler:
             room_id
             visibility: either "public" or "private"
         """
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
-
         await self.store.set_room_is_public_appservice(
             room_id, appservice_id, network_id, visibility == "public"
         )
 
     async def get_aliases_for_room(
         self, requester: Requester, room_id: str
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """
         Get a list of the aliases that currently point to this room on this server
         """

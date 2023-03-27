@@ -15,8 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from synapse.api.errors import SynapseError
-from synapse.handlers.room_member import RoomMemberHandler
+from synapse.handlers.room_member import NoKnownServersError, RoomMemberHandler
 from synapse.replication.http.membership import (
     ReplicationRemoteJoinRestServlet as ReplRemoteJoin,
     ReplicationRemoteKnockRestServlet as ReplRemoteKnock,
@@ -52,7 +51,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
     ) -> Tuple[str, int]:
         """Implements RoomMemberHandler._remote_join"""
         if len(remote_room_hosts) == 0:
-            raise SynapseError(404, "No known servers")
+            raise NoKnownServersError()
 
         ret = await self._remote_join_client(
             requester=requester,
@@ -114,6 +113,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
     async def remote_knock(
         self,
+        requester: Requester,
         remote_room_hosts: List[str],
         room_id: str,
         user: UserID,
@@ -124,9 +124,10 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         Implements RoomMemberHandler.remote_knock
         """
         ret = await self._remote_knock_client(
+            requester=requester,
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
-            user=user,
+            user_id=user.to_string(),
             content=content,
         )
         return ret["event_id"], ret["stream_id"]

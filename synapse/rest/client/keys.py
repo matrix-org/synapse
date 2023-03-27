@@ -27,6 +27,7 @@ from synapse.http.servlet import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import log_kv, set_tag
+from synapse.replication.http.devices import ReplicationUploadKeysForUserRestServlet
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
 from synapse.types import JsonDict, StreamToken
 from synapse.util.cancellation import cancellable
@@ -43,33 +44,65 @@ class KeyUploadServlet(RestServlet):
     Content-Type: application/json
 
     {
-      "device_keys": {
-        "user_id": "<user_id>",
-        "device_id": "<device_id>",
-        "valid_until_ts": <millisecond_timestamp>,
-        "algorithms": [
-          "m.olm.curve25519-aes-sha2",
-        ]
-        "keys": {
-          "<algorithm>:<device_id>": "<key_base64>",
+        "device_keys": {
+            "user_id": "<user_id>",
+            "device_id": "<device_id>",
+            "valid_until_ts": <millisecond_timestamp>,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+            ]
+            "keys": {
+                "<algorithm>:<device_id>": "<key_base64>",
+            },
+            "signatures:" {
+                "<user_id>" {
+                    "<algorithm>:<device_id>": "<signature_base64>"
+                }
+            }
         },
-        "signatures:" {
-          "<user_id>" {
-            "<algorithm>:<device_id>": "<signature_base64>"
-      } } },
-      "one_time_keys": {
-        "<algorithm>:<key_id>": "<key_base64>"
-      },
+        "fallback_keys": {
+            "<algorithm>:<device_id>": "<key_base64>",
+            "signed_<algorithm>:<device_id>": {
+                "fallback": true,
+                "key": "<key_base64>",
+                "signatures": {
+                    "<user_id>": {
+                        "<algorithm>:<device_id>": "<key_base64>"
+                    }
+                }
+            }
+        }
+        "one_time_keys": {
+            "<algorithm>:<key_id>": "<key_base64>"
+        },
     }
+
+    response, e.g.:
+
+    {
+        "one_time_key_counts": {
+            "curve25519": 10,
+            "signed_curve25519": 20
+        }
+    }
+
     """
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
         self.device_handler = hs.get_device_handler()
+
+        if hs.config.worker.worker_app is None:
+            # if main process
+            self.key_uploader = self.e2e_keys_handler.upload_keys_for_user
+        else:
+            # then a worker
+            self.key_uploader = ReplicationUploadKeysForUserRestServlet.make_client(hs)
 
     async def on_POST(
         self, request: SynapseRequest, device_id: Optional[str]
@@ -109,8 +142,8 @@ class KeyUploadServlet(RestServlet):
                 400, "To upload keys, you must pass device_id when authenticating"
             )
 
-        result = await self.e2e_keys_handler.upload_keys_for_user(
-            user_id, device_id, body
+        result = await self.key_uploader(
+            user_id=user_id, device_id=device_id, keys=body
         )
         return 200, result
 
@@ -150,6 +183,7 @@ class KeyQueryServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/query$")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -193,6 +227,7 @@ class KeyChangesServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/changes$")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -242,6 +277,7 @@ class OneTimeKeyServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/claim$")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -280,15 +316,29 @@ class SigningKeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
-        await self.auth_handler.validate_user_via_ui_auth(
-            requester,
-            request,
-            body,
-            "add a device signing key to your account",
-            # Allow skipping of UI auth since this is frequently called directly
-            # after login and it is silly to ask users to re-auth immediately.
-            can_skip_ui_auth=True,
-        )
+        if self.hs.config.experimental.msc3967_enabled:
+            if await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id):
+                # If we already have a master key then cross signing is set up and we require UIA to reset
+                await self.auth_handler.validate_user_via_ui_auth(
+                    requester,
+                    request,
+                    body,
+                    "reset the device signing key on your account",
+                    # Do not allow skipping of UIA auth.
+                    can_skip_ui_auth=False,
+                )
+            # Otherwise we don't require UIA since we are setting up cross signing for first time
+        else:
+            # Previous behaviour is to always require UIA but allow it to be skipped
+            await self.auth_handler.validate_user_via_ui_auth(
+                requester,
+                request,
+                body,
+                "add a device signing key to your account",
+                # Allow skipping of UI auth since this is frequently called directly
+                # after login and it is silly to ask users to re-auth immediately.
+                can_skip_ui_auth=True,
+            )
 
         result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)
         return 200, result
@@ -344,5 +394,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     KeyQueryServlet(hs).register(http_server)
     KeyChangesServlet(hs).register(http_server)
     OneTimeKeyServlet(hs).register(http_server)
-    SigningKeyUploadServlet(hs).register(http_server)
-    SignaturesUploadServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        SigningKeyUploadServlet(hs).register(http_server)
+        SignaturesUploadServlet(hs).register(http_server)

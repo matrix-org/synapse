@@ -440,7 +440,7 @@ class MatrixFederationHttpClient:
         Args:
             request: details of request to be sent
 
-            retry_on_dns_fail: true if the request should be retied on DNS failures
+            retry_on_dns_fail: true if the request should be retried on DNS failures
 
             timeout: number of milliseconds to wait for the response headers
                 (including connecting to the server), *for each attempt*.
@@ -475,7 +475,7 @@ class MatrixFederationHttpClient:
                 (except 429).
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
-            FederationDeniedError: If this destination  is not on our
+            FederationDeniedError: If this destination is not on our
                 federation whitelist
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
@@ -871,7 +871,7 @@ class MatrixFederationHttpClient:
                 (except 429).
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
-            FederationDeniedError: If this destination  is not on our
+            FederationDeniedError: If this destination is not on our
                 federation whitelist
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
@@ -951,15 +951,14 @@ class MatrixFederationHttpClient:
 
             args: query params
         Returns:
-            dict|list: Succeeds when we get a 2xx HTTP response. The
-            result will be the decoded JSON body.
+            Succeeds when we get a 2xx HTTP response. The result will be the decoded JSON body.
 
         Raises:
             HttpResponseException: If we get an HTTP response code >= 300
                 (except 429).
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
-            FederationDeniedError: If this destination  is not on our
+            FederationDeniedError: If this destination is not on our
                 federation whitelist
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
@@ -1037,6 +1036,8 @@ class MatrixFederationHttpClient:
             args: A dictionary used to create query strings, defaults to
                 None.
 
+            retry_on_dns_fail: true if the request should be retried on DNS failures
+
             timeout: number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
 
@@ -1064,7 +1065,7 @@ class MatrixFederationHttpClient:
                 (except 429).
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
-            FederationDeniedError: If this destination  is not on our
+            FederationDeniedError: If this destination is not on our
                 federation whitelist
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
@@ -1142,7 +1143,7 @@ class MatrixFederationHttpClient:
                 (except 429).
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
-            FederationDeniedError: If this destination  is not on our
+            FederationDeniedError: If this destination is not on our
                 federation whitelist
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
@@ -1198,7 +1199,7 @@ class MatrixFederationHttpClient:
                 (except 429).
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
-            FederationDeniedError: If this destination  is not on our
+            FederationDeniedError: If this destination is not on our
                 federation whitelist
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
@@ -1268,7 +1269,7 @@ class MatrixFederationHttpClient:
 def _flatten_response_never_received(e: BaseException) -> str:
     if hasattr(e, "reasons"):
         reasons = ", ".join(
-            _flatten_response_never_received(f.value) for f in e.reasons  # type: ignore[attr-defined]
+            _flatten_response_never_received(f.value) for f in e.reasons
         )
 
         return "%s:[%s]" % (type(e).__name__, reasons)

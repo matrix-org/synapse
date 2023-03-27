@@ -17,6 +17,8 @@
 
 """Contains constants from the specification."""
 
+import enum
+
 from typing_extensions import Final
 
 # the max size of a (canonical-json-encoded) event
@@ -125,6 +127,8 @@ class EventTypes:
     MSC2716_BATCH: Final = "org.matrix.msc2716.batch"
     MSC2716_MARKER: Final = "org.matrix.msc2716.marker"
 
+    Reaction: Final = "m.reaction"
+
 
 class ToDeviceEventTypes:
     RoomKeyRequest: Final = "m.room_key_request"
@@ -150,6 +154,7 @@ class EduTypes:
 
 class RejectedReason:
     AUTH_ERROR: Final = "auth_error"
+    OVERSIZED_EVENT: Final = "oversized_event"
 
 
 class RoomCreationPreset:
@@ -228,6 +233,12 @@ class EventContentFields:
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
 
+    # Use for mentioning users.
+    MSC3952_MENTIONS: Final = "org.matrix.msc3952.mentions"
+
+    # an unspecced field added to to-device messages to identify them uniquely-ish
+    TO_DEVICE_MSGID: Final = "org.matrix.msgid"
+
 
 class RoomTypes:
     """Understood values of the room_type field of m.room.create events."""
@@ -243,6 +254,7 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT: Final = "m.direct"
     IGNORED_USER_LIST: Final = "m.ignored_user_list"
+    TAG: Final = "m.tag"
 
 
 class HistoryVisibility:
@@ -283,3 +295,8 @@ class ApprovalNoticeMedium:
 
     NONE = "org.matrix.msc3866.none"
     EMAIL = "org.matrix.msc3866.email"
+
+
+class Direction(enum.Enum):
+    BACKWARDS = "b"
+    FORWARDS = "f"

@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set, Tuple
 from unittest.mock import Mock
 
 import attr
@@ -20,7 +20,9 @@ import attr
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import RedirectException
+from synapse.module_api import ModuleApi
 from synapse.server import HomeServer
+from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests.test_utils import simple_async_mock
@@ -29,6 +31,7 @@ from tests.unittest import HomeserverTestCase, override_config
 # Check if we have the dependencies to run the tests.
 try:
     import saml2.config
+    import saml2.response
     from saml2.sigver import SigverError
 
     has_saml2 = True
@@ -56,31 +59,39 @@ class FakeAuthnResponse:
 
 
 class TestMappingProvider:
-    def __init__(self, config, module):
+    def __init__(self, config: None, module: ModuleApi):
         pass
 
     @staticmethod
-    def parse_config(config):
-        return
+    def parse_config(config: JsonDict) -> None:
+        return None
 
     @staticmethod
-    def get_saml_attributes(config):
+    def get_saml_attributes(config: None) -> Tuple[Set[str], Set[str]]:
         return {"uid"}, {"displayName"}
 
-    def get_remote_user_id(self, saml_response, client_redirect_url):
+    def get_remote_user_id(
+        self, saml_response: "saml2.response.AuthnResponse", client_redirect_url: str
+    ) -> str:
         return saml_response.ava["uid"]
 
     def saml_response_to_user_attributes(
-        self, saml_response, failures, client_redirect_url
-    ):
+        self,
+        saml_response: "saml2.response.AuthnResponse",
+        failures: int,
+        client_redirect_url: str,
+    ) -> dict:
         localpart = saml_response.ava["username"] + (str(failures) if failures else "")
         return {"mxid_localpart": localpart, "displayname": None}
 
 
 class TestRedirectMappingProvider(TestMappingProvider):
     def saml_response_to_user_attributes(
-        self, saml_response, failures, client_redirect_url
-    ):
+        self,
+        saml_response: "saml2.response.AuthnResponse",
+        failures: int,
+        client_redirect_url: str,
+    ) -> dict:
         raise RedirectException(b"https://custom-saml-redirect/")
 
 
@@ -123,7 +134,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # send a mocked-up SAML response to the callback
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})
@@ -153,7 +164,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # Map a user via SSO.
         saml_response = FakeAuthnResponse(
@@ -195,11 +206,11 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # mock out the error renderer too
         sso_handler = self.hs.get_sso_handler()
-        sso_handler.render_error = Mock(return_value=None)
+        sso_handler.render_error = Mock(return_value=None)  # type: ignore[assignment]
 
         saml_response = FakeAuthnResponse({"uid": "test", "username": "föö"})
         request = _mock_request()
@@ -216,9 +227,9 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler and error renderer
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
         sso_handler = self.hs.get_sso_handler()
-        sso_handler.render_error = Mock(return_value=None)
+        sso_handler.render_error = Mock(return_value=None)  # type: ignore[assignment]
 
         # register a user to occupy the first-choice MXID
         store = self.hs.get_datastores().main
@@ -301,7 +312,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # The response doesn't have the proper userGroup or department.
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})
@@ -347,7 +358,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
         )
 
 
-def _mock_request():
+def _mock_request() -> Mock:
     """Returns a mock which will stand in as a SynapseRequest"""
     mock = Mock(
         spec=[

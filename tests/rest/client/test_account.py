@@ -40,7 +40,6 @@ from tests.unittest import override_config
 
 
 class PasswordResetTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         account.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -408,7 +407,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
 
 class DeactivateTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -492,7 +490,6 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
 
 class WhoamiTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -567,7 +564,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
 
 class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         account.register_servlets,
         login.register_servlets,
@@ -690,41 +686,21 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.hs.config.registration.enable_3pid_changes = False
 
         client_secret = "foobar"
-        session_id = self._request_token(self.email, client_secret)
-
-        self.assertEqual(len(self.email_attempts), 1)
-        link = self._get_link_from_email()
-
-        self._validate_token(link)
-
         channel = self.make_request(
             "POST",
-            b"/_matrix/client/unstable/account/3pid/add",
+            b"/_matrix/client/unstable/account/3pid/email/requestToken",
             {
                 "client_secret": client_secret,
-                "sid": session_id,
-                "auth": {
-                    "type": "m.login.password",
-                    "user": self.user_id,
-                    "password": "test",
-                },
+                "email": "test@example.com",
+                "send_attempt": 1,
             },
-            access_token=self.user_id_tok,
         )
+
         self.assertEqual(
             HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
         )
+
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
-
-        # Get user
-        channel = self.make_request(
-            "GET",
-            self.url_3pid,
-            access_token=self.user_id_tok,
-        )
-
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
-        self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email(self) -> None:
         """Test deleting an email from profile"""
@@ -1213,7 +1189,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
                 return {}
 
         # Register a mock that will return the expected result depending on the remote.
-        self.hs.get_federation_http_client().post_json = Mock(side_effect=post_json)
+        self.hs.get_federation_http_client().post_json = Mock(side_effect=post_json)  # type: ignore[assignment]
 
         # Check that we've got the correct response from the client-side endpoint.
         self._test_status(
@@ -1273,9 +1249,8 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
             # account status will fail.
             return UserID.from_string(user_id).localpart == "someuser"
 
-        self.hs.get_account_validity_handler()._is_user_expired_callbacks.append(
-            is_expired
-        )
+        account_validity_callbacks = self.hs.get_module_api_callbacks().account_validity
+        account_validity_callbacks.is_user_expired_callbacks.append(is_expired)
 
         self._test_status(
             users=[user],

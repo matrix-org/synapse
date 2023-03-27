@@ -14,13 +14,17 @@
 
 from typing import Iterable, Optional, Set
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import AccountDataTypes
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
 
 class IgnoredUsersTestCase(unittest.HomeserverTestCase):
-    def prepare(self, hs, reactor, clock):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = self.hs.get_datastores().main
         self.user = "@user:test"
 
@@ -55,7 +59,7 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
             expected_ignored_user_ids,
         )
 
-    def test_ignoring_users(self):
+    def test_ignoring_users(self) -> None:
         """Basic adding/removing of users from the ignore list."""
         self._update_ignore_list("@other:test", "@another:remote")
         self.assert_ignored(self.user, {"@other:test", "@another:remote"})
@@ -82,7 +86,7 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         # Check the removed user.
         self.assert_ignorers("@another:remote", {self.user})
 
-    def test_caching(self):
+    def test_caching(self) -> None:
         """Ensure that caching works properly between different users."""
         # The first user ignores a user.
         self._update_ignore_list("@other:test")
@@ -99,7 +103,7 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         self.assert_ignored(self.user, set())
         self.assert_ignorers("@other:test", {"@second:test"})
 
-    def test_invalid_data(self):
+    def test_invalid_data(self) -> None:
         """Invalid data ends up clearing out the ignored users list."""
         # Add some data and ensure it is there.
         self._update_ignore_list("@other:test")
@@ -136,3 +140,25 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         # No one ignores the user now.
         self.assert_ignored(self.user, set())
         self.assert_ignorers("@other:test", set())
+
+    def test_ignoring_users_with_latest_stream_ids(self) -> None:
+        """Test that ignoring users updates the latest stream ID for the ignored
+        user list account data."""
+
+        def get_latest_ignore_streampos(user_id: str) -> Optional[int]:
+            return self.get_success(
+                self.store.get_latest_stream_id_for_global_account_data_by_type_for_user(
+                    user_id, AccountDataTypes.IGNORED_USER_LIST
+                )
+            )
+
+        self.assertIsNone(get_latest_ignore_streampos("@user:test"))
+
+        self._update_ignore_list("@other:test", "@another:remote")
+
+        self.assertEqual(get_latest_ignore_streampos("@user:test"), 2)
+
+        # Add one user, remove one user, and leave one user.
+        self._update_ignore_list("@foo:test", "@another:remote")
+
+        self.assertEqual(get_latest_ignore_streampos("@user:test"), 3)

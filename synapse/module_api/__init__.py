@@ -18,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -63,20 +64,15 @@ from synapse.events.third_party_rules import (
     CHECK_EVENT_ALLOWED_CALLBACK,
     CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
     CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
+    ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
+    ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
     ON_THREEPID_BIND_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
-from synapse.handlers.account_validity import (
-    IS_USER_EXPIRED_CALLBACK,
-    ON_LEGACY_ADMIN_REQUEST,
-    ON_LEGACY_RENEW_CALLBACK,
-    ON_LEGACY_SEND_MAIL_CALLBACK,
-    ON_USER_REGISTRATION_CALLBACK,
-)
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
@@ -86,6 +82,7 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
+from synapse.handlers.device import DeviceHandler
 from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
@@ -101,6 +98,13 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api.callbacks.account_validity_callbacks import (
+    IS_USER_EXPIRED_CALLBACK,
+    ON_LEGACY_ADMIN_REQUEST,
+    ON_LEGACY_RENEW_CALLBACK,
+    ON_LEGACY_SEND_MAIL_CALLBACK,
+    ON_USER_REGISTRATION_CALLBACK,
+)
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -110,7 +114,6 @@ from synapse.storage.background_updates import (
 )
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
@@ -123,9 +126,10 @@ from synapse.types import (
     UserProfile,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
-from synapse.util.caches.descriptors import CachedFunction, cached
+from synapse.util.caches.descriptors import CachedFunction, cached as _cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
@@ -135,6 +139,7 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 P = ParamSpec("P")
+F = TypeVar("F", bound=Callable[..., Any])
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -184,6 +189,42 @@ class UserIpAndAgent:
     last_seen: int
 
 
+def cached(
+    *,
+    max_entries: int = 1000,
+    num_args: Optional[int] = None,
+    uncached_args: Optional[Collection[str]] = None,
+) -> Callable[[F], CachedFunction[F]]:
+    """Returns a decorator that applies a memoizing cache around the function. This
+    decorator behaves similarly to functools.lru_cache.
+
+    Example:
+
+        @cached()
+        def foo('a', 'b'):
+            ...
+
+    Added in Synapse v1.74.0.
+
+    Args:
+        max_entries: The maximum number of entries in the cache. If the cache is full
+            and a new entry is added, the least recently accessed entry will be evicted
+            from the cache.
+        num_args: The number of positional arguments (excluding `self`) to use as cache
+            keys. Defaults to all named args of the function.
+        uncached_args: A list of argument names to not use as the cache key. (`self` is
+            always ignored.) Cannot be used with num_args.
+
+    Returns:
+        A decorator that applies a memoizing cache around the function.
+    """
+    return _cached(
+        max_entries=max_entries,
+        num_args=num_args,
+        uncached_args=uncached_args,
+    )
+
+
 class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
@@ -207,7 +248,9 @@ class ModuleApi:
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
+        self._callbacks = hs.get_module_api_callbacks()
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -229,7 +272,6 @@ class ModuleApi:
         self._account_data_manager = AccountDataManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
-        self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
@@ -290,7 +332,7 @@ class ModuleApi:
 
         Added in Synapse v1.39.0.
         """
-        return self._account_validity_handler.register_account_validity_callbacks(
+        return self._callbacks.account_validity.register_callbacks(
             is_user_expired=is_user_expired,
             on_user_registration=on_user_registration,
             on_legacy_send_mail=on_legacy_send_mail,
@@ -317,6 +359,12 @@ class ModuleApi:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+        on_add_user_third_party_identifier: Optional[
+            ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
+        on_remove_user_third_party_identifier: Optional[
+            ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -333,6 +381,8 @@ class ModuleApi:
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
             on_threepid_bind=on_threepid_bind,
+            on_add_user_third_party_identifier=on_add_user_third_party_identifier,
+            on_remove_user_third_party_identifier=on_remove_user_third_party_identifier,
         )
 
     def register_presence_router_callbacks(
@@ -771,50 +821,11 @@ class ModuleApi:
             auth_provider_session_id: The session ID got during login from the SSO IdP,
                 if any.
         """
-        # The deprecated `generate_short_term_login_token` method defaulted to an empty
-        # string for the `auth_provider_id` because of how the underlying macaroon was
-        # generated. This will change to a proper NULL-able field when the tokens get
-        # moved to the database.
-        return self._hs.get_macaroon_generator().generate_short_term_login_token(
+        return await self._hs.get_auth_handler().create_login_token_for_user_id(
             user_id,
-            auth_provider_id or "",
-            auth_provider_session_id,
             duration_in_ms,
-        )
-
-    def generate_short_term_login_token(
-        self,
-        user_id: str,
-        duration_in_ms: int = (2 * 60 * 1000),
-        auth_provider_id: str = "",
-        auth_provider_session_id: Optional[str] = None,
-    ) -> str:
-        """Generate a login token suitable for m.login.token authentication
-
-        Added in Synapse v1.9.0.
-
-        This was deprecated in Synapse v1.69.0 in favor of create_login_token, and will
-        be removed in Synapse 1.71.0.
-
-        Args:
-            user_id: gives the ID of the user that the token is for
-
-            duration_in_ms: the time that the token will be valid for
-
-            auth_provider_id: the ID of the SSO IdP that the user used to authenticate
-               to get this token, if any. This is encoded in the token so that
-               /login can report stats on number of successful logins by IdP.
-        """
-        logger.warn(
-            "A module configured on this server uses ModuleApi.generate_short_term_login_token(), "
-            "which is deprecated in favor of ModuleApi.create_login_token(), and will be removed in "
-            "Synapse 1.71.0",
-        )
-        return self._hs.get_macaroon_generator().generate_short_term_login_token(
-            user_id,
             auth_provider_id,
             auth_provider_session_id,
-            duration_in_ms,
         )
 
     @defer.inlineCallbacks
@@ -823,10 +834,12 @@ class ModuleApi:
     ) -> Generator["defer.Deferred[Any]", Any, None]:
         """Invalidate an access token for a user
 
+        Can only be called from the main process.
+
         Added in Synapse v0.25.0.
 
         Args:
-            access_token(str): access token
+            access_token: access token
 
         Returns:
             twisted.internet.defer.Deferred - resolves once the access token
@@ -835,6 +848,10 @@ class ModuleApi:
         Raises:
             synapse.api.errors.AuthError: the access token is invalid
         """
+        assert isinstance(
+            self._device_handler, DeviceHandler
+        ), "invalidate_access_token can only be called on the main process"
+
         # see if the access token corresponds to a device
         user_info = yield defer.ensureDeferred(
             self._auth.get_user_by_access_token(access_token)
@@ -844,7 +861,7 @@ class ModuleApi:
         if device_id:
             # delete the device, which will also delete its access tokens
             yield defer.ensureDeferred(
-                self._hs.get_device_handler().delete_devices(user_id, [device_id])
+                self._device_handler.delete_devices(user_id, [device_id])
             )
         else:
             # no associated device. Just delete the access token.
@@ -871,7 +888,7 @@ class ModuleApi:
             **kwargs: named args to be passed to func
 
         Returns:
-            Deferred[object]: result of func
+            Result of func
         """
         # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
@@ -963,8 +980,7 @@ class ModuleApi:
                 to represent 'any') of the room state to acquire.
 
         Returns:
-            twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
-                The filtered state events in the room.
+            The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
             self._storage_controllers.state.get_current_state_ids(
@@ -1152,7 +1168,7 @@ class ModuleApi:
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
             presence_handler.get_federation_queue().send_presence_to_destinations(
-                presence_events, destination
+                presence_events, [destination]
             )
 
     def looping_background_call(
@@ -1570,14 +1586,41 @@ class ModuleApi:
             )
 
         requester = create_requester(user_id)
-        room_id_and_alias, _ = await self._hs.get_room_creation_handler().create_room(
+        room_id, room_alias, _ = await self._hs.get_room_creation_handler().create_room(
             requester=requester,
             config=config,
             ratelimit=ratelimit,
             creator_join_profile=creator_join_profile,
         )
+        room_alias_str = room_alias.to_string() if room_alias else None
+        return room_id, room_alias_str
 
-        return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
+    async def set_displayname(
+        self,
+        user_id: UserID,
+        new_displayname: str,
+        deactivation: bool = False,
+    ) -> None:
+        """Sets a user's display name.
+
+        Added in Synapse v1.76.0.
+
+        Args:
+            user_id:
+                The user whose display name is to be changed.
+            new_displayname:
+                The new display name to give the user.
+            deactivation:
+                Whether this change was made while deactivating the user.
+        """
+        requester = create_requester(user_id)
+        await self._hs.get_profile_handler().set_displayname(
+            target_user=user_id,
+            requester=requester,
+            new_displayname=new_displayname,
+            by_admin=True,
+            deactivation=deactivation,
+        )
 
 
 class PublicRoomListManager:

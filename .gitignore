@@ -36,6 +36,7 @@ __pycache__/
 
 # For direnv users
 /.envrc
+.direnv/
 
 # IDEs
 /.idea/
@@ -52,6 +53,7 @@ __pycache__/
 /coverage.*
 /dist/
 /docs/build/
+/dev-docs/_build/
 /htmlcov
 /pip-wheel-metadata/
 
@@ -60,7 +62,7 @@ book/
 
 # complement
 /complement-*
-/master.tar.gz
+/main.tar.gz
 
 # rust
 /target/
@@ -68,3 +70,6 @@ book/
 
 # Poetry will create a setup.py, which we don't want to include.
 /setup.py
+
+# Don't include users' poetry configs
+/poetry.toml

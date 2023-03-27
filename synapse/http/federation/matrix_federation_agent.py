@@ -87,7 +87,7 @@ class MatrixFederationAgent:
         reactor: ISynapseReactor,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
-        ip_whitelist: IPSet,
+        ip_whitelist: Optional[IPSet],
         ip_blacklist: IPSet,
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
@@ -155,11 +155,10 @@ class MatrixFederationAgent:
                 a file for a file upload).  Or None if the request is to have
                 no body.
         Returns:
-            Deferred[twisted.web.iweb.IResponse]:
-                fires when the header of the response has been received (regardless of the
-                response status code). Fails if there is any problem which prevents that
-                response from being received (including problems that prevent the request
-                from being sent).
+            A deferred which fires when the header of the response has been received
+            (regardless of the response status code). Fails if there is any problem
+            which prevents that response from being received (including problems that
+            prevent the request from being sent).
         """
         # We use urlparse as that will set `port` to None if there is no
         # explicit port.

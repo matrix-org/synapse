@@ -21,7 +21,9 @@
 import abc
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, cast
+
+from typing_extensions import TypeAlias
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
@@ -105,9 +107,11 @@ from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.media.media_repository import MediaRepository
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
-from synapse.notifier import Notifier
+from synapse.module_api.callbacks import ModuleApiCallbacks
+from synapse.notifier import Notifier, ReplicationNotifier
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -115,10 +119,7 @@ from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
-from synapse.rest.media.v1.media_repository import (
-    MediaRepository,
-    MediaRepositoryResource,
-)
+from synapse.rest.media.media_repository_resource import MediaRepositoryResource
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
@@ -144,10 +145,31 @@ if TYPE_CHECKING:
     from synapse.handlers.saml import SamlHandler
 
 
-T = TypeVar("T", bound=Callable[..., Any])
+# The annotation for `cache_in_self` used to be
+#     def (builder: Callable[["HomeServer"],T]) -> Callable[["HomeServer"],T]
+# which mypy was happy with.
+#
+# But PyCharm was confused by this. If `foo` was decorated by `@cache_in_self`, then
+# an expression like `hs.foo()`
+#
+# - would erroneously warn that we hadn't provided a `hs` argument to foo (PyCharm
+#   confused about boundmethods and unbound methods?), and
+# - would be considered to have type `Any`, making for a poor autocomplete and
+#   cross-referencing experience.
+#
+# Instead, use a typevar `F` to express that `@cache_in_self` returns exactly the
+# same type it receives. This isn't strictly true [*], but it's more than good
+# enough to keep PyCharm and mypy happy.
+#
+# [*]: (e.g. `builder` could be an object with a __call__ attribute rather than a
+#      types.FunctionType instance, whereas the return value is always a
+#      types.FunctionType instance.)
+
+T: TypeAlias = object
+F = TypeVar("F", bound=Callable[["HomeServer"], T])
 
 
-def cache_in_self(builder: T) -> T:
+def cache_in_self(builder: F) -> F:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -166,7 +188,7 @@ def cache_in_self(builder: T) -> T:
     building = [False]
 
     @functools.wraps(builder)
-    def _get(self):
+    def _get(self: "HomeServer") -> T:
         try:
             return getattr(self, depname)
         except AttributeError:
@@ -185,9 +207,7 @@ def cache_in_self(builder: T) -> T:
 
         return dep
 
-    # We cast here as we need to tell mypy that `_get` has the same signature as
-    # `builder`.
-    return cast(T, _get)
+    return cast(F, _get)
 
 
 class HomeServer(metaclass=abc.ABCMeta):
@@ -220,8 +240,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastores()
     DATASTORE_CLASS = abc.abstractproperty()
-
-    tls_server_context_factory: Optional[IOpenSSLContextFactory]
 
     def __init__(
         self,
@@ -257,6 +275,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
+
+        # This attribute is set by the free function `refresh_certificate`.
+        self.tls_server_context_factory: Optional[IOpenSSLContextFactory] = None
 
     def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
@@ -315,7 +336,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
-    def start_listening(self) -> None:
+    def start_listening(self) -> None:  # noqa: B027 (no-op by design)
         """Start the HTTP, manhole, metrics, etc listeners
 
         Does nothing in this base class; overridden in derived classes to start the
@@ -387,6 +408,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_notifier(self) -> Notifier:
         return Notifier(self)
+
+    @cache_in_self
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
     @cache_in_self
     def get_auth(self) -> Auth:
@@ -509,7 +534,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_device_handler(self):
+    def get_device_handler(self) -> DeviceWorkerHandler:
         if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
@@ -777,6 +802,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ModuleApi(self, self.get_auth_handler())
 
     @cache_in_self
+    def get_module_api_callbacks(self) -> ModuleApiCallbacks:
+        return ModuleApiCallbacks()
+
+    @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:
         return AccountDataHandler(self)
 
@@ -824,6 +853,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             hs=self,
             host=self.config.redis.redis_host,
             port=self.config.redis.redis_port,
+            dbid=self.config.redis.redis_dbid,
             password=self.config.redis.redis_password,
             reconnect=True,
         )

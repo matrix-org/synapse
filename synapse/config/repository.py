@@ -116,7 +116,6 @@ class ContentRepositoryConfig(Config):
     section = "media"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-
         # Only enable the media repo if either the media repo is enabled or the
         # current worker app is the media repo.
         if (
@@ -179,11 +178,13 @@ class ContentRepositoryConfig(Config):
         for i, provider_config in enumerate(storage_providers):
             # We special case the module "file_system" so as not to need to
             # expose FileStorageProviderBackend
-            if provider_config["module"] == "file_system":
-                provider_config["module"] = (
-                    "synapse.rest.media.v1.storage_provider"
-                    ".FileStorageProviderBackend"
-                )
+            if (
+                provider_config["module"] == "file_system"
+                or provider_config["module"] == "synapse.rest.media.v1.storage_provider"
+            ):
+                provider_config[
+                    "module"
+                ] = "synapse.media.storage_provider.FileStorageProviderBackend"
 
             provider_class, parsed_config = load_module(
                 provider_config, ("media_storage_providers", "<item %i>" % i)
@@ -205,7 +206,7 @@ class ContentRepositoryConfig(Config):
         )
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
-            check_requirements("url_preview")
+            check_requirements("url-preview")
 
             proxy_env = getproxies_environment()
             if "url_preview_ip_range_blacklist" not in config:

@@ -14,17 +14,26 @@
 
 import logging
 import re
+import unicodedata
 from typing import (
     TYPE_CHECKING,
-    Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
     Tuple,
     cast,
 )
+
+try:
+    # Figure out if ICU support is available for searching users.
+    import icu
+
+    USE_ICU = True
+except ModuleNotFoundError:
+    USE_ICU = False
 
 from typing_extensions import TypedDict
 
@@ -45,6 +54,7 @@ from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import (
     JsonDict,
+    UserID,
     UserProfile,
     get_domain_from_id,
     get_localpart_from_id,
@@ -90,7 +100,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     async def _populate_user_directory_createtables(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-
         # Get all the rooms that we want to process.
         def _make_staging_area(txn: LoggingTransaction) -> None:
             sql = (
@@ -185,9 +194,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         - who should be in the user_directory.
 
         Args:
-            progress (dict)
-            batch_size (int): Maximum number of state events to process
-                per cycle.
+            progress
+            batch_size: Maximum number of state events to process per cycle.
 
         Returns:
             number of events processed.
@@ -466,11 +474,116 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return False
 
+    async def set_remote_user_profile_in_user_dir_stale(
+        self, user_id: str, next_try_at_ms: int, retry_counter: int
+    ) -> None:
+        """
+        Marks a remote user as having a possibly-stale user directory profile.
+
+        Args:
+            user_id: the remote user who may have a stale profile on this server.
+            next_try_at_ms: timestamp in ms after which the user directory profile can be
+                refreshed.
+            retry_counter: number of failures in refreshing the profile so far. Used for
+                exponential backoff calculations.
+        """
+        assert not self.hs.is_mine_id(
+            user_id
+        ), "Can't mark a local user as a stale remote user."
+
+        server_name = UserID.from_string(user_id).domain
+
+        await self.db_pool.simple_upsert(
+            table="user_directory_stale_remote_users",
+            keyvalues={"user_id": user_id},
+            values={
+                "next_try_at_ts": next_try_at_ms,
+                "retry_counter": retry_counter,
+                "user_server_name": server_name,
+            },
+            desc="set_remote_user_profile_in_user_dir_stale",
+        )
+
+    async def clear_remote_user_profile_in_user_dir_stale(self, user_id: str) -> None:
+        """
+        Marks a remote user as no longer having a possibly-stale user directory profile.
+
+        Args:
+            user_id: the remote user who no longer has a stale profile on this server.
+        """
+        await self.db_pool.simple_delete(
+            table="user_directory_stale_remote_users",
+            keyvalues={"user_id": user_id},
+            desc="clear_remote_user_profile_in_user_dir_stale",
+        )
+
+    async def get_remote_servers_with_profiles_to_refresh(
+        self, now_ts: int, limit: int
+    ) -> List[str]:
+        """
+        Get a list of up to `limit` server names which have users whose
+        locally-cached profiles we believe to be stale
+        and are refreshable given the current time `now_ts` in milliseconds.
+        """
+
+        def _get_remote_servers_with_refreshable_profiles_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
+            sql = """
+                SELECT user_server_name
+                FROM user_directory_stale_remote_users
+                WHERE next_try_at_ts < ?
+                GROUP BY user_server_name
+                ORDER BY MIN(next_try_at_ts), user_server_name
+                LIMIT ?
+            """
+            txn.execute(sql, (now_ts, limit))
+            return [row[0] for row in txn]
+
+        return await self.db_pool.runInteraction(
+            "get_remote_servers_with_profiles_to_refresh",
+            _get_remote_servers_with_refreshable_profiles_txn,
+        )
+
+    async def get_remote_users_to_refresh_on_server(
+        self, server_name: str, now_ts: int, limit: int
+    ) -> List[Tuple[str, int, int]]:
+        """
+        Get a list of up to `limit` user IDs from the server `server_name`
+        whose locally-cached profiles we believe to be stale
+        and are refreshable given the current time `now_ts` in milliseconds.
+
+        Returns:
+            tuple of:
+                - User ID
+                - Retry counter (number of failures so far)
+                - Time the retry is scheduled for, in milliseconds
+        """
+
+        def _get_remote_users_to_refresh_on_server_txn(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[str, int, int]]:
+            sql = """
+                SELECT user_id, retry_counter, next_try_at_ts
+                FROM user_directory_stale_remote_users
+                WHERE user_server_name = ? AND next_try_at_ts < ?
+                ORDER BY next_try_at_ts
+                LIMIT ?
+            """
+            txn.execute(sql, (server_name, now_ts, limit))
+            return cast(List[Tuple[str, int, int]], txn.fetchall())
+
+        return await self.db_pool.runInteraction(
+            "get_remote_users_to_refresh_on_server",
+            _get_remote_users_to_refresh_on_server_txn,
+        )
+
     async def update_profile_in_user_dir(
         self, user_id: str, display_name: Optional[str], avatar_url: Optional[str]
     ) -> None:
         """
         Update or add a user's profile in the user directory.
+        If the user is remote, the profile will be marked as not stale.
         """
         # If the display name or avatar URL are unexpected types, replace with None.
         display_name = non_null_str_or_none(display_name)
@@ -482,8 +595,20 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 table="user_directory",
                 keyvalues={"user_id": user_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
-                lock=False,  # We're only inserter
             )
+
+            if not self.hs.is_mine_id(user_id):
+                # Remote users: Make sure the profile is not marked as stale anymore.
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    table="user_directory_stale_remote_users",
+                    keyvalues={"user_id": user_id},
+                )
+
+            # The display name that goes into the database index.
+            index_display_name = display_name
+            if index_display_name is not None:
+                index_display_name = _filter_text_for_index(index_display_name)
 
             if isinstance(self.database_engine, PostgresEngine):
                 # We weight the localpart most highly, then display name and finally
@@ -502,17 +627,20 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         user_id,
                         get_localpart_from_id(user_id),
                         get_domain_from_id(user_id),
-                        display_name,
+                        index_display_name,
                     ),
                 )
             elif isinstance(self.database_engine, Sqlite3Engine):
-                value = "%s %s" % (user_id, display_name) if display_name else user_id
+                value = (
+                    "%s %s" % (user_id, index_display_name)
+                    if index_display_name
+                    else user_id
+                )
                 self.db_pool.simple_upsert_txn(
                     txn,
                     table="user_directory_search",
                     keyvalues={"user_id": user_id},
                     values={"value": value},
-                    lock=False,  # We're only inserter
                 )
             else:
                 # This should be unreachable.
@@ -570,10 +698,17 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """Delete the entire user directory"""
 
         def _delete_all_from_user_dir_txn(txn: LoggingTransaction) -> None:
-            txn.execute("DELETE FROM user_directory")
-            txn.execute("DELETE FROM user_directory_search")
-            txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM users_who_share_private_rooms")
+            # SQLite doesn't support TRUNCATE.
+            # On Postgres, DELETE FROM does a table scan but TRUNCATE is more efficient.
+            truncate = (
+                "DELETE FROM"
+                if isinstance(self.database_engine, Sqlite3Engine)
+                else "TRUNCATE"
+            )
+            txn.execute(f"{truncate} user_directory")
+            txn.execute(f"{truncate} user_directory_search")
+            txn.execute(f"{truncate} users_in_public_rooms")
+            txn.execute(f"{truncate} users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
 
         await self.db_pool.runInteraction(
@@ -581,7 +716,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
     @cached()
-    async def get_user_in_directory(self, user_id: str) -> Optional[Dict[str, str]]:
+    async def get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
         return await self.db_pool.simple_select_one(
             table="user_directory",
             keyvalues={"user_id": user_id},
@@ -708,10 +843,10 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         Returns the rooms that a user is in.
 
         Args:
-            user_id(str): Must be a local user
+            user_id: Must be a local user
 
         Returns:
-            list: user_id
+            List of room IDs
         """
         rows = await self.db_pool.simple_select_onecol(
             table="users_who_share_private_rooms",
@@ -889,7 +1024,42 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
         limited = len(results) > limit
 
-        return {"limited": limited, "results": results}
+        return {"limited": limited, "results": results[0:limit]}
+
+
+def _filter_text_for_index(text: str) -> str:
+    """Transforms text before it is inserted into the user directory index, or searched
+    for in the user directory index.
+
+    Note that the user directory search table needs to be rebuilt whenever this function
+    changes.
+    """
+    # Lowercase the text, to make searches case-insensitive.
+    # This is necessary for both PostgreSQL and SQLite. PostgreSQL's
+    # `to_tsquery/to_tsvector` functions don't lowercase non-ASCII characters when using
+    # the "C" collation, while SQLite just doesn't lowercase non-ASCII characters at
+    # all.
+    text = text.lower()
+
+    # Normalize the text. NFKC normalization has two effects:
+    #  1. It canonicalizes the text, ie. maps all visually identical strings to the same
+    #     string. For example, ["e", "◌́"] is mapped to ["é"].
+    #  2. It maps strings that are roughly equivalent to the same string.
+    #     For example, ["ǆ"] is mapped to ["d", "ž"], ["①"] to ["1"] and ["i⁹"] to
+    #     ["i", "9"].
+    text = unicodedata.normalize("NFKC", text)
+
+    # Note that nothing is done to make searches accent-insensitive.
+    # That could be achieved by converting to NFKD form instead (with combining accents
+    # split out) and filtering out combining accents using `unicodedata.combining(c)`.
+    # The downside of this may be noisier search results, since search terms with
+    # explicit accents will match characters with no accents, or completely different
+    # accents.
+    #
+    # text = unicodedata.normalize("NFKD", text)
+    # text = "".join([c for c in text if not unicodedata.combining(c)])
+
+    return text
 
 
 def _parse_query_sqlite(search_term: str) -> str:
@@ -901,9 +1071,10 @@ def _parse_query_sqlite(search_term: str) -> str:
     We specifically add both a prefix and non prefix matching term so that
     exact matches get ranked higher.
     """
+    search_term = _filter_text_for_index(search_term)
 
     # Pull out the individual words, discarding any non-word characters.
-    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+    results = _parse_words(search_term)
     return " & ".join("(%s* OR %s)" % (result, result) for result in results)
 
 
@@ -913,12 +1084,81 @@ def _parse_query_postgres(search_term: str) -> Tuple[str, str, str]:
     We use this so that we can add prefix matching, which isn't something
     that is supported by default.
     """
+    search_term = _filter_text_for_index(search_term)
 
-    # Pull out the individual words, discarding any non-word characters.
-    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+    escaped_words = []
+    for word in _parse_words(search_term):
+        # Postgres tsvector and tsquery quoting rules:
+        # words potentially containing punctuation should be quoted
+        # and then existing quotes and backslashes should be doubled
+        # See: https://www.postgresql.org/docs/current/datatype-textsearch.html#DATATYPE-TSQUERY
 
-    both = " & ".join("(%s:* | %s)" % (result, result) for result in results)
-    exact = " & ".join("%s" % (result,) for result in results)
-    prefix = " & ".join("%s:*" % (result,) for result in results)
+        quoted_word = word.replace("'", "''").replace("\\", "\\\\")
+        escaped_words.append(f"'{quoted_word}'")
+
+    both = " & ".join("(%s:* | %s)" % (word, word) for word in escaped_words)
+    exact = " & ".join("%s" % (word,) for word in escaped_words)
+    prefix = " & ".join("%s:*" % (word,) for word in escaped_words)
 
     return both, exact, prefix
+
+
+def _parse_words(search_term: str) -> List[str]:
+    """Split the provided search string into a list of its words.
+
+    If support for ICU (International Components for Unicode) is available, use it.
+    Otherwise, fall back to using a regex to detect word boundaries. This latter
+    solution works well enough for most latin-based languages, but doesn't work as well
+    with other languages.
+
+    Args:
+        search_term: The search string.
+
+    Returns:
+        A list of the words in the search string.
+    """
+    if USE_ICU:
+        return _parse_words_with_icu(search_term)
+
+    return _parse_words_with_regex(search_term)
+
+
+def _parse_words_with_regex(search_term: str) -> List[str]:
+    """
+    Break down search term into words, when we don't have ICU available.
+    See: `_parse_words`
+    """
+    return re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+
+
+def _parse_words_with_icu(search_term: str) -> List[str]:
+    """Break down the provided search string into its individual words using ICU
+    (International Components for Unicode).
+
+    Args:
+        search_term: The search string.
+
+    Returns:
+        A list of the words in the search string.
+    """
+    results = []
+    breaker = icu.BreakIterator.createWordInstance(icu.Locale.getDefault())
+    breaker.setText(search_term)
+    i = 0
+    while True:
+        j = breaker.nextBoundary()
+        if j < 0:
+            break
+
+        result = search_term[i:j]
+
+        # libicu considers spaces and punctuation between words as words, but we don't
+        # want to include those in results as they would result in syntax errors in SQL
+        # queries (e.g. "foo bar" would result in the search query including "foo &  &
+        # bar").
+        if len(re.findall(r"([\w\-]+)", result, re.UNICODE)):
+            results.append(result)
+
+        i = j
+
+    return results

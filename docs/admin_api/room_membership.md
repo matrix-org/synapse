@@ -6,7 +6,7 @@ local users. The server administrator must be in the room and have permission to
 invite users.
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 ## Parameters
 

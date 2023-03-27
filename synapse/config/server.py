@@ -151,7 +151,7 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "fec0::/10",
 ]
 
-DEFAULT_ROOM_VERSION = "9"
+DEFAULT_ROOM_VERSION = "10"
 
 ROOM_COMPLEXITY_TOO_GREAT = (
     "Your homeserver is unable to join rooms this large or complex. "
@@ -177,6 +177,7 @@ KNOWN_RESOURCES = {
     "client",
     "consent",
     "federation",
+    "health",
     "keys",
     "media",
     "metrics",
@@ -207,6 +208,9 @@ class HttpListenerConfig:
     additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
     request_id_header: Optional[str] = None
+    # If true, the listener will return CORS response headers compatible with MSC3886:
+    # https://github.com/matrix-org/matrix-spec-proposals/pull/3886
+    experimental_cors_msc3886: bool = False
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -731,7 +735,6 @@ class ServerConfig(Config):
         listeners: Optional[List[dict]],
         **kwargs: Any,
     ) -> str:
-
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400
@@ -901,7 +904,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
         raise ConfigError(DIRECT_TCP_ERROR, ("listeners", str(num), "type"))
 
     port = listener.get("port")
-    if not isinstance(port, int):
+    if type(port) is not int:
         raise ConfigError("Listener configuration is lacking a valid 'port' option")
 
     tls = listener.get("tls", False)
@@ -935,6 +938,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
             request_id_header=listener.get("request_id_header"),
+            experimental_cors_msc3886=listener.get("experimental_cors_msc3886", False),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)

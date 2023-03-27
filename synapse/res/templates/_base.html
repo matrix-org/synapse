@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+    <style type="text/css">
+      {%- include 'style.css' without context %}
+    </style>
+    {% block header %}{%  endblock %}
+</head>
+<body>
+<header class="mx_Header">
+    {% if app_name == "Riot" %}
+        <img src="https://riot.im/img/external/riot-logo-email.png" width="83" height="83" alt="[Riot]"/>
+    {% elif app_name == "Vector" %}
+        <img src="https://matrix.org/img/vector-logo-email.png" width="64" height="83" alt="[Vector]"/>
+    {% elif app_name == "Element" %}
+        <img src="https://static.element.io/images/email-logo.png" width="83" height="83" alt="[Element]"/>
+    {% else %}
+        <img src="https://matrix.org/img/matrix-120x51.png" width="120" height="51" alt="[matrix]"/>
+    {% endif %}
+</header>
+
+{% block body %}{% endblock %}
+
+</body>
+</html>

@@ -18,12 +18,13 @@ import secrets
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from synapse.api.constants import UserTypes
+from synapse.api.constants import Direction, UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_boolean,
+    parse_enum,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -120,7 +121,7 @@ class UsersRestServletV2(RestServlet):
             ),
         )
 
-        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
 
         users, total = await self.store.get_users_paginate(
             start,
@@ -303,12 +304,19 @@ class UserRestServletV2(RestServlet):
                 # remove old threepids
                 for medium, address in del_threepids:
                     try:
-                        await self.auth_handler.delete_threepid(
-                            user_id, medium, address, None
+                        # Attempt to remove any known bindings of this third-party ID
+                        # and user ID from identity servers.
+                        await self.hs.get_identity_handler().try_unbind_threepid(
+                            user_id, medium, address, id_server=None
                         )
                     except Exception:
                         logger.exception("Failed to remove threepids")
                         raise SynapseError(500, "Failed to remove threepids")
+
+                    # Delete the local association of this user ID and third-party ID.
+                    await self.auth_handler.delete_local_threepid(
+                        user_id, medium, address
+                    )
 
                 # add new threepids
                 current_time = self.hs.get_clock().time_msec()
@@ -417,7 +425,6 @@ class UserRestServletV2(RestServlet):
                     ):
                         await self.pusher_pool.add_or_update_pusher(
                             user_id=user_id,
-                            access_token=None,
                             kind="email",
                             app_id="m.email",
                             app_display_name="Email Notifications",
@@ -675,15 +682,18 @@ class AccountValidityRenewServlet(RestServlet):
     PATTERNS = admin_patterns("/account_validity/validity$")
 
     def __init__(self, hs: "HomeServer"):
-        self.account_activity_handler = hs.get_account_validity_handler()
+        self.account_validity_handler = hs.get_account_validity_handler()
+        self.account_validity_module_callbacks = (
+            hs.get_module_api_callbacks().account_validity
+        )
         self.auth = hs.get_auth()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        if self.account_activity_handler.on_legacy_admin_request_callback:
-            expiration_ts = await (
-                self.account_activity_handler.on_legacy_admin_request_callback(request)
+        if self.account_validity_module_callbacks.on_legacy_admin_request_callback:
+            expiration_ts = await self.account_validity_module_callbacks.on_legacy_admin_request_callback(
+                request
             )
         else:
             body = parse_json_object_from_request(request)
@@ -694,7 +704,7 @@ class AccountValidityRenewServlet(RestServlet):
                     "Missing property 'user_id' in the request body",
                 )
 
-            expiration_ts = await self.account_activity_handler.renew_account_for_user(
+            expiration_ts = await self.account_validity_handler.renew_account_for_user(
                 body["user_id"],
                 body.get("expiration_ts"),
                 not body.get("enable_renewal_emails", True),
@@ -903,8 +913,9 @@ class PushersRestServlet(RestServlet):
         @user:server/pushers
 
     Returns:
-        pushers: Dictionary containing pushers information.
-        total: Number of pushers in dictionary `pushers`.
+        A dictionary with keys:
+            pushers: Dictionary containing pushers information.
+            total: Number of pushers in dictionary `pushers`.
     """
 
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
@@ -972,7 +983,7 @@ class UserTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request, allow_empty_body=True)
 
         valid_until_ms = body.get("valid_until_ms")
-        if valid_until_ms and not isinstance(valid_until_ms, int):
+        if type(valid_until_ms) not in (int, type(None)):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "'valid_until_ms' parameter must be an int"
             )
@@ -1124,14 +1135,14 @@ class RateLimitRestServlet(RestServlet):
         messages_per_second = body.get("messages_per_second", 0)
         burst_count = body.get("burst_count", 0)
 
-        if not isinstance(messages_per_second, int) or messages_per_second < 0:
+        if type(messages_per_second) is not int or messages_per_second < 0:
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (messages_per_second,),
                 errcode=Codes.INVALID_PARAM,
             )
 
-        if not isinstance(burst_count, int) or burst_count < 0:
+        if type(burst_count) is not int or burst_count < 0:
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (burst_count,),
@@ -1190,7 +1201,8 @@ class AccountDataRestServlet(RestServlet):
         if not await self._store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
 
-        global_data, by_room_data = await self._store.get_account_data_for_user(user_id)
+        global_data = await self._store.get_global_account_data_for_user(user_id)
+        by_room_data = await self._store.get_room_account_data_for_user(user_id)
         return HTTPStatus.OK, {
             "account_data": {
                 "global": global_data,
@@ -1219,6 +1231,31 @@ class UserByExternalId(RestServlet):
         await assert_requester_is_admin(self._auth, request)
 
         user_id = await self._store.get_user_by_external_id(provider, external_id)
+
+        if user_id is None:
+            raise NotFoundError("User not found")
+
+        return HTTPStatus.OK, {"user_id": user_id}
+
+
+class UserByThreePid(RestServlet):
+    """Find a user based on 3PID of a particular medium"""
+
+    PATTERNS = admin_patterns("/threepid/(?P<medium>[^/]*)/users/(?P<address>[^/]*)")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_GET(
+        self,
+        request: SynapseRequest,
+        medium: str,
+        address: str,
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        user_id = await self._store.get_user_id_by_threepid(medium, address)
 
         if user_id is None:
             raise NotFoundError("User not found")

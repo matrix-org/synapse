@@ -18,6 +18,13 @@
 import json
 import os
 
+
+def set_output(key: str, value: str):
+    # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-output-parameter
+    with open(os.environ["GITHUB_OUTPUT"], "at") as f:
+        print(f"{key}={value}", file=f)
+
+
 IS_PR = os.environ["GITHUB_REF"].startswith("refs/pull/")
 
 # First calculate the various trial jobs.
@@ -39,7 +46,7 @@ if not IS_PR:
             "database": "sqlite",
             "extras": "all",
         }
-        for version in ("3.8", "3.9", "3.10")
+        for version in ("3.8", "3.9", "3.10", "3.11")
     )
 
 
@@ -47,7 +54,7 @@ trial_postgres_tests = [
     {
         "python-version": "3.7",
         "database": "postgres",
-        "postgres-version": "10",
+        "postgres-version": "11",
         "extras": "all",
     }
 ]
@@ -55,9 +62,9 @@ trial_postgres_tests = [
 if not IS_PR:
     trial_postgres_tests.append(
         {
-            "python-version": "3.10",
+            "python-version": "3.11",
             "database": "postgres",
-            "postgres-version": "14",
+            "postgres-version": "15",
             "extras": "all",
         }
     )
@@ -81,7 +88,7 @@ print("::endgroup::")
 test_matrix = json.dumps(
     trial_sqlite_tests + trial_postgres_tests + trial_no_extra_tests
 )
-print(f"::set-output name=trial_test_matrix::{test_matrix}")
+set_output("trial_test_matrix", test_matrix)
 
 
 # First calculate the various sytest jobs.
@@ -102,11 +109,26 @@ sytest_tests = [
         "postgres": "multi-postgres",
         "workers": "workers",
     },
+    {
+        "sytest-tag": "focal",
+        "postgres": "multi-postgres",
+        "workers": "workers",
+        "reactor": "asyncio",
+    },
 ]
 
 if not IS_PR:
     sytest_tests.extend(
         [
+            {
+                "sytest-tag": "focal",
+                "reactor": "asyncio",
+            },
+            {
+                "sytest-tag": "focal",
+                "postgres": "postgres",
+                "reactor": "asyncio",
+            },
             {
                 "sytest-tag": "testing",
                 "postgres": "postgres",
@@ -125,4 +147,4 @@ print(json.dumps(sytest_tests, indent=4))
 print("::endgroup::")
 
 test_matrix = json.dumps(sytest_tests)
-print(f"::set-output name=sytest_test_matrix::{test_matrix}")
+set_output("sytest_test_matrix", test_matrix)

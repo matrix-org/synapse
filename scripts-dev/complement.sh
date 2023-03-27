@@ -53,6 +53,17 @@ Run the complement test suite on Synapse.
         Only build the Docker images. Don't actually run Complement.
         Conflicts with -f/--fast.
 
+  -e, --editable
+        Use an editable build of Synapse, rebuilding the image if necessary.
+        This is suitable for use in development where a fast turn-around time
+        is important.
+        Not suitable for use in CI in case the editable environment is impure.
+
+  --rebuild-editable
+        Force a rebuild of the editable build of Synapse.
+        This is occasionally useful if the built-in rebuild detection with
+        --editable fails, e.g. when changing configure_workers_and_start.py.
+
 For help on arguments to 'go test', run 'go help testflag'.
 EOF
 }
@@ -72,6 +83,12 @@ while [ $# -ge 1 ]; do
             ;;
         "--build-only")
             skip_complement_run=1
+            ;;
+        "-e"|"--editable")
+            use_editable_synapse=1
+            ;;
+        "--rebuild-editable")
+            rebuild_editable_synapse=1
             ;;
         *)
             # unknown arg: presumably an argument to gotest. break the loop.
@@ -96,25 +113,78 @@ if [[ -z "$COMPLEMENT_DIR" ]]; then
   echo "Checkout available at 'complement-${COMPLEMENT_REF}'"
 fi
 
+if [ -n "$use_editable_synapse" ]; then
+    if [[ -e synapse/synapse_rust.abi3.so ]]; then
+        # In an editable install, back up the host's compiled Rust module to prevent
+        # inconvenience; the container will overwrite the module with its own copy.
+        mv -n synapse/synapse_rust.abi3.so synapse/synapse_rust.abi3.so~host
+        # And restore it on exit:
+        synapse_pkg=`realpath synapse`
+        trap "mv -f '$synapse_pkg/synapse_rust.abi3.so~host' '$synapse_pkg/synapse_rust.abi3.so'" EXIT
+    fi
+
+    editable_mount="$(realpath .):/editable-src:z"
+    if [ -n "$rebuild_editable_synapse" ]; then
+        unset skip_docker_build
+    elif docker inspect complement-synapse-editable &>/dev/null; then
+        # complement-synapse-editable already exists: see if we can still use it:
+        # - The Rust module must still be importable; it will fail to import if the Rust source has changed.
+        # - The Poetry lock file must be the same (otherwise we assume dependencies have changed)
+
+        # First set up the module in the right place for an editable installation.
+        docker run --rm -v $editable_mount --entrypoint 'cp' complement-synapse-editable -- /synapse_rust.abi3.so.bak /editable-src/synapse/synapse_rust.abi3.so
+
+        if (docker run --rm -v $editable_mount --entrypoint 'python' complement-synapse-editable -c 'import synapse.synapse_rust' \
+            && docker run --rm -v $editable_mount --entrypoint 'diff' complement-synapse-editable --brief /editable-src/poetry.lock /poetry.lock.bak); then
+            skip_docker_build=1
+        else
+            echo "Editable Synapse image is stale. Will rebuild."
+            unset skip_docker_build
+        fi
+    fi
+fi
+
 if [ -z "$skip_docker_build" ]; then
-    # Build the base Synapse image from the local checkout
-    echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
-    docker build -t matrixdotorg/synapse \
-      --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION \
-      --build-arg TEST_ONLY_IGNORE_POETRY_LOCKFILE \
-      -f "docker/Dockerfile" .
-    echo_if_github "::endgroup::"
+    if [ -n "$use_editable_synapse" ]; then
 
-    # Build the workers docker image (from the base Synapse image we just built).
-    echo_if_github "::group::Build Docker image: matrixdotorg/synapse-workers"
-    docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
-    echo_if_github "::endgroup::"
+        # Build a special image designed for use in development with editable
+        # installs.
+        docker build -t synapse-editable \
+            -f "docker/editable.Dockerfile" .
 
-    # Build the unified Complement image (from the worker Synapse image we just built).
-    echo_if_github "::group::Build Docker image: complement/Dockerfile"
-    docker build -t complement-synapse \
-           -f "docker/complement/Dockerfile" "docker/complement"
-    echo_if_github "::endgroup::"
+        docker build -t synapse-workers-editable \
+            --build-arg FROM=synapse-editable \
+            -f "docker/Dockerfile-workers" .
+
+        docker build -t complement-synapse-editable \
+            --build-arg FROM=synapse-workers-editable \
+            -f "docker/complement/Dockerfile" "docker/complement"
+
+        # Prepare the Rust module
+        docker run --rm -v $editable_mount --entrypoint 'cp' complement-synapse-editable -- /synapse_rust.abi3.so.bak /editable-src/synapse/synapse_rust.abi3.so
+
+    else
+
+        # Build the base Synapse image from the local checkout
+        echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
+        docker build -t matrixdotorg/synapse \
+        --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION \
+        --build-arg TEST_ONLY_IGNORE_POETRY_LOCKFILE \
+        -f "docker/Dockerfile" .
+        echo_if_github "::endgroup::"
+
+        # Build the workers docker image (from the base Synapse image we just built).
+        echo_if_github "::group::Build Docker image: matrixdotorg/synapse-workers"
+        docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+        echo_if_github "::endgroup::"
+
+        # Build the unified Complement image (from the worker Synapse image we just built).
+        echo_if_github "::group::Build Docker image: complement/Dockerfile"
+        docker build -t complement-synapse \
+            -f "docker/complement/Dockerfile" "docker/complement"
+        echo_if_github "::endgroup::"
+
+    fi
 fi
 
 if [ -n "$skip_complement_run" ]; then
@@ -123,10 +193,14 @@ if [ -n "$skip_complement_run" ]; then
 fi
 
 export COMPLEMENT_BASE_IMAGE=complement-synapse
+if [ -n "$use_editable_synapse" ]; then
+    export COMPLEMENT_BASE_IMAGE=complement-synapse-editable
+    export COMPLEMENT_HOST_MOUNTS="$editable_mount"
+fi
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc3787"
+test_tags="synapse_blacklist,msc3787,msc3874,msc3890,msc3391,msc3930,faster_joins"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
@@ -138,6 +212,9 @@ extra_test_args+=("-timeout=60m")
 if [[ -n "$WORKERS" ]]; then
   # Use workers.
   export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=true
+
+  # Pass through the workers defined. If none, it will be an empty string
+  export PASS_SYNAPSE_WORKER_TYPES="$WORKER_TYPES"
 
   # Workers can only use Postgres as a database.
   export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
@@ -156,12 +233,14 @@ else
     export PASS_SYNAPSE_COMPLEMENT_DATABASE=sqlite
   fi
 
-  # We only test faster room joins on monoliths, because they are purposefully
-  # being developed without worker support to start with.
-  #
-  # The tests for importing historical messages (MSC2716) and jump to date (MSC3030)
-  # also only pass with monoliths, currently.
-  test_tags="$test_tags,faster_joins,msc2716,msc3030"
+  # The tests for importing historical messages (MSC2716)
+  # only pass with monoliths, currently.
+  test_tags="$test_tags,msc2716"
+fi
+
+if [[ -n "$ASYNCIO_REACTOR" ]]; then
+  # Enable the Twisted asyncio reactor
+  export PASS_SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=true
 fi
 
 

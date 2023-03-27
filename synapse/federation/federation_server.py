@@ -23,6 +23,7 @@ from typing import (
     Collection,
     Dict,
     List,
+    Mapping,
     Optional,
     Tuple,
     Union,
@@ -34,13 +35,20 @@ from prometheus_client import Counter, Gauge, Histogram
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EduTypes, EventContentFields, EventTypes, Membership
+from synapse.api.constants import (
+    Direction,
+    EduTypes,
+    EventContentFields,
+    EventTypes,
+    Membership,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
     FederationError,
     IncompatibleRoomVersionError,
     NotFoundError,
+    PartialStateConflictError,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -62,7 +70,9 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.opentracing import (
+    SynapseTags,
     log_kv,
+    set_tag,
     start_active_span_from_edu,
     tag_args,
     trace,
@@ -72,8 +82,9 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.lock import Lock
+from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
+from synapse.storage.roommember import MemberSummary
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util import json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
@@ -214,7 +225,7 @@ class FederationServer(FederationBase):
         return 200, res
 
     async def on_timestamp_to_event_request(
-        self, origin: str, room_id: str, timestamp: int, direction: str
+        self, origin: str, room_id: str, timestamp: int, direction: Direction
     ) -> Tuple[int, Dict[str, Any]]:
         """When we receive a federated `/timestamp_to_event` request,
         handle all of the logic for validating and fetching the event.
@@ -224,7 +235,7 @@ class FederationServer(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -481,6 +492,14 @@ class FederationServer(FederationBase):
                     pdu_results[pdu.event_id] = await process_pdu(pdu)
 
         async def process_pdu(pdu: EventBase) -> JsonDict:
+            """
+            Processes a pushed PDU sent to us via a `/send` transaction
+
+            Returns:
+                JsonDict representing a "PDU Processing Result" that will be bundled up
+                with the other processed PDU's in the `/send` transaction and sent back
+                to remote homeserver.
+            """
             event_id = pdu.event_id
             with nested_logging_context(event_id):
                 try:
@@ -668,6 +687,10 @@ class FederationServer(FederationBase):
         room_id: str,
         caller_supports_partial_state: bool = False,
     ) -> Dict[str, Any]:
+        set_tag(
+            SynapseTags.SEND_JOIN_RESPONSE_IS_PARTIAL_STATE,
+            caller_supports_partial_state,
+        )
         await self._room_member_handler._join_rate_per_room_limiter.ratelimit(  # type: ignore[has-type]
             requester=None,
             key=room_id,
@@ -683,8 +706,9 @@ class FederationServer(FederationBase):
         state_event_ids: Collection[str]
         servers_in_room: Optional[Collection[str]]
         if caller_supports_partial_state:
+            summary = await self.store.get_room_summary(room_id)
             state_event_ids = _get_event_ids_for_partial_state_join(
-                event, prev_state_ids
+                event, prev_state_ids, summary
             )
             servers_in_room = await self.state.get_hosts_in_room_at_events(
                 room_id, event_ids=event.prev_event_ids()
@@ -714,10 +738,12 @@ class FederationServer(FederationBase):
             "state": [p.get_pdu_json(time_now) for p in state_events],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain_events],
             "org.matrix.msc3706.partial_state": caller_supports_partial_state,
+            "members_omitted": caller_supports_partial_state,
         }
 
         if servers_in_room is not None:
             resp["org.matrix.msc3706.servers_in_room"] = list(servers_in_room)
+            resp["servers_in_room"] = list(servers_in_room)
 
         return resp
 
@@ -1487,8 +1513,9 @@ class FederationHandlerRegistry:
 def _get_event_ids_for_partial_state_join(
     join_event: EventBase,
     prev_state_ids: StateMap[str],
+    summary: Mapping[str, MemberSummary],
 ) -> Collection[str]:
-    """Calculate state to be retuned in a partial_state send_join
+    """Calculate state to be returned in a partial_state send_join
 
     Args:
         join_event: the join event being send_joined
@@ -1513,8 +1540,19 @@ def _get_event_ids_for_partial_state_join(
     if current_membership_event_id is not None:
         state_event_ids.add(current_membership_event_id)
 
-    # TODO: return a few more members:
-    #   - those with invites
-    #   - those that are kicked? / banned
+    name_id = prev_state_ids.get((EventTypes.Name, ""))
+    canonical_alias_id = prev_state_ids.get((EventTypes.CanonicalAlias, ""))
+    if not name_id and not canonical_alias_id:
+        # Also include the hero members of the room (for DM rooms without a title).
+        # To do this properly, we should select the correct subset of membership events
+        # from `prev_state_ids`. Instead, we are lazier and use the (cached)
+        # `get_room_summary` function, which is based on the current state of the room.
+        # This introduces races; we choose to ignore them because a) they should be rare
+        # and b) even if it's wrong, joining servers will get the full state eventually.
+        heroes = extract_heroes_from_room_summary(summary, join_event.state_key)
+        for hero in heroes:
+            membership_event_id = prev_state_ids.get((EventTypes.Member, hero))
+            if membership_event_id:
+                state_event_ids.add(membership_event_id)
 
     return state_event_ids
