@@ -1028,14 +1028,17 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
     async def claim_e2e_one_time_keys(
         self, query_list: Iterable[Tuple[str, str, str]]
-    ) -> Dict[str, Dict[str, Dict[str, str]]]:
+    ) -> Tuple[Dict[str, Dict[str, Dict[str, str]]], List[Tuple[str, str, str]]]:
         """Take a list of one time keys out of the database.
 
         Args:
             query_list: An iterable of tuples of (user ID, device ID, algorithm).
 
         Returns:
-            A map of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+            A tuple of:
+                A map of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+
+                A copy of the input which has not been fulfilled.
         """
 
         @trace
@@ -1116,6 +1119,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             return f"{algorithm}:{key_id}", key_json
 
         results: Dict[str, Dict[str, Dict[str, str]]] = {}
+        missing: List[Tuple[str, str, str]] = []
         for user_id, device_id, algorithm in query_list:
             if self.database_engine.supports_returning:
                 # If we support RETURNING clause we can use a single query that
@@ -1139,8 +1143,24 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                     device_id, {}
                 )
                 device_results[claim_row[0]] = claim_row[1]
-                continue
+            else:
+                missing.append((user_id, device_id, algorithm))
 
+        return results, missing
+
+    async def claim_e2e_fallback_keys(
+        self, query_list: Iterable[Tuple[str, str, str]]
+    ) -> Dict[str, Dict[str, Dict[str, str]]]:
+        """Take a list of fallback keys out of the database.
+
+        Args:
+            query_list: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A map of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+        """
+        results: Dict[str, Dict[str, Dict[str, str]]] = {}
+        for user_id, device_id, algorithm in query_list:
             # No one-time key available, so see if there's a fallback
             # key
             row = await self.db_pool.simple_select_one(

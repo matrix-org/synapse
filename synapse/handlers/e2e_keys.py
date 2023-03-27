@@ -542,6 +542,28 @@ class E2eKeysHandler:
 
         return ret
 
+    async def claim_local_one_time_keys(
+        self, local_query: List[Tuple[str, str, str]]
+    ) -> Iterable[Dict[str, Dict[str, Dict[str, str]]]]:
+        """Claim one time keys for local users.
+
+        1. Attempt to claim OTKs from the database.
+        2. Attempt to fetch fallback keys from the database.
+
+        Args:
+            local_query: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            An iterable of maps of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+        """
+
+        otk_results, not_found = await self.store.claim_e2e_one_time_keys(local_query)
+
+        # For any *still* remaining users, try fall-back keys.
+        fallback_results = await self.store.claim_e2e_fallback_keys(not_found)
+
+        return (otk_results, fallback_results)
+
     @trace
     async def claim_one_time_keys(
         self, query: Dict[str, Dict[str, Dict[str, str]]], timeout: Optional[int]
@@ -561,17 +583,18 @@ class E2eKeysHandler:
         set_tag("local_key_query", str(local_query))
         set_tag("remote_key_query", str(remote_queries))
 
-        results = await self.store.claim_e2e_one_time_keys(local_query)
+        results = await self.claim_local_one_time_keys(local_query)
 
         # A map of user ID -> device ID -> key ID -> key.
         json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         failures: Dict[str, JsonDict] = {}
-        for user_id, device_keys in results.items():
-            for device_id, keys in device_keys.items():
-                for key_id, json_str in keys.items():
-                    json_result.setdefault(user_id, {})[device_id] = {
-                        key_id: json_decoder.decode(json_str)
-                    }
+        for result in results:
+            for user_id, device_keys in result.items():
+                for device_id, keys in device_keys.items():
+                    for key_id, json_str in keys.items():
+                        json_result.setdefault(user_id, {})[device_id] = {
+                            key_id: json_decoder.decode(json_str)
+                        }
 
         @trace
         async def claim_client_keys(destination: str) -> None:
