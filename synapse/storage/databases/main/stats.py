@@ -523,7 +523,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (room_id,),
             )
-            membership_counts = {membership: cnt for membership, cnt in txn}
+            membership_counts = dict(txn)
 
             txn.execute(
                 """

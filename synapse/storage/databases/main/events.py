@@ -1348,9 +1348,7 @@ class PersistEventsStore:
             [event.event_id for event, _ in events_and_contexts],
         )
 
-        have_persisted: Dict[str, bool] = {
-            event_id: outlier for event_id, outlier in txn
-        }
+        have_persisted: Dict[str, bool] = dict(txn)
 
         logger.debug(
             "_update_outliers_txn: events=%s have_persisted=%s",
