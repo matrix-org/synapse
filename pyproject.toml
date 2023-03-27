@@ -359,7 +359,7 @@ optional = true
 sphinx = {version = "^6.1", python = "^3.8"}
 sphinx-autodoc2 = {version = "^0.4.2", python = "^3.8"}
 myst-parser = {version = "^1.0.0", python = "^3.8"}
-furo = "^2022.12.7"
+furo = ">=2022.12.7,<2024.0.0"
 
 
 [build-system]
