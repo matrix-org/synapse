@@ -1161,8 +1161,6 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         """
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for user_id, device_id, algorithm in query_list:
-            # No one-time key available, so see if there's a fallback
-            # key
             row = await self.db_pool.simple_select_one(
                 table="e2e_fallback_keys_json",
                 keyvalues={

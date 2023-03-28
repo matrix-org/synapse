@@ -891,7 +891,9 @@ class ApplicationServicesHandler:
             )
         )
 
-        # Patch together the results.
+        # Patch together the results -- they are all independent (since they
+        # require exclusive control over the users). They get returned as a list
+        # and the caller combines them.
         claimed_keys: List[Dict[str, Dict[str, Dict[str, JsonDict]]]] = []
         for success, result in results:
             if success:

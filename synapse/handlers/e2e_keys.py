@@ -565,9 +565,8 @@ class E2eKeysHandler:
         otk_results, not_found = await self.store.claim_e2e_one_time_keys(local_query)
 
         # If the application services have not provided any keys via the C-S
-        # API, query it directly.
+        # API, query it directly for one-time keys.
         if self._query_appservices_for_otks:
-            # Query the appservices for any OTKs.
             (
                 appservice_results,
                 not_found,
@@ -575,9 +574,12 @@ class E2eKeysHandler:
         else:
             appservice_results = []
 
-        # For any *still* remaining users, try fall-back keys.
+        # For each user that does not have a one-time keys available, see if
+        # there is a fallback key.
         fallback_results = await self.store.claim_e2e_fallback_keys(not_found)
 
+        # Return the results in order, each item from the input query should
+        # only appear once in the combined list.
         return (otk_results, *appservice_results, fallback_results)
 
     @trace
