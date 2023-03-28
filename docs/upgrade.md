@@ -101,7 +101,7 @@ via [the `Authorization` header](https://spec.matrix.org/v1.6/application-servic
 since v1.70.0. For backwards compatibility it is *also* sent as the `access_token`
 query parameter. This is insecure and should be considered deprecated.
 
-A future version of Synapse (v1.85.0 or later) will remove support for legacy
+A future version of Synapse (v1.88.0 or later) will remove support for legacy
 application service routes and query parameter authorization.
 
 # Upgrading to v1.80.0
