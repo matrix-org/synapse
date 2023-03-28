@@ -124,9 +124,6 @@ class ExperimentalConfig(Config):
         raw_msc3866_config = experimental.get("msc3866", {})
         self.msc3866 = MSC3866Config(**raw_msc3866_config)
 
-        # MSC3881: Remotely toggle push notifications for another client
-        self.msc3881_enabled: bool = experimental.get("msc3881_enabled", False)
-
         # MSC3882: Allow an existing session to sign in a new session
         self.msc3882_enabled: bool = experimental.get("msc3882_enabled", False)
         self.msc3882_ui_auth: bool = experimental.get("msc3882_ui_auth", True)

@@ -115,7 +115,7 @@ class VersionsRestServlet(RestServlet):
                     # Adds support for login token requests as per MSC3882
                     "org.matrix.msc3882": self.config.experimental.msc3882_enabled,
                     # Adds support for remotely enabling/disabling pushers, as per MSC3881
-                    "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
+                    "org.matrix.msc3881": True,
                     # Adds support for filtering /messages by event relation.
                     "org.matrix.msc3874": self.config.experimental.msc3874_enabled,
                     # Adds support for simple HTTP rendezvous as per MSC3886

@@ -819,7 +819,6 @@ class HTTPPusherTests(HomeserverTestCase):
         self.helper.send(room, body="Hello", tok=access_token)
         self.assertEqual(len(self.push_attempts), 1)
 
-    @override_config({"experimental_features": {"msc3881_enabled": True}})
     def test_disable(self) -> None:
         """Tests that disabling a pusher means it's not pushed to anymore."""
         user_id, access_token = self._make_user_with_pusher("user")
@@ -827,6 +826,11 @@ class HTTPPusherTests(HomeserverTestCase):
 
         room = self.helper.create_room_as(user_id, tok=access_token)
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # enable msc3881 per_user flag
+        self.get_success(
+            self.hs.get_datastores().main.set_feature_for_user(user_id, "msc3881", True)
+        )
 
         # Send a message and check that it generated a push.
         self.helper.send(room, body="Hi!", tok=other_access_token)
@@ -848,7 +852,6 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertFalse(enabled)
         self.assertTrue(isinstance(enabled, bool))
 
-    @override_config({"experimental_features": {"msc3881_enabled": True}})
     def test_enable(self) -> None:
         """Tests that enabling a disabled pusher means it gets pushed to."""
         # Create the user with the pusher already disabled.
@@ -857,6 +860,11 @@ class HTTPPusherTests(HomeserverTestCase):
 
         room = self.helper.create_room_as(user_id, tok=access_token)
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # enable msc3881 per_user flag
+        self.get_success(
+            self.hs.get_datastores().main.set_feature_for_user(user_id, "msc3881", True)
+        )
 
         # Send a message and check that it did not generate a push.
         self.helper.send(room, body="Hi!", tok=other_access_token)
@@ -878,7 +886,7 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertTrue(enabled)
         self.assertTrue(isinstance(enabled, bool))
 
-    @override_config({"experimental_features": {"msc3881_enabled": True}})
+    # @override_config({"experimental_features": {"msc3881_enabled": True}})
     def test_null_enabled(self) -> None:
         """Tests that a pusher that has an 'enabled' column set to NULL (eg pushers
         created before the column was introduced) is considered enabled.
@@ -886,6 +894,11 @@ class HTTPPusherTests(HomeserverTestCase):
         # We intentionally set 'enabled' to None so that it's stored as NULL in the
         # database.
         user_id, access_token = self._make_user_with_pusher("user", enabled=None)  # type: ignore[arg-type]
+
+        # enable msc3881 per_user flag
+        self.get_success(
+            self.hs.get_datastores().main.set_feature_for_user(user_id, "msc3881", True)
+        )
 
         channel = self.make_request("GET", "/pushers", access_token=access_token)
         self.assertEqual(channel.code, 200)
@@ -922,13 +935,17 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(pushers), 1)
         self.assertEqual(pushers[0].device_id, device_id)
 
-    @override_config({"experimental_features": {"msc3881_enabled": True}})
     def test_device_id(self) -> None:
         """Tests that a pusher created with a given device ID shows that device ID in
         GET /pushers requests.
         """
-        self.register_user("user", "pass")
+        user = self.register_user("user", "pass")
         access_token = self.login("user", "pass")
+
+        # enable msc3881 per_user flag
+        self.get_success(
+            self.hs.get_datastores().main.set_feature_for_user(user, "msc3881", True)
+        )
 
         # We create the pusher with an HTTP request rather than with
         # _make_user_with_pusher so that we can test the device ID is correctly set when

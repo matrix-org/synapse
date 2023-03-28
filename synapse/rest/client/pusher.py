@@ -42,7 +42,6 @@ class PushersRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self._msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -55,7 +54,9 @@ class PushersRestServlet(RestServlet):
         pusher_dicts = [p.as_dict() for p in pushers]
 
         for pusher in pusher_dicts:
-            if self._msc3881_enabled:
+            if await self.hs.get_datastores().main.get_feature_enabled(
+                user.to_string(), "msc3881"
+            ):
                 pusher["org.matrix.msc3881.enabled"] = pusher["enabled"]
                 pusher["org.matrix.msc3881.device_id"] = pusher["device_id"]
             del pusher["enabled"]
@@ -73,7 +74,6 @@ class PushersSetRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
         self.pusher_pool = self.hs.get_pusherpool()
-        self._msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -113,7 +113,12 @@ class PushersSetRestServlet(RestServlet):
             append = content["append"]
 
         enabled = True
-        if self._msc3881_enabled and "org.matrix.msc3881.enabled" in content:
+        if (
+            await self.hs.get_datastores().main.get_feature_enabled(
+                user.to_string(), "msc3881"
+            )
+            and "org.matrix.msc3881.enabled" in content
+        ):
             enabled = content["org.matrix.msc3881.enabled"]
 
         if not append:
