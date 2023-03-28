@@ -34,6 +34,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install Rust
+        # There don't seem to be versioned releases of this action per se: for each rust
+        # version there is a branch which gets constantly rebased on top of master.
+        # We pin to a specific commit for paranoia's sake.
+        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
+        with:
+            toolchain: 1.58.1
+      - uses: Swatinem/rust-cache@v2
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
