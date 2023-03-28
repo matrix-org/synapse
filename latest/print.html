@@ -248,8 +248,8 @@ that your email address is probably <code>user@example.com</code> rather than
 for most users.</p>
 <h4 id="docker-images-and-ansible-playbooks"><a class="header" href="#docker-images-and-ansible-playbooks">Docker images and Ansible playbooks</a></h4>
 <p>There is an official synapse image available at
-<a href="https://hub.docker.com/r/matrixdotorg/synapse">https://hub.docker.com/r/matrixdotorg/synapse</a> which can be used with
-the docker-compose file available at
+<a href="https://hub.docker.com/r/matrixdotorg/synapse">https://hub.docker.com/r/matrixdotorg/synapse</a> or at <a href="https://ghcr.io/matrix-org/synapse"><code>ghcr.io/matrix-org/synapse</code></a>
+which can be used with the docker-compose file available at
 <a href="https://github.com/matrix-org/synapse/tree/develop/contrib/docker">contrib/docker</a>.
 Further information on this including configuration options is available in the README
 on hub.docker.com.</p>
@@ -1779,6 +1779,14 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1800"><a class="header" href="#upgrading-to-v1800">Upgrading to v1.80.0</a></h1>
+<h2 id="reporting-events-error-code-change"><a class="header" href="#reporting-events-error-code-change">Reporting events error code change</a></h2>
+<p>Before this update, the
+<a href="https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3roomsroomidreporteventid"><code>POST /_matrix/client/v3/rooms/{roomId}/report/{eventId}</code></a>
+endpoint would return a <code>403</code> if a user attempted to report an event that they did not have access to.
+This endpoint will now return a <code>404</code> in this case instead.</p>
+<p>Clients that implement event reporting should check that their error handling code will handle this
+change.</p>
 <h1 id="upgrading-to-v1790"><a class="header" href="#upgrading-to-v1790">Upgrading to v1.79.0</a></h1>
 <h2 id="the-on_threepid_bind-module-callback-method-has-been-deprecated"><a class="header" href="#the-on_threepid_bind-module-callback-method-has-been-deprecated">The <code>on_threepid_bind</code> module callback method has been deprecated</a></h2>
 <p>Synapse v1.79.0 deprecates the
@@ -10724,6 +10732,7 @@ information.</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
 ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
 ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
+^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases
 ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
 
@@ -10737,6 +10746,7 @@ information.</p>
 # Registration/login requests
 ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
 ^/_matrix/client/(r0|v3|unstable)/register$
+^/_matrix/client/(r0|v3|unstable)/register/available$
 ^/_matrix/client/v1/register/m.login.registration_token/validity$
 
 # Event sending requests
