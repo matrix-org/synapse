@@ -503,6 +503,8 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
+        await self.hs.get_pusherpool().remove_pushers_by_devices(user_id, device_ids)
+
         # Delete data specific to each device. Not optimised as it is not
         # considered as part of a critical path.
         for device_id in device_ids:

@@ -1,1 +1,0 @@
-Skip processing of auto-join room behaviour if there are not auto-join rooms configured.

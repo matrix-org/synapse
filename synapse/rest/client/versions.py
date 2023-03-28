@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class VersionsRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/versions$")]
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -122,6 +123,8 @@ class VersionsRestServlet(RestServlet):
                     is not None,
                     # Adds support for relation-based redactions as per MSC3912.
                     "org.matrix.msc3912": self.config.experimental.msc3912_enabled,
+                    # Adds support for unstable "intentional mentions" behaviour.
+                    "org.matrix.msc3952_intentional_mentions": self.config.experimental.msc3952_intentional_mentions,
                 },
             },
         )

@@ -163,6 +163,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/versions$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$",
             "^/_matrix/client/(r0|v3|unstable)/register$",
+            "^/_matrix/client/(r0|v3|unstable)/register/available$",
             "^/_matrix/client/(r0|v3|unstable)/auth/.*/fallback/web$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/messages$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event",
@@ -171,6 +172,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/v1/rooms/.*/timestamp_to_event$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/search",
             "^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)",
+            "^/_matrix/client/(r0|v3|unstable)/password_policy$",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -422,7 +424,7 @@ def add_worker_roles_to_shared_config(
 
 
 def merge_worker_template_configs(
-    existing_dict: Dict[str, Any] | None,
+    existing_dict: Optional[Dict[str, Any]],
     to_be_merged_dict: Dict[str, Any],
 ) -> Dict[str, Any]:
     """When given an existing dict of worker template configuration consisting with both

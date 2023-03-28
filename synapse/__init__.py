@@ -17,9 +17,9 @@
 """ This is an implementation of a Matrix homeserver.
 """
 
-import json
 import os
 import sys
+from typing import Any, Dict
 
 from synapse.util.rust import check_rust_lib_up_to_date
 from synapse.util.stringutils import strtobool
@@ -61,11 +61,20 @@ try:
 except ImportError:
     pass
 
-# Use the standard library json implementation instead of simplejson.
+# Teach canonicaljson how to serialise immutabledicts.
 try:
-    from canonicaljson import set_json_library
+    from canonicaljson import register_preserialisation_callback
+    from immutabledict import immutabledict
 
-    set_json_library(json)
+    def _immutabledict_cb(d: immutabledict) -> Dict[str, Any]:
+        try:
+            return d._dict
+        except Exception:
+            # Paranoia: fall back to a `dict()` call, in case a future version of
+            # immutabledict removes `_dict` from the implementation.
+            return dict(d)
+
+    register_preserialisation_callback(immutabledict, _immutabledict_cb)
 except ImportError:
     pass
 

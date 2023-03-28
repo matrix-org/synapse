@@ -698,10 +698,17 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """Delete the entire user directory"""
 
         def _delete_all_from_user_dir_txn(txn: LoggingTransaction) -> None:
-            txn.execute("DELETE FROM user_directory")
-            txn.execute("DELETE FROM user_directory_search")
-            txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM users_who_share_private_rooms")
+            # SQLite doesn't support TRUNCATE.
+            # On Postgres, DELETE FROM does a table scan but TRUNCATE is more efficient.
+            truncate = (
+                "DELETE FROM"
+                if isinstance(self.database_engine, Sqlite3Engine)
+                else "TRUNCATE"
+            )
+            txn.execute(f"{truncate} user_directory")
+            txn.execute(f"{truncate} user_directory_search")
+            txn.execute(f"{truncate} users_in_public_rooms")
+            txn.execute(f"{truncate} users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
 
         await self.db_pool.runInteraction(
