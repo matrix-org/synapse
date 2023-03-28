@@ -1504,8 +1504,8 @@ class DatabasePool:
         self.engine.lock_table(txn, "user_ips")
 
         for keyv, valv in zip(key_values, value_values):
-            _keys = {x: y for x, y in zip(key_names, keyv)}
-            _vals = {x: y for x, y in zip(value_names, valv)}
+            _keys = dict(zip(key_names, keyv))
+            _vals = dict(zip(value_names, valv))
 
             self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=False)
 

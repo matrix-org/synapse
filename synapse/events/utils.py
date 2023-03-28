@@ -355,7 +355,7 @@ def serialize_event(
     time_now_ms = int(time_now_ms)
 
     # Should this strip out None's?
-    d = {k: v for k, v in e.get_dict().items()}
+    d = dict(e.get_dict().items())
 
     d["event_id"] = e.event_id
 
