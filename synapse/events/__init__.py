@@ -462,7 +462,7 @@ class FrozenEvent(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -510,7 +510,7 @@ class FrozenEventV2(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 

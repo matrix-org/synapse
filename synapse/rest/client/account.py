@@ -576,6 +576,9 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
 
 class ThreepidRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid$")
+    # This is used as a proxy for all the 3pid endpoints.
+
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -834,6 +837,7 @@ def assert_valid_next_link(hs: "HomeServer", next_link: str) -> None:
 
 class WhoamiRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/whoami$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

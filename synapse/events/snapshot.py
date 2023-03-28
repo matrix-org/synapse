@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
@@ -489,4 +489,4 @@ def _decode_state_dict(
     if input is None:
         return None
 
-    return frozendict({(etype, state_key): v for etype, state_key, v in input})
+    return immutabledict({(etype, state_key): v for etype, state_key, v in input})

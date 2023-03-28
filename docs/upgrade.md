@@ -88,6 +88,18 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.80.0
+
+## Reporting events error code change
+
+Before this update, the
+[`POST /_matrix/client/v3/rooms/{roomId}/report/{eventId}`](https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3roomsroomidreporteventid)
+endpoint would return a `403` if a user attempted to report an event that they did not have access to.
+This endpoint will now return a `404` in this case instead.
+
+Clients that implement event reporting should check that their error handling code will handle this
+change.
+
 # Upgrading to v1.79.0
 
 ## The `on_threepid_bind` module callback method has been deprecated

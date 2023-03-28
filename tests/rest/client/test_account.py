@@ -1406,9 +1406,8 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
             # account status will fail.
             return UserID.from_string(user_id).localpart == "someuser"
 
-        self.hs.get_account_validity_handler()._is_user_expired_callbacks.append(
-            is_expired
-        )
+        account_validity_callbacks = self.hs.get_module_api_callbacks().account_validity
+        account_validity_callbacks.is_user_expired_callbacks.append(is_expired)
 
         self._test_status(
             users=[user],
