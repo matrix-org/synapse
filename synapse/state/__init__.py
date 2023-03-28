@@ -33,7 +33,7 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 from prometheus_client import Counter, Histogram
 
 from synapse.api.constants import EventTypes
@@ -105,14 +105,18 @@ class _StateCacheEntry:
         #
         # This can be None if we have a `state_group` (as then we can fetch the
         # state from the DB.)
-        self._state = frozendict(state) if state is not None else None
+        self._state: Optional[StateMap[str]] = (
+            immutabledict(state) if state is not None else None
+        )
 
         # the ID of a state group if one and only one is involved.
         # otherwise, None otherwise?
         self.state_group = state_group
 
         self.prev_group = prev_group
-        self.delta_ids = frozendict(delta_ids) if delta_ids is not None else None
+        self.delta_ids: Optional[StateMap[str]] = (
+            immutabledict(delta_ids) if delta_ids is not None else None
+        )
 
     async def get_state(
         self,

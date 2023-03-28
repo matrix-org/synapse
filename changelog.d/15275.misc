@@ -1,1 +1,0 @@
-Make `configure_workers_and_start` script used in Complement tests compatible with older versions of Python.

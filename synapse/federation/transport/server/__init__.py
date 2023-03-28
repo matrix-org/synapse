@@ -108,6 +108,7 @@ class PublicRoomList(BaseFederationServlet):
     """
 
     PATH = "/publicRooms"
+    CATEGORY = "Federation requests"
 
     def __init__(
         self,
@@ -212,6 +213,7 @@ class OpenIdUserInfo(BaseFederationServlet):
     """
 
     PATH = "/openid/userinfo"
+    CATEGORY = "Federation requests"
 
     REQUIRE_AUTH = False
 

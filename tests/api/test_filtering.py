@@ -18,7 +18,6 @@ from typing import List
 from unittest.mock import patch
 
 import jsonschema
-from frozendict import frozendict
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -29,6 +28,7 @@ from synapse.api.presence import UserPresenceState
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
+from synapse.util.frozenutils import freeze
 
 from tests import unittest
 from tests.events.test_utils import MockEvent
@@ -343,12 +343,12 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         self.assertFalse(Filter(self.hs, definition)._check(event))
 
-        # check it works with frozendicts too
+        # check it works with frozen dictionaries too
         event = MockEvent(
             sender="@foo:bar",
             type="m.room.message",
             room_id="!secretbase:unknown",
-            content=frozendict({EventContentFields.LABELS: ["#fun"]}),
+            content=freeze({EventContentFields.LABELS: ["#fun"]}),
         )
         self.assertTrue(Filter(self.hs, definition)._check(event))
 

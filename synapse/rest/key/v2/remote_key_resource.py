@@ -93,6 +93,8 @@ class RemoteKey(RestServlet):
     }
     """
 
+    CATEGORY = "Federation requests"
+
     def __init__(self, hs: "HomeServer"):
         self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastores().main
