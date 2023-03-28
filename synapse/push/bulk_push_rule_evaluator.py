@@ -27,6 +27,7 @@ from typing import (
     Union,
 )
 
+import attr
 from prometheus_client import Counter
 
 from synapse.api.constants import (
@@ -105,6 +106,17 @@ def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
         return True
 
     return False
+
+
+@attr.s(slots=True, auto_attribs=True)
+class ActionsForUser:
+    """
+    A class to hold the actions for a given event and whether the event should
+    increment the unread count.
+    """
+
+    actions: Collection[Union[Mapping, str]]
+    count_as_unread: bool
 
 
 class BulkPushRuleEvaluator:
@@ -336,15 +348,8 @@ class BulkPushRuleEvaluator:
             # (historical messages persisted in reverse-chronological order).
             return
 
-        # Disable counting as unread unless the experimental configuration is
-        # enabled, as it can cause additional (unwanted) rows to be added to the
-        # event_push_actions table.
-        count_as_unread = False
-        if self.hs.config.experimental.msc2654_enabled:
-            count_as_unread = _should_count_as_unread(event, context)
-
         rules_by_user = await self._get_rules_for_event(event)
-        actions_by_user: Dict[str, Collection[Union[Mapping, str]]] = {}
+        actions_by_user: Dict[str, ActionsForUser] = {}
 
         room_member_count = await self.store.get_number_joined_users_in_room(
             event.room_id
@@ -429,17 +434,19 @@ class BulkPushRuleEvaluator:
                     if not isinstance(display_name, str):
                         display_name = None
 
-            if count_as_unread:
-                # Add an element for the current user if the event needs to be marked as
-                # unread, so that add_push_actions_to_staging iterates over it.
-                # If the event shouldn't be marked as unread but should notify the
-                # current user, it'll be added to the dict later.
-                actions_by_user[uid] = []
-
             actions = evaluator.run(rules, uid, display_name)
-            if "notify" in actions:
-                # Push rules say we should notify the user of this event
-                actions_by_user[uid] = actions
+
+            # check whether unread counts are enabled for this user
+            unread_enabled = await self.store.get_feature_enabled(uid, "msc2654")
+            if unread_enabled:
+                count_as_unread = _should_count_as_unread(event, context)
+            else:
+                count_as_unread = False
+
+            if "notify" in actions or count_as_unread:
+                # Push rules say we should notify the user of this event or the event should
+                # increment the unread count
+                actions_by_user[uid] = ActionsForUser(actions, count_as_unread)
 
         # If there aren't any actions then we can skip the rest of the
         # processing.
@@ -467,7 +474,6 @@ class BulkPushRuleEvaluator:
         await self.store.add_push_actions_to_staging(
             event.event_id,
             actions_by_user,
-            count_as_unread,
             thread_id,
         )
 

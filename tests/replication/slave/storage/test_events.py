@@ -24,6 +24,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.handlers.room import RoomEventSource
+from synapse.push.bulk_push_rule_evaluator import ActionsForUser
 from synapse.server import HomeServer
 from synapse.storage.databases.main.event_push_actions import (
     NotifCounts,
@@ -412,8 +413,10 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         self.get_success(
             self.master_store.add_push_actions_to_staging(
                 event.event_id,
-                dict(push_actions),
-                False,
+                {
+                    user_id: ActionsForUser(actions, False)
+                    for user_id, actions in push_actions
+                },
                 "main",
             )
         )

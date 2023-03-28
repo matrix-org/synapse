@@ -105,6 +105,7 @@ from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
+    from synapse.push.bulk_push_rule_evaluator import ActionsForUser
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -1215,8 +1216,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
     async def add_push_actions_to_staging(
         self,
         event_id: str,
-        user_id_actions: Dict[str, Collection[Union[Mapping, str]]],
-        count_as_unread: bool,
+        user_id_actions: Dict[str, "ActionsForUser"],
         thread_id: str,
     ) -> None:
         """Add the push actions for the event to the push action staging area.
@@ -1234,17 +1234,19 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # This is a helper function for generating the necessary tuple that
         # can be used to insert into the `event_push_actions_staging` table.
         def _gen_entry(
-            user_id: str, actions: Collection[Union[Mapping, str]]
+            user_id: str, actions_by_user: "ActionsForUser"
         ) -> Tuple[str, str, str, int, int, int, str, int]:
-            is_highlight = 1 if _action_has_highlight(actions) else 0
-            notif = 1 if "notify" in actions else 0
+            is_highlight = 1 if _action_has_highlight(actions_by_user.actions) else 0
+            notif = 1 if "notify" in actions_by_user.actions else 0
             return (
                 event_id,  # event_id column
                 user_id,  # user_id column
-                _serialize_action(actions, bool(is_highlight)),  # actions column
+                _serialize_action(
+                    actions_by_user.actions, bool(is_highlight)
+                ),  # actions column
                 notif,  # notif column
                 is_highlight,  # highlight column
-                int(count_as_unread),  # unread column
+                int(actions_by_user.count_as_unread),  # unread column
                 thread_id,  # thread_id column
                 self._clock.time_msec(),  # inserted_ts column
             )
@@ -1262,8 +1264,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 "inserted_ts",
             ),
             values=[
-                _gen_entry(user_id, actions)
-                for user_id, actions in user_id_actions.items()
+                _gen_entry(user_id, actions_by_user)
+                for user_id, actions_by_user in user_id_actions.items()
             ],
             desc="add_push_actions_to_staging",
         )

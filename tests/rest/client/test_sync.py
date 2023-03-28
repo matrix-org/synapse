@@ -538,9 +538,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
     def default_config(self) -> JsonDict:
         config = super().default_config()
-        config["experimental_features"] = {
-            "msc2654_enabled": True,
-        }
         return config
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -588,6 +585,9 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
     def test_unread_counts(self) -> None:
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
+        # add per-user flag to the DB
+        ex_handler = self.hs.get_experimental_features_manager()
+        self.get_success(ex_handler.set_feature_for_user(self.user_id, "msc2654", True))
 
         # Check that our own messages don't increase the unread count.
         self.helper.send(self.room_id, "hello", tok=self.tok)
