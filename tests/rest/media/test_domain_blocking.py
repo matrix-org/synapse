@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from binascii import unhexlify
+from typing import Dict
+
 from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.resource import Resource
 
 from synapse.media._base import FileInfo
 from synapse.server import HomeServer
@@ -20,10 +24,11 @@ from synapse.util import Clock
 from tests import unittest
 from tests.unittest import override_config
 
-try:
-    import lxml
-except ImportError:
-    lxml = None
+SMALL_PNG = unhexlify(
+    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+    b"0000001f15c4890000000a49444154789c63000100000500010d"
+    b"0a2db40000000049454e44ae426082"
+)
 
 
 class MediaDomainBlockingTests(unittest.HomeserverTestCase):
@@ -43,19 +48,25 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
             fname,
             finish,
         ):
-            f.write("something".encode("utf-8"))
+            f.write(SMALL_PNG)
             self.get_success(finish())
+
         self.get_success(
             self.store.store_cached_remote_media(
                 origin=self.remote_server_name,
                 media_id=self.remote_media_id,
-                media_type="text/plain",
+                media_type="image/png",
                 media_length=1,
                 time_now_ms=clock.time_msec(),
-                upload_name="test.txt",
+                upload_name="test.png",
                 filesystem_id=file_id,
             )
         )
+
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        # We need to manually set the resource tree to include media, the
+        # default only does `/_matrix/client` APIs.
+        return {"/_matrix/media": self.hs.get_media_repository_resource()}
 
     @override_config(
         {
@@ -98,7 +109,8 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         {
             # Disable downloads from the domain we'll be trying to download from.
             # Should result in a 404.
-            "prevent_downloads_from": ["evil.com"]
+            "prevent_downloads_from": ["evil.com"],
+            "dynamic_thumbnails": True,
         }
     )
     def test_cannot_download_blocked_media_thumbnail(self) -> None:
@@ -107,8 +119,9 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         """
         response = self.make_request(
             "GET",
-            f"/_matrix/media/v3/thumbnail/evil.com/{self.remote_media_id}",
+            f"/_matrix/media/v3/thumbnail/evil.com/{self.remote_media_id}?width=100&height=100",
             shorthand=False,
+            content={"width": 100, "height": 100},
         )
         self.assertEqual(response.code, 404)
 
@@ -116,7 +129,8 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         {
             # Disable downloads from a domain we won't be requesting downloads from.
             # This proves we haven't broken anything.
-            "prevent_downloads_from": ["not-listed.com"]
+            "prevent_downloads_from": ["not-listed.com"],
+            "dynamic_thumbnails": True,
         }
     )
     def test_remote_media_thumbnail_normally_unblocked(self) -> None:
@@ -125,7 +139,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         """
         response = self.make_request(
             "GET",
-            f"/_matrix/media/v3/thumbnail/evil.com/{self.remote_media_id}",
+            f"/_matrix/media/v3/thumbnail/evil.com/{self.remote_media_id}?width=100&height=100",
             shorthand=False,
         )
         self.assertEqual(response.code, 200)
