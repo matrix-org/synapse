@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import os.path
+import sqlite3
 import time
 import uuid
 import warnings
@@ -105,6 +106,8 @@ P = ParamSpec("P")
 
 # the type of thing that can be passed into `make_request` in the headers list
 CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
+
+PREPPED_DB_CONN: Optional[LoggingDatabaseConnection] = None
 
 
 class TimedOutException(Exception):
@@ -830,11 +833,6 @@ def connect_client(
 
 class TestHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore[assignment]
-
-
-import sqlite3
-
-PREPPED_DB_CONN = None
 
 
 def setup_test_homeserver(

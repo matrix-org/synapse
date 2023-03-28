@@ -86,6 +86,7 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
 
         if self._is_in_memory:
             if self._prepped_conn is not None:
+                assert isinstance(db_conn.conn, sqlite3.Connection)
                 self._prepped_conn.backup(db_conn.conn)
             else:
                 # In memory databases need to be rebuilt each time. Ideally we'd
