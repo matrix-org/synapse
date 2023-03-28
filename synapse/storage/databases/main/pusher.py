@@ -518,7 +518,7 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
         def set_device_id_for_pushers_txn(txn: LoggingTransaction) -> int:
             txn.execute(
                 """
-                    SELECT 
+                    SELECT
                         p.id AS pusher_id,
                         p.device_id AS pusher_device_id,
                         at.device_id AS token_device_id
