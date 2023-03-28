@@ -625,23 +625,6 @@ class ReplicationCommandHandler:
 
         self._notifier.notify_remote_server_up(cmd.data)
 
-        # We relay to all other connections to ensure every instance gets the
-        # notification.
-        #
-        # When configured to use redis we'll always only have one connection and
-        # so this is a no-op (all instances will have already received the same
-        # REMOTE_SERVER_UP command).
-        #
-        # For direct TCP connections this will relay to all other connections
-        # connected to us. When on master this will correctly fan out to all
-        # other direct TCP clients and on workers there'll only be the one
-        # connection to master.
-        #
-        # (The logic here should also be sound if we have a mix of Redis and
-        # direct TCP connections so long as there is only one traffic route
-        # between two instances, but that is not currently supported).
-        self.send_command(cmd, ignore_conn=conn)
-
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""
         self._connections.append(connection)
@@ -689,21 +672,14 @@ class ReplicationCommandHandler:
         """
         return bool(self._connections)
 
-    def send_command(
-        self, cmd: Command, ignore_conn: Optional[IReplicationConnection] = None
-    ) -> None:
+    def send_command(self, cmd: Command) -> None:
         """Send a command to all connected connections.
 
         Args:
             cmd
-            ignore_conn: If set don't send command to the given connection.
-                Used when relaying commands from one connection to all others.
         """
         if self._connections:
             for connection in self._connections:
-                if connection == ignore_conn:
-                    continue
-
                 try:
                     connection.send_command(cmd)
                 except Exception:

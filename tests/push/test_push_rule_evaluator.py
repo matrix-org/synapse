@@ -14,8 +14,6 @@
 
 from typing import Any, Dict, List, Optional, Union, cast
 
-import frozendict
-
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
@@ -318,11 +316,11 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "pattern should only match at the start/end of the value",
         )
 
-        # it should work on frozendicts too
+        # it should work on frozen dictionaries too
         self._assert_matches(
             condition,
-            frozendict.frozendict({"value": "FoobaZ"}),
-            "patterns should match on frozendicts",
+            freeze({"value": "FoobaZ"}),
+            "patterns should match on frozen dictionaries",
         )
 
         # wildcards should match
@@ -425,11 +423,11 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 "incorrect types should not match",
             )
 
-        # it should work on frozendicts too
+        # it should work on frozen dictionaries too
         self._assert_matches(
             condition,
-            frozendict.frozendict({"value": "foobaz"}),
-            "values should match on frozendicts",
+            freeze({"value": "foobaz"}),
+            "values should match on frozen dictionaries",
         )
 
     def test_exact_event_match_boolean(self) -> None:
@@ -546,11 +544,11 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "does not search in a string",
         )
 
-        # it should work on frozendicts too
+        # it should work on frozen dictionaries too
         self._assert_matches(
             condition,
             freeze({"value": ["foobaz"]}),
-            "values should match on frozendicts",
+            "values should match on frozen dictionaries",
         )
 
     def test_no_body(self) -> None:

@@ -1,0 +1,2 @@
+Add a check to [SQLite port_db script](https://matrix-org.github.io/synapse/latest/postgres.html#porting-from-sqlite)
+to ensure that the sqlite database passed to the script exists before trying to port from it.

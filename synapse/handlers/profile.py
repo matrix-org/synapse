@@ -63,7 +63,7 @@ class ProfileHandler:
 
         self._third_party_rules = hs.get_third_party_event_rules()
 
-    async def get_profile(self, user_id: str) -> JsonDict:
+    async def get_profile(self, user_id: str, ignore_backoff: bool = True) -> JsonDict:
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
@@ -81,7 +81,7 @@ class ProfileHandler:
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": user_id},
-                    ignore_backoff=True,
+                    ignore_backoff=ignore_backoff,
                 )
                 return result
             except RequestSendFailed as e:

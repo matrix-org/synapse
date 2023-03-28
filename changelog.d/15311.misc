@@ -1,0 +1,1 @@
+Reject events with an invalid "mentions" property pert [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952).

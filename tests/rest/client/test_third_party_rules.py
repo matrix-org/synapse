@@ -941,18 +941,16 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         just before associating and removing a 3PID to/from an account.
         """
         # Pretend to be a Synapse module and register both callbacks as mocks.
-        third_party_rules = self.hs.get_third_party_event_rules()
         on_add_user_third_party_identifier_callback_mock = Mock(
             return_value=make_awaitable(None)
         )
         on_remove_user_third_party_identifier_callback_mock = Mock(
             return_value=make_awaitable(None)
         )
-        third_party_rules._on_threepid_bind_callbacks.append(
-            on_add_user_third_party_identifier_callback_mock
-        )
-        third_party_rules._on_threepid_bind_callbacks.append(
-            on_remove_user_third_party_identifier_callback_mock
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules.register_third_party_rules_callbacks(
+            on_add_user_third_party_identifier=on_add_user_third_party_identifier_callback_mock,
+            on_remove_user_third_party_identifier=on_remove_user_third_party_identifier_callback_mock,
         )
 
         # Register an admin user.
@@ -1008,12 +1006,12 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         when a user is deactivated and their third-party ID associations are deleted.
         """
         # Pretend to be a Synapse module and register both callbacks as mocks.
-        third_party_rules = self.hs.get_third_party_event_rules()
         on_remove_user_third_party_identifier_callback_mock = Mock(
             return_value=make_awaitable(None)
         )
-        third_party_rules._on_threepid_bind_callbacks.append(
-            on_remove_user_third_party_identifier_callback_mock
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules.register_third_party_rules_callbacks(
+            on_remove_user_third_party_identifier=on_remove_user_third_party_identifier_callback_mock,
         )
 
         # Register an admin user.
@@ -1038,6 +1036,9 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             access_token=admin_tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Check that the mock was not called on the act of adding a third-party ID.
+        on_remove_user_third_party_identifier_callback_mock.assert_not_called()
 
         # Now deactivate the user.
         channel = self.make_request(
