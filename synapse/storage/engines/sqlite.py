@@ -34,6 +34,10 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
             ":memory:",
         )
 
+        self._prepped_conn: Optional[sqlite3.Connection] = database_config.get(
+            "_TEST_PREPPED_CONN"
+        )
+
         if platform.python_implementation() == "PyPy":
             # pypy's sqlite3 module doesn't handle bytearrays, convert them
             # back to bytes.
@@ -81,10 +85,13 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
         from synapse.storage.prepare_database import prepare_database
 
         if self._is_in_memory:
-            # In memory databases need to be rebuilt each time. Ideally we'd
-            # reuse the same connection as we do when starting up, but that
-            # would involve using adbapi before we have started the reactor.
-            prepare_database(db_conn, self, config=None)
+            if self._prepped_conn is not None:
+                self._prepped_conn.backup(db_conn.conn)
+            else:
+                # In memory databases need to be rebuilt each time. Ideally we'd
+                # reuse the same connection as we do when starting up, but that
+                # would involve using adbapi before we have started the reactor.
+                prepare_database(db_conn, self, config=None)
 
         db_conn.create_function("rank", 1, _rank)
         db_conn.execute("PRAGMA foreign_keys = ON;")

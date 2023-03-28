@@ -168,7 +168,7 @@ class TestCase(unittest.TestCase):
             ret = orig()
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
-            gc.collect()
+            gc.collect(0)
             set_current_context(SENTINEL_CONTEXT)
 
             return ret
