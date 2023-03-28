@@ -5,6 +5,7 @@
 
 CONFIGFILE_SERVERNAME="/etc/matrix-synapse/conf.d/server_name.yaml"
 CONFIGFILE_REPORTSTATS="/etc/matrix-synapse/conf.d/report_stats.yaml"
+CONFIGFILE_HOMESERVER="/etc/matrix-synapse/homeserver.yaml"
 USER="matrix-synapse"
 
 case "$1" in
@@ -43,12 +44,19 @@ EOF
       adduser --quiet --system --group --no-create-home --home /var/lib/matrix-synapse $USER
     fi
 
-    for DIR in /var/lib/matrix-synapse /var/log/matrix-synapse /etc/matrix-synapse; do
+    for DIR in /var/log/matrix-synapse /etc/matrix-synapse; do
       if ! dpkg-statoverride --list --quiet $DIR >/dev/null; then
         dpkg-statoverride --force-statoverride-add --quiet --update --add $USER "$(id -gn $USER)" 0755 $DIR
       fi
     done
 
+    if ! dpkg-statoverride --list --quiet /var/lib/matrix-synapse >/dev/null; then
+      dpkg-statoverride --force-statoverride-add --quiet --update --add $USER "$(id -gn $USER)" 0770 /var/lib/matrix-synapse
+    fi
+
+    if ! dpkg-statoverride --list --quiet $CONFIGFILE_HOMESERVER >/dev/null; then
+      dpkg-statoverride --force-statoverride-add --quiet --update --add $USER "$(id -gn $USER)" 0660 $CONFIGFILE_HOMESERVER
+    fi
     ;;
 esac
 
