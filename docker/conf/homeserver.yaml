@@ -68,6 +68,17 @@ database:
     database: "/data/homeserver.db"
 {% endif %}
 
+## Redis ##
+
+{% if REDIS_ENABLED %}
+redis:
+  enabled: true
+  host: "{{ REDIS_HOST or "localhost" }}"
+  port: "{{ REDIS_PORT or "6379" }}"
+  password: "{{ REDIS_PASSWORD or "" }}"
+  dbid: "{{ REDIS_DBID or "0" }}"
+{% endif %}
+
 ## Performance ##
 
 event_cache_size: "{{ SYNAPSE_EVENT_CACHE_SIZE or "10K" }}"
