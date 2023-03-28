@@ -68,6 +68,7 @@ from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.experimental_features import ExperimentalFeaturesHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.federation_event import FederationEventHandler
 from synapse.handlers.identity import IdentityHandler
@@ -875,3 +876,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_common_usage_metrics_manager(self) -> CommonUsageMetricsManager:
         """Usage metrics shared between phone home stats and the prometheus exporter."""
         return CommonUsageMetricsManager(self)
+
+    @cache_in_self
+    def get_experimental_features_manager(self) -> ExperimentalFeaturesHandler:
+        return ExperimentalFeaturesHandler(self)
