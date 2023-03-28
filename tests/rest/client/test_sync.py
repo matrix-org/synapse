@@ -543,6 +543,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.url = "/sync?since=%s"
         self.next_batch = "s0"
+        self.hs = hs
 
         # Register the first user (used to check the unread counts).
         self.user_id = self.register_user("kermit", "monkey")
@@ -586,8 +587,11 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     def test_unread_counts(self) -> None:
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
         # add per-user flag to the DB
-        ex_handler = self.hs.get_experimental_features_manager()
-        self.get_success(ex_handler.set_feature_for_user(self.user_id, "msc2654", True))
+        self.get_success(
+            self.hs.get_datastores().main.set_feature_for_user(
+                self.user_id, "msc2654", True
+            )
+        )
 
         # Check that our own messages don't increase the unread count.
         self.helper.send(self.room_id, "hello", tok=self.tok)
