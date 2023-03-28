@@ -108,8 +108,8 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
 
     def test_claim_keys(self) -> None:
         """
-        Tests that 3pe queries to the appservice are authenticated
-        with the appservice's token.
+        Tests that the /keys/claim response is properly parsed for missing
+        keys.
         """
 
         RESPONSE: JsonDict = {
