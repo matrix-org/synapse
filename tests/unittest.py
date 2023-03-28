@@ -128,34 +128,23 @@ def around(target: TV) -> Callable[[Callable[Concatenate[S, P], R]], None]:
     return _around
 
 
-@overload
-def deepcopy_config(config: RootConfig, root: Literal[True]) -> RootConfig:
-    ...
+_TConfig = TypeVar("_TConfig", Config, RootConfig)
 
 
-@overload
-def deepcopy_config(config: Config, root: Literal[False]) -> Config:
-    ...
+def deepcopy_config(config: _TConfig) -> _TConfig:
+    new_config: _TConfig
 
-
-def deepcopy_config(
-    config: Union[Config, RootConfig], root: bool
-) -> Union[RootConfig, Config]:
-    new_config: Union[Config, RootConfig]
-
-    if root:
-        typed_rootconfig = cast(RootConfig, config)
-        new_config = typed_rootconfig.__class__(typed_rootconfig.config_files)
+    if isinstance(config, RootConfig):
+        new_config = config.__class__(config.config_files)  # type: ignore[arg-type]
     else:
-        typed_config = cast(Config, config)
-        new_config = typed_config.__class__(typed_config.root)
+        new_config = config.__class__(config.root)
 
     for attr_name in config.__dict__:
         if attr_name.startswith("__") or attr_name == "root":
             continue
         attr = getattr(config, attr_name)
         if isinstance(attr, Config):
-            new_attr = deepcopy_config(attr, root=False)
+            new_attr = deepcopy_config(attr)
         else:
             new_attr = attr
 
@@ -193,7 +182,7 @@ def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
 
     assert isinstance(config_obj, RootConfig)
 
-    return deepcopy_config(config_obj, root=True)
+    return deepcopy_config(config_obj)
 
 
 class TestCase(unittest.TestCase):
