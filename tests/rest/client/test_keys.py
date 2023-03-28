@@ -205,7 +205,6 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
 
     @override_config(
         {
-            "experimental_features": {"msc3967_enabled": True},
             "ui_auth": {"session_timeout": "15s"},
         }
     )
@@ -215,6 +214,13 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
         device_id = "ABCDEFGHI"
         alice_id = self.register_user("alice", password)
         alice_token = self.login("alice", password, device_id=device_id)
+
+        # enable msc3967 in db
+        self.get_success(
+            self.hs.get_datastores().main.set_feature_for_user(
+                alice_id, "msc3967", True
+            )
+        )
 
         keys1 = self.make_device_keys(alice_id, device_id)
 
