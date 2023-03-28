@@ -80,7 +80,7 @@ jobs:
     needs:
       - pre
     steps:
-      - uses: action/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: "Set up Sphinx"
         uses: matrix-org/setup-python-poetry@v1
