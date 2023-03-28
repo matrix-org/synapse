@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 
+from enum import Enum
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
@@ -24,6 +25,17 @@ from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+
+class ValidFeatures(str, Enum):
+    """
+    Currently supported per-user features
+    """
+
+    MSC3026 = "msc3026"
+    MSC2654 = "msc2654"
+    MSC3881 = "msc3881"
+    MSC3967 = "msc3967"
 
 
 class ExperimentalFeaturesRestServlet(RestServlet):
@@ -41,7 +53,6 @@ class ExperimentalFeaturesRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
-        self.handler = hs.get_experimental_features_manager()
 
     async def on_GET(
         self,
@@ -63,10 +74,10 @@ class ExperimentalFeaturesRestServlet(RestServlet):
 
         # do a basic validation of the given feature
         validated = feature in [
-            "msc3026",
-            "msc2654",
-            "msc3881",
-            "msc3967",
+            ValidFeatures.MSC3026,
+            ValidFeatures.MSC2654,
+            ValidFeatures.MSC3881,
+            ValidFeatures.MSC3967,
         ]
 
         if not validated:
@@ -74,7 +85,7 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "Please provide a valid experimental feature."
             )
 
-        enabled = await self.handler.get_feature_enabled(user_id, feature)
+        enabled = await self.store.get_feature_enabled(user_id, feature)
 
         return HTTPStatus.OK, {"user": user_id, "feature": feature, "enabled": enabled}
 
@@ -95,10 +106,10 @@ class ExperimentalFeaturesRestServlet(RestServlet):
 
         # validate the feature
         validated = feature in [
-            "msc3026",
-            "msc2654",
-            "msc3881",
-            "msc3967",
+            ValidFeatures.MSC3026,
+            ValidFeatures.MSC2654,
+            ValidFeatures.MSC3881,
+            ValidFeatures.MSC3967,
         ]
 
         if not validated:
@@ -106,7 +117,7 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "Please provide a valid experimental feature."
             )
 
-        user, feature, enabled = await self.handler.set_feature_for_user(
+        user, feature, enabled = await self.store.set_feature_for_user(
             user_id, feature, True
         )
 
@@ -129,10 +140,10 @@ class ExperimentalFeaturesRestServlet(RestServlet):
 
         # validate the feature
         validated = feature in [
-            "msc3026",
-            "msc2654",
-            "msc3881",
-            "msc3967",
+            ValidFeatures.MSC3026,
+            ValidFeatures.MSC2654,
+            ValidFeatures.MSC3881,
+            ValidFeatures.MSC3967,
         ]
 
         if not validated:
@@ -140,7 +151,7 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "Please provide a valid experimental feature."
             )
 
-        user, feature, enabled = await self.handler.set_feature_for_user(
+        user, feature, enabled = await self.store.set_feature_for_user(
             user_id, feature, False
         )
 
