@@ -14,4 +14,4 @@
  */
 
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7403, 'delete_e2e_backup_keys_for_deactivated_users', '{}');
+  (7501, 'delete_e2e_backup_keys_for_deactivated_users', '{}');
