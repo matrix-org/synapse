@@ -38,7 +38,7 @@ from synapse.app._base import (
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.config.server import ListenerConfig
+from synapse.config.server import ListenerConfig, TCPListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.logging.context import LoggingContext
@@ -236,12 +236,13 @@ class GenericWorkerServer(HomeServer):
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
-                _base.listen_manhole(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole_settings=self.config.server.manhole_settings,
-                    manhole_globals={"hs": self},
-                )
+                if isinstance(listener, TCPListenerConfig):
+                    _base.listen_manhole(
+                        listener.bind_addresses,
+                        listener.port,
+                        manhole_settings=self.config.server.manhole_settings,
+                        manhole_globals={"hs": self},
+                    )
             elif listener.type == "metrics":
                 if not self.config.metrics.enable_metrics:
                     logger.warning(
@@ -249,10 +250,11 @@ class GenericWorkerServer(HomeServer):
                         "enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(
-                        listener.bind_addresses,
-                        listener.port,
-                    )
+                    if isinstance(listener, TCPListenerConfig):
+                        _base.listen_metrics(
+                            listener.bind_addresses,
+                            listener.port,
+                        )
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
 

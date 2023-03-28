@@ -61,7 +61,7 @@ from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config import ConfigError
 from synapse.config._base import format_config_error
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.server import ListenerConfig, ManholeConfig
+from synapse.config.server import ListenerConfig, ManholeConfig, TCPListenerConfig
 from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
@@ -390,18 +390,15 @@ def listen_http(
     context_factory: Optional[IOpenSSLContextFactory],
     reactor: ISynapseReactor = reactor,
 ) -> List[Port]:
-    port = listener_config.port
-    bind_addresses = listener_config.bind_addresses
-    tls = listener_config.tls
-
     assert listener_config.http_options is not None
 
     site_tag = listener_config.http_options.tag
     if site_tag is None:
-        site_tag = str(port)
+        site_tag = listener_config.get_site_tag()
 
     site = SynapseSite(
-        "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
+        "synapse.access.%s.%s"
+        % ("https" if listener_config.is_tls() else "http", site_tag),
         site_tag,
         listener_config,
         root_resource,
@@ -409,25 +406,31 @@ def listen_http(
         max_request_body_size=max_request_body_size,
         reactor=reactor,
     )
-    if tls:
-        # refresh_certificate should have been called before this.
-        assert context_factory is not None
-        ports = listen_ssl(
-            bind_addresses,
-            port,
-            site,
-            context_factory,
-            reactor=reactor,
-        )
-        logger.info("Synapse now listening on TCP port %d (TLS)", port)
+
+    if isinstance(listener_config, TCPListenerConfig):
+        port = listener_config.port
+        bind_addresses = listener_config.bind_addresses
+        if listener_config.is_tls():
+            # refresh_certificate should have been called before this.
+            assert context_factory is not None
+            ports = listen_ssl(
+                bind_addresses,
+                port,
+                site,
+                context_factory,
+                reactor=reactor,
+            )
+            logger.info("Synapse now listening on TCP port %d (TLS)", port)
+        else:
+            ports = listen_tcp(bind_addresses, port, site, reactor=reactor)
+            logger.info("Synapse now listening on TCP port %d", port)
+
     else:
-        ports = listen_tcp(
-            bind_addresses,
-            port,
-            site,
-            reactor=reactor,
-        )
-        logger.info("Synapse now listening on TCP port %d", port)
+        path = listener_config.path
+        mode = listener_config.mode
+        ports = listen_unix(path, mode, site, reactor=reactor)
+        logger.info(f"Synapse now listening on Unix Socket at: {ports[0]}")
+
     return ports
 
 
