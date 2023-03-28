@@ -35,15 +35,13 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
-    overload,
 )
 from unittest.mock import Mock, patch
 
 import canonicaljson
 import signedjson.key
 import unpaddedbase64
-from typing_extensions import Concatenate, Literal, ParamSpec, Protocol
+from typing_extensions import Concatenate, ParamSpec, Protocol
 
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
