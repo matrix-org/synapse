@@ -12,9 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import TYPE_CHECKING
-
-from black import Tuple
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
