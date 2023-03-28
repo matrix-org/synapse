@@ -41,7 +41,12 @@ from typing_extensions import ParamSpec
 
 import twisted
 from twisted.internet import defer, error, reactor as _reactor
-from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorSSL, IReactorTCP
+from twisted.internet.interfaces import (
+    IOpenSSLContextFactory,
+    IReactorSSL,
+    IReactorTCP,
+    IReactorUNIX,
+)
 from twisted.internet.protocol import ServerFactory
 from twisted.internet.tcp import Port
 from twisted.logger import LoggingFile, LogLevel
@@ -347,6 +352,32 @@ def listen_tcp(
             check_bind_error(e, address, bind_addresses)
 
     # IReactorTCP returns an object implementing IListeningPort from listenTCP,
+    # but we know it will be a Port instance.
+    return r  # type: ignore[return-value]
+
+
+def listen_unix(
+    path: str,
+    mode: int,
+    factory: ServerFactory,
+    reactor: IReactorUNIX = reactor,
+    backlog: int = 50,
+) -> List[Port]:
+    """
+    Create a UNIX socket for a given path with a permission of 0o666(that's octal)
+
+    Returns:
+        list of twisted.internet.tcp.Port listening for TCP connections
+    """
+    r = []
+    wantPID = True
+
+    try:
+        r.append(reactor.listenUNIX(path, factory, backlog, mode, wantPID))
+    except error.CannotListenError as e:
+        raise e
+
+    # IReactorUNIX returns an object implementing IListeningPort from listenUNIX,
     # but we know it will be a Port instance.
     return r  # type: ignore[return-value]
 
