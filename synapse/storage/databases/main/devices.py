@@ -1638,19 +1638,22 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             """
 
             rows = await self.db_pool.execute(
-                "check_too_many_devices_for_user_last_seen", None, sql, (user_id,)
+                "check_too_many_devices_for_user_last_seen",
+                None,
+                sql,
+                user_id,
             )
             if rows:
                 max_last_seen = max(rows[0][0], max_last_seen)
 
         # Fetch the devices to delete.
         sql = """
-            SELECT DISTINCT device_id FROM devices
+            SELECT device_id FROM devices
             LEFT JOIN e2e_device_keys_json USING (user_id, device_id)
             WHERE
                 user_id = ?
                 AND NOT hidden
-                AND last_seen < ?
+                AND last_seen <= ?
                 AND key_json IS NULL
             ORDER BY last_seen
         """
