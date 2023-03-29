@@ -16,7 +16,7 @@
 """Contains functions for registering clients."""
 
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter
 from typing_extensions import TypedDict
@@ -40,6 +40,7 @@ from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
 from synapse.handlers.device import DeviceHandler
 from synapse.http.servlet import assert_params_in_dict
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import (
     ReplicationPostRegisterActionsServlet,
@@ -48,6 +49,7 @@ from synapse.replication.http.register import (
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, UserID, create_requester
 from synapse.types.state import StateFilter
+from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -110,6 +112,10 @@ class RegistrationHandler:
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
+        # The set of users that we're currently pruning devices for. Ensures
+        # that we don't have two such jobs for the same user running at once.
+        self._currently_pruning_devices_for_users: Set[str] = set()
+
         self.spam_checker = hs.get_spam_checker()
 
         if hs.config.worker.worker_app:
@@ -121,7 +127,10 @@ class RegistrationHandler:
                 ReplicationPostRegisterActionsServlet.make_client(hs)
             )
         else:
-            self.device_handler = hs.get_device_handler()
+            device_handler = hs.get_device_handler()
+            assert isinstance(device_handler, DeviceHandler)
+            self.device_handler = device_handler
+
             self._register_device_client = self.register_device_inner
             self.pusher_pool = hs.get_pusherpool()
 
@@ -851,6 +860,9 @@ class RegistrationHandler:
         # This can only run on the main process.
         assert isinstance(self.device_handler, DeviceHandler)
 
+        # Prune the user's device list if they already have a lot of devices.
+        await self._maybe_prune_too_many_devices(user_id)
+
         registered_device_id = await self.device_handler.check_device_registered(
             user_id,
             device_id,
@@ -918,6 +930,42 @@ class RegistrationHandler:
             "valid_until_ms": access_token_expiry,
             "refresh_token": refresh_token,
         }
+
+    async def _maybe_prune_too_many_devices(self, user_id: str) -> None:
+        """Delete any excess old devices this user may have."""
+
+        if user_id in self._currently_pruning_devices_for_users:
+            return
+
+        # We also cap the number of users whose devices we prune at the same
+        # time, to avoid performance problems.
+        if len(self._currently_pruning_devices_for_users) > 5:
+            return
+
+        device_ids = await self.store.check_too_many_devices_for_user(user_id)
+        if not device_ids:
+            return
+
+        logger.info("Pruning %d stale devices for %s", len(device_ids), user_id)
+
+        # Now spawn a background loop that deletes said devices.
+        async def _prune_too_many_devices_loop() -> None:
+            if user_id in self._currently_pruning_devices_for_users:
+                return
+
+            self._currently_pruning_devices_for_users.add(user_id)
+
+            try:
+                for batch in batch_iter(device_ids, 10):
+                    await self.device_handler.delete_devices(user_id, batch)
+
+                    await self.clock.sleep(60)
+            finally:
+                self._currently_pruning_devices_for_users.discard(user_id)
+
+        run_as_background_process(
+            "_prune_too_many_devices_loop", _prune_too_many_devices_loop
+        )
 
     async def post_registration_actions(
         self, user_id: str, auth_result: dict, access_token: Optional[str]

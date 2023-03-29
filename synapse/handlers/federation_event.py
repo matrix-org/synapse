@@ -583,7 +583,7 @@ class FederationEventHandler:
 
             await self._check_event_auth(origin, event, context)
             if context.rejected:
-                raise SynapseError(400, "Join event was rejected")
+                raise SynapseError(403, "Join event was rejected")
 
             # the remote server is responsible for sending our join event to the rest
             # of the federation. Indeed, attempting to do so will result in problems
