@@ -364,7 +364,7 @@ def listen_unix(
     backlog: int = 50,
 ) -> List[Port]:
     """
-    Create a UNIX socket for a given path with a permission of 0o666(that's octal)
+    Create a UNIX socket for a given path and 'mode' permission
 
     Returns:
         list of twisted.internet.tcp.Port listening for TCP connections

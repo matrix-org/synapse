@@ -239,6 +239,7 @@ class UnixListenerConfig:
     # Note: unix sockets can not be tls encrypted, so HAVE to be behind a tls-handling
     # reverse proxy
     path: str = attr.ib()
+    # A default(0o666) for this is set in parse_listener_def() below
     mode: int
     type: str = attr.ib(validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
 
@@ -968,6 +969,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
     if socket_path:
         # TODO: Add in path validation, like if the directory exists and is writable?
         # TODO: Set this default in a better place, maybe UnixListenerConfig?
+        # Set a default for the permission, in case it's left out
         socket_mode = listener.get("mode", 0o666)
 
         return UnixListenerConfig(socket_path, socket_mode, listener_type, http_config)
