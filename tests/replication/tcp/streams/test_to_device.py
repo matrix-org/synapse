@@ -50,7 +50,7 @@ class ToDeviceStreamTestCase(BaseStreamTestCase):
         # add messages to the device inbox for user1 up until the
         # limit defined for a stream update batch
         for i in range(0, _STREAM_UPDATE_TARGET_ROW_COUNT):
-            msg["content"] = {"device": {"device_id": f"{i}"}}
+            msg["content"] = {"device": {}}
             messages = {user1: {"device": msg}}
 
             self.get_success(
@@ -63,7 +63,7 @@ class ToDeviceStreamTestCase(BaseStreamTestCase):
 
         # add one more message, for user2 this time
         # this message would be dropped before fixing #15335
-        msg["content"] = {"device": {"device_id": "1"}}
+        msg["content"] = {"device": {}}
         messages = {user2: {"device": msg}}
 
         self.get_success(
