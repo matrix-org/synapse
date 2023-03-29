@@ -1,1 +1,1 @@
-Fix joining rooms you have been unbanned from over federation. Introduced before Synapse bugs were tracked on Github. Contributed by Nico.
+Fix a long-standing bug preventing users from joining rooms, that they had been unbanned from, over federation. Contributed by Nico.
