@@ -15,6 +15,7 @@
 from typing import Optional, cast
 from unittest.mock import Mock, call
 
+from parameterized import parameterized
 from signedjson.key import generate_signing_key
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -723,6 +724,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # our status message should be the same as it was before
         self.assertEqual(state.status_msg, status_msg)
 
+    @parameterized.expand([(False,), (True,)])
     def test_set_presence_from_syncing_keeps_busy(
         self, test_with_workers: bool
     ) -> None:
