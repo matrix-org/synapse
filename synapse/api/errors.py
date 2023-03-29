@@ -19,7 +19,7 @@ import logging
 import typing
 from enum import Enum
 from http import HTTPStatus
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 from twisted.web import http
 
@@ -682,17 +682,26 @@ class FederationPullAttemptBackoffError(RuntimeError):
     Attributes:
         event_id: The event_id which we are refusing to pull
         message: A custom error message that gives more context
+        retry_after_ms: The remaining backoff interval, in milliseconds
     """
 
-    def __init__(self, event_ids: List[str], message: Optional[str]):
-        self.event_ids = event_ids
+    def __init__(
+        self, event_ids: Iterable[str], message: Optional[str], retry_after_ms: int
+    ):
+        event_ids = list(event_ids)
 
         if message:
             error_message = message
         else:
-            error_message = f"Not attempting to pull event_ids={self.event_ids} because we already tried to pull them recently (backing off)."
+            error_message = (
+                f"Not attempting to pull event_ids={event_ids} because we already "
+                "tried to pull them recently (backing off)."
+            )
 
         super().__init__(error_message)
+
+        self.event_ids = event_ids
+        self.retry_after_ms = retry_after_ms
 
 
 class HttpResponseException(CodeMessageException):

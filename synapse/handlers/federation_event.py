@@ -140,6 +140,7 @@ class FederationEventHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
@@ -1053,13 +1054,22 @@ class FederationEventHandler:
         # If we've already recently attempted to pull this missing event, don't
         # try it again so soon. Since we have to fetch all of the prev_events, we can
         # bail early here if we find any to ignore.
-        prevs_to_ignore = await self._store.get_event_ids_to_not_pull_from_backoff(
-            room_id, missing_prevs
+        prevs_with_pull_backoff = (
+            await self._store.get_event_ids_to_not_pull_from_backoff(
+                room_id, missing_prevs
+            )
         )
-        if len(prevs_to_ignore) > 0:
+        if len(prevs_with_pull_backoff) > 0:
             raise FederationPullAttemptBackoffError(
-                event_ids=prevs_to_ignore,
-                message=f"While computing context for event={event_id}, not attempting to pull missing prev_event={prevs_to_ignore[0]} because we already tried to pull recently (backing off).",
+                event_ids=prevs_with_pull_backoff.keys(),
+                message=(
+                    f"While computing context for event={event_id}, not attempting to "
+                    f"pull missing prev_events={list(prevs_with_pull_backoff.keys())} "
+                    "because we already tried to pull recently (backing off)."
+                ),
+                retry_after_ms=(
+                    max(prevs_with_pull_backoff.values()) - self._clock.time_msec()
+                ),
             )
 
         if not missing_prevs:
