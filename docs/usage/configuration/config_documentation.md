@@ -1521,7 +1521,7 @@ This option specifies several limits for login:
       address. Defaults to `per_second: 0.003`, `burst_count: 5`.
 
 * `account` ratelimits login requests based on the account the
-  client is attempting to log into. Defaults to `per_second: 0.03`,
+  client is attempting to log into. Defaults to `per_second: 0.003`,
   `burst_count: 5`.
 
 * `failed_attempts` ratelimits login requests based on the account the
