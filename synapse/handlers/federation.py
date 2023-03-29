@@ -1967,9 +1967,6 @@ class FederationHandler:
                         # This avoids a cascade of backoff for all events in the DAG downstream from
                         # one event backoff upstream.
                     except FederationError as e:
-                        # TODO: We should `record_event_failed_pull_attempt` here,
-                        #   see https://github.com/matrix-org/synapse/issues/13700
-
                         if attempt == len(destinations) - 1:
                             # We have tried every remote server for this event. Give up.
                             # TODO(faster_joins) giving up isn't the right thing to do
@@ -1986,6 +1983,8 @@ class FederationHandler:
                                 destination,
                                 e,
                             )
+                            # TODO: We should `record_event_failed_pull_attempt` here,
+                            #   see https://github.com/matrix-org/synapse/issues/13700
                             raise
 
                         # Try the next remote server.
