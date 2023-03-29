@@ -30,7 +30,7 @@ from prometheus_client import Counter
 from typing_extensions import TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, HttpResponseException
 from synapse.appservice import (
     ApplicationService,
     TransactionOneTimeKeysCount,
@@ -38,7 +38,7 @@ from synapse.appservice import (
 )
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
-from synapse.http.client import SimpleHttpClient
+from synapse.http.client import SimpleHttpClient, is_unknown_endpoint
 from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -426,9 +426,9 @@ class ApplicationServiceApi(SimpleHttpClient):
                 body,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
-        except CodeMessageException as e:
+        except HttpResponseException as e:
             # The appservice doesn't support this endpoint.
-            if e.code == 404 or e.code == 405:
+            if is_unknown_endpoint(e):
                 return {}, query
             logger.warning("claim_keys to %s received %s", uri, e.code)
             return {}, query
@@ -478,9 +478,9 @@ class ApplicationServiceApi(SimpleHttpClient):
                 query,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
-        except CodeMessageException as e:
+        except HttpResponseException as e:
             # The appservice doesn't support this endpoint.
-            if e.code == 404 or e.code == 405:
+            if is_unknown_endpoint(e):
                 return {}
             logger.warning("query_keys to %s received %s", uri, e.code)
             return {}
