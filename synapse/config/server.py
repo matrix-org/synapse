@@ -942,7 +942,10 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
     if socket_path and not isinstance(socket_path, str):
         raise ConfigError("Listener configuration is lacking a valid 'path' option")
     if port and socket_path:
-        raise ConfigError("Can not have both a UNIX socket and a IP/port declared for the same resource!")
+        raise ConfigError(
+            "Can not have both a UNIX socket and a IP/port declared for the same "
+            "resource!"
+        )
 
     tls = listener.get("tls", False)
 
