@@ -408,27 +408,32 @@ def listen_http(
     )
 
     if isinstance(listener_config, TCPListenerConfig):
-        port = listener_config.port
-        bind_addresses = listener_config.bind_addresses
         if listener_config.is_tls():
             # refresh_certificate should have been called before this.
             assert context_factory is not None
             ports = listen_ssl(
-                bind_addresses,
-                port,
+                listener_config.bind_addresses,
+                listener_config.port,
                 site,
                 context_factory,
                 reactor=reactor,
             )
-            logger.info("Synapse now listening on TCP port %d (TLS)", port)
+            logger.info(
+                "Synapse now listening on TCP port %d (TLS)", listener_config.port
+            )
         else:
-            ports = listen_tcp(bind_addresses, port, site, reactor=reactor)
-            logger.info("Synapse now listening on TCP port %d", port)
+            ports = listen_tcp(
+                listener_config.bind_addresses,
+                listener_config.port,
+                site,
+                reactor=reactor,
+            )
+            logger.info("Synapse now listening on TCP port %d", listener_config.port)
 
     else:
-        path = listener_config.path
-        mode = listener_config.mode
-        ports = listen_unix(path, mode, site, reactor=reactor)
+        ports = listen_unix(
+            listener_config.path, listener_config.mode, site, reactor=reactor
+        )
         logger.info(f"Synapse now listening on Unix Socket at: {ports[0].port}")
 
     return ports
