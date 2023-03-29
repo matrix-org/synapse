@@ -1,0 +1,1 @@
+Fix a long-standing bug preventing users from joining rooms, that they had been unbanned from, over federation. Contributed by Nico.

@@ -485,7 +485,7 @@ class DeviceHandler(DeviceWorkerHandler):
             device_ids = [d for d in device_ids if d != except_device_id]
         await self.delete_devices(user_id, device_ids)
 
-    async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
+    async def delete_devices(self, user_id: str, device_ids: StrCollection) -> None:
         """Delete several devices
 
         Args:
@@ -502,6 +502,8 @@ class DeviceHandler(DeviceWorkerHandler):
                 set_tag("reason", "User doesn't have that device id.")
             else:
                 raise
+
+        await self.hs.get_pusherpool().remove_pushers_by_devices(user_id, device_ids)
 
         # Delete data specific to each device. Not optimised as it is not
         # considered as part of a critical path.

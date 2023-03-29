@@ -3047,12 +3047,12 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             self.store.get_user_by_access_token(other_user_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=self.other_user,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",

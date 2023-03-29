@@ -1,4 +1,4 @@
-/* Copyright 2022 Beeper
+/* Copyright 2023 The Matrix.org Foundation C.I.C
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,7 @@
  * limitations under the License.
  */
 
--- Each of these are denormalised copies of `stream_ordering` from the corresponding row in` events` which
--- we use to improve database performance by reduring JOINs.
-ALTER TABLE current_state_events ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
-ALTER TABLE local_current_membership ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
-ALTER TABLE room_memberships ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
+-- Triggers the background update to set the device_id for pushers
+-- that don't have one, and clear the access_token column.
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (7402, 'set_device_id_for_pushers', '{}');

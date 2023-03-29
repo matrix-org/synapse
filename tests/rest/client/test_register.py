@@ -794,6 +794,53 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
         )
 
+    def test_check_stale_devices_get_pruned(self) -> None:
+        """Check that if a user has some stale devices we log them out when they
+        log in a new device."""
+
+        # Register some devices, but not too many that we go over the threshold
+        # where we prune more aggressively.
+        user_id = self.register_user("user", "pass")
+        for _ in range(0, 50):
+            self.login(user_id, "pass")
+
+        store = self.hs.get_datastores().main
+
+        res = self.get_success(store.get_devices_by_user(user_id))
+        self.assertEqual(len(res), 50)
+
+        # Advance time so that the above devices are considered "old".
+        self.reactor.advance(30 * 24 * 60 * 60 * 1000)
+
+        self.login(user_id, "pass")
+
+        self.reactor.pump([60] * 10)  # Ensure background job runs
+
+        # We expect all old devices to have been logged out
+        res = self.get_success(store.get_devices_by_user(user_id))
+        self.assertEqual(len(res), 1)
+
+    def test_check_recent_devices_get_pruned(self) -> None:
+        """Check that if a user has many devices we log out the last oldest
+        ones.
+
+        Note: this is similar to above, except if we lots of devices we prune
+        devices even if they're not old.
+        """
+
+        # Register a lot of devices in a short amount of time
+        user_id = self.register_user("user", "pass")
+        for _ in range(0, 100):
+            self.login(user_id, "pass")
+            self.reactor.advance(100)
+
+        store = self.hs.get_datastores().main
+
+        # We keep up to 50 devices that have been used in the last week, plus
+        # the device that was last logged in.
+        res = self.get_success(store.get_devices_by_user(user_id))
+        self.assertEqual(len(res), 51)
+
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
     servlets = [
