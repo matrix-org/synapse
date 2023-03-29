@@ -19,7 +19,7 @@ import logging
 import typing
 from enum import Enum
 from http import HTTPStatus
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from twisted.web import http
 
@@ -27,7 +27,7 @@ from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
     from synapse.config.homeserver import HomeServerConfig
-    from synapse.types import JsonDict
+    from synapse.types import JsonDict, StrCollection
 
 logger = logging.getLogger(__name__)
 
@@ -686,7 +686,7 @@ class FederationPullAttemptBackoffError(RuntimeError):
     """
 
     def __init__(
-        self, event_ids: Iterable[str], message: Optional[str], retry_after_ms: int
+        self, event_ids: "StrCollection", message: Optional[str], retry_after_ms: int
     ):
         event_ids = list(event_ids)
 
