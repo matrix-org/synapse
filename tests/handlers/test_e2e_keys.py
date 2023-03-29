@@ -960,7 +960,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         appservice = ApplicationService(
             token="i_am_an_app_service",
             id="1234",
-            namespaces={"users": [{"regex": r"@boris:*", "exclusive": True}]},
+            namespaces={"users": [{"regex": r"@boris:.+", "exclusive": True}]},
             # Note: this user does not have to match the regex above
             sender="@as_main:test",
         )
@@ -1101,7 +1101,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         appservice = ApplicationService(
             token="i_am_an_app_service",
             id="1234",
-            namespaces={"users": [{"regex": r"@boris:*", "exclusive": True}]},
+            namespaces={"users": [{"regex": r"@boris:.+", "exclusive": True}]},
             # Note: this user does not have to match the regex above
             sender="@as_main:test",
         )

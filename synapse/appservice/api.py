@@ -393,7 +393,11 @@ class ApplicationServiceApi(SimpleHttpClient):
     ) -> Tuple[Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str]]]:
         """Claim one time keys from an application service.
 
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
         Args:
+            service: The application service to query.
             query: An iterable of tuples of (user ID, device ID, algorithm).
 
         Returns:
@@ -449,7 +453,11 @@ class ApplicationServiceApi(SimpleHttpClient):
     ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
         """Query the application service for keys.
 
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
         Args:
+            service: The application service to query.
             query: An iterable of tuples of (user ID, device ID, algorithm).
 
         Returns:
@@ -474,10 +482,10 @@ class ApplicationServiceApi(SimpleHttpClient):
             # The appservice doesn't support this endpoint.
             if e.code == 404 or e.code == 405:
                 return {}
-            logger.warning("claim_keys to %s received %s", uri, e.code)
+            logger.warning("query_keys to %s received %s", uri, e.code)
             return {}
         except Exception as ex:
-            logger.warning("claim_keys to %s threw exception %s", uri, ex)
+            logger.warning("query_keys to %s threw exception %s", uri, ex)
             return {}
 
         return response

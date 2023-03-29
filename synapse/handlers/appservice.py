@@ -847,6 +847,10 @@ class ApplicationServicesHandler:
     ]:
         """Claim one time keys from application services.
 
+        Users which are exclusively owned by an application service are sent a
+        key claim request to check if the application service provides keys
+        directly.
+
         Args:
             query: An iterable of tuples of (user ID, device ID, algorithm).
 
@@ -907,6 +911,9 @@ class ApplicationServicesHandler:
         self, query: Mapping[str, Optional[List[str]]]
     ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
         """Query application services for device keys.
+
+        Users which are exclusively owned by an application service are queried
+        for keys to check if the application service provides keys directly.
 
         Args:
             query: map from user_id to a list of devices to query
