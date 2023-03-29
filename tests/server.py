@@ -983,7 +983,9 @@ def setup_test_homeserver(
                     dropped = True
                 except psycopg2.OperationalError as e:
                     warnings.warn(
-                        "Couldn't drop old db: " + str(e), category=UserWarning
+                        "Couldn't drop old db: " + str(e),
+                        category=UserWarning,
+                        stacklevel=2,
                     )
                     time.sleep(0.5)
 
@@ -991,7 +993,11 @@ def setup_test_homeserver(
             db_conn.close()
 
             if not dropped:
-                warnings.warn("Failed to drop old DB.", category=UserWarning)
+                warnings.warn(
+                    "Failed to drop old DB.",
+                    category=UserWarning,
+                    stacklevel=2,
+                )
 
         if not LEAVE_DB:
             # Register the cleanup hook
