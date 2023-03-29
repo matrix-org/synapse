@@ -1,3 +1,20 @@
+Synapse 1.80.0 (2023-03-28)
+===========================
+
+No significant changes since 1.80.0rc2.
+
+
+Synapse 1.80.0rc2 (2023-03-22)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug in which the [`POST /_matrix/client/v3/rooms/{roomId}/report/{eventId}`](https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3roomsroomidreporteventid) endpoint would return the wrong error if the user did not have permission to view the event. This aligns Synapse's implementation with [MSC2249](https://github.com/matrix-org/matrix-spec-proposals/pull/2249). ([\#15298](https://github.com/matrix-org/synapse/issues/15298), [\#15300](https://github.com/matrix-org/synapse/issues/15300))
+- Fix a bug introduced in Synapse 1.75.0rc1 where the [SQLite port_db script](https://matrix-org.github.io/synapse/latest/postgres.html#porting-from-sqlite)
+  would fail to open the SQLite database. ([\#15301](https://github.com/matrix-org/synapse/issues/15301))
+
+
 Synapse 1.80.0rc1 (2023-03-21)
 ==============================
 
