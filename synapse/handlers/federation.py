@@ -1960,7 +1960,9 @@ class FederationHandler:
                             except FederationPullAttemptBackoffError as e:
                                 # We are in the backoff period for one of the event's
                                 # prev_events. Wait it out and try again after.
-                                logger.warning("%s; waiting for %d ms...", e, e.retry_after_ms)
+                                logger.warning(
+                                    "%s; waiting for %d ms...", e, e.retry_after_ms
+                                )
                                 await self.clock.sleep(e.retry_after_ms / 1000)
 
                         # Success, no need to try the rest of the destinations.
