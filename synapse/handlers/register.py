@@ -946,6 +946,8 @@ class RegistrationHandler:
         if not device_ids:
             return
 
+        logger.info("Pruning %d stale devices for %s", len(device_ids), user_id)
+
         # Now spawn a background loop that deletes said devices.
         async def _prune_too_many_devices_loop() -> None:
             if user_id in self._currently_pruning_devices_for_users:
