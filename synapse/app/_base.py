@@ -429,7 +429,7 @@ def listen_http(
         path = listener_config.path
         mode = listener_config.mode
         ports = listen_unix(path, mode, site, reactor=reactor)
-        logger.info(f"Synapse now listening on Unix Socket at: {ports[0]}")
+        logger.info(f"Synapse now listening on Unix Socket at: {ports[0].port}")
 
     return ports
 
