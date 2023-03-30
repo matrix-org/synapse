@@ -152,8 +152,8 @@ class Stream:
         Returns:
             A triplet `(updates, new_last_token, limited)`, where `updates` is
             a list of `(token, row)` entries, `new_last_token` is the new
-            position in stream, and `limited` is whether there are more updates
-            to fetch.
+            position in stream (ie the highest token returned in the updates),
+            and `limited` is whether there are more updates to fetch.
         """
         current_token = self.current_token(self.local_instance_name)
         updates, current_token, limited = await self.get_updates_since(
