@@ -922,7 +922,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             auth_provider_session_id=None,
         )
 
-    @override_config({"oidc_config": DEFAULT_CONFIG})
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "enable_registration": True}})
     def test_map_userinfo_to_user(self) -> None:
         """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""
         userinfo: dict = {
@@ -973,6 +973,21 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError(
             "mapping_error",
             "Mapping provider does not support de-duplicating Matrix IDs",
+        )
+
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "enable_registration": False}})
+    def test_map_userinfo_to_user_does_not_register_new_user(self) -> None:
+        """Ensures new users are not registered if the enabled registration flag is disabled."""
+        userinfo: dict = {
+            "sub": "test_user",
+            "username": "test_user",
+        }
+        request, _ = self.start_authorization(userinfo)
+        self.get_success(self.handler.handle_oidc_callback(request))
+        self.complete_sso_login.assert_not_called()
+        self.assertRenderedError(
+            "mapping_error",
+            "User does not exist and registrations are disabled",
         )
 
     @override_config({"oidc_config": {**DEFAULT_CONFIG, "allow_existing_users": True}})
