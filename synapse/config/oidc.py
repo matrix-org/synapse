@@ -136,6 +136,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "type": "array",
             "items": SsoAttributeRequirement.JSON_SCHEMA,
         },
+        "enable_registration": {"type": "boolean"},
     },
 }
 
@@ -306,6 +307,7 @@ def _parse_oidc_config_dict(
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
         attribute_requirements=attribute_requirements,
+        enable_registration=oidc_config.get("enable_registration", True),
     )
 
 
@@ -405,3 +407,6 @@ class OidcProviderConfig:
 
     # required attributes to require in userinfo to allow login/registration
     attribute_requirements: List[SsoAttributeRequirement]
+
+    # Whether automatic registrations are enabled in the ODIC flow. Defaults to True
+    enable_registration: bool

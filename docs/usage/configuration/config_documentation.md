@@ -1521,7 +1521,7 @@ This option specifies several limits for login:
       address. Defaults to `per_second: 0.003`, `burst_count: 5`.
 
 * `account` ratelimits login requests based on the account the
-  client is attempting to log into. Defaults to `per_second: 0.03`,
+  client is attempting to log into. Defaults to `per_second: 0.003`,
   `burst_count: 5`.
 
 * `failed_attempts` ratelimits login requests based on the account the
@@ -3100,6 +3100,11 @@ Options for each entry include:
    match a pre-existing account instead of failing. This could be used if
    switching from password logins to OIDC. Defaults to false.
 
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the OIDC SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
 * `user_mapping_provider`: Configuration for how attributes returned from a OIDC
    provider are mapped onto a matrix user. This setting has the following
    sub-properties:
@@ -3216,6 +3221,7 @@ oidc_providers:
     userinfo_endpoint: "https://accounts.example.com/userinfo"
     jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
     skip_verification: true
+    enable_registration: true
     user_mapping_provider:
       config:
         subject_claim: "id"

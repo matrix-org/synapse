@@ -1127,15 +1127,11 @@ class PersistEventsStore:
                 # been inserted into room_memberships.
                 txn.execute_batch(
                     """INSERT INTO current_state_events
-                        (room_id, type, state_key, event_id, membership, event_stream_ordering)
-                    VALUES (
-                        ?, ?, ?, ?,
-                        (SELECT membership FROM room_memberships WHERE event_id = ?),
-                        (SELECT stream_ordering FROM events WHERE event_id = ?)
-                    )
+                        (room_id, type, state_key, event_id, membership)
+                    VALUES (?, ?, ?, ?, (SELECT membership FROM room_memberships WHERE event_id = ?))
                     """,
                     [
-                        (room_id, key[0], key[1], ev_id, ev_id, ev_id)
+                        (room_id, key[0], key[1], ev_id, ev_id)
                         for key, ev_id in to_insert.items()
                     ],
                 )
@@ -1162,15 +1158,11 @@ class PersistEventsStore:
             if to_insert:
                 txn.execute_batch(
                     """INSERT INTO local_current_membership
-                        (room_id, user_id, event_id, membership, event_stream_ordering)
-                    VALUES (
-                        ?, ?, ?,
-                        (SELECT membership FROM room_memberships WHERE event_id = ?),
-                        (SELECT stream_ordering FROM events WHERE event_id = ?)
-                    )
+                        (room_id, user_id, event_id, membership)
+                    VALUES (?, ?, ?, (SELECT membership FROM room_memberships WHERE event_id = ?))
                     """,
                     [
-                        (room_id, key[1], ev_id, ev_id, ev_id)
+                        (room_id, key[1], ev_id, ev_id)
                         for key, ev_id in to_insert.items()
                         if key[0] == EventTypes.Member and self.is_mine_id(key[1])
                     ],
@@ -1776,7 +1768,6 @@ class PersistEventsStore:
             table="room_memberships",
             keys=(
                 "event_id",
-                "event_stream_ordering",
                 "user_id",
                 "sender",
                 "room_id",
@@ -1787,7 +1778,6 @@ class PersistEventsStore:
             values=[
                 (
                     event.event_id,
-                    event.internal_metadata.stream_ordering,
                     event.state_key,
                     event.user_id,
                     event.room_id,
@@ -1820,7 +1810,6 @@ class PersistEventsStore:
                     keyvalues={"room_id": event.room_id, "user_id": event.state_key},
                     values={
                         "event_id": event.event_id,
-                        "event_stream_ordering": event.internal_metadata.stream_ordering,
                         "membership": event.membership,
                     },
                 )
