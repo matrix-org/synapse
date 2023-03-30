@@ -643,9 +643,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             if len(updates) >= limit:
                 upto_token = updates[-1][0]
 
-            limited = False
-            if upto_token < current_id:
-                limited = True
+            limited = upto_token < current_id
 
             return updates, upto_token, limited
 
