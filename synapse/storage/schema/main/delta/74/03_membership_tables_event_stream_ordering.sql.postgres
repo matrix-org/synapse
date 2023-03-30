@@ -15,6 +15,7 @@
 
 -- Each of these are denormalised copies of `stream_ordering` from the corresponding row in` events` which
 -- we use to improve database performance by reduring JOINs.
+
 -- NOTE: these are set to NOT VALID to prevent locks while adding the column on large existing tables,
 -- which will be validated in a later migration. For all new/updated rows the FKEY will be checked.
 
