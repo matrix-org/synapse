@@ -262,7 +262,7 @@ class SynapseHomeServer(HomeServer):
                     )
                 else:
                     raise ConfigError(
-                        "Can not using a unix socket for manhole at this time."
+                        "Can not use a unix socket for manhole at this time."
                     )
             elif listener.type == "metrics":
                 if not self.config.metrics.enable_metrics:
