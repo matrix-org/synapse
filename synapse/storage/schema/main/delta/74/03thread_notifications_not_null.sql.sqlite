@@ -55,26 +55,6 @@ CREATE TABLE event_push_summary_new (
     thread_id TEXT NOT NULL
 );
 
--- Swap the indexes.
-DROP INDEX IF EXISTS event_push_actions_staging_id;
-CREATE INDEX event_push_actions_staging_id ON event_push_actions_staging_new(event_id);
-
-DROP INDEX IF EXISTS event_push_actions_highlights_index;
-DROP INDEX IF EXISTS event_push_actions_rm_tokens;
-DROP INDEX IF EXISTS event_push_actions_room_id_user_id;
-DROP INDEX IF EXISTS event_push_actions_stream_ordering;
-DROP INDEX IF EXISTS event_push_actions_u_highlight;
-CREATE INDEX event_push_actions_highlights_index ON event_push_actions_new (user_id, room_id, topological_ordering, stream_ordering);
-CREATE INDEX event_push_actions_rm_tokens on event_push_actions_new( user_id, room_id, topological_ordering, stream_ordering );
-CREATE INDEX event_push_actions_room_id_user_id on event_push_actions_new(room_id, user_id);
-CREATE INDEX event_push_actions_stream_ordering on event_push_actions_new( stream_ordering, user_id );
-CREATE INDEX event_push_actions_u_highlight ON event_push_actions_new (user_id, stream_ordering);
--- Note we drop the event_push_actions_thread_id_null index by not re-creating it.
-
-DROP INDEX IF EXISTS event_push_summary_unique_index2;
-CREATE UNIQUE INDEX event_push_summary_unique_index2 ON event_push_summary_new (user_id, room_id, thread_id) ;
--- Note we drop the event_push_summary_thread_id_null index by not re-creating it.
-
 -- Copy the data.
 INSERT INTO event_push_actions_staging_new (event_id, user_id, actions, notif, highlight, unread, thread_id, inserted_ts)
     SELECT event_id, user_id, actions, notif, highlight, unread, thread_id, inserted_ts
@@ -98,8 +78,19 @@ ALTER TABLE event_push_actions_staging_new RENAME TO event_push_actions_staging;
 ALTER TABLE event_push_actions_new RENAME TO event_push_actions;
 ALTER TABLE event_push_summary_new RENAME TO event_push_summary;
 
--- Re-run background updates from 72/02event_push_actions_index.sql and
--- 72/06thread_notifications.sql.
+-- Recreate the indexes.
+CREATE INDEX event_push_actions_staging_id ON event_push_actions_staging_new(event_id);
+
+CREATE INDEX event_push_actions_highlights_index ON event_push_actions_new (user_id, room_id, topological_ordering, stream_ordering);
+CREATE INDEX event_push_actions_rm_tokens on event_push_actions_new( user_id, room_id, topological_ordering, stream_ordering );
+CREATE INDEX event_push_actions_room_id_user_id on event_push_actions_new(room_id, user_id);
+CREATE INDEX event_push_actions_stream_ordering on event_push_actions_new( stream_ordering, user_id );
+CREATE INDEX event_push_actions_u_highlight ON event_push_actions_new (user_id, stream_ordering);
+
+CREATE UNIQUE INDEX event_push_summary_unique_index2 ON event_push_summary_new (user_id, room_id, thread_id) ;
+
+-- Recreate some indexes in the background, by re-running the background updates
+-- from 72/02event_push_actions_index.sql and 72/06thread_notifications.sql.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (7403, 'event_push_summary_unique_index2', '{}')
   ON CONFLICT (update_name) DO UPDATE SET progress_json = '{}';
