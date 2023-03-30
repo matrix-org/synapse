@@ -146,6 +146,9 @@ class TestCase(unittest.TestCase):
                     % (current_context(),)
                 )
 
+            # Disable GC for duration of test. See below for why.
+            gc.disable()
+
             old_level = logging.getLogger().level
             if level is not None and old_level != level:
 
@@ -167,14 +170,9 @@ class TestCase(unittest.TestCase):
         # logcontexts when they are GCed (see the logcontext docs).
         #
         # The easiest way to do this would be to do a full GC after each test
-        # run, but that is very expensive. Instead, we disable GC for the
-        # duration of the test so that we only need to run a gen-0 GC, which is
-        # a lot quicker.
-
-        @around(self)
-        def setUp(orig: Callable[[], R]) -> R:
-            gc.disable()
-            return orig()
+        # run, but that is very expensive. Instead, we disable GC (above) for
+        # the duration of the test so that we only need to run a gen-0 GC, which
+        # is a lot quicker.
 
         @around(self)
         def tearDown(orig: Callable[[], R]) -> R:
