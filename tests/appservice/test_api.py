@@ -16,7 +16,7 @@ from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import HttpResponseException
 from synapse.appservice import ApplicationService
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -109,7 +109,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
 
     def test_fallback(self) -> None:
         """
-        Tests that Synapse fallsback to legacy URLs.
+        Tests that the fallback to legacy URLs works.
         """
         SUCCESS_RESULT_USER = [
             {
@@ -141,7 +141,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             self.request_url = url
             if url == URL_USER:
                 self.v1_seen = True
-                raise CodeMessageException(404, "NOT_FOUND")
+                raise HttpResponseException(404, "NOT_FOUND", b"NOT_FOUND")
             elif url == FALLBACK_URL_USER:
                 return SUCCESS_RESULT_USER
             else:

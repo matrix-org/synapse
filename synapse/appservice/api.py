@@ -151,8 +151,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         Returns:
             The return value of func.
         """
-        while prefixes:
-            prefix = prefixes.pop(0)
+        for i, prefix in enumerate(prefixes, start=1):
             uri = f"{service.url}{prefix}{path}"
             try:
                 return await func(uri, *args, **kwargs)
@@ -160,8 +159,11 @@ class ApplicationServiceApi(SimpleHttpClient):
                 # If an error is received that is due to an unrecognised path,
                 # fallback to next path (if one exists). Otherwise, consider it
                 # a legitimate error and raise.
-                if prefixes and is_unknown_endpoint(e):
+                if i < len(prefixes) and is_unknown_endpoint(e):
                     continue
+                raise
+            except Exception:
+                # Unexpected exceptions get sent to the caller.
                 raise
 
         # The function should always exit via the return or raise above this.
