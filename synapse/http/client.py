@@ -966,3 +966,41 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
 
     def creatorForNetloc(self, hostname: bytes, port: int) -> IOpenSSLContextFactory:
         return self
+
+
+def is_unknown_endpoint(
+    e: HttpResponseException, synapse_error: Optional[SynapseError] = None
+) -> bool:
+    """
+    Returns true if the response was due to an endpoint being unimplemented.
+
+    Args:
+        e: The error response received from the remote server.
+        synapse_error: The above error converted to a SynapseError. This is
+            automatically generated if not provided.
+
+    """
+    if synapse_error is None:
+        synapse_error = e.to_synapse_error()
+    # MSC3743 specifies that servers should return a 404 or 405 with an errcode
+    # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
+    # to an unknown method, respectively.
+    #
+    # Older versions of servers don't properly handle this. This needs to be
+    # rather specific as some endpoints truly do return 404 errors.
+    return (
+        # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
+        (e.code == 404 or e.code == 405)
+        and (
+            # Older Dendrites returned a text body or empty body.
+            # Older Conduit returned an empty body.
+            not e.response
+            or e.response == b"404 page not found"
+            # The proper response JSON with M_UNRECOGNIZED errcode.
+            or synapse_error.errcode == Codes.UNRECOGNIZED
+        )
+    ) or (
+        # Older Synapses returned a 400 error.
+        e.code == 400
+        and synapse_error.errcode == Codes.UNRECOGNIZED
+    )

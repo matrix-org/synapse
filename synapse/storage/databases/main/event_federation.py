@@ -1544,7 +1544,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self,
         room_id: str,
         event_ids: Collection[str],
-    ) -> List[str]:
+    ) -> Dict[str, int]:
         """
         Filter down the events to ones that we've failed to pull before recently. Uses
         exponential backoff.
@@ -1554,7 +1554,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             event_ids: A list of events to filter down
 
         Returns:
-            List of event_ids that should not be attempted to be pulled
+            A dictionary of event_ids that should not be attempted to be pulled and the
+            next timestamp at which we may try pulling them again.
         """
         event_failed_pull_attempts = await self.db_pool.simple_select_many_batch(
             table="event_failed_pull_attempts",
@@ -1570,22 +1571,28 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
         current_time = self._clock.time_msec()
-        return [
-            event_failed_pull_attempt["event_id"]
-            for event_failed_pull_attempt in event_failed_pull_attempts
+
+        event_ids_with_backoff = {}
+        for event_failed_pull_attempt in event_failed_pull_attempts:
+            event_id = event_failed_pull_attempt["event_id"]
             # Exponential back-off (up to the upper bound) so we don't try to
             # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
-            if current_time
-            < event_failed_pull_attempt["last_attempt_ts"]
-            + (
-                2
-                ** min(
-                    event_failed_pull_attempt["num_attempts"],
-                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+            backoff_end_time = (
+                event_failed_pull_attempt["last_attempt_ts"]
+                + (
+                    2
+                    ** min(
+                        event_failed_pull_attempt["num_attempts"],
+                        BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    )
                 )
+                * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
             )
-            * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
-        ]
+
+            if current_time < backoff_end_time:  # `backoff_end_time` is exclusive
+                event_ids_with_backoff[event_id] = backoff_end_time
+
+        return event_ids_with_backoff
 
     async def get_missing_events(
         self,
