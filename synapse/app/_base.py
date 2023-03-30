@@ -388,9 +388,7 @@ def listen_http(
 ) -> List[Port]:
     assert listener_config.http_options is not None
 
-    site_tag = listener_config.http_options.tag
-    if site_tag is None:
-        site_tag = listener_config.get_site_tag()
+    site_tag = listener_config.get_site_tag()
 
     site = SynapseSite(
         "synapse.access.%s.%s"

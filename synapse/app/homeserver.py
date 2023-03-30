@@ -84,9 +84,7 @@ class SynapseHomeServer(HomeServer):
     ) -> Iterable[Port]:
         # Must exist since this is an HTTP listener.
         assert listener_config.http_options is not None
-        site_tag = listener_config.http_options.tag
-        if site_tag is None:
-            site_tag = listener_config.get_site_tag()
+        site_tag = listener_config.get_site_tag()
 
         # We always include a health resource.
         resources: Dict[str, Resource] = {"/health": HealthResource()}

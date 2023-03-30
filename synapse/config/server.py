@@ -226,7 +226,11 @@ class TCPListenerConfig:
     http_options: Optional[HttpListenerConfig] = None
 
     def get_site_tag(self) -> str:
-        return str(self.port)
+        """Retrieves http_options.tag if it exists, otherwise the port number."""
+        if self.http_options and self.http_options.tag is not None:
+            return self.http_options.tag
+        else:
+            return str(self.port)
 
     def is_tls(self) -> bool:
         return self.tls
