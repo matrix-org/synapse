@@ -156,11 +156,11 @@ class ApplicationServiceApi(SimpleHttpClient):
             uri = f"{service.url}{prefix}{path}"
             try:
                 return await func(uri, *args, **kwargs)
-            except CodeMessageException as e:
+            except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised path,
                 # fallback to next path (if one exists). Otherwise, consider it
                 # a legitimate error and raise.
-                if prefixes and (e.code == 404 or e.code == 405):
+                if prefixes and is_unknown_endpoint(e):
                     continue
                 raise
 
