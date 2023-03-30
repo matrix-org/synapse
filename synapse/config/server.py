@@ -941,9 +941,9 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
     port = listener.get("port")
     socket_path = listener.get("path")
     # Either a port or a path should be declared at a minimum. Using both would be bad.
-    if port and not isinstance(port, int):
+    if port is not None and not isinstance(port, int):
         raise ConfigError("Listener configuration is lacking a valid 'port' option")
-    if socket_path and not isinstance(socket_path, str):
+    if socket_path is not None and not isinstance(socket_path, str):
         raise ConfigError("Listener configuration is lacking a valid 'path' option")
     if port and socket_path:
         raise ConfigError(
@@ -977,7 +977,6 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
 
     if socket_path:
         # TODO: Add in path validation, like if the directory exists and is writable?
-        # TODO: Set this default in a better place, maybe UnixListenerConfig?
         # Set a default for the permission, in case it's left out
         socket_mode = listener.get("mode", 0o666)
 
