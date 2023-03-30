@@ -79,15 +79,15 @@ ALTER TABLE event_push_actions_new RENAME TO event_push_actions;
 ALTER TABLE event_push_summary_new RENAME TO event_push_summary;
 
 -- Recreate the indexes.
-CREATE INDEX event_push_actions_staging_id ON event_push_actions_staging_new(event_id);
+CREATE INDEX event_push_actions_staging_id ON event_push_actions_staging(event_id);
 
-CREATE INDEX event_push_actions_highlights_index ON event_push_actions_new (user_id, room_id, topological_ordering, stream_ordering);
-CREATE INDEX event_push_actions_rm_tokens on event_push_actions_new( user_id, room_id, topological_ordering, stream_ordering );
-CREATE INDEX event_push_actions_room_id_user_id on event_push_actions_new(room_id, user_id);
-CREATE INDEX event_push_actions_stream_ordering on event_push_actions_new( stream_ordering, user_id );
-CREATE INDEX event_push_actions_u_highlight ON event_push_actions_new (user_id, stream_ordering);
+CREATE INDEX event_push_actions_highlights_index ON event_push_actions (user_id, room_id, topological_ordering, stream_ordering);
+CREATE INDEX event_push_actions_rm_tokens on event_push_actions( user_id, room_id, topological_ordering, stream_ordering );
+CREATE INDEX event_push_actions_room_id_user_id on event_push_actions(room_id, user_id);
+CREATE INDEX event_push_actions_stream_ordering on event_push_actions( stream_ordering, user_id );
+CREATE INDEX event_push_actions_u_highlight ON event_push_actions (user_id, stream_ordering);
 
-CREATE UNIQUE INDEX event_push_summary_unique_index2 ON event_push_summary_new (user_id, room_id, thread_id) ;
+CREATE UNIQUE INDEX event_push_summary_unique_index2 ON event_push_summary (user_id, room_id, thread_id) ;
 
 -- Recreate some indexes in the background, by re-running the background updates
 -- from 72/02event_push_actions_index.sql and 72/06thread_notifications.sql.
