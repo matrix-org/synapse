@@ -88,14 +88,17 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
         from synapse.storage.prepare_database import prepare_database
 
         if self._is_in_memory:
+            # In memory databases need to be rebuilt each time. Ideally we'd
+            # reuse the same connection as we do when starting up, but that
+            # would involve using adbapi before we have started the reactor.
+            #
+            # If we have a `prepped_conn` we can use that to initialise the DB,
+            # otherwise we need to call `prepare_database`.
             if self._prepped_conn is not None:
                 # Initialise the new DB from the pre-prepared DB.
                 assert isinstance(db_conn.conn, sqlite3.Connection)
                 self._prepped_conn.backup(db_conn.conn)
             else:
-                # In memory databases need to be rebuilt each time. Ideally we'd
-                # reuse the same connection as we do when starting up, but that
-                # would involve using adbapi before we have started the reactor.
                 prepare_database(db_conn, self, config=None)
 
         db_conn.create_function("rank", 1, _rank)
