@@ -982,20 +982,21 @@ def is_unknown_endpoint(
     """
     if synapse_error is None:
         synapse_error = e.to_synapse_error()
-    # MSC3743 specifies that servers should return a 404 or 405 with an errcode
+
+    # Matrix v1.6 specifies that servers should return a 404 or 405 with an errcode
     # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
     # to an unknown method, respectively.
     #
-    # Older versions of servers don't properly handle this. This needs to be
-    # rather specific as some endpoints truly do return 404 errors.
+    # Older versions of servers don't return proper errors, so be graceful. But,
+    # also handle that some endpoints truly do return 404 errors.
     return (
         # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
         (e.code == 404 or e.code == 405)
         and (
-            # Older Dendrites returned a text body or empty body.
-            # Older Conduit returned an empty body.
+            # Consider empty body or non-JSON bodies to be unrecognised (matches
+            # older Dendrites & Conduits).
             not e.response
-            or e.response == b"404 page not found"
+            or not e.response.startswith(b"{")
             # The proper response JSON with M_UNRECOGNIZED errcode.
             or synapse_error.errcode == Codes.UNRECOGNIZED
         )
