@@ -34,6 +34,9 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
             ":memory:",
         )
 
+        # A connection to a database that has already been prepared, to use as a
+        # base for an in-memory connection. This is used during unit tests to
+        # speed up setting up the DB.
         self._prepped_conn: Optional[sqlite3.Connection] = database_config.get(
             "_TEST_PREPPED_CONN"
         )
@@ -86,6 +89,7 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
 
         if self._is_in_memory:
             if self._prepped_conn is not None:
+                # Initialise the new DB from the pre-prepared DB.
                 assert isinstance(db_conn.conn, sqlite3.Connection)
                 self._prepped_conn.backup(db_conn.conn)
             else:

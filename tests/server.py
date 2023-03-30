@@ -107,7 +107,9 @@ P = ParamSpec("P")
 # the type of thing that can be passed into `make_request` in the headers list
 CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
 
-PREPPED_DB_CONN: Optional[LoggingDatabaseConnection] = None
+# A pre-prepared SQLite DB that is used as a template when creating new SQLite
+# DB each test run. This dramatically speeds up test set up when using SQLite.
+PREPPED_SQlITE_DB_CONN: Optional[LoggingDatabaseConnection] = None
 
 
 class TimedOutException(Exception):
@@ -904,18 +906,21 @@ def setup_test_homeserver(
             "args": {"database": test_db_location, "cp_min": 1, "cp_max": 1},
         }
 
-        global PREPPED_DB_CONN
-        if PREPPED_DB_CONN is None:
+        # Check if we have set up a DB that we can use as a template.
+        global PREPPED_SQlITE_DB_CONN
+        if PREPPED_SQlITE_DB_CONN is None:
             temp_engine = create_engine(database_config)
-            PREPPED_DB_CONN = LoggingDatabaseConnection(
+            PREPPED_SQlITE_DB_CONN = LoggingDatabaseConnection(
                 sqlite3.connect(":memory:"), temp_engine, "PREPPED_CONN"
             )
 
             database = DatabaseConnectionConfig("master", database_config)
             config.database.databases = [database]
-            prepare_database(PREPPED_DB_CONN, create_engine(database_config), config)
+            prepare_database(
+                PREPPED_SQlITE_DB_CONN, create_engine(database_config), config
+            )
 
-        database_config["_TEST_PREPPED_CONN"] = PREPPED_DB_CONN
+        database_config["_TEST_PREPPED_CONN"] = PREPPED_SQlITE_DB_CONN
 
     if "db_txn_limit" in kwargs:
         database_config["txn_limit"] = kwargs["db_txn_limit"]
