@@ -178,6 +178,7 @@ class TestCase(unittest.TestCase):
         def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
             gc.collect(0)
+            gc.enable()
             set_current_context(SENTINEL_CONTEXT)
 
             return ret
