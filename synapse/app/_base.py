@@ -369,17 +369,13 @@ def listen_unix(
     Returns:
         list of twisted.internet.tcp.Port listening for TCP connections
     """
-    r = []
     wantPID = True
 
-    try:
-        r.append(reactor.listenUNIX(path, factory, backlog, mode, wantPID))
-    except error.CannotListenError as e:
-        raise e
-
-    # IReactorUNIX returns an object implementing IListeningPort from listenUNIX,
-    # but we know it will be a Port instance.
-    return r  # type: ignore[return-value]
+    return [
+        # IReactorUNIX returns an object implementing IListeningPort from listenUNIX,
+        # but we know it will be a Port instance.
+        cast(Port, reactor.listenUNIX(path, factory, backlog, mode, wantPID))
+    ]
 
 
 def listen_http(
