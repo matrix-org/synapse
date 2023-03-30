@@ -39,7 +39,7 @@ from unpaddedbase64 import encode_base64
 
 from synapse.api.constants import RelationTypes
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
-from synapse.types import JsonDict, RoomStreamToken, StrCollection
+from synapse.types import JsonDict, RoomStreamToken, StrCollection, get_domain_from_id
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
@@ -334,10 +334,22 @@ class EventBase(metaclass=abc.ABCMeta):
     state_key: DictProperty[str] = DictProperty("state_key")
     type: DictProperty[str] = DictProperty("type")
     user_id: DictProperty[str] = DictProperty("sender")
+    # Should only matter for Linearized Matrix.
+    owner_server: DictProperty[Optional[str]] = DefaultDictProperty(
+        "owner_server", None
+    )
+    delegated_server: DictProperty[Optional[str]] = DefaultDictProperty(
+        "delegated_server", None
+    )
 
     @property
     def event_id(self) -> str:
         raise NotImplementedError()
+
+    @property
+    def pdu_domain(self) -> str:
+        """The domain which added this event to the DAG."""
+        return get_domain_from_id(self.sender)
 
     @property
     def membership(self) -> str:
@@ -591,6 +603,45 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
+class FrozenLinearizedEvent(FrozenEventV3):
+    """
+    Represents a Delegated Linearized PDU.
+    """
+
+    format_version = EventFormatVersions.LINEARIZED
+
+    @property
+    def pdu_domain(self) -> str:
+        """The domain which added this event to the DAG.
+
+        It could be the authorized server or the sender."""
+        if self.delegated_server is not None:
+            return self.delegated_server
+        return super().pdu_domain
+
+    def get_linearized_pdu_json(self, /, delegated: bool) -> JsonDict:
+        # if delegated and self.delegated_server is None:
+        #     # TODO Better error.
+        #     raise ValueError("Invalid")
+        # TODO Is this form correct? Are there other fields?
+        result = {
+            "room_id": self.room_id,
+            "type": self.type,
+            # Should state key be left out if it isn't a state event?
+            "state_key": self.state_key,
+            "sender": self.sender,
+            "origin_server_ts": self.origin_server_ts,
+            # If we want the delegated version use the owner_server
+            # if it exists.
+            "owner_server": self.delegated_server,
+            "content": self.content,
+            "hashes": self.hashes,
+        }
+        if delegated and self.delegated_server:
+            result["delegated_server"] = self.delegated_server
+        return result
+
+
 def _event_type_from_format_version(
     format_version: int,
 ) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
@@ -610,6 +661,8 @@ def _event_type_from_format_version(
         return FrozenEventV2
     elif format_version == EventFormatVersions.ROOM_V4_PLUS:
         return FrozenEventV3
+    elif format_version == EventFormatVersions.LINEARIZED:
+        return FrozenLinearizedEvent
     else:
         raise Exception("No event format %r" % (format_version,))
 

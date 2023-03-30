@@ -30,12 +30,14 @@ class EventFormatVersions:
     ROOM_V1_V2 = 1  # $id:server event id format: used for room v1 and v2
     ROOM_V3 = 2  # MSC1659-style $hash event id format: used for room v3
     ROOM_V4_PLUS = 3  # MSC1884-style $hash format: introduced for room v4
+    LINEARIZED = 4  # Delegated Linearized event
 
 
 KNOWN_EVENT_FORMAT_VERSIONS = {
     EventFormatVersions.ROOM_V1_V2,
     EventFormatVersions.ROOM_V3,
     EventFormatVersions.ROOM_V4_PLUS,
+    EventFormatVersions.LINEARIZED,
 }
 
 
@@ -108,6 +110,7 @@ class RoomVersion:
     msc3931_push_features: Tuple[str, ...]  # values from PushRuleRoomFlag
     # MSC3989: Redact the origin field.
     msc3989_redaction_rules: bool
+    linearized_matrix: bool
 
 
 class RoomVersions:
@@ -131,6 +134,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V2 = RoomVersion(
         "2",
@@ -152,6 +156,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V3 = RoomVersion(
         "3",
@@ -173,6 +178,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V4 = RoomVersion(
         "4",
@@ -194,6 +200,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V5 = RoomVersion(
         "5",
@@ -215,6 +222,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V6 = RoomVersion(
         "6",
@@ -236,6 +244,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -257,6 +266,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V7 = RoomVersion(
         "7",
@@ -278,6 +288,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V8 = RoomVersion(
         "8",
@@ -299,6 +310,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V9 = RoomVersion(
         "9",
@@ -320,6 +332,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     MSC3787 = RoomVersion(
         "org.matrix.msc3787",
@@ -341,6 +354,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     MSC3821 = RoomVersion(
         "org.matrix.msc3821.opt1",
@@ -362,6 +376,7 @@ class RoomVersions:
         msc3821_redaction_rules=True,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     V10 = RoomVersion(
         "10",
@@ -383,6 +398,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     MSC1767v10 = RoomVersion(
         # MSC1767 (Extensible Events) based on room version "10"
@@ -405,6 +421,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(PushRuleRoomFlag.EXTENSIBLE_EVENTS,),
         msc3989_redaction_rules=False,
+        linearized_matrix=False,
     )
     MSC3989 = RoomVersion(
         "org.matrix.msc3989",
@@ -426,6 +443,7 @@ class RoomVersions:
         msc3821_redaction_rules=False,
         msc3931_push_features=(),
         msc3989_redaction_rules=True,
+        linearized_matrix=False,
     )
     MSC3820opt2 = RoomVersion(
         # Based upon v10
@@ -448,6 +466,29 @@ class RoomVersions:
         msc3821_redaction_rules=True,  # Used by MSC3820
         msc3931_push_features=(),
         msc3989_redaction_rules=True,  # Used by MSC3820
+        linearized_matrix=False,
+    )
+    LINEARIZED = RoomVersion(
+        "org.matrix.i-d.ralston-mimi-linearized-matrix.00",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.LINEARIZED,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2175_implicit_room_creator=True,
+        msc2176_redaction_rules=True,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc3389_relation_redactions=False,
+        msc3787_knock_restricted_join_rule=True,
+        msc3667_int_only_power_levels=True,
+        msc3821_redaction_rules=False,
+        msc3931_push_features=(),
+        msc3989_redaction_rules=True,
+        linearized_matrix=True,
     )
 
 
@@ -468,6 +509,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V10,
         RoomVersions.MSC3989,
         RoomVersions.MSC3820opt2,
+        RoomVersions.LINEARIZED,
     )
 }
 

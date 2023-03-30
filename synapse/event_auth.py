@@ -55,7 +55,7 @@ from synapse.types import (
 
 if typing.TYPE_CHECKING:
     # conditional imports to avoid import cycle
-    from synapse.events import EventBase
+    from synapse.events import EventBase, FrozenLinearizedEvent
     from synapse.events.builder import EventBuilder
 
 logger = logging.getLogger(__name__)
@@ -117,13 +117,29 @@ def validate_event_for_room_version(event: "EventBase") -> None:
         if not is_invite_via_3pid:
             raise AuthError(403, "Event not signed by sender's server")
 
-    if event.format_version in (EventFormatVersions.ROOM_V1_V2,):
+    if event.format_version == EventFormatVersions.ROOM_V1_V2:
         # Only older room versions have event IDs to check.
         event_id_domain = get_domain_from_id(event.event_id)
 
         # Check the origin domain has signed the event
         if not event.signatures.get(event_id_domain):
             raise AuthError(403, "Event not signed by sending server")
+
+    if event.format_version == EventFormatVersions.LINEARIZED:
+        assert isinstance(event, FrozenLinearizedEvent)
+
+        # TODO Are these handling DAG-native events properly? Is the null-checks
+        # a bypass?
+
+        # CHeck that the authorizing domain signed it.
+        owner_server = event.owner_server
+        if owner_server and not event.signatures.get(owner_server):
+            raise AuthError(403, "Event not signed by owner server")
+
+        # If this is a delegated PDU, check the original domain signed it.
+        delegated_server = event.delegated_server
+        if delegated_server and not event.signatures.get(delegated_server):
+            raise AuthError(403, "Event not signed by delegated server")
 
     is_invite_via_allow_rule = (
         event.room_version.msc3083_join_rules
