@@ -44,13 +44,13 @@ EOF
       adduser --quiet --system --group --no-create-home --home /var/lib/matrix-synapse $USER
     fi
 
-    for DIR in /var/log/matrix-synapse /etc/matrix-synapse; do
+    for DIR in /var/log/matrix-synapse; do
       if ! dpkg-statoverride --list --quiet $DIR >/dev/null; then
         dpkg-statoverride --force-statoverride-add --quiet --update --add $USER "$(id -gn $USER)" 0755 $DIR
       fi
     done
 
-    if ! dpkg-statoverride --list --quiet /var/lib/matrix-synapse >/dev/null; then
+    if ! dpkg-statoverride --list --quiet /var/lib/matrix-synapse /etc/matrix-synapse >/dev/null; then
       dpkg-statoverride --force-statoverride-add --quiet --update --add $USER "$(id -gn $USER)" 0770 /var/lib/matrix-synapse
     fi
 
