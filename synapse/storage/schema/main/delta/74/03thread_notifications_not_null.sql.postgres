@@ -13,11 +13,13 @@
  * limitations under the License.
  */
 
--- Drop the indexes used to find null thread_ids.
-DROP INDEX IF EXISTS event_push_actions_thread_id_null;
-DROP INDEX IF EXISTS event_push_summary_thread_id_null;
-
 -- The thread_id columns can now be made non-nullable.
 ALTER TABLE event_push_actions_staging ALTER COLUMN thread_id SET NOT NULL;
 ALTER TABLE event_push_actions ALTER COLUMN thread_id SET NOT NULL;
 ALTER TABLE event_push_summary ALTER COLUMN thread_id SET NOT NULL;
+
+-- Drop the indexes used to find null thread_ids.
+-- Only do this *after* the ALTER because the indices may be useful for validating
+-- the NOT NULL constraint.
+DROP INDEX IF EXISTS event_push_actions_thread_id_null;
+DROP INDEX IF EXISTS event_push_summary_thread_id_null;
