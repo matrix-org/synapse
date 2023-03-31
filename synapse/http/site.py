@@ -509,10 +509,13 @@ class SynapseRequest(Request):
         unix socket and the normal IP address for TCP sockets.
 
         """
-        # If using a unix socket, getClientAddress() is supposed to return a
-        # UNIXAddress object containing the path and file of the socket, but for some
-        # reason it's 'None' which isn't helpful. getPeer() also doesn't exist, however
-        # getHost() does exist and reports the socket file correctly.
+        # getClientAddress().host returns a proper IP address for a TCP socket. But
+        # unix sockets have no concept of IP addresses or ports and return a
+        # UNIXAddress containing a 'None' value. In order to get something usable for
+        # logs(where this is used) get the unix socket file. getHost() returns a
+        # UNIXAddress containing a value of the socket file and has an instance
+        # variable of 'name' encoded as a byte string containing the path we want.
+        # Decode to utf-8 so it looks nice.
         if isinstance(self.getClientAddress(), UNIXAddress):
             return self.getHost().name.decode("utf-8")
         else:
