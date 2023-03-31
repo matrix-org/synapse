@@ -1,0 +1,1 @@
+Fix missing app variable in mail subject for password resets. Contributed by Cyberes.

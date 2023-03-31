@@ -30,7 +30,7 @@ from prometheus_client import Counter
 from typing_extensions import TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, HttpResponseException
 from synapse.appservice import (
     ApplicationService,
     TransactionOneTimeKeysCount,
@@ -38,7 +38,7 @@ from synapse.appservice import (
 )
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
-from synapse.http.client import SimpleHttpClient
+from synapse.http.client import SimpleHttpClient, is_unknown_endpoint
 from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -393,7 +393,11 @@ class ApplicationServiceApi(SimpleHttpClient):
     ) -> Tuple[Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str]]]:
         """Claim one time keys from an application service.
 
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
         Args:
+            service: The application service to query.
             query: An iterable of tuples of (user ID, device ID, algorithm).
 
         Returns:
@@ -422,9 +426,9 @@ class ApplicationServiceApi(SimpleHttpClient):
                 body,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
-        except CodeMessageException as e:
+        except HttpResponseException as e:
             # The appservice doesn't support this endpoint.
-            if e.code == 404 or e.code == 405:
+            if is_unknown_endpoint(e):
                 return {}, query
             logger.warning("claim_keys to %s received %s", uri, e.code)
             return {}, query
@@ -443,6 +447,48 @@ class ApplicationServiceApi(SimpleHttpClient):
         ]
 
         return response, missing
+
+    async def query_keys(
+        self, service: "ApplicationService", query: Dict[str, List[str]]
+    ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
+        """Query the application service for keys.
+
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
+        Args:
+            service: The application service to query.
+            query: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A map of device_keys/master_keys/self_signing_keys/user_signing_keys:
+
+            device_keys is a map of user ID -> a map device ID -> device info.
+        """
+        if service.url is None:
+            return {}
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3984/keys/query"
+        try:
+            response = await self.post_json_get_json(
+                uri,
+                query,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
+        except HttpResponseException as e:
+            # The appservice doesn't support this endpoint.
+            if is_unknown_endpoint(e):
+                return {}
+            logger.warning("query_keys to %s received %s", uri, e.code)
+            return {}
+        except Exception as ex:
+            logger.warning("query_keys to %s threw exception %s", uri, ex)
+            return {}
+
+        return response
 
     def _serialize(
         self, service: "ApplicationService", events: Iterable[EventBase]
