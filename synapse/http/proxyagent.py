@@ -214,6 +214,9 @@ class ProxyAgent(_AgentBase):
                 parsed_uri.port,
                 self.https_proxy_creds,
             )
+        elif parsed_uri.scheme == b"matrix":
+            endpoint = HostnameEndpoint(self.proxy_reactor, "127.0.0.1", 3000)
+            request_path = uri
         else:
             # not using a proxy
             endpoint = HostnameEndpoint(
@@ -232,6 +235,8 @@ class ProxyAgent(_AgentBase):
             )
             endpoint = wrapClientTLS(tls_connection_creator, endpoint)
         elif parsed_uri.scheme == b"http":
+            pass
+        elif parsed_uri.scheme == b"matrix":
             pass
         else:
             return defer.fail(
