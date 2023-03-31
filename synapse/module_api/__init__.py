@@ -105,6 +105,7 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
     ON_LEGACY_SEND_MAIL_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
 )
+from synapse.push.httppusher import HttpPusher
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -248,6 +249,7 @@ class ModuleApi:
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._pusherpool = hs.get_pusherpool()
         self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
@@ -1225,6 +1227,43 @@ class ModuleApi:
         """
 
         await self._clock.sleep(seconds)
+
+    async def send_http_push_notification(
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        content: JsonDict,
+        tweaks: Optional[JsonMapping] = None,
+    ) -> bool:
+        """Send an HTTP push notification that is forwarded to the registered push gateway
+        for the specified user/device.
+
+        Added in Synapse v1.82.0.
+
+        Args:
+            user_id: The user ID to send the push notification to.
+            device_id: The device ID of the device where to send the push notification. If `None`,
+            the notification will be sent to all registered HTTP pushers of the user.
+            content: A dict of values that will be put in the `notification` field of the push
+            (cf Push Gatway spec). `devices` field will be overrided if included.
+            tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
+
+        Returns:
+            True if at least one push was succesfully sent, False if no matching pusher has been
+            found or an error occured when sending the push.
+        """
+        sent = False
+        if user_id in self._pusherpool.pushers:
+            for p in self._pusherpool.pushers[user_id].values():
+                if isinstance(p, HttpPusher) and (
+                    not device_id or p.device_id == device_id
+                ):
+                    res = await p.dispatch_push(content, tweaks)
+                    if (
+                        isinstance(res, (list, tuple)) and len(res) == 0
+                    ) or res is not False:
+                        sent = True
+        return sent
 
     async def send_mail(
         self,
