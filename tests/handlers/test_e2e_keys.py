@@ -960,7 +960,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         appservice = ApplicationService(
             token="i_am_an_app_service",
             id="1234",
-            namespaces={"users": [{"regex": r"@boris:*", "exclusive": True}]},
+            namespaces={"users": [{"regex": r"@boris:.+", "exclusive": True}]},
             # Note: this user does not have to match the regex above
             sender="@as_main:test",
         )
@@ -1013,5 +1013,124 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 "one_time_keys": {
                     local_user: {device_id_1: fallback_key, device_id_2: otk}
                 },
+            },
+        )
+
+    @override_config({"experimental_features": {"msc3984_appservice_key_query": True}})
+    def test_query_local_devices_appservice(self) -> None:
+        """Test that querying of appservices for keys overrides responses from the database."""
+        local_user = "@boris:" + self.hs.hostname
+        device_1 = "abc"
+        device_2 = "def"
+        device_3 = "ghi"
+
+        # There are 3 devices:
+        #
+        # 1. One which is uploaded to the homeserver.
+        # 2. One which is uploaded to the homeserver, but a newer copy is returned
+        #     by the appservice.
+        # 3. One which is only returned by the appservice.
+        device_key_1: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_1,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            "keys": {
+                "ed25519:abc": "base64+ed25519+key",
+                "curve25519:abc": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:abc": "base64+signature"}},
+        }
+        device_key_2a: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_2,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            "keys": {
+                "ed25519:def": "base64+ed25519+key",
+                "curve25519:def": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:def": "base64+signature"}},
+        }
+
+        device_key_2b: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_2,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            # The device ID is the same (above), but the keys are different.
+            "keys": {
+                "ed25519:xyz": "base64+ed25519+key",
+                "curve25519:xyz": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:xyz": "base64+signature"}},
+        }
+        device_key_3: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_3,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            "keys": {
+                "ed25519:jkl": "base64+ed25519+key",
+                "curve25519:jkl": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:jkl": "base64+signature"}},
+        }
+
+        # Upload keys for devices 1 & 2a.
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user, device_1, {"device_keys": device_key_1}
+            )
+        )
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user, device_2, {"device_keys": device_key_2a}
+            )
+        )
+
+        # Inject an appservice interested in this user.
+        appservice = ApplicationService(
+            token="i_am_an_app_service",
+            id="1234",
+            namespaces={"users": [{"regex": r"@boris:.+", "exclusive": True}]},
+            # Note: this user does not have to match the regex above
+            sender="@as_main:test",
+        )
+        self.hs.get_datastores().main.services_cache = [appservice]
+        self.hs.get_datastores().main.exclusive_user_regex = _make_exclusive_regex(
+            [appservice]
+        )
+
+        # Setup a response.
+        self.appservice_api.query_keys.return_value = make_awaitable(
+            {
+                "device_keys": {
+                    local_user: {device_2: device_key_2b, device_3: device_key_3}
+                }
+            }
+        )
+
+        # Request all devices.
+        res = self.get_success(self.handler.query_local_devices({local_user: None}))
+        self.assertIn(local_user, res)
+        for res_key in res[local_user].values():
+            res_key.pop("unsigned", None)
+        self.assertDictEqual(
+            res,
+            {
+                local_user: {
+                    device_1: device_key_1,
+                    device_2: device_key_2b,
+                    device_3: device_key_3,
+                }
             },
         )

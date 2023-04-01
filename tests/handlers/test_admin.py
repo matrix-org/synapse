@@ -272,7 +272,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertIn("device_id", args[0][0])
         self.assertIsNone(args[0][0]["display_name"])
         self.assertIsNone(args[0][0]["last_seen_user_agent"])
-        self.assertEqual(args[0][0]["last_seen_ts"], 600)
+        self.assertIsNone(args[0][0]["last_seen_ts"])
         self.assertIsNone(args[0][0]["last_seen_ip"])
 
     def test_connections(self) -> None:
