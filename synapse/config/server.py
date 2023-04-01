@@ -947,7 +947,12 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
         raise ConfigError("Listener configuration is lacking a valid 'path' option")
     if port and socket_path:
         raise ConfigError(
-            "Can not have both a UNIX socket and a IP/port declared for the same "
+            "Can not have both a UNIX socket and an IP/port declared for the same "
+            "resource!"
+        )
+    if port is None and socket_path is None:
+        raise ConfigError(
+            "Must have either a UNIX socket or an IP/port declared for a given "
             "resource!"
         )
 
