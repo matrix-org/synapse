@@ -231,6 +231,17 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1810"><a class="header" href="#upgrading-to-v1810">Upgrading to v1.81.0</a></h1>
+<h2 id="application-service-path--authentication-deprecations"><a class="header" href="#application-service-path--authentication-deprecations">Application service path &amp; authentication deprecations</a></h2>
+<p>Synapse now attempts the versioned appservice paths before falling back to the
+<a href="https://spec.matrix.org/v1.6/application-service-api/#legacy-routes">legacy paths</a>.
+Usage of the legacy routes should be considered deprecated.</p>
+<p>Additionally, Synapse has supported sending the application service access token
+via <a href="https://spec.matrix.org/v1.6/application-service-api/#authorization">the <code>Authorization</code> header</a>
+since v1.70.0. For backwards compatibility it is <em>also</em> sent as the <code>access_token</code>
+query parameter. This is insecure and should be considered deprecated.</p>
+<p>A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service routes and query parameter authorization.</p>
 <h1 id="upgrading-to-v1800"><a class="header" href="#upgrading-to-v1800">Upgrading to v1.80.0</a></h1>
 <h2 id="reporting-events-error-code-change"><a class="header" href="#reporting-events-error-code-change">Reporting events error code change</a></h2>
 <p>Before this update, the
