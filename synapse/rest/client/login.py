@@ -107,6 +107,9 @@ class LoginRestServlet(RestServlet):
             and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
 
+        # Whether MSC3882 get login token is enabled.
+        self._get_login_token_enabled = hs.config.experimental.msc3882_enabled
+
         self.auth = hs.get_auth()
 
         self.clock = hs.get_clock()
@@ -145,7 +148,12 @@ class LoginRestServlet(RestServlet):
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
-        if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
+        if (
+            self.cas_enabled
+            or self.saml2_enabled
+            or self.oidc_enabled
+            or self._get_login_token_enabled
+        ):
             flows.append(
                 {
                     "type": LoginRestServlet.SSO_TYPE,
@@ -163,7 +171,11 @@ class LoginRestServlet(RestServlet):
             # don't know how to implement, since they (currently) will always
             # fall back to the fallback API if they don't understand one of the
             # login flow types returned.
-            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
+            tokenTypeFlow = {"type": LoginRestServlet.TOKEN_TYPE}
+            # If MSC3882 is enabled we advertise the get_login_token flag.
+            if self._get_login_token_enabled:
+                tokenTypeFlow["org.matrix.msc3882.get_login_token"] = True
+            flows.append(tokenTypeFlow)
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 

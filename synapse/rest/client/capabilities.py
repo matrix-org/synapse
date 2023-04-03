@@ -82,6 +82,11 @@ class CapabilitiesRestServlet(RestServlet):
                 "enabled": self.config.experimental.msc3664_enabled,
             }
 
+        if self.config.experimental.msc3882_enabled:
+            response["capabilities"]["org.matrix.msc3882.get_login_token"] = {
+                "enabled": True,
+            }
+
         return HTTPStatus.OK, response
 
 

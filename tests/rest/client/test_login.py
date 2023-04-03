@@ -446,6 +446,29 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
         )
 
+    def test_get_login_flows_with_msc3882_disabled(self) -> None:
+        """GET /login should return m.login.token without get_login_token true"""
+        channel = self.make_request("GET", "/_matrix/client/r0/login")
+        self.assertEqual(channel.code, 200, channel.result)
+
+        flows = {flow["type"]: flow for flow in channel.json_body["flows"]}
+        self.assertTrue(
+            "m.login.token" not in flows
+            or "org.matrix.msc3882.get_login_token" not in flows["m.login.token"]
+            or not flows["m.login.token"]["org.matrix.msc3882.get_login_token"]
+        )
+
+    @override_config({"experimental_features": {"msc3882_enabled": True}})
+    def test_get_login_flows_with_msc3882_enabled(self) -> None:
+        """GET /login should return m.login.token without get_login_token true"""
+        channel = self.make_request("GET", "/_matrix/client/r0/login")
+        self.assertEqual(channel.code, 200, channel.result)
+
+        print(channel.json_body)
+
+        flows = {flow["type"]: flow for flow in channel.json_body["flows"]}
+        self.assertTrue(flows["m.login.token"]["org.matrix.msc3882.get_login_token"])
+
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")
 class MultiSSOTestCase(unittest.HomeserverTestCase):
