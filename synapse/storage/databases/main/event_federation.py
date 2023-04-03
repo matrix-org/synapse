@@ -1232,9 +1232,16 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             txn.execute(sql, (stream_ordering, room_id))
             return [event_id for event_id, in txn]
 
-        return await self.db_pool.runInteraction(
+        event_ids = await self.db_pool.runInteraction(
             "get_forward_extremeties_for_room", get_forward_extremeties_for_room_txn
         )
+
+        # If we didn't find any IDs, then we must have cleared out the
+        # associated `stream_ordering_to_exterm`.
+        if not event_ids:
+            raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
+
+        return event_ids
 
     def _get_connected_batch_event_backfill_results_txn(
         self, txn: LoggingTransaction, insertion_event_id: str, limit: int
