@@ -943,6 +943,8 @@ class SyncHandler:
 
                 timeline_state = {}
 
+                # Membership events to fetch that can be found in the room state, or in
+                # the case of partial state rooms, the auth events of timeline events.
                 members_to_fetch = set()
                 first_event_by_sender_map = {}
                 for event in batch.events:
@@ -964,9 +966,19 @@ class SyncHandler:
                     # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
                     # We only need apply this on full state syncs given we disabled
                     # LL for incr syncs in #3840.
-                    members_to_fetch.add(sync_config.user.to_string())
-
-                state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
+                    # We don't insert ourselves into `members_to_fetch`, because in some
+                    # rare cases (an empty event batch with a now_token after the user's
+                    # leave in a partial state room which another local user has
+                    # joined), the room state will be missing our membership and there
+                    # is no guarantee that our membership will be in the auth events of
+                    # timeline events when the room is partial stated.
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        members_to_fetch.union((sync_config.user.to_string(),))
+                    )
+                else:
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        members_to_fetch
+                    )
 
                 # We are happy to use partial state to compute the `/sync` response.
                 # Since partial state may not include the lazy-loaded memberships we
