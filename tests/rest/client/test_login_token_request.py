@@ -22,7 +22,7 @@ from synapse.util import Clock
 from tests import unittest
 from tests.unittest import override_config
 
-endpoint = "/_matrix/client/unstable/org.matrix.msc3882/login/token"
+endpoint = "/_matrix/client/unstable/org.matrix.msc3882/login/get_token"
 
 
 class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
@@ -82,7 +82,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", endpoint, uia, access_token=token)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["expires_in"], 300)
+        self.assertEqual(channel.json_body["expires_in_ms"], 300000)
 
         login_token = channel.json_body["login_token"]
 
@@ -103,7 +103,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", endpoint, {}, access_token=token)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["expires_in"], 300)
+        self.assertEqual(channel.json_body["expires_in_ms"], 300000)
 
         login_token = channel.json_body["login_token"]
 
@@ -130,4 +130,4 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", endpoint, {}, access_token=token)
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["expires_in"], 15)
+        self.assertEqual(channel.json_body["expires_in_ms"], 15000)

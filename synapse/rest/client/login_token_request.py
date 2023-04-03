@@ -33,7 +33,7 @@ class LoginTokenRequestServlet(RestServlet):
 
     Request:
 
-    POST /login/token HTTP/1.1
+    POST /login/get_token HTTP/1.1
     Content-Type: application/json
 
     {}
@@ -43,12 +43,12 @@ class LoginTokenRequestServlet(RestServlet):
     HTTP/1.1 200 OK
     {
         "login_token": "ABDEFGH",
-        "expires_in": 3600,
+        "expires_in_ms": 3600000,
     }
     """
 
     PATTERNS = client_patterns(
-        "/org.matrix.msc3882/login/token$", releases=[], v1=False, unstable=True
+        "/org.matrix.msc3882/login/get_token$", releases=[], v1=False, unstable=True
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -77,7 +77,7 @@ class LoginTokenRequestServlet(RestServlet):
 
         login_token = await self.auth_handler.create_login_token_for_user_id(
             user_id=requester.user.to_string(),
-            auth_provider_id="org.matrix.msc3882.login_token_request",
+            auth_provider_id="org.matrix.msc3882.get_login_token",
             duration_ms=self.token_timeout,
         )
 
@@ -85,7 +85,7 @@ class LoginTokenRequestServlet(RestServlet):
             200,
             {
                 "login_token": login_token,
-                "expires_in": self.token_timeout // 1000,
+                "expires_in_ms": self.token_timeout,
             },
         )
 
