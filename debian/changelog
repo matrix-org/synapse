@@ -1,3 +1,10 @@
+matrix-synapse-py3 (1.80.0+nmu1) UNRELEASED; urgency=medium
+
+  [ nodiscc ]
+  * Don't make matrix-synapse configuration directory, homeserver config file and data directory world-readable
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 28 Mar 2023 15:03:17 +0200
+
 matrix-synapse-py3 (1.80.0) stable; urgency=medium
 
   * New Synapse release 1.80.0.
