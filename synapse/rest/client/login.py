@@ -171,7 +171,7 @@ class LoginRestServlet(RestServlet):
             # don't know how to implement, since they (currently) will always
             # fall back to the fallback API if they don't understand one of the
             # login flow types returned.
-            tokenTypeFlow = {"type": LoginRestServlet.TOKEN_TYPE}
+            tokenTypeFlow: Dict[str, any] = {"type": LoginRestServlet.TOKEN_TYPE}
             # If MSC3882 is enabled we advertise the get_login_token flag.
             if self._get_login_token_enabled:
                 tokenTypeFlow["org.matrix.msc3882.get_login_token"] = True
