@@ -464,10 +464,14 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
 
-        print(channel.json_body)
-
-        flows = {flow["type"]: flow for flow in channel.json_body["flows"]}
-        self.assertTrue(flows["m.login.token"]["org.matrix.msc3882.get_login_token"])
+        self.assertCountEqual(
+            channel.json_body["flows"],
+            [
+                {"type": "m.login.token", "org.matrix.msc3882.get_login_token": True},
+                {"type": "m.login.password"},
+                {"type": "m.login.application_service"},
+            ],
+        )
 
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")

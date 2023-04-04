@@ -148,12 +148,10 @@ class LoginRestServlet(RestServlet):
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
-        if (
-            self.cas_enabled
-            or self.saml2_enabled
-            or self.oidc_enabled
-            or self._get_login_token_enabled
-        ):
+        # MSC3882 requires m.login.token to be advertised
+        supportLoginTokenFlow = self._get_login_token_enabled
+
+        if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
             flows.append(
                 {
                     "type": LoginRestServlet.SSO_TYPE,
@@ -164,13 +162,10 @@ class LoginRestServlet(RestServlet):
                 }
             )
 
-            # While it's valid for us to advertise this login type generally,
-            # synapse currently only gives out these tokens as part of the
-            # SSO login flow.
-            # Generally we don't want to advertise login flows that clients
-            # don't know how to implement, since they (currently) will always
-            # fall back to the fallback API if they don't understand one of the
-            # login flow types returned.
+            # SSO requires a login token to be generated, so we need to advertise that flow
+            supportLoginTokenFlow = True
+
+        if supportLoginTokenFlow:
             tokenTypeFlow: Dict[str, Any] = {"type": LoginRestServlet.TOKEN_TYPE}
             # If MSC3882 is enabled we advertise the get_login_token flag.
             if self._get_login_token_enabled:
