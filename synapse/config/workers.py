@@ -19,15 +19,18 @@ from typing import Any, Dict, List, Union
 
 import attr
 
-from synapse.types import JsonDict
-
-from ._base import (
+from synapse.config._base import (
     Config,
     ConfigError,
     RoutableShardedWorkerHandlingConfig,
     ShardedWorkerHandlingConfig,
 )
-from .server import DIRECT_TCP_ERROR, ListenerConfig, parse_listener_def
+from synapse.config.server import (
+    DIRECT_TCP_ERROR,
+    TCPListenerConfig,
+    parse_listener_def,
+)
+from synapse.types import JsonDict
 
 _DEPRECATED_WORKER_DUTY_OPTION_USED = """
 The '%s' configuration option is deprecated and will be removed in a future
@@ -161,7 +164,7 @@ class WorkerConfig(Config):
         manhole = config.get("worker_manhole")
         if manhole:
             self.worker_listeners.append(
-                ListenerConfig(
+                TCPListenerConfig(
                     port=manhole,
                     bind_addresses=["127.0.0.1"],
                     type="manhole",
