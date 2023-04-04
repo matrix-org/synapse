@@ -50,6 +50,7 @@ from twisted.internet.interfaces import (
     IReactorTCP,
     IReactorThreads,
     IReactorTime,
+    IReactorUNIX,
 )
 
 from synapse.api.errors import Codes, SynapseError
@@ -91,6 +92,7 @@ StrCollection = Union[Tuple[str, ...], List[str], AbstractSet[str]]
 class ISynapseReactor(
     IReactorTCP,
     IReactorSSL,
+    IReactorUNIX,
     IReactorPluggableNameResolver,
     IReactorTime,
     IReactorCore,

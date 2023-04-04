@@ -1,1 +1,0 @@
-Fix bug in worker mode where on a rolling restart of workers the "typing" worker would consume 100% CPU until it got restarted.
