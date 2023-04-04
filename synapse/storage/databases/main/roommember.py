@@ -422,7 +422,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         rooms_to_exclude: AbstractSet[str] = set()
 
         # Users can't forget joined/invited rooms, so we skip the check for such look ups.
-        if not all(m in (Membership.JOIN, Membership.INVITE) for m in membership_list):
+        if any(m not in (Membership.JOIN, Membership.INVITE) for m in membership_list):
             rooms_to_exclude = await self.get_forgotten_rooms_for_user(user_id)
 
         if excluded_rooms is not None:
