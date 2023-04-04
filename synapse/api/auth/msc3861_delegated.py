@@ -90,6 +90,7 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         self._http_client = hs.get_proxied_http_client()
         self._hostname = hs.hostname
+        self._admin_token = self._config.admin_token
 
         self._issuer_metadata = RetryOnExceptionCachedCall(self._load_metadata)
 
@@ -176,6 +177,20 @@ class MSC3861DelegatedAuth(BaseAuth):
         token: str,
         allow_expired: bool = False,
     ) -> Requester:
+        if self._admin_token is not None and token == self._admin_token:
+            # XXX: This is a temporary solution so that the admin API can be called by
+            # the OIDC provider. This will be removed once we have OIDC client
+            # credentials grant support in matrix-authentication-service.
+            logging.info("Admin toked used")
+            # XXX: that user doesn't exist and won't be provisioned.
+            # This is mostly fine for admin calls, but we should also think about doing
+            # requesters without a user_id.
+            admin_user = UserID("__oidc_admin", self._hostname)
+            return create_requester(
+                user_id=admin_user,
+                scope=["urn:synapse:admin:*"],
+            )
+
         introspection_result = await self._introspect_token(token)
 
         logger.info(f"Introspection result: {introspection_result!r}")

@@ -136,6 +136,15 @@ class MSC3861:
     )
     """The URL of the My Account page on the OIDC Provider as per MSC2965."""
 
+    admin_token: Optional[str] = attr.ib(
+        default=None,
+        validator=attr.validators.optional(attr.validators.instance_of(str)),
+    )
+    """
+    A token that should be considered as an admin token.
+    This is used by the OIDC provider, to make admin calls to Synapse.
+    """
+
     def check_config_conflicts(self, root: RootConfig) -> None:
         """Checks for any configuration conflicts with other parts of Synapse.
 
