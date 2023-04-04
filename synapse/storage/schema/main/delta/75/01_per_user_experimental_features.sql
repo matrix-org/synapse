@@ -13,22 +13,15 @@
  * limitations under the License.
  */
 
--- Table containing a list of experimental features and whether they are
--- enabled for a given user
+-- Table containing experimental features and whether they are enabled for a given user
 CREATE TABLE per_user_experimental_features (
     -- The User ID to check/set the feature for
-    user_id TEXT NOT NULL PRIMARY KEY,
-
-    -- busy presence state enabled
-    msc3026 BOOLEAN,
-
-    -- enable unread counts
-    msc2654 BOOLEAN,
-
-    -- enable remotely toggling push notifications for another client
-    msc3881 BOOLEAN,
-
-    -- Do not require UIA when first uploading cross signing keys
-    msc3967 BOOLEAN
+    user_id TEXT NOT NULL,
+    -- Contains features to be enabled/disabled
+    feature TEXT NOT NULL,
+    -- whether the feature is enabled/disabled for a given user, defaults to disabled
+    enabled BOOLEAN DEFAULT false,
+    FOREIGN KEY (user_id) REFERENCES users(name),
+    PRIMARY KEY (user_id, feature)
 );
 
