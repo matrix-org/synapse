@@ -34,6 +34,13 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
             ":memory:",
         )
 
+        # A connection to a database that has already been prepared, to use as a
+        # base for an in-memory connection. This is used during unit tests to
+        # speed up setting up the DB.
+        self._prepped_conn: Optional[sqlite3.Connection] = database_config.get(
+            "_TEST_PREPPED_CONN"
+        )
+
         if platform.python_implementation() == "PyPy":
             # pypy's sqlite3 module doesn't handle bytearrays, convert them
             # back to bytes.
@@ -84,7 +91,15 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
             # In memory databases need to be rebuilt each time. Ideally we'd
             # reuse the same connection as we do when starting up, but that
             # would involve using adbapi before we have started the reactor.
-            prepare_database(db_conn, self, config=None)
+            #
+            # If we have a `prepped_conn` we can use that to initialise the DB,
+            # otherwise we need to call `prepare_database`.
+            if self._prepped_conn is not None:
+                # Initialise the new DB from the pre-prepared DB.
+                assert isinstance(db_conn.conn, sqlite3.Connection)
+                self._prepped_conn.backup(db_conn.conn)
+            else:
+                prepare_database(db_conn, self, config=None)
 
         db_conn.create_function("rank", 1, _rank)
         db_conn.execute("PRAGMA foreign_keys = ON;")

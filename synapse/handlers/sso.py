@@ -383,6 +383,7 @@ class SsoHandler:
         grandfather_existing_users: Callable[[], Awaitable[Optional[str]]],
         extra_login_attributes: Optional[JsonDict] = None,
         auth_provider_session_id: Optional[str] = None,
+        registration_enabled: bool = True,
     ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -435,6 +436,10 @@ class SsoHandler:
 
             auth_provider_session_id: An optional session ID from the IdP.
 
+            registration_enabled: An optional boolean to enable/disable automatic
+            registrations of new users. If false and the user does not exist then the
+            flow is aborted. Defaults to true.
+
         Raises:
             MappingException if there was a problem mapping the response to a user.
             RedirectException: if the mapping provider needs to redirect the user
@@ -462,8 +467,16 @@ class SsoHandler:
                         auth_provider_id, remote_user_id, user_id
                     )
 
-            # Otherwise, generate a new user.
-            if not user_id:
+            if not user_id and not registration_enabled:
+                logger.info(
+                    "User does not exist and registration are disabled for IdP '%s' and remote_user_id '%s'",
+                    auth_provider_id,
+                    remote_user_id,
+                )
+                raise MappingException(
+                    "User does not exist and registrations are disabled"
+                )
+            elif not user_id:  # Otherwise, generate a new user.
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
 
                 next_step_url = self._get_url_for_next_new_user_step(

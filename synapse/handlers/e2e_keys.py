@@ -91,6 +91,9 @@ class E2eKeysHandler:
         self._query_appservices_for_otks = (
             hs.config.experimental.msc3983_appservice_otk_claims
         )
+        self._query_appservices_for_keys = (
+            hs.config.experimental.msc3984_appservice_key_query
+        )
 
     @trace
     @cancellable
@@ -496,6 +499,19 @@ class E2eKeysHandler:
         results = await self.store.get_e2e_device_keys_for_cs_api(
             local_query, include_displaynames
         )
+
+        # Check if the application services have any additional results.
+        if self._query_appservices_for_keys:
+            # Query the appservices for any keys.
+            appservice_results = await self._appservice_handler.query_keys(query)
+
+            # Merge results, overriding with what the appservice returned.
+            for user_id, devices in appservice_results.get("device_keys", {}).items():
+                # Copy the appservice device info over the homeserver device info, but
+                # don't completely overwrite it.
+                results.setdefault(user_id, {}).update(devices)
+
+            # TODO Handle cross-signing keys.
 
         # Build the result structure
         for user_id, device_keys in results.items():
