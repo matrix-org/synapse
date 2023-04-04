@@ -36,7 +36,7 @@ class RedisConfig(Config):
         self.redis_dbid = redis_config.get("dbid", None)
         self.redis_password = redis_config.get("password")
 
-        self.redis_use_ssl = redis_config.get("use_ssl", False)
+        self.redis_use_tls = redis_config.get("use_tls", False)
         self.redis_certificate = redis_config.get("certificate_file", None)
         self.redis_private_key = redis_config.get("private_key_file", None)
         self.redis_ca_file = redis_config.get("ca_file", None)

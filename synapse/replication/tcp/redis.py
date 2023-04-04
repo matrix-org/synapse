@@ -388,7 +388,7 @@ def lazyConnection(
 
     reactor = hs.get_reactor()
 
-    if hs.config.redis.redis_use_ssl:
+    if hs.config.redis.redis_use_tls:
         ssl_context_factory = ClientContextFactory(hs.config.redis)
         reactor.connectSSL(
             host,

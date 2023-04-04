@@ -352,7 +352,7 @@ class ReplicationCommandHandler:
 
         reactor = hs.get_reactor()
         redis_config = hs.config.redis
-        if hs.config.redis.redis_use_ssl:
+        if hs.config.redis.redis_use_tls:
             ssl_context_factory = ClientContextFactory(hs.config.redis)
             reactor.connectSSL(
                 redis_config.redis_host,

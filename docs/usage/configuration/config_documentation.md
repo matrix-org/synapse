@@ -3928,7 +3928,7 @@ This setting has the following sub-options:
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
-* `use_ssl`: Whether to use ssl connection. Defaults to false.
+* `use_tls`: Whether to use tls connection. Defaults to false.
 * `certificate_file`: Optional path to the certificate file
 * `private_key_file`: Optional path to the private key file
 * `ca_file`: Optional path to the CA certificate file. Use this one or:
@@ -3944,7 +3944,7 @@ redis:
   port: 6379
   password: <secret_password>
   dbid: <dbid>
-  #use_ssl: True
+  #use_tls: True
   #certificate_file: <path_to_the_certificate_file>
   #private_key_file: <path_to_the_private_key_file>
   #ca_file: <path_to_the_ca_certificate_file>

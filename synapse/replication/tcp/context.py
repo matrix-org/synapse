@@ -22,7 +22,7 @@ class ClientContextFactory(ssl.ClientContextFactory):
         self.redis_config = redis_config
 
     def getContext(self) -> Context:
-        ctx = ssl.ClientContextFactory.getContext(self)
+        ctx = super().getContext(self)
         if self.redis_config.redis_certificate:
             ctx.use_certificate_file(self.redis_config.redis_certificate)
         if self.redis_config.redis_private_key:
@@ -30,5 +30,5 @@ class ClientContextFactory(ssl.ClientContextFactory):
         if self.redis_config.redis_ca_file:
             ctx.load_verify_locations(cafile=self.redis_config.redis_ca_file)
         elif self.redis_config.redis_ca_path:
-            ctx.load_verify_locationa(capath=self.redis_config.redis_ca_path)
+            ctx.load_verify_locations(capath=self.redis_config.redis_ca_path)
         return ctx
