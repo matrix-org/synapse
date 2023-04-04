@@ -199,6 +199,17 @@ Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.
 
 
+## User directory rebuild
+
+Synapse 1.74 queues a background update
+[to rebuild the user directory](https://github.com/matrix-org/synapse/pull/14643),
+in order to fix missing or erroneous entries.
+
+When this update begins, the user directory will be cleared out and rebuilt from
+scratch. User directory lookups will be incomplete until the rebuild completes.
+Admins can monitor the rebuild's progress by using the
+[Background update Admin API](usage/administration/admin_api/background_updates.md#status).
+
 # Upgrading to v1.73.0
 
 ## Legacy Prometheus metric names have now been removed
