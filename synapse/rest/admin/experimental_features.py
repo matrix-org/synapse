@@ -15,10 +15,10 @@
 
 from enum import Enum
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Dict, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin import admin_patterns, assert_requester_is_admin
 from synapse.types import JsonDict, UserID
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class ValidFeatures(str, Enum):
+class ExperimentalFeature(str, Enum):
     """
     Currently supported per-user features
     """
@@ -40,13 +40,11 @@ class ValidFeatures(str, Enum):
 
 class ExperimentalFeaturesRestServlet(RestServlet):
     """
-    Enable or disable an experimental feature or determine whether a given experimental
-    feature is enabled
+    Enable or disable experimental features for a user or determine which features are enabled
+    for a given user
     """
 
-    PATTERNS = admin_patterns(
-        "/experimental_features/(?P<user_id>[^/]*)/(?P<feature>[^/]*)"
-    )
+    PATTERNS = admin_patterns("/experimental_features/(?P<user_id>[^/]*)")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -58,10 +56,9 @@ class ExperimentalFeaturesRestServlet(RestServlet):
         self,
         request: SynapseRequest,
         user_id: str,
-        feature: str,
     ) -> Tuple[int, JsonDict]:
         """
-        Checks if a given feature is enabled for a given user
+        List which features are enabled for a given user
         """
         await assert_requester_is_admin(self.auth, request)
 
@@ -72,28 +69,15 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 "User must be local to check what experimental features are enabled.",
             )
 
-        # do a basic validation of the given feature
-        validated = feature in [
-            ValidFeatures.MSC3026,
-            ValidFeatures.MSC2654,
-            ValidFeatures.MSC3881,
-            ValidFeatures.MSC3967,
-        ]
+        enabled_list = await self.store.list_enabled_features(user_id)
 
-        if not validated:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Please provide a valid experimental feature."
-            )
-
-        enabled = await self.store.get_feature_enabled(user_id, feature)
-
-        return HTTPStatus.OK, {"user": user_id, "feature": feature, "enabled": enabled}
+        return HTTPStatus.OK, {"user_id": user_id, "features": enabled_list}
 
     async def on_PUT(
-        self, request: SynapseRequest, user_id: str, feature: str
-    ) -> Tuple[int, JsonDict]:
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[HTTPStatus, Dict]:
         """
-        Enables a given feature for the requester
+        Enable or disable the provided features for the requester
         """
         await assert_requester_is_admin(self.auth, request)
 
@@ -104,55 +88,25 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 "User must be local to enable experimental features.",
             )
 
-        # validate the feature
-        validated = feature in [
-            ValidFeatures.MSC3026,
-            ValidFeatures.MSC2654,
-            ValidFeatures.MSC3881,
-            ValidFeatures.MSC3967,
-        ]
-
-        if not validated:
+        body = parse_json_object_from_request(request)
+        features = body.get("features")
+        if not features:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Please provide a valid experimental feature."
+                HTTPStatus.BAD_REQUEST, "You must provide features to set."
             )
 
-        user, feature, enabled = await self.store.set_feature_for_user(
-            user_id, feature, True
-        )
+        # validate the provided features
+        validated_features = {}
+        for feature, enabled in features.items():
+            try:
+                validated_feature = ExperimentalFeature(feature)
+                validated_features[validated_feature] = enabled
+            except ValueError:
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "Please provide a valid experimental feature.",
+                )
 
-        return HTTPStatus.OK, {"user": user, "feature": feature, "enabled": enabled}
+        await self.store.set_features_for_user(user_id, validated_features)
 
-    async def on_DELETE(
-        self, request: SynapseRequest, user_id: str, feature: str
-    ) -> Tuple[int, JsonDict]:
-        """
-        Disables the requested feature for the given user
-        """
-        await assert_requester_is_admin(self.auth, request)
-
-        target_user = UserID.from_string(user_id)
-        if not self.is_mine(target_user):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "User must be local to disable an experimental feature.",
-            )
-
-        # validate the feature
-        validated = feature in [
-            ValidFeatures.MSC3026,
-            ValidFeatures.MSC2654,
-            ValidFeatures.MSC3881,
-            ValidFeatures.MSC3967,
-        ]
-
-        if not validated:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Please provide a valid experimental feature."
-            )
-
-        user, feature, enabled = await self.store.set_feature_for_user(
-            user_id, feature, False
-        )
-
-        return HTTPStatus.OK, {"user": user, "feature": feature, "enabled": enabled}
+        return HTTPStatus.OK, {}
