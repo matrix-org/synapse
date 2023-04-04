@@ -1391,6 +1391,12 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
             columns=["user_id", "room_id"],
             where_clause="forgotten = 1",
         )
+        self.db_pool.updates.register_background_index_update(
+            "room_membership_user_room_index",
+            index_name="room_membership_user_room_idx",
+            table="room_memberships",
+            columns=["user_id", "room_id"],
+        )
 
     async def _background_add_membership_profile(
         self, progress: JsonDict, batch_size: int
