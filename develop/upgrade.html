@@ -305,6 +305,14 @@ so that PyICU can build since no prebuilt wheels are available.</p>
 and then do <code>pip install matrix-synapse[user-search]</code> for a PyPI install.</p>
 <p>Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.</p>
+<h2 id="user-directory-rebuild"><a class="header" href="#user-directory-rebuild">User directory rebuild</a></h2>
+<p>Synapse 1.74 queues a background update
+<a href="https://github.com/matrix-org/synapse/pull/14643">to rebuild the user directory</a>,
+in order to fix missing or erroneous entries.</p>
+<p>When this update begins, the user directory will be cleared out and rebuilt from
+scratch. User directory lookups will be incomplete until the rebuild completes.
+Admins can monitor the rebuild's progress by using the
+<a href="usage/administration/admin_api/background_updates.html#status">Background update Admin API</a>.</p>
 <h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
 <h2 id="legacy-prometheus-metric-names-have-now-been-removed"><a class="header" href="#legacy-prometheus-metric-names-have-now-been-removed">Legacy Prometheus metric names have now been removed</a></h2>
 <p>Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
