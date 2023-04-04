@@ -1,6 +1,19 @@
 Synapse 1.81.0rc1 (2023-04-04)
 ==============================
 
+Synapse now attempts the versioned appservice paths before falling back to the
+[legacy paths](https://spec.matrix.org/v1.6/application-service-api/#legacy-routes).
+Usage of the legacy routes should be considered deprecated.
+
+Additionally, Synapse has supported sending the application service access token
+via [the `Authorization` header](https://spec.matrix.org/v1.6/application-service-api/#authorization)
+since v1.70.0. For backwards compatibility it is *also* sent as the `access_token`
+query parameter. This is insecure and should be considered deprecated.
+
+A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service routes and query parameter authorization.
+
+
 Features
 --------
 
@@ -8,6 +21,7 @@ Features
 - Add a primitive helper script for listing worker endpoints. ([\#15243](https://github.com/matrix-org/synapse/issues/15243))
 - Experimental support for passing One Time Key and device key requests to application services ([MSC3983](https://github.com/matrix-org/matrix-spec-proposals/pull/3983) and [MSC3984](https://github.com/matrix-org/matrix-spec-proposals/pull/3984)). ([\#15314](https://github.com/matrix-org/synapse/issues/15314), [\#15321](https://github.com/matrix-org/synapse/issues/15321))
 - Allow loading `/password_policy` endpoint on workers. ([\#15331](https://github.com/matrix-org/synapse/issues/15331))
+- Add experimental support for Unix sockets. Contributed by Jason Little. ([\#15353](https://github.com/matrix-org/synapse/issues/15353))
 - Build Debian packages for Ubuntu 23.04 (Lunar Lobster). ([\#15381](https://github.com/matrix-org/synapse/issues/15381))
 
 
@@ -20,7 +34,7 @@ Bugfixes
   to ensure that the sqlite database passed to the script exists before trying to port from it. ([\#15306](https://github.com/matrix-org/synapse/issues/15306))
 - Fix a bug introduced in Synapse 1.76.0 where responses from worker deployments could include an internal `_INT_STREAM_POS` key. ([\#15309](https://github.com/matrix-org/synapse/issues/15309))
 - Fix a long-standing bug that Synpase only used the [legacy appservice routes](https://spec.matrix.org/v1.6/application-service-api/#legacy-routes). ([\#15317](https://github.com/matrix-org/synapse/issues/15317))
-- Fix a long-standing bug preventing users from joining rooms, that they had been unbanned from, over federation. Contributed by Nico. ([\#15323](https://github.com/matrix-org/synapse/issues/15323))
+- Fix a long-standing bug preventing users from rejoining rooms after being banned and unbanned over federation. Contributed by Nico. ([\#15323](https://github.com/matrix-org/synapse/issues/15323))
 - Fix bug in worker mode where on a rolling restart of workers the "typing" worker would consume 100% CPU until it got restarted. ([\#15332](https://github.com/matrix-org/synapse/issues/15332))
 - Fix a long-standing bug where some to_device messages could be dropped when using workers. ([\#15349](https://github.com/matrix-org/synapse/issues/15349))
 - Fix a bug introduced in Synapse 1.70.0 where the background sync from a faster join could spin for hours when one of the events involved had been marked for backoff. ([\#15351](https://github.com/matrix-org/synapse/issues/15351))
@@ -32,6 +46,7 @@ Improved Documentation
 ----------------------
 
 - Fix a typo in login requests ratelimit defaults. ([\#15341](https://github.com/matrix-org/synapse/issues/15341))
+- Add some clarification to the doc/comments regarding TCP replication. ([\#15354](https://github.com/matrix-org/synapse/issues/15354))
 - Note that Synapse 1.74 queued a rebuild of the user directory tables. ([\#15386](https://github.com/matrix-org/synapse/issues/15386))
 
 
@@ -45,7 +60,7 @@ Internal Changes
 - Allow running the Twisted trunk job against other branches. ([\#15302](https://github.com/matrix-org/synapse/issues/15302))
 - Remind the releaser to ask for changelog feedback in [#synapse-dev](https://matrix.to/#/#synapse-dev:matrix.org). ([\#15303](https://github.com/matrix-org/synapse/issues/15303))
 - Bump dtolnay/rust-toolchain from e12eda571dc9a5ee5d58eecf4738ec291c66f295 to fc3253060d0c959bea12a59f10f8391454a0b02d. ([\#15304](https://github.com/matrix-org/synapse/issues/15304))
-- Reject events with an invalid "mentions" property pert [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952). ([\#15311](https://github.com/matrix-org/synapse/issues/15311))
+- Reject events with an invalid "mentions" property per [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952). ([\#15311](https://github.com/matrix-org/synapse/issues/15311))
 - As an optimisation, use `TRUNCATE` on Postgres when clearing the user directory tables. ([\#15316](https://github.com/matrix-org/synapse/issues/15316))
 - Fix `.gitignore` rule for the Complement source tarball downloaded automatically by `complement.sh`. ([\#15319](https://github.com/matrix-org/synapse/issues/15319))
 - Bump serde from 1.0.157 to 1.0.158. ([\#15324](https://github.com/matrix-org/synapse/issues/15324))
@@ -58,8 +73,6 @@ Internal Changes
 - Speed up unit tests when using SQLite3. ([\#15334](https://github.com/matrix-org/synapse/issues/15334))
 - Speed up pydantic CI job. ([\#15339](https://github.com/matrix-org/synapse/issues/15339))
 - Speed up sample config CI job. ([\#15340](https://github.com/matrix-org/synapse/issues/15340))
-- Add experimental support for Unix sockets. Contributed by Jason Little. ([\#15353](https://github.com/matrix-org/synapse/issues/15353))
-- Add some clarification to the doc/comments regarding TCP replication. ([\#15354](https://github.com/matrix-org/synapse/issues/15354))
 - Fix copyright year in SSO footer template. ([\#15358](https://github.com/matrix-org/synapse/issues/15358))
 - Bump peaceiris/actions-gh-pages from 3.9.2 to 3.9.3. ([\#15369](https://github.com/matrix-org/synapse/issues/15369))
 - Bump serde from 1.0.158 to 1.0.159. ([\#15370](https://github.com/matrix-org/synapse/issues/15370))
@@ -463,7 +476,7 @@ Those who are `poetry install`ing from source using our lockfile should ensure t
 Notes on faster joins
 ---------------------
 
-The faster joins project sees the most benefit when joining a room with a large number of members (joined or historical). We expect it to be particularly useful for joining large public rooms like the [Matrix HQ](https://matrix.to/#/#matrix:matrix.org) or [Synapse Admins](https://matrix.to/#/#synapse:matrix.org) rooms. 
+The faster joins project sees the most benefit when joining a room with a large number of members (joined or historical). We expect it to be particularly useful for joining large public rooms like the [Matrix HQ](https://matrix.to/#/#matrix:matrix.org) or [Synapse Admins](https://matrix.to/#/#synapse:matrix.org) rooms.
 
 After a faster join, Synapse considers that room "partially joined". In this state, you should be able to
 
