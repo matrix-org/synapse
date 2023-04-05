@@ -793,7 +793,7 @@ def check_redaction(
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
-        True if the the sender is allowed to redact the target event if the
+        True if the sender is allowed to redact the target event if the
         target event was created by them.
         False if the sender is allowed to redact the target event with no
         further checks.
