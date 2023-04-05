@@ -290,6 +290,11 @@ class FederationServer(FederationBase):
         # accurate as possible.
         request_time = self._clock.time_msec()
 
+        # TODO(LM): If we are the hub server and the destination is a participant
+        #           server then pdus are Linear PDUs.
+        #
+        # TODO(LM): If we are the hub's DAG server we need to linearize and give
+        #           it the results.
         transaction = Transaction(
             transaction_id=transaction_id,
             destination=destination,

@@ -65,9 +65,6 @@ def prune_event(event: EventBase) -> EventBase:
     type, state_key etc.
     """
 
-    # TODO Check users of prune_event and prune_event_dict to ensure they shouldn't
-    # be doing something with linearized matrix.
-
     pruned_event_dict = prune_event_dict(event.room_version, event.get_dict())
 
     from . import make_event_from_dict
@@ -115,6 +112,9 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
     # Room versions from before MSC2176 had additional allowed keys.
     if not room_version.msc2176_redaction_rules:
         allowed_keys.extend(["prev_state", "membership"])
+    # The hub server should not be redacted for linear matrix.
+    if room_version.linearized_matrix:
+        allowed_keys.append("hub_server")
 
     # Room versions before MSC3989 kept the origin field.
     if not room_version.msc3989_redaction_rules:

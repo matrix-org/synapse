@@ -85,6 +85,7 @@ class FakeEvent:
         self.state_key = state_key
         self.content = content
         self.room_id = ROOM_ID
+        self.hub_server = None
 
     def to_event(self, auth_events: List[str], prev_events: List[str]) -> EventBase:
         """Given the auth_events and prev_events, convert to a Frozen Event

@@ -335,12 +335,7 @@ class EventBase(metaclass=abc.ABCMeta):
     type: DictProperty[str] = DictProperty("type")
     user_id: DictProperty[str] = DictProperty("sender")
     # Should only matter for Linearized Matrix.
-    owner_server: DictProperty[Optional[str]] = DefaultDictProperty(
-        "owner_server", None
-    )
-    delegated_server: DictProperty[Optional[str]] = DefaultDictProperty(
-        "delegated_server", None
-    )
+    hub_server: DictProperty[Optional[str]] = DefaultDictProperty("hub_server", None)
 
     @property
     def event_id(self) -> str:
@@ -615,31 +610,17 @@ class FrozenLinearizedEvent(FrozenEventV3):
         """The domain which added this event to the DAG.
 
         It could be the authorized server or the sender."""
-        if self.delegated_server is not None:
-            return self.delegated_server
+        if self.hub_server is not None:
+            return self.hub_server
         return super().pdu_domain
 
-    def get_linearized_pdu_json(self, /, delegated: bool) -> JsonDict:
-        # if delegated and self.delegated_server is None:
-        #     # TODO Better error.
-        #     raise ValueError("Invalid")
-        # TODO Is this form correct? Are there other fields?
-        result = {
-            "room_id": self.room_id,
-            "type": self.type,
-            # Should state key be left out if it isn't a state event?
-            "state_key": self.state_key,
-            "sender": self.sender,
-            "origin_server_ts": self.origin_server_ts,
-            # If we want the delegated version use the owner_server
-            # if it exists.
-            "owner_server": self.delegated_server,
-            "content": self.content,
-            "hashes": self.hashes,
-        }
-        if delegated and self.delegated_server:
-            result["delegated_server"] = self.delegated_server
-        return result
+    def get_linearized_pdu_json(self) -> JsonDict:
+        # Get the full PDU and then remove fields from it.
+        pdu = self.get_pdu_json()
+        pdu.pop("hashes")
+        pdu.pop("auth_events")
+        pdu.pop("prev_events")
+        return pdu
 
 
 def _event_type_from_format_version(

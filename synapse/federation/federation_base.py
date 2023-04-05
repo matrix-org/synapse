@@ -21,7 +21,7 @@ from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, FrozenLinearizedEvent, make_event_from_dict
-from synapse.events.utils import prune_event, validate_canonicaljson
+from synapse.events.utils import prune_event, prune_event_dict, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.opentracing import log_kv, trace
 from synapse.types import JsonDict, get_domain_from_id
@@ -174,7 +174,7 @@ async def _check_sigs_on_pdu(
 
     # we want to check that the event is signed by:
     #
-    # (a) the sender's (or the delagated sender's) server
+    # (a) the sender's server or the hub
     #
     #     - except in the case of invites created from a 3pid invite, which are exempt
     #     from this check, because the sender has to match that of the original 3pid
@@ -250,50 +250,26 @@ async def _check_sigs_on_pdu(
                 pdu.event_id,
             ) from None
 
-    # If this is a linearized PDU we may need to check signatures of the owner
+    # If this is a linearized PDU we may need to check signatures of the hub
     # and sender.
     if room_version.event_format == EventFormatVersions.LINEARIZED:
         assert isinstance(pdu, FrozenLinearizedEvent)
 
-        # Check that the fields are not invalid.
-        if pdu.delegated_server and not pdu.owner_server:
-            raise InvalidEventSignatureError(
-                "PDU missing owner_server", pdu.event_id
-            ) from None
-
-        # If the event was sent from a linear server, check the authorized server.
+        # If the event was sent via a hub server, check the signature of the
+        # sender against the Linear PDU. (But only if the sender isn't the hub.)
         #
-        # Note that the signature of the delegated server, if one exists, is
-        # checked against the full PDU above.
-        if pdu.owner_server:
-            # Construct the Linear PDU and check the signature against the sender.
-            #
-            # If the owner & sender are the same, then only a Delegated Linear PDU
-            # is created (the Linear PDU is not signed by itself).
-            if pdu.owner_server != sender_domain:
-                try:
-                    await keyring.verify_json_for_server(
-                        sender_domain,
-                        pdu.get_linearized_pdu_json(delegated=False),
-                        origin_server_ts_for_signing,
-                    )
-                except Exception as e:
-                    raise InvalidEventSignatureError(
-                        f"unable to verify signature for sender {sender_domain}: {e}",
-                        pdu.event_id,
-                    ) from None
-
-            # Construct the Delegated Linear PDU and check the signature
-            # against owner_server.
+        # Note that the signature of the hub server, if one exists, is checked
+        # against the full PDU above.
+        if pdu.hub_server and pdu.hub_server != sender_domain:
             try:
                 await keyring.verify_json_for_server(
-                    pdu.owner_server,
-                    pdu.get_linearized_pdu_json(delegated=True),
+                    sender_domain,
+                    prune_event_dict(pdu.room_version, pdu.get_linearized_pdu_json()),
                     origin_server_ts_for_signing,
                 )
             except Exception as e:
                 raise InvalidEventSignatureError(
-                    f"unable to verify signature for owner_server {pdu.owner_server}: {e}",
+                    f"unable to verify signature for sender {sender_domain}: {e}",
                     pdu.event_id,
                 ) from None
 

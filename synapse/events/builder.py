@@ -87,6 +87,9 @@ class EventBuilder:
     _redacts: Optional[str] = None
     _origin_server_ts: Optional[int] = None
 
+    # TODO(LM) If Synapse is acting as a hub-server this should be itself.
+    hub_server: Optional[str] = None
+
     internal_metadata: _EventInternalMetadata = attr.Factory(
         lambda: _EventInternalMetadata({})
     )

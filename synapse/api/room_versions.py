@@ -468,8 +468,13 @@ class RoomVersions:
         msc3989_redaction_rules=True,  # Used by MSC3820
         linearized_matrix=False,
     )
+    # Based on room version 11:
+    #
+    # - Enable MSC2176, MSC2175, MSC3989, MSC2174, MSC1767, MSC3821.
+    # - Disable 'restricted' and 'knock_restricted' join rules.
+    # - Mark as linearized.
     LINEARIZED = RoomVersion(
-        "org.matrix.i-d.ralston-mimi-linearized-matrix.00",
+        "org.matrix.i-d.ralston-mimi-linearized-matrix.02",
         RoomDisposition.UNSTABLE,
         EventFormatVersions.LINEARIZED,
         StateResolutionVersions.V2,
@@ -479,13 +484,13 @@ class RoomVersions:
         limit_notifications_power_levels=True,
         msc2175_implicit_room_creator=True,
         msc2176_redaction_rules=True,
-        msc3083_join_rules=True,
-        msc3375_redaction_rules=True,
+        msc3083_join_rules=False,
+        msc3375_redaction_rules=False,
         msc2403_knocking=True,
         msc3389_relation_redactions=False,
-        msc3787_knock_restricted_join_rule=True,
+        msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=True,
-        msc3821_redaction_rules=False,
+        msc3821_redaction_rules=True,
         msc3931_push_features=(),
         msc3989_redaction_rules=True,
         linearized_matrix=True,
