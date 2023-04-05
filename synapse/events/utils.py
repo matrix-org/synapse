@@ -106,13 +106,16 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         "depth",
         "prev_events",
         "auth_events",
-        "origin",
         "origin_server_ts",
     ]
 
     # Room versions from before MSC2176 had additional allowed keys.
     if not room_version.msc2176_redaction_rules:
         allowed_keys.extend(["prev_state", "membership"])
+
+    # Room versions before MSC3989 kept the origin field.
+    if not room_version.msc3989_redaction_rules:
+        allowed_keys.append("origin")
 
     event_type = event_dict["type"]
 
