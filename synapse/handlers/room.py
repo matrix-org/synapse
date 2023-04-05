@@ -1058,14 +1058,6 @@ class RoomCreationHandler:
         # (as this info can't be pulled from the db)
         state_map: MutableStateMap[str] = {}
 
-        def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
-            e = {"type": etype, "content": content}
-
-            e.update(event_keys)
-            e.update(kwargs)
-
-            return e
-
         async def create_event(
             etype: str,
             content: JsonDict,
@@ -1088,7 +1080,10 @@ class RoomCreationHandler:
             nonlocal depth
             nonlocal prev_event
 
-            event_dict = create_event_dict(etype, content, **kwargs)
+            # Create the event dictionary.
+            event_dict = {"type": etype, "content": content}
+            event_dict.update(event_keys)
+            event_dict.update(kwargs)
 
             (
                 new_event,
