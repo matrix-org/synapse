@@ -419,7 +419,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
         # Now we filter out forgotten and excluded rooms
-        rooms_to_exclude = await self.get_forgotten_rooms_for_user(user_id)
+        rooms_to_exclude: AbstractSet[str] = set()
+
+        # Users can't forget joined/invited rooms, so we skip the check for such look ups.
+        if any(m not in (Membership.JOIN, Membership.INVITE) for m in membership_list):
+            rooms_to_exclude = await self.get_forgotten_rooms_for_user(user_id)
 
         if excluded_rooms is not None:
             # Take a copy to avoid mutating the in-cache set
@@ -1390,6 +1394,12 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
             table="room_memberships",
             columns=["user_id", "room_id"],
             where_clause="forgotten = 1",
+        )
+        self.db_pool.updates.register_background_index_update(
+            "room_membership_user_room_index",
+            index_name="room_membership_user_room_idx",
+            table="room_memberships",
+            columns=["user_id", "room_id"],
         )
 
     async def _background_add_membership_profile(
