@@ -22,7 +22,7 @@ class ClientContextFactory(ssl.ClientContextFactory):
         self.redis_config = redis_config
 
     def getContext(self) -> Context:
-        ctx = super().getContext(self)
+        ctx = super().getContext()
         if self.redis_config.redis_certificate:
             ctx.use_certificate_file(self.redis_config.redis_certificate)
         if self.redis_config.redis_private_key:
