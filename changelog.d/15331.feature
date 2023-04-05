@@ -1,1 +1,0 @@
-Allow loading `/password_policy` endpoint on workers.

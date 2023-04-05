@@ -59,6 +59,7 @@ from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
+from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyBackgroundStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
 from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
@@ -225,6 +226,7 @@ class Store(
     MainStateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
+    EndToEndRoomKeyBackgroundStore,
     StatsStore,
     AccountDataWorkerStore,
     PushRuleStore,
