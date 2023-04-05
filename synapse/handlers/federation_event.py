@@ -1515,10 +1515,9 @@ class FederationEventHandler:
         # support it or the event is not from the room creator.
         room_version = await self._store.get_room_version(marker_event.room_id)
         create_event = await self._store.get_create_event_for_room(marker_event.room_id)
-        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
         if not room_version.msc2716_historical and (
             not self._config.experimental.msc2716_enabled
-            or marker_event.sender != room_creator
+            or marker_event.sender != create_event.sender
         ):
             return
 

@@ -1998,6 +1998,9 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             for room_id, event_json in room_id_to_create_event_results:
                 event_dict = db_to_json(event_json)
 
+                # The creator property might not exist in newer room versions, but
+                # for those versions the creator column should be properly populate
+                # during room creation.
                 creator = event_dict.get("content").get(EventContentFields.ROOM_CREATOR)
 
                 self.db_pool.simple_update_txn(
@@ -2132,13 +2135,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             # invalid, and it would fail auth checks anyway.
             raise StoreError(400, "No create event in state")
 
-        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
-
-        if not isinstance(room_creator, str):
-            # If the create event does not have a creator then the room is
-            # invalid, and it would fail auth checks anyway.
-            raise StoreError(400, "No creator defined on the create event")
-
         await self.db_pool.simple_upsert(
             desc="upsert_room_on_join",
             table="rooms",
@@ -2146,7 +2142,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             values={"room_version": room_version.identifier},
             insertion_values={
                 "is_public": False,
-                "creator": room_creator,
+                "creator": create_event.sender,
                 "has_auth_chain_index": has_auth_chain_index,
             },
         )
