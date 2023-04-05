@@ -1234,7 +1234,7 @@ class ModuleApi:
         device_id: Optional[str],
         content: JsonDict,
         tweaks: Optional[JsonMapping] = None,
-    ) -> bool:
+    ) -> Dict[str, bool]:
         """Send an HTTP push notification that is forwarded to the registered push gateway
         for the specified user/device.
 
@@ -1249,21 +1249,26 @@ class ModuleApi:
             tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
 
         Returns:
-            True if at least one push was succesfully sent, False if no matching pusher has been
-            found or an error occured when sending the push.
+            a dict reprensenting the status of the push per device ID
         """
-        sent = False
+        status = {}
         if user_id in self._pusherpool.pushers:
             for p in self._pusherpool.pushers[user_id].values():
                 if isinstance(p, HttpPusher) and (
                     not device_id or p.device_id == device_id
                 ):
+                    sent = False
                     res = await p.dispatch_push(content, tweaks)
                     if (
                         isinstance(res, (list, tuple)) and len(res) == 0
                     ) or res is not False:
                         sent = True
-        return sent
+                    # This is mainly to accomodate mypy
+                    # device_id should never be empty after the `set_device_id_for_pushers`
+                    # background job has been properly run.
+                    if p.device_id:
+                        status[p.device_id] = sent
+        return status
 
     async def send_mail(
         self,

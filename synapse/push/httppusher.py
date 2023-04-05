@@ -344,12 +344,28 @@ class HttpPusher(Pusher):
                     await self._pusherpool.remove_pusher(self.app_id, pk, self.user_id)
         return True
 
-    async def _build_event_notification(
+    async def _build_event_notification_content(
         self,
         event: EventBase,
         tweaks: JsonMapping,
         badge: int,
     ) -> Tuple[JsonDict, JsonMapping]:
+        """Build the content of a push notification from an event, as specified by the
+        Push Gateway spec. This excludes the top level `notification` element and
+        is not taking care of the `devices` section either, those are handled by
+        `_build_notification_dict`.
+
+        Args:
+            event: the event
+            tweaks: tweaks to apply
+            badge: unread count to send with the push notification
+
+        Returns: a tuple `(content, tweaks)`, where:
+           * `content` is the content to put in `notification` before sending it to the
+           push gateway.
+           * `tweaks` is the tweaks to put in the `devices` section, they could be
+           different from the ones inputed in this function.
+        """
         priority = "low"
         if (
             event.type == EventTypes.Encrypted
@@ -405,6 +421,18 @@ class HttpPusher(Pusher):
     def _build_notification_dict(
         self, content: JsonDict, tweaks: Optional[JsonMapping]
     ) -> JsonDict:
+        """Build a full notification from the content of it, as specified by the
+        Push Gateway spec. It wraps the content in a top level `notification`
+        element and put relevant device info in the `devices` section.
+
+        Args:
+            content: the content
+            tweaks: tweaks to add into the `devices` section
+
+        Returns:
+            a full notification that can be send to the registered push gateway.
+        """
+        content = content.copy()
         device = {
             "app_id": self.app_id,
             "pushkey": self.pushkey,
@@ -421,6 +449,20 @@ class HttpPusher(Pusher):
     async def dispatch_push(
         self, content: JsonDict, tweaks: Optional[JsonMapping] = None
     ) -> Union[bool, Iterable[str]]:
+        """Send a notification to the registered push gateway, with `content` being
+        the content of the `notification` top property specified in the spec.
+        If specified `devices` property will be overrided with device-specific
+        information for this pusher.
+
+        Args:
+            content: the content
+            tweaks: tweaks to add into the `devices` section
+
+        Returns:
+            False if an error occured when calling the push gateway, or an array of
+            rejected push keys otherwise. If this array is empty, the push fully
+            succeeded.
+        """
         notif_dict = self._build_notification_dict(content, tweaks)
         try:
             resp = await self.http_client.post_json_get_json(self.url, notif_dict)
@@ -443,9 +485,23 @@ class HttpPusher(Pusher):
         tweaks: JsonMapping,
         badge: int,
     ) -> Union[bool, Iterable[str]]:
-        content, tweaks = await self._build_event_notification(event, tweaks, badge)
-        if not content:
-            return []
+        """Send a notification to the registered push gateway by building it
+        from an event.
+
+        Args:
+            event: the event
+            tweaks: tweaks to add into the `devices` section, and to decide the
+            priority to use
+            badge: unread count to send with the push notification
+
+        Returns:
+            False if an error occured when calling the push gateway, or an array of
+            rejected push keys otherwise. If this array is empty, the push fully
+            succeeded.
+        """
+        content, tweaks = await self._build_event_notification_content(
+            event, tweaks, badge
+        )
 
         res = await self.dispatch_push(content, tweaks)
 
