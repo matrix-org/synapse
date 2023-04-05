@@ -1171,6 +1171,35 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return int(min_depth) if min_depth is not None else None
 
+    async def has_room_extremities_changed_since(
+        self,
+        room_id: str,
+        stream_ordering: int,
+    ) -> bool:
+        """Check if the forward extremities in a room have changed since the
+        given stream ordering
+
+        Throws a StoreError if we have since purged the index for
+        stream_orderings from that point.
+        """
+
+        if stream_ordering <= self.stream_ordering_month_ago:  # type: ignore[attr-defined]
+            raise StoreError(400, f"stream_ordering too old {stream_ordering}")
+
+        sql = """
+            SELECT 1 FROM stream_ordering_to_exterm
+            WHERE stream_ordering > ? AND room_id = ?
+            LIMIT 1
+        """
+
+        def has_room_extremities_changed_since_txn(txn: LoggingTransaction) -> bool:
+            txn.execute(sql, (stream_ordering, room_id))
+            return txn.fetchone() is not None
+
+        return await self.db_pool.runInteraction(
+            "has_room_extremities_changed_since", has_room_extremities_changed_since_txn
+        )
+
     @cancellable
     async def get_forward_extremities_for_room_at_stream_ordering(
         self, room_id: str, stream_ordering: int
