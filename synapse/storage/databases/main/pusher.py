@@ -562,7 +562,7 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
             )
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, "set_device_id_for_pushers", {"pusher_id": rows[-1]["id"]}
+                txn, "set_device_id_for_pushers", {"pusher_id": rows[-1]["pusher_id"]}
             )
 
             return len(rows)
