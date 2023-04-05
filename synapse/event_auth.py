@@ -494,7 +494,11 @@ def _is_membership_change_allowed(
         key = (EventTypes.Create, "")
         create = auth_events.get(key)
         if create and event.prev_event_ids()[0] == create.event_id:
-            if create.sender == event.state_key:
+            if room_version.msc2175_implicit_room_creator:
+                creator = create.sender
+            else:
+                creator = create.content[EventContentFields.ROOM_CREATOR]
+            if creator == event.state_key:
                 return
 
     target_user_id = event.state_key
