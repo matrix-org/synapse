@@ -13,16 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Iterable, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, cast
 
 from typing_extensions import Literal, TypedDict
 
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.types import JsonDict, JsonSerializable, StreamKeyType
 from synapse.util import json_encoder
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class RoomKey(TypedDict):
@@ -37,7 +44,82 @@ class RoomKey(TypedDict):
     session_data: JsonSerializable
 
 
-class EndToEndRoomKeyStore(SQLBaseStore):
+class EndToEndRoomKeyBackgroundStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_update_handler(
+            "delete_e2e_backup_keys_for_deactivated_users",
+            self._delete_e2e_backup_keys_for_deactivated_users,
+        )
+
+    def _delete_keys_txn(self, txn: LoggingTransaction, user_id: str) -> None:
+        self.db_pool.simple_delete_txn(
+            txn,
+            table="e2e_room_keys",
+            keyvalues={"user_id": user_id},
+        )
+
+        self.db_pool.simple_delete_txn(
+            txn,
+            table="e2e_room_keys_versions",
+            keyvalues={"user_id": user_id},
+        )
+
+    async def _delete_e2e_backup_keys_for_deactivated_users(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """
+        Retroactively purges account data for users that have already been deactivated.
+        Gets run as a background update caused by a schema delta.
+        """
+
+        last_user: str = progress.get("last_user", "")
+
+        def _delete_backup_keys_for_deactivated_users_txn(
+            txn: LoggingTransaction,
+        ) -> int:
+            sql = """
+                SELECT name FROM users
+                WHERE deactivated = ? and name > ?
+                ORDER BY name ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (1, last_user, batch_size))
+            users = [row[0] for row in txn]
+
+            for user in users:
+                self._delete_keys_txn(txn, user)
+
+            if users:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn,
+                    "delete_e2e_backup_keys_for_deactivated_users",
+                    {"last_user": users[-1]},
+                )
+
+            return len(users)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_delete_backup_keys_for_deactivated_users",
+            _delete_backup_keys_for_deactivated_users_txn,
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "delete_e2e_backup_keys_for_deactivated_users"
+            )
+
+        return number_deleted
+
+
+class EndToEndRoomKeyStore(EndToEndRoomKeyBackgroundStore):
     """The store for end to end room key backups.
 
     See https://spec.matrix.org/v1.1/client-server-api/#server-side-key-backups
@@ -549,4 +631,30 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         await self.db_pool.runInteraction(
             "delete_e2e_room_keys_version", _delete_e2e_room_keys_version_txn
+        )
+
+    async def bulk_delete_backup_keys_and_versions_for_user(self, user_id: str) -> None:
+        """
+        Bulk deletes all backup room keys and versions for a given user.
+
+        Args:
+            user_id: the user whose backup keys and versions we're deleting
+        """
+
+        def _delete_all_e2e_room_keys_and_versions_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="e2e_room_keys",
+                keyvalues={"user_id": user_id},
+            )
+
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="e2e_room_keys_versions",
+                keyvalues={"user_id": user_id},
+            )
+
+        await self.db_pool.runInteraction(
+            "delete_all_e2e_room_keys_and_versions",
+            _delete_all_e2e_room_keys_and_versions_txn,
         )
