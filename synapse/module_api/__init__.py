@@ -1245,7 +1245,7 @@ class ModuleApi:
             device_id: The device ID of the device where to send the push notification. If `None`,
             the notification will be sent to all registered HTTP pushers of the user.
             content: A dict of values that will be put in the `notification` field of the push
-            (cf Push Gatway spec). `devices` field will be overrided if included.
+            (cf Push Gateway spec). `devices` field will be overrided if included.
             tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
 
         Returns:
