@@ -457,7 +457,7 @@ def _check_create(event: "EventBase") -> None:
 
     # 1.4 If content has no creator field, reject if the room version requires it.
     if (
-        not event.room_version.msc2175_create_events
+        not event.room_version.msc2175_implicit_room_creator
         and EventContentFields.ROOM_CREATOR not in event.content
     ):
         raise AuthError(403, "Create event lacks a 'creator' property")
