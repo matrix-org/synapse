@@ -25,9 +25,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -50,9 +48,7 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -89,9 +85,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@fc3253060d0c959bea12a59f10f8391454a0b02d
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Patch dependencies
