@@ -555,6 +555,8 @@ jobs:
             toolchain: 1.58.1
       - uses: Swatinem/rust-cache@v2
 
+      - uses: actions/setup-go@v4
+
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
 
