@@ -3033,14 +3033,14 @@ files = [
 
 [[package]]
 name = "types-netaddr"
-version = "0.8.0.6"
+version = "0.8.0.7"
 description = "Typing stubs for netaddr"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-netaddr-0.8.0.6.tar.gz", hash = "sha256:e5048640c2412e7ea2d3eb02c94ae1b50442b2c7a50a7c48e957676139cdf19b"},
-    {file = "types_netaddr-0.8.0.6-py3-none-any.whl", hash = "sha256:d4d40d1ba35430a4e4c929596542cd37e6831f5d08676b33dc84e06e01a840f6"},
+    {file = "types-netaddr-0.8.0.7.tar.gz", hash = "sha256:3362864fa0258782d449b91707f37e55f62290b4f438974a08758b498169e109"},
+    {file = "types_netaddr-0.8.0.7-py3-none-any.whl", hash = "sha256:a540cdfb2f858a0509ce5a4e4fcc80ef11b19f10a2473e48d32217af517818c0"},
 ]
 
 [[package]]
