@@ -1122,7 +1122,7 @@ class RoomCreationHandler:
 
         # MSC2175 removes the creator field from the create event.
         if not room_version.msc2175_implicit_room_creator:
-            creation_content.update({"creator": creator_id})
+            creation_content["creator"] = creator_id
         creation_event, unpersisted_creation_context = await create_event(
             EventTypes.Create, creation_content, False
         )
