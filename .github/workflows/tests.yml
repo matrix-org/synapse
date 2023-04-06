@@ -70,7 +70,7 @@ jobs:
       - run: .ci/scripts/check_lockfile.py
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v2.0.1"
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@dmr/debug"
     with:
       typechecking-extras: "all"
 
