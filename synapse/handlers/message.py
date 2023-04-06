@@ -1909,12 +1909,18 @@ class EventCreationHandler:
                 room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
                 create_event = await self.store.get_create_event_for_room(event.room_id)
+                if room_version_obj.msc2175_implicit_room_creator:
+                    room_creator = create_event.sender
+                else:
+                    room_creator = create_event.content.get(
+                        EventContentFields.ROOM_CREATOR
+                    )
 
                 # Only check an insertion event if the room version
                 # supports it or the event is from the room creator.
                 if room_version_obj.msc2716_historical or (
                     self.config.experimental.msc2716_enabled
-                    and event.sender == create_event.sender
+                    and event.sender == room_creator
                 ):
                     next_batch_id = event.content.get(
                         EventContentFields.MSC2716_NEXT_BATCH_ID
