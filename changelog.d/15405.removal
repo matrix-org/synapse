@@ -1,0 +1,1 @@
+Remove the broken, unspecced registration fallback. (Note that the *login* fallback is unaffected by this change.)
