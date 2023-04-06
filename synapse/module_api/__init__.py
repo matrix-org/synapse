@@ -1234,6 +1234,7 @@ class ModuleApi:
         device_id: Optional[str],
         content: JsonDict,
         tweaks: Optional[JsonMapping] = None,
+        default_payload: Optional[JsonMapping] = None,
     ) -> Dict[str, bool]:
         """Send an HTTP push notification that is forwarded to the registered push gateway
         for the specified user/device.
@@ -1247,6 +1248,9 @@ class ModuleApi:
             content: A dict of values that will be put in the `notification` field of the push
             (cf Push Gateway spec). `devices` field will be overrided if included.
             tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+            This will be merged (and override if some matching values already exist there)
+            with existing default_payload.
 
         Returns:
             a dict reprensenting the status of the push per device ID
@@ -1258,7 +1262,7 @@ class ModuleApi:
                     not device_id or p.device_id == device_id
                 ):
                     sent = False
-                    res = await p.dispatch_push(content, tweaks)
+                    res = await p.dispatch_push(content, tweaks, default_payload)
                     if (
                         isinstance(res, (list, tuple)) and len(res) == 0
                     ) or res is not False:
