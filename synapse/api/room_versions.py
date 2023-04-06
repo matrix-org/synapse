@@ -106,6 +106,8 @@ class RoomVersion:
     # support the flag. Unknown flags are ignored by the evaluator, making conditions
     # fail if used.
     msc3931_push_features: Tuple[str, ...]  # values from PushRuleRoomFlag
+    # MSC3989: Redact the origin field.
+    msc3989_redaction_rules: bool
 
 
 class RoomVersions:
@@ -128,6 +130,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V2 = RoomVersion(
         "2",
@@ -148,6 +151,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V3 = RoomVersion(
         "3",
@@ -168,6 +172,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V4 = RoomVersion(
         "4",
@@ -188,6 +193,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V5 = RoomVersion(
         "5",
@@ -208,6 +214,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V6 = RoomVersion(
         "6",
@@ -228,6 +235,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -248,6 +256,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V7 = RoomVersion(
         "7",
@@ -268,6 +277,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V8 = RoomVersion(
         "8",
@@ -288,6 +298,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V9 = RoomVersion(
         "9",
@@ -308,6 +319,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     MSC3787 = RoomVersion(
         "org.matrix.msc3787",
@@ -328,6 +340,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     V10 = RoomVersion(
         "10",
@@ -348,6 +361,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=True,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     MSC2716v4 = RoomVersion(
         "org.matrix.msc2716v4",
@@ -368,6 +382,7 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=False,
         msc3931_push_features=(),
+        msc3989_redaction_rules=False,
     )
     MSC1767v10 = RoomVersion(
         # MSC1767 (Extensible Events) based on room version "10"
@@ -389,6 +404,28 @@ class RoomVersions:
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=True,
         msc3931_push_features=(PushRuleRoomFlag.EXTENSIBLE_EVENTS,),
+        msc3989_redaction_rules=False,
+    )
+    MSC3989 = RoomVersion(
+        "org.matrix.msc3989",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.ROOM_V4_PLUS,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2175_implicit_room_creator=False,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=True,
+        msc3667_int_only_power_levels=True,
+        msc3931_push_features=(),
+        msc3989_redaction_rules=True,
     )
 
 
@@ -408,6 +445,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.MSC3787,
         RoomVersions.V10,
         RoomVersions.MSC2716v4,
+        RoomVersions.MSC3989,
     )
 }
 
