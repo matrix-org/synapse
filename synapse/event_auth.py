@@ -1011,14 +1011,14 @@ def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> in
         # that.
         key = (EventTypes.Create, "")
         create_event = auth_events.get(key)
-        if create_event.room_version.msc2175_implicit_room_creator:
-            creator = create_event.sender
-        else:
-            creator = create_event.content[EventContentFields.ROOM_CREATOR]
-        if create_event is not None and creator == user_id:
-            return 100
-        else:
-            return 0
+        if create_event is not None:
+            if create_event.room_version.msc2175_implicit_room_creator:
+                creator = create_event.sender
+            else:
+                creator = create_event.content[EventContentFields.ROOM_CREATOR]
+            if creator == user_id:
+                return 100
+        return 0
 
 
 def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int) -> int:
