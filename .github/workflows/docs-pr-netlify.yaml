@@ -14,7 +14,7 @@ jobs:
       # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
       # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
       - name: 📥 Download artifact
-        uses: dawidd6/action-download-artifact@5e780fc7bbd0cac69fc73271ed86edf5dcb72d67 # v2.26.0
+        uses: dawidd6/action-download-artifact@7132ab516fba5f602fafae6fdd4822afa10db76f # v2.26.1
         with:
           workflow: docs-pr.yaml
           run_id: ${{ github.event.workflow_run.id }}
