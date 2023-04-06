@@ -218,7 +218,7 @@ class DeviceWorkerHandler:
             # Check if the forward extremities have changed. If not then we know
             # the current state won't have changed, and so we can skip this room.
             try:
-                if not await self.store.has_room_extremities_changed_since(
+                if not await self.store.have_room_forward_extremities_changed_since(
                     room_id, stream_ordering
                 ):
                     continue

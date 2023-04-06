@@ -1171,7 +1171,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return int(min_depth) if min_depth is not None else None
 
-    async def has_room_extremities_changed_since(
+    async def have_room_forward_extremities_changed_since(
         self,
         room_id: str,
         stream_ordering: int,
@@ -1192,12 +1192,15 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             LIMIT 1
         """
 
-        def has_room_extremities_changed_since_txn(txn: LoggingTransaction) -> bool:
+        def have_room_forward_extremities_changed_since_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
             txn.execute(sql, (stream_ordering, room_id))
             return txn.fetchone() is not None
 
         return await self.db_pool.runInteraction(
-            "has_room_extremities_changed_since", has_room_extremities_changed_since_txn
+            "have_room_forward_extremities_changed_since",
+            have_room_forward_extremities_changed_since_txn,
         )
 
     @cancellable
