@@ -419,7 +419,10 @@ class HttpPusher(Pusher):
         return (content, tweaks)
 
     def _build_notification_dict(
-        self, content: JsonDict, tweaks: Optional[JsonMapping]
+        self,
+        content: JsonDict,
+        tweaks: Optional[JsonMapping],
+        default_payload: Optional[JsonMapping] = None,
     ) -> JsonDict:
         """Build a full notification from the content of it, as specified by the
         Push Gateway spec. It wraps the content in a top level `notification`
@@ -428,16 +431,26 @@ class HttpPusher(Pusher):
         Args:
             content: the content
             tweaks: tweaks to add into the `devices` section
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+            This will be merged (and override if some matching values already exist there)
+            with existing default_payload.
 
         Returns:
             a full notification that can be send to the registered push gateway.
         """
         content = content.copy()
+
+        data = self.data_minus_url.copy()
+        if default_payload:
+            if "default_payload" not in data:
+                data["default_payload"] = {}
+            data["default_payload"].update(default_payload)
+
         device = {
             "app_id": self.app_id,
             "pushkey": self.pushkey,
             "pushkey_ts": int(self.pushkey_ts / 1000),
-            "data": self.data_minus_url,
+            "data": data,
         }
         if tweaks:
             device["tweaks"] = tweaks
@@ -447,7 +460,10 @@ class HttpPusher(Pusher):
         return {"notification": content}
 
     async def dispatch_push(
-        self, content: JsonDict, tweaks: Optional[JsonMapping] = None
+        self,
+        content: JsonDict,
+        tweaks: Optional[JsonMapping] = None,
+        default_payload: Optional[JsonMapping] = None,
     ) -> Union[bool, Iterable[str]]:
         """Send a notification to the registered push gateway, with `content` being
         the content of the `notification` top property specified in the spec.
@@ -463,7 +479,7 @@ class HttpPusher(Pusher):
             rejected push keys otherwise. If this array is empty, the push fully
             succeeded.
         """
-        notif_dict = self._build_notification_dict(content, tweaks)
+        notif_dict = self._build_notification_dict(content, tweaks, default_payload)
         try:
             resp = await self.http_client.post_json_get_json(self.url, notif_dict)
         except Exception as e:
