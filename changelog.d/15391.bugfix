@@ -1,0 +1,1 @@
+Fix the `set_device_id_for_pushers_txn` background update crash.

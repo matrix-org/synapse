@@ -1,1 +1,0 @@
-Fix a long-standing bug that Synpase only used the [legacy appservice routes](https://spec.matrix.org/v1.6/application-service-api/#legacy-routes).
