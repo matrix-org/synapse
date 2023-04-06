@@ -2135,6 +2135,17 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             # invalid, and it would fail auth checks anyway.
             raise StoreError(400, "No create event in state")
 
+        # Before MSC2175, the room creator was a separate field.
+        if not room_version.msc2175_implicit_room_creator:
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+
+            if not isinstance(room_creator, str):
+                # If the create event does not have a creator then the room is
+                # invalid, and it would fail auth checks anyway.
+                raise StoreError(400, "No creator defined on the create event")
+        else:
+            room_creator = create_event.sender
+
         await self.db_pool.simple_upsert(
             desc="upsert_room_on_join",
             table="rooms",
@@ -2142,7 +2153,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             values={"room_version": room_version.identifier},
             insertion_values={
                 "is_public": False,
-                "creator": create_event.sender,
+                "creator": room_creator,
                 "has_auth_chain_index": has_auth_chain_index,
             },
         )
