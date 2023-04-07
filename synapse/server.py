@@ -38,7 +38,6 @@ from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.config.homeserver import HomeServerConfig
-from synapse.crypto import context_factory
 from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
@@ -475,9 +474,11 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         An HTTP client for federation.
         """
-        tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
-            self.config
-        )
+        # XXX Disable TLS for federation.
+        # tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
+        #     self.config
+        # )
+        tls_client_options_factory = None
         return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     @cache_in_self
