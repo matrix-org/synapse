@@ -433,7 +433,7 @@ class HttpPusher(Pusher):
             tweaks: tweaks to add into the `devices` section
             default_payload: default payload to add in `devices[0].data.default_payload`.
             This will be merged (and override if some matching values already exist there)
-            with existing default_payload.
+            with existing `default_payload`.
 
         Returns:
             a full notification that can be send to the registered push gateway.
@@ -473,6 +473,9 @@ class HttpPusher(Pusher):
         Args:
             content: the content
             tweaks: tweaks to add into the `devices` section
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+            This will be merged (and override if some matching values already exist there)
+            with existing `default_payload`.
 
         Returns:
             False if an error occured when calling the push gateway, or an array of

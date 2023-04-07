@@ -1250,7 +1250,7 @@ class ModuleApi:
             tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
             default_payload: default payload to add in `devices[0].data.default_payload`.
             This will be merged (and override if some matching values already exist there)
-            with existing default_payload.
+            with existing `default_payload`.
 
         Returns:
             a dict reprensenting the status of the push per device ID
