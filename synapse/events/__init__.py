@@ -605,6 +605,9 @@ class FrozenLinearizedEvent(FrozenEventV3):
 
     format_version = EventFormatVersions.LINEARIZED
 
+    # TODO(LM): Do we re-calculate depth at some point?
+    depth = 0  # type: ignore[assignment]
+
     @property
     def pdu_domain(self) -> str:
         """The domain which added this event to the DAG.

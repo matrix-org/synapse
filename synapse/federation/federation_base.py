@@ -295,20 +295,25 @@ def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventB
     """
     # we could probably enforce a bunch of other fields here (room_id, sender,
     # origin, etc etc)
-    assert_params_in_dict(pdu_json, ("type", "depth"))
+    if room_version.event_format == EventFormatVersions.LINEARIZED:
+        assert_params_in_dict(pdu_json, ("type",))
+    else:
+        assert_params_in_dict(pdu_json, ("type", "depth"))
+
+        depth = pdu_json["depth"]
+        if type(depth) is not int:
+            raise SynapseError(
+                400, "Depth %r not an integer" % (depth,), Codes.BAD_JSON
+            )
+
+        if depth < 0:
+            raise SynapseError(400, "Depth too small", Codes.BAD_JSON)
+        elif depth > MAX_DEPTH:
+            raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
     # Strip any unauthorized values from "unsigned" if they exist
     if "unsigned" in pdu_json:
         _strip_unsigned_values(pdu_json)
-
-    depth = pdu_json["depth"]
-    if type(depth) is not int:
-        raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
-
-    if depth < 0:
-        raise SynapseError(400, "Depth too small", Codes.BAD_JSON)
-    elif depth > MAX_DEPTH:
-        raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
     # Validate that the JSON conforms to the specification.
     if room_version.strict_canonicaljson:

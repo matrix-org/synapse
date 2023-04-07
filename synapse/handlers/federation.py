@@ -662,7 +662,9 @@ class FederationHandler:
                 origin = ret.origin
                 state = ret.state
                 auth_chain = ret.auth_chain
-                auth_chain.sort(key=lambda e: e.depth)
+                # TODO(LM) Assume the auth chain is reasonable ordered.
+                if not room_version_obj.linearized_matrix:
+                    auth_chain.sort(key=lambda e: e.depth)
 
                 logger.debug("do_invite_join auth_chain: %s", auth_chain)
                 logger.debug("do_invite_join state: %s", state)
