@@ -336,7 +336,7 @@ syncs.
 Example `nginx` configuration snippet that handles the cases above. This is just an
 example and probably requires some changes according to your particular setup:
 
-```js
+```nginx
 # Choose sync worker based on the existence of "since" query parameter
 map $arg_since $sync {
     default synapse_sync;
