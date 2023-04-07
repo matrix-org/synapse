@@ -333,6 +333,76 @@ when a user logs in on a new device and can be *very* resource intensive, so
 isolating these requests will stop them from interfering with other users ongoing
 syncs.
 
+Example `nginx` configuration snippet that handles the cases above. This is just an
+example and probably requires some changes according to your particular setup:
+
+```js
+# Choose sync worker based on the existence of "since" query parameter
+map $arg_since $sync {
+    default synapse_sync;
+    '' synapse_initial_sync;
+}
+
+# Extract username from access token passed as URL parameter
+map $arg_access_token $accesstoken_from_urlparam {
+    # Defaults to just passing back the whole accesstoken
+    default   $arg_access_token;
+    # Try to extract username part from accesstoken URL parameter
+    "~syt_(?<username>.*?)_.*"           $username;
+}
+
+# Extract username from access token passed as authorization header
+map $http_authorization $mxid_localpart {
+    # Defaults to just passing back the whole accesstoken
+    default                              $http_authorization;
+    # Try to extract username part from accesstoken header
+    "~Bearer syt_(?<username>.*?)_.*"    $username;
+    # if no authorization-header exist, try mapper for URL parameter "access_token"
+    ""                                   $accesstoken_from_urlparam;
+}
+
+upstream synapse_initial_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8016;
+    server 127.0.0.1:8036;
+}
+
+upstream synapse_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8013;
+    server 127.0.0.1:8037;
+    server 127.0.0.1:8038;
+    server 127.0.0.1:8039;
+}
+
+# Sync initial/normal
+location ~ ^/_matrix/client/(r0|v3)/sync$ {
+	include snippets/matrix-proxy-headers.conf;
+	proxy_pass http://$sync;
+	proxy_read_timeout 1h;
+}
+
+# Normal sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/events$ {
+	include snippets/matrix-proxy-headers.conf;
+	proxy_pass http://synapse_sync;
+}
+
+# Initial_sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/initialSync$ {
+	include snippets/matrix-proxy-headers.conf;
+	proxy_pass http://synapse_initial_sync;
+	proxy_read_timeout 1h;
+}
+location ~ ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$ {
+	include snippets/matrix-proxy-headers.conf;
+	proxy_pass http://synapse_initial_sync;
+	proxy_read_timeout 1h;
+}
+```
+
 Federation and client requests can be balanced via simple round robin.
 
 The inbound federation transaction request `^/_matrix/federation/v1/send/`
