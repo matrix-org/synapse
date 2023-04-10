@@ -65,9 +65,59 @@ jobs:
       - run: .ci/scripts/check_lockfile.py
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v2"
-    with:
-      typechecking-extras: "all"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Poetry
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          install-project: "false"
+
+      - name: Import order (isort)
+        run: poetry run isort --check --diff .
+
+      - name: Code style (black)
+        run: poetry run black --check --diff .
+
+      - name: Semantic checks (ruff)
+        # --quiet suppresses the update check.
+        run: poetry run ruff --quiet .
+
+  lint-mypy:
+    runs-on: ubuntu-latest
+    name: Typechecking
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Poetry
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          # We want to make use of type hints in optional dependencies too.
+          extras: all
+          # We have seen odd mypy failures that were resolved when we started
+          # installing the project again:
+          # https://github.com/matrix-org/synapse/pull/15376#issuecomment-1498983775
+          # To make CI green, err towards caution and install the project.
+          install-project: "true"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.58.1
+      - uses: Swatinem/rust-cache@v2
+
+      # NB: I have two concerns with this action:
+      # 1. We occasionally see odd mypy problems that aren't reproducible
+      #    locally with clean caches. I suspect some dodgy caching behaviour.
+      # 2. The action uses GHA machinery that's deprecated
+      #    (https://github.com/AustinScola/mypy-cache-github-action/issues/277)
+      # It may be simpler to use actions/cache ourselves to restore .mypy_cache.
+      - name: Restore/persist mypy's cache
+        uses: AustinScola/mypy-cache-github-action@df56268388422ee282636ee2c7a9cc55ec644a41
+
+      - name: Run mypy
+        run: poetry run mypy
 
   lint-crlf:
     runs-on: ubuntu-latest
@@ -165,6 +215,7 @@ jobs:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     needs:
       - lint
+      - lint-mypy
       - lint-crlf
       - lint-newsfile
       - lint-pydantic
