@@ -495,6 +495,9 @@ class FederationEventHandler:
             PartialStateConflictError if the homeserver is already in the room and it
                 has been un-partial stated.
         """
+        # TODO(LM) LM server currently includes non-state events.
+        state = [e for e in state if e.is_state()]
+
         create_event = None
         for e in state:
             if (e.type, e.state_key) == (EventTypes.Create, ""):
