@@ -181,7 +181,7 @@ class KeyStore(SQLBaseStore):
             desc="store_server_keys_json",
         )
 
-    async def get_server_keys_json(
+    async def get_server_keys_json_for_remote(
         self, server_keys: Iterable[Tuple[str, Optional[str], Optional[str]]]
     ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[Dict[str, Any]]]:
         """Retrieve the key json for a list of server_keys and key ids.
@@ -189,8 +189,10 @@ class KeyStore(SQLBaseStore):
         that server, key_id, and source triplet entry will be an empty list.
         The JSON is returned as a byte array so that it can be efficiently
         used in an HTTP response.
+
         Args:
             server_keys: List of (server_name, key_id, source) triplets.
+
         Returns:
             A mapping from (server_name, key_id, source) triplets to a list of dicts
         """

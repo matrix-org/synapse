@@ -464,7 +464,7 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
         key_json = self.get_success(
-            self.hs.get_datastores().main.get_server_keys_json([lookup_triplet])
+            self.hs.get_datastores().main.get_server_keys_json_for_remote([lookup_triplet])
         )
         res_keys = key_json[lookup_triplet]
         self.assertEqual(len(res_keys), 1)
@@ -582,7 +582,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
         key_json = self.get_success(
-            self.hs.get_datastores().main.get_server_keys_json([lookup_triplet])
+            self.hs.get_datastores().main.get_server_keys_json_for_remote(
+                [lookup_triplet]
+            )
         )
         res_keys = key_json[lookup_triplet]
         self.assertEqual(len(res_keys), 1)
@@ -703,7 +705,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
         key_json = self.get_success(
-            self.hs.get_datastores().main.get_server_keys_json([lookup_triplet])
+            self.hs.get_datastores().main.get_server_keys_json_for_remote(
+                [lookup_triplet]
+            )
         )
         res_keys = key_json[lookup_triplet]
         self.assertEqual(len(res_keys), 1)
