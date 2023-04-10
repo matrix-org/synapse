@@ -14,10 +14,12 @@
 # limitations under the License.
 
 import itertools
+import json
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from signedjson.key import decode_verify_key_bytes
+from unpaddedbase64 import decode_base64
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction
@@ -63,10 +65,12 @@ class KeyStore(SQLBaseStore):
             """Processes a batch of keys to fetch, and adds the result to `keys`."""
 
             # batch_iter always returns tuples so it's safe to do len(batch)
-            sql = (
-                "SELECT server_name, key_id, verify_key, ts_valid_until_ms "
-                "FROM server_signature_keys WHERE 1=0"
-            ) + " OR (server_name=? AND key_id=?)" * len(batch)
+            sql = """
+            SELECT server_name, key_id, verify_key, ts_valid_until_ms
+            FROM server_signature_keys WHERE 1=0
+            """ + " OR (server_name=? AND key_id=?)" * len(
+                batch
+            )
 
             txn.execute(sql, tuple(itertools.chain.from_iterable(batch)))
 
@@ -180,6 +184,74 @@ class KeyStore(SQLBaseStore):
             },
             desc="store_server_keys_json",
         )
+
+        # invalidate takes a tuple corresponding to the params of
+        # _get_server_keys_json. _get_server_keys_json only takes one
+        # param, which is itself the 2-tuple (server_name, key_id).
+        self._get_server_keys_json.invalidate((((server_name, key_id),)))
+
+    @cached()
+    def _get_server_keys_json(
+        self, server_name_and_key_id: Tuple[str, str]
+    ) -> FetchKeyResult:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="_get_server_keys_json", list_name="server_name_and_key_ids"
+    )
+    async def get_server_keys_json(
+        self, server_name_and_key_ids: Iterable[Tuple[str, str]]
+    ) -> Dict[Tuple[str, str], FetchKeyResult]:
+        """
+        Args:
+            server_name_and_key_ids:
+                iterable of (server_name, key-id) tuples to fetch keys for
+
+        Returns:
+            A map from (server_name, key_id) -> FetchKeyResult, or None if the
+            key is unknown
+        """
+        keys = {}
+
+        def _get_keys(txn: Cursor, batch: Tuple[Tuple[str, str], ...]) -> None:
+            """Processes a batch of keys to fetch, and adds the result to `keys`."""
+
+            # batch_iter always returns tuples so it's safe to do len(batch)
+            sql = """
+            SELECT server_name, key_id, key_json, ts_valid_until_ms
+            FROM server_keys_json WHERE 1=0
+            """ + " OR (server_name=? AND key_id=?)" * len(
+                batch
+            )
+
+            txn.execute(sql, tuple(itertools.chain.from_iterable(batch)))
+
+            for server_name, key_id, key_json_bytes, ts_valid_until_ms in txn:
+                if ts_valid_until_ms is None:
+                    # Old keys may be stored with a ts_valid_until_ms of null,
+                    # in which case we treat this as if it was set to `0`, i.e.
+                    # it won't match key requests that define a minimum
+                    # `ts_valid_until_ms`.
+                    ts_valid_until_ms = 0
+
+                # The entire signed JSON response is stored in server_keys_json,
+                # fetch out the bits needed.
+                key_json = json.loads(key_json_bytes)
+                key_base64 = key_json["verify_keys"][key_id]["key"]
+
+                keys[(server_name, key_id)] = FetchKeyResult(
+                    verify_key=decode_verify_key_bytes(
+                        key_id, decode_base64(key_base64)
+                    ),
+                    valid_until_ts=ts_valid_until_ms,
+                )
+
+        def _txn(txn: Cursor) -> Dict[Tuple[str, str], FetchKeyResult]:
+            for batch in batch_iter(server_name_and_key_ids, 50):
+                _get_keys(txn, batch)
+            return keys
+
+        return await self.db_pool.runInteraction("get_server_keys_json", _txn)
 
     async def get_server_keys_json_for_remote(
         self, server_keys: Iterable[Tuple[str, Optional[str], Optional[str]]]

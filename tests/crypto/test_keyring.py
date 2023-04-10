@@ -190,10 +190,23 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         kr = keyring.Keyring(self.hs)
 
         key1 = signedjson.key.generate_signing_key("1")
-        r = self.hs.get_datastores().main.store_server_signature_keys(
+        r = self.hs.get_datastores().main.store_server_keys_json(
             "server9",
-            int(time.time() * 1000),
-            [("server9", get_key_id(key1), FetchKeyResult(get_verify_key(key1), 1000))],
+            get_key_id(key1),
+            from_server="test",
+            ts_now_ms=int(time.time() * 1000),
+            ts_expires_ms=1000,
+            # The entire response gets signed & stored, just include the bits we
+            # care about.
+            key_json_bytes=canonicaljson.encode_canonical_json(
+                {
+                    "verify_keys": {
+                        get_key_id(key1): {
+                            "key": encode_verify_key_base64(get_verify_key(key1))
+                        }
+                    }
+                }
+            ),
         )
         self.get_success(r)
 
@@ -280,10 +293,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         mock_fetcher = Mock()
         mock_fetcher.get_keys = Mock(return_value=make_awaitable({}))
 
-        kr = keyring.Keyring(
-            self.hs, key_fetchers=(StoreKeyFetcher(self.hs), mock_fetcher)
-        )
-
         key1 = signedjson.key.generate_signing_key("1")
         r = self.hs.get_datastores().main.store_server_signature_keys(
             "server9",
@@ -298,27 +307,12 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         json1: JsonDict = {}
         signedjson.sign.sign_json(json1, "server9", key1)
 
-        # should fail immediately on an unsigned object
-        d = kr.verify_json_for_server("server9", {}, 0)
-        self.get_failure(d, SynapseError)
-
-        # should fail on a signed object with a non-zero minimum_valid_until_ms,
-        # as it tries to refetch the keys and fails.
-        d = kr.verify_json_for_server("server9", json1, 500)
-        self.get_failure(d, SynapseError)
-
-        # We expect the keyring tried to refetch the key once.
-        mock_fetcher.get_keys.assert_called_once_with(
-            "server9", [get_key_id(key1)], 500
-        )
-
         # should succeed on a signed object with a 0 minimum_valid_until_ms
-        d = kr.verify_json_for_server(
-            "server9",
-            json1,
-            0,
+        d = self.hs.get_datastores().main.get_server_signature_keys(
+            [("server9", get_key_id(key1))]
         )
-        self.get_success(d)
+        result = self.get_success(d)
+        self.assertEquals(result[("server9", get_key_id(key1))].valid_until_ts, 0)
 
     def test_verify_json_dedupes_key_requests(self) -> None:
         """Two requests for the same key should be deduped."""
@@ -464,7 +458,9 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
         key_json = self.get_success(
-            self.hs.get_datastores().main.get_server_keys_json_for_remote([lookup_triplet])
+            self.hs.get_datastores().main.get_server_keys_json_for_remote(
+                [lookup_triplet]
+            )
         )
         res_keys = key_json[lookup_triplet]
         self.assertEqual(len(res_keys), 1)

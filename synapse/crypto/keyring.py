@@ -510,7 +510,7 @@ class StoreKeyFetcher(KeyFetcher):
             for key_id in queue_value.key_ids
         )
 
-        res = await self.store.get_server_signature_keys(key_ids_to_fetch)
+        res = await self.store.get_server_keys_json(key_ids_to_fetch)
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
