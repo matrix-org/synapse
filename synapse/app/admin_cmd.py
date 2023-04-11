@@ -17,7 +17,7 @@ import logging
 import os
 import sys
 import tempfile
-from typing import List, Optional
+from typing import List, Mapping, Optional
 
 from twisted.internet import defer, task
 
@@ -44,6 +44,7 @@ from synapse.storage.databases.main.event_push_actions import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.filtering import FilteringWorkerStore
+from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.profile import ProfileWorkerStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
@@ -86,6 +87,7 @@ class AdminCmdSlavedStore(
     RegistrationWorkerStore,
     RoomWorkerStore,
     ProfileWorkerStore,
+    MediaRepositoryStore,
 ):
     def __init__(
         self,
@@ -149,7 +151,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(events_file, "a") as f:
             for event in events:
-                print(json.dumps(event.get_pdu_json()), file=f)
+                json.dump(event.get_pdu_json(), fp=f)
 
     def write_state(
         self, room_id: str, event_id: str, state: StateMap[EventBase]
@@ -162,7 +164,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(event_file, "a") as f:
             for event in state.values():
-                print(json.dumps(event.get_pdu_json()), file=f)
+                json.dump(event.get_pdu_json(), fp=f)
 
     def write_invite(
         self, room_id: str, event: EventBase, state: StateMap[EventBase]
@@ -178,7 +180,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(invite_state, "a") as f:
             for event in state.values():
-                print(json.dumps(event), file=f)
+                json.dump(event, fp=f)
 
     def write_knock(
         self, room_id: str, event: EventBase, state: StateMap[EventBase]
@@ -194,7 +196,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(knock_state, "a") as f:
             for event in state.values():
-                print(json.dumps(event), file=f)
+                json.dump(event, fp=f)
 
     def write_profile(self, profile: JsonDict) -> None:
         user_directory = os.path.join(self.base_directory, "user_data")
@@ -202,7 +204,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
         profile_file = os.path.join(user_directory, "profile")
 
         with open(profile_file, "a") as f:
-            print(json.dumps(profile), file=f)
+            json.dump(profile, fp=f)
 
     def write_devices(self, devices: List[JsonDict]) -> None:
         user_directory = os.path.join(self.base_directory, "user_data")
@@ -211,7 +213,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         for device in devices:
             with open(device_file, "a") as f:
-                print(json.dumps(device), file=f)
+                json.dump(device, fp=f)
 
     def write_connections(self, connections: List[JsonDict]) -> None:
         user_directory = os.path.join(self.base_directory, "user_data")
@@ -220,7 +222,28 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         for connection in connections:
             with open(connection_file, "a") as f:
-                print(json.dumps(connection), file=f)
+                json.dump(connection, fp=f)
+
+    def write_account_data(
+        self, file_name: str, account_data: Mapping[str, JsonDict]
+    ) -> None:
+        account_data_directory = os.path.join(
+            self.base_directory, "user_data", "account_data"
+        )
+        os.makedirs(account_data_directory, exist_ok=True)
+
+        account_data_file = os.path.join(account_data_directory, file_name)
+
+        with open(account_data_file, "a") as f:
+            json.dump(account_data, fp=f)
+
+    def write_media_id(self, media_id: str, media_metadata: JsonDict) -> None:
+        file_directory = os.path.join(self.base_directory, "media_ids")
+        os.makedirs(file_directory, exist_ok=True)
+        media_id_file = os.path.join(file_directory, media_id)
+
+        with open(media_id_file, "w") as f:
+            json.dump(media_metadata, fp=f)
 
     def finished(self) -> str:
         return self.base_directory

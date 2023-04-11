@@ -32,7 +32,6 @@ from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import (
-    SynapseTags,
     active_span,
     force_tracing,
     start_active_span,
@@ -161,12 +160,6 @@ class Auth:
                     force_tracing(parent_span)
                 parent_span.set_tag(
                     "authenticated_entity", requester.authenticated_entity
-                )
-                # We tag the Synapse instance name so that it's an easy jumping
-                # off point into the logs. Can also be used to filter for an
-                # instance that is under load.
-                parent_span.set_tag(
-                    SynapseTags.INSTANCE_NAME, self.hs.get_instance_name()
                 )
                 parent_span.set_tag("user_id", requester.user.to_string())
                 if requester.device_id is not None:

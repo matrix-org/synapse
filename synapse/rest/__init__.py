@@ -20,6 +20,7 @@ from synapse.rest.client import (
     account,
     account_data,
     account_validity,
+    appservice_ping,
     auth,
     capabilities,
     devices,
@@ -108,8 +109,7 @@ class ClientRestResource(JsonResource):
         if is_main_process:
             logout.register_servlets(hs, client_resource)
         sync.register_servlets(hs, client_resource)
-        if is_main_process:
-            filter.register_servlets(hs, client_resource)
+        filter.register_servlets(hs, client_resource)
         account.register_servlets(hs, client_resource)
         register.register_servlets(hs, client_resource)
         if is_main_process:
@@ -140,7 +140,8 @@ class ClientRestResource(JsonResource):
         relations.register_servlets(hs, client_resource)
         if is_main_process:
             password_policy.register_servlets(hs, client_resource)
-            knock.register_servlets(hs, client_resource)
+        knock.register_servlets(hs, client_resource)
+        appservice_ping.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
         if is_main_process:

@@ -1,5 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
-# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020-2023 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,29 +32,20 @@ from twisted.internet.error import DNSLookupError
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
-from synapse.http.server import (
-    DirectServeJsonResource,
-    respond_with_json,
-    respond_with_json_bytes,
-)
-from synapse.http.servlet import parse_integer, parse_string
-from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.media._base import FileInfo, get_filename_from_headers
+from synapse.media.media_storage import MediaStorage
+from synapse.media.oembed import OEmbedProvider
+from synapse.media.preview_html import decode_body, parse_html_to_open_graph
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.rest.media.v1._base import get_filename_from_headers
-from synapse.rest.media.v1.media_storage import MediaStorage
-from synapse.rest.media.v1.oembed import OEmbedProvider
-from synapse.rest.media.v1.preview_html import decode_body, parse_html_to_open_graph
 from synapse.types import JsonDict, UserID
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.stringutils import random_string
 
-from ._base import FileInfo
-
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.media.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -107,22 +98,10 @@ class MediaInfo:
     etag: Optional[str]
 
 
-class PreviewUrlResource(DirectServeJsonResource):
+class UrlPreviewer:
     """
-    The `GET /_matrix/media/r0/preview_url` endpoint provides a generic preview API
-    for URLs which outputs Open Graph (https://ogp.me/) responses (with some Matrix
-    specific additions).
-
-    This does have trade-offs compared to other designs:
-
-    * Pros:
-      * Simple and flexible; can be used by any clients at any point
-    * Cons:
-      * If each homeserver provides one of these independently, all the homeservers in a
-        room may needlessly DoS the target URI
-      * The URL metadata must be stored somewhere, rather than just using Matrix
-        itself to store the media.
-      * Matrix cannot be used to distribute the metadata between homeservers.
+    Generates an Open Graph (https://ogp.me/) responses (with some Matrix
+    specific additions) for a given URL.
 
     When Synapse is asked to preview a URL it does the following:
 
@@ -163,13 +142,15 @@ class PreviewUrlResource(DirectServeJsonResource):
        7. Stores the result in the database cache.
     4. Returns the result.
 
+    If any additional requests (e.g. from oEmbed autodiscovery, step 5.3 or
+    image thumbnailing, step 5.4 or 6.4) fails then the URL preview as a whole
+    does not fail. As much information as possible is returned.
+
     The in-memory cache expires after 1 hour.
 
     Expired entries in the database cache (and their associated media files) are
     deleted every 10 seconds. The default expiration time is 1 hour from download.
     """
-
-    isLeaf = True
 
     def __init__(
         self,
@@ -177,9 +158,6 @@ class PreviewUrlResource(DirectServeJsonResource):
         media_repo: "MediaRepository",
         media_storage: MediaStorage,
     ):
-        super().__init__()
-
-        self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.media.max_spider_size
@@ -225,18 +203,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 self._start_expire_url_cache_data, 10 * 1000
             )
 
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        request.setHeader(b"Allow", b"OPTIONS, GET")
-        respond_with_json(request, 200, {}, send_cors=True)
-
-    async def _async_render_GET(self, request: SynapseRequest) -> None:
-        # XXX: if get_user_by_req fails, what should we do in an async render?
-        requester = await self.auth.get_user_by_req(request)
-        url = parse_string(request, "url", required=True)
-        ts = parse_integer(request, "ts")
-        if ts is None:
-            ts = self.clock.time_msec()
-
+    async def preview(self, url: str, user: UserID, ts: int) -> bytes:
         # XXX: we could move this into _do_preview if we wanted.
         url_tuple = urlsplit(url)
         for entry in self.url_preview_url_blacklist:
@@ -283,14 +250,13 @@ class PreviewUrlResource(DirectServeJsonResource):
         observable = self._cache.get(url)
 
         if not observable:
-            download = run_in_background(self._do_preview, url, requester.user, ts)
+            download = run_in_background(self._do_preview, url, user, ts)
             observable = ObservableDeferred(download, consumeErrors=True)
             self._cache[url] = observable
         else:
             logger.info("Returning cached response")
 
-        og = await make_deferred_yieldable(observable.observe())
-        respond_with_json_bytes(request, 200, og, send_cors=True)
+        return await make_deferred_yieldable(observable.observe())
 
     async def _do_preview(self, url: str, user: UserID, ts: int) -> bytes:
         """Check the db, and download the URL and build a preview
@@ -365,16 +331,25 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
-                    oembed_info = await self._handle_url(
-                        oembed_url, user, allow_data_urls=True
-                    )
-                    (
-                        og_from_oembed,
-                        author_name,
-                        expiration_ms,
-                    ) = await self._handle_oembed_response(
-                        url, oembed_info, expiration_ms
-                    )
+                    try:
+                        oembed_info = await self._handle_url(
+                            oembed_url, user, allow_data_urls=True
+                        )
+                    except Exception as e:
+                        # Fetching the oEmbed info failed, don't block the entire URL preview.
+                        logger.warning(
+                            "oEmbed fetch failed during URL preview: %s errored with %s",
+                            oembed_url,
+                            e,
+                        )
+                    else:
+                        (
+                            og_from_oembed,
+                            author_name,
+                            expiration_ms,
+                        ) = await self._handle_oembed_response(
+                            url, oembed_info, expiration_ms
+                        )
 
                 # Parse Open Graph information from the HTML in case the oEmbed
                 # response failed or is incomplete.

@@ -35,15 +35,14 @@ class PresenceTestCase(unittest.HomeserverTestCase):
     servlets = [presence.register_servlets]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
-        presence_handler = Mock(spec=PresenceHandler)
-        presence_handler.set_state.return_value = make_awaitable(None)
+        self.presence_handler = Mock(spec=PresenceHandler)
+        self.presence_handler.set_state.return_value = make_awaitable(None)
 
         hs = self.setup_test_homeserver(
             "red",
             federation_http_client=None,
             federation_client=Mock(),
-            presence_handler=presence_handler,
+            presence_handler=self.presence_handler,
         )
 
         return hs
@@ -61,7 +60,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.code, HTTPStatus.OK)
-        self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 1)
+        self.assertEqual(self.presence_handler.set_state.call_count, 1)
 
     @unittest.override_config({"use_presence": False})
     def test_put_presence_disabled(self) -> None:
@@ -76,4 +75,4 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.code, HTTPStatus.OK)
-        self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 0)
+        self.assertEqual(self.presence_handler.set_state.call_count, 0)

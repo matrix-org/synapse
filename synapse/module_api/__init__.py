@@ -64,20 +64,15 @@ from synapse.events.third_party_rules import (
     CHECK_EVENT_ALLOWED_CALLBACK,
     CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
     CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
+    ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
+    ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
     ON_THREEPID_BIND_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
-from synapse.handlers.account_validity import (
-    IS_USER_EXPIRED_CALLBACK,
-    ON_LEGACY_ADMIN_REQUEST,
-    ON_LEGACY_RENEW_CALLBACK,
-    ON_LEGACY_SEND_MAIL_CALLBACK,
-    ON_USER_REGISTRATION_CALLBACK,
-)
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
@@ -103,6 +98,13 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api.callbacks.account_validity_callbacks import (
+    IS_USER_EXPIRED_CALLBACK,
+    ON_LEGACY_ADMIN_REQUEST,
+    ON_LEGACY_RENEW_CALLBACK,
+    ON_LEGACY_SEND_MAIL_CALLBACK,
+    ON_USER_REGISTRATION_CALLBACK,
+)
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -248,6 +250,7 @@ class ModuleApi:
         self._push_rules_handler = hs.get_push_rules_handler()
         self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
+        self._callbacks = hs.get_module_api_callbacks()
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -269,7 +272,6 @@ class ModuleApi:
         self._account_data_manager = AccountDataManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
-        self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
@@ -330,7 +332,7 @@ class ModuleApi:
 
         Added in Synapse v1.39.0.
         """
-        return self._account_validity_handler.register_account_validity_callbacks(
+        return self._callbacks.account_validity.register_callbacks(
             is_user_expired=is_user_expired,
             on_user_registration=on_user_registration,
             on_legacy_send_mail=on_legacy_send_mail,
@@ -357,6 +359,12 @@ class ModuleApi:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+        on_add_user_third_party_identifier: Optional[
+            ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
+        on_remove_user_third_party_identifier: Optional[
+            ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -373,6 +381,8 @@ class ModuleApi:
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
             on_threepid_bind=on_threepid_bind,
+            on_add_user_third_party_identifier=on_add_user_third_party_identifier,
+            on_remove_user_third_party_identifier=on_remove_user_third_party_identifier,
         )
 
     def register_presence_router_callbacks(
@@ -1576,14 +1586,41 @@ class ModuleApi:
             )
 
         requester = create_requester(user_id)
-        room_id_and_alias, _ = await self._hs.get_room_creation_handler().create_room(
+        room_id, room_alias, _ = await self._hs.get_room_creation_handler().create_room(
             requester=requester,
             config=config,
             ratelimit=ratelimit,
             creator_join_profile=creator_join_profile,
         )
+        room_alias_str = room_alias.to_string() if room_alias else None
+        return room_id, room_alias_str
 
-        return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
+    async def set_displayname(
+        self,
+        user_id: UserID,
+        new_displayname: str,
+        deactivation: bool = False,
+    ) -> None:
+        """Sets a user's display name.
+
+        Added in Synapse v1.76.0.
+
+        Args:
+            user_id:
+                The user whose display name is to be changed.
+            new_displayname:
+                The new display name to give the user.
+            deactivation:
+                Whether this change was made while deactivating the user.
+        """
+        requester = create_requester(user_id)
+        await self._hs.get_profile_handler().set_displayname(
+            target_user=user_id,
+            requester=requester,
+            new_displayname=new_displayname,
+            by_admin=True,
+            deactivation=deactivation,
+        )
 
     async def set_displayname(
         self,

@@ -159,7 +159,6 @@ class GenericWorkerServer(HomeServer):
     DATASTORE_CLASS = GenericWorkerSlavedStore  # type: ignore
 
     def _listen_http(self, listener_config: ListenerConfig) -> None:
-
         assert listener_config.http_options is not None
 
         # We always include a health resource.

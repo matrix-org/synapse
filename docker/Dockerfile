@@ -38,16 +38,23 @@ RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update -qq && apt-get install -yqq \
-  build-essential git libffi-dev libssl-dev \
+  build-essential curl git libffi-dev libssl-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# Install rust and ensure its in the PATH
+# Install rust and ensure its in the PATH.
+# (Rust may be needed to compile `cryptography`---which is one of poetry's
+# dependencies---on platforms that don't have a `cryptography` wheel.
 ENV RUSTUP_HOME=/rust
 ENV CARGO_HOME=/cargo
 ENV PATH=/cargo/bin:/rust/bin:$PATH
 RUN mkdir /rust /cargo
 
 RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable --profile minimal
+
+# arm64 builds consume a lot of memory if `CARGO_NET_GIT_FETCH_WITH_CLI` is not
+# set to true, so we expose it as a build-arg.
+ARG CARGO_NET_GIT_FETCH_WITH_CLI=false
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=$CARGO_NET_GIT_FETCH_WITH_CLI
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
@@ -193,12 +200,7 @@ RUN \
   openssl \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install/bin /usr/local/bin
-# Copy the python site-packages into /install instead of /usr/local/lib as some environments use different paths
-# e.g pyston using /usr/lib, so we instead specify a PYTHONPATH environment variable to make everyone happy.
-COPY --from=builder /install/lib/*/site-packages /install
-ENV PYTHONPATH="/install"
-
+COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 

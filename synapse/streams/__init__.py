@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from abc import ABC, abstractmethod
 from typing import Generic, List, Optional, Tuple, TypeVar
 
 from synapse.types import StrCollection, UserID
@@ -22,7 +22,8 @@ K = TypeVar("K")
 R = TypeVar("R")
 
 
-class EventSource(Generic[K, R]):
+class EventSource(ABC, Generic[K, R]):
+    @abstractmethod
     async def get_new_events(
         self,
         user: UserID,
@@ -32,4 +33,4 @@ class EventSource(Generic[K, R]):
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[R], K]:
-        ...
+        raise NotImplementedError()

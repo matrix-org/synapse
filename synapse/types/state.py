@@ -120,7 +120,7 @@ class StateFilter:
 
     def to_types(self) -> Iterable[Tuple[str, Optional[str]]]:
         """The inverse to `from_types`."""
-        for (event_type, state_keys) in self.types.items():
+        for event_type, state_keys in self.types.items():
             if state_keys is None:
                 yield event_type, None
             else:

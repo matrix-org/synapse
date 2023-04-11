@@ -591,7 +591,9 @@ class PaginationHandler:
 
         time_now = self.clock.time_msec()
 
-        serialize_options = SerializeEventConfig(as_client_event=as_client_event)
+        serialize_options = SerializeEventConfig(
+            as_client_event=as_client_event, requester=requester
+        )
 
         chunk = {
             "chunk": (
@@ -693,7 +695,7 @@ class PaginationHandler:
 
                     await self._storage_controllers.purge_events.purge_room(room_id)
 
-            logger.info("complete")
+            logger.info("purge complete for room_id %s", room_id)
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_COMPLETE
         except Exception:
             f = Failure()

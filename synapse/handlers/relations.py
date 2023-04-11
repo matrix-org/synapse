@@ -20,6 +20,7 @@ import attr
 from synapse.api.constants import Direction, EventTypes, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase, relation_from_event
+from synapse.events.utils import SerializeEventConfig
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import trace
 from synapse.storage.databases.main.relations import ThreadsNextBatch, _RelatedEvent
@@ -60,13 +61,12 @@ class BundledAggregations:
     Some values require additional processing during serialization.
     """
 
-    annotations: Optional[JsonDict] = None
     references: Optional[JsonDict] = None
     replace: Optional[EventBase] = None
     thread: Optional[_ThreadAggregation] = None
 
     def __bool__(self) -> bool:
-        return bool(self.annotations or self.references or self.replace or self.thread)
+        return bool(self.references or self.replace or self.thread)
 
 
 class RelationsHandler:
@@ -152,16 +152,23 @@ class RelationsHandler:
         )
 
         now = self._clock.time_msec()
+        serialize_options = SerializeEventConfig(requester=requester)
         return_value: JsonDict = {
             "chunk": self._event_serializer.serialize_events(
-                events, now, bundle_aggregations=aggregations
+                events,
+                now,
+                bundle_aggregations=aggregations,
+                config=serialize_options,
             ),
         }
         if include_original_event:
             # Do not bundle aggregations when retrieving the original event because
             # we want the content before relations are applied to it.
             return_value["original_event"] = self._event_serializer.serialize_event(
-                event, now, bundle_aggregations=None
+                event,
+                now,
+                bundle_aggregations=None,
+                config=serialize_options,
             )
 
         if next_token:
@@ -226,67 +233,6 @@ class RelationsHandler:
                     event_id,
                     e.msg,
                 )
-
-    async def get_annotations_for_events(
-        self, event_ids: Collection[str], ignored_users: FrozenSet[str] = frozenset()
-    ) -> Dict[str, List[JsonDict]]:
-        """Get a list of annotations to the given events, grouped by event type and
-        aggregation key, sorted by count.
-
-        This is used e.g. to get the what and how many reactions have happened
-        on an event.
-
-        Args:
-            event_ids: Fetch events that relate to these event IDs.
-            ignored_users: The users ignored by the requesting user.
-
-        Returns:
-            A map of event IDs to a list of groups of annotations that match.
-            Each entry is a dict with `type`, `key` and `count` fields.
-        """
-        # Get the base results for all users.
-        full_results = await self._main_store.get_aggregation_groups_for_events(
-            event_ids
-        )
-
-        # Avoid additional logic if there are no ignored users.
-        if not ignored_users:
-            return {
-                event_id: results
-                for event_id, results in full_results.items()
-                if results
-            }
-
-        # Then subtract off the results for any ignored users.
-        ignored_results = await self._main_store.get_aggregation_groups_for_users(
-            [event_id for event_id, results in full_results.items() if results],
-            ignored_users,
-        )
-
-        filtered_results = {}
-        for event_id, results in full_results.items():
-            # If no annotations, skip.
-            if not results:
-                continue
-
-            # If there are not ignored results for this event, copy verbatim.
-            if event_id not in ignored_results:
-                filtered_results[event_id] = results
-                continue
-
-            # Otherwise, subtract out the ignored results.
-            event_ignored_results = ignored_results[event_id]
-            for result in results:
-                key = (result["type"], result["key"])
-                if key in event_ignored_results:
-                    # Ensure to not modify the cache.
-                    result = result.copy()
-                    result["count"] -= event_ignored_results[key]
-                    if result["count"] <= 0:
-                        continue
-                filtered_results.setdefault(event_id, []).append(result)
-
-        return filtered_results
 
     async def get_references_for_events(
         self, event_ids: Collection[str], ignored_users: FrozenSet[str] = frozenset()
@@ -531,17 +477,6 @@ class RelationsHandler:
                 # (as that is what makes it part of the thread).
                 relations_by_id[latest_thread_event.event_id] = RelationTypes.THREAD
 
-        async def _fetch_annotations() -> None:
-            """Fetch any annotations (ie, reactions) to bundle with this event."""
-            annotations_by_event_id = await self.get_annotations_for_events(
-                events_by_id.keys(), ignored_users=ignored_users
-            )
-            for event_id, annotations in annotations_by_event_id.items():
-                if annotations:
-                    results.setdefault(event_id, BundledAggregations()).annotations = {
-                        "chunk": annotations
-                    }
-
         async def _fetch_references() -> None:
             """Fetch any references to bundle with this event."""
             references_by_event_id = await self.get_references_for_events(
@@ -575,7 +510,6 @@ class RelationsHandler:
         await make_deferred_yieldable(
             gather_results(
                 (
-                    run_in_background(_fetch_annotations),
                     run_in_background(_fetch_references),
                     run_in_background(_fetch_edits),
                 )

@@ -119,7 +119,6 @@ class EventSearchInsertionTest(HomeserverTestCase):
             "content": {"msgtype": "m.text", "body": 2},
             "room_id": room_id,
             "sender": user_id,
-            "depth": prev_event.depth + 1,
             "prev_events": prev_event_ids,
             "origin_server_ts": self.clock.time_msec(),
         }
@@ -134,7 +133,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
                     prev_state_map,
                     for_verification=False,
                 ),
-                depth=event_dict["depth"],
+                depth=prev_event.depth + 1,
             )
         )
 

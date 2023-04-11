@@ -20,10 +20,10 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_bytes_from_args
 from synapse.http.site import SynapseRequest
-from synapse.rest.media.v1.media_storage import SpamMediaException
+from synapse.media.media_storage import SpamMediaException
 
 if TYPE_CHECKING:
-    from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.media.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)

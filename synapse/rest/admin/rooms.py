@@ -83,7 +83,6 @@ class RoomRestV2Servlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-
         requester = await self._auth.get_user_by_req(request)
         await assert_user_is_admin(self._auth, requester)
 
@@ -152,7 +151,6 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-
         await assert_requester_is_admin(self._auth, request)
 
         if not RoomID.is_valid(room_id):
@@ -189,7 +187,6 @@ class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, delete_id: str
     ) -> Tuple[int, JsonDict]:
-
         await assert_requester_is_admin(self._auth, request)
 
         delete_status = self._pagination_handler.get_delete_status(delete_id)
@@ -452,7 +449,6 @@ class RoomStateRestServlet(RestServlet):
 
 
 class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
-
     PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):

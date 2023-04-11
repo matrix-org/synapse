@@ -25,7 +25,7 @@ class ToTwistedHandler(logging.Handler):
 
     tx_log = twisted.logger.Logger()
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         log_entry = self.format(record)
         log_level = record.levelname.lower().replace("warning", "warn")
         self.tx_log.emit(
@@ -33,7 +33,7 @@ class ToTwistedHandler(logging.Handler):
         )
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure the python logging appropriately for the tests.
 
     (Logs will end up in _trial_temp.)

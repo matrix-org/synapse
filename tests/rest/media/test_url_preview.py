@@ -26,8 +26,8 @@ from twisted.internet.interfaces import IAddress, IResolutionReceiver
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactor
 
 from synapse.config.oembed import OEmbedEndpointConfig
-from synapse.rest.media.v1.media_repository import MediaRepositoryResource
-from synapse.rest.media.v1.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
+from synapse.media.url_previewer import IMAGE_CACHE_EXPIRY_MS
+from synapse.rest.media.media_repository_resource import MediaRepositoryResource
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -36,7 +36,6 @@ from synapse.util.stringutils import parse_and_validate_mxc_uri
 from tests import unittest
 from tests.server import FakeTransport
 from tests.test_utils import SMALL_PNG
-from tests.utils import MockClock
 
 try:
     import lxml
@@ -58,7 +57,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     )
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["url_preview_enabled"] = True
         config["max_spider_size"] = 9999999
@@ -83,7 +81,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         config["media_store_path"] = self.media_store_path
 
         provider_config = {
-            "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
+            "module": "synapse.media.storage_provider.FileStorageProviderBackend",
             "store_local": True,
             "store_synchronous": False,
             "store_remote": True,
@@ -118,9 +116,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
-        self.media_repo = hs.get_media_repository_resource()
-        self.preview_url = self.media_repo.children[b"preview_url"]
+        self.media_repo = hs.get_media_repository()
+        media_repo_resource = hs.get_media_repository_resource()
+        self.preview_url = media_repo_resource.children[b"preview_url"]
 
         self.lookups: Dict[str, Any] = {}
 
@@ -133,7 +131,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 addressTypes: Optional[Sequence[Type[IAddress]]] = None,
                 transportSemantics: str = "TCP",
             ) -> IResolutionReceiver:
-
                 resolution = HostResolution(hostName)
                 resolutionReceiver.resolutionBegan(resolution)
                 if hostName not in self.lookups:
@@ -196,9 +193,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         # Clear the in-memory cache
-        self.assertIn("http://matrix.org", self.preview_url._cache)
-        self.preview_url._cache.pop("http://matrix.org")
-        self.assertNotIn("http://matrix.org", self.preview_url._cache)
+        self.assertIn("http://matrix.org", self.preview_url._url_previewer._cache)
+        self.preview_url._url_previewer._cache.pop("http://matrix.org")
+        self.assertNotIn("http://matrix.org", self.preview_url._url_previewer._cache)
 
         # Check the database cache returns the correct response
         channel = self.make_request(
@@ -660,7 +657,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """If the preview image doesn't exist, ensure some data is returned."""
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
-        end_content = (
+        result = (
             b"""<html><body><img src="http://cdn.matrix.org/foo.jpg"></body></html>"""
         )
 
@@ -681,8 +678,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
                 b'Content-Type: text/html; charset="utf8"\r\n\r\n'
             )
-            % (len(end_content),)
-            + end_content
+            % (len(result),)
+            + result
         )
 
         self.pump()
@@ -690,6 +687,44 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # The image should not be in the result.
         self.assertNotIn("og:image", channel.json_body)
+
+    def test_oembed_failure(self) -> None:
+        """If the autodiscovered oEmbed URL fails, ensure some data is returned."""
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+
+        result = b"""
+        <title>oEmbed Autodiscovery Fail</title>
+        <link rel="alternate" type="application/json+oembed"
+            href="http://example.com/oembed?url=http%3A%2F%2Fmatrix.org&format=json"
+            title="matrixdotorg" />
+        """
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+            )
+            % (len(result),)
+            + result
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # The image should not be in the result.
+        self.assertEqual(channel.json_body["og:title"], "oEmbed Autodiscovery Fail")
 
     def test_data_url(self) -> None:
         """
@@ -1038,7 +1073,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """Test that files are not stored in or fetched from storage providers."""
         host, media_id = self._download_image()
 
-        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        rel_file_path = self.media_repo.filepaths.url_cache_filepath_rel(media_id)
         media_store_path = os.path.join(self.media_store_path, rel_file_path)
         storage_provider_path = os.path.join(self.storage_path, rel_file_path)
 
@@ -1081,7 +1116,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         host, media_id = self._download_image()
 
         rel_thumbnail_path = (
-            self.preview_url.filepaths.url_cache_thumbnail_directory_rel(media_id)
+            self.media_repo.filepaths.url_cache_thumbnail_directory_rel(media_id)
         )
         media_store_thumbnail_path = os.path.join(
             self.media_store_path, rel_thumbnail_path
@@ -1108,7 +1143,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Remove the original, otherwise thumbnails will regenerate
-        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        rel_file_path = self.media_repo.filepaths.url_cache_filepath_rel(media_id)
         media_store_path = os.path.join(self.media_store_path, rel_file_path)
         os.remove(media_store_path)
 
@@ -1131,26 +1166,24 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def test_cache_expiry(self) -> None:
         """Test that URL cache files and thumbnails are cleaned up properly on expiry."""
-        self.preview_url.clock = MockClock()
-
         _host, media_id = self._download_image()
 
-        file_path = self.preview_url.filepaths.url_cache_filepath(media_id)
-        file_dirs = self.preview_url.filepaths.url_cache_filepath_dirs_to_delete(
+        file_path = self.media_repo.filepaths.url_cache_filepath(media_id)
+        file_dirs = self.media_repo.filepaths.url_cache_filepath_dirs_to_delete(
             media_id
         )
-        thumbnail_dir = self.preview_url.filepaths.url_cache_thumbnail_directory(
+        thumbnail_dir = self.media_repo.filepaths.url_cache_thumbnail_directory(
             media_id
         )
-        thumbnail_dirs = self.preview_url.filepaths.url_cache_thumbnail_dirs_to_delete(
+        thumbnail_dirs = self.media_repo.filepaths.url_cache_thumbnail_dirs_to_delete(
             media_id
         )
 
         self.assertTrue(os.path.isfile(file_path))
         self.assertTrue(os.path.isdir(thumbnail_dir))
 
-        self.preview_url.clock.advance_time_msec(IMAGE_CACHE_EXPIRY_MS + 1)
-        self.get_success(self.preview_url._expire_url_cache_data())
+        self.reactor.advance(IMAGE_CACHE_EXPIRY_MS * 1000 + 1)
+        self.get_success(self.preview_url._url_previewer._expire_url_cache_data())
 
         for path in [file_path] + file_dirs + [thumbnail_dir] + thumbnail_dirs:
             self.assertFalse(
