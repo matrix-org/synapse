@@ -40,6 +40,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         return self.setup_test_homeserver(federation_http_client=self.http_client)
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.reactor.advance(1)
         user_id = UserID("us", "test")
         our_user = create_requester(user_id)
         room_creator = self.hs.get_room_creation_handler()
