@@ -77,6 +77,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
         self.room_batch_handler = hs.get_room_batch_handler()
+        self.enable_also_allow_user = hs.config.experimental.msc2716_also_allow_user
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str

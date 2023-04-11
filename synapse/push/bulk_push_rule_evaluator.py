@@ -78,7 +78,7 @@ def _should_count_as_unread(
     context: EventContext,
     non_bot_room_members_count: int,
     current_user: str,
-    related_events: Dict[str, Dict[str, str]],
+    related_events: Dict[str, Dict[str, Any]],
 ) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
@@ -99,7 +99,6 @@ def _should_count_as_unread(
         # Beeper: We want reactions to only count as unread if they're reactions to the current user in rooms that
         # have fewer than 20 users.
         elif event.type == "m.reaction" and related_events.get("m.annotation"):
-
             return (
                 related_events["m.annotation"]["sender"] == current_user
                 and non_bot_room_members_count < 20

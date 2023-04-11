@@ -122,6 +122,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
                 user_id, room_id, "com.beeper.inbox.done"
             )
         )
+        assert done is not None
         self.assertEqual(done["updated_ts"], ts)
         self.assertEqual(done["at_ts"], ts + (1000 * 60 * 5))
 
@@ -130,6 +131,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
                 user_id, room_id, "m.marked_unread"
             )
         )
+        assert marked_unread is not None
         self.assertEqual(marked_unread["unread"], True)
         self.assertEqual(marked_unread["ts"], ts)
 
@@ -167,5 +169,6 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
                 user_id, room_id, "m.marked_unread"
             )
         )
+        assert marked_unread is not None
         self.assertEqual(marked_unread["unread"], False)
         self.assertEqual(marked_unread["ts"], ts)
