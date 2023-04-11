@@ -918,13 +918,9 @@ class DeviceListWorkerUpdater:
 
     def __init__(self, hs: "HomeServer"):
         from synapse.replication.http.devices import (
-            ReplicationMultiUserDevicesResyncRestServlet,
-            ReplicationUserDevicesResyncRestServlet,
+            ReplicationMultiUserDevicesResyncRestServlet
         )
 
-        self._user_device_resync_client = (
-            ReplicationUserDevicesResyncRestServlet.make_client(hs)
-        )
         self._multi_user_device_resync_client = (
             ReplicationMultiUserDevicesResyncRestServlet.make_client(hs)
         )
@@ -948,17 +944,8 @@ class DeviceListWorkerUpdater:
 
         try:
             return await self._multi_user_device_resync_client(user_ids=user_ids)
-        except SynapseError as err:
-            if not (
-                err.code == HTTPStatus.NOT_FOUND and err.errcode == Codes.UNRECOGNIZED
-            ):
-                raise
-
-            # Fall back to single requests
-            result: Dict[str, Optional[JsonDict]] = {}
-            for user_id in user_ids:
-                result[user_id] = await self._user_device_resync_client(user_id=user_id)
-            return result
+        except:
+            raise
 
     async def user_device_resync(
         self, user_id: str, mark_failed_as_stale: bool = True
