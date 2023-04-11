@@ -773,6 +773,43 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         # Check room alias.
         self.assertIsNone(room_alias)
 
+    def test_on_logged_out(self) -> None:
+        """Test that on_logged_out module hook is properly call when logging out
+        a device, and that related pushers are still available at this time.
+        """
+        device_id = "AAAAAAA"
+        user_id = self.register_user("test_on_logged_out", "secret")
+        token = self.login("test_on_logged_out", "secret", device_id)
+
+        self.get_success(
+            self.hs.get_pusherpool().add_or_update_pusher(
+                user_id=user_id,
+                device_id=device_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
+            )
+        )
+
+        self.nb_of_pushers = None
+
+        self.module_api.register_password_auth_provider_callbacks(
+            on_logged_out=self._on_logged_out_mock
+        )
+
+        self.get_success(
+            self.hs.get_device_handler().delete_devices(user_id, [device_id])
+        )
+
+        self.assertEqual(self.nb_of_pushers, 1)
+
+    def _on_logged_out_mock(self, user_id, device_id, access_token):
+        self.nb_of_pushers = len(self.hs.get_pusherpool().pushers[user_id].values())
+
 
 class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
