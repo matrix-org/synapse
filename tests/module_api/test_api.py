@@ -796,7 +796,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
             )
         )
 
-        self.nb_of_pushers: Optional[int] = None
+        self.nb_of_pushers_in_callback: Optional[int] = None
 
         self.module_api.register_password_auth_provider_callbacks(
             on_logged_out=self._on_logged_out_mock
@@ -806,12 +806,16 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         assert isinstance(device_handler, DeviceHandler)
         self.get_success(device_handler.delete_devices(user_id, [device_id]))
 
-        self.assertEqual(self.nb_of_pushers, 1)
+        self.assertEqual(self.nb_of_pushers_in_callback, 1)
+
+        self.assertEqual(len(self.hs.get_pusherpool().pushers[user_id].values()), 0)
 
     async def _on_logged_out_mock(
         self, user_id: str, device_id: Optional[str], access_token: str
     ) -> None:
-        self.nb_of_pushers = len(self.hs.get_pusherpool().pushers[user_id].values())
+        self.nb_of_pushers_in_callback = len(
+            self.hs.get_pusherpool().pushers[user_id].values()
+        )
 
 
 class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCase):
