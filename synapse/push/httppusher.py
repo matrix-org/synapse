@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
 from prometheus_client import Counter
 
@@ -27,7 +27,7 @@ from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.storage.databases.main.event_push_actions import HttpPushAction
-from synapse.types import JsonDict, JsonMapping
+from synapse.types import JsonDict, JsonMapping, SimpleJsonValue
 
 from . import push_tools
 
@@ -57,7 +57,9 @@ http_badges_failed_counter = Counter(
 )
 
 
-def tweaks_for_actions(actions: List[Union[str, Dict]]) -> JsonMapping:
+def tweaks_for_actions(
+    actions: List[Union[str, Dict]]
+) -> Mapping[str, SimpleJsonValue]:
     """
     Converts a list of actions into a `tweaks` dict (which can then be passed to
         the push gateway).
@@ -344,29 +346,82 @@ class HttpPusher(Pusher):
                     await self._pusherpool.remove_pusher(self.app_id, pk, self.user_id)
         return True
 
-    async def _build_event_notification_content(
+    async def dispatch_push(
+        self,
+        content: JsonDict,
+        tweaks: Optional[Mapping[str, SimpleJsonValue]] = None,
+        default_payload: Optional[JsonMapping] = None,
+    ) -> Union[bool, Iterable[str]]:
+        """Send a notification to the registered push gateway, with `content` being
+        the content of the `notification` top property specified in the spec.
+        If specified, the `devices` property will be overridden with device-specific
+        information for this pusher.
+
+        Args:
+            content: the content
+            tweaks: tweaks to add into the `devices` section
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+                This will be merged (and override if some matching values already exist there)
+                with existing `default_payload`.
+
+        Returns:
+            False if an error occured when calling the push gateway, or an array of
+            rejected push keys otherwise. If this array is empty, the push fully
+            succeeded.
+        """
+        content = content.copy()
+
+        data = self.data_minus_url.copy()
+        if default_payload:
+            data.setdefault("default_payload", {}).update(default_payload)
+
+        device = {
+            "app_id": self.app_id,
+            "pushkey": self.pushkey,
+            "pushkey_ts": int(self.pushkey_ts / 1000),
+            "data": data,
+        }
+        if tweaks:
+            device["tweaks"] = tweaks
+
+        content["devices"] = [device]
+
+        try:
+            resp = await self.http_client.post_json_get_json(
+                self.url, {"notification": content}
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to push data to %s: %s %s",
+                self.name,
+                type(e),
+                e,
+            )
+            return False
+        rejected = []
+        if "rejected" in resp:
+            rejected = resp["rejected"]
+        return rejected
+
+    async def dispatch_push_event(
         self,
         event: EventBase,
-        tweaks: JsonMapping,
+        tweaks: Mapping[str, SimpleJsonValue],
         badge: int,
-    ) -> Tuple[JsonDict, JsonMapping]:
-        """
-        Build the content of a push notification from an event, as specified by the
-        Push Gateway spec.
-
-        _build_notification_dict uses this to build the notification field and handles
-        adding the devices field.
+    ) -> Union[bool, Iterable[str]]:
+        """Send a notification to the registered push gateway by building it
+        from an event.
 
         Args:
             event: the event
-            tweaks: tweaks to apply
+            tweaks: tweaks to add into the `devices` section, and to decide the
+            priority to use
             badge: unread count to send with the push notification
 
         Returns:
-            A tuple of:
-                The content to put in `notification` before sending it to the push gateway.
-
-                The tweaks to put in the `devices` section, they may be different from the input.
+            False if an error occured when calling the push gateway, or an array of
+            rejected push keys otherwise. If this array is empty, the push fully
+            succeeded.
         """
         priority = "low"
         if (
@@ -387,140 +442,36 @@ class HttpPusher(Pusher):
                 "counts": {"unread": badge},
                 "prio": priority,
             }
-            return content, {}
-
-        ctx = await push_tools.get_context_for_event(
-            self._storage_controllers, event, self.user_id
-        )
-
-        content = {
-            "id": event.event_id,  # deprecated: remove soon
-            "event_id": event.event_id,
-            "room_id": event.room_id,
-            "type": event.type,
-            "sender": event.user_id,
-            "prio": priority,
-            "counts": {
-                "unread": badge,
-                # 'missed_calls': 2
-            },
-        }
-        if event.type == "m.room.member" and event.is_state():
-            content["membership"] = event.content["membership"]
-            content["user_is_target"] = event.state_key == self.user_id
-        if self.hs.config.push.push_include_content and event.content:
-            content["content"] = event.content
-
-        # We no longer send aliases separately, instead, we send the human
-        # readable name of the room, which may be an alias.
-        if "sender_display_name" in ctx and len(ctx["sender_display_name"]) > 0:
-            content["sender_display_name"] = ctx["sender_display_name"]
-        if "name" in ctx and len(ctx["name"]) > 0:
-            content["room_name"] = ctx["name"]
-
-        return (content, tweaks)
-
-    def _build_notification_dict(
-        self,
-        content: JsonDict,
-        tweaks: Optional[JsonMapping],
-        default_payload: Optional[JsonMapping] = None,
-    ) -> JsonDict:
-        """Build a full notification from the content of it, as specified by the
-        Push Gateway spec. It wraps the content in a top level `notification`
-        element and put relevant device info in the `devices` section.
-
-        Args:
-            content: the content
-            tweaks: tweaks to add into the `devices` section
-            default_payload: default payload to add in `devices[0].data.default_payload`.
-                This will be merged (and override if some matching values already exist there)
-                with existing `default_payload`.
-
-        Returns:
-            a full notification that can be send to the registered push gateway.
-        """
-        content = content.copy()
-
-        data = self.data_minus_url.copy()
-        if default_payload:
-            data.setdefault("default_payload", {}).update(default_payload)
-
-        device = {
-            "app_id": self.app_id,
-            "pushkey": self.pushkey,
-            "pushkey_ts": int(self.pushkey_ts / 1000),
-            "data": data,
-        }
-        if tweaks:
-            device["tweaks"] = tweaks
-
-        content["devices"] = [device]
-
-        return {"notification": content}
-
-    async def dispatch_push(
-        self,
-        content: JsonDict,
-        tweaks: Optional[JsonMapping] = None,
-        default_payload: Optional[JsonMapping] = None,
-    ) -> Union[bool, Iterable[str]]:
-        """Send a notification to the registered push gateway, with `content` being
-        the content of the `notification` top property specified in the spec.
-        If specified, the `devices` property will be overridden with device-specific
-        information for this pusher.
-
-        Args:
-            content: the content
-            tweaks: tweaks to add into the `devices` section
-            default_payload: default payload to add in `devices[0].data.default_payload`.
-                This will be merged (and override if some matching values already exist there)
-                with existing `default_payload`.
-
-        Returns:
-            False if an error occured when calling the push gateway, or an array of
-            rejected push keys otherwise. If this array is empty, the push fully
-            succeeded.
-        """
-        notif_dict = self._build_notification_dict(content, tweaks, default_payload)
-        try:
-            resp = await self.http_client.post_json_get_json(self.url, notif_dict)
-        except Exception as e:
-            logger.warning(
-                "Failed to push data to %s: %s %s",
-                self.name,
-                type(e),
-                e,
+            tweaks = {}
+        else:
+            ctx = await push_tools.get_context_for_event(
+                self._storage_controllers, event, self.user_id
             )
-            return False
-        rejected = []
-        if "rejected" in resp:
-            rejected = resp["rejected"]
-        return rejected
 
-    async def dispatch_push_event(
-        self,
-        event: EventBase,
-        tweaks: JsonMapping,
-        badge: int,
-    ) -> Union[bool, Iterable[str]]:
-        """Send a notification to the registered push gateway by building it
-        from an event.
+            content = {
+                "id": event.event_id,  # deprecated: remove soon
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "type": event.type,
+                "sender": event.user_id,
+                "prio": priority,
+                "counts": {
+                    "unread": badge,
+                    # 'missed_calls': 2
+                },
+            }
+            if event.type == "m.room.member" and event.is_state():
+                content["membership"] = event.content["membership"]
+                content["user_is_target"] = event.state_key == self.user_id
+            if self.hs.config.push.push_include_content and event.content:
+                content["content"] = event.content
 
-        Args:
-            event: the event
-            tweaks: tweaks to add into the `devices` section, and to decide the
-            priority to use
-            badge: unread count to send with the push notification
-
-        Returns:
-            False if an error occured when calling the push gateway, or an array of
-            rejected push keys otherwise. If this array is empty, the push fully
-            succeeded.
-        """
-        content, tweaks = await self._build_event_notification_content(
-            event, tweaks, badge
-        )
+            # We no longer send aliases separately, instead, we send the human
+            # readable name of the room, which may be an alias.
+            if "sender_display_name" in ctx and len(ctx["sender_display_name"]) > 0:
+                content["sender_display_name"] = ctx["sender_display_name"]
+            if "name" in ctx and len(ctx["name"]) > 0:
+                content["room_name"] = ctx["name"]
 
         res = await self.dispatch_push(content, tweaks)
 
