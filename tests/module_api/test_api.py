@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -21,6 +21,7 @@ from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
+from synapse.handlers.device import DeviceHandler
 from synapse.handlers.presence import UserPresenceState
 from synapse.handlers.push_rules import InvalidRuleException
 from synapse.module_api import ModuleApi
@@ -795,19 +796,21 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
             )
         )
 
-        self.nb_of_pushers = None
+        self.nb_of_pushers: Optional[int] = None
 
         self.module_api.register_password_auth_provider_callbacks(
             on_logged_out=self._on_logged_out_mock
         )
 
-        self.get_success(
-            self.hs.get_device_handler().delete_devices(user_id, [device_id])
-        )
+        device_handler = self.hs.get_device_handler()
+        assert isinstance(device_handler, DeviceHandler)
+        self.get_success(device_handler.delete_devices(user_id, [device_id]))
 
         self.assertEqual(self.nb_of_pushers, 1)
 
-    def _on_logged_out_mock(self, user_id, device_id, access_token):
+    async def _on_logged_out_mock(
+        self, user_id: str, device_id: Optional[str], access_token: str
+    ) -> None:
         self.nb_of_pushers = len(self.hs.get_pusherpool().pushers[user_id].values())
 
 
