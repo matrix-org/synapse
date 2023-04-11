@@ -150,18 +150,19 @@ class Keyring:
     def __init__(
         self, hs: "HomeServer", key_fetchers: "Optional[Iterable[KeyFetcher]]" = None
     ):
-        self.clock = hs.get_clock()
-
         if key_fetchers is None:
-            key_fetchers = (
-                # Fetch keys from the database.
-                StoreKeyFetcher(hs),
-                # Fetch keys from a configured Perspectives server.
-                PerspectivesKeyFetcher(hs),
-                # Fetch keys from the origin server directly.
-                ServerKeyFetcher(hs),
-            )
-        self._key_fetchers = key_fetchers
+            # Always fetch keys from the database.
+            mutable_key_fetchers: List[KeyFetcher] = [StoreKeyFetcher(hs)]
+            # Fetch keys from configured trusted key servers, if any exist.
+            key_servers = hs.config.key.key_servers
+            if key_servers:
+                mutable_key_fetchers.append(PerspectivesKeyFetcher(hs))
+            # Finally, fetch keys from the origin server directly.
+            mutable_key_fetchers.append(ServerKeyFetcher(hs))
+
+            self._key_fetchers: Iterable[KeyFetcher] = tuple(mutable_key_fetchers)
+        else:
+            self._key_fetchers = key_fetchers
 
         self._fetch_keys_queue: BatchingQueue[
             _FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]
@@ -522,7 +523,6 @@ class BaseV2KeyFetcher(KeyFetcher):
         super().__init__(hs)
 
         self.store = hs.get_datastores().main
-        self.config = hs.config
 
     async def process_v2_response(
         self, from_server: str, response_json: JsonDict, time_added_ms: int
@@ -626,7 +626,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_federation_http_client()
-        self.key_servers = self.config.key.key_servers
+        self.key_servers = hs.config.key.key_servers
 
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]
