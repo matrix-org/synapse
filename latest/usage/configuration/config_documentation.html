@@ -1466,7 +1466,7 @@ address. Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>
 </li>
 <li>
 <p><code>account</code> ratelimits login requests based on the account the
-client is attempting to log into. Defaults to <code>per_second: 0.03</code>,
+client is attempting to log into. Defaults to <code>per_second: 0.003</code>,
 <code>burst_count: 5</code>.</p>
 </li>
 <li>
@@ -2770,6 +2770,12 @@ match a pre-existing account instead of failing. This could be used if
 switching from password logins to OIDC. Defaults to false.</p>
 </li>
 <li>
+<p><code>enable_registration</code>: set to 'false' to disable automatic registration of new
+users. This allows the OIDC SSO flow to be limited to sign in only, rather than
+automatically registering users that have a valid SSO login but do not have
+a pre-registered account. Defaults to true.</p>
+</li>
+<li>
 <p><code>user_mapping_provider</code>: Configuration for how attributes returned from a OIDC
 provider are mapped onto a matrix user. This setting has the following
 sub-properties:</p>
@@ -2891,6 +2897,7 @@ claim MUST contain &quot;admin&quot;.</p>
     userinfo_endpoint: &quot;https://accounts.example.com/userinfo&quot;
     jwks_uri: &quot;https://accounts.example.com/.well-known/jwks.json&quot;
     skip_verification: true
+    enable_registration: true
     user_mapping_provider:
       config:
         subject_claim: &quot;id&quot;

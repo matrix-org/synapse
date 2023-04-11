@@ -231,6 +231,17 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1810"><a class="header" href="#upgrading-to-v1810">Upgrading to v1.81.0</a></h1>
+<h2 id="application-service-path--authentication-deprecations"><a class="header" href="#application-service-path--authentication-deprecations">Application service path &amp; authentication deprecations</a></h2>
+<p>Synapse now attempts the versioned appservice paths before falling back to the
+<a href="https://spec.matrix.org/v1.6/application-service-api/#legacy-routes">legacy paths</a>.
+Usage of the legacy routes should be considered deprecated.</p>
+<p>Additionally, Synapse has supported sending the application service access token
+via <a href="https://spec.matrix.org/v1.6/application-service-api/#authorization">the <code>Authorization</code> header</a>
+since v1.70.0. For backwards compatibility it is <em>also</em> sent as the <code>access_token</code>
+query parameter. This is insecure and should be considered deprecated.</p>
+<p>A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service routes and query parameter authorization.</p>
 <h1 id="upgrading-to-v1800"><a class="header" href="#upgrading-to-v1800">Upgrading to v1.80.0</a></h1>
 <h2 id="reporting-events-error-code-change"><a class="header" href="#reporting-events-error-code-change">Reporting events error code change</a></h2>
 <p>Before this update, the
@@ -294,6 +305,14 @@ so that PyICU can build since no prebuilt wheels are available.</p>
 and then do <code>pip install matrix-synapse[user-search]</code> for a PyPI install.</p>
 <p>Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.</p>
+<h2 id="user-directory-rebuild"><a class="header" href="#user-directory-rebuild">User directory rebuild</a></h2>
+<p>Synapse 1.74 queues a background update
+<a href="https://github.com/matrix-org/synapse/pull/14643">to rebuild the user directory</a>,
+in order to fix missing or erroneous entries.</p>
+<p>When this update begins, the user directory will be cleared out and rebuilt from
+scratch. User directory lookups will be incomplete until the rebuild completes.
+Admins can monitor the rebuild's progress by using the
+<a href="usage/administration/admin_api/background_updates.html#status">Background update Admin API</a>.</p>
 <h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
 <h2 id="legacy-prometheus-metric-names-have-now-been-removed"><a class="header" href="#legacy-prometheus-metric-names-have-now-been-removed">Legacy Prometheus metric names have now been removed</a></h2>
 <p>Synapse v1.69.0 included the deprecation of legacy Prometheus metric names

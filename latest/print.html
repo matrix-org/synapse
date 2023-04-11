@@ -1779,6 +1779,17 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1810"><a class="header" href="#upgrading-to-v1810">Upgrading to v1.81.0</a></h1>
+<h2 id="application-service-path--authentication-deprecations"><a class="header" href="#application-service-path--authentication-deprecations">Application service path &amp; authentication deprecations</a></h2>
+<p>Synapse now attempts the versioned appservice paths before falling back to the
+<a href="https://spec.matrix.org/v1.6/application-service-api/#legacy-routes">legacy paths</a>.
+Usage of the legacy routes should be considered deprecated.</p>
+<p>Additionally, Synapse has supported sending the application service access token
+via <a href="https://spec.matrix.org/v1.6/application-service-api/#authorization">the <code>Authorization</code> header</a>
+since v1.70.0. For backwards compatibility it is <em>also</em> sent as the <code>access_token</code>
+query parameter. This is insecure and should be considered deprecated.</p>
+<p>A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service routes and query parameter authorization.</p>
 <h1 id="upgrading-to-v1800"><a class="header" href="#upgrading-to-v1800">Upgrading to v1.80.0</a></h1>
 <h2 id="reporting-events-error-code-change"><a class="header" href="#reporting-events-error-code-change">Reporting events error code change</a></h2>
 <p>Before this update, the
@@ -1842,6 +1853,14 @@ so that PyICU can build since no prebuilt wheels are available.</p>
 and then do <code>pip install matrix-synapse[user-search]</code> for a PyPI install.</p>
 <p>Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.</p>
+<h2 id="user-directory-rebuild"><a class="header" href="#user-directory-rebuild">User directory rebuild</a></h2>
+<p>Synapse 1.74 queues a background update
+<a href="https://github.com/matrix-org/synapse/pull/14643">to rebuild the user directory</a>,
+in order to fix missing or erroneous entries.</p>
+<p>When this update begins, the user directory will be cleared out and rebuilt from
+scratch. User directory lookups will be incomplete until the rebuild completes.
+Admins can monitor the rebuild's progress by using the
+<a href="usage/administration/admin_api/background_updates.html#status">Background update Admin API</a>.</p>
 <h1 id="upgrading-to-v1730"><a class="header" href="#upgrading-to-v1730">Upgrading to v1.73.0</a></h1>
 <h2 id="legacy-prometheus-metric-names-have-now-been-removed"><a class="header" href="#legacy-prometheus-metric-names-have-now-been-removed">Legacy Prometheus metric names have now been removed</a></h2>
 <p>Synapse v1.69.0 included the deprecation of legacy Prometheus metric names
@@ -4864,7 +4883,7 @@ address. Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>
 </li>
 <li>
 <p><code>account</code> ratelimits login requests based on the account the
-client is attempting to log into. Defaults to <code>per_second: 0.03</code>,
+client is attempting to log into. Defaults to <code>per_second: 0.003</code>,
 <code>burst_count: 5</code>.</p>
 </li>
 <li>
@@ -6168,6 +6187,12 @@ match a pre-existing account instead of failing. This could be used if
 switching from password logins to OIDC. Defaults to false.</p>
 </li>
 <li>
+<p><code>enable_registration</code>: set to 'false' to disable automatic registration of new
+users. This allows the OIDC SSO flow to be limited to sign in only, rather than
+automatically registering users that have a valid SSO login but do not have
+a pre-registered account. Defaults to true.</p>
+</li>
+<li>
 <p><code>user_mapping_provider</code>: Configuration for how attributes returned from a OIDC
 provider are mapped onto a matrix user. This setting has the following
 sub-properties:</p>
@@ -6289,6 +6314,7 @@ claim MUST contain &quot;admin&quot;.</p>
     userinfo_endpoint: &quot;https://accounts.example.com/userinfo&quot;
     jwks_uri: &quot;https://accounts.example.com/.well-known/jwks.json&quot;
     skip_verification: true
+    enable_registration: true
     user_mapping_provider:
       config:
         subject_claim: &quot;id&quot;
@@ -10748,6 +10774,7 @@ information.</p>
 ^/_matrix/client/(r0|v3|unstable)/register$
 ^/_matrix/client/(r0|v3|unstable)/register/available$
 ^/_matrix/client/v1/register/m.login.registration_token/validity$
+^/_matrix/client/(r0|v3|unstable)/password_policy$
 
 # Event sending requests
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
@@ -17432,7 +17459,7 @@ position of all streams. The server then periodically sends <code>RDATA</code> c
 which have the format <code>RDATA &lt;stream_name&gt; &lt;instance_name&gt; &lt;token&gt; &lt;row&gt;</code>, where
 the format of <code>&lt;row&gt;</code> is defined by the individual streams. The
 <code>&lt;instance_name&gt;</code> is the name of the Synapse process that generated the data
-(usually &quot;master&quot;).</p>
+(usually &quot;master&quot;). We expect an RDATA for every row in the DB.</p>
 <p>Error reporting happens by either the client or server sending an ERROR
 command, and usually the connection will be closed.</p>
 <p>Since the protocol is a simple line based, its possible to manually
@@ -17499,7 +17526,7 @@ reconnect, following the steps above.</p>
 <p>If the server sends messages faster than the client can consume them the
 server will first buffer a (fairly large) number of commands and then
 disconnect the client. This ensures that we don't queue up an unbounded
-number of commands in memory and gives us a potential oppurtunity to
+number of commands in memory and gives us a potential opportunity to
 squawk loudly. When/if the client recovers it can reconnect to the
 server and ask for missed messages.</p>
 <h3 id="reliability"><a class="header" href="#reliability">Reliability</a></h3>
@@ -17510,7 +17537,7 @@ disappears.</p>
 since these include tokens which can be used to restart the stream on
 connection errors.</p>
 <p>The client should keep track of the token in the last RDATA command
-received for each stream so that on reconneciton it can start streaming
+received for each stream so that on reconnection it can start streaming
 from the correct place. Note: not all RDATA have valid tokens due to
 batching. See <code>RdataCommand</code> for more details.</p>
 <h3 id="example-5"><a class="header" href="#example-5">Example</a></h3>
@@ -17561,7 +17588,8 @@ request to the appropriate process.</p>
 <p>Two positions are included, the &quot;new&quot; position and the last position sent respectively.
 This allows servers to tell instances that the positions have advanced but no
 data has been written, without clients needlessly checking to see if they
-have missed any updates.</p>
+have missed any updates. Instances will only fetch stuff if there is a gap between
+their current position and the given last position.</p>
 <h4 id="error-s-c"><a class="header" href="#error-s-c">ERROR (S, C)</a></h4>
 <p>There was an error</p>
 <h4 id="ping-s-c"><a class="header" href="#ping-s-c">PING (S, C)</a></h4>

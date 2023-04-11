@@ -168,7 +168,7 @@ position of all streams. The server then periodically sends <code>RDATA</code> c
 which have the format <code>RDATA &lt;stream_name&gt; &lt;instance_name&gt; &lt;token&gt; &lt;row&gt;</code>, where
 the format of <code>&lt;row&gt;</code> is defined by the individual streams. The
 <code>&lt;instance_name&gt;</code> is the name of the Synapse process that generated the data
-(usually &quot;master&quot;).</p>
+(usually &quot;master&quot;). We expect an RDATA for every row in the DB.</p>
 <p>Error reporting happens by either the client or server sending an ERROR
 command, and usually the connection will be closed.</p>
 <p>Since the protocol is a simple line based, its possible to manually
@@ -235,7 +235,7 @@ reconnect, following the steps above.</p>
 <p>If the server sends messages faster than the client can consume them the
 server will first buffer a (fairly large) number of commands and then
 disconnect the client. This ensures that we don't queue up an unbounded
-number of commands in memory and gives us a potential oppurtunity to
+number of commands in memory and gives us a potential opportunity to
 squawk loudly. When/if the client recovers it can reconnect to the
 server and ask for missed messages.</p>
 <h3 id="reliability"><a class="header" href="#reliability">Reliability</a></h3>
@@ -246,7 +246,7 @@ disappears.</p>
 since these include tokens which can be used to restart the stream on
 connection errors.</p>
 <p>The client should keep track of the token in the last RDATA command
-received for each stream so that on reconneciton it can start streaming
+received for each stream so that on reconnection it can start streaming
 from the correct place. Note: not all RDATA have valid tokens due to
 batching. See <code>RdataCommand</code> for more details.</p>
 <h3 id="example"><a class="header" href="#example">Example</a></h3>
@@ -297,7 +297,8 @@ request to the appropriate process.</p>
 <p>Two positions are included, the &quot;new&quot; position and the last position sent respectively.
 This allows servers to tell instances that the positions have advanced but no
 data has been written, without clients needlessly checking to see if they
-have missed any updates.</p>
+have missed any updates. Instances will only fetch stuff if there is a gap between
+their current position and the given last position.</p>
 <h4 id="error-s-c"><a class="header" href="#error-s-c">ERROR (S, C)</a></h4>
 <p>There was an error</p>
 <h4 id="ping-s-c"><a class="header" href="#ping-s-c">PING (S, C)</a></h4>
