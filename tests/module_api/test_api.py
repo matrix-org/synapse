@@ -779,7 +779,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         """
         device_id = "AAAAAAA"
         user_id = self.register_user("test_on_logged_out", "secret")
-        token = self.login("test_on_logged_out", "secret", device_id)
+        self.login("test_on_logged_out", "secret", device_id)
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
