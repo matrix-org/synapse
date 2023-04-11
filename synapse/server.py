@@ -535,7 +535,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_device_handler(self) -> DeviceWorkerHandler:
-        if not self.config.worker.worker_app:
+        if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
             return DeviceHandler(self)
