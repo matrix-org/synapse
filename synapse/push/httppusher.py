@@ -444,9 +444,7 @@ class HttpPusher(Pusher):
 
         data = self.data_minus_url.copy()
         if default_payload:
-            if "default_payload" not in data:
-                data["default_payload"] = {}
-            data["default_payload"].update(default_payload)
+            data.setdefault("default_payload", {}).update(default_payload)
 
         device = {
             "app_id": self.app_id,
