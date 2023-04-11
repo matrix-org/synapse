@@ -236,7 +236,7 @@ class KeyStore(SQLBaseStore):
 
                 # The entire signed JSON response is stored in server_keys_json,
                 # fetch out the bits needed.
-                key_json = json.loads(key_json_bytes)
+                key_json = json.loads(bytes(key_json_bytes))
                 key_base64 = key_json["verify_keys"][key_id]["key"]
 
                 keys[(server_name, key_id)] = FetchKeyResult(
