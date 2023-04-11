@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -918,7 +917,7 @@ class DeviceListWorkerUpdater:
 
     def __init__(self, hs: "HomeServer"):
         from synapse.replication.http.devices import (
-            ReplicationMultiUserDevicesResyncRestServlet
+            ReplicationMultiUserDevicesResyncRestServlet,
         )
 
         self._multi_user_device_resync_client = (
