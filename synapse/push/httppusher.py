@@ -350,21 +350,23 @@ class HttpPusher(Pusher):
         tweaks: JsonMapping,
         badge: int,
     ) -> Tuple[JsonDict, JsonMapping]:
-        """Build the content of a push notification from an event, as specified by the
-        Push Gateway spec. This excludes the top level `notification` element and
-        is not taking care of the `devices` section either, those are handled by
-        `_build_notification_dict`.
+        """
+        Build the content of a push notification from an event, as specified by the
+        Push Gateway spec.
+
+        _build_notification_dict uses this to build the notification field and handles
+        adding the devices field.
 
         Args:
             event: the event
             tweaks: tweaks to apply
             badge: unread count to send with the push notification
 
-        Returns: a tuple `(content, tweaks)`, where:
-           * `content` is the content to put in `notification` before sending it to the
-           push gateway.
-           * `tweaks` is the tweaks to put in the `devices` section, they could be
-           different from the ones inputed in this function.
+        Returns:
+            A tuple of:
+                The content to put in `notification` before sending it to the push gateway.
+
+                The tweaks to put in the `devices` section, they may be different from the input.
         """
         priority = "low"
         if (
@@ -432,8 +434,8 @@ class HttpPusher(Pusher):
             content: the content
             tweaks: tweaks to add into the `devices` section
             default_payload: default payload to add in `devices[0].data.default_payload`.
-            This will be merged (and override if some matching values already exist there)
-            with existing `default_payload`.
+                This will be merged (and override if some matching values already exist there)
+                with existing `default_payload`.
 
         Returns:
             a full notification that can be send to the registered push gateway.
@@ -467,15 +469,15 @@ class HttpPusher(Pusher):
     ) -> Union[bool, Iterable[str]]:
         """Send a notification to the registered push gateway, with `content` being
         the content of the `notification` top property specified in the spec.
-        If specified `devices` property will be overrided with device-specific
+        If specified, the `devices` property will be overridden with device-specific
         information for this pusher.
 
         Args:
             content: the content
             tweaks: tweaks to add into the `devices` section
             default_payload: default payload to add in `devices[0].data.default_payload`.
-            This will be merged (and override if some matching values already exist there)
-            with existing `default_payload`.
+                This will be merged (and override if some matching values already exist there)
+                with existing `default_payload`.
 
         Returns:
             False if an error occured when calling the push gateway, or an array of
