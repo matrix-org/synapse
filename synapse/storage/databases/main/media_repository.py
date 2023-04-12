@@ -26,6 +26,7 @@ from typing import (
     cast,
 )
 
+from synapse.api.constants import Direction
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -176,7 +177,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         limit: int,
         user_id: str,
         order_by: str = MediaSortOrder.CREATED_TS.value,
-        direction: str = "f",
+        direction: Direction = Direction.FORWARDS,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Get a paginated list of metadata for a local piece of media
         which an user_id has uploaded
@@ -195,11 +196,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         def get_local_media_by_user_paginate_txn(
             txn: LoggingTransaction,
         ) -> Tuple[List[Dict[str, Any]], int]:
-
             # Set ordering
             order_by_column = MediaSortOrder(order_by).value
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"

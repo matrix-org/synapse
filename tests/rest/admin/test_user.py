@@ -28,8 +28,8 @@ import synapse.rest.admin
 from synapse.api.constants import ApprovalNoticeMedium, LoginType, UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
+from synapse.media.filepath import MediaFilePaths
 from synapse.rest.client import devices, login, logout, profile, register, room, sync
-from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
@@ -2913,7 +2913,8 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         other_user_tok = self.login("user", "pass")
         event_builder_factory = self.hs.get_event_builder_factory()
         event_creation_handler = self.hs.get_event_creation_handler()
-        storage_controllers = self.hs.get_storage_controllers()
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
 
         # Create two rooms, one with a local user only and one with both a local
         # and remote user.
@@ -2934,11 +2935,13 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(storage_controllers.persistence.persist_event(event, context))
+        context = self.get_success(unpersisted_context.persist(event))
+
+        self.get_success(persistence.persist_event(event, context))
 
         # Now get rooms
         url = "/_synapse/admin/v1/users/@joiner:remote_hs/joined_rooms"
@@ -3044,12 +3047,12 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             self.store.get_user_by_access_token(other_user_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=self.other_user,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",

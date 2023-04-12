@@ -35,6 +35,8 @@ def MockEvent(**kwargs: Any) -> EventBase:
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
+    if "content" not in kwargs:
+        kwargs["content"] = {}
     return make_event_from_dict(kwargs)
 
 
@@ -139,6 +141,13 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             {"type": "A", "prev_state": "prev_state", "membership": "join"},
             {"type": "A", "content": {}, "signatures": {}, "unsigned": {}},
             room_version=RoomVersions.MSC2176,
+        )
+
+        # As of MSC3989 we now redact the origin key.
+        self.run_test(
+            {"type": "A", "origin": "example.com"},
+            {"type": "A", "content": {}, "signatures": {}, "unsigned": {}},
+            room_version=RoomVersions.MSC3989,
         )
 
     def test_unsigned(self) -> None:

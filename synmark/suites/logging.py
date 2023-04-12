@@ -30,7 +30,6 @@ from synapse.util import Clock
 
 
 class LineCounter(LineOnlyReceiver):
-
     delimiter = b"\n"
 
     def __init__(self, *args, **kwargs):

@@ -19,6 +19,7 @@ import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Awaitable,
     Callable,
     Collection,
@@ -37,7 +38,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -60,6 +61,7 @@ from synapse.federation.federation_base import (
     event_from_pdu_json,
 )
 from synapse.federation.transport.client import SendJoinResponse
+from synapse.http.client import is_unknown_endpoint
 from synapse.http.types import QueryParams
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, tag_args, trace
 from synapse.types import JsonDict, UserID, get_domain_from_id
@@ -110,8 +112,9 @@ class SendJoinResult:
     # True if 'state' elides non-critical membership events
     partial_state: bool
 
-    # if 'partial_state' is set, a list of the servers in the room (otherwise empty)
-    servers_in_room: List[str]
+    # If 'partial_state' is set, a set of the servers in the room (otherwise empty).
+    # Always contains the server we joined off.
+    servers_in_room: AbstractSet[str]
 
 
 class FederationClient(FederationBase):
@@ -757,43 +760,6 @@ class FederationClient(FederationBase):
 
         return signed_auth
 
-    def _is_unknown_endpoint(
-        self, e: HttpResponseException, synapse_error: Optional[SynapseError] = None
-    ) -> bool:
-        """
-        Returns true if the response was due to an endpoint being unimplemented.
-
-        Args:
-            e: The error response received from the remote server.
-            synapse_error: The above error converted to a SynapseError. This is
-                automatically generated if not provided.
-
-        """
-        if synapse_error is None:
-            synapse_error = e.to_synapse_error()
-        # MSC3743 specifies that servers should return a 404 or 405 with an errcode
-        # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
-        # to an unknown method, respectively.
-        #
-        # Older versions of servers don't properly handle this. This needs to be
-        # rather specific as some endpoints truly do return 404 errors.
-        return (
-            # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
-            (e.code == 404 or e.code == 405)
-            and (
-                # Older Dendrites returned a text or empty body.
-                # Older Conduit returned an empty body.
-                not e.response
-                or e.response == b"404 page not found"
-                # The proper response JSON with M_UNRECOGNIZED errcode.
-                or synapse_error.errcode == Codes.UNRECOGNIZED
-            )
-        ) or (
-            # Older Synapses returned a 400 error.
-            e.code == 400
-            and synapse_error.errcode == Codes.UNRECOGNIZED
-        )
-
     async def _try_destination_list(
         self,
         description: str,
@@ -882,10 +848,10 @@ class FederationClient(FederationBase):
                 if 500 <= e.code < 600:
                     failover = True
 
-                elif e.code == 400 and synapse_error.errcode in failover_errcodes:
+                elif 400 <= e.code < 500 and synapse_error.errcode in failover_errcodes:
                     failover = True
 
-                elif failover_on_unknown_endpoint and self._is_unknown_endpoint(
+                elif failover_on_unknown_endpoint and is_unknown_endpoint(
                     e, synapse_error
                 ):
                     failover = True
@@ -997,14 +963,13 @@ class FederationClient(FederationBase):
 
             return destination, ev, room_version
 
+        failover_errcodes = {Codes.NOT_FOUND}
         # MSC3083 defines additional error codes for room joins. Unfortunately
         # we do not yet know the room version, assume these will only be returned
         # by valid room versions.
-        failover_errcodes = (
-            (Codes.UNABLE_AUTHORISE_JOIN, Codes.UNABLE_TO_GRANT_JOIN)
-            if membership == Membership.JOIN
-            else None
-        )
+        if membership == Membership.JOIN:
+            failover_errcodes.add(Codes.UNABLE_AUTHORISE_JOIN)
+            failover_errcodes.add(Codes.UNABLE_TO_GRANT_JOIN)
 
         return await self._try_destination_list(
             "make_" + membership,
@@ -1152,15 +1117,24 @@ class FederationClient(FederationBase):
                     % (auth_chain_create_events,)
                 )
 
-            if response.members_omitted and not response.servers_in_room:
-                raise InvalidResponseError(
-                    "members_omitted was set, but no servers were listed in the room"
-                )
+            servers_in_room = None
+            if response.servers_in_room is not None:
+                servers_in_room = set(response.servers_in_room)
 
-            if response.members_omitted and not partial_state:
-                raise InvalidResponseError(
-                    "members_omitted was set, but we asked for full state"
-                )
+            if response.members_omitted:
+                if not servers_in_room:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but no servers were listed in the room"
+                    )
+
+                if not partial_state:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but we asked for full state"
+                    )
+
+                # `servers_in_room` is supposed to be a complete list.
+                # Fix things up in case the remote homeserver is badly behaved.
+                servers_in_room.add(destination)
 
             return SendJoinResult(
                 event=event,
@@ -1168,7 +1142,7 @@ class FederationClient(FederationBase):
                 auth_chain=signed_auth,
                 origin=destination,
                 partial_state=response.members_omitted,
-                servers_in_room=response.servers_in_room or [],
+                servers_in_room=servers_in_room or frozenset(),
             )
 
         # MSC3083 defines additional error codes for room joins.
@@ -1213,7 +1187,7 @@ class FederationClient(FederationBase):
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
-            if not self._is_unknown_endpoint(e):
+            if not is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
@@ -1287,7 +1261,7 @@ class FederationClient(FederationBase):
             # fallback to the v1 endpoint if the room uses old-style event IDs.
             # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
-            if self._is_unknown_endpoint(e, err):
+            if is_unknown_endpoint(e, err):
                 if room_version.event_format != EventFormatVersions.ROOM_V1_V2:
                     raise SynapseError(
                         400,
@@ -1348,7 +1322,7 @@ class FederationClient(FederationBase):
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
-            if not self._is_unknown_endpoint(e):
+            if not is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_leave with the v2 API, falling back to the v1 API")
@@ -1619,7 +1593,7 @@ class FederationClient(FederationBase):
                 # If an error is received that is due to an unrecognised endpoint,
                 # fallback to the unstable endpoint. Otherwise, consider it a
                 # legitimate error and raise.
-                if not self._is_unknown_endpoint(e):
+                if not is_unknown_endpoint(e):
                     raise
 
                 logger.debug(
@@ -1680,7 +1654,12 @@ class FederationClient(FederationBase):
         return result
 
     async def timestamp_to_event(
-        self, *, destinations: List[str], room_id: str, timestamp: int, direction: str
+        self,
+        *,
+        destinations: List[str],
+        room_id: str,
+        timestamp: int,
+        direction: Direction,
     ) -> Optional["TimestampToEventResponse"]:
         """
         Calls each remote federating server from `destinations` asking for their closest
@@ -1693,7 +1672,7 @@ class FederationClient(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1738,7 +1717,7 @@ class FederationClient(FederationBase):
             return None
 
     async def _timestamp_to_event_from_destination(
-        self, destination: str, room_id: str, timestamp: int, direction: str
+        self, destination: str, room_id: str, timestamp: int, direction: Direction
     ) -> "TimestampToEventResponse":
         """
         Calls a remote federating server at `destination` asking for their
@@ -1751,7 +1730,7 @@ class FederationClient(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1864,7 +1843,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if not isinstance(origin_server_ts, int):
+        if type(origin_server_ts) is not int:
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

@@ -124,7 +124,6 @@ class InitialSyncHandler:
         as_client_event: bool = True,
         include_archived: bool = False,
     ) -> JsonDict:
-
         memberships = [Membership.INVITE, Membership.JOIN]
         if include_archived:
             memberships.append(Membership.LEAVE)
@@ -154,9 +153,8 @@ class InitialSyncHandler:
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
-        account_data, account_data_by_room = await self.store.get_account_data_for_user(
-            user_id
-        )
+        account_data = await self.store.get_global_account_data_for_user(user_id)
+        account_data_by_room = await self.store.get_room_account_data_for_user(user_id)
 
         public_room_ids = await self.store.get_public_room_ids()
 
@@ -320,11 +318,9 @@ class InitialSyncHandler:
         )
         is_peeking = member_event_id is None
 
-        user_id = requester.user.to_string()
-
         if membership == Membership.JOIN:
             result = await self._room_initial_sync_joined(
-                user_id, room_id, pagin_config, membership, is_peeking
+                requester, room_id, pagin_config, membership, is_peeking
             )
         elif membership == Membership.LEAVE:
             # The member_event_id will always be available if membership is set
@@ -332,10 +328,16 @@ class InitialSyncHandler:
             assert member_event_id
 
             result = await self._room_initial_sync_parted(
-                user_id, room_id, pagin_config, membership, member_event_id, is_peeking
+                requester,
+                room_id,
+                pagin_config,
+                membership,
+                member_event_id,
+                is_peeking,
             )
 
         account_data_events = []
+        user_id = requester.user.to_string()
         tags = await self.store.get_tags_for_room(user_id, room_id)
         if tags:
             account_data_events.append(
@@ -352,7 +354,7 @@ class InitialSyncHandler:
 
     async def _room_initial_sync_parted(
         self,
-        user_id: str,
+        requester: Requester,
         room_id: str,
         pagin_config: PaginationConfig,
         membership: str,
@@ -371,13 +373,17 @@ class InitialSyncHandler:
         )
 
         messages = await filter_events_for_client(
-            self._storage_controllers, user_id, messages, is_peeking=is_peeking
+            self._storage_controllers,
+            requester.user.to_string(),
+            messages,
+            is_peeking=is_peeking,
         )
 
         start_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, token)
         end_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, stream_token)
 
         time_now = self.clock.time_msec()
+        serialize_options = SerializeEventConfig(requester=requester)
 
         return {
             "membership": membership,
@@ -385,14 +391,18 @@ class InitialSyncHandler:
             "messages": {
                 "chunk": (
                     # Don't bundle aggregations as this is a deprecated API.
-                    self._event_serializer.serialize_events(messages, time_now)
+                    self._event_serializer.serialize_events(
+                        messages, time_now, config=serialize_options
+                    )
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),
             },
             "state": (
                 # Don't bundle aggregations as this is a deprecated API.
-                self._event_serializer.serialize_events(room_state.values(), time_now)
+                self._event_serializer.serialize_events(
+                    room_state.values(), time_now, config=serialize_options
+                )
             ),
             "presence": [],
             "receipts": [],
@@ -400,7 +410,7 @@ class InitialSyncHandler:
 
     async def _room_initial_sync_joined(
         self,
-        user_id: str,
+        requester: Requester,
         room_id: str,
         pagin_config: PaginationConfig,
         membership: str,
@@ -412,9 +422,12 @@ class InitialSyncHandler:
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()
+        serialize_options = SerializeEventConfig(requester=requester)
         # Don't bundle aggregations as this is a deprecated API.
         state = self._event_serializer.serialize_events(
-            current_state.values(), time_now
+            current_state.values(),
+            time_now,
+            config=serialize_options,
         )
 
         now_token = self.hs.get_event_sources().get_current_token()
@@ -452,7 +465,10 @@ class InitialSyncHandler:
             if not receipts:
                 return []
 
-            return ReceiptEventSource.filter_out_private_receipts(receipts, user_id)
+            return ReceiptEventSource.filter_out_private_receipts(
+                receipts,
+                requester.user.to_string(),
+            )
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(
             gather_results(
@@ -471,20 +487,23 @@ class InitialSyncHandler:
         )
 
         messages = await filter_events_for_client(
-            self._storage_controllers, user_id, messages, is_peeking=is_peeking
+            self._storage_controllers,
+            requester.user.to_string(),
+            messages,
+            is_peeking=is_peeking,
         )
 
         start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
         end_token = now_token
-
-        time_now = self.clock.time_msec()
 
         ret = {
             "room_id": room_id,
             "messages": {
                 "chunk": (
                     # Don't bundle aggregations as this is a deprecated API.
-                    self._event_serializer.serialize_events(messages, time_now)
+                    self._event_serializer.serialize_events(
+                        messages, time_now, config=serialize_options
+                    )
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),

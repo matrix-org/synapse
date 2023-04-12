@@ -476,7 +476,7 @@ class RegistrationHandler:
                     # create room expects the localpart of the room alias
                     config["room_alias_name"] = room_alias.localpart
 
-                    info, _ = await room_creation_handler.create_room(
+                    room_id, _, _ = await room_creation_handler.create_room(
                         fake_requester,
                         config=config,
                         ratelimit=False,
@@ -490,7 +490,7 @@ class RegistrationHandler:
                                 user_id, authenticated_entity=self._server_name
                             ),
                             target=UserID.from_string(user_id),
-                            room_id=info["room_id"],
+                            room_id=room_id,
                             # Since it was just created, there are no remote hosts.
                             remote_room_hosts=[],
                             action="join",
@@ -596,14 +596,20 @@ class RegistrationHandler:
         Args:
             user_id: The user to join
         """
+        # If there are no rooms to auto-join, just bail.
+        if not self.hs.config.registration.auto_join_rooms:
+            return
+
         # auto-join the user to any rooms we're supposed to dump them into
 
         # try to create the room if we're the first real user on the server. Note
         # that an auto-generated support or bot user is not a real user and will never be
         # the user to create the room
         should_auto_create_rooms = False
-        is_real_user = await self.store.is_real_user(user_id)
-        if self.hs.config.registration.autocreate_auto_join_rooms and is_real_user:
+        if (
+            self.hs.config.registration.autocreate_auto_join_rooms
+            and await self.store.is_real_user(user_id)
+        ):
             count = await self.store.count_real_users()
             should_auto_create_rooms = count == 1
 
@@ -1007,11 +1013,11 @@ class RegistrationHandler:
             user_tuple = await self.store.get_user_by_access_token(token)
             # The token better still exist.
             assert user_tuple
-            token_id = user_tuple.token_id
+            device_id = user_tuple.device_id
 
             await self.pusher_pool.add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="email",
                 app_id="m.email",
                 app_display_name="Email Notifications",

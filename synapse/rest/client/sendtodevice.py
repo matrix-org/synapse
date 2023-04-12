@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Awaitable, Tuple
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.http import servlet
 from synapse.http.server import HttpServer
@@ -21,7 +21,7 @@ from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_r
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.types import JsonDict
+from synapse.types import JsonDict, Requester
 
 from ._base import client_patterns
 
@@ -35,6 +35,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_patterns(
         "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$"
     )
+    CATEGORY = "The to_device stream"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -43,19 +44,26 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.txns = HttpTransactionCache(hs)
         self.device_message_handler = hs.get_device_message_handler()
 
-    def on_PUT(
-        self, request: SynapseRequest, message_type: str, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
-        return self.txns.fetch_or_execute_request(
-            request, self._put, request, message_type, txn_id
-        )
-
-    async def _put(
+    async def on_PUT(
         self, request: SynapseRequest, message_type: str, txn_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        set_tag("txn_id", txn_id)
+        return await self.txns.fetch_or_execute_request(
+            request,
+            requester,
+            self._put,
+            request,
+            requester,
+            message_type,
+        )
 
+    async def _put(
+        self,
+        request: SynapseRequest,
+        requester: Requester,
+        message_type: str,
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("messages",))
 

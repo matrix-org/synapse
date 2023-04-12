@@ -44,6 +44,8 @@ from twisted.internet.interfaces import (
     IAddress,
     IDelayedCall,
     IHostResolution,
+    IOpenSSLContextFactory,
+    IReactorCore,
     IReactorPluggableNameResolver,
     IReactorTime,
     IResolutionReceiver,
@@ -226,7 +228,9 @@ class _IPBlacklistingResolver:
         return recv
 
 
-@implementer(ISynapseReactor)
+# ISynapseReactor implies IReactorCore, but explicitly marking it this as an implementer
+# of IReactorCore seems to keep mypy-zope happier.
+@implementer(IReactorCore, ISynapseReactor)
 class BlacklistingReactorWrapper:
     """
     A Reactor wrapper which will prevent DNS resolution to blacklisted IP
@@ -264,8 +268,8 @@ class BlacklistingAgentWrapper(Agent):
     def __init__(
         self,
         agent: IAgent,
+        ip_blacklist: IPSet,
         ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
     ):
         """
         Args:
@@ -287,7 +291,9 @@ class BlacklistingAgentWrapper(Agent):
         h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
-            ip_address = IPAddress(h.hostname)
+            # h.hostname is Optional[str], None raises an AddrFormatError, so
+            # this is safe even though IPAddress requires a str.
+            ip_address = IPAddress(h.hostname)  # type: ignore[arg-type]
         except AddrFormatError:
             # Not an IP
             pass
@@ -384,8 +390,8 @@ class SimpleHttpClient:
             # by the DNS resolution.
             self.agent = BlacklistingAgentWrapper(
                 self.agent,
-                ip_whitelist=self._ip_whitelist,
                 ip_blacklist=self._ip_blacklist,
+                ip_whitelist=self._ip_whitelist,
             )
 
     async def request(
@@ -955,8 +961,47 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
         self._context.set_verify(VERIFY_NONE, lambda *_: False)
 
-    def getContext(self, hostname=None, port=None):
+    def getContext(self) -> SSL.Context:
         return self._context
 
-    def creatorForNetloc(self, hostname: bytes, port: int):
+    def creatorForNetloc(self, hostname: bytes, port: int) -> IOpenSSLContextFactory:
         return self
+
+
+def is_unknown_endpoint(
+    e: HttpResponseException, synapse_error: Optional[SynapseError] = None
+) -> bool:
+    """
+    Returns true if the response was due to an endpoint being unimplemented.
+
+    Args:
+        e: The error response received from the remote server.
+        synapse_error: The above error converted to a SynapseError. This is
+            automatically generated if not provided.
+
+    """
+    if synapse_error is None:
+        synapse_error = e.to_synapse_error()
+
+    # Matrix v1.6 specifies that servers should return a 404 or 405 with an errcode
+    # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
+    # to an unknown method, respectively.
+    #
+    # Older versions of servers don't return proper errors, so be graceful. But,
+    # also handle that some endpoints truly do return 404 errors.
+    return (
+        # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
+        (e.code == 404 or e.code == 405)
+        and (
+            # Consider empty body or non-JSON bodies to be unrecognised (matches
+            # older Dendrites & Conduits).
+            not e.response
+            or not e.response.startswith(b"{")
+            # The proper response JSON with M_UNRECOGNIZED errcode.
+            or synapse_error.errcode == Codes.UNRECOGNIZED
+        )
+    ) or (
+        # Older Synapses returned a 400 error.
+        e.code == 400
+        and synapse_error.errcode == Codes.UNRECOGNIZED
+    )

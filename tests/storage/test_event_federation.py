@@ -54,6 +54,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
+        persist_events = hs.get_datastores().persist_events
+        assert persist_events is not None
+        self.persist_events = persist_events
 
     def test_get_prev_events_for_room(self) -> None:
         room_id = "@ROOM:local"
@@ -226,7 +229,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                     },
                 )
 
-            self.hs.datastores.persist_events._persist_event_auth_chain_txn(
+            self.persist_events._persist_event_auth_chain_txn(
                 txn,
                 [
                     cast(EventBase, FakeEvent(event_id, room_id, auth_graph[event_id]))
@@ -445,7 +448,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 )
 
             # Insert all events apart from 'B'
-            self.hs.datastores.persist_events._persist_event_auth_chain_txn(
+            self.persist_events._persist_event_auth_chain_txn(
                 txn,
                 [
                     cast(EventBase, FakeEvent(event_id, room_id, auth_graph[event_id]))
@@ -464,7 +467,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 updatevalues={"has_auth_chain_index": False},
             )
 
-            self.hs.datastores.persist_events._persist_event_auth_chain_txn(
+            self.persist_events._persist_event_auth_chain_txn(
                 txn,
                 [cast(EventBase, FakeEvent("b", room_id, auth_graph["b"]))],
             )
@@ -669,7 +672,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         complete_event_dict_map: Dict[str, JsonDict] = {}
         stream_ordering = 0
-        for (event_id, prev_event_ids) in event_graph.items():
+        for event_id, prev_event_ids in event_graph.items():
             depth = depth_map[event_id]
 
             complete_event_dict_map[event_id] = {
@@ -1140,19 +1143,24 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         tok = self.login("alice", "test")
         room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
 
+        failure_time = self.clock.time_msec()
         self.get_success(
             self.store.record_event_failed_pull_attempt(
                 room_id, "$failed_event_id", "fake cause"
             )
         )
 
-        event_ids_to_backoff = self.get_success(
+        event_ids_with_backoff = self.get_success(
             self.store.get_event_ids_to_not_pull_from_backoff(
                 room_id=room_id, event_ids=["$failed_event_id", "$normal_event_id"]
             )
         )
 
-        self.assertEqual(event_ids_to_backoff, ["$failed_event_id"])
+        self.assertEqual(
+            event_ids_with_backoff,
+            # We expect a 2^1 hour backoff after a single failed attempt.
+            {"$failed_event_id": failure_time + 2 * 60 * 60 * 1000},
+        )
 
     def test_get_event_ids_to_not_pull_from_backoff_retry_after_backoff_duration(
         self,
@@ -1176,14 +1184,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # attempt (2^1 hours).
         self.reactor.advance(datetime.timedelta(hours=2).total_seconds())
 
-        event_ids_to_backoff = self.get_success(
+        event_ids_with_backoff = self.get_success(
             self.store.get_event_ids_to_not_pull_from_backoff(
                 room_id=room_id, event_ids=["$failed_event_id", "$normal_event_id"]
             )
         )
         # Since this function only returns events we should backoff from, time has
         # elapsed past the backoff range so there is no events to backoff from.
-        self.assertEqual(event_ids_to_backoff, [])
+        self.assertEqual(event_ids_with_backoff, {})
 
 
 @attr.s(auto_attribs=True)

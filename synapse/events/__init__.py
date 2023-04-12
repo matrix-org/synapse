@@ -39,7 +39,7 @@ from unpaddedbase64 import encode_base64
 
 from synapse.api.constants import RelationTypes
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StrCollection
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
@@ -413,7 +413,7 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self._dict["prev_events"]]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -462,7 +462,7 @@ class FrozenEvent(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -510,7 +510,7 @@ class FrozenEventV2(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -558,7 +558,7 @@ class FrozenEventV2(EventBase):
         """
         return self._dict["prev_events"]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 

@@ -68,6 +68,7 @@ redis:
   enabled: true
   host: redis
   port: 6379
+  # dbid:  <redis_logical_db_id>
   # password: <secret_password>  
 ```
 

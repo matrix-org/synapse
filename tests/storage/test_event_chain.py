@@ -389,6 +389,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
         """
 
         persist_events_store = self.hs.get_datastores().persist_events
+        assert persist_events_store is not None
 
         for e in events:
             e.internal_metadata.stream_ordering = self._next_stream_ordering
@@ -397,6 +398,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
         def _persist(txn: LoggingTransaction) -> None:
             # We need to persist the events to the events and state_events
             # tables.
+            assert persist_events_store is not None
             persist_events_store._store_event_txn(
                 txn,
                 [(e, EventContext(self.hs.get_storage_controllers())) for e in events],
@@ -415,7 +417,6 @@ class EventChainStoreTestCase(HomeserverTestCase):
     def fetch_chains(
         self, events: List[EventBase]
     ) -> Tuple[Dict[str, Tuple[int, int]], _LinkMap]:
-
         # Fetch the map from event ID -> (chain ID, sequence number)
         rows = self.get_success(
             self.store.db_pool.simple_select_many_batch(
@@ -490,7 +491,6 @@ class LinkMapTestCase(unittest.TestCase):
 
 
 class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
@@ -522,7 +522,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         latest_event_ids = self.get_success(
             self.store.get_prev_events_for_room(room_id)
         )
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_handler.create_event(
                 self.requester,
                 {
@@ -535,14 +535,17 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
                 prev_event_ids=latest_event_ids,
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
             event_handler.handle_new_client_event(
                 self.requester, events_and_context=[(event, context)]
             )
         )
-        state1 = set(self.get_success(context.get_current_state_ids()).values())
+        state_ids1 = self.get_success(context.get_current_state_ids())
+        assert state_ids1 is not None
+        state1 = set(state_ids1.values())
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_handler.create_event(
                 self.requester,
                 {
@@ -555,12 +558,15 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
                 prev_event_ids=latest_event_ids,
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
             event_handler.handle_new_client_event(
                 self.requester, events_and_context=[(event, context)]
             )
         )
-        state2 = set(self.get_success(context.get_current_state_ids()).values())
+        state_ids2 = self.get_success(context.get_current_state_ids())
+        assert state_ids2 is not None
+        state2 = set(state_ids2.values())
 
         # Delete the chain cover info.
 

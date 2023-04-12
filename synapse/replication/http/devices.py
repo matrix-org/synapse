@@ -70,7 +70,6 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
     async def _serialize_payload(  # type: ignore[override]
         user_id: str, device_id: str, keys: JsonDict
     ) -> JsonDict:
-
         return {
             "user_id": user_id,
             "device_id": device_id,

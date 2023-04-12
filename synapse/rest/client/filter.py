@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class GetFilterRestServlet(RestServlet):
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -69,6 +70,7 @@ class GetFilterRestServlet(RestServlet):
 
 class CreateFilterRestServlet(RestServlet):
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -79,7 +81,6 @@ class CreateFilterRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
 

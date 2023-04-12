@@ -50,7 +50,16 @@ def cpython(wheel_file: str, name: str, version: Version, tag: Tag) -> str:
 
     check_is_abi3_compatible(wheel_file)
 
-    abi3_tag = Tag(tag.interpreter, "abi3", tag.platform)
+    # HACK: it seems that some older versions of pip will consider a wheel marked
+    # as macosx_11_0 as incompatible with Big Sur. I haven't done the full archaeology
+    # here; there are some clues in
+    #     https://github.com/pantsbuild/pants/pull/12857
+    #     https://github.com/pypa/pip/issues/9138
+    #     https://github.com/pypa/packaging/pull/319
+    # Empirically this seems to work, note that macOS 11 and 10.16 are the same,
+    # both versions are valid for backwards compatibility.
+    platform = tag.platform.replace("macosx_11_0", "macosx_10_16")
+    abi3_tag = Tag(tag.interpreter, "abi3", platform)
 
     dirname = os.path.dirname(wheel_file)
     new_wheel_file = os.path.join(

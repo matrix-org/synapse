@@ -47,6 +47,7 @@ from synapse.api.errors import (
     FederationError,
     FederationPullAttemptBackoffError,
     HttpResponseException,
+    PartialStateConflictError,
     RequestSendFailed,
     SynapseError,
 )
@@ -58,7 +59,7 @@ from synapse.event_auth import (
     validate_event_for_room_version,
 )
 from synapse.events import EventBase
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
 from synapse.federation.federation_client import InvalidResponseError, PulledPduInfo
 from synapse.logging.context import nested_logging_context
 from synapse.logging.opentracing import (
@@ -74,7 +75,6 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.state import StateResolutionStore
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
     PersistedEventPosition,
@@ -140,6 +140,7 @@ class FederationEventHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
@@ -426,7 +427,9 @@ class FederationEventHandler:
         return event, context
 
     async def check_join_restrictions(
-        self, context: EventContext, event: EventBase
+        self,
+        context: UnpersistedEventContextBase,
+        event: EventBase,
     ) -> None:
         """Check that restrictions in restricted join rules are matched
 
@@ -439,16 +442,17 @@ class FederationEventHandler:
         # Check if the user is already in the room or invited to the room.
         user_id = event.state_key
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
-        prev_member_event = None
+        prev_membership = None
         if prev_member_event_id:
             prev_member_event = await self._store.get_event(prev_member_event_id)
+            prev_membership = prev_member_event.membership
 
         # Check if the member should be allowed access via membership in a space.
         await self._event_auth_handler.check_restricted_join_rules(
             prev_state_ids,
             event.room_version,
             user_id,
-            prev_member_event,
+            prev_membership,
         )
 
     @trace
@@ -524,17 +528,63 @@ class FederationEventHandler:
             "Peristing join-via-remote %s (partial_state: %s)", event, partial_state
         )
         with nested_logging_context(suffix=event.event_id):
+            if partial_state:
+                # When handling a second partial state join into a partial state room,
+                # the returned state will exclude the membership from the first join. To
+                # preserve prior memberships, we try to compute the partial state before
+                # the event ourselves if we know about any of the prev events.
+                #
+                # When we don't know about any of the prev events, it's fine to just use
+                # the returned state, since the new join will create a new forward
+                # extremity, and leave the forward extremity containing our prior
+                # memberships alone.
+                prev_event_ids = set(event.prev_event_ids())
+                seen_event_ids = await self._store.have_events_in_timeline(
+                    prev_event_ids
+                )
+                missing_event_ids = prev_event_ids - seen_event_ids
+
+                state_maps_to_resolve: List[StateMap[str]] = []
+
+                # Fetch the state after the prev events that we know about.
+                state_maps_to_resolve.extend(
+                    (
+                        await self._state_storage_controller.get_state_groups_ids(
+                            room_id, seen_event_ids, await_full_state=False
+                        )
+                    ).values()
+                )
+
+                # When there are prev events we do not have the state for, we state
+                # resolve with the state returned by the remote homeserver.
+                if missing_event_ids or len(state_maps_to_resolve) == 0:
+                    state_maps_to_resolve.append(
+                        {(e.type, e.state_key): e.event_id for e in state}
+                    )
+
+                state_ids_before_event = (
+                    await self._state_resolution_handler.resolve_events_with_store(
+                        event.room_id,
+                        room_version.identifier,
+                        state_maps_to_resolve,
+                        event_map=None,
+                        state_res_store=StateResolutionStore(self._store),
+                    )
+                )
+            else:
+                state_ids_before_event = {
+                    (e.type, e.state_key): e.event_id for e in state
+                }
+
             context = await self._state_handler.compute_event_context(
                 event,
-                state_ids_before_event={
-                    (e.type, e.state_key): e.event_id for e in state
-                },
+                state_ids_before_event=state_ids_before_event,
                 partial_state=partial_state,
             )
 
             await self._check_event_auth(origin, event, context)
             if context.rejected:
-                raise SynapseError(400, "Join event was rejected")
+                raise SynapseError(403, "Join event was rejected")
 
             # the remote server is responsible for sending our join event to the rest
             # of the federation. Indeed, attempting to do so will result in problems
@@ -989,8 +1039,8 @@ class FederationEventHandler:
 
         Raises:
             FederationPullAttemptBackoffError if we are are deliberately not attempting
-                to pull the given event over federation because we've already done so
-                recently and are backing off.
+                to pull one of the given event's `prev_event`s over federation because
+                we've already done so recently and are backing off.
             FederationError if we fail to get the state from the remote server after any
                 missing `prev_event`s.
         """
@@ -1004,13 +1054,22 @@ class FederationEventHandler:
         # If we've already recently attempted to pull this missing event, don't
         # try it again so soon. Since we have to fetch all of the prev_events, we can
         # bail early here if we find any to ignore.
-        prevs_to_ignore = await self._store.get_event_ids_to_not_pull_from_backoff(
-            room_id, missing_prevs
+        prevs_with_pull_backoff = (
+            await self._store.get_event_ids_to_not_pull_from_backoff(
+                room_id, missing_prevs
+            )
         )
-        if len(prevs_to_ignore) > 0:
+        if len(prevs_with_pull_backoff) > 0:
             raise FederationPullAttemptBackoffError(
-                event_ids=prevs_to_ignore,
-                message=f"While computing context for event={event_id}, not attempting to pull missing prev_event={prevs_to_ignore[0]} because we already tried to pull recently (backing off).",
+                event_ids=prevs_with_pull_backoff.keys(),
+                message=(
+                    f"While computing context for event={event_id}, not attempting to "
+                    f"pull missing prev_events={list(prevs_with_pull_backoff.keys())} "
+                    "because we already tried to pull recently (backing off)."
+                ),
+                retry_after_ms=(
+                    max(prevs_with_pull_backoff.values()) - self._clock.time_msec()
+                ),
             )
 
         if not missing_prevs:
@@ -1456,7 +1515,10 @@ class FederationEventHandler:
         # support it or the event is not from the room creator.
         room_version = await self._store.get_room_version(marker_event.room_id)
         create_event = await self._store.get_create_event_for_room(marker_event.room_id)
-        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        if not room_version.msc2175_implicit_room_creator:
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        else:
+            room_creator = create_event.sender
         if not room_version.msc2716_historical and (
             not self._config.experimental.msc2716_enabled
             or marker_event.sender != room_creator

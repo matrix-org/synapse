@@ -174,15 +174,29 @@ class Config:
 
     @staticmethod
     def parse_size(value: Union[str, int]) -> int:
-        if isinstance(value, int):
+        """Interpret `value` as a number of bytes.
+
+        If an integer is provided it is treated as bytes and is unchanged.
+
+        String byte sizes can have a suffix of 'K' or `M`, representing kibibytes and
+        mebibytes respectively. No suffix is understood as a plain byte count.
+
+        Raises:
+            TypeError, if given something other than an integer or a string
+            ValueError: if given a string not of the form described above.
+        """
+        if type(value) is int:
             return value
-        sizes = {"K": 1024, "M": 1024 * 1024}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+        elif type(value) is str:
+            sizes = {"K": 1024, "M": 1024 * 1024}
+            size = 1
+            suffix = value[-1]
+            if suffix in sizes:
+                value = value[:-1]
+                size = sizes[suffix]
+            return int(value) * size
+        else:
+            raise TypeError(f"Bad byte size {value!r}")
 
     @staticmethod
     def parse_duration(value: Union[str, int]) -> int:
@@ -198,22 +212,36 @@ class Config:
 
         Returns:
             The number of milliseconds in the duration.
+
+        Raises:
+            TypeError, if given something other than an integer or a string
+            ValueError: if given a string not of the form described above.
         """
-        if isinstance(value, int):
+        if type(value) is int:
             return value
-        second = 1000
-        minute = 60 * second
-        hour = 60 * minute
-        day = 24 * hour
-        week = 7 * day
-        year = 365 * day
-        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+        elif type(value) is str:
+            second = 1000
+            minute = 60 * second
+            hour = 60 * minute
+            day = 24 * hour
+            week = 7 * day
+            year = 365 * day
+            sizes = {
+                "s": second,
+                "m": minute,
+                "h": hour,
+                "d": day,
+                "w": week,
+                "y": year,
+            }
+            size = 1
+            suffix = value[-1]
+            if suffix in sizes:
+                value = value[:-1]
+                size = sizes[suffix]
+            return int(value) * size
+        else:
+            raise TypeError(f"Bad duration {value!r}")
 
     @staticmethod
     def abspath(file_path: str) -> str:

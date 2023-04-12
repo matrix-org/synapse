@@ -1239,6 +1239,7 @@ class OidcProvider:
             grandfather_existing_users,
             extra_attributes,
             auth_provider_session_id=sid,
+            registration_enabled=self._config.enable_registration,
         )
 
     def _remote_id_from_userinfo(self, userinfo: UserInfo) -> str:

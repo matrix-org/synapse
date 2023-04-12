@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, cast
 import attr
 from canonicaljson import encode_canonical_json
 
+from synapse.api.constants import Direction
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import db_to_json
 from synapse.storage.database import (
@@ -223,7 +224,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
 
         await self.db_pool.runInteraction(
             "set_destination_retry_timings",
-            self._set_destination_retry_timings_native,
+            self._set_destination_retry_timings_txn,
             destination,
             failure_ts,
             retry_last_ts,
@@ -231,7 +232,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             db_autocommit=True,  # Safe as it's a single upsert
         )
 
-    def _set_destination_retry_timings_native(
+    def _set_destination_retry_timings_txn(
         self,
         txn: LoggingTransaction,
         destination: str,
@@ -260,58 +261,6 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         """
 
         txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
-
-        self._invalidate_cache_and_stream(
-            txn, self.get_destination_retry_timings, (destination,)
-        )
-
-    def _set_destination_retry_timings_emulated(
-        self,
-        txn: LoggingTransaction,
-        destination: str,
-        failure_ts: Optional[int],
-        retry_last_ts: int,
-        retry_interval: int,
-    ) -> None:
-        self.database_engine.lock_table(txn, "destinations")
-
-        # We need to be careful here as the data may have changed from under us
-        # due to a worker setting the timings.
-
-        prev_row = self.db_pool.simple_select_one_txn(
-            txn,
-            table="destinations",
-            keyvalues={"destination": destination},
-            retcols=("failure_ts", "retry_last_ts", "retry_interval"),
-            allow_none=True,
-        )
-
-        if not prev_row:
-            self.db_pool.simple_insert_txn(
-                txn,
-                table="destinations",
-                values={
-                    "destination": destination,
-                    "failure_ts": failure_ts,
-                    "retry_last_ts": retry_last_ts,
-                    "retry_interval": retry_interval,
-                },
-            )
-        elif (
-            retry_interval == 0
-            or prev_row["retry_interval"] is None
-            or prev_row["retry_interval"] < retry_interval
-        ):
-            self.db_pool.simple_update_one_txn(
-                txn,
-                "destinations",
-                keyvalues={"destination": destination},
-                updatevalues={
-                    "failure_ts": failure_ts,
-                    "retry_last_ts": retry_last_ts,
-                    "retry_interval": retry_interval,
-                },
-            )
 
         self._invalidate_cache_and_stream(
             txn, self.get_destination_retry_timings, (destination,)
@@ -496,7 +445,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         limit: int,
         destination: Optional[str] = None,
         order_by: str = DestinationSortOrder.DESTINATION.value,
-        direction: str = "f",
+        direction: Direction = Direction.FORWARDS,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of destinations.
         This will return a json list of destinations and the
@@ -518,7 +467,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         ) -> Tuple[List[JsonDict], int]:
             order_by_column = DestinationSortOrder(order_by).value
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
@@ -550,7 +499,11 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def get_destination_rooms_paginate(
-        self, destination: str, start: int, limit: int, direction: str = "f"
+        self,
+        destination: str,
+        start: int,
+        limit: int,
+        direction: Direction = Direction.FORWARDS,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of destination's rooms.
         This will return a json list of rooms and the
@@ -568,8 +521,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         def get_destination_rooms_paginate_txn(
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
-
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"

@@ -41,6 +41,7 @@ from typing import (
     Any,
     Collection,
     Dict,
+    Iterable,
     List,
     Optional,
     Set,
@@ -50,7 +51,7 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 from typing_extensions import Literal
 
 from twisted.internet import defer
@@ -86,6 +87,7 @@ MAX_STREAM_SIZE = 1000
 
 _STREAM_TOKEN = "stream"
 _TOPOLOGICAL_TOKEN = "topological"
+
 
 # Used as return values for pagination APIs
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -556,7 +558,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 if p > min_pos
             }
 
-        return RoomStreamToken(None, min_pos, frozendict(positions))
+        return RoomStreamToken(None, min_pos, immutabledict(positions))
 
     async def get_room_events_stream_for_rooms(
         self,
@@ -1342,7 +1344,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             GROUP BY type
         """
         txn.execute(sql)
-        min_positions = {typ: pos for typ, pos in txn}  # Map from type -> min position
+        min_positions = dict(
+            cast(Iterable[Tuple[str, int]], txn)
+        )  # Map from type -> min position
 
         # Ensure we do actually have some values here
         assert set(min_positions) == {"federation", "events"}

@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
     cast,
@@ -1004,7 +1005,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             room_id,
         )
 
-    async def get_max_depth_of(self, event_ids: List[str]) -> Tuple[Optional[str], int]:
+    async def get_max_depth_of(
+        self, event_ids: Collection[str]
+    ) -> Tuple[Optional[str], int]:
         """Returns the event ID and depth for the event that has the max depth from a set of event IDs
 
         Args:
@@ -1141,7 +1144,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
     @cached(max_entries=5000, iterable=True)
-    async def get_latest_event_ids_in_room(self, room_id: str) -> List[str]:
+    async def get_latest_event_ids_in_room(self, room_id: str) -> Sequence[str]:
         return await self.db_pool.simple_select_onecol(
             table="event_forward_extremities",
             keyvalues={"room_id": room_id},
@@ -1168,10 +1171,42 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return int(min_depth) if min_depth is not None else None
 
+    async def have_room_forward_extremities_changed_since(
+        self,
+        room_id: str,
+        stream_ordering: int,
+    ) -> bool:
+        """Check if the forward extremities in a room have changed since the
+        given stream ordering
+
+        Throws a StoreError if we have since purged the index for
+        stream_orderings from that point.
+        """
+
+        if stream_ordering <= self.stream_ordering_month_ago:  # type: ignore[attr-defined]
+            raise StoreError(400, f"stream_ordering too old {stream_ordering}")
+
+        sql = """
+            SELECT 1 FROM stream_ordering_to_exterm
+            WHERE stream_ordering > ? AND room_id = ?
+            LIMIT 1
+        """
+
+        def have_room_forward_extremities_changed_since_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            txn.execute(sql, (stream_ordering, room_id))
+            return txn.fetchone() is not None
+
+        return await self.db_pool.runInteraction(
+            "have_room_forward_extremities_changed_since",
+            have_room_forward_extremities_changed_since_txn,
+        )
+
     @cancellable
     async def get_forward_extremities_for_room_at_stream_ordering(
         self, room_id: str, stream_ordering: int
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """For a given room_id and stream_ordering, return the forward
         extremeties of the room at that point in "time".
 
@@ -1204,7 +1239,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     @cached(max_entries=5000, num_args=2)
     async def _get_forward_extremeties_for_room(
         self, room_id: str, stream_ordering: int
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """For a given room_id and stream_ordering, return the forward
         extremeties of the room at that point in "time".
 
@@ -1229,9 +1264,16 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             txn.execute(sql, (stream_ordering, room_id))
             return [event_id for event_id, in txn]
 
-        return await self.db_pool.runInteraction(
+        event_ids = await self.db_pool.runInteraction(
             "get_forward_extremeties_for_room", get_forward_extremeties_for_room_txn
         )
+
+        # If we didn't find any IDs, then we must have cleared out the
+        # associated `stream_ordering_to_exterm`.
+        if not event_ids:
+            raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
+
+        return event_ids
 
     def _get_connected_batch_event_backfill_results_txn(
         self, txn: LoggingTransaction, insertion_event_id: str, limit: int
@@ -1541,7 +1583,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self,
         room_id: str,
         event_ids: Collection[str],
-    ) -> List[str]:
+    ) -> Dict[str, int]:
         """
         Filter down the events to ones that we've failed to pull before recently. Uses
         exponential backoff.
@@ -1551,7 +1593,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             event_ids: A list of events to filter down
 
         Returns:
-            List of event_ids that should not be attempted to be pulled
+            A dictionary of event_ids that should not be attempted to be pulled and the
+            next timestamp at which we may try pulling them again.
         """
         event_failed_pull_attempts = await self.db_pool.simple_select_many_batch(
             table="event_failed_pull_attempts",
@@ -1567,22 +1610,28 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
         current_time = self._clock.time_msec()
-        return [
-            event_failed_pull_attempt["event_id"]
-            for event_failed_pull_attempt in event_failed_pull_attempts
+
+        event_ids_with_backoff = {}
+        for event_failed_pull_attempt in event_failed_pull_attempts:
+            event_id = event_failed_pull_attempt["event_id"]
             # Exponential back-off (up to the upper bound) so we don't try to
             # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
-            if current_time
-            < event_failed_pull_attempt["last_attempt_ts"]
-            + (
-                2
-                ** min(
-                    event_failed_pull_attempt["num_attempts"],
-                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+            backoff_end_time = (
+                event_failed_pull_attempt["last_attempt_ts"]
+                + (
+                    2
+                    ** min(
+                        event_failed_pull_attempt["num_attempts"],
+                        BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    )
                 )
+                * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
             )
-            * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
-        ]
+
+            if current_time < backoff_end_time:  # `backoff_end_time` is exclusive
+                event_ids_with_backoff[event_id] = backoff_end_time
+
+        return event_ids_with_backoff
 
     async def get_missing_events(
         self,
@@ -1609,7 +1658,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         latest_events: List[str],
         limit: int,
     ) -> List[str]:
-
         seen_events = set(earliest_events)
         front = set(latest_events) - seen_events
         event_results: List[str] = []
@@ -1655,19 +1703,12 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     @wrap_as_background_process("delete_old_forward_extrem_cache")
     async def _delete_old_forward_extrem_cache(self) -> None:
         def _delete_old_forward_extrem_cache_txn(txn: LoggingTransaction) -> None:
-            # Delete entries older than a month, while making sure we don't delete
-            # the only entries for a room.
             sql = """
                 DELETE FROM stream_ordering_to_exterm
-                WHERE
-                room_id IN (
-                    SELECT room_id
-                    FROM stream_ordering_to_exterm
-                    WHERE stream_ordering > ?
-                ) AND stream_ordering < ?
+                WHERE stream_ordering < ?
             """
             txn.execute(
-                sql, (self.stream_ordering_month_ago, self.stream_ordering_month_ago)  # type: ignore[attr-defined]
+                sql, (self.stream_ordering_month_ago)  # type: ignore[attr-defined]
             )
 
         await self.db_pool.runInteraction(

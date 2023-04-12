@@ -16,6 +16,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Optional, Tuple
 
+from synapse.api.constants import Direction
 from synapse.handlers.relations import ThreadsListInclude
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
@@ -41,6 +42,7 @@ class RelationPaginationServlet(RestServlet):
         "(/(?P<relation_type>[^/]*)(/(?P<event_type>[^/]*))?)?$",
         releases=("v1",),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -59,7 +61,7 @@ class RelationPaginationServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         pagination_config = await PaginationConfig.from_request(
-            self._store, request, default_limit=5, default_dir="b"
+            self._store, request, default_limit=5, default_dir=Direction.BACKWARDS
         )
 
         # The unstable version of this API returns an extra field for client
@@ -83,6 +85,7 @@ class RelationPaginationServlet(RestServlet):
 
 class ThreadsServlet(RestServlet):
     PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/threads"),)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
