@@ -1,0 +1,1 @@
+Load SSO rest API for redirect only if SSO is enabled.
