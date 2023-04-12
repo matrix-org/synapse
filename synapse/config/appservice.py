@@ -33,7 +33,9 @@ class AppServiceConfig(Config):
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.app_service_config_files = config.get("app_service_config_files", [])
-        if not isinstance(self.app_service_config_files, list):
+        if not isinstance(self.app_service_config_files, list) or not all(
+            type(x) is str for x in self.app_service_config_files
+        ):
             # type-ignore: this function gets arbitrary json value; we do use this path.
             raise ConfigError(
                 "Expected '%s' to be a list of AS config files:"

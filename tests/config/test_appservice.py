@@ -19,7 +19,15 @@ from tests.unittest import TestCase
 
 class AppServiceConfigTest(TestCase):
     def test_invalid_app_service_config_files(self) -> None:
-        for invalid_value in ["foobar", 1, None, True, False, {}]:
+        for invalid_value in [
+            "foobar",
+            1,
+            None,
+            True,
+            False,
+            {},
+            ["foo", "bar", False],
+        ]:
             with self.assertRaises(ConfigError):
                 AppServiceConfig().read_config(
                     {"app_service_config_files": invalid_value}
