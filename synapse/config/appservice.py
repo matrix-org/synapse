@@ -42,8 +42,11 @@ def load_appservices(
     """Returns a list of Application Services from the config files."""
     if not isinstance(config_files, list):
         # type-ignore: this function gets arbitrary json value; we do use this path.
-        logger.warning("Expected %s to be a list of AS config files.", config_files)  # type: ignore[unreachable]
-        return []
+        raise ConfigError(
+            "Expected '%s' to be a list of AS config files:"
+            % (config_files)
+            "app_service_config_files"
+        )
 
     # Dicts of value -> filename
     seen_as_tokens: Dict[str, str] = {}
