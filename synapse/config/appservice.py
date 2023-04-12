@@ -38,7 +38,7 @@ class AppServiceConfig(Config):
             raise ConfigError(
                 "Expected '%s' to be a list of AS config files:"
                 % (self.app_service_config_files),
-                "app_service_config_files"
+                "app_service_config_files",
             )
 
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
