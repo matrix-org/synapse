@@ -312,35 +312,24 @@ class BlacklistingAgentWrapper(Agent):
         )
 
 
-class SimpleHttpClient:
+class BaseSynapseClient:
     """
     A simple, no-frills HTTP client with methods that wrap up common ways of
     using HTTP in Matrix
+
+    Args:
+        hs: The HomeServer instance to pass in
+        treq_args: Extra keyword arguments to be given to treq.request.
     """
 
     def __init__(
         self,
         hs: "HomeServer",
         treq_args: Optional[Dict[str, Any]] = None,
-        ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
-        use_proxy: bool = False,
     ):
-        """
-        Args:
-            hs
-            treq_args: Extra keyword arguments to be given to treq.request.
-            ip_blacklist: The IP addresses that are blacklisted that
-                we may not request.
-            ip_whitelist: The whitelisted IP addresses, that we can
-               request if it were otherwise caught in a blacklist.
-            use_proxy: Whether proxy settings should be discovered and used
-                from conventional environment variables.
-        """
         self.hs = hs
+        self.reactor = hs.get_reactor()
 
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
         self._extra_treq_args = treq_args or {}
         self.clock = hs.get_clock()
 
@@ -356,43 +345,10 @@ class SimpleHttpClient:
         # reactor.
         self._cooperator = Cooperator(scheduler=_make_scheduler(hs.get_reactor()))
 
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we need to use a DNS resolver which
-            # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
-                hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
-            )
-        else:
-            self.reactor = hs.get_reactor()
-
-        # the pusher makes lots of concurrent SSL connections to sygnal, and
-        # tends to do so in batches, so we need to allow the pool to keep
-        # lots of idle connections around.
-        pool = HTTPConnectionPool(self.reactor)
-        # XXX: The justification for using the cache factor here is that larger instances
-        # will need both more cache and more connections.
-        # Still, this should probably be a separate dial
-        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
-        pool.cachedConnectionTimeout = 2 * 60
-
-        self.agent: IAgent = ProxyAgent(
+        self.agent: IAgent = Agent(
             self.reactor,
-            hs.get_reactor(),
-            connectTimeout=15,
-            contextFactory=self.hs.get_http_client_context_factory(),
-            pool=pool,
-            use_proxy=use_proxy,
+            contextFactory=hs.get_http_client_context_factory(),
         )
-
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we then install the blacklisting Agent
-            # which prevents direct access to IP addresses, that are not caught
-            # by the DNS resolution.
-            self.agent = BlacklistingAgentWrapper(
-                self.agent,
-                ip_blacklist=self._ip_blacklist,
-                ip_whitelist=self._ip_whitelist,
-            )
 
     async def request(
         self,
@@ -797,6 +753,75 @@ class SimpleHttpClient:
             response.request.absoluteURI.decode("ascii"),
             response.code,
         )
+
+
+class SimpleHttpClient(BaseSynapseClient):
+    """
+    An HTTP client capable of crossing a proxy and respecting a block/allow list. This
+    does set up a HTTPConnectionPool based on a multiplier of 100 times
+    hs.config.caches.global_factor, as it is responsible for pushing to Sygnal.
+
+    Args:
+        hs: The HomeServer instance to pass in
+        treq_args: Extra keyword arguments to be given to treq.request.
+        ip_blacklist: The IP addresses that are blacklisted that
+            we may not request.
+        ip_whitelist: The whitelisted IP addresses, that we can
+           request if it were otherwise caught in a blacklist.
+        use_proxy: Whether proxy settings should be discovered and used
+            from conventional environment variables.
+    """
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+        treq_args: Optional[Dict[str, Any]] = None,
+        ip_whitelist: Optional[IPSet] = None,
+        ip_blacklist: Optional[IPSet] = None,
+        use_proxy: bool = False,
+    ):
+        super().__init__(hs, treq_args=treq_args)
+        self._ip_whitelist = ip_whitelist
+        self._ip_blacklist = ip_blacklist
+
+        if self._ip_blacklist:
+            # If we have an IP blacklist, we need to use a DNS resolver which
+            # filters out blacklisted IP addresses, to prevent DNS rebinding.
+            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
+                hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
+            )
+        else:
+            # This should have already been set up in the call to super(). Make sure.
+            self.reactor = hs.get_reactor()
+
+        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
+        # do so in batches, so we need to allow the pool to keep lots of idle
+        # connections around.
+        pool = HTTPConnectionPool(self.reactor)
+        # XXX: The justification for using the cache factor here is that larger
+        # instances will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
+        pool.cachedConnectionTimeout = 2 * 60
+
+        self.agent: IAgent = ProxyAgent(
+            self.reactor,
+            hs.get_reactor(),
+            connectTimeout=15,
+            contextFactory=self.hs.get_http_client_context_factory(),
+            pool=pool,
+            use_proxy=use_proxy,
+        )
+
+        if self._ip_blacklist:
+            # If we have an IP blacklist, we then install the blacklisting Agent
+            # which prevents direct access to IP addresses, that are not caught
+            # by the DNS resolution.
+            self.agent = BlacklistingAgentWrapper(
+                self.agent,
+                ip_blacklist=self._ip_blacklist,
+                ip_whitelist=self._ip_whitelist,
+            )
 
 
 def _timeout_to_request_timed_out_error(f: Failure) -> Failure:
