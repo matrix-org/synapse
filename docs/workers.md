@@ -323,7 +323,7 @@ load balancing can be done in different ways.
 
 For `/sync` and `/initialSync` requests it will be more efficient if all
 requests from a particular user are routed to a single instance. This can
-be done e.g. in nginx via extracting username from the users access token.
+be done reverse proxy via extracting username from the users access token.
 
 Admins may additionally wish to separate out `/sync`
 requests that have a `since` query parameter from those that don't (and
