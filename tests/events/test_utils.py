@@ -143,6 +143,13 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             room_version=RoomVersions.MSC2176,
         )
 
+        # As of MSC3989 we now redact the origin key.
+        self.run_test(
+            {"type": "A", "origin": "example.com"},
+            {"type": "A", "content": {}, "signatures": {}, "unsigned": {}},
+            room_version=RoomVersions.MSC3989,
+        )
+
     def test_unsigned(self) -> None:
         """Ensure that unsigned properties get stripped (except age_ts and replaces_state)."""
         self.run_test(

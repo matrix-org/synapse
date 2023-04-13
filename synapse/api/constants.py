@@ -215,6 +215,8 @@ class EventContentFields:
     FEDERATE: Final = "m.federate"
 
     # The creator of the room, as used in `m.room.create` events.
+    #
+    # This is deprecated in MSC2175.
     ROOM_CREATOR: Final = "creator"
 
     # Used in m.room.guest_access events.

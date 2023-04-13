@@ -1,0 +1,1 @@
+Improve DB performance of clearing out old data from `stream_ordering_to_exterm`.

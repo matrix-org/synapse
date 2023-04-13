@@ -455,8 +455,11 @@ def _check_create(event: "EventBase") -> None:
             "room appears to have unsupported version %s" % (room_version_prop,),
         )
 
-    # 1.4 If content has no creator field, reject.
-    if EventContentFields.ROOM_CREATOR not in event.content:
+    # 1.4 If content has no creator field, reject if the room version requires it.
+    if (
+        not event.room_version.msc2175_implicit_room_creator
+        and EventContentFields.ROOM_CREATOR not in event.content
+    ):
         raise AuthError(403, "Create event lacks a 'creator' property")
 
 
@@ -491,7 +494,11 @@ def _is_membership_change_allowed(
         key = (EventTypes.Create, "")
         create = auth_events.get(key)
         if create and event.prev_event_ids()[0] == create.event_id:
-            if create.content["creator"] == event.state_key:
+            if room_version.msc2175_implicit_room_creator:
+                creator = create.sender
+            else:
+                creator = create.content[EventContentFields.ROOM_CREATOR]
+            if creator == event.state_key:
                 return
 
     target_user_id = event.state_key
@@ -1004,10 +1011,14 @@ def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> in
         # that.
         key = (EventTypes.Create, "")
         create_event = auth_events.get(key)
-        if create_event is not None and create_event.content["creator"] == user_id:
-            return 100
-        else:
-            return 0
+        if create_event is not None:
+            if create_event.room_version.msc2175_implicit_room_creator:
+                creator = create_event.sender
+            else:
+                creator = create_event.content[EventContentFields.ROOM_CREATOR]
+            if creator == user_id:
+                return 100
+        return 0
 
 
 def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int) -> int:
