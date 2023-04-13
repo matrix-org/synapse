@@ -80,7 +80,8 @@ class RoomVersion:
     limit_notifications_power_levels: bool
     # MSC2175: No longer include the creator in m.room.create events.
     msc2175_implicit_room_creator: bool
-    # MSC2174/MSC2176: Apply updated redaction rules algorithm.
+    # MSC2174/MSC2176: Apply updated redaction rules algorithm, move redacts to
+    # content property.
     msc2176_redaction_rules: bool
     # MSC3083: Support the 'restricted' join_rule.
     msc3083_join_rules: bool

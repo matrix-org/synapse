@@ -1708,7 +1708,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 WHERE stream_ordering < ?
             """
             txn.execute(
-                sql, (self.stream_ordering_month_ago)  # type: ignore[attr-defined]
+                sql, (self.stream_ordering_month_ago,)  # type: ignore[attr-defined]
             )
 
         await self.db_pool.runInteraction(

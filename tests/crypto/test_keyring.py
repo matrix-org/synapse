@@ -300,7 +300,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
             # None is not a valid value in FetchKeyResult, but we're abusing this
             # API to insert null values into the database. The nulls get converted
             # to 0 when fetched in KeyStore.get_server_signature_keys.
-            [("server9", get_key_id(key1), FetchKeyResult(get_verify_key(key1), None))],  # type: ignore[arg-type]
+            {("server9", get_key_id(key1)): FetchKeyResult(get_verify_key(key1), None)},  # type: ignore[arg-type]
         )
         self.get_success(r)
 

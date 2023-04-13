@@ -1096,6 +1096,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
+        self._store = hs.get_datastores().main
         self._relation_handler = hs.get_relations_handler()
         self._msc3912_enabled = hs.config.experimental.msc3912_enabled
 
@@ -1113,6 +1114,19 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
     ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
+        # Ensure the redacts property in the content matches the one provided in
+        # the URL.
+        room_version = await self._store.get_room_version(room_id)
+        if room_version.msc2176_redaction_rules:
+            if "redacts" in content and content["redacts"] != event_id:
+                raise SynapseError(
+                    400,
+                    "Cannot provide a redacts value incoherent with the event_id of the URL parameter",
+                    Codes.INVALID_PARAM,
+                )
+            else:
+                content["redacts"] = event_id
+
         try:
             with_relations = None
             if self._msc3912_enabled and "org.matrix.msc3912.with_relations" in content:
@@ -1128,20 +1142,23 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
                     requester, txn_id, room_id
                 )
 
+            # Event is not yet redacted, create a new event to redact it.
             if event is None:
+                event_dict = {
+                    "type": EventTypes.Redaction,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+                # Earlier room versions had a top-level redacts property.
+                if not room_version.msc2176_redaction_rules:
+                    event_dict["redacts"] = event_id
+
                 (
                     event,
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                    requester,
-                    {
-                        "type": EventTypes.Redaction,
-                        "content": content,
-                        "room_id": room_id,
-                        "sender": requester.user.to_string(),
-                        "redacts": event_id,
-                    },
-                    txn_id=txn_id,
+                    requester, event_dict, txn_id=txn_id
                 )
 
                 if with_relations:

@@ -16,7 +16,7 @@
 import itertools
 import json
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
@@ -100,7 +100,7 @@ class KeyStore(SQLBaseStore):
         self,
         from_server: str,
         ts_added_ms: int,
-        verify_keys: Iterable[Tuple[str, str, FetchKeyResult]],
+        verify_keys: Mapping[Tuple[str, str], FetchKeyResult],
     ) -> None:
         """Stores NACL verification keys for remote servers.
         Args:
@@ -113,7 +113,7 @@ class KeyStore(SQLBaseStore):
         key_values = []
         value_values = []
         invalidations = []
-        for server_name, key_id, fetch_result in verify_keys:
+        for (server_name, key_id), fetch_result in verify_keys.items():
             key_values.append((server_name, key_id))
             value_values.append(
                 (
