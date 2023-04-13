@@ -179,7 +179,6 @@ KNOWN_RESOURCES = {
     "federation",
     "health",
     "keys",
-    "linearized",
     "media",
     "metrics",
     "openid",
