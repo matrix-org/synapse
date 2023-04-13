@@ -1,0 +1,1 @@
+Only load the SSO redirect servlet if SSO is enabled.
