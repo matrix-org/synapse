@@ -1712,7 +1712,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 DELETE FROM stream_ordering_to_exterm
                 WHERE stream_ordering < ?
             """
-            txn.execute(sql, self.stream_ordering_month_ago)
+            txn.execute(sql, (self.stream_ordering_month_ago,))
 
         await self.db_pool.runInteraction(
             "_delete_old_forward_extrem_cache",
