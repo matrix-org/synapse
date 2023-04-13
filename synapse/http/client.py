@@ -312,7 +312,7 @@ class BlacklistingAgentWrapper(Agent):
         )
 
 
-class BaseSynapseClient:
+class BaseHttpClient:
     """
     A simple, no-frills HTTP client with methods that wrap up common ways of
     using HTTP in Matrix
@@ -757,9 +757,9 @@ class BaseSynapseClient:
 
 class SimpleHttpClient(BaseSynapseClient):
     """
-    An HTTP client capable of crossing a proxy and respecting a block/allow list. This
-    does set up a HTTPConnectionPool based on a multiplier of 100 times
-    hs.config.caches.global_factor, as it is responsible for pushing to Sygnal.
+    An HTTP client capable of crossing a proxy and respecting a block/allow list.
+
+    This also configures a larger / longer lasting HTTP connection pool.
 
     Args:
         hs: The HomeServer instance to pass in
@@ -788,11 +788,8 @@ class SimpleHttpClient(BaseSynapseClient):
             # If we have an IP blacklist, we need to use a DNS resolver which
             # filters out blacklisted IP addresses, to prevent DNS rebinding.
             self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
-                hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
+                self.reactor, self._ip_whitelist, self._ip_blacklist
             )
-        else:
-            # This should have already been set up in the call to super(). Make sure.
-            self.reactor = hs.get_reactor()
 
         # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
         # do so in batches, so we need to allow the pool to keep lots of idle
