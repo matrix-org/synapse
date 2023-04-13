@@ -1,0 +1,1 @@
+Disable loading `RefreshTokenServlet` (`/_matrix/client/(r0|v3|unstable)/refresh`) on workers.

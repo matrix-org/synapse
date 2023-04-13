@@ -1,5 +1,5 @@
-Synapse 1.81.0rc2 (2023-04-06)
-==============================
+Synapse 1.81.0 (2023-04-11)
+===========================
 
 Synapse now attempts the versioned appservice paths before falling back to the
 [legacy paths](https://spec.matrix.org/v1.6/application-service-api/#legacy-routes).
@@ -13,6 +13,12 @@ query parameter. This is insecure and should be considered deprecated.
 A future version of Synapse (v1.88.0 or later) will remove support for legacy
 application service routes and query parameter authorization.
 
+
+No significant changes since 1.81.0rc2.
+
+
+Synapse 1.81.0rc2 (2023-04-06)
+==============================
 
 Bugfixes
 --------
