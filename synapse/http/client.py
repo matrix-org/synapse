@@ -755,7 +755,7 @@ class BaseHttpClient:
         )
 
 
-class SimpleHttpClient(BaseSynapseClient):
+class SimpleHttpClient(BaseHttpClient):
     """
     An HTTP client capable of crossing a proxy and respecting a block/allow list.
 
