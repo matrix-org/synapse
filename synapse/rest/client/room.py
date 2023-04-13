@@ -1119,7 +1119,11 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         room_version = await self._store.get_room_version(room_id)
         if room_version.msc2176_redaction_rules:
             if "redacts" in content and content["redacts"] != event_id:
-                raise SynapseError(400, "Cannot provide a redacts value incoherent with the event_id of the URL parameter", Codes.INVALID_PARAM)
+                raise SynapseError(
+                    400,
+                    "Cannot provide a redacts value incoherent with the event_id of the URL parameter",
+                    Codes.INVALID_PARAM,
+                )
             else:
                 content["redacts"] = event_id
 
