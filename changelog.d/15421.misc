@@ -1,1 +1,1 @@
-Load SSO rest API for redirect only if SSO is enabled.
+Only load the SSO redirect servlet if SSO is enabled.
