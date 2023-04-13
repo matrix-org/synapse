@@ -422,6 +422,21 @@ class RemoteServerUpCommand(_SimpleCommand):
     NAME = "REMOTE_SERVER_UP"
 
 
+class ReadyToRefreshStaleUserDirectoryProfilesCommand(_SimpleCommand):
+    """
+    Sent when a worker needs to tell the user directory worker that there are
+    stale remote user profiles that require refreshing.
+
+    Triggered when the user directory background update has been completed.
+
+    Format::
+
+        USER_DIRECTORY_READY_TO_REFRESH_STALE_REMOTE_PROFILES ''
+    """
+
+    NAME = "USER_DIRECTORY_READY_TO_REFRESH_STALE_REMOTE_PROFILES"
+
+
 _COMMANDS: Tuple[Type[Command], ...] = (
     ServerCommand,
     RdataCommand,
@@ -435,6 +450,7 @@ _COMMANDS: Tuple[Type[Command], ...] = (
     UserIpCommand,
     RemoteServerUpCommand,
     ClearUserSyncsCommand,
+    ReadyToRefreshStaleUserDirectoryProfilesCommand,
 )
 
 # Map of command name to command type.
@@ -448,6 +464,7 @@ VALID_SERVER_COMMANDS = (
     ErrorCommand.NAME,
     PingCommand.NAME,
     RemoteServerUpCommand.NAME,
+    ReadyToRefreshStaleUserDirectoryProfilesCommand.NAME,
 )
 
 # The commands the client is allowed to send
@@ -461,6 +478,7 @@ VALID_CLIENT_COMMANDS = (
     UserIpCommand.NAME,
     ErrorCommand.NAME,
     RemoteServerUpCommand.NAME,
+    ReadyToRefreshStaleUserDirectoryProfilesCommand.NAME,
 )
 
 
