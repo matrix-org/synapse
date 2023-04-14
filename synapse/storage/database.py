@@ -370,6 +370,7 @@ class LoggingTransaction:
 
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
+
             # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
             # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_batch
             # suggests each arg in args should be a sequence or mapping
