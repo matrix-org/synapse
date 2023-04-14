@@ -775,7 +775,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertIsNone(room_alias)
 
     def test_on_logged_out(self) -> None:
-        """Test that on_logged_out module hook is properly call when logging out
+        """Test that on_logged_out module hook is properly called when logging out
         a device, and that related pushers are still available at this time.
         """
         device_id = "AAAAAAA"
@@ -796,26 +796,31 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
             )
         )
 
-        self.nb_of_pushers_in_callback: Optional[int] = None
+        # Setup a callback counting the number of pushers.
+        number_of_pushers_in_callback: Optional[int] = None
+
+        async def _on_logged_out_mock(
+            user_id: str, device_id: Optional[str], access_token: str
+        ) -> None:
+            nonlocal number_of_pushers_in_callback
+            number_of_pushers_in_callback = len(
+                self.hs.get_pusherpool().pushers[user_id].values()
+            )
 
         self.module_api.register_password_auth_provider_callbacks(
-            on_logged_out=self._on_logged_out_mock
+            on_logged_out=_on_logged_out_mock
         )
 
+        # Delete the device.
         device_handler = self.hs.get_device_handler()
         assert isinstance(device_handler, DeviceHandler)
         self.get_success(device_handler.delete_devices(user_id, [device_id]))
 
-        self.assertEqual(self.nb_of_pushers_in_callback, 1)
+        # Check that the callback was called and the pushers still existed.
+        self.assertEqual(number_of_pushers_in_callback, 1)
 
+        # Ensure the pushers were deleted after the callback.
         self.assertEqual(len(self.hs.get_pusherpool().pushers[user_id].values()), 0)
-
-    async def _on_logged_out_mock(
-        self, user_id: str, device_id: Optional[str], access_token: str
-    ) -> None:
-        self.nb_of_pushers_in_callback = len(
-            self.hs.get_pusherpool().pushers[user_id].values()
-        )
 
 
 class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCase):
