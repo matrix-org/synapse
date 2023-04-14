@@ -18,7 +18,7 @@ import logging
 from typing import Any, Dict, List, Union
 
 import attr
-from pydantic import BaseModel, StrictBool, StrictInt, StrictStr, parse_obj_as
+from pydantic import BaseModel, StrictBool, StrictInt, StrictStr, parse_obj_as, Extra
 
 from synapse.config._base import (
     Config,
@@ -51,7 +51,13 @@ def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
     return obj
 
 
-class InstanceLocationConfig(BaseModel):
+class InstanceLocationConfigModel(BaseModel):
+    class Config:
+        extra = Extra.ignore
+        allow_mutation = False
+
+
+class InstanceLocationConfig(InstanceLocationConfigModel):
     """The host and port to talk to an instance via HTTP replication."""
 
     host: StrictStr
@@ -191,9 +197,8 @@ class WorkerConfig(Config):
         )
 
         # A map from instance name to host/port of their HTTP replication endpoint.
-        # instance_map = config.get("instance_map") or {}
         self.instance_map = parse_obj_as(
-            Dict[str, InstanceLocationConfig], config.get("instance_map") or {}
+            Dict[str, InstanceLocationConfig], config.get("instance_map", {})
         )
 
         # Map from type of streams to source, c.f. WriterLocations.
