@@ -569,6 +569,9 @@ class StaticResource(File):
         set_clickjacking_protection_headers(request)
         return super().render_GET(request)
 
+    def directoryListing(self) -> resource.NoResource:
+        return self.childNotFound
+
 
 class UnrecognizedRequestResource(resource.Resource):
     """
