@@ -174,6 +174,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)",
             "^/_matrix/client/(r0|v3|unstable)/password_policy$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*$",
+            "^/_matrix/client/(r0|v3|unstable)/capabilities$",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",

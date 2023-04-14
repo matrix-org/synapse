@@ -33,6 +33,7 @@ class CapabilitiesRestServlet(RestServlet):
     """End point to expose the capabilities of the server."""
 
     PATTERNS = client_patterns("/capabilities$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
