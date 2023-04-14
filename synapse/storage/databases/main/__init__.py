@@ -130,13 +130,6 @@ class DataStore(
     LockStore,
     SessionStore,
 ):
-    DATASTORE_CLASSES: List[Type[SQLBaseStore]] = [
-        RelationsStore,
-    ]
-
-    # XXX So mypy knows about dynamic properties.
-    relations: RelationsStore
-
     def __init__(
         self,
         database: DatabasePool,
@@ -149,18 +142,8 @@ class DataStore(
 
         super().__init__(database, db_conn, hs)
 
-        def repl(match: Match[str]) -> str:
-            return "_" + match.group(0).lower()
-
-        for datastore_class in self.DATASTORE_CLASSES:
-            name = datastore_class.__name__
-            if name.endswith("Store"):
-                name = name[: -len("Store")]
-
-            name = re.sub(r"[A-Z]", repl, name)[1:]
-
-            store = datastore_class(database, db_conn, hs, self)
-            setattr(self, name, store)
+        # This is a bit repetitive, but avoids dynamically setting attributes.
+        self.relations: RelationsStore = RelationsStore(database, db_conn, hs, self)
 
     async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
