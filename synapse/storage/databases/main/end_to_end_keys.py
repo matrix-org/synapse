@@ -49,7 +49,11 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
+    MultiWriterIdGenerator,
+    StreamIdGenerator,
+)
 from synapse.types import JsonDict
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -1210,13 +1214,26 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
+        self._cross_signing_id_gen: AbstractStreamIdGenerator
 
-        self._cross_signing_id_gen = StreamIdGenerator(
-            db_conn,
-            hs.get_replication_notifier(),
-            "e2e_cross_signing_keys",
-            "stream_id",
-        )
+        if isinstance(database.engine, PostgresEngine):
+            self._cross_signing_id_gen = MultiWriterIdGenerator(
+                db_conn=db_conn,
+                db=database,
+                notifier=hs.get_replication_notifier(),
+                stream_name="e2e_cross_signing_keys",
+                instance_name=hs.get_instance_name(),
+                tables=[("e2e_cross_signing_keys", "instance_name", "stream_id")],
+                sequence_name="e2e_cross_signing_keys_sequence",
+                writers=[],  # can be empty as we only need an AbstractStreamIdGenerator
+            )
+        else:
+            self._cross_signing_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "e2e_cross_signing_keys",
+                "stream_id",
+            )
 
     async def set_e2e_device_keys(
         self, user_id: str, device_id: str, time_now: int, device_keys: JsonDict

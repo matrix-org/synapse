@@ -34,8 +34,10 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
+    MultiWriterIdGenerator,
     StreamIdGenerator,
 )
 from synapse.types import JsonDict
@@ -59,14 +61,30 @@ class PusherWorkerStore(SQLBaseStore):
 
         # In the worker store this is an ID tracker which we overwrite in the non-worker
         # class below that is used on the main process.
-        self._pushers_id_gen = StreamIdGenerator(
-            db_conn,
-            hs.get_replication_notifier(),
-            "pushers",
-            "id",
-            extra_tables=[("deleted_pushers", "stream_id")],
-            is_writer=hs.config.worker.worker_app is None,
-        )
+        self._pushers_id_gen: AbstractStreamIdGenerator
+        if isinstance(database.engine, PostgresEngine):
+            self._pushers_id_gen = MultiWriterIdGenerator(
+                db_conn=db_conn,
+                db=database,
+                notifier=hs.get_replication_notifier(),
+                stream_name="pushers",
+                instance_name=hs.get_instance_name(),
+                tables=[
+                    ("pushers", "instance_name", "id"),
+                    ("deleted_pushers", "instance_name", "stream_id"),
+                ],
+                sequence_name="pushers_sequence",
+                writers=["master"],
+            )
+        else:
+            self._pushers_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "pushers",
+                "id",
+                extra_tables=[("deleted_pushers", "stream_id")],
+                is_writer=hs.config.worker.worker_app is None,
+            )
 
         self.db_pool.updates.register_background_update_handler(
             "remove_deactivated_pushers",

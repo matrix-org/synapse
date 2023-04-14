@@ -2106,10 +2106,10 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
-
-        self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
-
         self._instance_name = hs.get_instance_name()
+        self._event_reports_id_gen = IdGenerator(
+            db_conn, database, "event_reports", "id", "event_reports_id_sequence"
+        )
 
     async def upsert_room_on_join(
         self, room_id: str, room_version: RoomVersion, state_events: List[EventBase]
@@ -2357,7 +2357,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         Returns:
             Id of the event report.
         """
-        next_id = self._event_reports_id_gen.get_next()
+        next_id = await self._event_reports_id_gen.get_next()
         await self.db_pool.simple_insert(
             table="event_reports",
             values={

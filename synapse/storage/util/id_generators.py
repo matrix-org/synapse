@@ -48,7 +48,10 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.types import Cursor
-from synapse.storage.util.sequence import PostgresSequenceGenerator
+from synapse.storage.util.sequence import (
+    PostgresSequenceGenerator,
+    build_sequence_generator,
+)
 
 if TYPE_CHECKING:
     from synapse.notifier import ReplicationNotifier
@@ -63,22 +66,43 @@ class IdGenerator:
     def __init__(
         self,
         db_conn: LoggingDatabaseConnection,
+        db: DatabasePool,
         table: str,
         column: str,
+        sequence_name: str,
     ):
-        self._lock = threading.Lock()
-        self._next_id = _load_current_id(db_conn, table, column)
+        self._db = db
+        self._desc = "id_generator {} {}".format(table, column)
 
-    def get_next(self) -> int:
-        with self._lock:
-            self._next_id += 1
-            return self._next_id
+        def get_first_callback(txn: Cursor) -> int:
+            return _load_current_id_txn(txn, table, column)
+
+        self._sequence_gen = build_sequence_generator(
+            db_conn=db_conn,
+            database_engine=db.engine,
+            get_first_callback=get_first_callback,
+            sequence_name=sequence_name,
+            table=table,
+            id_column=column,
+        )
+
+    def get_next_txn(self, txn: Cursor) -> int:
+        return self._sequence_gen.get_next_id_txn(txn)
+
+    async def get_next(self) -> int:
+        return await self._db.runInteraction(self._desc, self.get_next_txn)
 
 
 def _load_current_id(
     db_conn: LoggingDatabaseConnection, table: str, column: str, step: int = 1
 ) -> int:
     cur = db_conn.cursor(txn_name="_load_current_id")
+    current_id = _load_current_id_txn(cur, table, column, step)
+    cur.close()
+    return current_id
+
+
+def _load_current_id_txn(cur: Cursor, table: str, column: str, step: int = 1) -> int:
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
     else:
@@ -86,7 +110,6 @@ def _load_current_id(
     result = cur.fetchone()
     assert result is not None
     (val,) = result
-    cur.close()
     current_id = int(val) if val else step
     res = (max if step > 0 else min)(current_id, step)
     logger.info("Initialising stream generator for %s(%s): %i", table, column, res)

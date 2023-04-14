@@ -49,9 +49,11 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
+    MultiWriterIdGenerator,
     StreamIdGenerator,
 )
 from synapse.types import JsonDict, StrCollection, get_verify_key_from_cross_signing_key
@@ -90,20 +92,44 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
 
         # In the worker store this is an ID tracker which we overwrite in the non-worker
         # class below that is used on the main process.
-        self._device_list_id_gen = StreamIdGenerator(
-            db_conn,
-            hs.get_replication_notifier(),
-            "device_lists_stream",
-            "stream_id",
-            extra_tables=[
-                ("user_signature_stream", "stream_id"),
-                ("device_lists_outbound_pokes", "stream_id"),
-                ("device_lists_changes_in_room", "stream_id"),
-                ("device_lists_remote_pending", "stream_id"),
-                ("device_lists_changes_converted_stream_position", "stream_id"),
-            ],
-            is_writer=hs.config.worker.worker_app is None,
-        )
+        self._device_list_id_gen: AbstractStreamIdGenerator
+        if isinstance(database.engine, PostgresEngine):
+            self._device_list_id_gen = MultiWriterIdGenerator(
+                db_conn=db_conn,
+                db=database,
+                notifier=hs.get_replication_notifier(),
+                stream_name="device_lists",
+                instance_name=hs.get_instance_name(),
+                tables=[
+                    ("device_lists_stream", "instance_name", "stream_id"),
+                    ("user_signature_stream", "instance_name", "stream_id"),
+                    ("device_lists_outbound_pokes", "instance_name", "stream_id"),
+                    ("device_lists_changes_in_room", "instance_name", "stream_id"),
+                    ("device_lists_remote_pending", "instance_name", "stream_id"),
+                    (
+                        "device_lists_changes_converted_stream_position",
+                        "instance_name",
+                        "stream_id",
+                    ),
+                ],
+                sequence_name="device_lists_sequence",
+                writers=["master"],
+            )
+        else:
+            self._device_list_id_gen = StreamIdGenerator(
+                db_conn,
+                hs.get_replication_notifier(),
+                "device_lists_stream",
+                "stream_id",
+                extra_tables=[
+                    ("user_signature_stream", "stream_id"),
+                    ("device_lists_outbound_pokes", "stream_id"),
+                    ("device_lists_changes_in_room", "stream_id"),
+                    ("device_lists_remote_pending", "stream_id"),
+                    ("device_lists_changes_converted_stream_position", "stream_id"),
+                ],
+                is_writer=hs.config.worker.worker_app is None,
+            )
 
         # Type-ignore: _device_list_id_gen is mixed in from either DataStore (as a
         # StreamIdGenerator) or SlavedDataStore (as a SlavedIdTracker).

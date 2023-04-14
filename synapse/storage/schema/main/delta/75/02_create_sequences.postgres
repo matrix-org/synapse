@@ -1,0 +1,63 @@
+CREATE SEQUENCE IF NOT EXISTS device_lists_sequence;
+-- We need to take the max across all the tables sharing the ID generator
+SELECT setval('device_lists_sequence', (
+    SELECT GREATEST(
+        (SELECT COALESCE(MAX(stream_id), 1) FROM device_lists_stream),
+        (SELECT COALESCE(MAX(stream_id), 1) FROM user_signature_stream),
+        (SELECT COALESCE(MAX(stream_id), 1) FROM device_lists_outbound_pokes),
+        (SELECT COALESCE(MAX(stream_id), 1) FROM device_lists_changes_in_room),
+        (SELECT COALESCE(MAX(stream_id), 1) FROM device_lists_remote_pending),
+        (SELECT COALESCE(MAX(stream_id), 1) FROM device_lists_changes_converted_stream_position)
+    )
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS e2e_cross_signing_keys_sequence;
+SELECT setval('e2e_cross_signing_keys_sequence', (
+    SELECT COALESCE(MAX(stream_id), 1) FROM e2e_cross_signing_keys
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS push_rules_sequence;
+SELECT setval('push_rules_sequence', (
+    SELECT COALESCE(MAX(stream_id), 1) FROM push_rules_stream
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS pushers_sequence;
+SELECT setval('pushers_sequence', (
+    SELECT GREATEST(
+        (SELECT COALESCE(MAX(id), 1) FROM pushers),
+        (SELECT COALESCE(MAX(stream_id), 1) FROM deleted_pushers)
+    )
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS event_reports_id_sequence;
+SELECT setval('event_reports_id_sequence', (
+    SELECT COALESCE(MAX(id), 1) FROM event_reports
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS access_tokens_id_sequence;
+SELECT setval('access_tokens_id_sequence', (
+    SELECT COALESCE(MAX(id), 1) FROM access_tokens
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS refresh_tokens_id_sequence;
+SELECT setval('refresh_tokens_id_sequence', (
+    SELECT COALESCE(MAX(id), 1) FROM refresh_tokens
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS push_rules_id_sequence;
+SELECT setval('push_rules_id_sequence', (
+    SELECT COALESCE(MAX(id), 1) FROM push_rules
+));
+
+
+CREATE SEQUENCE IF NOT EXISTS push_rules_enable_id_sequence;
+SELECT setval('push_rules_enable_id_sequence', (
+    SELECT COALESCE(MAX(id), 1) FROM push_rules_enable
+));

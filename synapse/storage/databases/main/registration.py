@@ -2148,8 +2148,12 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             hs.config.server.request_token_inhibit_3pid_errors
         )
 
-        self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
-        self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
+        self._access_tokens_id_gen = IdGenerator(
+            db_conn, database, "access_tokens", "id", "access_tokens_id_sequence"
+        )
+        self._refresh_tokens_id_gen = IdGenerator(
+            db_conn, database, "refresh_tokens", "id", "refresh_tokens_id_sequence"
+        )
 
         # If support for MSC3866 is enabled and configured to require approval for new
         # account, we will create new users with an 'approved' flag set to false.
@@ -2188,7 +2192,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         Returns:
             The token ID
         """
-        next_id = self._access_tokens_id_gen.get_next()
+        next_id = await self._access_tokens_id_gen.get_next()
         now = self._clock.time_msec()
 
         await self.db_pool.simple_insert(
@@ -2235,7 +2239,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         Returns:
             The token ID
         """
-        next_id = self._refresh_tokens_id_gen.get_next()
+        next_id = await self._refresh_tokens_id_gen.get_next()
 
         await self.db_pool.simple_insert(
             "refresh_tokens",
