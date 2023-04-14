@@ -24,6 +24,7 @@ import time
 import traceback
 from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -53,7 +54,12 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.notifier import ReplicationNotifier
-from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+    make_conn,
+)
 from synapse.storage.databases.main import FilteringWorkerStore, PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
@@ -93,6 +99,9 @@ from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor
 from synapse.util import SYNAPSE_VERSION, Clock
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 # Cast safety: Twisted does some naughty magic which replaces the
 # twisted.internet.reactor module with a Reactor instance at runtime.
@@ -238,8 +247,18 @@ class Store(
     PusherBackgroundUpdatesStore,
     PresenceBackgroundUpdateStore,
     ReceiptsBackgroundUpdateStore,
-    RelationsWorkerStore,
 ):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        # This is a bit repetitive, but avoids dynamically setting attributes.
+        self.relations = RelationsWorkerStore(database, db_conn, hs)
+
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
 
