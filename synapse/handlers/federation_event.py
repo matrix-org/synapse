@@ -169,7 +169,7 @@ class FederationEventHandler:
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
         if hs.config.worker.worker_app:
-            self.multi_user_device_resync = (
+            self._multi_user_device_resync = (
                 ReplicationMultiUserDevicesResyncRestServlet.make_client(hs)
             )
         else:
@@ -1489,7 +1489,7 @@ class FederationEventHandler:
 
             # Immediately attempt a resync in the background
             if self._config.worker.worker_app:
-                await self.multi_user_device_resync(user_ids=[sender])
+                await self._multi_user_device_resync(user_ids=[sender])
             else:
                 await self._device_list_updater.multi_user_device_resync(
                     user_ids=[sender]
