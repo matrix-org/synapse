@@ -50,7 +50,7 @@ from twisted.web import resource
 try:
     from twisted.web.pages import notFound
 except ImportError:
-    from twisted.web.resource import NoResource as notFound
+    from twisted.web.resource import NoResource as notFound  # type: ignore[assignment]
 
 from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET, Request
