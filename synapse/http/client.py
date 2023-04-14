@@ -315,12 +315,15 @@ class BlacklistingAgentWrapper(Agent):
 class BaseHttpClient:
     """
     A simple, no-frills HTTP client with methods that wrap up common ways of
-    using HTTP in Matrix
+    using HTTP in Matrix. Does not come with a default Agent, subclasses will need to
+    define their own.
 
     Args:
         hs: The HomeServer instance to pass in
         treq_args: Extra keyword arguments to be given to treq.request.
     """
+
+    agent: IAgent
 
     def __init__(
         self,
@@ -344,11 +347,6 @@ class BaseHttpClient:
         # We use this for our body producers to ensure that they use the correct
         # reactor.
         self._cooperator = Cooperator(scheduler=_make_scheduler(hs.get_reactor()))
-
-        self.agent: IAgent = Agent(
-            self.reactor,
-            contextFactory=hs.get_http_client_context_factory(),
-        )
 
     async def request(
         self,
