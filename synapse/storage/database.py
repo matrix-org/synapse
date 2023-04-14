@@ -58,7 +58,7 @@ from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Connection, Cursor, _Parameters
+from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter
 
@@ -404,7 +404,7 @@ class LoggingTransaction:
             sql,
         )
 
-    def execute(self, sql: str, parameters: _Parameters = ()) -> None:
+    def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
         self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
