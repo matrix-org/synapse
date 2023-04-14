@@ -46,6 +46,8 @@ from twisted.internet import defer, interfaces
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
 from twisted.web import resource
+from twisted.web.pages import notFound
+from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import File
 from twisted.web.util import redirectTo
@@ -569,8 +571,8 @@ class StaticResource(File):
         set_clickjacking_protection_headers(request)
         return super().render_GET(request)
 
-    def directoryListing(self) -> resource.NoResource:
-        return self.childNotFound
+    def directoryListing(self) -> IResource:
+        return notFound()
 
 
 class UnrecognizedRequestResource(resource.Resource):
