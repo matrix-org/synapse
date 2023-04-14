@@ -141,7 +141,7 @@ class DataStore(
         super().__init__(database, db_conn, hs)
 
         # This is a bit repetitive, but avoids dynamically setting attributes.
-        self.relations: RelationsStore = RelationsStore(database, db_conn, hs, self)
+        self.relations = RelationsStore(database, db_conn, hs)
 
     async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.

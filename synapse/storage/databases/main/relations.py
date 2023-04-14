@@ -52,7 +52,6 @@ from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +95,8 @@ class RelationsWorkerStore(SQLBaseStore):
         database: DatabasePool,
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
-        datastore: "DataStore",
     ):
-        super().__init__(database, db_conn, hs, datastore)
+        super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_update_handler(
             "threads_backfill", self._backfill_threads

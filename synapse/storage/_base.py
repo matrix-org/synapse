@@ -25,7 +25,6 @@ from synapse.util.caches.descriptors import CachedFunction
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-    from synapse.storage.databases import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +44,11 @@ class SQLBaseStore(metaclass=ABCMeta):
         database: DatabasePool,
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
-        datastore: Optional["DataStore"] = None,
     ):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
         self.db_pool = database
-        # A reference back to the root datastore.
-        self.datastore = datastore
 
         self.external_cached_functions: Dict[str, CachedFunction] = {}
 
