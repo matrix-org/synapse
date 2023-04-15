@@ -13,15 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Optional, Tuple, Union, cast
 
 from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class FilteringWorkerStore(SQLBaseStore):
@@ -97,3 +104,67 @@ class FilteringWorkerStore(SQLBaseStore):
 
                 if attempts >= 5:
                     raise StoreError(500, "Couldn't generate a filter ID.")
+
+
+class FilteringBackgroundUpdateStore(FilteringWorkerStore):
+    POPULATE_USER_FILTERS_FULL_USER_ID = "populate_user_filters_full_user_id"
+
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_update_handler(
+            self.POPULATE_USER_FILTERS_FULL_USER_ID,
+            self._populate_user_filters_full_user_id,
+        )
+
+    async def _populate_user_filters_full_user_id(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Populates the `user_filters.full_user_id` column.
+
+        In a future Synapse version, this column will be renamed to `user_id`, replacing
+        the existing `user_id` column.
+
+        Note that completion of this background update does not imply that there are no
+        longer any `NULL` values in `full_user_id`. Until the old `user_id` column has
+        been removed, Synapse may be rolled back to a previous version which does not
+        populate `full_user_id` after the background update has finished.
+        """
+
+        def _populate_user_filters_full_user_id_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            sql = """
+                UPDATE user_filters
+                SET full_user_id = '@' || user_id || ':' || ?
+                WHERE user_id IN (
+                    SELECT user_id
+                    FROM user_filters
+                    WHERE full_user_id IS NULL
+                    LIMIT ?
+                )
+            """
+            txn.execute(sql, (self.hs.hostname, batch_size))
+
+            return txn.rowcount == 0
+
+        finished = await self.db_pool.runInteraction(
+            "_populate_user_filters_full_user_id_txn",
+            _populate_user_filters_full_user_id_txn,
+        )
+
+        if finished:
+            await self.db_pool.updates._end_background_update(
+                self.POPULATE_USER_FILTERS_FULL_USER_ID
+            )
+
+        return batch_size
+
+
+class FilteringStore(FilteringBackgroundUpdateStore):
+    pass

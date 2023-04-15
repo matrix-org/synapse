@@ -21,3 +21,6 @@ CREATE UNIQUE INDEX full_user_filters_unique ON user_filters (full_user_id, filt
 -- NB: This will lock the table for writes while the index is being built.
 --     There are around 4,000,000 user_filters on matrix.org so we expect this to take
 --     a couple of seconds at most.
+
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (7502, 'populate_user_filters_full_user_id', '{}');
