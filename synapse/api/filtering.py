@@ -170,11 +170,9 @@ class Filtering:
         result = await self.store.get_user_filter(user_id, filter_id)
         return FilterCollection(self._hs, result)
 
-    def add_user_filter(
-        self, user_localpart: str, user_filter: JsonDict
-    ) -> Awaitable[int]:
+    def add_user_filter(self, user_id: str, user_filter: JsonDict) -> Awaitable[int]:
         self.check_valid_filter(user_filter)
-        return self.store.add_user_filter(user_localpart, user_filter)
+        return self.store.add_user_filter(user_id, user_filter)
 
     # TODO(paul): surely we should probably add a delete_user_filter or
     #   replace_user_filter at some point? There's no REST API specified for

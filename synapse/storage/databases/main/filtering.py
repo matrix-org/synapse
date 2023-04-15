@@ -44,7 +44,6 @@ class FilteringWorkerStore(SQLBaseStore):
         except ValueError:
             raise SynapseError(400, "Invalid filter ID", Codes.INVALID_PARAM)
 
-        user_localpart = UserID.from_string(user_id).localpart
         try:
             def_json = await self.db_pool.simple_select_one_onecol(
                 table="user_filters",
@@ -68,7 +67,8 @@ class FilteringWorkerStore(SQLBaseStore):
 
         return db_to_json(def_json)
 
-    async def add_user_filter(self, user_localpart: str, user_filter: JsonDict) -> int:
+    async def add_user_filter(self, user_id: str, user_filter: JsonDict) -> int:
+        user_localpart = UserID.from_string(user_id).localpart
         def_json = encode_canonical_json(user_filter)
 
         # Need an atomic transaction to SELECT the maximal ID so far then
@@ -92,10 +92,10 @@ class FilteringWorkerStore(SQLBaseStore):
                 filter_id = max_id + 1
 
             sql = (
-                "INSERT INTO user_filters (user_id, filter_id, filter_json)"
-                "VALUES(?, ?, ?)"
+                "INSERT INTO user_filters (full_user_id, user_id, filter_id, filter_json)"
+                "VALUES(?, ?, ?, ?)"
             )
-            txn.execute(sql, (user_localpart, filter_id, bytearray(def_json)))
+            txn.execute(sql, (user_id, user_localpart, filter_id, bytearray(def_json)))
 
             return filter_id
 
