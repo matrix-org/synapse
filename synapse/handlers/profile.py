@@ -100,7 +100,7 @@ class ProfileHandler:
         if self.hs.is_mine(target_user):
             try:
                 displayname = await self.store.get_profile_displayname(
-                    target_user.localpart
+                    target_user.to_string()
                 )
             except StoreError as e:
                 if e.code == 404:
@@ -364,7 +364,8 @@ class ProfileHandler:
                 Codes.FORBIDDEN,
             )
 
-        user = UserID.from_string(args["user_id"])
+        user_id = args["user_id"]
+        user = UserID.from_string(user_id)
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this homeserver")
 
@@ -374,7 +375,7 @@ class ProfileHandler:
         try:
             if just_field is None or just_field == "displayname":
                 response["displayname"] = await self.store.get_profile_displayname(
-                    user.localpart
+                    user_id
                 )
 
             if just_field is None or just_field == "avatar_url":

@@ -57,13 +57,26 @@ class ProfileWorkerStore(SQLBaseStore):
             avatar_url=profile["avatar_url"], display_name=profile["displayname"]
         )
 
-    async def get_profile_displayname(self, user_localpart: str) -> Optional[str]:
-        return await self.db_pool.simple_select_one_onecol(
-            table="profiles",
-            keyvalues={"user_id": user_localpart},
-            retcol="displayname",
-            desc="get_profile_displayname",
-        )
+    async def get_profile_displayname(self, user_id: str) -> Optional[str]:
+        try:
+            return await self.db_pool.simple_select_one_onecol(
+                table="profiles",
+                keyvalues={"full_user_id": user_id},
+                retcol="displayname",
+                desc="get_profile_displayname",
+            )
+        except StoreError as e:
+            if e.code == 404:
+                # Fall back to the `user_id` column.
+                user_localpart = UserID.from_string(user_id).localpart
+                return await self.db_pool.simple_select_one_onecol(
+                    table="profiles",
+                    keyvalues={"user_id": user_localpart},
+                    retcol="displayname",
+                    desc="get_profile_displayname",
+                )
+            else:
+                raise
 
     async def get_profile_avatar_url(self, user_localpart: str) -> Optional[str]:
         return await self.db_pool.simple_select_one_onecol(

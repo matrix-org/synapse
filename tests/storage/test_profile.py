@@ -37,7 +37,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
             "Frank",
             (
                 self.get_success(
-                    self.store.get_profile_displayname(self.u_frank.localpart)
+                    self.store.get_profile_displayname(self.u_frank.to_string())
                 )
             ),
         )
@@ -48,7 +48,9 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            self.get_success(self.store.get_profile_displayname(self.u_frank.localpart))
+            self.get_success(
+                self.store.get_profile_displayname(self.u_frank.to_string())
+            )
         )
 
     def test_avatar_url(self) -> None:

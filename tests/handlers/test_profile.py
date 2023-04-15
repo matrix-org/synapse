@@ -84,7 +84,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             (
                 self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
+                    self.store.get_profile_displayname(self.frank.to_string())
                 )
             ),
             "Frank Jr.",
@@ -100,7 +100,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             (
                 self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
+                    self.store.get_profile_displayname(self.frank.to_string())
                 )
             ),
             "Frank",
@@ -114,7 +114,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            self.get_success(self.store.get_profile_displayname(self.frank.localpart))
+            self.get_success(self.store.get_profile_displayname(self.frank.to_string()))
         )
 
     def test_set_my_name_if_disabled(self) -> None:
@@ -128,7 +128,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             (
                 self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
+                    self.store.get_profile_displayname(self.frank.to_string())
                 )
             ),
             "Frank",

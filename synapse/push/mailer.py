@@ -37,7 +37,7 @@ from synapse.push.push_types import (
     TemplateVars,
 )
 from synapse.storage.databases.main.event_push_actions import EmailPushAction
-from synapse.types import StateMap, UserID
+from synapse.types import StateMap
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
@@ -246,9 +246,7 @@ class Mailer:
         state_by_room = {}
 
         try:
-            user_display_name = await self.store.get_profile_displayname(
-                UserID.from_string(user_id).localpart
-            )
+            user_display_name = await self.store.get_profile_displayname(user_id)
             if user_display_name is None:
                 user_display_name = user_id
         except StoreError:

@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.types import UserID
 from synapse.util import stringutils
 from synapse.util.async_helpers import delay_cancellation
 
@@ -163,9 +162,7 @@ class AccountValidityHandler:
             return
 
         try:
-            user_display_name = await self.store.get_profile_displayname(
-                UserID.from_string(user_id).localpart
-            )
+            user_display_name = await self.store.get_profile_displayname(user_id)
             if user_display_name is None:
                 user_display_name = user_id
         except StoreError:

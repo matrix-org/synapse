@@ -103,7 +103,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertEqual(email["added_at"], 0)
 
         # Check that the displayname was assigned
-        displayname = self.get_success(self.store.get_profile_displayname("bob"))
+        displayname = self.get_success(self.store.get_profile_displayname("@bob:test"))
         self.assertEqual(displayname, "Bobberino")
 
     def test_can_register_admin_user(self) -> None:
