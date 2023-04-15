@@ -186,7 +186,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def test_get_my_avatar(self) -> None:
         self.get_success(
             self.store.set_profile_avatar_url(
-                self.frank.localpart, "http://my.server/me.png"
+                self.frank.to_string(), "http://my.server/me.png"
             )
         )
         avatar_url = self.get_success(self.handler.get_avatar_url(self.frank))
@@ -252,7 +252,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         # Setting displayname for the first time is allowed
         self.get_success(
             self.store.set_profile_avatar_url(
-                self.frank.localpart, "http://my.server/me.png"
+                self.frank.to_string(), "http://my.server/me.png"
             )
         )
 

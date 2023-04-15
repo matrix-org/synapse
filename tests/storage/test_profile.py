@@ -58,7 +58,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.store.set_profile_avatar_url(
-                self.u_frank.localpart, "http://my.site/here"
+                self.u_frank.to_string(), "http://my.site/here"
             )
         )
 
@@ -73,7 +73,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         # test set to None
         self.get_success(
-            self.store.set_profile_avatar_url(self.u_frank.localpart, None)
+            self.store.set_profile_avatar_url(self.u_frank.to_string(), None)
         )
 
         self.assertIsNone(

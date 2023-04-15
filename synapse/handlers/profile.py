@@ -273,7 +273,7 @@ class ProfileHandler:
             )
 
         await self.store.set_profile_avatar_url(
-            target_user.localpart, avatar_url_to_set
+            target_user.to_string(), avatar_url_to_set
         )
 
         profile = await self.store.get_profileinfo(target_user.to_string())
