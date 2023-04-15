@@ -24,7 +24,7 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -34,8 +34,9 @@ if TYPE_CHECKING:
 class FilteringWorkerStore(SQLBaseStore):
     @cached(num_args=2)
     async def get_user_filter(
-        self, user_localpart: str, filter_id: Union[int, str]
+        self, user_id: str, filter_id: Union[int, str]
     ) -> JsonDict:
+        user_localpart = UserID.from_string(user_id).localpart
         # filter_id is BIGINT UNSIGNED, so if it isn't a number, fail
         # with a coherent error message rather than 500 M_UNKNOWN.
         try:
@@ -43,13 +44,27 @@ class FilteringWorkerStore(SQLBaseStore):
         except ValueError:
             raise SynapseError(400, "Invalid filter ID", Codes.INVALID_PARAM)
 
-        def_json = await self.db_pool.simple_select_one_onecol(
-            table="user_filters",
-            keyvalues={"user_id": user_localpart, "filter_id": filter_id},
-            retcol="filter_json",
-            allow_none=False,
-            desc="get_user_filter",
-        )
+        user_localpart = UserID.from_string(user_id).localpart
+        try:
+            def_json = await self.db_pool.simple_select_one_onecol(
+                table="user_filters",
+                keyvalues={"full_user_id": user_id, "filter_id": filter_id},
+                retcol="filter_json",
+                allow_none=False,
+                desc="get_user_filter",
+            )
+        except StoreError as e:
+            if e.code == 404:
+                # Fall back to the `user_id` column.
+                def_json = await self.db_pool.simple_select_one_onecol(
+                    table="user_filters",
+                    keyvalues={"user_id": user_localpart, "filter_id": filter_id},
+                    retcol="filter_json",
+                    allow_none=False,
+                    desc="get_user_filter",
+                )
+            else:
+                raise
 
         return db_to_json(def_json)
 

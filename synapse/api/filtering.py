@@ -165,9 +165,9 @@ class Filtering:
         self.DEFAULT_FILTER_COLLECTION = FilterCollection(hs, {})
 
     async def get_user_filter(
-        self, user_localpart: str, filter_id: Union[int, str]
+        self, user_id: str, filter_id: Union[int, str]
     ) -> "FilterCollection":
-        result = await self.store.get_user_filter(user_localpart, filter_id)
+        result = await self.store.get_user_filter(user_id, filter_id)
         return FilterCollection(self._hs, result)
 
     def add_user_filter(
