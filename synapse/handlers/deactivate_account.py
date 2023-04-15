@@ -282,8 +282,6 @@ class DeactivateAccountHandler:
         Args:
             user_id: ID of user to be re-activated
         """
-        user = UserID.from_string(user_id)
-
         # Ensure the user is not marked as erased.
         await self.store.mark_user_not_erased(user_id)
 
@@ -297,5 +295,5 @@ class DeactivateAccountHandler:
         # Add the user to the directory, if necessary. Note that
         # this must be done after the user is re-activated, because
         # deactivated users are excluded from the user directory.
-        profile = await self.store.get_profileinfo(user.localpart)
+        profile = await self.store.get_profileinfo(user_id)
         await self.user_directory_handler.handle_local_profile_change(user_id, profile)

@@ -314,7 +314,7 @@ class RegistrationHandler:
                 approved=approved,
             )
 
-            profile = await self.store.get_profileinfo(localpart)
+            profile = await self.store.get_profileinfo(user_id)
             await self.user_directory_handler.handle_local_profile_change(
                 user_id, profile
             )

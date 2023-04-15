@@ -21,21 +21,31 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.roommember import ProfileInfo
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
 class ProfileWorkerStore(SQLBaseStore):
-    async def get_profileinfo(self, user_localpart: str) -> ProfileInfo:
+    async def get_profileinfo(self, user_id: str) -> ProfileInfo:
         try:
             profile = await self.db_pool.simple_select_one(
                 table="profiles",
-                keyvalues={"user_id": user_localpart},
+                keyvalues={"full_user_id": user_id},
                 retcols=("displayname", "avatar_url"),
+                allow_none=True,
                 desc="get_profileinfo",
             )
+            if profile is None:
+                # Fall back to the `user_id` column.
+                user_localpart = UserID.from_string(user_id).localpart
+                profile = await self.db_pool.simple_select_one(
+                    table="profiles",
+                    keyvalues={"user_id": user_localpart},
+                    retcols=("displayname", "avatar_url"),
+                    desc="get_profileinfo",
+                )
         except StoreError as e:
             if e.code == 404:
                 # no match

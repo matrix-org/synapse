@@ -67,7 +67,7 @@ class ProfileHandler:
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
-            profileinfo = await self.store.get_profileinfo(target_user.localpart)
+            profileinfo = await self.store.get_profileinfo(user_id)
             if profileinfo.display_name is None:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
 
@@ -147,7 +147,7 @@ class ProfileHandler:
             raise AuthError(400, "Cannot set another user's displayname")
 
         if not by_admin and not self.hs.config.registration.enable_set_displayname:
-            profile = await self.store.get_profileinfo(target_user.localpart)
+            profile = await self.store.get_profileinfo(target_user.to_string())
             if profile.display_name:
                 raise SynapseError(
                     400,
@@ -182,7 +182,7 @@ class ProfileHandler:
             target_user.localpart, displayname_to_set
         )
 
-        profile = await self.store.get_profileinfo(target_user.localpart)
+        profile = await self.store.get_profileinfo(target_user.to_string())
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
         )
@@ -243,7 +243,7 @@ class ProfileHandler:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
         if not by_admin and not self.hs.config.registration.enable_set_avatar_url:
-            profile = await self.store.get_profileinfo(target_user.localpart)
+            profile = await self.store.get_profileinfo(target_user.to_string())
             if profile.avatar_url:
                 raise SynapseError(
                     400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
@@ -276,7 +276,7 @@ class ProfileHandler:
             target_user.localpart, avatar_url_to_set
         )
 
-        profile = await self.store.get_profileinfo(target_user.localpart)
+        profile = await self.store.get_profileinfo(target_user.to_string())
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
         )

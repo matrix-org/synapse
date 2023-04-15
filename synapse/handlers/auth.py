@@ -1756,9 +1756,7 @@ class AuthHandler:
             respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
-        user_profile_data = await self.store.get_profileinfo(
-            UserID.from_string(registered_user_id).localpart
-        )
+        user_profile_data = await self.store.get_profileinfo(registered_user_id)
 
         # Store any extra attributes which will be passed in the login response.
         # Note that this is per-user so it may overwrite a previous value, this
