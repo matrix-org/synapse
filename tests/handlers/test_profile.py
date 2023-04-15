@@ -67,7 +67,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_get_my_name(self) -> None:
         self.get_success(
-            self.store.set_profile_displayname(self.frank.localpart, "Frank")
+            self.store.set_profile_displayname(self.frank.to_string(), "Frank")
         )
 
         displayname = self.get_success(self.handler.get_displayname(self.frank))
@@ -122,7 +122,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         # Setting displayname for the first time is allowed
         self.get_success(
-            self.store.set_profile_displayname(self.frank.localpart, "Frank")
+            self.store.set_profile_displayname(self.frank.to_string(), "Frank")
         )
 
         self.assertEqual(
@@ -167,7 +167,9 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_incoming_fed_query(self) -> None:
         self.get_success(self.store.create_profile("@caroline:test"))
-        self.get_success(self.store.set_profile_displayname("caroline", "Caroline"))
+        self.get_success(
+            self.store.set_profile_displayname("@caroline:test", "Caroline")
+        )
 
         response = self.get_success(
             self.query_handlers["profile"](

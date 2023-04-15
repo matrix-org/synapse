@@ -179,7 +179,7 @@ class ProfileHandler:
             )
 
         await self.store.set_profile_displayname(
-            target_user.localpart, displayname_to_set
+            target_user.to_string(), displayname_to_set
         )
 
         profile = await self.store.get_profileinfo(target_user.to_string())

@@ -31,7 +31,7 @@ class DataStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.register_user(self.user.to_string(), "pass"))
         self.get_success(self.store.create_profile(self.user.to_string()))
         self.get_success(
-            self.store.set_profile_displayname(self.user.localpart, self.displayname)
+            self.store.set_profile_displayname(self.user.to_string(), self.displayname)
         )
 
         users, total = self.get_success(

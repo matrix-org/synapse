@@ -108,12 +108,13 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_displayname(
-        self, user_localpart: str, new_displayname: Optional[str]
+        self, user_id: str, new_displayname: Optional[str]
     ) -> None:
+        user_localpart = UserID.from_string(user_id).localpart
         await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={"displayname": new_displayname},
+            values={"full_user_id": user_id, "displayname": new_displayname},
             desc="set_profile_displayname",
         )
 
