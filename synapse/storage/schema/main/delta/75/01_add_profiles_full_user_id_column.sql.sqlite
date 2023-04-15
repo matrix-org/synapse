@@ -38,3 +38,6 @@ DROP TABLE profiles;
 
 -- Rename the table.
 ALTER TABLE profiles_new RENAME TO profiles;
+
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (7501, 'populate_profiles_full_user_id', '{}');

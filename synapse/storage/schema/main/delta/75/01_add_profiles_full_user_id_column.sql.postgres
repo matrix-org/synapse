@@ -30,3 +30,6 @@ ALTER TABLE ONLY profiles
 -- `profiles` can contain on the order of 10s/100s of millions of rows. We use
 -- `NOT VALID` so that we do not lock the table to check existing rows. New rows will
 -- still be checked.
+
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (7501, 'populate_profiles_full_user_id', '{}');

@@ -11,11 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.roommember import ProfileInfo
+from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class ProfileWorkerStore(SQLBaseStore):
@@ -80,5 +89,65 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
 
-class ProfileStore(ProfileWorkerStore):
+class ProfileBackgroundUpdateStore(ProfileWorkerStore):
+    POPULATE_PROFILES_FULL_USER_ID = "populate_profiles_full_user_id"
+
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_update_handler(
+            self.POPULATE_PROFILES_FULL_USER_ID,
+            self._populate_profiles_full_user_id,
+        )
+
+    async def _populate_profiles_full_user_id(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Populates the `profiles.full_user_id` column.
+
+        In a future Synapse version, this column will be renamed to `user_id`, replacing
+        the existing `user_id` column.
+
+        Note that completion of this background update does not imply that there are no
+        longer any `NULL` values in `full_user_id`. Until the old `user_id` column has
+        been removed, Synapse may be rolled back to a previous version which does not
+        populate `full_user_id` after the background update has finished.
+        """
+
+        def _populate_profiles_full_user_id_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            sql = """
+                UPDATE profiles
+                SET full_user_id = '@' || user_id || ':' || ?
+                WHERE user_id IN (
+                    SELECT user_id
+                    FROM profiles
+                    WHERE full_user_id IS NULL
+                    LIMIT ?
+                )
+            """
+            txn.execute(sql, (self.hs.hostname, batch_size))
+
+            return txn.rowcount == 0
+
+        finished = await self.db_pool.runInteraction(
+            "_populate_profiles_full_user_id_txn",
+            _populate_profiles_full_user_id_txn,
+        )
+
+        if finished:
+            await self.db_pool.updates._end_background_update(
+                self.POPULATE_PROFILES_FULL_USER_ID
+            )
+
+        return batch_size
+
+
+class ProfileStore(ProfileBackgroundUpdateStore):
     pass
