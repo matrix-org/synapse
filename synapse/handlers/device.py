@@ -1244,18 +1244,6 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
 
         return result
 
-    async def user_device_resync(
-        self, user_id: str, mark_failed_as_stale: bool = True
-    ) -> Optional[JsonDict]:
-        result, failed = await self._user_device_resync_returning_failed(user_id)
-
-        if failed and mark_failed_as_stale:
-            # Mark the remote user's device list as stale so we know we need to retry
-            # it later.
-            await self.store.mark_remote_users_device_caches_as_stale((user_id,))
-
-        return result
-
     async def _user_device_resync_returning_failed(
         self, user_id: str
     ) -> Tuple[Optional[JsonDict], bool]:
