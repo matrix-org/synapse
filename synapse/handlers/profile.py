@@ -197,7 +197,7 @@ class ProfileHandler:
         if self.hs.is_mine(target_user):
             try:
                 avatar_url = await self.store.get_profile_avatar_url(
-                    target_user.localpart
+                    target_user.to_string()
                 )
             except StoreError as e:
                 if e.code == 404:
@@ -380,7 +380,7 @@ class ProfileHandler:
 
             if just_field is None or just_field == "avatar_url":
                 response["avatar_url"] = await self.store.get_profile_avatar_url(
-                    user.localpart
+                    user_id
                 )
         except StoreError as e:
             if e.code == 404:
