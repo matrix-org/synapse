@@ -18,7 +18,7 @@ import logging
 from typing import Any, Dict, List, Union
 
 import attr
-from pydantic import BaseModel, StrictBool, StrictInt, StrictStr, parse_obj_as, Extra
+from pydantic import BaseModel, Extra, StrictBool, StrictInt, StrictStr
 
 from synapse.config._base import (
     Config,
@@ -26,6 +26,7 @@ from synapse.config._base import (
     RoutableShardedWorkerHandlingConfig,
     ShardedWorkerHandlingConfig,
 )
+from synapse.config._util import validate_instance_map_config
 from synapse.config.server import (
     DIRECT_TCP_ERROR,
     TCPListenerConfig,
@@ -213,8 +214,11 @@ class WorkerConfig(Config):
         )
 
         # A map from instance name to host/port of their HTTP replication endpoint.
-        self.instance_map = parse_obj_as(
-            Dict[str, InstanceLocationConfig], config.get("instance_map", {})
+        self.instance_map: Dict[
+            str, InstanceLocationConfig
+        ] = validate_instance_map_config(
+            config.get("instance_map", {}),
+            InstanceLocationConfig,
         )
 
         # Map from type of streams to source, c.f. WriterLocations.

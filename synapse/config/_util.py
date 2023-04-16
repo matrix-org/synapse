@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Iterable
+from typing import Any, Dict, Iterable, TypeAlias, TypeVar
 
 import jsonschema
+from pydantic import BaseModel, ValidationError, parse_obj_as
 
 from synapse.config._base import ConfigError
 from synapse.types import JsonDict
@@ -64,3 +65,30 @@ def json_error_to_config_error(
         else:
             path.append(str(p))
     return ConfigError(e.message, path)
+
+
+Model = TypeVar("Model", bound=BaseModel)
+
+
+def validate_instance_map_config(
+    config: Any,
+    model_type: TypeAlias,
+) -> Dict[str, Model]:
+    """Validate Dict type data in the style of Dict[str, ExampleBaseModel] and check it
+    for realness. Acts as a wrapper for parse_obj_as() from pydantic that changes any
+    ValidationError to ConfigError.
+
+    Args:
+        config: The configuration data to check
+        model_type: The BaseModel to validate and parse against.
+    Returns: Fully validated and parsed Dict[str, ExampleBaseModel]
+    """
+    try:
+        instances = parse_obj_as(Dict[str, model_type], config)
+    except ValidationError as e:
+        raise validation_error_to_config_error(e)
+    return instances
+
+
+def validation_error_to_config_error(e: ValidationError) -> ConfigError:
+    return ConfigError(str(e))
