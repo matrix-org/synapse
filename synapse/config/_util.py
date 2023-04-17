@@ -75,21 +75,17 @@ def validate_instance_map_config(
     config: Any,
     model_type: TypeAlias,
 ) -> Dict[str, Model]:
-    """Validate Dict type data in the style of Dict[str, ExampleBaseModel] and check it
-    for realness. Acts as a wrapper for parse_obj_as() from pydantic that changes any
-    ValidationError to ConfigError.
-
+    """Parse `config` as a mapping from strings to a given `Model` type.
     Args:
         config: The configuration data to check
         model_type: The BaseModel to validate and parse against.
-    Returns: Fully validated and parsed Dict[str, ExampleBaseModel]
+    Returns:
+        Fully validated and parsed Dict[str, Model].
+    Raises:
+        ConfigError, if given improper input.
     """
     try:
         instances = parse_obj_as(Dict[str, model_type], config)
     except ValidationError as e:
-        raise validation_error_to_config_error(e)
+        raise ConfigError(str(e)) from e
     return instances
-
-
-def validation_error_to_config_error(e: ValidationError) -> ConfigError:
-    return ConfigError(str(e))
