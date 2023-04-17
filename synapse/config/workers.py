@@ -26,7 +26,7 @@ from synapse.config._base import (
     RoutableShardedWorkerHandlingConfig,
     ShardedWorkerHandlingConfig,
 )
-from synapse.config._util import validate_instance_map_config
+from synapse.config._util import parse_and_validate_mapping
 from synapse.config.server import (
     DIRECT_TCP_ERROR,
     TCPListenerConfig,
@@ -216,7 +216,7 @@ class WorkerConfig(Config):
         # A map from instance name to host/port of their HTTP replication endpoint.
         self.instance_map: Dict[
             str, InstanceLocationConfig
-        ] = validate_instance_map_config(
+        ] = parse_and_validate_mapping(
             config.get("instance_map", {}),
             InstanceLocationConfig,
         )
