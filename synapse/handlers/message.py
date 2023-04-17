@@ -1909,7 +1909,12 @@ class EventCreationHandler:
                 room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
                 create_event = await self.store.get_create_event_for_room(event.room_id)
-                room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+                if not room_version_obj.msc2175_implicit_room_creator:
+                    room_creator = create_event.content.get(
+                        EventContentFields.ROOM_CREATOR
+                    )
+                else:
+                    room_creator = create_event.sender
 
                 # Only check an insertion event if the room version
                 # supports it or the event is from the room creator.

@@ -103,6 +103,9 @@ Called during a logout request for a user. It is passed the qualified user ID, t
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.
 
+Deleting the related pushers is done after calling `on_logged_out`, so you can rely on them
+to still be present.
+
 If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `get_username_for_registration`

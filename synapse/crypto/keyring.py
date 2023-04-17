@@ -721,7 +721,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         )
 
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
-        added_keys: List[Tuple[str, str, FetchKeyResult]] = []
+        added_keys: Dict[Tuple[str, str], FetchKeyResult] = {}
 
         time_now_ms = self.clock.time_msec()
 
@@ -752,9 +752,27 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 # we continue to process the rest of the response
                 continue
 
-            added_keys.extend(
-                (server_name, key_id, key) for key_id, key in processed_response.items()
-            )
+            for key_id, key in processed_response.items():
+                dict_key = (server_name, key_id)
+                if dict_key in added_keys:
+                    already_present_key = added_keys[dict_key]
+                    logger.warning(
+                        "Duplicate server keys for %s (%s) from perspective %s (%r, %r)",
+                        server_name,
+                        key_id,
+                        perspective_name,
+                        already_present_key,
+                        key,
+                    )
+
+                    if already_present_key.valid_until_ts > key.valid_until_ts:
+                        # Favour the entry with the largest valid_until_ts,
+                        # as `old_verify_keys` are also collected from this
+                        # response.
+                        continue
+
+                added_keys[dict_key] = key
+
             keys.setdefault(server_name, {}).update(processed_response)
 
         await self.store.store_server_verify_keys(
