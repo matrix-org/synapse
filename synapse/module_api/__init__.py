@@ -120,6 +120,7 @@ from synapse.types import (
     JsonMapping,
     Requester,
     RoomAlias,
+    RoomID,
     StateMap,
     UserID,
     UserInfo,
@@ -1519,6 +1520,26 @@ class ModuleApi:
         return await self._store.get_monthly_active_users_by_service(
             start_timestamp, end_timestamp
         )
+
+    async def get_room_alias(self, room_id: RoomID) -> Optional[RoomAlias]:
+        """
+        Get the room alias associated with a room ID.
+
+        Added in Synapse v1.82.0.
+
+        Args:
+            room_id: The Room ID to find the alias of.
+
+        Returns:
+            The optional room alias
+        """
+        from synapse.api.constants import EventTypes
+
+        alias_event = await self._storage_controllers.state.get_current_state_event(
+            room_id, EventTypes.CanonicalAlias, ""
+        )
+        if alias_event:
+            return alias_event.content.get("alias")
 
     async def lookup_room_alias(self, room_alias: str) -> Tuple[str, List[str]]:
         """
