@@ -1,38 +1,45 @@
 # Experimental Features API
 
 This API allows a server administrator to enable or disable some experimental features on a per-user
-basis. Currently supported features are [msc3026](https://github.com/matrix-org/matrix-spec-proposals/pull/3026): busy presence state enabled,  [msc2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654): enable unread counts,
-[msc3881](https://github.com/matrix-org/matrix-spec-proposals/pull/3881): enable remotely toggling push notifications for another client, and [msc3967](https://github.com/matrix-org/matrix-spec-proposals/pull/3967): do not require
+basis. Currently supported features are [msc3026](https://github.com/matrix-org/matrix-spec-proposals/pull/3026): busy 
+presence state enabled,  [msc2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654): enable unread counts,
+[msc3881](https://github.com/matrix-org/matrix-spec-proposals/pull/3881): enable remotely toggling push notifications 
+for another client, and [msc3967](https://github.com/matrix-org/matrix-spec-proposals/pull/3967): do not require
 UIA when first uploading cross-signing keys. 
 
 
 To use it, you will need to authenticate by providing an `access_token`
 for a server admin: see [Admin API](../usage/administration/admin_api/).
 
-## Enable a Feature
+## Enabling/Disabling Features
 
-This API allows a server administrator to enable an experimental feature for a given user, where the
-user_id is the user id of the user for whom to enable the feature, and the feature is referred to by
-the msc number - i.e. to enable unread counts, the parameter `msc2654` would be added to the url. 
+This API allows a server administrator to enable experimental features for a given user, where the
+`user_id` is the user id of the user for whom to enable or disable the features. The request must 
+provide a body listing the features to enable/disable in the following format:
+```
+{
+"features": {"msc3026": True, "msc2654": True}
+}
+
+```
+where True is  used to enable the feature, and False is used to disable the feature.
+
 
 The API is:
 
 ```
-PUT /_synapse/admin/v1/experimental_features/<user_id>/<feature>
+PUT /_synapse/admin/v1/experimental_features/<user_id>
 ```
 
-## Disable a Feature
-
-To disable a currently enabled feature, the API is:
-
-```
-DELETE /_synapse/admin/v1/experimental_features/<user_id>/<feature>
-```
-
-## Check if a feature is enabled
-
-To check if a given feature is enabled for a given user, the API is:
+## Listing Enabled Features
+ 
+To list the enabled features for a given user, use the following API:
 
 ```
-GET /_synapse/admin/v1/experimental_features/<user_id>/<feature>
+GET /_synapse/admin/v1/experimental_features
+```
+
+It will return a list of enabled features in the following format:
+```
+{"user_id": user_id, "features": ["msc3026"]}
 ```
