@@ -1,0 +1,1 @@
+Allow resolving room aliases in module API.
