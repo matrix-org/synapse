@@ -52,7 +52,7 @@ def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
     return obj
 
 
-class InstanceLocationConfigModel(BaseModel):
+class ConfigModel(BaseModel):
     """A custom version of Pydantic's BaseModel which
 
      - ignores unknown fields and
@@ -74,7 +74,7 @@ class InstanceLocationConfigModel(BaseModel):
         allow_mutation = False
 
 
-class InstanceLocationConfig(InstanceLocationConfigModel):
+class InstanceLocationConfig(ConfigModel):
     """The host and port to talk to an instance via HTTP replication."""
 
     host: StrictStr
