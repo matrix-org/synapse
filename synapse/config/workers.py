@@ -60,8 +60,9 @@ class ConfigModel(BaseModel):
 
     but otherwise uses Pydantic's default behaviour.
 
-    Ignoring unknown fields is a useful default. It means that clients can provide
-    unstable field not known to the server without the request being refused outright.
+    For now, ignore unknown fields. In the future, we could change this so that unknown
+    config values cause a ValidationError, provided the error messages are meaningful to
+    server operators.
 
     Subclassing in this way is recommended by
     https://pydantic-docs.helpmanual.io/usage/model_config/#change-behaviour-globally
