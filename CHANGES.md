@@ -1,3 +1,72 @@
+Synapse 1.82.0rc1 (2023-04-18)
+==============================
+
+Features
+--------
+
+- Allow loading the `/directory/room/{roomAlias}` endpoint on workers. ([\#15333](https://github.com/matrix-org/synapse/issues/15333))
+- Add some validation to `instance_map` configuration loading. ([\#15431](https://github.com/matrix-org/synapse/issues/15431))
+- Allow loading the `/capabilities` endpoint on workers. ([\#15436](https://github.com/matrix-org/synapse/issues/15436))
+
+
+Bugfixes
+--------
+
+- Delete server-side backup keys when deactivating an account. ([\#15181](https://github.com/matrix-org/synapse/issues/15181))
+- Fix and document untold assumption that `on_logged_out` module hooks will be called before the deletion of pushers. ([\#15410](https://github.com/matrix-org/synapse/issues/15410))
+- Improve robustness when handling a perspective key response by deduplicating received server keys. ([\#15423](https://github.com/matrix-org/synapse/issues/15423))
+- Synapse now correctly fails to start if the config option `app_service_config_files` is not a list. ([\#15425](https://github.com/matrix-org/synapse/issues/15425))
+- Disable loading `RefreshTokenServlet` (`/_matrix/client/(r0|v3|unstable)/refresh`) on workers. ([\#15428](https://github.com/matrix-org/synapse/issues/15428))
+
+
+Improved Documentation
+----------------------
+
+- Note that the `delete_stale_devices_after` background job always runs on the main process. ([\#15452](https://github.com/matrix-org/synapse/issues/15452))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove the broken, unspecced registration fallback. Note that the *login* fallback is unaffected by this change. ([\#15405](https://github.com/matrix-org/synapse/issues/15405))
+
+
+Internal Changes
+----------------
+
+- Bump black from 23.1.0 to 23.3.0. ([\#15372](https://github.com/matrix-org/synapse/issues/15372))
+- Bump pyopenssl from 23.1.0 to 23.1.1. ([\#15373](https://github.com/matrix-org/synapse/issues/15373))
+- Bump types-psycopg2 from 2.9.21.8 to 2.9.21.9. ([\#15374](https://github.com/matrix-org/synapse/issues/15374))
+- Bump types-netaddr from 0.8.0.6 to 0.8.0.7. ([\#15375](https://github.com/matrix-org/synapse/issues/15375))
+- Bump types-opentracing from 2.4.10.3 to 2.4.10.4. ([\#15376](https://github.com/matrix-org/synapse/issues/15376))
+- Bump dawidd6/action-download-artifact from 2.26.0 to 2.26.1. ([\#15404](https://github.com/matrix-org/synapse/issues/15404))
+- Bump parameterized from 0.8.1 to 0.9.0. ([\#15412](https://github.com/matrix-org/synapse/issues/15412))
+- Bump types-pillow from 9.4.0.17 to 9.4.0.19. ([\#15413](https://github.com/matrix-org/synapse/issues/15413))
+- Bump sentry-sdk from 1.17.0 to 1.19.1. ([\#15414](https://github.com/matrix-org/synapse/issues/15414))
+- Bump immutabledict from 2.2.3 to 2.2.4. ([\#15415](https://github.com/matrix-org/synapse/issues/15415))
+- Bump dawidd6/action-download-artifact from 2.26.1 to 2.27.0. ([\#15441](https://github.com/matrix-org/synapse/issues/15441))
+- Bump serde_json from 1.0.95 to 1.0.96. ([\#15442](https://github.com/matrix-org/synapse/issues/15442))
+- Bump serde from 1.0.159 to 1.0.160. ([\#15443](https://github.com/matrix-org/synapse/issues/15443))
+- Bump pillow from 9.4.0 to 9.5.0. ([\#15444](https://github.com/matrix-org/synapse/issues/15444))
+- Bump furo from 2023.3.23 to 2023.3.27. ([\#15445](https://github.com/matrix-org/synapse/issues/15445))
+- Bump types-pyopenssl from 23.1.0.0 to 23.1.0.2. ([\#15446](https://github.com/matrix-org/synapse/issues/15446))
+- Bump mypy from 1.0.0 to 1.0.1. ([\#15447](https://github.com/matrix-org/synapse/issues/15447))
+- Bump psycopg2 from 2.9.5 to 2.9.6. ([\#15448](https://github.com/matrix-org/synapse/issues/15448))
+- Improve DB performance of clearing out old data from `stream_ordering_to_exterm`. ([\#15382](https://github.com/matrix-org/synapse/issues/15382), [\#15429](https://github.com/matrix-org/synapse/issues/15429))
+- Implement [MSC3989](https://github.com/matrix-org/matrix-spec-proposals/pull/3989) redaction algorithm. ([\#15393](https://github.com/matrix-org/synapse/issues/15393))
+- Implement [MSC2175](https://github.com/matrix-org/matrix-doc/pull/2175) to stop adding `creator` to create events. ([\#15394](https://github.com/matrix-org/synapse/issues/15394))
+- Implement [MSC2174](https://github.com/matrix-org/matrix-spec-proposals/pull/2174) to move the `redacts` key to a `content` property. ([\#15395](https://github.com/matrix-org/synapse/issues/15395))
+- Trust dtonlay/rust-toolchain in CI. ([\#15406](https://github.com/matrix-org/synapse/issues/15406))
+- Explicitly install Synapse during typechecking in CI. ([\#15409](https://github.com/matrix-org/synapse/issues/15409))
+- Only load the SSO redirect servlet if SSO is enabled. ([\#15421](https://github.com/matrix-org/synapse/issues/15421))
+- Refactor `SimpleHttpClient` to pull out a base class. ([\#15427](https://github.com/matrix-org/synapse/issues/15427))
+- Improve type hints. ([\#15432](https://github.com/matrix-org/synapse/issues/15432))
+- Convert async to normal tests in `TestSSOHandler`. ([\#15433](https://github.com/matrix-org/synapse/issues/15433))
+- Speed up the user directory background update. ([\#15435](https://github.com/matrix-org/synapse/issues/15435))
+- Disable directory listing for static resources in `/_matrix/static/`. ([\#15438](https://github.com/matrix-org/synapse/issues/15438))
+- Move various module API callback registration methods to a dedicated class. ([\#15453](https://github.com/matrix-org/synapse/issues/15453))
+
+
 Synapse 1.81.0 (2023-04-11)
 ===========================
 
