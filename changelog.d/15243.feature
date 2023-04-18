@@ -1,1 +1,0 @@
-Add a primitive helper script for listing worker endpoints.

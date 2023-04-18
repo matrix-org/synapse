@@ -1,0 +1,1 @@
+Explicitly install Synapse during typechecking in CI.

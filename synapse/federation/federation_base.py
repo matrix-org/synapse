@@ -51,7 +51,7 @@ class FederationBase:
 
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.store = hs.get_datastores().main
         self._clock = hs.get_clock()
         self._storage_controllers = hs.get_storage_controllers()
@@ -137,9 +137,9 @@ class FederationBase:
                     )
             return redacted_event
 
-        spam_check = await self.spam_checker.check_event_for_spam(pdu)
+        spam_check = await self._spam_checker_module_callbacks.check_event_for_spam(pdu)
 
-        if spam_check != self.spam_checker.NOT_SPAM:
+        if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
             logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
             log_kv(
                 {

@@ -670,9 +670,17 @@ class CasTicketServlet(RestServlet):
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
-    if hs.config.registration.refreshable_access_token_lifetime is not None:
+    if (
+        hs.config.worker.worker_app is None
+        and hs.config.registration.refreshable_access_token_lifetime is not None
+    ):
         RefreshTokenServlet(hs).register(http_server)
-    SsoRedirectServlet(hs).register(http_server)
+    if (
+        hs.config.cas.cas_enabled
+        or hs.config.saml2.saml2_enabled
+        or hs.config.oidc.oidc_enabled
+    ):
+        SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
 

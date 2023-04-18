@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.55.0 which could delay remote homeservers being able to decrypt encrypted messages sent by local users.

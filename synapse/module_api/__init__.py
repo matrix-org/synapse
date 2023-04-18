@@ -44,20 +44,6 @@ from synapse.events.presence_router import (
     GET_USERS_FOR_STATES_CALLBACK,
     PresenceRouter,
 )
-from synapse.events.spamcheck import (
-    CHECK_EVENT_FOR_SPAM_CALLBACK,
-    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
-    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
-    CHECK_USERNAME_FOR_SPAM_CALLBACK,
-    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
-    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
-    USER_MAY_CREATE_ROOM_CALLBACK,
-    USER_MAY_INVITE_CALLBACK,
-    USER_MAY_JOIN_ROOM_CALLBACK,
-    USER_MAY_PUBLISH_ROOM_CALLBACK,
-    USER_MAY_SEND_3PID_INVITE_CALLBACK,
-    SpamChecker,
-)
 from synapse.events.third_party_rules import (
     CHECK_CAN_DEACTIVATE_USER_CALLBACK,
     CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
@@ -105,6 +91,20 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
     ON_LEGACY_SEND_MAIL_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
 )
+from synapse.module_api.callbacks.spamchecker_callbacks import (
+    CHECK_EVENT_FOR_SPAM_CALLBACK,
+    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
+    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+    CHECK_USERNAME_FOR_SPAM_CALLBACK,
+    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
+    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
+    USER_MAY_CREATE_ROOM_CALLBACK,
+    USER_MAY_INVITE_CALLBACK,
+    USER_MAY_JOIN_ROOM_CALLBACK,
+    USER_MAY_PUBLISH_ROOM_CALLBACK,
+    USER_MAY_SEND_3PID_INVITE_CALLBACK,
+    SpamCheckerModuleApiCallbacks,
+)
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -147,7 +147,7 @@ are loaded into Synapse.
 """
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
-NOT_SPAM = SpamChecker.NOT_SPAM
+NOT_SPAM = SpamCheckerModuleApiCallbacks.NOT_SPAM
 
 __all__ = [
     "errors",
@@ -271,7 +271,6 @@ class ModuleApi:
         self._public_room_list_manager = PublicRoomListManager(hs)
         self._account_data_manager = AccountDataManager(hs)
 
-        self._spam_checker = hs.get_spam_checker()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
@@ -305,7 +304,7 @@ class ModuleApi:
 
         Added in Synapse v1.37.0.
         """
-        return self._spam_checker.register_callbacks(
+        return self._callbacks.spam_checker.register_callbacks(
             check_event_for_spam=check_event_for_spam,
             should_drop_federated_event=should_drop_federated_event,
             user_may_join_room=user_may_join_room,

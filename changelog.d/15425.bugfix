@@ -1,0 +1,1 @@
+Synapse now correctly fails to start if the config option `app_service_config_files` is not a list.

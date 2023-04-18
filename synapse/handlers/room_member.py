@@ -96,7 +96,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.servernotices.server_notices_mxid
         self._enable_lookup = hs.config.registration.enable_3pid_lookup
@@ -806,7 +806,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
                     block_invite_result = (Codes.FORBIDDEN, {})
 
-                spam_check = await self.spam_checker.user_may_invite(
+                spam_check = await self._spam_checker_module_callbacks.user_may_invite(
                     requester.user.to_string(), target_id, room_id
                 )
                 if spam_check != NOT_SPAM:
@@ -850,63 +850,68 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # `is_partial_state_room` also indicates whether `partial_state_before_join` is
         # partial.
 
-        # TODO: Refactor into dictionary of explicitly allowed transitions
-        # between old and new state, with specific error messages for some
-        # transitions and generic otherwise
-        old_state_id = partial_state_before_join.get(
-            (EventTypes.Member, target.to_string())
-        )
-        if old_state_id:
-            old_state = await self.store.get_event(old_state_id, allow_none=True)
-            old_membership = old_state.content.get("membership") if old_state else None
-            if action == "unban" and old_membership != "ban":
-                raise SynapseError(
-                    403,
-                    "Cannot unban user who was not banned"
-                    " (membership=%s)" % old_membership,
-                    errcode=Codes.BAD_STATE,
-                )
-            if old_membership == "ban" and action not in ["ban", "unban", "leave"]:
-                raise SynapseError(
-                    403,
-                    "Cannot %s user who was banned" % (action,),
-                    errcode=Codes.BAD_STATE,
-                )
-
-            if old_state:
-                same_content = content == old_state.content
-                same_membership = old_membership == effective_membership_state
-                same_sender = requester.user.to_string() == old_state.sender
-                if same_sender and same_membership and same_content:
-                    # duplicate event.
-                    # we know it was persisted, so must have a stream ordering.
-                    assert old_state.internal_metadata.stream_ordering
-                    return (
-                        old_state.event_id,
-                        old_state.internal_metadata.stream_ordering,
-                    )
-
-            if old_membership in ["ban", "leave"] and action == "kick":
-                raise AuthError(403, "The target user is not in the room")
-
-            # we don't allow people to reject invites to the server notice
-            # room, but they can leave it once they are joined.
-            if (
-                old_membership == Membership.INVITE
-                and effective_membership_state == Membership.LEAVE
-            ):
-                is_blocked = await self.store.is_server_notice_room(room_id)
-                if is_blocked:
-                    raise SynapseError(
-                        HTTPStatus.FORBIDDEN,
-                        "You cannot reject this invite",
-                        errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
-                    )
-        else:
-            if action == "kick":
-                raise AuthError(403, "The target user is not in the room")
-
         is_host_in_room = await self._is_host_in_room(partial_state_before_join)
+
+        # if we are not in the room, we won't have the current state
+        if is_host_in_room:
+            # TODO: Refactor into dictionary of explicitly allowed transitions
+            # between old and new state, with specific error messages for some
+            # transitions and generic otherwise
+            old_state_id = partial_state_before_join.get(
+                (EventTypes.Member, target.to_string())
+            )
+
+            if old_state_id:
+                old_state = await self.store.get_event(old_state_id, allow_none=True)
+                old_membership = (
+                    old_state.content.get("membership") if old_state else None
+                )
+                if action == "unban" and old_membership != "ban":
+                    raise SynapseError(
+                        403,
+                        "Cannot unban user who was not banned"
+                        " (membership=%s)" % old_membership,
+                        errcode=Codes.BAD_STATE,
+                    )
+                if old_membership == "ban" and action not in ["ban", "unban", "leave"]:
+                    raise SynapseError(
+                        403,
+                        "Cannot %s user who was banned" % (action,),
+                        errcode=Codes.BAD_STATE,
+                    )
+
+                if old_state:
+                    same_content = content == old_state.content
+                    same_membership = old_membership == effective_membership_state
+                    same_sender = requester.user.to_string() == old_state.sender
+                    if same_sender and same_membership and same_content:
+                        # duplicate event.
+                        # we know it was persisted, so must have a stream ordering.
+                        assert old_state.internal_metadata.stream_ordering
+                        return (
+                            old_state.event_id,
+                            old_state.internal_metadata.stream_ordering,
+                        )
+
+                if old_membership in ["ban", "leave"] and action == "kick":
+                    raise AuthError(403, "The target user is not in the room")
+
+                # we don't allow people to reject invites to the server notice
+                # room, but they can leave it once they are joined.
+                if (
+                    old_membership == Membership.INVITE
+                    and effective_membership_state == Membership.LEAVE
+                ):
+                    is_blocked = await self.store.is_server_notice_room(room_id)
+                    if is_blocked:
+                        raise SynapseError(
+                            HTTPStatus.FORBIDDEN,
+                            "You cannot reject this invite",
+                            errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
+                        )
+            else:
+                if action == "kick":
+                    raise AuthError(403, "The target user is not in the room")
 
         if effective_membership_state == Membership.JOIN:
             if requester.is_guest:
@@ -935,8 +940,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # a room then they're allowed to join it.
                 and not new_room
             ):
-                spam_check = await self.spam_checker.user_may_join_room(
-                    target.to_string(), room_id, is_invited=inviter is not None
+                spam_check = (
+                    await self._spam_checker_module_callbacks.user_may_join_room(
+                        target.to_string(), room_id, is_invited=inviter is not None
+                    )
                 )
                 if spam_check != NOT_SPAM:
                     raise SynapseError(
@@ -1545,11 +1552,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
         else:
             # Check if the spamchecker(s) allow this invite to go through.
-            spam_check = await self.spam_checker.user_may_send_3pid_invite(
-                inviter_userid=requester.user.to_string(),
-                medium=medium,
-                address=address,
-                room_id=room_id,
+            spam_check = (
+                await self._spam_checker_module_callbacks.user_may_send_3pid_invite(
+                    inviter_userid=requester.user.to_string(),
+                    medium=medium,
+                    address=address,
+                    room_id=room_id,
+                )
             )
             if spam_check != NOT_SPAM:
                 raise SynapseError(

@@ -508,7 +508,7 @@ class EventCreationHandler:
 
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.third_party_event_rules: "ThirdPartyEventRules" = (
             self.hs.get_third_party_event_rules()
         )
@@ -1035,8 +1035,12 @@ class EventCreationHandler:
                     event.sender,
                 )
 
-                spam_check_result = await self.spam_checker.check_event_for_spam(event)
-                if spam_check_result != self.spam_checker.NOT_SPAM:
+                spam_check_result = (
+                    await self._spam_checker_module_callbacks.check_event_for_spam(
+                        event
+                    )
+                )
+                if spam_check_result != self._spam_checker_module_callbacks.NOT_SPAM:
                     if isinstance(spam_check_result, tuple):
                         try:
                             [code, dict] = spam_check_result
@@ -1909,7 +1913,12 @@ class EventCreationHandler:
                 room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
                 create_event = await self.store.get_create_event_for_room(event.room_id)
-                room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+                if not room_version_obj.msc2175_implicit_room_creator:
+                    room_creator = create_event.content.get(
+                        EventContentFields.ROOM_CREATOR
+                    )
+                else:
+                    room_creator = create_event.sender
 
                 # Only check an insertion event if the room version
                 # supports it or the event is from the room creator.
