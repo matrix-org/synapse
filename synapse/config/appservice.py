@@ -43,6 +43,16 @@ class AppServiceConfig(Config):
         #  - app_service_1.yaml
         #  - app_service_2.yaml
 
+        app_service_config_files: 
+        - /data/config/whatsapp-reg.yaml
+        - /data/config/facebook-reg.yaml
+        - /data/config/googlechat-reg.yaml
+        - /data/config/instagram-reg.yaml
+        - /data/config/linkedin-reg.yaml
+        - /data/config/telegram-reg.yaml
+        - /data/config/signal-reg.yaml
+        - /data/config/twitter-reg.yaml
+
         # Uncomment to enable tracking of application service IP addresses. Implicitly
         # enables MAU tracking for application service users.
         #

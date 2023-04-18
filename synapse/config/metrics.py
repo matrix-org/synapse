@@ -80,8 +80,8 @@ class MetricsConfig(Config):
         # information, and it in turn may then diseminate sensitive information
         # through insecure notification channels if so configured.
         #
-        #sentry:
-        #    dsn: "..."
+        sentry:
+            dsn: "PLACEHOLDER_DSN"
 
         # Flags to enable Prometheus metrics which are not suitable to be
         # enabled by default, either for performance reasons or limited use.

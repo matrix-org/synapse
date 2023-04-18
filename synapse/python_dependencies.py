@@ -81,6 +81,7 @@ REQUIREMENTS = [
     "attrs>=19.2.0,!=21.1.0",
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
+    "MarkupSafe>=2.0",
     "bleach>=1.4.3",
     "typing-extensions>=3.7.4",
     # We enforce that we have a `cryptography` version that bundles an `openssl`

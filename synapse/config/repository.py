@@ -246,7 +246,19 @@ class ContentRepositoryConfig(Config):
 
         # Media storage providers allow media to be stored in different
         # locations.
-        #
+        
+        media_storage_providers:
+          - module: s3_storage_provider.S3StorageProviderBackend
+            store_local: True
+            store_remote: True
+            store_synchronous: True
+            config:
+              bucket: PLACEHOLDER_BUCKET_NAME
+              # All of the below options are optional, for use with non-AWS S3-like
+              # services, or to specify access tokens here instead of some external method.
+              access_key_id: PLACEHOLDER_ACCESS_KEY_ID
+              secret_access_key: PLACEHOLDER_SECRET_ACCESS_KEY
+
         #media_storage_providers:
         #  - module: file_system
         #    # Whether to store newly uploaded local files

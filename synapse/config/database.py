@@ -46,33 +46,29 @@ DEFAULT_CONFIG = """\
 #
 # Example SQLite configuration:
 #
-#database:
-#  name: sqlite3
-#  args:
-#    database: /path/to/homeserver.db
+# database:
+#   name: sqlite3
+#   args:
+#     database: %(database_path)s
 #
 #
 # Example Postgres configuration:
 #
-#database:
-#  name: psycopg2
-#  txn_limit: 10000
-#  args:
-#    user: synapse_user
-#    password: secretpassword
-#    database: synapse
-#    host: localhost
-#    port: 5432
-#    cp_min: 5
-#    cp_max: 10
-#
+database:
+  name: psycopg2
+  txn_limit: 10000
+  args:
+    user: postgres
+    password: PLACEHOLDER_PASSWORD
+    database: PLACEHOLDER_DATABASE
+    host: PLACEHOLDER_HOST
+    port: 5432
+    cp_min: 5
+    cp_max: 100
+
 # For more information on using Synapse with Postgres,
 # see https://matrix-org.github.io/synapse/latest/postgres.html.
 #
-database:
-  name: sqlite3
-  args:
-    database: %(database_path)s
 """
 
 

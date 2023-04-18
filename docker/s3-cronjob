@@ -1,0 +1,3 @@
+#!/bin/bash -l
+0 0 * * 7 echo "----- [$(date)] -----" >> /var/log/cron.log 2>&1 && /usr/local/bin/s3_media_upload update-db 0d >> /var/log/cron.log 2>&1 && /usr/local/bin/s3_media_upload --no-progress check-deleted /data/media_store >> /var/log/cron.log 2>&1 && /usr/local/bin/s3_media_upload --no-progress upload /data/media_store PLACEHOLDER_BUCKET_NAME --delete >> /var/log/cron.log 2>&1 && /usr/local/bin/python /root/log_to_slack.py
+# An empty line is required at the end of this file for a valid cron file.

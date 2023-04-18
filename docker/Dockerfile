@@ -46,6 +46,10 @@ COPY synapse/python_dependencies.py /synapse/synapse/python_dependencies.py
 # This is aiming at installing the `install_requires` and `extras_require` from `setup.py`
 RUN pip install --prefix="/install" --no-warn-script-location \
     /synapse[all]
+RUN pip install --prefix="/install" --no-warn-script-location \
+    synapse-s3-storage-provider
+RUN pip install --prefix="/install" --no-warn-script-location \
+    slack_sdk
 
 # Copy over the rest of the project
 COPY synapse /synapse/synapse/
@@ -67,6 +71,8 @@ LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git
 LABEL org.opencontainers.image.licenses='Apache-2.0'
 
 RUN apt-get update && apt-get install -y \
+    vim \
+    cron \
     curl \
     gosu \
     libjpeg62-turbo \
@@ -81,6 +87,8 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
+
+RUN mkdir -p /var/log && touch /var/log/cron.log
 
 VOLUME ["/data"]
 

@@ -1,0 +1,5 @@
+user: postgres
+password: PLACEHOLDER_PASSWORD
+database: PLACEHOLDER_DATABASE
+host: PLACEHOLDER_HOST
+port: 5432
