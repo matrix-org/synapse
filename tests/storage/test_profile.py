@@ -27,7 +27,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         self.u_frank = UserID.from_string("@frank:test")
 
     def test_displayname(self) -> None:
-        self.get_success(self.store.create_profile(self.u_frank.localpart))
+        self.get_success(self.store.create_profile(self.u_frank.to_string()))
 
         self.get_success(
             self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
@@ -52,7 +52,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         )
 
     def test_avatar_url(self) -> None:
-        self.get_success(self.store.create_profile(self.u_frank.localpart))
+        self.get_success(self.store.create_profile(self.u_frank.to_string()))
 
         self.get_success(
             self.store.set_profile_avatar_url(

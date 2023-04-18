@@ -16,6 +16,7 @@ from typing import Optional
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.databases.main.roommember import ProfileInfo
+from synapse.types import UserID
 
 
 class ProfileWorkerStore(SQLBaseStore):
@@ -54,9 +55,10 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_avatar_url",
         )
 
-    async def create_profile(self, user_localpart: str) -> None:
+    async def create_profile(self, user_id: str) -> None:
+        user_localpart = UserID.from_string(user_id).localpart
         await self.db_pool.simple_insert(
-            table="profiles", values={"user_id": user_localpart}, desc="create_profile"
+            table="profiles", values={"user_id": user_localpart, "full_username": user_id}, desc="create_profile"
         )
 
     async def set_profile_displayname(

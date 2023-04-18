@@ -166,7 +166,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_incoming_fed_query(self) -> None:
-        self.get_success(self.store.create_profile("caroline"))
+        self.get_success(self.store.create_profile("@caroline:test"))
         self.get_success(self.store.set_profile_displayname("caroline", "Caroline"))
 
         response = self.get_success(
