@@ -91,7 +91,7 @@ Changes in SCHEMA_VERSION = 74:
     - A query on `event_stream_ordering` column has now been disambiguated (i.e. the
       codebase can handle the `current_state_events`, `local_current_memberships` and
       `room_memberships` tables having an `event_stream_ordering` column).
-      
+
 Changes in SCHEMA_VERSION = 75:
     - Adds a full_user_id column to tables profiles and user_filters
 """
