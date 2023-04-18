@@ -1,0 +1,7 @@
+/*
+ * Indents each chapter title in the left sidebar so that they aren't
+ * at the same level as the section headers.
+ */
+.chapter-item {
+    margin-left: 1em;
+}
