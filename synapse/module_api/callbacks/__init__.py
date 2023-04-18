@@ -17,8 +17,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-from .account_validity_callbacks import AccountValidityModuleApiCallbacks
-from .spamchecker_callbacks import SpamCheckerModuleApiCallbacks
+from synapse.module_api.callbacks.account_validity_callbacks import (
+    AccountValidityModuleApiCallbacks,
+)
+from synapse.module_api.callbacks.spamchecker_callbacks import (
+    SpamCheckerModuleApiCallbacks,
+)
 
 
 class ModuleApiCallbacks:
