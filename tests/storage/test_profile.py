@@ -30,7 +30,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.create_profile(self.u_frank.to_string()))
 
         self.get_success(
-            self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
+            self.store.set_profile_displayname(self.u_frank.to_string(), "Frank")
         )
 
         self.assertEqual(
@@ -44,7 +44,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         # test set to None
         self.get_success(
-            self.store.set_profile_displayname(self.u_frank.localpart, None)
+            self.store.set_profile_displayname(self.u_frank.to_string(), None)
         )
 
         self.assertIsNone(
