@@ -286,11 +286,10 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
         api.register_spam_checker_callbacks(**hooks)
 
 
-class SpamChecker:
+class SpamCheckerModuleApiCallbacks:
     NOT_SPAM: Literal["NOT_SPAM"] = "NOT_SPAM"
 
     def __init__(self, hs: "synapse.server.HomeServer") -> None:
-        self.hs = hs
         self.clock = hs.get_clock()
 
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []

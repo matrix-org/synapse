@@ -513,8 +513,6 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
-        await self.hs.get_pusherpool().remove_pushers_by_devices(user_id, device_ids)
-
         # Delete data specific to each device. Not optimised as it is not
         # considered as part of a critical path.
         for device_id in device_ids:
@@ -532,6 +530,10 @@ class DeviceHandler(DeviceWorkerHandler):
                     user_id,
                     f"org.matrix.msc3890.local_notification_settings.{device_id}",
                 )
+
+        # Pushers are deleted after `delete_access_tokens_for_user` is called so that
+        # modules using `on_logged_out` hook can use them if needed.
+        await self.hs.get_pusherpool().remove_pushers_by_devices(user_id, device_ids)
 
         await self.notify_device_update(user_id, device_ids)
 

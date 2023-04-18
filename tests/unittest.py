@@ -793,16 +793,12 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             hs.get_datastores().main.store_server_verify_keys(
                 from_server=self.OTHER_SERVER_NAME,
                 ts_added_ms=clock.time_msec(),
-                verify_keys=[
-                    (
-                        self.OTHER_SERVER_NAME,
-                        verify_key_id,
-                        FetchKeyResult(
-                            verify_key=verify_key,
-                            valid_until_ts=clock.time_msec() + 10000,
-                        ),
-                    )
-                ],
+                verify_keys={
+                    (self.OTHER_SERVER_NAME, verify_key_id): FetchKeyResult(
+                        verify_key=verify_key,
+                        valid_until_ts=clock.time_msec() + 10000,
+                    ),
+                },
             )
         )
 
