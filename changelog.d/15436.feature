@@ -1,1 +1,0 @@
-Allow loading `/capabilities` endpoint on workers.

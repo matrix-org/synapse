@@ -1,1 +1,0 @@
-Note that the `delete_stale_devices_after` background job always runs on the main process.
