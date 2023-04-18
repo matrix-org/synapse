@@ -639,6 +639,9 @@ The default value is 10.</p>
 <p>An optional duration. If set, Synapse will run a daily background task to log out and
 delete any device that hasn't been accessed for more than the specified amount of time.</p>
 <p>Defaults to no duration, which means devices are never pruned.</p>
+<p><strong>Note:</strong> This task will always run on the main process, regardless of the value of
+<code>run_background_tasks_on</code>. This is due to workers currently not having the ability to
+delete devices.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">delete_stale_devices_after: 1y
 </code></pre>
