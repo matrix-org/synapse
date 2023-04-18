@@ -941,10 +941,7 @@ class DeviceListWorkerUpdater:
             # Shortcut empty requests
             return {}
 
-        try:
-            return await self._multi_user_device_resync_client(user_ids=user_ids)
-        except:
-            raise
+        return await self._multi_user_device_resync_client(user_ids=user_ids)
 
 
 class DeviceListUpdater(DeviceListWorkerUpdater):
