@@ -73,12 +73,13 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_avatar_url(
-        self, user_localpart: str, new_avatar_url: Optional[str]
+        self, user_id: str, new_avatar_url: Optional[str]
     ) -> None:
+        user_localpart = UserID.from_string(user_id).localpart
         await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={"avatar_url": new_avatar_url},
+            values={"avatar_url": new_avatar_url, "full_user_id": user_id},
             desc="set_profile_avatar_url",
         )
 

@@ -802,9 +802,9 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         # Set avatar URL to all users, that no user has a NULL value to avoid
         # different sort order between SQlite and PostreSQL
-        self.get_success(self.store.set_profile_avatar_url("user1", "mxc://url3"))
-        self.get_success(self.store.set_profile_avatar_url("user2", "mxc://url2"))
-        self.get_success(self.store.set_profile_avatar_url("admin", "mxc://url1"))
+        self.get_success(self.store.set_profile_avatar_url("@user1:test", "mxc://url3"))
+        self.get_success(self.store.set_profile_avatar_url("@user2:test", "mxc://url2"))
+        self.get_success(self.store.set_profile_avatar_url("@admin:test", "mxc://url1"))
 
         # order by default (name)
         self._order_test([self.admin_user, user1, user2], None)
@@ -1127,7 +1127,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         # set attributes for user
         self.get_success(
-            self.store.set_profile_avatar_url("user", "mxc://servername/mediaid")
+            self.store.set_profile_avatar_url("@user:test", "mxc://servername/mediaid")
         )
         self.get_success(
             self.store.user_add_threepid("@user:test", "email", "foo@bar.com", 0, 0)
@@ -1257,7 +1257,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         Reproduces #12257.
         """
         # Patch `self.other_user` to have an empty string as their avatar.
-        self.get_success(self.store.set_profile_avatar_url("user", ""))
+        self.get_success(self.store.set_profile_avatar_url("@user:test", ""))
 
         # Check we can still erase them.
         channel = self.make_request(
@@ -2311,7 +2311,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # set attributes for user
         self.get_success(
-            self.store.set_profile_avatar_url("user", "mxc://servername/mediaid")
+            self.store.set_profile_avatar_url("@user:test", "mxc://servername/mediaid")
         )
         self.get_success(
             self.store.user_add_threepid("@user:test", "email", "foo@bar.com", 0, 0)
