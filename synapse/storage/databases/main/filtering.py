@@ -20,7 +20,7 @@ from canonicaljson import encode_canonical_json
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import LoggingTransaction
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util.caches.descriptors import cached
 
 
@@ -46,8 +46,9 @@ class FilteringWorkerStore(SQLBaseStore):
 
         return db_to_json(def_json)
 
-    async def add_user_filter(self, user_localpart: str, user_filter: JsonDict) -> int:
+    async def add_user_filter(self, user_id: str, user_filter: JsonDict) -> int:
         def_json = encode_canonical_json(user_filter)
+        user_localpart = UserID.from_string(user_id).localpart
 
         # Need an atomic transaction to SELECT the maximal ID so far then
         # INSERT a new one
@@ -70,10 +71,10 @@ class FilteringWorkerStore(SQLBaseStore):
                 filter_id = max_id + 1
 
             sql = (
-                "INSERT INTO user_filters (user_id, filter_id, filter_json)"
-                "VALUES(?, ?, ?)"
+                "INSERT INTO user_filters (full_user_id, user_id, filter_id, filter_json)"
+                "VALUES(?, ?, ?, ?)"
             )
-            txn.execute(sql, (user_localpart, filter_id, bytearray(def_json)))
+            txn.execute(sql, (user_id, user_localpart, filter_id, bytearray(def_json)))
 
             return filter_id
 

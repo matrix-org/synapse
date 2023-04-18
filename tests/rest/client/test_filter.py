@@ -76,7 +76,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
     def test_get_filter(self) -> None:
         filter_id = self.get_success(
             self.filtering.add_user_filter(
-                user_localpart="apple", user_filter=self.EXAMPLE_FILTER
+                user_id="@apple:test", user_filter=self.EXAMPLE_FILTER
             )
         )
         self.reactor.advance(1)
