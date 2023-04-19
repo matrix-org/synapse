@@ -105,7 +105,11 @@ from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
-from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
+from synapse.http.client import (
+    InsecureInterceptableContextFactory,
+    SimpleHttpClient,
+    SimpleReplicationClient,
+)
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.media.media_repository import MediaRepository
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
@@ -453,6 +457,13 @@ class HomeServer(metaclass=abc.ABCMeta):
             ip_blacklist=self.config.server.ip_range_blacklist,
             use_proxy=True,
         )
+
+    @cache_in_self
+    def get_replication_client(self) -> SimpleReplicationClient:
+        """
+        An HTTP client for HTTP replication.
+        """
+        return SimpleReplicationClient(self)
 
     @cache_in_self
     def get_federation_http_client(self) -> MatrixFederationHttpClient:

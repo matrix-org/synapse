@@ -74,6 +74,7 @@ from twisted.web.iweb import (
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
+from synapse.http.replicationagent import ReplicationAgent
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
@@ -817,6 +818,128 @@ class SimpleHttpClient(BaseHttpClient):
                 ip_blacklist=self._ip_blacklist,
                 ip_whitelist=self._ip_whitelist,
             )
+
+
+class SimpleReplicationClient(BaseHttpClient):
+    """No frills client for connecting to Replication endpoints.
+
+    Uses existing BaseHttpClient methods but replaces the 'agent' used to make the
+    request with one that supports HTTP and HTTPS.
+    Attributes:
+            endpoints.
+        agent: The custom Twisted Agent used for constructing the connection.
+    """
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+    ):
+        """
+        Args:
+            hs
+        """
+        super().__init__(hs)
+
+        # Use a pool, but a very small one.
+        pool = HTTPConnectionPool(self.reactor)
+        pool.maxPersistentPerHost = 5
+        pool.cachedConnectionTimeout = 2 * 60
+
+        self.agent: IAgent = ReplicationAgent(
+            hs.get_reactor(),
+            hs,
+            contextFactory=hs.get_http_client_context_factory(),
+            pool=pool,
+        )
+
+    async def request(
+        self,
+        method: str,
+        uri: str,
+        data: Optional[bytes] = None,
+        headers: Optional[Headers] = None,
+    ) -> IResponse:
+        """
+        Args:
+            method: HTTP method to use.
+            uri: URI to query.
+            data: Data to send in the request body, if applicable.
+            headers: Request headers.
+
+        Returns:
+            Response object, once the headers have been read.
+
+        Raises:
+            RequestTimedOutError if the request times out before the headers are read
+
+        """
+        outgoing_requests_counter.labels(method).inc()
+
+        # log request but strip `access_token` (AS requests for example include this)
+        logger.debug("Sending request %s %s", method, redact_uri(uri))
+
+        with start_active_span(
+            "outgoing-replication-request",
+            tags={
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.HTTP_METHOD: method,
+                tags.HTTP_URL: uri,
+            },
+            finish_on_close=True,
+        ):
+            try:
+                body_producer = None
+                if data is not None:
+                    body_producer = QuieterFileBodyProducer(
+                        BytesIO(data),
+                        cooperator=self._cooperator,
+                    )
+
+                # Skip the fancy treq stuff, we don't need cookie handling, redirects,
+                # or buffered response bodies.
+                method_bytes = method.encode("ascii")
+                uri_bytes = uri.encode("ascii")
+
+                request_deferred = self.agent.request(
+                    method_bytes,
+                    uri_bytes,
+                    headers,
+                    bodyProducer=body_producer,
+                )
+
+                # we use our own timeout mechanism rather than treq's as a workaround
+                # for https://twistedmatrix.com/trac/ticket/9534.
+                request_deferred = timeout_deferred(
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
+                )
+
+                # turn timeouts into RequestTimedOutErrors
+                request_deferred.addErrback(_timeout_to_request_timed_out_error)
+
+                response = await make_deferred_yieldable(request_deferred)
+
+                incoming_responses_counter.labels(method, response.code).inc()
+                logger.info(
+                    "Received response to %s %s: %s",
+                    method,
+                    redact_uri(uri),
+                    response.code,
+                )
+                return response
+            except Exception as e:
+                incoming_responses_counter.labels(method, "ERR").inc()
+                logger.info(
+                    "Error sending request to  %s %s: %s %s",
+                    method,
+                    redact_uri(uri),
+                    type(e).__name__,
+                    e.args[0],
+                )
+                set_tag(tags.ERROR, True)
+                set_tag("error_reason", e.args[0])
+                raise
 
 
 def _timeout_to_request_timed_out_error(f: Failure) -> Failure:
