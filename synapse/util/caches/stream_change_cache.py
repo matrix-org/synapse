@@ -14,6 +14,8 @@
 
 import logging
 import math
+import threading
+from collections.abc import Callable
 from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 import attr
@@ -67,12 +69,18 @@ class StreamChangeCache:
     def __init__(
         self,
         name: str,
-        current_stream_pos: int,
+        current_pos_and_prefilled_cache_supplier: Callable[
+            [], tuple[Optional[Mapping[EntityType, int]], int]
+        ],
         max_size: int = 10000,
-        prefilled_cache: Optional[Mapping[EntityType, int]] = None,
     ) -> None:
+        self._prefill_done: bool = False
+        self._lock = threading.Lock()
         self._original_max_size: int = max_size
         self._max_size = math.floor(max_size)
+        self._current_pos_and_prefilled_cache_supplier = (
+            current_pos_and_prefilled_cache_supplier
+        )
 
         # map from stream id to the set of entities which changed at that stream id.
         self._cache: SortedDict[int, Set[EntityType]] = SortedDict()
@@ -85,16 +93,30 @@ class StreamChangeCache:
         # get_all_entities_changed. In other words, one less than the earliest
         # stream_pos for which we know _cache is valid.
         #
-        self._earliest_known_stream_pos = current_stream_pos
+        self._earliest_known_stream_pos: int = 0
 
         self.name = name
         self.metrics = caches.register_cache(
             "cache", self.name, self._cache, resize_callback=self.set_cache_factor
         )
 
-        if prefilled_cache:
-            for entity, stream_pos in prefilled_cache.items():
-                self.entity_has_changed(entity, stream_pos)
+    def _prefill(self) -> None:
+        if self._prefill_done:
+            return
+        with self._lock:
+            # check again in case another thread updated this
+            if self._prefill_done:
+                return  # type: ignore[unreachable]
+
+            (
+                prefilled_cache,
+                current_pos,
+            ) = self._current_pos_and_prefilled_cache_supplier()
+            self._earliest_known_stream_pos = current_pos
+            if prefilled_cache:
+                for entity, stream_pos in prefilled_cache.items():
+                    self.entity_has_changed(entity, stream_pos)
+            self._prefill_done = True
 
     def set_cache_factor(self, factor: float) -> bool:
         """
@@ -134,6 +156,7 @@ class StreamChangeCache:
                   for the entity.
         """
         assert isinstance(stream_pos, int)
+        self._prefill()
 
         # _cache is not valid at or before the earliest known stream position, so
         # return that the entity has changed.
@@ -177,6 +200,7 @@ class StreamChangeCache:
             This will be all entities if the given stream position is at or earlier
             than the earliest known stream position.
         """
+        self._prefill()
         cache_result = self.get_all_entities_changed(stream_pos)
         if cache_result.hit:
             # We now do an intersection, trying to do so in the most efficient
@@ -212,6 +236,7 @@ class StreamChangeCache:
             False otherwise.
         """
         assert isinstance(stream_pos, int)
+        self._prefill()
 
         # _cache is not valid at or before the earliest known stream position, so
         # return that an entity has changed.
@@ -244,6 +269,7 @@ class StreamChangeCache:
             includes the entities in the order they were changed.
         """
         assert isinstance(stream_pos, int)
+        self._prefill()
 
         # _cache is not valid at or before the earliest known stream position, so
         # return None to mark that it is unknown if an entity has changed.
@@ -265,6 +291,7 @@ class StreamChangeCache:
             stream_pos: The stream position to update the entity to.
         """
         assert isinstance(stream_pos, int)
+        self._prefill()
 
         # For a change before _cache is valid (e.g. at or before the earliest known
         # stream position) there's nothing to do.
@@ -295,6 +322,7 @@ class StreamChangeCache:
 
         Evicts entries until it is at the maximum size.
         """
+        self._prefill()
         # if the cache is too big, remove entries
         while len(self._cache) > self._max_size:
             k, r = self._cache.popitem(0)
@@ -313,4 +341,5 @@ class StreamChangeCache:
             The stream position of the latest change for the given entity or
             the earliest known stream position if the entitiy is unknown.
         """
+        self._prefill()
         return self._entity_to_key.get(entity, self._earliest_known_stream_pos)

@@ -496,21 +496,19 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         # during startup which would cause one to die.
         self._need_to_reset_federation_stream_positions = self._send_federation
 
-        events_max = self.get_room_max_stream_ordering()
-        event_cache_prefill, min_event_val = self.db_pool.get_cache_dict(
-            db_conn,
-            "events",
-            entity_column="room_id",
-            stream_column="stream_ordering",
-            max_value=events_max,
-        )
         self._events_stream_cache = StreamChangeCache(
             "EventsRoomStreamChangeCache",
-            min_event_val,
-            prefilled_cache=event_cache_prefill,
+            lambda: self.db_pool.get_cache_dict(
+                db_conn,
+                "events",
+                entity_column="room_id",
+                stream_column="stream_ordering",
+                max_value=self.get_room_max_stream_ordering(),
+            ),
         )
         self._membership_stream_cache = StreamChangeCache(
-            "MembershipStreamChangeCache", events_max
+            "MembershipStreamChangeCache",
+            lambda: (None, self.get_room_max_stream_ordering()),
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()

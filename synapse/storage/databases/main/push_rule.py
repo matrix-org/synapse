@@ -125,18 +125,15 @@ class PushRulesWorkerStore(
             is_writer=hs.config.worker.worker_app is None,
         )
 
-        push_rules_prefill, push_rules_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "push_rules_stream",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=self.get_max_push_rules_stream_id(),
-        )
-
         self.push_rules_stream_cache = StreamChangeCache(
             "PushRulesStreamChangeCache",
-            push_rules_id,
-            prefilled_cache=push_rules_prefill,
+            lambda: self.db_pool.get_cache_dict(
+                db_conn,
+                "push_rules_stream",
+                entity_column="user_id",
+                stream_column="stream_id",
+                max_value=self.get_max_push_rules_stream_id(),
+            ),
         )
 
     def get_max_push_rules_stream_id(self) -> int:

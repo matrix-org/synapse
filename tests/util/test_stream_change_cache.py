@@ -13,7 +13,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         Providing a prefilled cache to StreamChangeCache will result in a cache
         with the prefilled-cache entered in.
         """
-        cache = StreamChangeCache("#test", 1, prefilled_cache={"user@foo.com": 2})
+        cache = StreamChangeCache("#test", lambda: ({"user@foo.com": 2}, 1))
         self.assertTrue(cache.has_entity_changed("user@foo.com", 1))
 
     def test_has_entity_changed(self) -> None:
@@ -21,7 +21,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         StreamChangeCache.entity_has_changed will mark entities as changed, and
         has_entity_changed will observe the changed entities.
         """
-        cache = StreamChangeCache("#test", 3)
+        cache = StreamChangeCache("#test", lambda: (None, 3))
 
         cache.entity_has_changed("user@foo.com", 6)
         cache.entity_has_changed("bar@baz.net", 7)
@@ -59,7 +59,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         StreamChangeCache.entity_has_changed will respect the max size and
         purge the oldest items upon reaching that max size.
         """
-        cache = StreamChangeCache("#test", 1, max_size=2)
+        cache = StreamChangeCache("#test", lambda: (None, 1), max_size=2)
 
         cache.entity_has_changed("user@foo.com", 2)
         cache.entity_has_changed("bar@baz.net", 3)
@@ -95,7 +95,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         entities since the given position.  If the position is before the start
         of the known stream, it returns None instead.
         """
-        cache = StreamChangeCache("#test", 1)
+        cache = StreamChangeCache("#test", lambda: (None, 1))
 
         cache.entity_has_changed("user@foo.com", 2)
         cache.entity_has_changed("bar@baz.net", 3)
@@ -142,7 +142,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         stream position is before it, it will return True, otherwise False if
         the cache has no entries.
         """
-        cache = StreamChangeCache("#test", 1)
+        cache = StreamChangeCache("#test", lambda: (None, 1))
 
         # With no entities, it returns True for the past, present, and False for
         # the future.
@@ -168,7 +168,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         stream position is earlier than the earliest known position, it will
         return all of the entities queried for.
         """
-        cache = StreamChangeCache("#test", 1)
+        cache = StreamChangeCache("#test", lambda: (None, 1))
 
         cache.entity_has_changed("user@foo.com", 2)
         cache.entity_has_changed("bar@baz.net", 3)
@@ -227,7 +227,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         recent point where the entity could have changed.  If the entity is not
         known, the stream start is provided instead.
         """
-        cache = StreamChangeCache("#test", 1)
+        cache = StreamChangeCache("#test", lambda: (None, 1))
 
         cache.entity_has_changed("user@foo.com", 2)
         cache.entity_has_changed("bar@baz.net", 3)

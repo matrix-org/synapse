@@ -92,17 +92,15 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         self.hs = hs
         self._presence_on_startup = self._get_active_presence(db_conn)
 
-        presence_cache_prefill, min_presence_val = self.db_pool.get_cache_dict(
-            db_conn,
-            "presence_stream",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=self._presence_id_gen.get_current_token(),
-        )
         self.presence_stream_cache = StreamChangeCache(
             "PresenceStreamChangeCache",
-            min_presence_val,
-            prefilled_cache=presence_cache_prefill,
+            lambda: self.db_pool.get_cache_dict(
+                db_conn,
+                "presence_stream",
+                entity_column="user_id",
+                stream_column="stream_id",
+                max_value=self._presence_id_gen.get_current_token(),
+            ),
         )
 
     async def update_presence(

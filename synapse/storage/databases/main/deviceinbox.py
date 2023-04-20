@@ -105,35 +105,30 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 db_conn, hs.get_replication_notifier(), "device_inbox", "stream_id"
             )
 
-        max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
-        device_inbox_prefill, min_device_inbox_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "device_inbox",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=max_device_inbox_id,
-            limit=1000,
-        )
         self._device_inbox_stream_cache = StreamChangeCache(
             "DeviceInboxStreamChangeCache",
-            min_device_inbox_id,
-            prefilled_cache=device_inbox_prefill,
+            lambda: self.db_pool.get_cache_dict(
+                db_conn,
+                "device_inbox",
+                entity_column="user_id",
+                stream_column="stream_id",
+                max_value=self._device_inbox_id_gen.get_current_token(),
+                limit=1000,
+            ),
         )
 
         # The federation outbox and the local device inbox uses the same
         # stream_id generator.
-        device_outbox_prefill, min_device_outbox_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "device_federation_outbox",
-            entity_column="destination",
-            stream_column="stream_id",
-            max_value=max_device_inbox_id,
-            limit=1000,
-        )
         self._device_federation_outbox_stream_cache = StreamChangeCache(
             "DeviceFederationOutboxStreamChangeCache",
-            min_device_outbox_id,
-            prefilled_cache=device_outbox_prefill,
+            lambda: self.db_pool.get_cache_dict(
+                db_conn,
+                "device_federation_outbox",
+                entity_column="destination",
+                stream_column="stream_id",
+                max_value=self._device_inbox_id_gen.get_current_token(),
+                limit=1000,
+            ),
         )
 
     def process_replication_rows(
