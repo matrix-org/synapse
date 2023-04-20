@@ -20,7 +20,7 @@ CREATE TABLE per_user_experimental_features (
     -- Contains features to be enabled/disabled
     feature TEXT NOT NULL,
     -- whether the feature is enabled/disabled for a given user, defaults to disabled
-    enabled BOOLEAN DEFAULT false,
+    enabled BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(name),
     PRIMARY KEY (user_id, feature)
 );

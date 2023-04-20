@@ -124,6 +124,7 @@ BOOLEAN_COLUMNS = {
     "users": ["shadow_banned", "approved"],
     "un_partial_stated_event_stream": ["rejection_status_changed"],
     "users_who_share_rooms": ["share_private"],
+    "per_user_experimental_features": ["enabled"],
 }
 
 
