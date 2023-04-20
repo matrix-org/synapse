@@ -18,6 +18,7 @@ from synapse.config._base import ConfigError
 from synapse.http.server import UnrecognizedRequestResource
 
 from .config_resource import MediaConfigResource
+from .create_resource import CreateResource
 from .download_resource import DownloadResource
 from .preview_url_resource import PreviewUrlResource
 from .thumbnail_resource import ThumbnailResource
@@ -80,6 +81,7 @@ class MediaRepositoryResource(UnrecognizedRequestResource):
         super().__init__()
         media_repo = hs.get_media_repository()
 
+        self.putChild(b"create", CreateResource(hs, media_repo))
         self.putChild(b"upload", UploadResource(hs, media_repo))
         self.putChild(b"download", DownloadResource(hs, media_repo))
         self.putChild(
