@@ -210,6 +210,7 @@ class JsonParser(_BaseJsonParser[Union[JsonDict, list]]):
 
 class JsonDictParser(_BaseJsonParser[JsonDict]):
     """Ensure the response is a JSON object."""
+
     def __init__(self) -> None:
         super().__init__(self._validate)
 
@@ -220,6 +221,7 @@ class JsonDictParser(_BaseJsonParser[JsonDict]):
 
 class LegacyJsonDictParser(_BaseJsonParser[Tuple[int, JsonDict]]):
     """Ensure the legacy responses of /send_join & /send_leave are correct."""
+
     def __init__(self) -> None:
         super().__init__(self._validate)
 
