@@ -18,6 +18,7 @@ from synapse.config._base import ConfigError
 from synapse.http.server import HttpServer, JsonResource
 
 from .config_resource import MediaConfigResource
+from .create_resource import CreateResource
 from .download_resource import DownloadResource
 from .preview_url_resource import PreviewUrlResource
 from .thumbnail_resource import ThumbnailResource
@@ -91,7 +92,7 @@ class MediaRepositoryResource(JsonResource):
 
         # Note that many of these should not exist as v1 endpoints, but empirically
         # a lot of traffic still goes to them.
-
+        CreateResource(hs, media_repo).register(http_server)
         UploadResource(hs, media_repo).register(http_server)
         DownloadResource(hs, media_repo).register(http_server)
         ThumbnailResource(hs, media_repo, media_repo.media_storage).register(

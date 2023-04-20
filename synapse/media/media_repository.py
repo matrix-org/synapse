@@ -80,6 +80,7 @@ class MediaRepository:
         self.store = hs.get_datastores().main
         self.max_upload_size = hs.config.media.max_upload_size
         self.max_image_pixels = hs.config.media.max_image_pixels
+        self.unused_expiration_time = hs.config.media.unused_expiration_time
 
         Thumbnailer.set_limits(self.max_image_pixels)
 
@@ -184,6 +185,29 @@ class MediaRepository:
             self.recently_accessed_remotes.add((server_name, media_id))
         else:
             self.recently_accessed_locals.add(media_id)
+
+    @trace
+    async def create_media_id(self, auth_user: UserID) -> Tuple[str, int]:
+        """Create and store a media ID for a local user and return the MXC URI and its
+        expiration.
+
+        Args:
+            auth_user: The user_id of the uploader
+
+        Returns:
+            A tuple containing the MXC URI of the stored content and the timestamp at
+            which the MXC URI expires.
+        """
+        media_id = random_string(24)
+        now = self.clock.time_msec()
+        unused_expires_at = now + self.unused_expiration_time
+        await self.store.store_local_media_id(
+            media_id=media_id,
+            time_now_ms=now,
+            user_id=auth_user,
+            unused_expires_at=unused_expires_at,
+        )
+        return f"mxc://{self.server_name}/{media_id}", unused_expires_at
 
     @trace
     async def create_content(
