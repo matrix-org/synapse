@@ -40,9 +40,23 @@ def main(force_colors: bool) -> None:
     exec(r, locals)
     current_schema_version = locals["SCHEMA_VERSION"]
 
-    click.secho(f"Current schema version: {current_schema_version}")
-
     diffs: List[git.Diff] = repo.remote().refs.develop.commit.diff(None)
+
+    for diff in diffs:
+        if (
+            diff.b_path == "synapse/storage/schema/__init__.py"
+            and diff.change_type == "M"
+        ):
+            # we've changed the schema file, let's check if the version has been bumped
+            res = repo.git.show(
+                f"{repo.active_branch}:synapse/storage/schema/__init__.py"
+            )
+            new_locals: Dict[str, Any] = {}
+            exec(res, new_locals)
+            if new_locals["SCHEMA_VERSION"] != current_schema_version:
+                current_schema_version = new_locals["SCHEMA_VERSION"]
+
+    click.secho(f"Current schema version: {current_schema_version}")
 
     seen_deltas = False
     bad_files = []
