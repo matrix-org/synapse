@@ -1013,7 +1013,9 @@ class FederationServer(FederationBase):
                 query.append((user_id, device_id, algorithm))
 
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
-        results = await self._e2e_keys_handler.claim_local_one_time_keys(query)
+        results = await self._e2e_keys_handler.claim_local_one_time_keys(
+            query, always_include_fallback_keys=False
+        )
 
         json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for result in results:
