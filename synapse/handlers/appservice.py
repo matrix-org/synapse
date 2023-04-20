@@ -842,9 +842,7 @@ class ApplicationServicesHandler:
 
     async def claim_e2e_one_time_keys(
         self, query: Iterable[Tuple[str, str, str]]
-    ) -> Tuple[
-        Iterable[Dict[str, Dict[str, Dict[str, JsonDict]]]], List[Tuple[str, str, str]]
-    ]:
+    ) -> Tuple[Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str]]]:
         """Claim one time keys from application services.
 
         Users which are exclusively owned by an application service are sent a
@@ -856,7 +854,7 @@ class ApplicationServicesHandler:
 
         Returns:
             A tuple of:
-                An iterable of maps of user ID -> a map device ID -> a map of key ID -> JSON bytes.
+                A map of user ID -> a map device ID -> a map of key ID -> JSON.
 
                 A copy of the input which has not been fulfilled (either because
                 they are not appservice users or the appservice does not support
@@ -897,12 +895,11 @@ class ApplicationServicesHandler:
         )
 
         # Patch together the results -- they are all independent (since they
-        # require exclusive control over the users). They get returned as a list
-        # and the caller combines them.
-        claimed_keys: List[Dict[str, Dict[str, Dict[str, JsonDict]]]] = []
+        # require exclusive control over the users, which is the outermost key).
+        claimed_keys: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for success, result in results:
             if success:
-                claimed_keys.append(result[0])
+                claimed_keys.update(result[0])
                 missing.extend(result[1])
 
         return claimed_keys, missing

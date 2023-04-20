@@ -596,7 +596,7 @@ class E2eKeysHandler:
 
         # Return the results in order, each item from the input query should
         # only appear once in the combined list.
-        return (otk_results, *appservice_results, fallback_results)
+        return (otk_results, appservice_results, fallback_results)
 
     @trace
     async def claim_one_time_keys(
