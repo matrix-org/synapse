@@ -69,7 +69,6 @@ from synapse.logging.context import (
 )
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
-from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
@@ -848,15 +847,23 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
         verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
         self.get_success(
-            hs.get_datastores().main.store_server_verify_keys(
+            hs.get_datastores().main.store_server_keys_json(
+                self.OTHER_SERVER_NAME,
+                verify_key_id,
                 from_server=self.OTHER_SERVER_NAME,
-                ts_added_ms=clock.time_msec(),
-                verify_keys={
-                    (self.OTHER_SERVER_NAME, verify_key_id): FetchKeyResult(
-                        verify_key=verify_key,
-                        valid_until_ts=clock.time_msec() + 10000,
-                    ),
-                },
+                ts_now_ms=clock.time_msec(),
+                ts_expires_ms=clock.time_msec() + 10000,
+                key_json_bytes=canonicaljson.encode_canonical_json(
+                    {
+                        "verify_keys": {
+                            verify_key_id: {
+                                "key": signedjson.key.encode_verify_key_base64(
+                                    verify_key
+                                )
+                            }
+                        }
+                    }
+                ),
             )
         )
 
