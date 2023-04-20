@@ -1,0 +1,1 @@
+Don't fail moving read marker if current set to a missing event. Contributed by Nick @ Beeper (@fizzadar).
