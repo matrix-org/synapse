@@ -189,7 +189,14 @@ class _BaseJsonParser(ByteParser[T]):
 
     CONTENT_TYPE = "application/json"
 
-    def __init__(self, validator: Optional[Callable[[Any], bool]] = None) -> None:
+    def __init__(
+        self, validator: Optional[Callable[[Optional[object]], bool]] = None
+    ) -> None:
+        """
+        Args:
+            validator: A callable which takes the parsed JSON value and returns
+                true if the value is valid.
+        """
         self._buffer = StringIO()
         self._binary_wrapper = BinaryIOWrapper(self._buffer)
         self._validator = validator
@@ -200,7 +207,9 @@ class _BaseJsonParser(ByteParser[T]):
     def finish(self) -> T:
         result = json_decoder.decode(self._buffer.getvalue())
         if self._validator is not None and not self._validator(result):
-            raise ValueError(f"Received incorrect JSON value: {result.__class__.__name__}")
+            raise ValueError(
+                f"Received incorrect JSON value: {result.__class__.__name__}"
+            )
         return result
 
 
