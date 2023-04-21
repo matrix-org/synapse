@@ -1263,10 +1263,9 @@ class ModuleApi:
                 ):
                     sent = False
                     res = await p.dispatch_push(content, tweaks, default_payload)
-                    if (
-                        isinstance(res, (list, tuple)) and len(res) == 0
-                    ) or res is not False:
-                        sent = True
+                    # Check if the push was successful and no pushers were rejected.
+                    sent = res is not False and not res
+
                     # This is mainly to accomodate mypy
                     # device_id should never be empty after the `set_device_id_for_pushers`
                     # background job has been properly run.
