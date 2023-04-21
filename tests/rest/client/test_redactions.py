@@ -16,6 +16,7 @@ from typing import List, Optional
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.room_versions import RoomVersions
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
 from synapse.server import HomeServer
@@ -74,6 +75,7 @@ class RedactionsTestCase(HomeserverTestCase):
         event_id: str,
         expect_code: int = 200,
         with_relations: Optional[List[str]] = None,
+        content: Optional[JsonDict] = None,
     ) -> JsonDict:
         """Helper function to send a redaction event.
 
@@ -81,7 +83,7 @@ class RedactionsTestCase(HomeserverTestCase):
         """
         path = "/_matrix/client/r0/rooms/%s/redact/%s" % (room_id, event_id)
 
-        request_content = {}
+        request_content = content or {}
         if with_relations:
             request_content["org.matrix.msc3912.with_relations"] = with_relations
 
@@ -92,7 +94,7 @@ class RedactionsTestCase(HomeserverTestCase):
         return channel.json_body
 
     def _sync_room_timeline(self, access_token: str, room_id: str) -> List[JsonDict]:
-        channel = self.make_request("GET", "sync", access_token=self.mod_access_token)
+        channel = self.make_request("GET", "sync", access_token=access_token)
         self.assertEqual(channel.code, 200)
         room_sync = channel.json_body["rooms"]["join"][room_id]
         return room_sync["timeline"]["events"]
@@ -466,3 +468,36 @@ class RedactionsTestCase(HomeserverTestCase):
         )
         self.assertIn("body", event_dict["content"], event_dict)
         self.assertEqual("I'm in a thread!", event_dict["content"]["body"])
+
+    def test_content_redaction(self) -> None:
+        """MSC2174 moved the redacts property to the content."""
+        # Create a room with the newer room version.
+        room_id = self.helper.create_room_as(
+            self.mod_user_id,
+            tok=self.mod_access_token,
+            room_version=RoomVersions.MSC2176.identifier,
+        )
+
+        # Create an event.
+        b = self.helper.send(room_id=room_id, tok=self.mod_access_token)
+        event_id = b["event_id"]
+
+        # Attempt to redact it with a bogus event ID.
+        self._redact_event(
+            self.mod_access_token,
+            room_id,
+            event_id,
+            expect_code=400,
+            content={"redacts": "foo"},
+        )
+
+        # Redact it for real.
+        self._redact_event(self.mod_access_token, room_id, event_id)
+
+        # Sync the room, to get the id of the create event
+        timeline = self._sync_room_timeline(self.mod_access_token, room_id)
+        redact_event = timeline[-1]
+        self.assertEqual(redact_event["type"], EventTypes.Redaction)
+        # The redacts key should be in the content.
+        self.assertNotIn("redacts", redact_event)
+        self.assertEquals(redact_event["content"]["redacts"], event_id)

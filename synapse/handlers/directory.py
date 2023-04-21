@@ -60,7 +60,7 @@ class DirectoryHandler:
             "directory", self.on_directory_query
         )
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
 
     async def _create_association(
         self,
@@ -145,10 +145,12 @@ class DirectoryHandler:
                         403, "You must be in the room to create an alias for it"
                     )
 
-            spam_check = await self.spam_checker.user_may_create_room_alias(
-                user_id, room_alias
+            spam_check = (
+                await self._spam_checker_module_callbacks.user_may_create_room_alias(
+                    user_id, room_alias
+                )
             )
-            if spam_check != self.spam_checker.NOT_SPAM:
+            if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                 raise AuthError(
                     403,
                     "This user is not permitted to create this alias",
@@ -444,7 +446,9 @@ class DirectoryHandler:
         """
         user_id = requester.user.to_string()
 
-        spam_check = await self.spam_checker.user_may_publish_room(user_id, room_id)
+        spam_check = await self._spam_checker_module_callbacks.user_may_publish_room(
+            user_id, room_id
+        )
         if spam_check != NOT_SPAM:
             raise AuthError(
                 403,

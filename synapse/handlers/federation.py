@@ -141,7 +141,7 @@ class FederationHandler:
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.event_builder_factory = hs.get_event_builder_factory()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -1042,7 +1042,7 @@ class FederationHandler:
         if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        spam_check = await self.spam_checker.user_may_invite(
+        spam_check = await self._spam_checker_module_callbacks.user_may_invite(
             event.sender, event.state_key, event.room_id
         )
         if spam_check != NOT_SPAM:
