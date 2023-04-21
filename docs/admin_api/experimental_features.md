@@ -13,33 +13,42 @@ for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 ## Enabling/Disabling Features
 
-This API allows a server administrator to enable experimental features for a given user, where the
-`user_id` is the user id of the user for whom to enable or disable the features. The request must 
-provide a body listing the features to enable/disable in the following format:
+This API allows a server administrator to enable experimental features for a given user. The request must 
+provide a body containing the user id and listing the features to enable/disable in the following format:
 ```
 {
-"features": {"msc3026": True, "msc2654": True}
+"user_id": user_id,
+"features": {"msc3026": true, "msc2654": true}
 }
 
 ```
-where True is  used to enable the feature, and False is used to disable the feature.
+where true is  used to enable the feature, and false is used to disable the feature.
 
 
 The API is:
 
 ```
-PUT /_synapse/admin/v1/experimental_features/<user_id>
+PUT /_synapse/admin/v1/experimental_features
 ```
 
 ## Listing Enabled Features
  
-To list the enabled features for a given user, use the following API:
+To list which features are enabled/disabled for a given user, send a request with a body in the following format:
+
+```
+{
+"user_id": user_id
+}
+```
+
+to the API
 
 ```
 GET /_synapse/admin/v1/experimental_features
 ```
 
-It will return a list of enabled features in the following format:
+It will return a list of possible features and indicate whether they are enabled or disabled for the
+user like so:
 ```
-{"user_id": user_id, "features": ["msc3026"]}
+{"user_id": user_id, "features": {"msc3026": true, "msc2654": true, "msc3881": false, "msc3967": false}}
 ```

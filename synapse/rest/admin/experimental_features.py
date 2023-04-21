@@ -44,7 +44,7 @@ class ExperimentalFeaturesRestServlet(RestServlet):
     for a given user
     """
 
-    PATTERNS = admin_patterns("/experimental_features/(?P<user_id>[^/]*)")
+    PATTERNS = admin_patterns("/experimental_features")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -55,12 +55,21 @@ class ExperimentalFeaturesRestServlet(RestServlet):
     async def on_GET(
         self,
         request: SynapseRequest,
-        user_id: str,
     ) -> Tuple[int, JsonDict]:
         """
         List which features are enabled for a given user
         """
         await assert_requester_is_admin(self.auth, request)
+
+        body = parse_json_object_from_request(request)
+
+        if "user_id" not in body:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Missing property 'user_id' in the request body",
+            )
+
+        user_id = body["user_id"]
 
         target_user = UserID.from_string(user_id)
         if not self.is_mine(target_user):
@@ -69,17 +78,31 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 "User must be local to check what experimental features are enabled.",
             )
 
-        enabled_list = await self.store.list_enabled_features(user_id)
+        enabled_features = await self.store.list_enabled_features(user_id)
 
-        return HTTPStatus.OK, {"user_id": user_id, "features": enabled_list}
+        user_features = {}
+        for feature in ExperimentalFeature:
+            if feature in enabled_features:
+                user_features[feature] = True
+            else:
+                user_features[feature] = False
+        return HTTPStatus.OK, {"user_id": user_id, "features": user_features}
 
-    async def on_PUT(
-        self, request: SynapseRequest, user_id: str
-    ) -> Tuple[HTTPStatus, Dict]:
+    async def on_PUT(self, request: SynapseRequest) -> Tuple[HTTPStatus, Dict]:
         """
         Enable or disable the provided features for the requester
         """
         await assert_requester_is_admin(self.auth, request)
+
+        body = parse_json_object_from_request(request)
+
+        if "user_id" not in body:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Missing property 'user_id' in the request body",
+            )
+
+        user_id = body["user_id"]
 
         target_user = UserID.from_string(user_id)
         if not self.is_mine(target_user):
@@ -88,7 +111,6 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 "User must be local to enable experimental features.",
             )
 
-        body = parse_json_object_from_request(request)
         features = body.get("features")
         if not features:
             raise SynapseError(

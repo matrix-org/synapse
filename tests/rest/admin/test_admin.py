@@ -394,11 +394,14 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
         Test basic functionality of ExperimentalFeatures endpoint
         """
         # test enabling features works
-        url = f"{self.url}/{self.other_user}"
+        url = f"{self.url}"
         channel = self.make_request(
             "PUT",
             url,
-            content={"features": {"msc3026": True, "msc2654": True}},
+            content={
+                "user_id": self.other_user,
+                "features": {"msc3026": True, "msc2654": True},
+            },
             access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200)
@@ -409,16 +412,17 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             url,
+            content={"user_id": self.other_user},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200)
-        self.assertIn(
-            "msc3026",
-            channel.json_body["features"],
+        self.assertEqual(
+            True,
+            channel.json_body["features"]["msc3026"],
         )
-        self.assertIn(
-            "msc2654",
-            channel.json_body["features"],
+        self.assertEqual(
+            True,
+            channel.json_body["features"]["msc2654"],
         )
         self.assertIn(
             self.other_user,
@@ -426,31 +430,40 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
         )
 
         # test disabling a feature works
-        url = f"{self.url}/{self.other_user}"
+        url = f"{self.url}"
         channel = self.make_request(
             "PUT",
             url,
-            content={"features": {"msc3026": False}},
+            content={"user_id": self.other_user, "features": {"msc3026": False}},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200)
 
-        # list which features are enabled and ensure the disabled one is not listed
+        # list the features enabled/disabled and ensure they are still are correct
         self.assertEqual(channel.code, 200)
-        url = f"{self.url}/{self.other_user}"
+        url = f"{self.url}"
         channel = self.make_request(
             "GET",
             url,
+            content={"user_id": self.other_user},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200)
-        self.assertNotIn(
-            "msc3026",
-            channel.json_body["features"],
+        self.assertEqual(
+            False,
+            channel.json_body["features"]["msc3026"],
         )
-        self.assertIn(
-            "msc2654",
-            channel.json_body["features"],
+        self.assertEqual(
+            True,
+            channel.json_body["features"]["msc2654"],
+        )
+        self.assertEqual(
+            False,
+            channel.json_body["features"]["msc3881"],
+        )
+        self.assertEqual(
+            False,
+            channel.json_body["features"]["msc3967"],
         )
         self.assertIn(
             self.other_user,
@@ -458,21 +471,21 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
         )
 
         # test nothing blows up if you try to disable a feature that isn't already enabled
-        url = f"{self.url}/{self.other_user}"
+        url = f"{self.url}"
         channel = self.make_request(
             "PUT",
             url,
-            content={"features": {"msc3026": False}},
+            content={"user_id": self.other_user, "features": {"msc3026": False}},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 200)
 
         # test trying to enable a feature without an admin access token is denied
-        url = f"{self.url}/{self.other_user}"
+        url = f"{self.url}"
         channel = self.make_request(
             "PUT",
             url,
-            content={"features": {"msc3881": True}},
+            content={"user_id": self.other_user, "features": {"msc3881": True}},
             access_token=self.other_user_tok,
         )
         self.assertEqual(channel.code, 403)
@@ -482,11 +495,11 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
         )
 
         # test trying to enable a bogus msc is denied
-        url = f"{self.url}/{self.other_user}"
+        url = f"{self.url}"
         channel = self.make_request(
             "PUT",
             url,
-            content={"features": {"msc6666": True}},
+            content={"user_id": self.other_user, "features": {"msc6666": True}},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(channel.code, 400)
