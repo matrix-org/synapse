@@ -476,7 +476,8 @@ class HttpPusher(Pusher):
 
         # If the push is successful and none are rejected, update the badge count.
         if res is not False and not res:
-            self.bad_count_last_call = badge
+            self.badge_count_last_call = badge
+
         return res
 
     async def _send_badge(self, badge: int) -> None:
