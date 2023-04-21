@@ -141,7 +141,7 @@ class FederationHandler:
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.event_builder_factory = hs.get_event_builder_factory()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -1042,7 +1042,7 @@ class FederationHandler:
         if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        spam_check = await self.spam_checker.user_may_invite(
+        spam_check = await self._spam_checker_module_callbacks.user_may_invite(
             event.sender, event.state_key, event.room_id
         )
         if spam_check != NOT_SPAM:
@@ -1949,27 +1949,25 @@ class FederationHandler:
             )
             for event in events:
                 for attempt in itertools.count():
+                    # We try a new destination on every iteration.
                     try:
-                        await self._federation_event_handler.update_state_for_partial_state_event(
-                            destination, event
-                        )
-                        break
-                    except FederationPullAttemptBackoffError as exc:
-                        # Log a warning about why we failed to process the event (the error message
-                        # for `FederationPullAttemptBackoffError` is pretty good)
-                        logger.warning("_sync_partial_state_room: %s", exc)
-                        # We do not record a failed pull attempt when we backoff fetching a missing
-                        # `prev_event` because not being able to fetch the `prev_events` just means
-                        # we won't be able to de-outlier the pulled event. But we can still use an
-                        # `outlier` in the state/auth chain for another event. So we shouldn't stop
-                        # a downstream event from trying to pull it.
-                        #
-                        # This avoids a cascade of backoff for all events in the DAG downstream from
-                        # one event backoff upstream.
-                    except FederationError as e:
-                        # TODO: We should `record_event_failed_pull_attempt` here,
-                        #   see https://github.com/matrix-org/synapse/issues/13700
+                        while True:
+                            try:
+                                await self._federation_event_handler.update_state_for_partial_state_event(
+                                    destination, event
+                                )
+                                break
+                            except FederationPullAttemptBackoffError as e:
+                                # We are in the backoff period for one of the event's
+                                # prev_events. Wait it out and try again after.
+                                logger.warning(
+                                    "%s; waiting for %d ms...", e, e.retry_after_ms
+                                )
+                                await self.clock.sleep(e.retry_after_ms / 1000)
 
+                        # Success, no need to try the rest of the destinations.
+                        break
+                    except FederationError as e:
                         if attempt == len(destinations) - 1:
                             # We have tried every remote server for this event. Give up.
                             # TODO(faster_joins) giving up isn't the right thing to do
@@ -1986,6 +1984,8 @@ class FederationHandler:
                                 destination,
                                 e,
                             )
+                            # TODO: We should `record_event_failed_pull_attempt` here,
+                            #   see https://github.com/matrix-org/synapse/issues/13700
                             raise
 
                         # Try the next remote server.

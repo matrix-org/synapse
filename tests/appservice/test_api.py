@@ -16,6 +16,7 @@ from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.errors import HttpResponseException
 from synapse.appservice import ApplicationService
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -64,8 +65,8 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             }
         ]
 
-        URL_USER = f"{URL}/_matrix/app/unstable/thirdparty/user/{PROTOCOL}"
-        URL_LOCATION = f"{URL}/_matrix/app/unstable/thirdparty/location/{PROTOCOL}"
+        URL_USER = f"{URL}/_matrix/app/v1/thirdparty/user/{PROTOCOL}"
+        URL_LOCATION = f"{URL}/_matrix/app/v1/thirdparty/location/{PROTOCOL}"
 
         self.request_url = None
 
@@ -105,3 +106,114 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(self.request_url, URL_LOCATION)
         self.assertEqual(result, SUCCESS_RESULT_LOCATION)
+
+    def test_fallback(self) -> None:
+        """
+        Tests that the fallback to legacy URLs works.
+        """
+        SUCCESS_RESULT_USER = [
+            {
+                "protocol": PROTOCOL,
+                "userid": "@a:user",
+                "fields": {
+                    "more": "fields",
+                },
+            }
+        ]
+
+        URL_USER = f"{URL}/_matrix/app/v1/thirdparty/user/{PROTOCOL}"
+        FALLBACK_URL_USER = f"{URL}/_matrix/app/unstable/thirdparty/user/{PROTOCOL}"
+
+        self.request_url = None
+        self.v1_seen = False
+
+        async def get_json(
+            url: str,
+            args: Mapping[Any, Any],
+            headers: Mapping[Union[str, bytes], Sequence[Union[str, bytes]]],
+        ) -> List[JsonDict]:
+            # Ensure the access token is passed as both a header and query arg.
+            if not headers.get("Authorization") or not args.get(b"access_token"):
+                raise RuntimeError("Access token not provided")
+
+            self.assertEqual(headers.get("Authorization"), [f"Bearer {TOKEN}"])
+            self.assertEqual(args.get(b"access_token"), TOKEN)
+            self.request_url = url
+            if url == URL_USER:
+                self.v1_seen = True
+                raise HttpResponseException(404, "NOT_FOUND", b"NOT_FOUND")
+            elif url == FALLBACK_URL_USER:
+                return SUCCESS_RESULT_USER
+            else:
+                raise RuntimeError(
+                    "URL provided was invalid. This should never be seen."
+                )
+
+        # We assign to a method, which mypy doesn't like.
+        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
+
+        result = self.get_success(
+            self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
+        )
+        self.assertTrue(self.v1_seen)
+        self.assertEqual(self.request_url, FALLBACK_URL_USER)
+        self.assertEqual(result, SUCCESS_RESULT_USER)
+
+    def test_claim_keys(self) -> None:
+        """
+        Tests that the /keys/claim response is properly parsed for missing
+        keys.
+        """
+
+        RESPONSE: JsonDict = {
+            "@alice:example.org": {
+                "DEVICE_1": {
+                    "signed_curve25519:AAAAHg": {
+                        # We don't really care about the content of the keys,
+                        # they get passed back transparently.
+                    },
+                    "signed_curve25519:BBBBHg": {},
+                },
+                "DEVICE_2": {"signed_curve25519:CCCCHg": {}},
+            },
+        }
+
+        async def post_json_get_json(
+            uri: str,
+            post_json: Any,
+            headers: Mapping[Union[str, bytes], Sequence[Union[str, bytes]]],
+        ) -> JsonDict:
+            # Ensure the access token is passed as both a header and query arg.
+            if not headers.get("Authorization"):
+                raise RuntimeError("Access token not provided")
+
+            self.assertEqual(headers.get("Authorization"), [f"Bearer {TOKEN}"])
+            return RESPONSE
+
+        # We assign to a method, which mypy doesn't like.
+        self.api.post_json_get_json = Mock(side_effect=post_json_get_json)  # type: ignore[assignment]
+
+        MISSING_KEYS = [
+            # Known user, known device, missing algorithm.
+            ("@alice:example.org", "DEVICE_1", "signed_curve25519:DDDDHg"),
+            # Known user, missing device.
+            ("@alice:example.org", "DEVICE_3", "signed_curve25519:EEEEHg"),
+            # Unknown user.
+            ("@bob:example.org", "DEVICE_4", "signed_curve25519:FFFFHg"),
+        ]
+
+        claimed_keys, missing = self.get_success(
+            self.api.claim_client_keys(
+                self.service,
+                [
+                    # Found devices
+                    ("@alice:example.org", "DEVICE_1", "signed_curve25519:AAAAHg"),
+                    ("@alice:example.org", "DEVICE_1", "signed_curve25519:BBBBHg"),
+                    ("@alice:example.org", "DEVICE_2", "signed_curve25519:CCCCHg"),
+                ]
+                + MISSING_KEYS,
+            )
+        )
+
+        self.assertEqual(claimed_keys, RESPONSE)
+        self.assertEqual(missing, MISSING_KEYS)

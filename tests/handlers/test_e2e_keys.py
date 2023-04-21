@@ -23,18 +23,24 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
+from synapse.appservice import ApplicationService
 from synapse.handlers.device import DeviceHandler
 from synapse.server import HomeServer
+from synapse.storage.databases.main.appservice import _make_exclusive_regex
 from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
+from tests.unittest import override_config
 
 
 class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        return self.setup_test_homeserver(federation_client=mock.Mock())
+        self.appservice_api = mock.Mock()
+        return self.setup_test_homeserver(
+            federation_client=mock.Mock(), application_service_api=self.appservice_api
+        )
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = hs.get_e2e_keys_handler()
@@ -941,3 +947,190 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
             # The two requests to the local homeserver should be identical.
             self.assertEqual(response_1, response_2)
+
+    @override_config({"experimental_features": {"msc3983_appservice_otk_claims": True}})
+    def test_query_appservice(self) -> None:
+        local_user = "@boris:" + self.hs.hostname
+        device_id_1 = "xyz"
+        fallback_key = {"alg1:k1": "fallback_key1"}
+        device_id_2 = "abc"
+        otk = {"alg1:k2": "key2"}
+
+        # Inject an appservice interested in this user.
+        appservice = ApplicationService(
+            token="i_am_an_app_service",
+            id="1234",
+            namespaces={"users": [{"regex": r"@boris:.+", "exclusive": True}]},
+            # Note: this user does not have to match the regex above
+            sender="@as_main:test",
+        )
+        self.hs.get_datastores().main.services_cache = [appservice]
+        self.hs.get_datastores().main.exclusive_user_regex = _make_exclusive_regex(
+            [appservice]
+        )
+
+        # Setup a response, but only for device 2.
+        self.appservice_api.claim_client_keys.return_value = make_awaitable(
+            ({local_user: {device_id_2: otk}}, [(local_user, device_id_1, "alg1")])
+        )
+
+        # we shouldn't have any unused fallback keys yet
+        res = self.get_success(
+            self.store.get_e2e_unused_fallback_key_types(local_user, device_id_1)
+        )
+        self.assertEqual(res, [])
+
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user,
+                device_id_1,
+                {"fallback_keys": fallback_key},
+            )
+        )
+
+        # we should now have an unused alg1 key
+        fallback_res = self.get_success(
+            self.store.get_e2e_unused_fallback_key_types(local_user, device_id_1)
+        )
+        self.assertEqual(fallback_res, ["alg1"])
+
+        # claiming an OTK when no OTKs are available should ask the appservice, then
+        # query the fallback keys.
+        claim_res = self.get_success(
+            self.handler.claim_one_time_keys(
+                {
+                    "one_time_keys": {
+                        local_user: {device_id_1: "alg1", device_id_2: "alg1"}
+                    }
+                },
+                timeout=None,
+            )
+        )
+        self.assertEqual(
+            claim_res,
+            {
+                "failures": {},
+                "one_time_keys": {
+                    local_user: {device_id_1: fallback_key, device_id_2: otk}
+                },
+            },
+        )
+
+    @override_config({"experimental_features": {"msc3984_appservice_key_query": True}})
+    def test_query_local_devices_appservice(self) -> None:
+        """Test that querying of appservices for keys overrides responses from the database."""
+        local_user = "@boris:" + self.hs.hostname
+        device_1 = "abc"
+        device_2 = "def"
+        device_3 = "ghi"
+
+        # There are 3 devices:
+        #
+        # 1. One which is uploaded to the homeserver.
+        # 2. One which is uploaded to the homeserver, but a newer copy is returned
+        #     by the appservice.
+        # 3. One which is only returned by the appservice.
+        device_key_1: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_1,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            "keys": {
+                "ed25519:abc": "base64+ed25519+key",
+                "curve25519:abc": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:abc": "base64+signature"}},
+        }
+        device_key_2a: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_2,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            "keys": {
+                "ed25519:def": "base64+ed25519+key",
+                "curve25519:def": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:def": "base64+signature"}},
+        }
+
+        device_key_2b: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_2,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            # The device ID is the same (above), but the keys are different.
+            "keys": {
+                "ed25519:xyz": "base64+ed25519+key",
+                "curve25519:xyz": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:xyz": "base64+signature"}},
+        }
+        device_key_3: JsonDict = {
+            "user_id": local_user,
+            "device_id": device_3,
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
+            "keys": {
+                "ed25519:jkl": "base64+ed25519+key",
+                "curve25519:jkl": "base64+curve25519+key",
+            },
+            "signatures": {local_user: {"ed25519:jkl": "base64+signature"}},
+        }
+
+        # Upload keys for devices 1 & 2a.
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user, device_1, {"device_keys": device_key_1}
+            )
+        )
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user, device_2, {"device_keys": device_key_2a}
+            )
+        )
+
+        # Inject an appservice interested in this user.
+        appservice = ApplicationService(
+            token="i_am_an_app_service",
+            id="1234",
+            namespaces={"users": [{"regex": r"@boris:.+", "exclusive": True}]},
+            # Note: this user does not have to match the regex above
+            sender="@as_main:test",
+        )
+        self.hs.get_datastores().main.services_cache = [appservice]
+        self.hs.get_datastores().main.exclusive_user_regex = _make_exclusive_regex(
+            [appservice]
+        )
+
+        # Setup a response.
+        self.appservice_api.query_keys.return_value = make_awaitable(
+            {
+                "device_keys": {
+                    local_user: {device_2: device_key_2b, device_3: device_key_3}
+                }
+            }
+        )
+
+        # Request all devices.
+        res = self.get_success(self.handler.query_local_devices({local_user: None}))
+        self.assertIn(local_user, res)
+        for res_key in res[local_user].values():
+            res_key.pop("unsigned", None)
+        self.assertDictEqual(
+            res,
+            {
+                local_user: {
+                    device_1: device_key_1,
+                    device_2: device_key_2b,
+                    device_3: device_key_3,
+                }
+            },
+        )

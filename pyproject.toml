@@ -89,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.80.0rc2"
+version = "1.82.0rc1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -311,7 +311,7 @@ all = [
 # We pin black so that our tests don't start failing on new releases.
 isort = ">=5.10.1"
 black = ">=22.3.0"
-ruff = "0.0.252"
+ruff = "0.0.259"
 
 # Typechecking
 mypy = "*"
@@ -349,6 +349,18 @@ towncrier = ">=18.6.0rc1"
 
 # Used for checking the Poetry lockfile
 tomli = ">=1.2.3"
+
+
+# Dependencies for building the development documentation
+[tool.poetry.group.dev-docs]
+optional = true
+
+[tool.poetry.group.dev-docs.dependencies]
+sphinx = {version = "^6.1", python = "^3.8"}
+sphinx-autodoc2 = {version = "^0.4.2", python = "^3.8"}
+myst-parser = {version = "^1.0.0", python = "^3.8"}
+furo = ">=2022.12.7,<2024.0.0"
+
 
 [build-system]
 # The upper bounds here are defensive, intended to prevent situations like

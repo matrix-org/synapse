@@ -326,7 +326,6 @@ class EventBase(metaclass=abc.ABCMeta):
     hashes: DictProperty[Dict[str, str]] = DictProperty("hashes")
     origin: DictProperty[str] = DictProperty("origin")
     origin_server_ts: DictProperty[int] = DictProperty("origin_server_ts")
-    redacts: DefaultDictProperty[Optional[str]] = DefaultDictProperty("redacts", None)
     room_id: DictProperty[str] = DictProperty("room_id")
     sender: DictProperty[str] = DictProperty("sender")
     # TODO state_key should be Optional[str]. This is generally asserted in Synapse
@@ -345,6 +344,13 @@ class EventBase(metaclass=abc.ABCMeta):
     @property
     def membership(self) -> str:
         return self.content["membership"]
+
+    @property
+    def redacts(self) -> Optional[str]:
+        """MSC2176 moved the redacts field into the content."""
+        if self.room_version.msc2176_redaction_rules:
+            return self.content.get("redacts")
+        return self.get("redacts")
 
     def is_state(self) -> bool:
         return self.get_state_key() is not None
@@ -462,7 +468,7 @@ class FrozenEvent(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -510,7 +516,7 @@ class FrozenEventV2(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 

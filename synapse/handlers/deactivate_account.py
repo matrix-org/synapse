@@ -176,6 +176,9 @@ class DeactivateAccountHandler:
         # Remove account data (including ignored users and push rules).
         await self.store.purge_account_data_for_user(user_id)
 
+        # Delete any server-side backup keys
+        await self.store.bulk_delete_backup_keys_and_versions_for_user(user_id)
+
         # Let modules know the user has been deactivated.
         await self._third_party_rules.on_user_deactivation_status_changed(
             user_id,

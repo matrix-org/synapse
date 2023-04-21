@@ -1504,8 +1504,10 @@ class AuthHandler:
         )
 
         # delete pushers associated with this access token
+        # XXX(quenting): This is only needed until the 'set_device_id_for_pushers'
+        # background update completes.
         if token.token_id is not None:
-            await self.hs.get_pusherpool().remove_pushers_by_access_token(
+            await self.hs.get_pusherpool().remove_pushers_by_access_tokens(
                 token.user_id, (token.token_id,)
             )
 
@@ -1535,7 +1537,9 @@ class AuthHandler:
             )
 
         # delete pushers associated with the access tokens
-        await self.hs.get_pusherpool().remove_pushers_by_access_token(
+        # XXX(quenting): This is only needed until the 'set_device_id_for_pushers'
+        # background update completes.
+        await self.hs.get_pusherpool().remove_pushers_by_access_tokens(
             user_id, (token_id for _, token_id, _ in tokens_and_devices)
         )
 

@@ -215,6 +215,16 @@ class DeviceWorkerHandler:
         possibly_changed = set(changed)
         possibly_left = set()
         for room_id in rooms_changed:
+            # Check if the forward extremities have changed. If not then we know
+            # the current state won't have changed, and so we can skip this room.
+            try:
+                if not await self.store.have_room_forward_extremities_changed_since(
+                    room_id, stream_ordering
+                ):
+                    continue
+            except errors.StoreError:
+                pass
+
             current_state_ids = await self._state_storage.get_current_state_ids(
                 room_id, await_full_state=False
             )
@@ -520,6 +530,10 @@ class DeviceHandler(DeviceWorkerHandler):
                     user_id,
                     f"org.matrix.msc3890.local_notification_settings.{device_id}",
                 )
+
+        # Pushers are deleted after `delete_access_tokens_for_user` is called so that
+        # modules using `on_logged_out` hook can use them if needed.
+        await self.hs.get_pusherpool().remove_pushers_by_devices(user_id, device_ids)
 
         await self.notify_device_update(user_id, device_ids)
 

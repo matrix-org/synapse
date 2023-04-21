@@ -110,7 +110,7 @@ class RegistrationHandler:
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
 
         if hs.config.worker.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
@@ -259,7 +259,7 @@ class RegistrationHandler:
 
         await self.check_registration_ratelimit(address)
 
-        result = await self.spam_checker.check_registration_for_spam(
+        result = await self._spam_checker_module_callbacks.check_registration_for_spam(
             threepid,
             localpart,
             user_agent_ips or [],
@@ -1013,11 +1013,11 @@ class RegistrationHandler:
             user_tuple = await self.store.get_user_by_access_token(token)
             # The token better still exist.
             assert user_tuple
-            token_id = user_tuple.token_id
+            device_id = user_tuple.device_id
 
             await self.pusher_pool.add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="email",
                 app_id="m.email",
                 app_display_name="Email Notifications",

@@ -1,1 +1,0 @@
-Use `immutabledict` instead of `frozendict`.

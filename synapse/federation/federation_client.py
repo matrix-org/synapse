@@ -61,6 +61,7 @@ from synapse.federation.federation_base import (
     event_from_pdu_json,
 )
 from synapse.federation.transport.client import SendJoinResponse
+from synapse.http.client import is_unknown_endpoint
 from synapse.http.types import QueryParams
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, tag_args, trace
 from synapse.types import JsonDict, UserID, get_domain_from_id
@@ -759,43 +760,6 @@ class FederationClient(FederationBase):
 
         return signed_auth
 
-    def _is_unknown_endpoint(
-        self, e: HttpResponseException, synapse_error: Optional[SynapseError] = None
-    ) -> bool:
-        """
-        Returns true if the response was due to an endpoint being unimplemented.
-
-        Args:
-            e: The error response received from the remote server.
-            synapse_error: The above error converted to a SynapseError. This is
-                automatically generated if not provided.
-
-        """
-        if synapse_error is None:
-            synapse_error = e.to_synapse_error()
-        # MSC3743 specifies that servers should return a 404 or 405 with an errcode
-        # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
-        # to an unknown method, respectively.
-        #
-        # Older versions of servers don't properly handle this. This needs to be
-        # rather specific as some endpoints truly do return 404 errors.
-        return (
-            # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
-            (e.code == 404 or e.code == 405)
-            and (
-                # Older Dendrites returned a text or empty body.
-                # Older Conduit returned an empty body.
-                not e.response
-                or e.response == b"404 page not found"
-                # The proper response JSON with M_UNRECOGNIZED errcode.
-                or synapse_error.errcode == Codes.UNRECOGNIZED
-            )
-        ) or (
-            # Older Synapses returned a 400 error.
-            e.code == 400
-            and synapse_error.errcode == Codes.UNRECOGNIZED
-        )
-
     async def _try_destination_list(
         self,
         description: str,
@@ -887,7 +851,7 @@ class FederationClient(FederationBase):
                 elif 400 <= e.code < 500 and synapse_error.errcode in failover_errcodes:
                     failover = True
 
-                elif failover_on_unknown_endpoint and self._is_unknown_endpoint(
+                elif failover_on_unknown_endpoint and is_unknown_endpoint(
                     e, synapse_error
                 ):
                     failover = True
@@ -1223,7 +1187,7 @@ class FederationClient(FederationBase):
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
-            if not self._is_unknown_endpoint(e):
+            if not is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
@@ -1297,7 +1261,7 @@ class FederationClient(FederationBase):
             # fallback to the v1 endpoint if the room uses old-style event IDs.
             # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
-            if self._is_unknown_endpoint(e, err):
+            if is_unknown_endpoint(e, err):
                 if room_version.event_format != EventFormatVersions.ROOM_V1_V2:
                     raise SynapseError(
                         400,
@@ -1358,7 +1322,7 @@ class FederationClient(FederationBase):
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
-            if not self._is_unknown_endpoint(e):
+            if not is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_leave with the v2 API, falling back to the v1 API")
@@ -1629,7 +1593,7 @@ class FederationClient(FederationBase):
                 # If an error is received that is due to an unrecognised endpoint,
                 # fallback to the unstable endpoint. Otherwise, consider it a
                 # legitimate error and raise.
-                if not self._is_unknown_endpoint(e):
+                if not is_unknown_endpoint(e):
                     raise
 
                 logger.debug(

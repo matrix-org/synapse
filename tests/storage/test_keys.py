@@ -37,24 +37,24 @@ KEY_2 = decode_verify_key_base64(
 
 
 class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
-    def test_get_server_verify_keys(self) -> None:
+    def test_get_server_signature_keys(self) -> None:
         store = self.hs.get_datastores().main
 
         key_id_1 = "ed25519:key1"
         key_id_2 = "ed25519:KEY_ID_2"
         self.get_success(
-            store.store_server_verify_keys(
+            store.store_server_signature_keys(
                 "from_server",
                 10,
-                [
-                    ("server1", key_id_1, FetchKeyResult(KEY_1, 100)),
-                    ("server1", key_id_2, FetchKeyResult(KEY_2, 200)),
-                ],
+                {
+                    ("server1", key_id_1): FetchKeyResult(KEY_1, 100),
+                    ("server1", key_id_2): FetchKeyResult(KEY_2, 200),
+                },
             )
         )
 
         res = self.get_success(
-            store.get_server_verify_keys(
+            store.get_server_signature_keys(
                 [
                     ("server1", key_id_1),
                     ("server1", key_id_2),
@@ -87,18 +87,18 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         key_id_2 = "ed25519:key2"
 
         self.get_success(
-            store.store_server_verify_keys(
+            store.store_server_signature_keys(
                 "from_server",
                 0,
-                [
-                    ("srv1", key_id_1, FetchKeyResult(KEY_1, 100)),
-                    ("srv1", key_id_2, FetchKeyResult(KEY_2, 200)),
-                ],
+                {
+                    ("srv1", key_id_1): FetchKeyResult(KEY_1, 100),
+                    ("srv1", key_id_2): FetchKeyResult(KEY_2, 200),
+                },
             )
         )
 
         res = self.get_success(
-            store.get_server_verify_keys([("srv1", key_id_1), ("srv1", key_id_2)])
+            store.get_server_signature_keys([("srv1", key_id_1), ("srv1", key_id_2)])
         )
         self.assertEqual(len(res.keys()), 2)
 
@@ -111,20 +111,20 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertEqual(res2.valid_until_ts, 200)
 
         # we should be able to look up the same thing again without a db hit
-        res = self.get_success(store.get_server_verify_keys([("srv1", key_id_1)]))
+        res = self.get_success(store.get_server_signature_keys([("srv1", key_id_1)]))
         self.assertEqual(len(res.keys()), 1)
         self.assertEqual(res[("srv1", key_id_1)].verify_key, KEY_1)
 
         new_key_2 = signedjson.key.get_verify_key(
             signedjson.key.generate_signing_key("key2")
         )
-        d = store.store_server_verify_keys(
-            "from_server", 10, [("srv1", key_id_2, FetchKeyResult(new_key_2, 300))]
+        d = store.store_server_signature_keys(
+            "from_server", 10, {("srv1", key_id_2): FetchKeyResult(new_key_2, 300)}
         )
         self.get_success(d)
 
         res = self.get_success(
-            store.get_server_verify_keys([("srv1", key_id_1), ("srv1", key_id_2)])
+            store.get_server_signature_keys([("srv1", key_id_1), ("srv1", key_id_2)])
         )
         self.assertEqual(len(res.keys()), 2)
 
