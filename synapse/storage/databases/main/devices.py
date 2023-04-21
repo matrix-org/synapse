@@ -110,7 +110,6 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         self._device_list_stream_cache = StreamChangeCache(
             "DeviceListStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "device_lists_stream",
                 entity_column="user_id",
                 stream_column="stream_id",
@@ -122,7 +121,6 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         self._user_signature_stream_cache = StreamChangeCache(
             "UserSignatureStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "user_signature_stream",
                 entity_column="from_user_id",
                 stream_column="stream_id",
@@ -134,7 +132,6 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         self._device_list_federation_stream_cache = StreamChangeCache(
             "DeviceListFederationStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "device_lists_outbound_pokes",
                 entity_column="destination",
                 stream_column="stream_id",

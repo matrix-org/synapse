@@ -95,7 +95,6 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         self.presence_stream_cache = StreamChangeCache(
             "PresenceStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "presence_stream",
                 entity_column="user_id",
                 stream_column="stream_id",

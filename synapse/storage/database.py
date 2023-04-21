@@ -2301,7 +2301,6 @@ class DatabasePool:
 
     def get_cache_dict(
         self,
-        db_conn: LoggingDatabaseConnection,
         table: str,
         entity_column: str,
         stream_column: str,
@@ -2313,39 +2312,37 @@ class DatabasePool:
 
         Also returns the minimum stream ID.
         """
+        with make_conn(self._database_config, self.engine, "get_cache_dict") as db_conn:
+            # This may return many rows for the same entity, but the `limit` is only
+            # a suggestion so we don't care that much.
+            #
+            # Note: Some stream tables can have multiple rows with the same stream
+            # ID. Instead of handling this with complicated SQL, we instead simply
+            # add one to the returned minimum stream ID to ensure correctness.
+            sql = f"""
+                SELECT {entity_column}, {stream_column}
+                FROM {table}
+                ORDER BY {stream_column} DESC
+                LIMIT ?
+            """
 
-        # This may return many rows for the same entity, but the `limit` is only
-        # a suggestion so we don't care that much.
-        #
-        # Note: Some stream tables can have multiple rows with the same stream
-        # ID. Instead of handling this with complicated SQL, we instead simply
-        # add one to the returned minimum stream ID to ensure correctness.
-        sql = f"""
-            SELECT {entity_column}, {stream_column}
-            FROM {table}
-            ORDER BY {stream_column} DESC
-            LIMIT ?
-        """
+            cache: Dict[Any, int] = {}
+            with db_conn.cursor(txn_name="get_cache_dict") as txn:
+                txn.execute(sql, (limit,))
 
-        txn = db_conn.cursor(txn_name="get_cache_dict")
-        txn.execute(sql, (limit,))
+                # The rows come out in reverse stream ID order, so we want to keep the
+                # stream ID of the first row for each entity.
+                for row in txn:
+                    cache.setdefault(row[0], int(row[1]))
 
-        # The rows come out in reverse stream ID order, so we want to keep the
-        # stream ID of the first row for each entity.
-        cache: Dict[Any, int] = {}
-        for row in txn:
-            cache.setdefault(row[0], int(row[1]))
+            if cache:
+                # We add one here as we don't know if we have all rows for the
+                # minimum stream ID.
+                min_val = min(cache.values()) + 1
+            else:
+                min_val = max_value
 
-        txn.close()
-
-        if cache:
-            # We add one here as we don't know if we have all rows for the
-            # minimum stream ID.
-            min_val = min(cache.values()) + 1
-        else:
-            min_val = max_value
-
-        return cache, min_val
+            return cache, min_val
 
     @classmethod
     def simple_select_list_paginate_txn(

@@ -108,7 +108,6 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         self._device_inbox_stream_cache = StreamChangeCache(
             "DeviceInboxStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "device_inbox",
                 entity_column="user_id",
                 stream_column="stream_id",
@@ -122,7 +121,6 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         self._device_federation_outbox_stream_cache = StreamChangeCache(
             "DeviceFederationOutboxStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "device_federation_outbox",
                 entity_column="destination",
                 stream_column="stream_id",

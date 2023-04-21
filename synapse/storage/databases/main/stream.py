@@ -499,7 +499,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self._events_stream_cache = StreamChangeCache(
             "EventsRoomStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "events",
                 entity_column="room_id",
                 stream_column="stream_ordering",

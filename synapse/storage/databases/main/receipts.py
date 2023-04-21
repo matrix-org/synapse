@@ -105,7 +105,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self._receipts_stream_cache = StreamChangeCache(
             "ReceiptsRoomChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "receipts_linearized",
                 entity_column="room_id",
                 stream_column="stream_id",

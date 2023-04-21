@@ -240,7 +240,6 @@ class EventsWorkerStore(SQLBaseStore):
         self._curr_state_delta_stream_cache: StreamChangeCache = StreamChangeCache(
             "_curr_state_delta_stream_cache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "current_state_delta_stream",
                 entity_column="room_id",
                 stream_column="stream_id",

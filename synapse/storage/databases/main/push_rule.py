@@ -128,7 +128,6 @@ class PushRulesWorkerStore(
         self.push_rules_stream_cache = StreamChangeCache(
             "PushRulesStreamChangeCache",
             lambda: self.db_pool.get_cache_dict(
-                db_conn,
                 "push_rules_stream",
                 entity_column="user_id",
                 stream_column="stream_id",
