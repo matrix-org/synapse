@@ -581,6 +581,12 @@ class E2eKeysHandler:
             An iterable of maps of user ID -> a map device ID -> a map of key ID -> JSON bytes.
         """
 
+        # Cap the number of OTKs that can be claimed at once to avoid abuse.
+        local_query = [
+            (user_id, device_id, algorithm, min(count, 5))
+            for user_id, device_id, algorithm, count in local_query
+        ]
+
         otk_results, not_found = await self.store.claim_e2e_one_time_keys(local_query)
 
         # If the application services have not provided any keys via the C-S
