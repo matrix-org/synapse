@@ -841,8 +841,10 @@ class ApplicationServicesHandler:
         return True
 
     async def claim_e2e_one_time_keys(
-        self, query: Iterable[Tuple[str, str, str]]
-    ) -> Tuple[Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str]]]:
+        self, query: Iterable[Tuple[str, str, str, int]]
+    ) -> Tuple[
+        Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str, int]]
+    ]:
         """Claim one time keys from application services.
 
         Users which are exclusively owned by an application service are sent a
@@ -863,18 +865,18 @@ class ApplicationServicesHandler:
         services = self.store.get_app_services()
 
         # Partition the users by appservice.
-        query_by_appservice: Dict[str, List[Tuple[str, str, str]]] = {}
+        query_by_appservice: Dict[str, List[Tuple[str, str, str, int]]] = {}
         missing = []
-        for user_id, device, algorithm in query:
+        for user_id, device, algorithm, count in query:
             if not self.store.get_if_app_services_interested_in_user(user_id):
-                missing.append((user_id, device, algorithm))
+                missing.append((user_id, device, algorithm, count))
                 continue
 
             # Find the associated appservice.
             for service in services:
                 if service.is_exclusive_user(user_id):
                     query_by_appservice.setdefault(service.id, []).append(
-                        (user_id, device, algorithm)
+                        (user_id, device, algorithm, count)
                     )
                     continue
 

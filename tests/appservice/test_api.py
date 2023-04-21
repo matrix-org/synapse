@@ -195,11 +195,11 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
 
         MISSING_KEYS = [
             # Known user, known device, missing algorithm.
-            ("@alice:example.org", "DEVICE_1", "signed_curve25519:DDDDHg"),
+            ("@alice:example.org", "DEVICE_2", "xyz", 1),
             # Known user, missing device.
-            ("@alice:example.org", "DEVICE_3", "signed_curve25519:EEEEHg"),
+            ("@alice:example.org", "DEVICE_3", "signed_curve25519", 1),
             # Unknown user.
-            ("@bob:example.org", "DEVICE_4", "signed_curve25519:FFFFHg"),
+            ("@bob:example.org", "DEVICE_4", "signed_curve25519", 1),
         ]
 
         claimed_keys, missing = self.get_success(
@@ -207,9 +207,8 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                 self.service,
                 [
                     # Found devices
-                    ("@alice:example.org", "DEVICE_1", "signed_curve25519:AAAAHg"),
-                    ("@alice:example.org", "DEVICE_1", "signed_curve25519:BBBBHg"),
-                    ("@alice:example.org", "DEVICE_2", "signed_curve25519:CCCCHg"),
+                    ("@alice:example.org", "DEVICE_1", "signed_curve25519", 1),
+                    ("@alice:example.org", "DEVICE_2", "signed_curve25519", 1),
                 ]
                 + MISSING_KEYS,
             )

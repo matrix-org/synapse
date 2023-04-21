@@ -1010,7 +1010,7 @@ class FederationServer(FederationBase):
         query = []
         for user_id, device_keys in content.get("one_time_keys", {}).items():
             for device_id, algorithm in device_keys.items():
-                query.append((user_id, device_id, algorithm))
+                query.append((user_id, device_id, algorithm, 1))
 
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = await self._e2e_keys_handler.claim_local_one_time_keys(

@@ -160,7 +160,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         res2 = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -205,7 +205,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # key
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -224,7 +224,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # claiming an OTK again should return the same fallback key
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -273,7 +273,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -285,7 +285,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -306,7 +306,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -347,7 +347,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # return both.
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -369,7 +369,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # Claiming an OTK again should return only the fallback key.
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id: "alg1"}}},
+                {local_user: {device_id: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1052,7 +1052,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         # Setup a response, but only for device 2.
         self.appservice_api.claim_client_keys.return_value = make_awaitable(
-            ({local_user: {device_id_2: otk}}, [(local_user, device_id_1, "alg1")])
+            ({local_user: {device_id_2: otk}}, [(local_user, device_id_1, "alg1", 1)])
         )
 
         # we shouldn't have any unused fallback keys yet
@@ -1079,11 +1079,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # query the fallback keys.
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {
-                    "one_time_keys": {
-                        local_user: {device_id_1: "alg1", device_id_2: "alg1"}
-                    }
-                },
+                {local_user: {device_id_1: {"alg1": 1}, device_id_2: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -1128,7 +1124,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # Claim OTKs, which will ask the appservice and do nothing else.
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id_1: "alg1"}}},
+                {local_user: {device_id_1: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1172,7 +1168,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # uploaded fallback key.
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id_1: "alg1"}}},
+                {local_user: {device_id_1: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1205,7 +1201,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # Claim OTKs, which will return information only from the database.
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id_1: "alg1"}}},
+                {local_user: {device_id_1: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1232,7 +1228,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # Claim OTKs, which will return only the fallback key from the database.
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
-                {"one_time_keys": {local_user: {device_id_1: "alg1"}}},
+                {local_user: {device_id_1: {"alg1": 1}}},
                 timeout=None,
                 always_include_fallback_keys=True,
             )
