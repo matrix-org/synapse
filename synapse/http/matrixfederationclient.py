@@ -200,7 +200,7 @@ class _BaseJsonParser(ByteParser[T]):
     def finish(self) -> T:
         result = json_decoder.decode(self._buffer.getvalue())
         if self._validator is not None and not self._validator(result):
-            raise ValueError("Unexpected JSON object")
+            raise ValueError(f"Received incorrect JSON value: {result.__class__.__name__}")
         return result
 
 
