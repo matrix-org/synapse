@@ -75,6 +75,7 @@ class StreamChangeCache:
         max_size: int = 10000,
     ) -> None:
         self._prefill_done: bool = False
+        self._prefill_in_progres: bool = False
         self._lock = threading.Lock()
         self._original_max_size: int = max_size
         self._max_size = math.floor(max_size)
@@ -101,22 +102,26 @@ class StreamChangeCache:
         )
 
     def _prefill(self) -> None:
-        if self._prefill_done:
+        if self._prefill_done or self._prefill_in_progres:
             return
         with self._lock:
             # check again in case another thread updated this
-            if self._prefill_done:
+            if self._prefill_done or self._prefill_in_progres:
                 return  # type: ignore[unreachable]
 
-            (
-                prefilled_cache,
-                current_pos,
-            ) = self._current_pos_and_prefilled_cache_supplier()
-            self._earliest_known_stream_pos = current_pos
-            if prefilled_cache:
-                for entity, stream_pos in prefilled_cache.items():
-                    self.entity_has_changed(entity, stream_pos)
-            self._prefill_done = True
+            try:
+                self._prefill_in_progres = True
+                (
+                    prefilled_cache,
+                    current_pos,
+                ) = self._current_pos_and_prefilled_cache_supplier()
+                self._earliest_known_stream_pos = current_pos
+                if prefilled_cache:
+                    for entity, stream_pos in prefilled_cache.items():
+                        self.entity_has_changed(entity, stream_pos)
+                self._prefill_done = True
+            finally:
+                self._prefill_in_progres = False
 
     def set_cache_factor(self, factor: float) -> bool:
         """
@@ -128,6 +133,7 @@ class StreamChangeCache:
         Returns:
             Whether the cache changed size or not.
         """
+        self._prefill()
         new_size = math.floor(self._original_max_size * factor)
         if new_size != self._max_size:
             self.max_size = new_size
