@@ -351,7 +351,7 @@ class HttpPusher(Pusher):
         content: JsonDict,
         tweaks: Optional[Mapping[str, SimpleJsonValue]] = None,
         default_payload: Optional[JsonMapping] = None,
-    ) -> Union[bool, Iterable[str]]:
+    ) -> Union[bool, List[str]]:
         """Send a notification to the registered push gateway, with `content` being
         the content of the `notification` top property specified in the spec.
         Note that the `devices` property will be added with device-specific
@@ -414,8 +414,8 @@ class HttpPusher(Pusher):
 
         Args:
             event: the event
-            tweaks: tweaks to add into the `devices` section, and to decide the
-            priority to use
+            tweaks: tweaks to add into the `devices` section, used to decide the
+                push priority
             badge: unread count to send with the push notification
 
         Returns:
@@ -442,6 +442,7 @@ class HttpPusher(Pusher):
                 "counts": {"unread": badge},
                 "prio": priority,
             }
+            # event_id_only doesn't include the tweaks, so override them.
             tweaks = {}
         else:
             ctx = await push_tools.get_context_for_event(
