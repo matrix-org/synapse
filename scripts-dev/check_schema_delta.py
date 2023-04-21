@@ -47,14 +47,29 @@ def main(force_colors: bool) -> None:
             diff.b_path == "synapse/storage/schema/__init__.py"
             and diff.change_type == "M"
         ):
-            # we've changed the schema file, let's check if the version has been bumped
+            # we've changed the schema file, let's check if the version has been changed
             res = repo.git.show(
                 f"{repo.active_branch}:synapse/storage/schema/__init__.py"
             )
             new_locals: Dict[str, Any] = {}
             exec(res, new_locals)
-            if new_locals["SCHEMA_VERSION"] != current_schema_version:
-                current_schema_version = new_locals["SCHEMA_VERSION"]
+
+            local_schema_version = new_locals["SCHEMA_VERSION"]
+
+            if local_schema_version != current_schema_version:
+                # local schema version must be +/-1 the current schema version on develop
+                if abs(local_schema_version - current_schema_version) != 1:
+                    click.secho(
+                        "The proposed schema version has diverged more than one version from develop, please fix!",
+                        fg="red",
+                        bold=True,
+                        color=force_colors,
+                    )
+                    click.get_current_context().exit(1)
+
+                # right, we've changed the schema version within the allowable tolerance so
+                # let's now use the local version as the canonical version
+                current_schema_version = local_schema_version
 
     click.secho(f"Current schema version: {current_schema_version}")
 
