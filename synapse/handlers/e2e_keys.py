@@ -665,7 +665,7 @@ class E2eKeysHandler:
         always_include_fallback_keys: bool,
     ) -> JsonDict:
         local_query: List[Tuple[str, str, str, int]] = []
-        remote_queries: Dict[str, Dict[str, Dict[str, str]]] = {}
+        remote_queries: Dict[str, Dict[str, Dict[str, Dict[str, int]]]] = {}
 
         for user_id, one_time_keys in query.items():
             # we use UserID.from_string to catch invalid user ids
@@ -675,12 +675,7 @@ class E2eKeysHandler:
                         local_query.append((user_id, device_id, algorithm, count))
             else:
                 domain = get_domain_from_id(user_id)
-                # TODO Support passing the count to remote destinations.
-                for device_id, algorithms in one_time_keys.items():
-                    if algorithms:
-                        remote_queries.setdefault(domain, {})[user_id] = {
-                            device_id: next(iter(algorithms))
-                        }
+                remote_queries.setdefault(domain, {})[user_id] = one_time_keys
 
         set_tag("local_key_query", str(local_query))
         set_tag("remote_key_query", str(remote_queries))
@@ -708,7 +703,7 @@ class E2eKeysHandler:
             device_keys = remote_queries[destination]
             try:
                 remote_result = await self.federation.claim_client_keys(
-                    destination, {"one_time_keys": device_keys}, timeout=timeout
+                    destination, device_keys, timeout=timeout
                 )
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:

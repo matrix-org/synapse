@@ -235,7 +235,10 @@ class FederationClient(FederationBase):
         )
 
     async def claim_client_keys(
-        self, destination: str, content: JsonDict, timeout: Optional[int]
+        self,
+        destination: str,
+        content: Dict[str, Dict[str, Dict[str, int]]],
+        timeout: Optional[int],
     ) -> JsonDict:
         """Claims one-time keys for a device hosted on a remote server.
 
@@ -247,8 +250,41 @@ class FederationClient(FederationBase):
             The JSON object from the response
         """
         sent_queries_counter.labels("client_one_time_keys").inc()
+
+        # Convert the query with counts into a legacy query and check if attempting
+        # to claim more than 1 OTK.
+        legacy_content: Dict[str, Dict[str, str]] = {}
+        use_unstable = False
+        for user_id, one_time_keys in content.items():
+            for device_id, algorithms in one_time_keys.items():
+                if any(count > 1 for count in algorithms.values()):
+                    use_unstable = True
+                if algorithms:
+                    # Choose the first algorithm only.
+                    legacy_content.setdefault(user_id, {})[device_id] = next(
+                        iter(algorithms)
+                    )
+
+        if use_unstable:
+            try:
+                return await self.transport_layer.claim_client_keys_unstable(
+                    destination, content, timeout
+                )
+            except HttpResponseException as e:
+                # If an error is received that is due to an unrecognised endpoint,
+                # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
+                # and raise.
+                if not is_unknown_endpoint(e):
+                    raise
+
+            logger.debug(
+                "Couldn't claim client keys with the unstable API, falling back to the v1 API"
+            )
+        else:
+            logger.debug("Skipping unstable claim client keys API")
+
         return await self.transport_layer.claim_client_keys(
-            destination, content, timeout
+            destination, legacy_content, timeout
         )
 
     @trace
