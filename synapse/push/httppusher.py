@@ -354,7 +354,7 @@ class HttpPusher(Pusher):
     ) -> Union[bool, Iterable[str]]:
         """Send a notification to the registered push gateway, with `content` being
         the content of the `notification` top property specified in the spec.
-        If specified, the `devices` property will be overridden with device-specific
+        Note that the `devices` property will be added with device-specific
         information for this pusher.
 
         Args:
