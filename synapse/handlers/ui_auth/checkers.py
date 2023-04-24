@@ -20,6 +20,7 @@ from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.types import UserID
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -314,6 +315,87 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
             )
 
 
+class JwtAuthChecker(UserInteractiveAuthChecker):
+    AUTH_TYPE = LoginType.JWT
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.hs = hs
+
+    def is_enabled(self) -> bool:
+        return bool(self.hs.config.jwt.jwt_enabled)
+
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
+        token = authdict.get("token", None)
+        if token is None:
+            raise LoginError(
+                403, "Token field for JWT is missing", errcode=Codes.FORBIDDEN
+            )
+
+        from authlib.jose import JsonWebToken, JWTClaims
+        from authlib.jose.errors import BadSignatureError, InvalidClaimError, JoseError
+
+        jwt = JsonWebToken([self.hs.config.jwt.jwt_algorithm])
+        claim_options = {}
+        if self.hs.config.jwt.jwt_issuer is not None:
+            claim_options["iss"] = {
+                "value": self.hs.config.jwt.jwt_issuer,
+                "essential": True,
+            }
+        if self.hs.config.jwt.jwt_audiences is not None:
+            claim_options["aud"] = {
+                "values": self.hs.config.jwt.jwt_audiences,
+                "essential": True,
+            }
+
+        try:
+            claims = jwt.decode(
+                token,
+                key=self.hs.config.jwt.jwt_secret,
+                claims_cls=JWTClaims,
+                claims_options=claim_options,
+            )
+        except BadSignatureError:
+            # We handle this case separately to provide a better error message
+            raise LoginError(
+                403,
+                "JWT validation failed: Signature verification failed",
+                errcode=Codes.FORBIDDEN,
+            )
+        except JoseError as e:
+            # A JWT error occurred, return some info back to the client.
+            raise LoginError(
+                403,
+                "JWT validation failed: %s" % (str(e),),
+                errcode=Codes.FORBIDDEN,
+            )
+
+        try:
+            claims.validate(leeway=120)  # allows 2 min of clock skew
+
+            # Enforce the old behavior which is rolled out in productive
+            # servers: if the JWT contains an 'aud' claim but none is
+            # configured, the login attempt will fail
+            if claims.get("aud") is not None:
+                if (
+                    self.hs.config.jwt.jwt_audiences is None
+                    or len(self.hs.config.jwt.jwt_audiences) == 0
+                ):
+                    raise InvalidClaimError("aud")
+        except JoseError as e:
+            raise LoginError(
+                403,
+                "JWT validation failed: %s" % (str(e),),
+                errcode=Codes.FORBIDDEN,
+            )
+
+        user = claims.get(self.hs.config.jwt.jwt_subject_claim, None)
+        if user is None:
+            raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
+
+        return UserID(user, self.hs.hostname).to_string()
+
+
 INTERACTIVE_AUTH_CHECKERS: Sequence[Type[UserInteractiveAuthChecker]] = [
     DummyAuthChecker,
     TermsAuthChecker,
@@ -321,5 +403,6 @@ INTERACTIVE_AUTH_CHECKERS: Sequence[Type[UserInteractiveAuthChecker]] = [
     EmailIdentityAuthChecker,
     MsisdnAuthChecker,
     RegistrationTokenAuthChecker,
+    JwtAuthChecker,
 ]
 """A list of UserInteractiveAuthChecker classes"""

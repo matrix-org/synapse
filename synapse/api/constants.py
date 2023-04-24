@@ -84,6 +84,7 @@ class LoginType:
     SSO: Final = "m.login.sso"
     DUMMY: Final = "m.login.dummy"
     REGISTRATION_TOKEN: Final = "m.login.registration_token"
+    JWT: Final = "org.matrix.login.jwt"
 
 
 # This is used in the `type` parameter for /register when called by
