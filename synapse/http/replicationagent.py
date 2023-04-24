@@ -49,7 +49,7 @@ class ReplicationEndpointFactory:
     def __init__(
         self,
         reactor: ISynapseReactor,
-        context_factory: Optional[IPolicyForHTTPS],
+        context_factory: IPolicyForHTTPS,
     ) -> None:
         self.reactor = reactor
         self.context_factory = context_factory
@@ -66,7 +66,9 @@ class ReplicationEndpointFactory:
         if b"http" in uri.scheme:
             endpoint = HostnameEndpoint(self.reactor, uri.host, uri.port)
             if uri.scheme == b"https":
-                endpoint = wrapClientTLS(self.context_factory, endpoint)
+                endpoint = wrapClientTLS(
+                    self.context_factory.creatorForNetloc(uri.host, uri.port), endpoint
+                )
             return endpoint
         else:
             raise SchemeNotSupported()
