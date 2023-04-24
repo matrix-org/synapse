@@ -15,7 +15,6 @@
 
 ALTER TABLE profiles ADD COLUMN full_user_id TEXT;
 
--- Add a new constraint on the new column, mirroring the `profiles_user_id_key`
+-- Make sure the column has a unique constraint, mirroring the `profiles_user_id_key`
 -- constraint.
-ALTER TABLE ONLY profiles
-    ADD CONSTRAINT profiles_full_user_id_key UNIQUE (full_user_id);
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES (7501, 'profiles_full_user_id_key_idx', '{}');

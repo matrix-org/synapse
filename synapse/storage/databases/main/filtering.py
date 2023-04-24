@@ -16,15 +16,37 @@
 from typing import Optional, Tuple, Union, cast
 
 from canonicaljson import encode_canonical_json
+from typing_extensions import TYPE_CHECKING
 
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.types import JsonDict, UserID
 from synapse.util.caches.descriptors import cached
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 class FilteringWorkerStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+        self.db_pool.updates.register_background_index_update(
+            "full_users_filters_unique_idx",
+            index_name="full_users_unique_idx",
+            table="user_filters",
+            columns=["full_user_id, filter_id"],
+        )
+
     @cached(num_args=2)
     async def get_user_filter(
         self, user_localpart: str, filter_id: Union[int, str]

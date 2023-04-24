@@ -11,15 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.types import UserID
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 class ProfileWorkerStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+        self.db_pool.updates.register_background_index_update(
+            "profiles_full_user_id_key_idx",
+            index_name="profiles_full_user_id_key",
+            table="profiles",
+            columns=["full_user_id"],
+        )
+
     async def get_profileinfo(self, user_localpart: str) -> ProfileInfo:
         try:
             profile = await self.db_pool.simple_select_one(
