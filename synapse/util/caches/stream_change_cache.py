@@ -77,6 +77,7 @@ class StreamChangeCache:
     ) -> None:
         self._prefill_done: bool = False
         self._prefill_in_progres: bool = False
+        self._need_eviction: bool = False
         self._lock = threading.Lock()
         self._original_max_size: int = max_size
         self._max_size = math.floor(max_size)
@@ -126,6 +127,8 @@ class StreamChangeCache:
                     for entity, stream_pos in prefilled_cache.items():
                         self.entity_has_changed(entity, stream_pos)
                 self._prefill_done = True
+                if self._need_eviction:
+                    self._evict()
             finally:
                 self._prefill_in_progres = False
 
@@ -139,11 +142,14 @@ class StreamChangeCache:
         Returns:
             Whether the cache changed size or not.
         """
-        self._prefill()
         new_size = math.floor(self._original_max_size * factor)
         if new_size != self._max_size:
             self.max_size = new_size
-            self._evict()
+            with self._lock:
+                if self._prefill_done:
+                    self._evict()
+                else:
+                    self._need_eviction = True
             return True
         return False
 
@@ -334,7 +340,6 @@ class StreamChangeCache:
 
         Evicts entries until it is at the maximum size.
         """
-        self._prefill()
         # if the cache is too big, remove entries
         while len(self._cache) > self._max_size:
             k, r = self._cache.popitem(0)
