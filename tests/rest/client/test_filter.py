@@ -17,6 +17,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.errors import Codes
 from synapse.rest.client import filter
 from synapse.server import HomeServer
+from synapse.types import UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -76,7 +77,8 @@ class FilterTestCase(unittest.HomeserverTestCase):
     def test_get_filter(self) -> None:
         filter_id = self.get_success(
             self.filtering.add_user_filter(
-                user_id="@apple:test", user_filter=self.EXAMPLE_FILTER
+                user_id=UserID.from_string("@apple:test"),
+                user_filter=self.EXAMPLE_FILTER,
             )
         )
         self.reactor.advance(1)

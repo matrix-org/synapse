@@ -170,7 +170,7 @@ class Filtering:
         result = await self.store.get_user_filter(user_localpart, filter_id)
         return FilterCollection(self._hs, result)
 
-    def add_user_filter(self, user_id: str, user_filter: JsonDict) -> Awaitable[int]:
+    def add_user_filter(self, user_id: UserID, user_filter: JsonDict) -> Awaitable[int]:
         self.check_valid_filter(user_filter)
         return self.store.add_user_filter(user_id, user_filter)
 

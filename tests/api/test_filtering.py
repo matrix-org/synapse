@@ -26,15 +26,15 @@ from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.api.presence import UserPresenceState
 from synapse.server import HomeServer
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 from synapse.util.frozenutils import freeze
 
 from tests import unittest
 from tests.events.test_utils import MockEvent
 
-user_id = "@test_user:test"
-user2_id = "@test_user2:test"
+user_id = UserID.from_string("@test_user:test")
+user2_id = UserID.from_string("@test_user2:test")
 user_localpart = "test_user"
 
 

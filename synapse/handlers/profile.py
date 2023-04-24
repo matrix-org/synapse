@@ -178,9 +178,7 @@ class ProfileHandler:
                 authenticated_entity=requester.authenticated_entity,
             )
 
-        await self.store.set_profile_displayname(
-            target_user.to_string(), displayname_to_set
-        )
+        await self.store.set_profile_displayname(target_user, displayname_to_set)
 
         profile = await self.store.get_profileinfo(target_user.localpart)
         await self.user_directory_handler.handle_local_profile_change(
@@ -272,9 +270,7 @@ class ProfileHandler:
                 target_user, authenticated_entity=requester.authenticated_entity
             )
 
-        await self.store.set_profile_avatar_url(
-            target_user.to_string(), avatar_url_to_set
-        )
+        await self.store.set_profile_avatar_url(target_user, avatar_url_to_set)
 
         profile = await self.store.get_profileinfo(target_user.localpart)
         await self.user_directory_handler.handle_local_profile_change(

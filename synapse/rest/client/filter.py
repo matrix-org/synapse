@@ -94,7 +94,7 @@ class CreateFilterRestServlet(RestServlet):
         set_timeline_upper_limit(content, self.hs.config.server.filter_timeline_limit)
 
         filter_id = await self.filtering.add_user_filter(
-            user_id=target_user.to_string(), user_filter=content
+            user_id=target_user, user_filter=content
         )
 
         return 200, {"filter_id": str(filter_id)}

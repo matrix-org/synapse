@@ -55,33 +55,33 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_avatar_url",
         )
 
-    async def create_profile(self, user_id: str) -> None:
-        user_localpart = UserID.from_string(user_id).localpart
+    async def create_profile(self, user_id: UserID) -> None:
+        user_localpart = user_id.localpart
         await self.db_pool.simple_insert(
             table="profiles",
-            values={"user_id": user_localpart, "full_user_id": user_id},
+            values={"user_id": user_localpart, "full_user_id": user_id.to_string()},
             desc="create_profile",
         )
 
     async def set_profile_displayname(
-        self, user_id: str, new_displayname: Optional[str]
+        self, user_id: UserID, new_displayname: Optional[str]
     ) -> None:
-        user_localpart = UserID.from_string(user_id).localpart
+        user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={"displayname": new_displayname, "full_user_id": user_id},
+            values={"displayname": new_displayname, "full_user_id": user_id.to_string()},
             desc="set_profile_displayname",
         )
 
     async def set_profile_avatar_url(
-        self, user_id: str, new_avatar_url: Optional[str]
+        self, user_id: UserID, new_avatar_url: Optional[str]
     ) -> None:
-        user_localpart = UserID.from_string(user_id).localpart
+        user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={"avatar_url": new_avatar_url, "full_user_id": user_id},
+            values={"avatar_url": new_avatar_url, "full_user_id": user_id.to_string()},
             desc="set_profile_avatar_url",
         )
 

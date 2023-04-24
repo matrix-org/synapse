@@ -46,9 +46,8 @@ class FilteringWorkerStore(SQLBaseStore):
 
         return db_to_json(def_json)
 
-    async def add_user_filter(self, user_id: str, user_filter: JsonDict) -> int:
+    async def add_user_filter(self, user_id: UserID, user_filter: JsonDict) -> int:
         def_json = encode_canonical_json(user_filter)
-        user_localpart = UserID.from_string(user_id).localpart
 
         # Need an atomic transaction to SELECT the maximal ID so far then
         # INSERT a new one
@@ -57,13 +56,13 @@ class FilteringWorkerStore(SQLBaseStore):
                 "SELECT filter_id FROM user_filters "
                 "WHERE user_id = ? AND filter_json = ?"
             )
-            txn.execute(sql, (user_localpart, bytearray(def_json)))
+            txn.execute(sql, (user_id.localpart, bytearray(def_json)))
             filter_id_response = txn.fetchone()
             if filter_id_response is not None:
                 return filter_id_response[0]
 
             sql = "SELECT MAX(filter_id) FROM user_filters WHERE user_id = ?"
-            txn.execute(sql, (user_localpart,))
+            txn.execute(sql, (user_id.localpart,))
             max_id = cast(Tuple[Optional[int]], txn.fetchone())[0]
             if max_id is None:
                 filter_id = 0
@@ -74,7 +73,9 @@ class FilteringWorkerStore(SQLBaseStore):
                 "INSERT INTO user_filters (full_user_id, user_id, filter_id, filter_json)"
                 "VALUES(?, ?, ?, ?)"
             )
-            txn.execute(sql, (user_id, user_localpart, filter_id, bytearray(def_json)))
+            txn.execute(
+                sql, (user_id.to_string(), user_id.localpart, filter_id, bytearray(def_json))
+            )
 
             return filter_id
 
