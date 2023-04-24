@@ -88,7 +88,10 @@ class ProfileWorkerStore(SQLBaseStore):
         await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={"displayname": new_displayname, "full_user_id": user_id.to_string()},
+            values={
+                "displayname": new_displayname,
+                "full_user_id": user_id.to_string(),
+            },
             desc="set_profile_displayname",
         )
 

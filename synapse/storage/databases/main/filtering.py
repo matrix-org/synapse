@@ -96,7 +96,13 @@ class FilteringWorkerStore(SQLBaseStore):
                 "VALUES(?, ?, ?, ?)"
             )
             txn.execute(
-                sql, (user_id.to_string(), user_id.localpart, filter_id, bytearray(def_json))
+                sql,
+                (
+                    user_id.to_string(),
+                    user_id.localpart,
+                    filter_id,
+                    bytearray(def_json),
+                ),
             )
 
             return filter_id
