@@ -15,6 +15,7 @@
 import logging
 import math
 import threading
+import traceback
 from collections.abc import Callable
 from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
@@ -110,6 +111,11 @@ class StreamChangeCache:
                 return  # type: ignore[unreachable]
 
             try:
+                logger.info(
+                    "Initializing cache: %s. Stacktrace:\n%s",
+                    self.name,
+                    "".join(traceback.format_stack()),
+                )
                 self._prefill_in_progres = True
                 (
                     prefilled_cache,
