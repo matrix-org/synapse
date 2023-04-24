@@ -144,7 +144,7 @@ class StreamChangeCache:
         """
         new_size = math.floor(self._original_max_size * factor)
         if new_size != self._max_size:
-            self.max_size = new_size
+            self._max_size = new_size
             with self._lock:
                 if self._prefill_done:
                     self._evict()
