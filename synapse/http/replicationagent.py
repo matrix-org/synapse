@@ -64,7 +64,7 @@ class ReplicationEndpointFactory:
         Returns: The correct client endpoint object
         """
         if b"http" in uri.scheme:
-            endpoint = HostnameEndpoint(self.reactor, uri.host, int(uri.port))
+            endpoint = HostnameEndpoint(self.reactor, uri.host, uri.port)
             if uri.scheme == b"https":
                 endpoint = wrapClientTLS(self.context_factory, endpoint)
             return endpoint
