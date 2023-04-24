@@ -847,7 +847,6 @@ class SimpleReplicationClient(BaseHttpClient):
 
         self.agent: IAgent = ReplicationAgent(
             hs.get_reactor(),
-            hs,
             contextFactory=hs.get_http_client_context_factory(),
             pool=pool,
         )
