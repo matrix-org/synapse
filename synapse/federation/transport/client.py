@@ -88,7 +88,6 @@ class TransportLayerClient:
             path=path,
             args={"event_id": event_id},
             try_trailing_slash_on_400=True,
-            parser=JsonDictParser(),
         )
 
     async def get_room_state(
@@ -141,7 +140,6 @@ class TransportLayerClient:
             path=path,
             timeout=timeout,
             try_trailing_slash_on_400=True,
-            parser=JsonDictParser(),
         )
 
     async def backfill(
@@ -261,7 +259,6 @@ class TransportLayerClient:
             long_retries=True,
             backoff_on_404=True,  # If we get a 404 the other side has gone
             try_trailing_slash_on_400=True,
-            parser=JsonDictParser(),
         )
 
     async def make_query(
@@ -282,7 +279,6 @@ class TransportLayerClient:
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=10000,
             ignore_backoff=ignore_backoff,
-            parser=JsonDictParser(),
         )
 
     async def make_membership_event(
@@ -344,7 +340,6 @@ class TransportLayerClient:
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=20000,
             ignore_backoff=ignore_backoff,
-            parser=JsonDictParser(),
         )
 
     async def send_join_v1(
@@ -421,7 +416,6 @@ class TransportLayerClient:
             # server was just having a momentary blip, the room will be out of
             # sync.
             ignore_backoff=True,
-            parser=JsonDictParser(),
         )
 
     async def send_knock_v1(
@@ -457,7 +451,6 @@ class TransportLayerClient:
             destination=destination,
             path=path,
             data=content,
-            parser=JsonDictParser(),
         )
 
     async def send_invite_v1(
@@ -483,7 +476,6 @@ class TransportLayerClient:
             path=path,
             data=content,
             ignore_backoff=True,
-            parser=JsonDictParser(),
         )
 
     async def get_public_rooms(
@@ -548,7 +540,6 @@ class TransportLayerClient:
                     path=path,
                     args=args,
                     ignore_backoff=True,
-                    parser=JsonDictParser(),
                 )
             except HttpResponseException as e:
                 if e.code == 403:
@@ -749,7 +740,6 @@ class TransportLayerClient:
             destination=destination,
             path=path,
             args={"suggested_only": "true" if suggested_only else "false"},
-            parser=JsonDictParser(),
         )
 
     async def get_room_hierarchy_unstable(
@@ -769,7 +759,6 @@ class TransportLayerClient:
             destination=destination,
             path=path,
             args={"suggested_only": "true" if suggested_only else "false"},
-            parser=JsonDictParser(),
         )
 
     async def get_account_status(
