@@ -471,9 +471,10 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         # Create the expected payload shape.
         body: Dict[str, Dict[str, List[str]]] = {}
-        for user_id, device, algorithm, _count in query:
-            # Note that only a single OTK can be claimed this way.
-            body.setdefault(user_id, {}).setdefault(device, []).append(algorithm)
+        for user_id, device, algorithm, count in query:
+            body.setdefault(user_id, {}).setdefault(device, []).extend(
+                [algorithm] * count
+            )
 
         uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3983/keys/claim"
         try:

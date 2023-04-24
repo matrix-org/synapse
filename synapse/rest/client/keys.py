@@ -16,6 +16,7 @@
 
 import logging
 import re
+from collections import Counter
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 from synapse.api.errors import InvalidAPICallError, SynapseError
@@ -290,7 +291,7 @@ class OneTimeKeyServlet(RestServlet):
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
 
-        # Map the legacy request to the new request format.
+        # Generate a count for each algorithm, which is hard-coded to 1.
         query: Dict[str, Dict[str, Dict[str, int]]] = {}
         for user_id, one_time_keys in body.get("one_time_keys", {}).items():
             for device_id, algorithm in one_time_keys.items():
@@ -312,9 +313,8 @@ class UnstableOneTimeKeyServlet(RestServlet):
     {
       "one_time_keys": {
         "<user_id>": {
-          "<device_id>": {
-            "<algorithm>": <count>
-    } } } }
+          "<device_id>": ["<algorithm>", ...]
+    } } }
 
     HTTP/1.1 200 OK
     {
@@ -338,7 +338,13 @@ class UnstableOneTimeKeyServlet(RestServlet):
         await self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        query = body.get("one_time_keys", {})
+
+        # Generate a count for each algorithm.
+        query: Dict[str, Dict[str, Dict[str, int]]] = {}
+        for user_id, one_time_keys in body.get("one_time_keys", {}).items():
+            for device_id, algorithms in one_time_keys.items():
+                query.setdefault(user_id, {})[device_id] = Counter(algorithms)
+
         result = await self.e2e_keys_handler.claim_one_time_keys(
             query, timeout, always_include_fallback_keys=True
         )

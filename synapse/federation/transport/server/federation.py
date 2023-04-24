@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
+from collections import Counter
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -577,7 +578,7 @@ class FederationClientKeysClaimServlet(BaseFederationServerServlet):
     async def on_POST(
         self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
     ) -> Tuple[int, JsonDict]:
-        # Flatten the request query.
+        # Generate a count for each algorithm, which is hard-coded to 1.
         key_query: List[Tuple[str, str, str, int]] = []
         for user_id, device_keys in content.get("one_time_keys", {}).items():
             for device_id, algorithm in device_keys.items():
@@ -603,11 +604,12 @@ class FederationUnstableClientKeysClaimServlet(BaseFederationServerServlet):
     async def on_POST(
         self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
     ) -> Tuple[int, JsonDict]:
-        # Flatten the request query.
+        # Generate a count for each algorithm.
         key_query: List[Tuple[str, str, str, int]] = []
         for user_id, device_keys in content.get("one_time_keys", {}).items():
             for device_id, algorithms in device_keys.items():
-                for algorithm, count in algorithms.items():
+                counts = Counter(algorithms)
+                for algorithm, count in counts.items():
                     key_query.append((user_id, device_id, algorithm, count))
 
         response = await self.handler.on_claim_client_keys(

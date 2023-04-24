@@ -237,7 +237,7 @@ class FederationClient(FederationBase):
     async def claim_client_keys(
         self,
         destination: str,
-        content: Dict[str, Dict[str, Dict[str, int]]],
+        query: Dict[str, Dict[str, Dict[str, int]]],
         timeout: Optional[int],
     ) -> JsonDict:
         """Claims one-time keys for a device hosted on a remote server.
@@ -251,24 +251,33 @@ class FederationClient(FederationBase):
         """
         sent_queries_counter.labels("client_one_time_keys").inc()
 
-        # Convert the query with counts into a legacy query and check if attempting
-        # to claim more than 1 OTK.
-        legacy_content: Dict[str, Dict[str, str]] = {}
+        # Convert the query with counts into a stable and unstable query and check
+        # if attempting to claim more than 1 OTK.
+        content: Dict[str, Dict[str, str]] = {}
+        unstable_content: Dict[str, Dict[str, List[str]]] = {}
         use_unstable = False
-        for user_id, one_time_keys in content.items():
+        for user_id, one_time_keys in query.items():
             for device_id, algorithms in one_time_keys.items():
                 if any(count > 1 for count in algorithms.values()):
                     use_unstable = True
                 if algorithms:
-                    # Choose the first algorithm only.
-                    legacy_content.setdefault(user_id, {})[device_id] = next(
-                        iter(algorithms)
+                    # Choose the first algorithm only for the stable query.
+                    content.setdefault(user_id, {})[device_id] = next(iter(algorithms))
+                    # Flatten the map of algorithm -> count to a list repeating
+                    # each algorithm count times for the unstable query.
+                    unstable_content.setdefault(user_id, {})[device_id] = list(
+                        itertools.chain(
+                            *(
+                                itertools.repeat(algorithm, count)
+                                for algorithm, count in algorithms.items()
+                            )
+                        )
                     )
 
         if use_unstable:
             try:
                 return await self.transport_layer.claim_client_keys_unstable(
-                    destination, content, timeout
+                    destination, unstable_content, timeout
                 )
             except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised endpoint,
@@ -284,7 +293,7 @@ class FederationClient(FederationBase):
             logger.debug("Skipping unstable claim client keys API")
 
         return await self.transport_layer.claim_client_keys(
-            destination, legacy_content, timeout
+            destination, content, timeout
         )
 
     @trace
