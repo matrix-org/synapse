@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from zope.interface import implementer
 
@@ -39,9 +39,6 @@ from twisted.web.iweb import (
 
 from synapse.types import ISynapseReactor
 
-if TYPE_CHECKING:
-    from synapse.server import HomeServer
-
 logger = logging.getLogger(__name__)
 
 
@@ -52,11 +49,9 @@ class ReplicationEndpointFactory:
     def __init__(
         self,
         reactor: ISynapseReactor,
-        hs: "HomeServer",
         context_factory: Optional[IPolicyForHTTPS],
     ) -> None:
         self.reactor = reactor
-        self.hs = hs
         self.context_factory = context_factory
 
     def endpointForURI(self, uri: URI) -> IStreamClientEndpoint:
@@ -92,7 +87,6 @@ class ReplicationAgent(_AgentBase):
     def __init__(
         self,
         reactor: ISynapseReactor,
-        hs: "HomeServer",
         contextFactory: Optional[IPolicyForHTTPS] = None,
         connectTimeout: Optional[float] = None,
         bindAddress: Optional[bytes] = None,
@@ -124,7 +118,7 @@ class ReplicationAgent(_AgentBase):
             contextFactory = _DeprecatedToCurrentPolicyForHTTPS(contextFactory)
 
         _AgentBase.__init__(self, reactor, pool)
-        endpoint_factory = ReplicationEndpointFactory(reactor, hs, contextFactory)
+        endpoint_factory = ReplicationEndpointFactory(reactor, contextFactory)
         self._endpointFactory = endpoint_factory
 
     def _getEndpoint(self, uri: URI) -> IStreamClientEndpoint:
