@@ -43,11 +43,7 @@ from synapse.api.urls import (
 )
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
-from synapse.http.matrixfederationclient import (
-    ByteParser,
-    JsonDictParser,
-    LegacyJsonDictParser,
-)
+from synapse.http.matrixfederationclient import ByteParser, LegacyJsonSendParser
 from synapse.http.types import QueryParams
 from synapse.types import JsonDict
 from synapse.util import ExceptionBundle
@@ -136,10 +132,7 @@ class TransportLayerClient:
 
         path = _create_v1_path("/event/%s", event_id)
         return await self.client.get_json(
-            destination,
-            path=path,
-            timeout=timeout,
-            try_trailing_slash_on_400=True,
+            destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
         )
 
     async def backfill(
@@ -399,7 +392,7 @@ class TransportLayerClient:
             # server was just having a momentary blip, the room will be out of
             # sync.
             ignore_backoff=True,
-            parser=LegacyJsonDictParser(),
+            parser=LegacyJsonSendParser(),
         )
 
     async def send_leave_v2(
@@ -448,9 +441,7 @@ class TransportLayerClient:
         path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
-            destination=destination,
-            path=path,
-            data=content,
+            destination=destination, path=path, data=content
         )
 
     async def send_invite_v1(
@@ -463,7 +454,7 @@ class TransportLayerClient:
             path=path,
             data=content,
             ignore_backoff=True,
-            parser=LegacyJsonDictParser(),
+            parser=LegacyJsonSendParser(),
         )
 
     async def send_invite_v2(
@@ -472,10 +463,7 @@ class TransportLayerClient:
         path = _create_v2_path("/invite/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
-            destination=destination,
-            path=path,
-            data=content,
-            ignore_backoff=True,
+            destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     async def get_public_rooms(
@@ -536,10 +524,7 @@ class TransportLayerClient:
 
             try:
                 response = await self.client.get_json(
-                    destination=remote_server,
-                    path=path,
-                    args=args,
-                    ignore_backoff=True,
+                    destination=remote_server, path=path, args=args, ignore_backoff=True
                 )
             except HttpResponseException as e:
                 if e.code == 403:
@@ -559,7 +544,7 @@ class TransportLayerClient:
         path = _create_v1_path("/exchange_third_party_invite/%s", room_id)
 
         return await self.client.put_json(
-            destination=destination, path=path, data=event_dict, parser=JsonDictParser()
+            destination=destination, path=path, data=event_dict
         )
 
     async def get_event_auth(
@@ -567,9 +552,7 @@ class TransportLayerClient:
     ) -> JsonDict:
         path = _create_v1_path("/event_auth/%s/%s", room_id, event_id)
 
-        return await self.client.get_json(
-            destination=destination, path=path, parser=JsonDictParser()
-        )
+        return await self.client.get_json(destination=destination, path=path)
 
     async def query_client_keys(
         self, destination: str, query_content: JsonDict, timeout: int
@@ -648,7 +631,7 @@ class TransportLayerClient:
         path = _create_v1_path("/user/devices/%s", user_id)
 
         return await self.client.get_json(
-            destination=destination, path=path, timeout=timeout, parser=JsonDictParser()
+            destination=destination, path=path, timeout=timeout
         )
 
     async def claim_client_keys(
@@ -721,9 +704,7 @@ class TransportLayerClient:
         """
         path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id)
 
-        return await self.client.get_json(
-            destination=destination, path=path, parser=JsonDictParser()
-        )
+        return await self.client.get_json(destination=destination, path=path)
 
     async def get_room_hierarchy(
         self, destination: str, room_id: str, suggested_only: bool

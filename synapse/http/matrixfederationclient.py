@@ -213,12 +213,8 @@ class _BaseJsonParser(ByteParser[T]):
         return result
 
 
-class JsonParser(_BaseJsonParser[Union[JsonDict, list]]):
-    """A parser that buffers the response and tries to parse it as JSON."""
-
-
-class JsonDictParser(_BaseJsonParser[JsonDict]):
-    """Ensure the response is a JSON object."""
+class JsonParser(_BaseJsonParser[JsonDict]):
+    """A parser that buffers the response and tries to parse it as a JSON object."""
 
     def __init__(self) -> None:
         super().__init__(self._validate)
@@ -228,7 +224,7 @@ class JsonDictParser(_BaseJsonParser[JsonDict]):
         return isinstance(v, dict)
 
 
-class LegacyJsonDictParser(_BaseJsonParser[Tuple[int, JsonDict]]):
+class LegacyJsonSendParser(_BaseJsonParser[Tuple[int, JsonDict]]):
     """Ensure the legacy responses of /send_join & /send_leave are correct."""
 
     def __init__(self) -> None:
@@ -946,7 +942,7 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         if parser is None:
-            parser = cast(ByteParser[T], JsonDictParser())
+            parser = cast(ByteParser[T], JsonParser())
 
         body = await _handle_response(
             self.reactor,
@@ -1027,12 +1023,7 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         body = await _handle_response(
-            self.reactor,
-            _sec_timeout,
-            request,
-            response,
-            start_ms,
-            parser=JsonDictParser(),
+            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
         )
         return body
 
@@ -1140,7 +1131,7 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         if parser is None:
-            parser = cast(ByteParser[T], JsonDictParser())
+            parser = cast(ByteParser[T], JsonParser())
 
         body = await _handle_response(
             self.reactor,
@@ -1161,7 +1152,7 @@ class MatrixFederationHttpClient:
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
         args: Optional[QueryParams] = None,
-    ) -> Union[JsonDict, list]:
+    ) -> JsonDict:
         """Send a DELETE request to the remote expecting some json response
 
         Args:
