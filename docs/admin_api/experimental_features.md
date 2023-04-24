@@ -15,12 +15,14 @@ for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 This API allows a server administrator to enable experimental features for a given user. The request must 
 provide a body containing the user id and listing the features to enable/disable in the following format:
-```
+```json
 {
-"user_id": user_id,
-"features": {"msc3026": true, "msc2654": true}
+   "user_id": "user_id",
+   "features": {
+      "msc3026":true,
+      "msc2654":true
+   }
 }
-
 ```
 where true is  used to enable the feature, and false is used to disable the feature.
 
@@ -35,9 +37,9 @@ PUT /_synapse/admin/v1/experimental_features
  
 To list which features are enabled/disabled for a given user, send a request with a body in the following format:
 
-```
+```json
 {
-"user_id": user_id
+   "user_id": user_id
 }
 ```
 
@@ -49,6 +51,14 @@ GET /_synapse/admin/v1/experimental_features
 
 It will return a list of possible features and indicate whether they are enabled or disabled for the
 user like so:
-```
-{"user_id": user_id, "features": {"msc3026": true, "msc2654": true, "msc3881": false, "msc3967": false}}
+```json
+{
+   "user_id": user_id,
+   "features": {
+      "msc3026": true,
+      "msc2654": true,
+      "msc3881": false,
+      "msc3967": false
+   }
+}
 ```
