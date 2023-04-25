@@ -196,3 +196,6 @@ class ExperimentalConfig(Config):
         self.msc3981_recurse_relations = experimental.get(
             "msc3981_recurse_relations", False
         )
+
+        # MSC3970: Scope transaction IDs to devices
+        self.msc3970_enabled = experimental.get("msc3970_enabled", False)

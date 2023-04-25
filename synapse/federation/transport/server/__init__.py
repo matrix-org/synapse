@@ -25,6 +25,7 @@ from synapse.federation.transport.server._base import (
 from synapse.federation.transport.server.federation import (
     FEDERATION_SERVLET_CLASSES,
     FederationAccountStatusServlet,
+    FederationUnstableClientKeysClaimServlet,
 )
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import (
@@ -296,6 +297,11 @@ def register_servlets(
             if (
                 servletclass == FederationAccountStatusServlet
                 and not hs.config.experimental.msc3720_enabled
+            ):
+                continue
+            if (
+                servletclass == FederationUnstableClientKeysClaimServlet
+                and not hs.config.experimental.msc3983_appservice_otk_claims
             ):
                 continue
 
