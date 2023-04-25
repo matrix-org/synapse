@@ -310,7 +310,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     def make_worker_hs(
         self, worker_app: str, extra_config: Optional[dict] = None, **kwargs: Any
     ) -> HomeServer:
-        """Make a new worker HS instance, correctly connecting replcation
+        """Make a new worker HS instance, correctly connecting replication
         stream to the master HS.
 
         Args:
