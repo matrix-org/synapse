@@ -97,7 +97,7 @@ Changes in SCHEMA_VERSION = 75:
       `local_current_membership` & `room_memberships`) is now being populated for new
       rows. When the background job to populate historical rows lands this will
       become the compat schema version.
-      
+
 Changes in SCHEMA_VERSION = 76:
     - Adds a full_user_id column to tables profiles and user_filters.
 """
