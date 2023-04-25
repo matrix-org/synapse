@@ -4056,6 +4056,9 @@ The default value is 10.</p>
 <p>An optional duration. If set, Synapse will run a daily background task to log out and
 delete any device that hasn't been accessed for more than the specified amount of time.</p>
 <p>Defaults to no duration, which means devices are never pruned.</p>
+<p><strong>Note:</strong> This task will always run on the main process, regardless of the value of
+<code>run_background_tasks_on</code>. This is due to workers currently not having the ability to
+delete devices.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">delete_stale_devices_after: 1y
 </code></pre>
@@ -10243,6 +10246,8 @@ the authentication is denied.</p>
 <p>Called during a logout request for a user. It is passed the qualified user ID, the ID of the
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.</p>
+<p>Deleting the related pushers is done after calling <code>on_logged_out</code>, so you can rely on them
+to still be present.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h3 id="get_username_for_registration"><a class="header" href="#get_username_for_registration"><code>get_username_for_registration</code></a></h3>
 <p><em>First introduced in Synapse v1.52.0</em></p>
@@ -10761,6 +10766,8 @@ information.</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases
 ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
+^/_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*$
+^/_matrix/client/(r0|v3|unstable)/capabilities$
 
 # Encryption requests
 ^/_matrix/client/(r0|v3|unstable)/keys/query$
