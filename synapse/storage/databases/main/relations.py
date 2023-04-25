@@ -203,7 +203,7 @@ class RelationsWorkerStore(SQLBaseStore):
         assert limit >= 0
 
         where_clause = ["room_id = ?"]
-        where_args: List[Union[str, int]] = [event.event_id, room_id]
+        where_args: List[Union[str, int]] = [room_id]
         is_redacted = event.internal_metadata.is_redacted()
 
         if relation_type is not None:
@@ -271,7 +271,7 @@ class RelationsWorkerStore(SQLBaseStore):
         def _get_recent_references_for_event_txn(
             txn: LoggingTransaction,
         ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
-            txn.execute(sql, where_args + [limit + 1])
+            txn.execute(sql, [event.event_id] + where_args + [limit + 1])
 
             events = []
             topo_orderings: List[int] = []
