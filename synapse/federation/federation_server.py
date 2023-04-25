@@ -1005,7 +1005,7 @@ class FederationServer(FederationBase):
 
     @trace
     async def on_claim_client_keys(
-        self, origin: str, content: JsonDict
+        self, origin: str, content: JsonDict, always_include_fallback_keys: bool
     ) -> Dict[str, Any]:
         query = []
         for user_id, device_keys in content.get("one_time_keys", {}).items():
@@ -1014,7 +1014,7 @@ class FederationServer(FederationBase):
 
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = await self._e2e_keys_handler.claim_local_one_time_keys(
-            query, always_include_fallback_keys=False
+            query, always_include_fallback_keys=always_include_fallback_keys
         )
 
         json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
