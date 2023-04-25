@@ -231,7 +231,12 @@ class RelationsWorkerStore(SQLBaseStore):
         if pagination_clause:
             where_clause.append(pagination_clause)
 
-        # TODO This needs to be a recursive query that maybe still matches some of the times above.
+        # If a recursive query is requested then the filters are applied after
+        # recursively following relationships from the requested event to children
+        # up to 3-relations deep.
+        #
+        # If no recursion is needed then the event_relations table is queried
+        # for direct children of the requested event.
         if recurse:
             sql = """
                 WITH RECURSIVE related_events AS (
