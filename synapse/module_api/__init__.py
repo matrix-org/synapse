@@ -1260,7 +1260,6 @@ class ModuleApi:
                 if isinstance(p, HttpPusher) and (
                     not device_id or p.device_id == device_id
                 ):
-                    sent = False
                     res = await p.dispatch_push(content, tweaks, default_payload)
                     # Check if the push was successful and no pushers were rejected.
                     sent = res is not False and not res
