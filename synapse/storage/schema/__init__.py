@@ -93,14 +93,17 @@ Changes in SCHEMA_VERSION = 74:
       `room_memberships` tables having an `event_stream_ordering` column).
 
 Changes in SCHEMA_VERSION = 75:
-    - Adds a full_user_id column to tables profiles and user_filters
+    - The `event_stream_ordering` column in membership tables (`current_state_events`,
+      `local_current_membership` & `room_memberships`) is now being populated for new
+      rows. When the background job to populate historical rows lands this will
+      become the compat schema version.
 """
 
 
 SCHEMA_COMPAT_VERSION = (
-    # The threads_id column must exist for event_push_actions, event_push_summary,
-    # receipts_linearized, and receipts_graph.
-    73
+    # Queries against `event_stream_ordering` columns in membership tables must
+    # be disambiguated.
+    74
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

@@ -155,7 +155,7 @@ class RemoteKey(RestServlet):
             for key_id in key_ids:
                 store_queries.append((server_name, key_id, None))
 
-        cached = await self.store.get_server_keys_json(store_queries)
+        cached = await self.store.get_server_keys_json_for_remote(store_queries)
 
         json_results: Set[bytes] = set()
 
