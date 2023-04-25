@@ -16,6 +16,7 @@ import logging
 from collections import Counter
 from typing import TYPE_CHECKING, Collection, List, Tuple
 
+from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases import Databases
 from synapse.storage.engines import PostgresEngine
@@ -34,7 +35,7 @@ class StatsController:
 
     async def get_room_db_size_estimate(self) -> List[Tuple[str, int]]:
         """Get an estimate of the largest rooms and how much database space they
-        use.
+        use, in bytes.
 
         Only works against PostgreSQL.
 
@@ -43,10 +44,10 @@ class StatsController:
 
         # Note: We look at both tables on the main and state databases.
         if not isinstance(self.stores.main.database_engine, PostgresEngine):
-            return []
+            raise SynapseError(400, "Endpoint requires using PostgreSQL")
 
         if not isinstance(self.stores.state.database_engine, PostgresEngine):
-            return []
+            raise SynapseError(400, "Endpoint requires using PostgreSQL")
 
         # For each "large" table, we go through and get the largest rooms
         # and an estimate of how much space they take. We can then sum the
@@ -56,11 +57,9 @@ class StatsController:
         # anyway its good enough.
         room_estimates: Counter[str] = Counter()
 
-        # Return size of the table on disk.
+        # Return size of the table on disk, including indexes and TOAST.
         table_sql = """
-            SELECT pg_relation_size(relid)
-            FROM pg_catalog.pg_statio_user_tables
-            WHERE relname = ?
+            SELECT pg_total_relation_size(?)
         """
 
         # Get an estimate for the largest rooms and their frequency.

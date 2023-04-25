@@ -85,8 +85,8 @@ The following fields are returned in the JSON response body:
 
 # Get largest rooms by size in database
 
-Returns the largest rooms and an estimate of how much space in the database they
-are taking.
+Returns the 10 largest rooms and an estimate of how much space in the database
+they are taking.
 
 This does not include the size of any associated media associated with the room.
 
