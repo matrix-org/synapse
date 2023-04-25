@@ -1,0 +1,13 @@
+Make all ID generators rely on Postgres sequences to improve support for running with multiple homeserver nodes.
+
+1. Update the implementation of `IdGenerator` to use defer to `SequenceGenerator`.
+    * The `SequenceGenerator` object is obtained from `build_sequence_generator`, which returns a
+    `PostgresSequenceGenerator` backed by a Postgres sequence when running against Postgres.
+    * `get_next` now involves querying the next value from the DB in an async fashion, hence we add a synchronous
+    `get_next_txn` which can be used when a `Cursor` object is already available.
+2. Replace all instances of `StreamIdGenerator` with `MultiWriterIdGenerator`, which is backed by Postgres sequences,
+    when running with Postgres. `SequenceIdGenerator` is kept when running with SQLite, which doesn't support sequences.
+3. Bump schema version and add delta files to create the Postgres sequences, and add `instance_name` columns to tables
+used with `MultiWriterIdGenerator`.
+    * Note that in case of downgrade, the sequence will get out of sync with the database and startup consistency checks
+    will fail when upgrading again.
