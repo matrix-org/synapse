@@ -235,7 +235,7 @@ class RelationsWorkerStore(SQLBaseStore):
         if recurse:
             sql = """
                 WITH RECURSIVE related_events AS (
-                    SELECT event_id, relation_type, relates_to_id, 0 depth
+                    SELECT event_id, relation_type, relates_to_id, 0 AS depth
                     FROM event_relations
                     WHERE relates_to_id = ?
                     UNION SELECT e.event_id, e.relation_type, e.relates_to_id, depth + 1
@@ -991,7 +991,7 @@ class RelationsWorkerStore(SQLBaseStore):
         # relation.
         sql = """
             WITH RECURSIVE related_events AS (
-                SELECT event_id, relates_to_id, relation_type, 0 depth
+                SELECT event_id, relates_to_id, relation_type, 0 AS depth
                 FROM event_relations
                 WHERE event_id = ?
                 UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1
@@ -1051,7 +1051,7 @@ class RelationsWorkerStore(SQLBaseStore):
         sql = """
         SELECT relates_to_id FROM event_relations WHERE relates_to_id = COALESCE((
             WITH RECURSIVE related_events AS (
-                SELECT event_id, relates_to_id, relation_type, 0 depth
+                SELECT event_id, relates_to_id, relation_type, 0 AS depth
                 FROM event_relations
                 WHERE event_id = ?
                 UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1
