@@ -198,9 +198,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         local_instance_name = hs.get_instance_name()
 
         # The value of these option should match the replication listener settings
-        master_host = hs.config.worker.worker_replication_host
-        master_port = hs.config.worker.worker_replication_http_port
-        master_tls = hs.config.worker.worker_replication_http_tls
+        # master_host = hs.config.worker.worker_replication_host
+        # master_port = hs.config.worker.worker_replication_http_port
+        # master_tls = hs.config.worker.worker_replication_http_tls
 
         instance_map = hs.config.worker.instance_map
 
@@ -221,11 +221,11 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             with outgoing_gauge.track_inprogress():
                 if instance_name == local_instance_name:
                     raise Exception("Trying to send HTTP request to self")
-                if instance_name == "master":
-                    host = master_host
-                    port = master_port
-                    tls = master_tls
-                elif instance_name in instance_map:
+                # if instance_name == "master":
+                #     host = master_host
+                #     port = master_port
+                #     tls = master_tls
+                if instance_name in instance_map:
                     host = instance_map[instance_name].host
                     port = instance_map[instance_name].port
                     tls = instance_map[instance_name].tls

@@ -69,6 +69,9 @@ import yaml
 from jinja2 import Environment, FileSystemLoader
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
+MAIN_PROCESS_INSTANCE_NAME = "master"
+MAIN_PROCESS_LOCALHOST_ADDRESS = "127.0.0.1"
+MAIN_PROCESS_REPLICATION_PORT = 9093
 
 # A simple name used as a placeholder in the WORKERS_CONFIG below. This will be replaced
 # during processing with the name of the worker.
@@ -719,8 +722,8 @@ def generate_worker_files(
     # shared config file.
     listeners = [
         {
-            "port": 9093,
-            "bind_address": "127.0.0.1",
+            "port": MAIN_PROCESS_REPLICATION_PORT,
+            "bind_address": MAIN_PROCESS_LOCALHOST_ADDRESS,
             "type": "http",
             "resources": [{"names": ["replication"]}],
         }
@@ -869,6 +872,12 @@ def generate_worker_files(
         ]
 
     workers_in_use = len(requested_worker_types) > 0
+
+    instance_map = shared_config.setdefault("instance_map", {})
+    instance_map[MAIN_PROCESS_INSTANCE_NAME] = {
+        "host": MAIN_PROCESS_LOCALHOST_ADDRESS,
+        "port": MAIN_PROCESS_REPLICATION_PORT,
+    }
 
     # Shared homeserver config
     convert(
