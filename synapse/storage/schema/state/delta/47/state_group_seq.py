@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
-from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if isinstance(database_engine, PostgresEngine):
         # if we already have some state groups, we want to start making new
         # ones with a higher id.

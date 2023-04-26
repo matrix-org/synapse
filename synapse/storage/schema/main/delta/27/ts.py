@@ -14,9 +14,9 @@
 import json
 import logging
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
-from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ ALTER_TABLE = (
 )
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     for statement in get_statements(ALTER_TABLE.splitlines()):
         cur.execute(statement)
 

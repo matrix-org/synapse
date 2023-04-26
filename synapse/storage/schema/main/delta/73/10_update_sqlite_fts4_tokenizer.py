@@ -13,11 +13,11 @@
 # limitations under the License.
 import json
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, Sqlite3Engine
-from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     """
     Upgrade the event_search table to use the porter tokenizer if it isn't already
 

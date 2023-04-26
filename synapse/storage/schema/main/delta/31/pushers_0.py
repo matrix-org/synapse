@@ -20,8 +20,8 @@
 
 import logging
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine
-from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def token_to_stream_ordering(token: str) -> int:
     return int(token[1:].split("_")[0])
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     logger.info("Porting pushers table, delta 31...")
     cur.execute(
         """

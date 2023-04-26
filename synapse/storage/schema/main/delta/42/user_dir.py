@@ -14,9 +14,9 @@
 
 import logging
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.prepare_database import get_statements
-from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ CREATE VIRTUAL TABLE user_directory_search
 """
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     for statement in get_statements(BOTH_TABLES.splitlines()):
         cur.execute(statement)
 

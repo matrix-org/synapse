@@ -16,14 +16,14 @@
 Adds a postgres SEQUENCE for generating guest user IDs.
 """
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.registration import (
     find_max_generated_user_id_localpart,
 )
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
-from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if not isinstance(database_engine, PostgresEngine):
         return
 

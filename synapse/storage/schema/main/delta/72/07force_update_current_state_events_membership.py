@@ -20,12 +20,14 @@ for its completion can be removed.
 Note the background job must still remain defined in the database class.
 """
 from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine
-from synapse.storage.types import Cursor
 
 
 def run_upgrade(
-    cur: Cursor, database_engine: BaseDatabaseEngine, config: HomeServerConfig
+    cur: LoggingTransaction,
+    database_engine: BaseDatabaseEngine,
+    config: HomeServerConfig,
 ) -> None:
     cur.execute("SELECT update_name FROM background_updates")
     rows = cur.fetchall()

@@ -16,13 +16,13 @@ from typing import Dict, Iterable, List, Tuple, cast
 
 from synapse.config.appservice import load_appservices
 from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine
-from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     # NULL indicates user was not registered by an appservice.
     try:
         cur.execute("ALTER TABLE users ADD COLUMN appservice_id TEXT")
@@ -32,7 +32,9 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
 
 
 def run_upgrade(
-    cur: Cursor, database_engine: BaseDatabaseEngine, config: HomeServerConfig
+    cur: LoggingTransaction,
+    database_engine: BaseDatabaseEngine,
+    config: HomeServerConfig,
 ) -> None:
     cur.execute("SELECT name FROM users")
     rows = cast(Iterable[Tuple[str]], cur.fetchall())

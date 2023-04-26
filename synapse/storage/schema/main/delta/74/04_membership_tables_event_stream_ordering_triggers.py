@@ -17,11 +17,11 @@
 This migration adds triggers to the room membership tables to enforce consistency.
 Triggers cannot be expressed in .sql files, so we have to use a separate file.
 """
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     # Complain if the `event_stream_ordering` in membership tables doesn't match
     # the `stream_ordering` row with the same `event_id` in `events`.
     if isinstance(database_engine, Sqlite3Engine):
