@@ -114,6 +114,10 @@ class _NoChainCoverIndex(Exception):
 
 
 class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBaseStore):
+    # TODO: this attribute comes from EventPushActionWorkerStore. Should we inherit from
+    # that store so that mypy can deduce this for itself?
+    stream_ordering_month_ago: Optional[int]
+
     def __init__(
         self,
         database: DatabasePool,
@@ -1171,6 +1175,38 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return int(min_depth) if min_depth is not None else None
 
+    async def have_room_forward_extremities_changed_since(
+        self,
+        room_id: str,
+        stream_ordering: int,
+    ) -> bool:
+        """Check if the forward extremities in a room have changed since the
+        given stream ordering
+
+        Throws a StoreError if we have since purged the index for
+        stream_orderings from that point.
+        """
+        assert self.stream_ordering_month_ago is not None
+        if stream_ordering <= self.stream_ordering_month_ago:
+            raise StoreError(400, f"stream_ordering too old {stream_ordering}")
+
+        sql = """
+            SELECT 1 FROM stream_ordering_to_exterm
+            WHERE stream_ordering > ? AND room_id = ?
+            LIMIT 1
+        """
+
+        def have_room_forward_extremities_changed_since_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            txn.execute(sql, (stream_ordering, room_id))
+            return txn.fetchone() is not None
+
+        return await self.db_pool.runInteraction(
+            "have_room_forward_extremities_changed_since",
+            have_room_forward_extremities_changed_since_txn,
+        )
+
     @cancellable
     async def get_forward_extremities_for_room_at_stream_ordering(
         self, room_id: str, stream_ordering: int
@@ -1199,7 +1235,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         # provided the last_change is recent enough, we now clamp the requested
         # stream_ordering to it.
-        if last_change > self.stream_ordering_month_ago:  # type: ignore[attr-defined]
+        assert self.stream_ordering_month_ago is not None
+        if last_change > self.stream_ordering_month_ago:
             stream_ordering = min(last_change, stream_ordering)
 
         return await self._get_forward_extremeties_for_room(room_id, stream_ordering)
@@ -1214,8 +1251,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         Throws a StoreError if we have since purged the index for
         stream_orderings from that point.
         """
-
-        if stream_ordering <= self.stream_ordering_month_ago:  # type: ignore[attr-defined]
+        assert self.stream_ordering_month_ago is not None
+        if stream_ordering <= self.stream_ordering_month_ago:
             raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
 
         sql = """
@@ -1232,9 +1269,16 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             txn.execute(sql, (stream_ordering, room_id))
             return [event_id for event_id, in txn]
 
-        return await self.db_pool.runInteraction(
+        event_ids = await self.db_pool.runInteraction(
             "get_forward_extremeties_for_room", get_forward_extremeties_for_room_txn
         )
+
+        # If we didn't find any IDs, then we must have cleared out the
+        # associated `stream_ordering_to_exterm`.
+        if not event_ids:
+            raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
+
+        return event_ids
 
     def _get_connected_batch_event_backfill_results_txn(
         self, txn: LoggingTransaction, insertion_event_id: str, limit: int
@@ -1664,20 +1708,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     @wrap_as_background_process("delete_old_forward_extrem_cache")
     async def _delete_old_forward_extrem_cache(self) -> None:
         def _delete_old_forward_extrem_cache_txn(txn: LoggingTransaction) -> None:
-            # Delete entries older than a month, while making sure we don't delete
-            # the only entries for a room.
             sql = """
                 DELETE FROM stream_ordering_to_exterm
-                WHERE
-                room_id IN (
-                    SELECT room_id
-                    FROM stream_ordering_to_exterm
-                    WHERE stream_ordering > ?
-                ) AND stream_ordering < ?
+                WHERE stream_ordering < ?
             """
-            txn.execute(
-                sql, (self.stream_ordering_month_ago, self.stream_ordering_month_ago)  # type: ignore[attr-defined]
-            )
+            txn.execute(sql, (self.stream_ordering_month_ago,))
 
         await self.db_pool.runInteraction(
             "_delete_old_forward_extrem_cache",

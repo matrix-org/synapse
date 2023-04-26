@@ -1149,18 +1149,19 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         return results, missing
 
     async def claim_e2e_fallback_keys(
-        self, query_list: Iterable[Tuple[str, str, str]]
+        self, query_list: Iterable[Tuple[str, str, str, bool]]
     ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
         """Take a list of fallback keys out of the database.
 
         Args:
-            query_list: An iterable of tuples of (user ID, device ID, algorithm).
+            query_list: An iterable of tuples of
+                (user ID, device ID, algorithm, whether the key should be marked as used).
 
         Returns:
             A map of user ID -> a map device ID -> a map of key ID -> JSON.
         """
         results: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
-        for user_id, device_id, algorithm in query_list:
+        for user_id, device_id, algorithm, mark_as_used in query_list:
             row = await self.db_pool.simple_select_one(
                 table="e2e_fallback_keys_json",
                 keyvalues={
@@ -1180,7 +1181,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             used = row["used"]
 
             # Mark fallback key as used if not already.
-            if not used:
+            if not used and mark_as_used:
                 await self.db_pool.simple_update_one(
                     table="e2e_fallback_keys_json",
                     keyvalues={

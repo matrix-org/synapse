@@ -577,7 +577,28 @@ class FederationClientKeysClaimServlet(BaseFederationServerServlet):
     async def on_POST(
         self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
     ) -> Tuple[int, JsonDict]:
-        response = await self.handler.on_claim_client_keys(origin, content)
+        response = await self.handler.on_claim_client_keys(
+            origin, content, always_include_fallback_keys=False
+        )
+        return 200, response
+
+
+class FederationUnstableClientKeysClaimServlet(BaseFederationServerServlet):
+    """
+    Identical to the stable endpoint (FederationClientKeysClaimServlet) except it
+    always includes fallback keys in the response.
+    """
+
+    PREFIX = FEDERATION_UNSTABLE_PREFIX
+    PATH = "/user/keys/claim"
+    CATEGORY = "Federation requests"
+
+    async def on_POST(
+        self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
+    ) -> Tuple[int, JsonDict]:
+        response = await self.handler.on_claim_client_keys(
+            origin, content, always_include_fallback_keys=True
+        )
         return 200, response
 
 

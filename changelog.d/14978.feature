@@ -1,1 +1,0 @@
-Add the ability to enable/disable registrations when in the OIDC flow.
