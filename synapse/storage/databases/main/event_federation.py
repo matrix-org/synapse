@@ -114,6 +114,10 @@ class _NoChainCoverIndex(Exception):
 
 
 class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBaseStore):
+    # TODO: this attribute comes from EventPushActionWorkerStore. Should we inherit from
+    # that store so that mypy can deduce this for itself?
+    stream_ordering_month_ago: Optional[int]
+
     def __init__(
         self,
         database: DatabasePool,
@@ -1182,8 +1186,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         Throws a StoreError if we have since purged the index for
         stream_orderings from that point.
         """
-
-        if stream_ordering <= self.stream_ordering_month_ago:  # type: ignore[attr-defined]
+        assert self.stream_ordering_month_ago is not None
+        if stream_ordering <= self.stream_ordering_month_ago:
             raise StoreError(400, f"stream_ordering too old {stream_ordering}")
 
         sql = """
@@ -1231,7 +1235,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         # provided the last_change is recent enough, we now clamp the requested
         # stream_ordering to it.
-        if last_change > self.stream_ordering_month_ago:  # type: ignore[attr-defined]
+        assert self.stream_ordering_month_ago is not None
+        if last_change > self.stream_ordering_month_ago:
             stream_ordering = min(last_change, stream_ordering)
 
         return await self._get_forward_extremeties_for_room(room_id, stream_ordering)
@@ -1246,8 +1251,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         Throws a StoreError if we have since purged the index for
         stream_orderings from that point.
         """
-
-        if stream_ordering <= self.stream_ordering_month_ago:  # type: ignore[attr-defined]
+        assert self.stream_ordering_month_ago is not None
+        if stream_ordering <= self.stream_ordering_month_ago:
             raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
 
         sql = """
@@ -1707,9 +1712,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 DELETE FROM stream_ordering_to_exterm
                 WHERE stream_ordering < ?
             """
-            txn.execute(
-                sql, (self.stream_ordering_month_ago,)  # type: ignore[attr-defined]
-            )
+            txn.execute(sql, (self.stream_ordering_month_ago,))
 
         await self.db_pool.runInteraction(
             "_delete_old_forward_extrem_cache",
