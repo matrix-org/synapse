@@ -198,11 +198,6 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         client = hs.get_simple_http_client()
         local_instance_name = hs.get_instance_name()
 
-        # The value of these option should match the replication listener settings
-        # master_host = hs.config.worker.worker_replication_host
-        # master_port = hs.config.worker.worker_replication_http_port
-        # master_tls = hs.config.worker.worker_replication_http_tls
-
         instance_map = hs.config.worker.instance_map
 
         outgoing_gauge = _pending_outgoing_requests.labels(cls.NAME)
