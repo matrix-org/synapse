@@ -15,9 +15,10 @@ _trial_temp*/
 .DS_Store
 __pycache__/
 
-# We do want the poetry and cargo lockfile.
+# We do want poetry, cargo and flake lockfiles.
 !poetry.lock
 !Cargo.lock
+!flake.lock
 
 # stuff that is likely to exist when you run a server locally
 /*.db
