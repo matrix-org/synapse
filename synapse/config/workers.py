@@ -222,8 +222,6 @@ class WorkerConfig(Config):
         # itself doesn't need this data as it would never have to talk to itself.
         instance_map: Dict[str, Any] = config.get("instance_map", {})
 
-        # TODO: In the interest of not using 'master' as the name in the instance_map,
-        #  opt to use 'main' instead. Or perhaps 'home'?
         if instance_map and self.instance_name is not MAIN_PROCESS_INSTANCE_NAME:
             # The host used to connect to the main synapse
             main_host = config.get("worker_replication_host", None)
