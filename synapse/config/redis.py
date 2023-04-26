@@ -35,3 +35,8 @@ class RedisConfig(Config):
         self.redis_port = redis_config.get("port", 6379)
         self.redis_dbid = redis_config.get("dbid", None)
         self.redis_password = redis_config.get("password")
+        self.redis_sentinel_enabled = redis_config.get("sentinel", False)
+        self.redis_sentinels = [
+            (s.get("host"), int(s.get("port")))
+            for s in redis_config.get("sentinels", [])
+        ]

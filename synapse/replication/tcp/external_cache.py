@@ -22,8 +22,7 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
-    from txredisapi import ConnectionHandler
-
+    from synapse.replication.tcp.redis.connection import IRedisConnection
     from synapse.server import HomeServer
 
 set_counter = Counter(
@@ -64,7 +63,7 @@ class ExternalCache:
     def __init__(self, hs: "HomeServer"):
         if hs.config.redis.redis_enabled:
             self._redis_connection: Optional[
-                "ConnectionHandler"
+                "IRedisConnection"
             ] = hs.get_outbound_redis_connection()
         else:
             self._redis_connection = None

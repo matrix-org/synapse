@@ -3940,6 +3940,10 @@ This setting has the following sub-options:
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
 
   _Added in Synapse 1.78.0._
+* `sentinel`: whether to use Redis Sentinel. Defaults to false. When enabled the `host` and `port` are ignored
+* `sentinels`: List of Redis Sentinel servers that can be connected to each entry with:
+  * `host`: Hostname of a Redis Sentinel server
+  * `port`: Port of a Redis Sentinel server
 
 Example configuration:
 ```yaml
@@ -3949,6 +3953,19 @@ redis:
   port: 6379
   password: <secret_password>
   dbid: <dbid>
+```
+Or with Redis Sentinel:
+```yaml
+redis:
+  enabled: true
+  sentinel: true
+  dbid: service_name
+  sentinels:
+    - host: redis1
+      port: 6379
+    - host: redis2
+      port: 6379
+  password: <secret_password>
 ```
 ---
 ## Individual worker configuration

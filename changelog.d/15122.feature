@@ -1,0 +1,1 @@
+Add Redis Sentinel support.
