@@ -64,8 +64,8 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     """
     )
     count = 0
-    for row in cur.fetchall():
-        row = list(row)
+    for tuple_row in cur.fetchall():
+        row = list(tuple_row)
         row[8] = bytes(row[8]).decode("utf-8")
         row[11] = bytes(row[11]).decode("utf-8")
         cur.execute(

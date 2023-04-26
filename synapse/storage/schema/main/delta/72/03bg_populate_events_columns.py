@@ -28,7 +28,9 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     # current min and max stream orderings, since that is guaranteed to include all
     # the events that were stored before the new columns were added.
     cur.execute("SELECT MIN(stream_ordering), MAX(stream_ordering) FROM events")
-    (min_stream_ordering, max_stream_ordering) = cur.fetchone()
+    row = cur.fetchone()
+    assert row is not None
+    (min_stream_ordering, max_stream_ordering) = row
 
     if min_stream_ordering is None:
         # no rows, nothing to do.

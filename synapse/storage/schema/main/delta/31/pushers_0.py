@@ -64,8 +64,8 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     """
     )
     count = 0
-    for row in cur.fetchall():
-        row = list(row)
+    for tuple_row in cur.fetchall():
+        row = list(tuple_row)
         row[12] = token_to_stream_ordering(row[12])
         cur.execute(
             """

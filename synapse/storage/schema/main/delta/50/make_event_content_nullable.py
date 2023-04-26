@@ -73,7 +73,9 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     cur.execute(
         "SELECT sql FROM sqlite_master WHERE tbl_name='events' AND type='table'"
     )
-    (oldsql,) = cur.fetchone()
+    row = cur.fetchone()
+    assert row is not None
+    (oldsql,) = row
 
     sql = oldsql.replace("content TEXT NOT NULL", "content TEXT")
     if sql == oldsql:
@@ -82,7 +84,9 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     logger.info("Replacing definition of 'events' with: %s", sql)
 
     cur.execute("PRAGMA schema_version")
-    (oldver,) = cur.fetchone()
+    row = cur.fetchone()
+    assert row is not None
+    (oldver,) = row
     cur.execute("PRAGMA writable_schema=ON")
     cur.execute(
         "UPDATE sqlite_master SET sql=? WHERE tbl_name='events' AND type='table'",

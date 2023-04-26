@@ -22,6 +22,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
         # ones with a higher id.
         cur.execute("SELECT max(id) FROM state_groups")
         row = cur.fetchone()
+        assert row is not None
 
         if row[0] is None:
             start_val = 1

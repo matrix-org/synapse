@@ -31,10 +31,12 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
 
         cur.execute("SELECT COALESCE(max(txn_id), 0) FROM application_services_txns")
         row = cur.fetchone()
+        assert row is not None
         txn_max = row[0]
 
         cur.execute("SELECT COALESCE(max(last_txn), 0) FROM application_services_state")
         row = cur.fetchone()
+        assert row is not None
         last_txn_max = row[0]
 
         start_val = max(last_txn_max, txn_max) + 1

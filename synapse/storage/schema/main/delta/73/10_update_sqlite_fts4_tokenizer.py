@@ -38,6 +38,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     # Re-run the background job to re-populate the event_search table.
     cur.execute("SELECT MIN(stream_ordering) FROM events")
     row = cur.fetchone()
+    assert row is not None
     min_stream_id = row[0]
 
     # If there are not any events, nothing to do.
@@ -46,6 +47,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
 
     cur.execute("SELECT MAX(stream_ordering) FROM events")
     row = cur.fetchone()
+    assert row is not None
     max_stream_id = row[0]
 
     progress = {

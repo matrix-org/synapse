@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Dict, Iterable, List, Tuple, cast
 
 from synapse.config.appservice import load_appservices
 from synapse.config.homeserver import HomeServerConfig
@@ -34,7 +35,7 @@ def run_upgrade(
     cur: Cursor, database_engine: BaseDatabaseEngine, config: HomeServerConfig
 ) -> None:
     cur.execute("SELECT name FROM users")
-    rows = cur.fetchall()
+    rows = cast(Iterable[Tuple[str]], cur.fetchall())
 
     config_files = []
     try:
@@ -44,7 +45,7 @@ def run_upgrade(
 
     appservices = load_appservices(config.server.server_name, config_files)
 
-    owned = {}
+    owned: Dict[str, List[str]] = {}
 
     for row in rows:
         user_id = row[0]
