@@ -222,6 +222,40 @@ about the user and their local media. Objects contain the following fields:
 <li><code>next_token</code> - integer - Opaque value used for pagination. See above.</li>
 <li><code>total</code> - integer - Total number of users after filtering.</li>
 </ul>
+<h1 id="get-largest-rooms-by-size-in-database"><a class="header" href="#get-largest-rooms-by-size-in-database">Get largest rooms by size in database</a></h1>
+<p>Returns the 10 largest rooms and an estimate of how much space in the database
+they are taking.</p>
+<p>This does not include the size of any associated media associated with the room.</p>
+<p>Returns an error on SQLite.</p>
+<p><em>Note:</em> This uses the planner statistics from PostgreSQL to do the estimates,
+which means that the returned information can vary widely from reality. However,
+it should be enough to get a rough idea of where database disk space is going.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/statistics/statistics/database/rooms
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;rooms&quot;: [
+    {
+      &quot;room_id&quot;: &quot;!OGEhHVWSdvArJzumhm:matrix.org&quot;,
+      &quot;estimated_size&quot;: 47325417353
+    }
+  ],
+}
+</code></pre>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>rooms</code> - An array of objects, sorted by largest room first. Objects contain
+the following fields:
+<ul>
+<li><code>room_id</code> - string - The room ID.</li>
+<li><code>estimated_size</code> - integer - Estimated disk space used in bytes by the room
+in the database.</li>
+</ul>
+</li>
+</ul>
+<p><em>Added in Synapse 1.83.0</em></p>
 
                     </main>
 
