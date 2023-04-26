@@ -45,6 +45,7 @@ class FilteringWorkerStore(SQLBaseStore):
             index_name="full_users_unique_idx",
             table="user_filters",
             columns=["full_user_id, filter_id"],
+            unique=True,
         )
 
     @cached(num_args=2)

@@ -36,6 +36,7 @@ class ProfileWorkerStore(SQLBaseStore):
             index_name="profiles_full_user_id_key",
             table="profiles",
             columns=["full_user_id"],
+            unique=True,
         )
 
     async def get_profileinfo(self, user_localpart: str) -> ProfileInfo:
