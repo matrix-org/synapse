@@ -25,6 +25,7 @@ from twisted.internet.error import ConnectError, DNSLookupError
 from twisted.web.server import Request
 
 from synapse.api.errors import HttpResponseException, SynapseError
+from synapse.config.workers import MAIN_PROCESS_INSTANCE_NAME
 from synapse.http import RequestTimedOutError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
@@ -213,7 +214,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             )
 
         @trace_with_opname("outgoing_replication_request")
-        async def send_request(*, instance_name: str = "master", **kwargs: Any) -> Any:
+        async def send_request(
+            *, instance_name: str = MAIN_PROCESS_INSTANCE_NAME, **kwargs: Any
+        ) -> Any:
             # We have to pull these out here to avoid circular dependencies...
             streams = hs.get_replication_command_handler().get_streams_to_replicate()
             replication = hs.get_replication_data_handler()
@@ -221,10 +224,6 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             with outgoing_gauge.track_inprogress():
                 if instance_name == local_instance_name:
                     raise Exception("Trying to send HTTP request to self")
-                # if instance_name == "master":
-                #     host = master_host
-                #     port = master_port
-                #     tls = master_tls
                 if instance_name in instance_map:
                     host = instance_map[instance_name].host
                     port = instance_map[instance_name].port

@@ -110,7 +110,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
         config["worker_app"] = "synapse.app.generic_worker"
-        config["instance_map"] = {"master": {"host": "testserv", "port": 8765}}
+        config["instance_map"] = {"main": {"host": "testserv", "port": 8765}}
         return config
 
     def _build_replication_data_handler(self) -> "TestReplicationDataHandler":
@@ -248,7 +248,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         """
         base = super().default_config()
         base["redis"] = {"enabled": True}
-        base["instance_map"] = {"master": {"host": "testserv", "port": 8765}}
+        base["instance_map"] = {"main": {"host": "testserv", "port": 8765}}
         return base
 
     def setUp(self) -> None:

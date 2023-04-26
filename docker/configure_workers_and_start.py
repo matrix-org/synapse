@@ -69,7 +69,7 @@ import yaml
 from jinja2 import Environment, FileSystemLoader
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
-MAIN_PROCESS_INSTANCE_NAME = "master"
+MAIN_PROCESS_INSTANCE_NAME = "main"
 MAIN_PROCESS_LOCALHOST_ADDRESS = "127.0.0.1"
 MAIN_PROCESS_REPLICATION_PORT = 9093
 
@@ -873,11 +873,13 @@ def generate_worker_files(
 
     workers_in_use = len(requested_worker_types) > 0
 
-    instance_map = shared_config.setdefault("instance_map", {})
-    instance_map[MAIN_PROCESS_INSTANCE_NAME] = {
-        "host": MAIN_PROCESS_LOCALHOST_ADDRESS,
-        "port": MAIN_PROCESS_REPLICATION_PORT,
-    }
+    # If there are workers, add the main process to the instance_map too.
+    if workers_in_use:
+        instance_map = shared_config.setdefault("instance_map", {})
+        instance_map[MAIN_PROCESS_INSTANCE_NAME] = {
+            "host": MAIN_PROCESS_LOCALHOST_ADDRESS,
+            "port": MAIN_PROCESS_REPLICATION_PORT,
+        }
 
     # Shared homeserver config
     convert(
