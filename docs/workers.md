@@ -355,11 +355,14 @@ effects of bursts of events from that bridge on events sent by normal users.
 Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.
 
-To enable this, the worker must have a
-[HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
-have a [`worker_name`](usage/configuration/config_documentation.md#worker_name)
+To enable this, the worker must have:
+* An [HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
+* Have a [`worker_name`](usage/configuration/config_documentation.md#worker_name)
 and be listed in the [`instance_map`](usage/configuration/config_documentation.md#instance_map)
-config. The same worker can handle multiple streams, but unless otherwise documented,
+config. 
+* Have the main process declared on the [`instance_map`](usage/configuration/config_documentation.md#instance_map) as well.
+
+Note: The same worker can handle multiple streams, but unless otherwise documented,
 each stream can only have a single writer.
 
 For example, to move event persistence off to a dedicated worker, the shared
@@ -367,6 +370,9 @@ configuration would include:
 
 ```yaml
 instance_map:
+    main:
+        host: localhost
+        port: 8030
     event_persister1:
         host: localhost
         port: 8034

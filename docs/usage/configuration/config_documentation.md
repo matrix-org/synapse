@@ -3846,15 +3846,20 @@ federation_sender_instances:
 ### `instance_map`
 
 When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured.
+HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
 a HTTP replication listener, and that listener should be included in the `instance_map`.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the `instance_map`.)
+The main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is declared 
+inside the `listener` block for a `replication` listener.
+
 
 Example configuration:
 ```yaml
 instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
@@ -3864,7 +3869,8 @@ instance_map:
 
 Experimental: When using workers you can define which workers should
 handle writing to streams such as event persistence and typing notifications.
-Any worker specified here must also be in the [`instance_map`](#instance_map).
+Any worker specified here must also be in the [`instance_map`](#instance_map), the 
+exception being the main process.
 
 See the list of available streams in the
 [worker documentation](../../workers.md#stream-writers).
@@ -3986,6 +3992,7 @@ worker_name: generic_worker1
 ```
 ---
 ### `worker_replication_host`
+*Deprecated as of version 1.83.0. Place `host` under `main` entry on the [`instance_map`](usage/configuration/config_documentation.md#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -3997,6 +4004,7 @@ worker_replication_host: 127.0.0.1
 ```
 ---
 ### `worker_replication_http_port`
+*Deprecated as of version 1.83.0. Place `port` under `main` entry on the [`instance_map`](usage/configuration/config_documentation.md#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -4008,6 +4016,7 @@ worker_replication_http_port: 9093
 ```
 ---
 ### `worker_replication_http_tls`
+*Deprecated as of version 1.83.0. Place `tls` under `main` entry on the [`instance_map`](usage/configuration/config_documentation.md#instance_map) in your shared yaml configuration instead.*
 
 Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
@@ -4033,9 +4042,9 @@ A worker can handle HTTP requests. To do so, a `worker_listeners` option
 must be declared, in the same way as the [`listeners` option](#listeners)
 in the shared config.
 
-Workers declared in [`stream_writers`](#stream_writers) will need to include a
-`replication` listener here, in order to accept internal HTTP requests from
-other workers.
+Workers declared in [`stream_writers`](#stream_writers) and [`instance_map`](usage/configuration/config_documentation.md#instance_map)
+ will need to include a `replication` listener here, in order to accept internal HTTP 
+requests from other workers.
 
 Example configuration:
 ```yaml

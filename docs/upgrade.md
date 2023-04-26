@@ -88,6 +88,28 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.83.0
+
+## Worker Yaml setting deprecations
+
+When using workers, 
+* `worker_replication_host`
+* `worker_replication_http_port`
+* `worker_replication_http_tls`
+ 
+can now be removed from individual worker yaml if you add the main process to the `instance_map` in the shared yaml configuration. 
+
+Example:
+```yaml
+instance_map:
+  main:
+    host: localhost
+    port: 3456
+    tls: false
+```
+Notes: 
+* `tls` is optional but mirrors the functionality of `worker_replication_http_tls`
+* Ensure these values match up with the `replication` listener declared for the main process.
 # Upgrading to v1.81.0
 
 ## Application service path & authentication deprecations
