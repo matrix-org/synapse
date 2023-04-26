@@ -14,8 +14,9 @@
 import json
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.storage.prepare_database import get_statements
+from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ ALTER TABLE event_search ADD COLUMN stream_ordering BIGINT;
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     if not isinstance(database_engine, PostgresEngine):
         return
 

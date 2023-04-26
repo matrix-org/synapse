@@ -14,7 +14,9 @@
 import json
 import logging
 
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
+from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,7 @@ ALTER TABLE events ADD COLUMN contains_url BOOLEAN;
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     for statement in get_statements(ALTER_TABLE.splitlines()):
         cur.execute(statement)
 

@@ -22,7 +22,7 @@ from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3E
 from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     # complain if the room_id in partial_state_events doesn't match
     # that in `events`. We already have a fk constraint which ensures that the event
     # exists in `events`, so all we have to do is raise if there is a row with a

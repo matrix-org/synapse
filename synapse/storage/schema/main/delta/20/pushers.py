@@ -24,10 +24,13 @@ UTF-8 bytes, so we have to do it in Python.
 
 import logging
 
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.types import Cursor
+
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     logger.info("Porting pushers table...")
     cur.execute(
         """

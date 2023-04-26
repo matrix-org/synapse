@@ -27,7 +27,14 @@
 # equivalent behaviour as if the server had remained in the room).
 
 
-def run_upgrade(cur, database_engine, config, *args, **kwargs):
+from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.types import Cursor
+
+
+def run_upgrade(
+    cur: Cursor, database_engine: BaseDatabaseEngine, config: HomeServerConfig
+) -> None:
     # We need to do the insert in `run_upgrade` section as we don't have access
     # to `config` in `run_create`.
 
@@ -77,7 +84,7 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
     )
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     cur.execute(
         """
         CREATE TABLE local_current_membership (

@@ -14,10 +14,11 @@
 
 import json
 
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     """Add a bg update to populate the `state_key` and `rejection_reason` columns of `events`"""
 
     # we know that any new events will have the columns populated (and that has been

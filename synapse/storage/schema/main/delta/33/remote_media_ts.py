@@ -14,14 +14,20 @@
 
 import time
 
+from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.types import Cursor
+
 ALTER_TABLE = "ALTER TABLE remote_media_cache ADD COLUMN last_access_ts BIGINT"
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     cur.execute(ALTER_TABLE)
 
 
-def run_upgrade(cur, database_engine, *args, **kwargs):
+def run_upgrade(
+    cur: Cursor, database_engine: BaseDatabaseEngine, config: HomeServerConfig
+) -> None:
     cur.execute(
         "UPDATE remote_media_cache SET last_access_ts = ?",
         (int(time.time() * 1000),),

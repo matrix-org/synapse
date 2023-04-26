@@ -21,7 +21,7 @@ from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3E
 from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     # Complain if the `event_stream_ordering` in membership tables doesn't match
     # the `stream_ordering` row with the same `event_id` in `events`.
     if isinstance(database_engine, Sqlite3Engine):

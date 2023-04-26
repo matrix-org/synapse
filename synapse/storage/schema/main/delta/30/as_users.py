@@ -14,11 +14,14 @@
 import logging
 
 from synapse.config.appservice import load_appservices
+from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     # NULL indicates user was not registered by an appservice.
     try:
         cur.execute("ALTER TABLE users ADD COLUMN appservice_id TEXT")
@@ -27,7 +30,9 @@ def run_create(cur, database_engine, *args, **kwargs):
         pass
 
 
-def run_upgrade(cur, database_engine, config, *args, **kwargs):
+def run_upgrade(
+    cur: Cursor, database_engine: BaseDatabaseEngine, config: HomeServerConfig
+) -> None:
     cur.execute("SELECT name FROM users")
     rows = cur.fetchall()
 
