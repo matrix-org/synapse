@@ -79,7 +79,3 @@ def run_create(cur, database_engine, *args, **kwargs):
 
     for statement in get_statements(drop_constraint.splitlines()):
         cur.execute(statement)
-
-
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass

@@ -57,7 +57,3 @@ def run_create(cur, database_engine, *args, **kwargs):
 
     for statement in get_statements(FIX_INDEXES.splitlines()):
         cur.execute(statement)
-
-
-def run_upgrade(*args, **kwargs):
-    pass

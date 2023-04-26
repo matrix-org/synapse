@@ -78,7 +78,3 @@ def run_create(cur, database_engine, *args, **kwargs):
             cur.execute(statement)
     else:
         raise Exception("Unrecognized database engine")
-
-
-def run_upgrade(*args, **kwargs):
-    pass

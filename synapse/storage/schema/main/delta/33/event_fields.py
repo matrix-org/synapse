@@ -51,7 +51,3 @@ def run_create(cur, database_engine, *args, **kwargs):
         )
 
         cur.execute(sql, ("event_fields_sender_url", progress_json))
-
-
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass

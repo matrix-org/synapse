@@ -28,7 +28,3 @@ def run_create(cur, database_engine, *args, **kwargs):
 
     next_id = find_max_generated_user_id_localpart(cur) + 1
     cur.execute("CREATE SEQUENCE user_id_seq START WITH %s", (next_id,))
-
-
-def run_upgrade(*args, **kwargs):
-    pass

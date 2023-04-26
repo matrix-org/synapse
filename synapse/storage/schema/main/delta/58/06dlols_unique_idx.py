@@ -27,10 +27,6 @@ from synapse.storage.types import Cursor
 logger = logging.getLogger(__name__)
 
 
-def run_upgrade(*args, **kwargs):
-    pass
-
-
 def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
     # some instances might already have this index, in which case we can skip this
     if isinstance(database_engine, PostgresEngine):

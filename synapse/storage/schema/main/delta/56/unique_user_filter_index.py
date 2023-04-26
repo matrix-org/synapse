@@ -16,10 +16,6 @@ This migration updates the user_filters table as follows:
 """
 
 
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass
-
-
 def run_create(cur, database_engine, *args, **kwargs):
     if isinstance(database_engine, PostgresEngine):
         select_clause = """

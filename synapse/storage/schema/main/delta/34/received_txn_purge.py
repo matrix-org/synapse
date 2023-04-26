@@ -26,7 +26,3 @@ def run_create(cur, database_engine, *args, **kwargs):
         cur.execute("DELETE FROM received_transactions")
 
     cur.execute("CREATE INDEX received_transactions_ts ON received_transactions(ts)")
-
-
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass

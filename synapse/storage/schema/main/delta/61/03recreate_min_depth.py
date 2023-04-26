@@ -64,7 +64,3 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs
             (6103, 'replace_room_depth_min_depth', '{}', 'populate_room_depth2')
         """
     )
-
-
-def run_upgrade(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
-    pass
