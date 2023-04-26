@@ -90,7 +90,7 @@ they are taking.
 
 This does not include the size of any associated media associated with the room.
 
-Returns an empty list on SQLite.
+Returns an error on SQLite.
 
 *Note:* This uses the planner statistics from PostgreSQL to do the estimates,
 which means that the returned information can vary widely from reality. However,
@@ -127,3 +127,6 @@ The following fields are returned in the JSON response body:
   - `room_id` - string - The room ID.
   - `estimated_size` - integer - Estimated disk space used in bytes by the room
     in the database.
+
+
+*Added in Synapse 1.83.0*
