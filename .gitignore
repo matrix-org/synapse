@@ -38,6 +38,9 @@ __pycache__/
 /.envrc
 .direnv/
 
+# For nix/devenv users
+.devenv/
+
 # IDEs
 /.idea/
 /.ropeproject/
