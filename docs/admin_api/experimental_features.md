@@ -30,30 +30,21 @@ where true is  used to enable the feature, and false is used to disable the feat
 The API is:
 
 ```
-PUT /_synapse/admin/v1/experimental_features
+PUT /_synapse/admin/v1/experimental_features/<user_id>
 ```
 
 ## Listing Enabled Features
  
-To list which features are enabled/disabled for a given user, send a request with a body in the following format:
-
-```json
-{
-   "user_id": user_id
-}
-```
-
-to the API
+To list which features are enabled/disabled for a given user send a request to the following API:
 
 ```
-GET /_synapse/admin/v1/experimental_features
+GET /_synapse/admin/v1/experimental_features/<user_id>
 ```
 
 It will return a list of possible features and indicate whether they are enabled or disabled for the
 user like so:
 ```json
 {
-   "user_id": user_id,
    "features": {
       "msc3026": true,
       "msc2654": true,

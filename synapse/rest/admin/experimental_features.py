@@ -44,7 +44,7 @@ class ExperimentalFeaturesRestServlet(RestServlet):
     for a given user
     """
 
-    PATTERNS = admin_patterns("/experimental_features")
+    PATTERNS = admin_patterns("/experimental_features/(?P<user_id>[^/]*)")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -55,21 +55,12 @@ class ExperimentalFeaturesRestServlet(RestServlet):
     async def on_GET(
         self,
         request: SynapseRequest,
+        user_id: str,
     ) -> Tuple[int, JsonDict]:
         """
         List which features are enabled for a given user
         """
         await assert_requester_is_admin(self.auth, request)
-
-        body = parse_json_object_from_request(request)
-
-        if "user_id" not in body:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Missing property 'user_id' in the request body",
-            )
-
-        user_id = body["user_id"]
 
         target_user = UserID.from_string(user_id)
         if not self.is_mine(target_user):
@@ -86,23 +77,17 @@ class ExperimentalFeaturesRestServlet(RestServlet):
                 user_features[feature] = True
             else:
                 user_features[feature] = False
-        return HTTPStatus.OK, {"user_id": user_id, "features": user_features}
+        return HTTPStatus.OK, {"features": user_features}
 
-    async def on_PUT(self, request: SynapseRequest) -> Tuple[HTTPStatus, Dict]:
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[HTTPStatus, Dict]:
         """
         Enable or disable the provided features for the requester
         """
         await assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request)
-
-        if "user_id" not in body:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Missing property 'user_id' in the request body",
-            )
-
-        user_id = body["user_id"]
 
         target_user = UserID.from_string(user_id)
         if not self.is_mine(target_user):
