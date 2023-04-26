@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any, Optional, Tuple
 
 from synapse.api.errors import InvalidAPICallError, SynapseError
@@ -288,7 +289,33 @@ class OneTimeKeyServlet(RestServlet):
         await self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        result = await self.e2e_keys_handler.claim_one_time_keys(body, timeout)
+        result = await self.e2e_keys_handler.claim_one_time_keys(
+            body, timeout, always_include_fallback_keys=False
+        )
+        return 200, result
+
+
+class UnstableOneTimeKeyServlet(RestServlet):
+    """
+    Identical to the stable endpoint (OneTimeKeyServlet) except it always includes
+    fallback keys in the response.
+    """
+
+    PATTERNS = [re.compile(r"^/_matrix/client/unstable/org.matrix.msc3983/keys/claim$")]
+    CATEGORY = "Encryption requests"
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.e2e_keys_handler = hs.get_e2e_keys_handler()
+
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await self.auth.get_user_by_req(request, allow_guest=True)
+        timeout = parse_integer(request, "timeout", 10 * 1000)
+        body = parse_json_object_from_request(request)
+        result = await self.e2e_keys_handler.claim_one_time_keys(
+            body, timeout, always_include_fallback_keys=True
+        )
         return 200, result
 
 
@@ -394,6 +421,8 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     KeyQueryServlet(hs).register(http_server)
     KeyChangesServlet(hs).register(http_server)
     OneTimeKeyServlet(hs).register(http_server)
+    if hs.config.experimental.msc3983_appservice_otk_claims:
+        UnstableOneTimeKeyServlet(hs).register(http_server)
     if hs.config.worker.worker_app is None:
         SigningKeyUploadServlet(hs).register(http_server)
         SignaturesUploadServlet(hs).register(http_server)

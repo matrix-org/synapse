@@ -198,9 +198,16 @@ class _EventInternalMetadata:
     soft_failed: DictProperty[bool] = DictProperty("soft_failed")
     proactively_send: DictProperty[bool] = DictProperty("proactively_send")
     redacted: DictProperty[bool] = DictProperty("redacted")
-    txn_id: DictProperty[str] = DictProperty("txn_id")
-    token_id: DictProperty[int] = DictProperty("token_id")
     historical: DictProperty[bool] = DictProperty("historical")
+
+    txn_id: DictProperty[str] = DictProperty("txn_id")
+    """The transaction ID, if it was set when the event was created."""
+
+    token_id: DictProperty[int] = DictProperty("token_id")
+    """The access token ID of the user who sent this event, if any."""
+
+    device_id: DictProperty[str] = DictProperty("device_id")
+    """The device ID of the user who sent this event, if any."""
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't

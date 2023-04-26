@@ -16,6 +16,7 @@
 import logging
 import urllib
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Collection,
@@ -42,10 +43,13 @@ from synapse.api.urls import (
 )
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
-from synapse.http.matrixfederationclient import ByteParser
+from synapse.http.matrixfederationclient import ByteParser, LegacyJsonSendParser
 from synapse.http.types import QueryParams
 from synapse.types import JsonDict
 from synapse.util import ExceptionBundle
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +57,7 @@ logger = logging.getLogger(__name__)
 class TransportLayerClient:
     """Sends federation HTTP requests to other servers"""
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.server_name = hs.hostname
         self.client = hs.get_federation_http_client()
         self._faster_joins_enabled = hs.config.experimental.faster_joins_enabled
@@ -133,7 +137,7 @@ class TransportLayerClient:
 
     async def backfill(
         self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
-    ) -> Optional[JsonDict]:
+    ) -> Optional[Union[JsonDict, list]]:
         """Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
@@ -388,6 +392,7 @@ class TransportLayerClient:
             # server was just having a momentary blip, the room will be out of
             # sync.
             ignore_backoff=True,
+            parser=LegacyJsonSendParser(),
         )
 
     async def send_leave_v2(
@@ -445,7 +450,11 @@ class TransportLayerClient:
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+            parser=LegacyJsonSendParser(),
         )
 
     async def send_invite_v2(
