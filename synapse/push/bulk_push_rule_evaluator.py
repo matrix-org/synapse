@@ -326,6 +326,7 @@ class BulkPushRuleEvaluator:
         if (
             not event.internal_metadata.is_notifiable()
             or event.internal_metadata.is_historical()
+            or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync
         ):
             # Push rules for events that aren't notifiable can't be processed by this and
             # we want to skip push notification actions for historical messages
