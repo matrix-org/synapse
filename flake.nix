@@ -130,7 +130,7 @@
                 # * Perl is needed to run the SyTest test suite.
                 languages.go.enable = true;
                 languages.rust.enable = true;
-                languages.rust.version = "latest";
+                languages.rust.version = "stable";
                 languages.perl.enable = true;
 
                 # Postgres is needed to run Synapse with postgres support and
