@@ -650,10 +650,10 @@ class TransportLayerClient:
 
         Response:
             {
-              "device_keys": {
+              "one_time_keys": {
                 "<user_id>": {
                   "<device_id>": {
-                    "<algorithm>:<key_id>": "<key_base64>"
+                    "<algorithm>:<key_id>": <OTK JSON>
                   }
                 }
               }
@@ -669,7 +669,50 @@ class TransportLayerClient:
         path = _create_v1_path("/user/keys/claim")
 
         return await self.client.post_json(
-            destination=destination, path=path, data=query_content, timeout=timeout
+            destination=destination,
+            path=path,
+            data={"one_time_keys": query_content},
+            timeout=timeout,
+        )
+
+    async def claim_client_keys_unstable(
+        self, destination: str, query_content: JsonDict, timeout: Optional[int]
+    ) -> JsonDict:
+        """Claim one-time keys for a list of devices hosted on a remote server.
+
+        Request:
+            {
+              "one_time_keys": {
+                "<user_id>": {
+                  "<device_id>": {"<algorithm>": <count>}
+                }
+              }
+            }
+
+        Response:
+            {
+              "one_time_keys": {
+                "<user_id>": {
+                  "<device_id>": {
+                    "<algorithm>:<key_id>": <OTK JSON>
+                  }
+                }
+              }
+            }
+
+        Args:
+            destination: The server to query.
+            query_content: The user ids to query.
+        Returns:
+            A dict containing the one-time keys.
+        """
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/user/keys/claim")
+
+        return await self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"one_time_keys": query_content},
+            timeout=timeout,
         )
 
     async def get_missing_events(
