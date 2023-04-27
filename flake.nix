@@ -24,10 +24,10 @@
 # running: `devenv up`. To stop them, use Ctrl-C.
 #
 # A PostgreSQL database called 'synapse' will be set up for you, along with
-# a PostgreSQL user named 'synapse_user' with password 'password123'.
+# a PostgreSQL user named 'synapse_user'.
 # The 'host' can be found by running `echo $PGHOST` with the development
 # shell activated. Use these values to configure your Synapse to connect
-# to the local PostgreSQL database.
+# to the local PostgreSQL database. You do not need to specify a password.
 # https://matrix-org.github.io/synapse/latest/postgres
 #
 # All state (the venv, postgres and redis data and config) are stored in
@@ -147,7 +147,6 @@
                 # over the 'synapse' database.
                 services.postgres.initialScript = ''
                 CREATE USER synapse_user;
-                ALTER USER postgres PASSWORD 'password123';
                 ALTER DATABASE synapse OWNER TO synapse_user;
                 '';
 
