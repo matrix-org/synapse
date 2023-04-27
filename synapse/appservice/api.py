@@ -499,7 +499,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         # TODO This places a lot of faith in the response shape being correct.
         missing = []
         for user_id, device, algorithm, count in query:
-            # The number of keys responded for this algorithm.
+            # Count the number of keys in the response for this algorithm by
+            # checking which key IDs start with the algorithm. This uses that
+            # True == 1 in Python to generate a count.
             response_count = sum(
                 key_id.startswith(f"{algorithm}:")
                 for key_id in response.get(user_id, {}).get(device, {})

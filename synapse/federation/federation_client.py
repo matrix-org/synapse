@@ -261,10 +261,12 @@ class FederationClient(FederationBase):
                 if any(count > 1 for count in algorithms.values()):
                     use_unstable = True
                 if algorithms:
-                    # Choose the first algorithm only for the stable query.
+                    # For the stable query, choose only the first algorithm.
                     content.setdefault(user_id, {})[device_id] = next(iter(algorithms))
-                    # Flatten the map of algorithm -> count to a list repeating
-                    # each algorithm count times for the unstable query.
+                    # For the unstable query, repeat each algorithm by count, then
+                    # splat those into chain to get a flattened list of all algorithms.
+                    #
+                    # Converts from {"algo1": 2, "algo2": 2} to ["algo1", "algo1", "algo2"].
                     unstable_content.setdefault(user_id, {})[device_id] = list(
                         itertools.chain(
                             *(
