@@ -184,18 +184,34 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
+    "nixpkgs-unstable": {
       "locked": {
-        "lastModified": 1682519441,
-        "narHash": "sha256-Vsq/8NOtvW1AoC6shCBxRxZyMQ+LhvPuJT6ltbzuv+Y=",
+        "lastModified": 1682592683,
+        "narHash": "sha256-L2Y8rRlVzu5qA3CZqTMotuoj2EXrVbV52BB1nhEGsKE=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "7a32a141db568abde9bc389845949dc2a454dfd3",
+        "rev": "468813060dc63db045cd9b47bc633292f2d08f9a",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "ref": "master",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1669833724,
+        "narHash": "sha256-/HEZNyGbnQecrgJnfE8d0WC5c1xuPSD2LUpB6YXlg4c=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "4d2b37a84fad1091b9de401eb450aae66f1a741e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "22.11",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -233,6 +249,7 @@
         "devenv": "devenv",
         "fenix": "fenix",
         "nixpkgs": "nixpkgs_2",
+        "nixpkgs-unstable": "nixpkgs-unstable",
         "systems": "systems"
       }
     },

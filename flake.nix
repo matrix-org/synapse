@@ -46,7 +46,8 @@
   inputs = {
     # Use the master/unstable branch of nixpkgs. The latest stable, 22.11,
     # does not contain 'perl536Packages.NetAsyncHTTP', needed by Sytest.
-    nixpkgs.url = "github:NixOS/nixpkgs/master";
+    nixpkgs.url = "github:NixOS/nixpkgs/22.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     # Output a development shell for x86_64/aarch64 Linux/Darwin (MacOS).
     systems.url = "github:nix-systems/default";
     # A development environment manager built on Nix. See https://devenv.sh.
@@ -62,13 +63,14 @@
     };
   };
 
-  outputs = { self, nixpkgs, devenv, systems, ... } @ inputs:
+  outputs = { self, nixpkgs, nixpkgs-unstable, devenv, systems, ... } @ inputs:
     let
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
     in {
       devShells = forEachSystem (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
         in {
           # Everything is configured via devenv - a nix module for creating declarative
           # developer environments. See https://devenv.sh/reference/options/ for a list
@@ -191,7 +193,7 @@
                   ModulePluggable
                   NetAsyncHTTP
                   MetricsAny  # required by Net::Async::HTTP
-                  NetAsyncHTTPServer
+                  pkgs-unstable.perl536Packages.NetAsyncHTTPServer
                   StructDumb
                   URI
                   YAMLLibYAML
