@@ -435,14 +435,73 @@ may wish to run multiple groups of workers handling different endpoints so that
 load balancing can be done in different ways.</p>
 <p>For <code>/sync</code> and <code>/initialSync</code> requests it will be more efficient if all
 requests from a particular user are routed to a single instance. This can
-be done e.g. in nginx via IP <code>hash $http_x_forwarded_for;</code> or via
-<code>hash $http_authorization consistent;</code> which contains the users access token.</p>
+be done in reverse proxy by extracting username part from the users access token.</p>
 <p>Admins may additionally wish to separate out <code>/sync</code>
 requests that have a <code>since</code> query parameter from those that don't (and
 <code>/initialSync</code>), as requests that don't are known as &quot;initial sync&quot; that happens
 when a user logs in on a new device and can be <em>very</em> resource intensive, so
 isolating these requests will stop them from interfering with other users ongoing
 syncs.</p>
+<p>Example <code>nginx</code> configuration snippet that handles the cases above. This is just an
+example and probably requires some changes according to your particular setup:</p>
+<pre><code class="language-nginx"># Choose sync worker based on the existence of &quot;since&quot; query parameter
+map $arg_since $sync {
+    default synapse_sync;
+    '' synapse_initial_sync;
+}
+
+# Extract username from access token passed as URL parameter
+map $arg_access_token $accesstoken_from_urlparam {
+    # Defaults to just passing back the whole accesstoken
+    default   $arg_access_token;
+    # Try to extract username part from accesstoken URL parameter
+    &quot;~syt_(?&lt;username&gt;.*?)_.*&quot;           $username;
+}
+
+# Extract username from access token passed as authorization header
+map $http_authorization $mxid_localpart {
+    # Defaults to just passing back the whole accesstoken
+    default                              $http_authorization;
+    # Try to extract username part from accesstoken header
+    &quot;~Bearer syt_(?&lt;username&gt;.*?)_.*&quot;    $username;
+    # if no authorization-header exist, try mapper for URL parameter &quot;access_token&quot;
+    &quot;&quot;                                   $accesstoken_from_urlparam;
+}
+
+upstream synapse_initial_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8016;
+    server 127.0.0.1:8036;
+}
+
+upstream synapse_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8013;
+    server 127.0.0.1:8037;
+    server 127.0.0.1:8038;
+    server 127.0.0.1:8039;
+}
+
+# Sync initial/normal
+location ~ ^/_matrix/client/(r0|v3)/sync$ {
+	proxy_pass http://$sync;
+}
+
+# Normal sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/events$ {
+	proxy_pass http://synapse_sync;
+}
+
+# Initial_sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/initialSync$ {
+	proxy_pass http://synapse_initial_sync;
+}
+location ~ ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$ {
+	proxy_pass http://synapse_initial_sync;
+}
+</code></pre>
 <p>Federation and client requests can be balanced via simple round robin.</p>
 <p>The inbound federation transaction request <code>^/_matrix/federation/v1/send/</code>
 should be balanced by source IP so that transactions from the same remote server
