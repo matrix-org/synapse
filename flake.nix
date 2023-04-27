@@ -40,7 +40,7 @@
 # upon entering this directory in your terminal, first install `direnv`
 # (https://direnv.net/). Then run `echo 'use flake . --impure' >> .envrc` at
 # the root of the Synapse repo. Finally, run `direnv allow .` to allow the
-# contents of '.envrc' to run every time you enter this directory. Viola!
+# contents of '.envrc' to run every time you enter this directory. Voilà!
 
 {
   inputs = {
