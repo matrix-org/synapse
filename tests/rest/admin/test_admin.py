@@ -496,6 +496,6 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
             channel.json_body,
             {
                 "errcode": "M_UNKNOWN",
-                "error": "Please provide a valid experimental feature.",
+                "error": "'msc6666' is not recognised as a valid experimental feature.",
             },
         )
