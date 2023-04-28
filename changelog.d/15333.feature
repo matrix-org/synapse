@@ -1,1 +1,0 @@
-Allow loading `/directory/room/{roomAlias}` endpoint on workers.

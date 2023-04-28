@@ -24,10 +24,13 @@ UTF-8 bytes, so we have to do it in Python.
 
 import logging
 
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine
+
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     logger.info("Porting pushers table...")
     cur.execute(
         """
@@ -61,8 +64,8 @@ def run_create(cur, database_engine, *args, **kwargs):
     """
     )
     count = 0
-    for row in cur.fetchall():
-        row = list(row)
+    for tuple_row in cur.fetchall():
+        row = list(tuple_row)
         row[8] = bytes(row[8]).decode("utf-8")
         row[11] = bytes(row[11]).decode("utf-8")
         cur.execute(
@@ -81,7 +84,3 @@ def run_create(cur, database_engine, *args, **kwargs):
     cur.execute("DROP TABLE pushers")
     cur.execute("ALTER TABLE pushers2 RENAME TO pushers")
     logger.info("Moved %d pushers to new table", count)
-
-
-def run_upgrade(*args, **kwargs):
-    pass

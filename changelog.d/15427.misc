@@ -1,1 +1,0 @@
-Refactor `SimpleHttpClient` to pull out a base class.
