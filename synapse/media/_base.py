@@ -50,6 +50,12 @@ TEXT_CONTENT_TYPES = [
     "text/xml",
 ]
 
+# Default timeout_ms for download and thumbnail requests
+DEFAULT_MAX_TIMEOUT_MS = 20_000
+
+# Maximum allowed timeout_ms for download and thumbnail requests
+MAXIMUM_ALLOWED_MAX_TIMEOUT_MS = 60_000
+
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     """Parses the server name, media ID and optional file name from the request URI

@@ -28,6 +28,8 @@ from synapse.http.server import (
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.media._base import (
+    DEFAULT_MAX_TIMEOUT_MS,
+    MAXIMUM_ALLOWED_MAX_TIMEOUT_MS,
     FileInfo,
     ThumbnailInfo,
     parse_media_id,
@@ -70,26 +72,37 @@ class ThumbnailResource(DirectServeJsonResource):
         method = parse_string(request, "method", "scale")
         # TODO Parse the Accept header to get an prioritised list of thumbnail types.
         m_type = "image/png"
+        max_timeout_ms = parse_integer(
+            request, "timeout_ms", default=DEFAULT_MAX_TIMEOUT_MS
+        )
+        max_timeout_ms = min(max_timeout_ms, MAXIMUM_ALLOWED_MAX_TIMEOUT_MS)
 
         if server_name == self.server_name:
             if self.dynamic_thumbnails:
                 await self._select_or_generate_local_thumbnail(
-                    request, media_id, width, height, method, m_type
+                    request, media_id, width, height, method, m_type, max_timeout_ms
                 )
             else:
                 await self._respond_local_thumbnail(
-                    request, media_id, width, height, method, m_type
+                    request, media_id, width, height, method, m_type, max_timeout_ms
                 )
             self.media_repo.mark_recently_accessed(None, media_id)
         else:
-            if self.dynamic_thumbnails:
-                await self._select_or_generate_remote_thumbnail(
-                    request, server_name, media_id, width, height, method, m_type
-                )
-            else:
-                await self._respond_remote_thumbnail(
-                    request, server_name, media_id, width, height, method, m_type
-                )
+            remote_resp_function = (
+                self._select_or_generate_remote_thumbnail
+                if self.dynamic_thumbnails
+                else self._respond_remote_thumbnail
+            )
+            await remote_resp_function(
+                request,
+                server_name,
+                media_id,
+                width,
+                height,
+                method,
+                m_type,
+                max_timeout_ms,
+            )
             self.media_repo.mark_recently_accessed(server_name, media_id)
 
     async def _respond_local_thumbnail(
@@ -100,15 +113,12 @@ class ThumbnailResource(DirectServeJsonResource):
         height: int,
         method: str,
         m_type: str,
+        max_timeout_ms: int,
     ) -> None:
-        media_info = await self.store.get_local_media(media_id)
-
+        media_info = await self.media_repo.get_local_media_info(
+            request, media_id, max_timeout_ms
+        )
         if not media_info:
-            respond_404(request)
-            return
-        if media_info["quarantined_by"]:
-            logger.info("Media is quarantined")
-            respond_404(request)
             return
 
         thumbnail_infos = await self.store.get_local_media_thumbnails(media_id)
@@ -133,8 +143,13 @@ class ThumbnailResource(DirectServeJsonResource):
         desired_height: int,
         desired_method: str,
         desired_type: str,
+        max_timeout_ms: int,
     ) -> None:
-        media_info = await self.store.get_local_media(media_id)
+        media_info = await self.media_repo.get_local_media_info(
+            request, media_id, max_timeout_ms
+        )
+        if not media_info:
+            return
 
         if not media_info:
             respond_404(request)
@@ -199,8 +214,13 @@ class ThumbnailResource(DirectServeJsonResource):
         desired_height: int,
         desired_method: str,
         desired_type: str,
+        max_timeout_ms: int,
     ) -> None:
-        media_info = await self.media_repo.get_remote_media_info(server_name, media_id)
+        media_info = await self.media_repo.get_remote_media_info(
+            server_name, media_id, max_timeout_ms
+        )
+        if not media_info:
+            return
 
         thumbnail_infos = await self.store.get_remote_media_thumbnails(
             server_name, media_id
@@ -262,11 +282,16 @@ class ThumbnailResource(DirectServeJsonResource):
         height: int,
         method: str,
         m_type: str,
+        max_timeout_ms: int,
     ) -> None:
         # TODO: Don't download the whole remote file
         # We should proxy the thumbnail from the remote server instead of
         # downloading the remote file and generating our own thumbnails.
-        media_info = await self.media_repo.get_remote_media_info(server_name, media_id)
+        media_info = await self.media_repo.get_remote_media_info(
+            server_name, media_id, max_timeout_ms
+        )
+        if not media_info:
+            return
 
         thumbnail_infos = await self.store.get_remote_media_thumbnails(
             server_name, media_id
