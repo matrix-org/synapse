@@ -39,6 +39,7 @@ from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
 )
+from synapse.rest.admin.experimental_features import ExperimentalFeaturesRestServlet
 from synapse.rest.admin.federation import (
     DestinationMembershipRestServlet,
     DestinationResetConnectionRestServlet,
@@ -292,6 +293,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     BackgroundUpdateEnabledRestServlet(hs).register(http_server)
     BackgroundUpdateRestServlet(hs).register(http_server)
     BackgroundUpdateStartJobRestServlet(hs).register(http_server)
+    ExperimentalFeaturesRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
