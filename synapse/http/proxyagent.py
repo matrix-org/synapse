@@ -36,6 +36,7 @@ from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS, IResponse
 
+from synapse.config.federation import FederationProxy
 from synapse.http import redact_uri
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
 
@@ -89,6 +90,7 @@ class ProxyAgent(_AgentBase):
         bindAddress: Optional[bytes] = None,
         pool: Optional[HTTPConnectionPool] = None,
         use_proxy: bool = False,
+        federation_proxy: Optional[FederationProxy] = None,
     ):
         contextFactory = contextFactory or BrowserLikePolicyForHTTPS()
 
@@ -126,6 +128,7 @@ class ProxyAgent(_AgentBase):
 
         self._policy_for_https = contextFactory
         self._reactor = reactor
+        self._federation_proxy = federation_proxy
 
     def request(
         self,
@@ -214,8 +217,12 @@ class ProxyAgent(_AgentBase):
                 parsed_uri.port,
                 self.https_proxy_creds,
             )
-        elif parsed_uri.scheme == b"matrix":
-            endpoint = HostnameEndpoint(self.proxy_reactor, "127.0.0.1", 3000)
+        elif parsed_uri.scheme == b"matrix-federation" and self._federation_proxy:
+            endpoint = HostnameEndpoint(
+                self.proxy_reactor,
+                self._federation_proxy.host,
+                self._federation_proxy.port,
+            )
             request_path = uri
         else:
             # not using a proxy
@@ -236,7 +243,7 @@ class ProxyAgent(_AgentBase):
             endpoint = wrapClientTLS(tls_connection_creator, endpoint)
         elif parsed_uri.scheme == b"http":
             pass
-        elif parsed_uri.scheme == b"matrix":
+        elif parsed_uri.scheme == b"matrix-federation" and self._federation_proxy:
             pass
         else:
             return defer.fail(

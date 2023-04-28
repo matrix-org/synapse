@@ -50,7 +50,7 @@ from twisted.internet.interfaces import IReactorTime
 from twisted.internet.task import Cooperator
 from twisted.web.client import ResponseFailed
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IBodyProducer, IResponse
+from twisted.web.iweb import IAgent, IBodyProducer, IResponse
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -175,7 +175,14 @@ class MatrixFederationRequest:
 
         # The object is frozen so we can pre-compute this.
         uri = urllib.parse.urlunparse(
-            (b"matrix", destination_bytes, path_bytes, None, query_bytes, b"")
+            (
+                b"matrix-federation",
+                destination_bytes,
+                path_bytes,
+                None,
+                query_bytes,
+                b"",
+            )
         )
         object.__setattr__(self, "uri", uri)
 
@@ -389,9 +396,21 @@ class MatrixFederationHttpClient:
         if hs.config.server.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
 
-        federation_agent = ProxyAgent(
-            self.reactor, self.reactor, tls_client_options_factory
-        )
+        if hs.config.federation.federation_proxy:
+            federation_agent: IAgent = ProxyAgent(
+                self.reactor,
+                self.reactor,
+                tls_client_options_factory,
+                federation_proxy=hs.config.federation.federation_proxy,
+            )
+        else:
+            federation_agent = MatrixFederationAgent(
+                self.reactor,
+                tls_client_options_factory,
+                user_agent.encode("ascii"),
+                hs.config.server.federation_ip_range_whitelist,
+                hs.config.server.federation_ip_range_blacklist,
+            )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names

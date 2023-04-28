@@ -174,7 +174,7 @@ class MatrixFederationAgent:
         # the host header with the delegated server name.
         delegated_server = None
         if (
-            parsed_uri.scheme == b"matrix"
+            parsed_uri.scheme == b"matrix-federation"
             and not _is_ip_literal(parsed_uri.hostname)
             and not parsed_uri.port
         ):
@@ -379,7 +379,7 @@ class MatrixHostnameEndpoint:
         connect to.
         """
 
-        if self._parsed_uri.scheme != b"matrix":
+        if self._parsed_uri.scheme != b"matrix-federation":
             return [Server(host=self._parsed_uri.host, port=self._parsed_uri.port)]
 
         # Note: We don't do well-known lookup as that needs to have happened

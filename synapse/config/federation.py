@@ -13,9 +13,21 @@
 # limitations under the License.
 from typing import Any, Optional
 
+import attr
+
 from synapse.config._base import Config
 from synapse.config._util import validate_config
 from synapse.types import JsonDict
+
+
+@attr.s(frozen=True, auto_attribs=True)
+class FederationProxy:
+    """A proxy server for outbound federation traffic, for URIs with a
+    `matrix-federation://` scheme.
+    """
+
+    host: str
+    port: int
 
 
 class FederationConfig(Config):
@@ -48,6 +60,13 @@ class FederationConfig(Config):
         self.allow_device_name_lookup_over_federation = config.get(
             "allow_device_name_lookup_over_federation", False
         )
+
+        self.federation_proxy = None
+        federation_proxy = config.get("federation_proxy")
+        if federation_proxy:
+            host = federation_proxy["host"]
+            port = int(federation_proxy["port"])
+            self.federation_proxy = FederationProxy(host, port)
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}
