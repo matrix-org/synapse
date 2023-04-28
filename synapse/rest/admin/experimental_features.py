@@ -111,7 +111,7 @@ class ExperimentalFeaturesRestServlet(RestServlet):
             except ValueError:
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
-                    "Please provide a valid experimental feature.",
+                    f"{feature!r} is not recognised as a valid experimental feature.",
                 )
 
         await self.store.set_features_for_user(user_id, validated_features)

@@ -17,7 +17,6 @@ This API allows a server administrator to enable experimental features for a giv
 provide a body containing the user id and listing the features to enable/disable in the following format:
 ```json
 {
-   "user_id": "user_id",
    "features": {
       "msc3026":true,
       "msc2654":true
