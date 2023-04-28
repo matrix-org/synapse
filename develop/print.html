@@ -16564,39 +16564,10 @@ def run_upgrade(
 <h2 id="boolean-columns"><a class="header" href="#boolean-columns">Boolean columns</a></h2>
 <p>Boolean columns require special treatment, since SQLite treats booleans the
 same as integers.</p>
-<p>There are three separate aspects to this:</p>
-<ul>
-<li>
 <p>Any new boolean column must be added to the <code>BOOLEAN_COLUMNS</code> list in
 <code>synapse/_scripts/synapse_port_db.py</code>. This tells the port script to cast
 the integer value from SQLite to a boolean before writing the value to the
 postgres database.</p>
-</li>
-<li>
-<p>Before SQLite 3.23, <code>TRUE</code> and <code>FALSE</code> were not recognised as constants by
-SQLite, and the <code>IS [NOT] TRUE</code>/<code>IS [NOT] FALSE</code> operators were not
-supported. This makes it necessary to avoid using <code>TRUE</code> and <code>FALSE</code>
-constants in SQL commands.</p>
-<p>For example, to insert a <code>TRUE</code> value into the database, write:</p>
-<pre><code class="language-python">txn.execute(&quot;INSERT INTO tbl(col) VALUES (?)&quot;, (True, ))
-</code></pre>
-</li>
-<li>
-<p>Default values for new boolean columns present a particular
-difficulty. Generally it is best to create separate schema files for
-Postgres and SQLite. For example:</p>
-<pre><code class="language-sql"># in 00delta.sql.postgres:
-ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT FALSE;
-</code></pre>
-<pre><code class="language-sql"># in 00delta.sql.sqlite:
-ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT 0;
-</code></pre>
-<p>Note that there is a particularly insidious failure mode here: the Postgres
-flavour will be accepted by SQLite 3.22, but will give a column whose
-default value is the <strong>string</strong> <code>&quot;FALSE&quot;</code> - which, when cast back to a boolean
-in Python, evaluates to <code>True</code>.</p>
-</li>
-</ul>
 <h2 id="event_id-global-uniqueness"><a class="header" href="#event_id-global-uniqueness"><code>event_id</code> global uniqueness</a></h2>
 <p><code>event_id</code>'s can be considered globally unique although there has been a lot of
 debate on this topic in places like
