@@ -20,6 +20,7 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.logging.context import make_deferred_yieldable
 from synapse.push import PusherConfig, PusherConfigException
+from synapse.rest.admin.experimental_features import ExperimentalFeature
 from synapse.rest.client import login, push_rule, pusher, receipts, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -829,7 +830,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # enable msc3881 per_user flag
         self.get_success(
-            self.hs.get_datastores().main.set_feature_for_user(user_id, "msc3881", True)
+            self.hs.get_datastores().main.set_features_for_user(
+                user_id, {ExperimentalFeature.MSC3881: True}
+            )
         )
 
         # Send a message and check that it generated a push.
@@ -863,7 +866,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # enable msc3881 per_user flag
         self.get_success(
-            self.hs.get_datastores().main.set_feature_for_user(user_id, "msc3881", True)
+            self.hs.get_datastores().main.set_features_for_user(
+                user_id, {ExperimentalFeature.MSC3881: True}
+            )
         )
 
         # Send a message and check that it did not generate a push.
@@ -897,7 +902,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # enable msc3881 per_user flag
         self.get_success(
-            self.hs.get_datastores().main.set_feature_for_user(user_id, "msc3881", True)
+            self.hs.get_datastores().main.set_features_for_user(
+                user_id, {ExperimentalFeature.MSC3881: True}
+            )
         )
 
         channel = self.make_request("GET", "/pushers", access_token=access_token)
@@ -944,7 +951,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # enable msc3881 per_user flag
         self.get_success(
-            self.hs.get_datastores().main.set_feature_for_user(user, "msc3881", True)
+            self.hs.get_datastores().main.set_features_for_user(
+                user, {ExperimentalFeature.MSC3881: True}
+            )
         )
 
         # We create the pusher with an HTTP request rather than with

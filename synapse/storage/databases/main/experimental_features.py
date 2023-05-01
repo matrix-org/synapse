@@ -104,4 +104,4 @@ class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
             res["enabled"] = True
 
         return res["enabled"]
->>>>>>> 6c2267f83d... add a db function to tell if just one feature is enabled
+

@@ -36,6 +36,7 @@ from synapse.handlers.presence import (
     handle_update,
 )
 from synapse.rest import admin
+from synapse.rest.admin.experimental_features import ExperimentalFeature
 from synapse.rest.client import room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID, get_domain_from_id
@@ -514,9 +515,14 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
 
 class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
+    servlets = [
+        admin.register_servlets,
+    ]
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
+        self.user = self.register_user("test", "pass")
 
     def test_external_process_timeout(self) -> None:
         """Test that if an external process doesn't update the records for a while
@@ -734,13 +740,12 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             test_with_workers: If True, check the presence state of the user by calling
                 /sync against a worker, rather than the main process.
         """
-        user_id = "@test:server"
         status_msg = "I'm busy!"
 
         # set busy state in db
         self.get_success(
-            self.hs.get_datastores().main.set_feature_for_user(
-                user_id, "msc_3026", True
+            self.hs.get_datastores().main.set_features_for_user(
+                self.user, {ExperimentalFeature.MSC3026: True}
             )
         )
 
@@ -755,20 +760,22 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             )
 
         # Set presence to BUSY
-        self._set_presencestate_with_status_msg(user_id, PresenceState.BUSY, status_msg)
+        self._set_presencestate_with_status_msg(
+            self.user, PresenceState.BUSY, status_msg
+        )
 
         # Perform a sync with a presence state other than busy. This should NOT change
         # our presence status; we only change from busy if we explicitly set it via
         # /presence/*.
         self.get_success(
             worker_to_sync_against.get_presence_handler().user_syncing(
-                user_id, True, PresenceState.ONLINE
+                self.user, True, PresenceState.ONLINE
             )
         )
 
         # Check against the main process that the user's presence did not change.
         state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
+            self.presence_handler.get_state(UserID.from_string(self.user))
         )
         # we should still be busy
         self.assertEqual(state.state, PresenceState.BUSY)

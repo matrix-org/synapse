@@ -23,6 +23,7 @@ from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes
 from synapse.rest import admin
+from synapse.rest.admin.experimental_features import ExperimentalFeature
 from synapse.rest.client import keys, login
 from synapse.types import JsonDict
 
@@ -217,8 +218,8 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
 
         # enable msc3967 in db
         self.get_success(
-            self.hs.get_datastores().main.set_feature_for_user(
-                alice_id, "msc3967", True
+            self.hs.get_datastores().main.set_features_for_user(
+                alice_id, {ExperimentalFeature.MSC3967: True}
             )
         )
 

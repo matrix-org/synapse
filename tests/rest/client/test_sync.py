@@ -28,6 +28,7 @@ from synapse.api.constants import (
     ReceiptTypes,
     RelationTypes,
 )
+from synapse.rest.admin.experimental_features import ExperimentalFeature
 from synapse.rest.client import devices, knock, login, read_marker, receipts, room, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -588,8 +589,8 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
         # add per-user flag to the DB
         self.get_success(
-            self.hs.get_datastores().main.set_feature_for_user(
-                self.user_id, "msc2654", True
+            self.hs.get_datastores().main.set_features_for_user(
+                self.user_id, {ExperimentalFeature.MSC2654: True}
             )
         )
 
