@@ -73,3 +73,35 @@ class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
             )
 
             await self.invalidate_cache_and_stream("list_enabled_features", (user,))
+
+    async def get_feature_enabled(self, user_id: str, feature: str) -> bool:
+        """
+        Checks to see if a given feature is enabled for the user
+        Args:
+            user:
+                the user to be queried on
+            feature:
+                the feature in question
+        Returns:
+                True if the feature is enabled, False if it is not or if the feature was
+                not found.
+        """
+
+        res = await self.db_pool.simple_select_one(
+            "per_user_experimental_features",
+            {"user_id": user_id, "feature": feature},
+            ["enabled"],
+            allow_none=True,
+        )
+
+        if not res:
+            res = {"enabled": False}
+
+        # Deal with Sqlite boolean return values
+        if res["enabled"] == 0:
+            res["enabled"] = False
+        if res["enabled"] == 1:
+            res["enabled"] = True
+
+        return res["enabled"]
+>>>>>>> 6c2267f83d... add a db function to tell if just one feature is enabled
