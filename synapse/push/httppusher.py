@@ -24,13 +24,13 @@ from twisted.web.client import HTTPConnectionPool
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
+from synapse.http.client import SimpleHttpClient
 from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.storage.databases.main.event_push_actions import HttpPushAction
 from synapse.types import JsonDict, JsonMapping
 
-from ..http.client import SimpleHttpClient
 from . import push_tools
 
 if TYPE_CHECKING:
