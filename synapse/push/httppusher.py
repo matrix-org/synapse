@@ -20,6 +20,7 @@ from prometheus_client import Counter
 
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 from twisted.internet.interfaces import IDelayedCall
+from twisted.web.client import HTTPConnectionPool
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
@@ -29,6 +30,7 @@ from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.storage.databases.main.event_push_actions import HttpPushAction
 from synapse.types import JsonDict, JsonMapping
 
+from ..http.client import SimpleHttpClient
 from . import push_tools
 
 if TYPE_CHECKING:
@@ -140,7 +142,25 @@ class HttpPusher(Pusher):
             )
 
         self.url = url
-        self.http_client = hs.get_proxied_blacklisted_http_client()
+
+        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
+        # do so in batches, so we need to allow the pool to keep lots of idle
+        # connections around.
+        pool = HTTPConnectionPool(hs.get_reactor())
+        # XXX: The justification for using the cache factor here is that larger
+        # instances will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
+        pool.cachedConnectionTimeout = 2 * 60
+
+        self.http_client = SimpleHttpClient(
+            hs,
+            ip_whitelist=hs.config.server.ip_range_whitelist,
+            ip_blacklist=hs.config.server.ip_range_blacklist,
+            use_proxy=True,
+            connection_pool=pool,
+        )
+
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
         del self.data_minus_url["url"]
