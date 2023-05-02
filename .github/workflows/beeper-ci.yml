@@ -44,8 +44,8 @@ jobs:
       volumes:
         - ${{ github.workspace }}:/src
       env:
-        # Pinned at: https://github.com/matrix-org/sytest/commit/5727f78f77d10b5e3ece5bfc3054eac86fc691d1
-        SYTEST_BRANCH: 5727f78f77d10b5e3ece5bfc3054eac86fc691d1
+        # Pinned at: https://github.com/matrix-org/sytest/commit/3b0208a1ced1da95d46d88881ebe90f5696b8e27
+        SYTEST_BRANCH: 3b0208a1ced1da95d46d88881ebe90f5696b8e27
         TOP: ${{ github.workspace }}
         POSTGRES: 1
         MULTI_POSTGRES: 1
