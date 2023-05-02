@@ -3444,7 +3444,7 @@ This option has a number of sub-options. They are as follows:
    of unread messages.
 * `jitter_delay`: Delays push notifications by a random amount up to the given
   duration. Useful for mitigating timing attacks. Optional, defaults to no
-  delay.
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
