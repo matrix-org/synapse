@@ -2100,6 +2100,14 @@ class RoomForgetterHandler(StateDeltasHandler):
                 )
                 self.pos = room_max_stream_ordering
 
+        if not self._hs.config.room.forget_on_leave:
+            # Update the processing position, so that if the server admin turns the
+            # feature on at a later date, we don't decide to forget every room that
+            # has ever been left in the past.
+            self.pos = self._store.get_room_max_stream_ordering()
+            await self._store.update_room_forgetter_stream_pos(self.pos)
+            return
+
         # Loop round handling deltas until we're up to date
 
         while True:
@@ -2113,21 +2121,15 @@ class RoomForgetterHandler(StateDeltasHandler):
             logger.debug(
                 "Processing room forgetting %s->%s", self.pos, room_max_stream_ordering
             )
-            if self._hs.config.room.forget_on_leave:
-                (
-                    max_pos,
-                    deltas,
-                ) = await self._storage_controllers.state.get_current_state_deltas(
-                    self.pos, room_max_stream_ordering
-                )
+            (
+                max_pos,
+                deltas,
+            ) = await self._storage_controllers.state.get_current_state_deltas(
+                self.pos, room_max_stream_ordering
+            )
 
-                logger.debug("Handling %d state deltas", len(deltas))
-                await self._handle_deltas(deltas)
-            else:
-                # Update the processing position, so that if the server admin turns the
-                # feature on at a later date, we don't decide to forget every room that
-                # has ever been left in the past.
-                pass
+            logger.debug("Handling %d state deltas", len(deltas))
+            await self._handle_deltas(deltas)
 
             self.pos = max_pos
 
