@@ -1,10 +1,12 @@
 # Experimental Features API
 
 This API allows a server administrator to enable or disable some experimental features on a per-user
-basis. Currently supported features are [msc3026](https://github.com/matrix-org/matrix-spec-proposals/pull/3026): busy 
-presence state enabled, [msc2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654): enable unread counts,
-[msc3881](https://github.com/matrix-org/matrix-spec-proposals/pull/3881): enable remotely toggling push notifications 
-for another client, and [msc3967](https://github.com/matrix-org/matrix-spec-proposals/pull/3967): do not require
+basis. The currently supported features are: 
+- [MSC3026](https://github.com/matrix-org/matrix-spec-proposals/pull/3026): busy 
+presence state enabled
+- [MSC3881](https://github.com/matrix-org/matrix-spec-proposals/pull/3881): enable remotely toggling push notifications 
+for another client 
+- [MSC3967](https://github.com/matrix-org/matrix-spec-proposals/pull/3967): do not require
 UIA when first uploading cross-signing keys. 
 
 
@@ -19,7 +21,7 @@ provide a body containing the user id and listing the features to enable/disable
 {
    "features": {
       "msc3026":true,
-      "msc2654":true
+      "msc3881":true
    }
 }
 ```
@@ -46,7 +48,6 @@ user like so:
 {
    "features": {
       "msc3026": true,
-      "msc2654": true,
       "msc3881": false,
       "msc3967": false
    }
