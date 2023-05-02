@@ -104,4 +104,3 @@ class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
             res["enabled"] = True
 
         return res["enabled"]
-
