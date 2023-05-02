@@ -414,7 +414,6 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
                 event.event_id,
                 dict(push_actions),
                 {user_id: False for user_id, _ in push_actions},
-                False,
                 "main",
             )
         )

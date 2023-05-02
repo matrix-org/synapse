@@ -169,7 +169,6 @@ class UrlPreviewer:
             ip_whitelist=hs.config.media.url_preview_ip_range_whitelist,
             ip_blacklist=hs.config.media.url_preview_ip_range_blacklist,
             use_proxy=True,
-            user_agent=f"{hs.version_string} UrlPreviewBot",
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
