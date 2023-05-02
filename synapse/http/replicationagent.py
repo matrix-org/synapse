@@ -63,7 +63,7 @@ class ReplicationEndpointFactory:
 
         Returns: The correct client endpoint object
         """
-        if b"http" in uri.scheme:
+        if uri.scheme in (b"http", b"https"):
             endpoint = HostnameEndpoint(self.reactor, uri.host, uri.port)
             if uri.scheme == b"https":
                 endpoint = wrapClientTLS(
@@ -71,7 +71,7 @@ class ReplicationEndpointFactory:
                 )
             return endpoint
         else:
-            raise SchemeNotSupported()
+            raise SchemeNotSupported(f"Unsupported scheme: {uri.scheme!r}")
 
 
 @implementer(IAgent)

@@ -821,10 +821,8 @@ class SimpleHttpClient(BaseHttpClient):
 
 
 class SimpleReplicationClient(BaseHttpClient):
-    """No frills client for connecting to Replication endpoints.
+    """Client for connecting to replication endpoints via HTTP and HTTPS.
 
-    Uses existing BaseHttpClient methods but replaces the 'agent' used to make the
-    request with one that supports HTTP and HTTPS.
     Attributes:
         agent: The custom Twisted Agent used for constructing the connection.
     """
