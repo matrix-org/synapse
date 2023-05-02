@@ -35,7 +35,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         )
         return hs
 
-    async def test_set_avatar(self) -> None:
+    def test_set_avatar(self) -> None:
         """Tests successfully setting the avatar of a newly created user"""
         handler = self.hs.get_sso_handler()
 
@@ -54,7 +54,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         self.assertIsNot(profile["avatar_url"], None)
 
     @unittest.override_config({"max_avatar_size": 1})
-    async def test_set_avatar_too_big_image(self) -> None:
+    def test_set_avatar_too_big_image(self) -> None:
         """Tests that saving an avatar fails when it is too big"""
         handler = self.hs.get_sso_handler()
 
@@ -66,7 +66,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
         )
 
     @unittest.override_config({"allowed_avatar_mimetypes": ["image/jpeg"]})
-    async def test_set_avatar_incorrect_mime_type(self) -> None:
+    def test_set_avatar_incorrect_mime_type(self) -> None:
         """Tests that saving an avatar fails when its mime type is not allowed"""
         handler = self.hs.get_sso_handler()
 
@@ -77,7 +77,7 @@ class TestSSOHandler(unittest.HomeserverTestCase):
             self.get_success(handler.set_avatar(user_id, "http://my.server/me.png"))
         )
 
-    async def test_skip_saving_avatar_when_not_changed(self) -> None:
+    def test_skip_saving_avatar_when_not_changed(self) -> None:
         """Tests whether saving of avatar correctly skips if the avatar hasn't
         changed"""
         handler = self.hs.get_sso_handler()

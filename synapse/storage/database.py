@@ -34,6 +34,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -57,7 +58,7 @@ from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Connection, Cursor
+from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter
 
@@ -98,6 +99,15 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "receipts_linearized": "receipts_linearized_unique_index",
     "receipts_graph": "receipts_graph_unique_index",
 }
+
+
+class _PoolConnection(Connection):
+    """
+    A Connection from twisted.enterprise.adbapi.Connection.
+    """
+
+    def reconnect(self) -> None:
+        ...
 
 
 def make_pool(
@@ -361,10 +371,18 @@ class LoggingTransaction:
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
 
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_batch
+            # suggests each arg in args should be a sequence or mapping
             self._do_execute(
                 lambda the_sql: execute_batch(self.txn, the_sql, args), sql
             )
         else:
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#sqlite3.Cursor.executemany
+            # suggests that the outer collection may be iterable, but
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#how-to-use-placeholders-to-bind-values-in-sql-queries
+            # suggests that the inner collection should be a sequence or dict.
             self.executemany(sql, args)
 
     def execute_values(
@@ -380,14 +398,20 @@ class LoggingTransaction:
         from psycopg2.extras import execute_values
 
         return self._do_execute(
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
             lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
             sql,
         )
 
-    def execute(self, sql: str, *args: Any) -> None:
-        self._do_execute(self.txn.execute, sql, *args)
+    def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
+        self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
+        # TODO: we should add a type for *args here. Looking at Cursor.executemany
+        # and DBAPI2 it ought to be Sequence[_Parameter], but we pass in
+        # Iterable[Iterable[Any]] in execute_batch and execute_values above, which mypy
+        # complains about.
         self._do_execute(self.txn.executemany, sql, *args)
 
     def executescript(self, sql: str) -> None:
@@ -856,7 +880,8 @@ class DatabasePool:
             try:
                 with opentracing.start_active_span(f"db.{desc}"):
                     result = await self.runWithConnection(
-                        self.new_transaction,
+                        # mypy seems to have an issue with this, maybe a bug?
+                        self.new_transaction,  # type: ignore[arg-type]
                         desc,
                         after_callbacks,
                         async_after_callbacks,
@@ -892,7 +917,7 @@ class DatabasePool:
 
     async def runWithConnection(
         self,
-        func: Callable[..., R],
+        func: Callable[Concatenate[LoggingDatabaseConnection, P], R],
         *args: Any,
         db_autocommit: bool = False,
         isolation_level: Optional[int] = None,
@@ -926,7 +951,7 @@ class DatabasePool:
 
         start_time = monotonic_time()
 
-        def inner_func(conn, *args, **kwargs):
+        def inner_func(conn: _PoolConnection, *args: P.args, **kwargs: P.kwargs) -> R:
             # We shouldn't be in a transaction. If we are then something
             # somewhere hasn't committed after doing work. (This is likely only
             # possible during startup, as `run*` will ensure changes are
@@ -1019,7 +1044,7 @@ class DatabasePool:
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
         *args: Any,
-    ) -> R:
+    ) -> Union[List[Tuple[Any, ...]], R]:
         """Runs a single query for a result set.
 
         Args:
@@ -1032,7 +1057,7 @@ class DatabasePool:
             The result of decoder(results)
         """
 
-        def interaction(txn):
+        def interaction(txn: LoggingTransaction) -> Union[List[Tuple[Any, ...]], R]:
             txn.execute(query, args)
             if decoder:
                 return decoder(txn)
@@ -1493,8 +1518,8 @@ class DatabasePool:
         self.engine.lock_table(txn, "user_ips")
 
         for keyv, valv in zip(key_values, value_values):
-            _keys = {x: y for x, y in zip(key_names, keyv)}
-            _vals = {x: y for x, y in zip(value_names, valv)}
+            _keys = dict(zip(key_names, keyv))
+            _vals = dict(zip(value_names, valv))
 
             self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=False)
 

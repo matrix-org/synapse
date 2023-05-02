@@ -72,6 +72,8 @@ class LoginResponse(TypedDict, total=False):
 
 class LoginRestServlet(RestServlet):
     PATTERNS = client_patterns("/login$", v1=True)
+    CATEGORY = "Registration/login requests"
+
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
@@ -537,6 +539,7 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
 
 class RefreshTokenServlet(RestServlet):
     PATTERNS = client_patterns("/refresh$")
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()
@@ -590,6 +593,7 @@ class SsoRedirectServlet(RestServlet):
             + "/(r0|v3)/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$"
         )
     ]
+    CATEGORY = "SSO requests needed for all SSO providers"
 
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
@@ -666,9 +670,17 @@ class CasTicketServlet(RestServlet):
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
-    if hs.config.registration.refreshable_access_token_lifetime is not None:
+    if (
+        hs.config.worker.worker_app is None
+        and hs.config.registration.refreshable_access_token_lifetime is not None
+    ):
         RefreshTokenServlet(hs).register(http_server)
-    SsoRedirectServlet(hs).register(http_server)
+    if (
+        hs.config.cas.cas_enabled
+        or hs.config.saml2.saml2_enabled
+        or hs.config.oidc.oidc_enabled
+    ):
+        SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
 

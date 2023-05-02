@@ -46,6 +46,13 @@ from twisted.internet import defer, interfaces
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
 from twisted.web import resource
+
+try:
+    from twisted.web.pages import notFound
+except ImportError:
+    from twisted.web.resource import NoResource as notFound  # type: ignore[assignment]
+
+from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import File
 from twisted.web.util import redirectTo
@@ -569,6 +576,9 @@ class StaticResource(File):
         set_clickjacking_protection_headers(request)
         return super().render_GET(request)
 
+    def directoryListing(self) -> IResource:
+        return notFound()
+
 
 class UnrecognizedRequestResource(resource.Resource):
     """
@@ -891,6 +901,10 @@ def set_cors_headers(request: SynapseRequest) -> None:
         request.setHeader(
             b"Access-Control-Allow-Headers",
             b"X-Requested-With, Content-Type, Authorization, Date",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"Synapse-Trace-Id",
         )
 
 

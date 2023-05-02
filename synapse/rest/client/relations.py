@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 from synapse.api.constants import Direction
 from synapse.handlers.relations import ThreadsListInclude
 from synapse.http.server import HttpServer
-from synapse.http.servlet import RestServlet, parse_integer, parse_string
+from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.storage.databases.main.relations import ThreadsNextBatch
@@ -42,12 +42,14 @@ class RelationPaginationServlet(RestServlet):
         "(/(?P<relation_type>[^/]*)(/(?P<event_type>[^/]*))?)?$",
         releases=("v1",),
     )
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self._store = hs.get_datastores().main
         self._relations_handler = hs.get_relations_handler()
+        self._support_recurse = hs.config.experimental.msc3981_recurse_relations
 
     async def on_GET(
         self,
@@ -62,6 +64,12 @@ class RelationPaginationServlet(RestServlet):
         pagination_config = await PaginationConfig.from_request(
             self._store, request, default_limit=5, default_dir=Direction.BACKWARDS
         )
+        if self._support_recurse:
+            recurse = parse_boolean(
+                request, "org.matrix.msc3981.recurse", default=False
+            )
+        else:
+            recurse = False
 
         # The unstable version of this API returns an extra field for client
         # compatibility, see https://github.com/matrix-org/synapse/issues/12930.
@@ -74,6 +82,7 @@ class RelationPaginationServlet(RestServlet):
             event_id=parent_id,
             room_id=room_id,
             pagin_config=pagination_config,
+            recurse=recurse,
             include_original_event=include_original_event,
             relation_type=relation_type,
             event_type=event_type,
@@ -84,6 +93,7 @@ class RelationPaginationServlet(RestServlet):
 
 class ThreadsServlet(RestServlet):
     PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/threads"),)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

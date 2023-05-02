@@ -778,17 +778,13 @@ def parse_json_object_from_request(
 Model = TypeVar("Model", bound=BaseModel)
 
 
-def parse_and_validate_json_object_from_request(
-    request: Request, model_type: Type[Model]
-) -> Model:
-    """Parse a JSON object from the body of a twisted HTTP request, then deserialise and
-    validate using the given pydantic model.
+def validate_json_object(content: JsonDict, model_type: Type[Model]) -> Model:
+    """Validate a deserialized JSON object using the given pydantic model.
 
     Raises:
         SynapseError if the request body couldn't be decoded as JSON or
             if it wasn't a JSON object.
     """
-    content = parse_json_object_from_request(request, allow_empty_body=False)
     try:
         instance = model_type.parse_obj(content)
     except ValidationError as e:
@@ -809,6 +805,20 @@ def parse_and_validate_json_object_from_request(
         raise SynapseError(HTTPStatus.BAD_REQUEST, str(e), errcode=errcode)
 
     return instance
+
+
+def parse_and_validate_json_object_from_request(
+    request: Request, model_type: Type[Model]
+) -> Model:
+    """Parse a JSON object from the body of a twisted HTTP request, then deserialise and
+    validate using the given pydantic model.
+
+    Raises:
+        SynapseError if the request body couldn't be decoded as JSON or
+            if it wasn't a JSON object.
+    """
+    content = parse_json_object_from_request(request, allow_empty_body=False)
+    return validate_json_object(content, model_type)
 
 
 def assert_params_in_dict(body: JsonDict, required: Iterable[str]) -> None:

@@ -70,7 +70,9 @@ from synapse.logging.opentracing import (
     trace,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
+from synapse.replication.http.devices import (
+    ReplicationMultiUserDevicesResyncRestServlet,
+)
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
@@ -140,6 +142,7 @@ class FederationEventHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
@@ -166,8 +169,8 @@ class FederationEventHandler:
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
         if hs.config.worker.worker_app:
-            self._user_device_resync = (
-                ReplicationUserDevicesResyncRestServlet.make_client(hs)
+            self._multi_user_device_resync = (
+                ReplicationMultiUserDevicesResyncRestServlet.make_client(hs)
             )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
@@ -583,7 +586,7 @@ class FederationEventHandler:
 
             await self._check_event_auth(origin, event, context)
             if context.rejected:
-                raise SynapseError(400, "Join event was rejected")
+                raise SynapseError(403, "Join event was rejected")
 
             # the remote server is responsible for sending our join event to the rest
             # of the federation. Indeed, attempting to do so will result in problems
@@ -1038,8 +1041,8 @@ class FederationEventHandler:
 
         Raises:
             FederationPullAttemptBackoffError if we are are deliberately not attempting
-                to pull the given event over federation because we've already done so
-                recently and are backing off.
+                to pull one of the given event's `prev_event`s over federation because
+                we've already done so recently and are backing off.
             FederationError if we fail to get the state from the remote server after any
                 missing `prev_event`s.
         """
@@ -1053,13 +1056,22 @@ class FederationEventHandler:
         # If we've already recently attempted to pull this missing event, don't
         # try it again so soon. Since we have to fetch all of the prev_events, we can
         # bail early here if we find any to ignore.
-        prevs_to_ignore = await self._store.get_event_ids_to_not_pull_from_backoff(
-            room_id, missing_prevs
+        prevs_with_pull_backoff = (
+            await self._store.get_event_ids_to_not_pull_from_backoff(
+                room_id, missing_prevs
+            )
         )
-        if len(prevs_to_ignore) > 0:
+        if len(prevs_with_pull_backoff) > 0:
             raise FederationPullAttemptBackoffError(
-                event_ids=prevs_to_ignore,
-                message=f"While computing context for event={event_id}, not attempting to pull missing prev_event={prevs_to_ignore[0]} because we already tried to pull recently (backing off).",
+                event_ids=prevs_with_pull_backoff.keys(),
+                message=(
+                    f"While computing context for event={event_id}, not attempting to "
+                    f"pull missing prev_events={list(prevs_with_pull_backoff.keys())} "
+                    "because we already tried to pull recently (backing off)."
+                ),
+                retry_after_ms=(
+                    max(prevs_with_pull_backoff.values()) - self._clock.time_msec()
+                ),
             )
 
         if not missing_prevs:
@@ -1477,9 +1489,11 @@ class FederationEventHandler:
 
             # Immediately attempt a resync in the background
             if self._config.worker.worker_app:
-                await self._user_device_resync(user_id=sender)
+                await self._multi_user_device_resync(user_ids=[sender])
             else:
-                await self._device_list_updater.user_device_resync(sender)
+                await self._device_list_updater.multi_user_device_resync(
+                    user_ids=[sender]
+                )
         except Exception:
             logger.exception("Failed to resync device for %s", sender)
 
@@ -1505,7 +1519,10 @@ class FederationEventHandler:
         # support it or the event is not from the room creator.
         room_version = await self._store.get_room_version(marker_event.room_id)
         create_event = await self._store.get_create_event_for_room(marker_event.room_id)
-        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        if not room_version.msc2175_implicit_room_creator:
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        else:
+            room_creator = create_event.sender
         if not room_version.msc2716_historical and (
             not self._config.experimental.msc2716_enabled
             or marker_event.sender != room_creator

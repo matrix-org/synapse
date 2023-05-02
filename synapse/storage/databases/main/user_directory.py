@@ -54,6 +54,7 @@ from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import (
     JsonDict,
+    UserID,
     UserProfile,
     get_domain_from_id,
     get_localpart_from_id,
@@ -101,44 +102,34 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     ) -> int:
         # Get all the rooms that we want to process.
         def _make_staging_area(txn: LoggingTransaction) -> None:
-            sql = (
-                "CREATE TABLE IF NOT EXISTS "
-                + TEMP_TABLE
-                + "_rooms(room_id TEXT NOT NULL, events BIGINT NOT NULL)"
-            )
-            txn.execute(sql)
-
-            sql = (
-                "CREATE TABLE IF NOT EXISTS "
-                + TEMP_TABLE
-                + "_position(position TEXT NOT NULL)"
-            )
-            txn.execute(sql)
-
-            # Get rooms we want to process from the database
-            sql = """
-                SELECT room_id, count(*) FROM current_state_events
+            sql = f"""
+                CREATE TABLE IF NOT EXISTS {TEMP_TABLE}_rooms AS
+                SELECT room_id, count(*) AS events
+                FROM current_state_events
                 GROUP BY room_id
             """
             txn.execute(sql)
-            rooms = list(txn.fetchall())
-            self.db_pool.simple_insert_many_txn(
-                txn, TEMP_TABLE + "_rooms", keys=("room_id", "events"), values=rooms
+            txn.execute(
+                f"CREATE INDEX IF NOT EXISTS {TEMP_TABLE}_rooms_rm ON {TEMP_TABLE}_rooms (room_id)"
             )
-            del rooms
+            txn.execute(
+                f"CREATE INDEX IF NOT EXISTS {TEMP_TABLE}_rooms_evs ON {TEMP_TABLE}_rooms (events)"
+            )
 
-            sql = (
-                "CREATE TABLE IF NOT EXISTS "
-                + TEMP_TABLE
-                + "_users(user_id TEXT NOT NULL)"
-            )
+            sql = f"""
+                CREATE TABLE IF NOT EXISTS {TEMP_TABLE}_position (
+                    position TEXT NOT NULL
+                )
+            """
             txn.execute(sql)
 
-            txn.execute("SELECT name FROM users")
-            users = list(txn.fetchall())
-
-            self.db_pool.simple_insert_many_txn(
-                txn, TEMP_TABLE + "_users", keys=("user_id",), values=users
+            sql = f"""
+                CREATE TABLE IF NOT EXISTS {TEMP_TABLE}_users AS
+                SELECT name AS user_id FROM users
+            """
+            txn.execute(sql)
+            txn.execute(
+                f"CREATE INDEX IF NOT EXISTS {TEMP_TABLE}_users_idx ON {TEMP_TABLE}_users (user_id)"
             )
 
         new_pos = await self.get_max_stream_id_in_current_state_deltas()
@@ -221,12 +212,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             if not rooms_to_work_on:
                 return None
 
-            # Get how many are left to process, so we can give status on how
-            # far we are in processing
-            txn.execute("SELECT COUNT(*) FROM " + TEMP_TABLE + "_rooms")
-            result = txn.fetchone()
-            assert result is not None
-            progress["remaining"] = result[0]
+            if "remaining" not in progress:
+                # Get how many are left to process, so we can give status on how
+                # far we are in processing
+                txn.execute("SELECT COUNT(*) FROM " + TEMP_TABLE + "_rooms")
+                result = txn.fetchone()
+                assert result is not None
+                progress["remaining"] = result[0]
 
             return rooms_to_work_on
 
@@ -331,7 +323,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
             if processed_event_count > batch_size:
                 # Don't process any more rooms, we've hit our batch size.
-                return processed_event_count
+                break
+
+        await self.db_pool.runInteraction(
+            "populate_user_directory",
+            self.db_pool.updates._background_update_progress_txn,
+            "populate_user_directory_process_rooms",
+            progress,
+        )
 
         return processed_event_count
 
@@ -355,13 +354,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
             users_to_work_on = [x[0] for x in user_result]
 
-            # Get how many are left to process, so we can give status on how
-            # far we are in processing
-            sql = "SELECT COUNT(*) FROM " + TEMP_TABLE + "_users"
-            txn.execute(sql)
-            count_result = txn.fetchone()
-            assert count_result is not None
-            progress["remaining"] = count_result[0]
+            if "remaining" not in progress:
+                # Get how many are left to process, so we can give status on how
+                # far we are in processing
+                sql = "SELECT COUNT(*) FROM " + TEMP_TABLE + "_users"
+                txn.execute(sql)
+                count_result = txn.fetchone()
+                assert count_result is not None
+                progress["remaining"] = count_result[0]
 
             return users_to_work_on
 
@@ -473,11 +473,116 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return False
 
+    async def set_remote_user_profile_in_user_dir_stale(
+        self, user_id: str, next_try_at_ms: int, retry_counter: int
+    ) -> None:
+        """
+        Marks a remote user as having a possibly-stale user directory profile.
+
+        Args:
+            user_id: the remote user who may have a stale profile on this server.
+            next_try_at_ms: timestamp in ms after which the user directory profile can be
+                refreshed.
+            retry_counter: number of failures in refreshing the profile so far. Used for
+                exponential backoff calculations.
+        """
+        assert not self.hs.is_mine_id(
+            user_id
+        ), "Can't mark a local user as a stale remote user."
+
+        server_name = UserID.from_string(user_id).domain
+
+        await self.db_pool.simple_upsert(
+            table="user_directory_stale_remote_users",
+            keyvalues={"user_id": user_id},
+            values={
+                "next_try_at_ts": next_try_at_ms,
+                "retry_counter": retry_counter,
+                "user_server_name": server_name,
+            },
+            desc="set_remote_user_profile_in_user_dir_stale",
+        )
+
+    async def clear_remote_user_profile_in_user_dir_stale(self, user_id: str) -> None:
+        """
+        Marks a remote user as no longer having a possibly-stale user directory profile.
+
+        Args:
+            user_id: the remote user who no longer has a stale profile on this server.
+        """
+        await self.db_pool.simple_delete(
+            table="user_directory_stale_remote_users",
+            keyvalues={"user_id": user_id},
+            desc="clear_remote_user_profile_in_user_dir_stale",
+        )
+
+    async def get_remote_servers_with_profiles_to_refresh(
+        self, now_ts: int, limit: int
+    ) -> List[str]:
+        """
+        Get a list of up to `limit` server names which have users whose
+        locally-cached profiles we believe to be stale
+        and are refreshable given the current time `now_ts` in milliseconds.
+        """
+
+        def _get_remote_servers_with_refreshable_profiles_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
+            sql = """
+                SELECT user_server_name
+                FROM user_directory_stale_remote_users
+                WHERE next_try_at_ts < ?
+                GROUP BY user_server_name
+                ORDER BY MIN(next_try_at_ts), user_server_name
+                LIMIT ?
+            """
+            txn.execute(sql, (now_ts, limit))
+            return [row[0] for row in txn]
+
+        return await self.db_pool.runInteraction(
+            "get_remote_servers_with_profiles_to_refresh",
+            _get_remote_servers_with_refreshable_profiles_txn,
+        )
+
+    async def get_remote_users_to_refresh_on_server(
+        self, server_name: str, now_ts: int, limit: int
+    ) -> List[Tuple[str, int, int]]:
+        """
+        Get a list of up to `limit` user IDs from the server `server_name`
+        whose locally-cached profiles we believe to be stale
+        and are refreshable given the current time `now_ts` in milliseconds.
+
+        Returns:
+            tuple of:
+                - User ID
+                - Retry counter (number of failures so far)
+                - Time the retry is scheduled for, in milliseconds
+        """
+
+        def _get_remote_users_to_refresh_on_server_txn(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[str, int, int]]:
+            sql = """
+                SELECT user_id, retry_counter, next_try_at_ts
+                FROM user_directory_stale_remote_users
+                WHERE user_server_name = ? AND next_try_at_ts < ?
+                ORDER BY next_try_at_ts
+                LIMIT ?
+            """
+            txn.execute(sql, (server_name, now_ts, limit))
+            return cast(List[Tuple[str, int, int]], txn.fetchall())
+
+        return await self.db_pool.runInteraction(
+            "get_remote_users_to_refresh_on_server",
+            _get_remote_users_to_refresh_on_server_txn,
+        )
+
     async def update_profile_in_user_dir(
         self, user_id: str, display_name: Optional[str], avatar_url: Optional[str]
     ) -> None:
         """
         Update or add a user's profile in the user directory.
+        If the user is remote, the profile will be marked as not stale.
         """
         # If the display name or avatar URL are unexpected types, replace with None.
         display_name = non_null_str_or_none(display_name)
@@ -490,6 +595,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 keyvalues={"user_id": user_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
             )
+
+            if not self.hs.is_mine_id(user_id):
+                # Remote users: Make sure the profile is not marked as stale anymore.
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    table="user_directory_stale_remote_users",
+                    keyvalues={"user_id": user_id},
+                )
 
             # The display name that goes into the database index.
             index_display_name = display_name
@@ -584,10 +697,17 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """Delete the entire user directory"""
 
         def _delete_all_from_user_dir_txn(txn: LoggingTransaction) -> None:
-            txn.execute("DELETE FROM user_directory")
-            txn.execute("DELETE FROM user_directory_search")
-            txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM users_who_share_private_rooms")
+            # SQLite doesn't support TRUNCATE.
+            # On Postgres, DELETE FROM does a table scan but TRUNCATE is more efficient.
+            truncate = (
+                "DELETE FROM"
+                if isinstance(self.database_engine, Sqlite3Engine)
+                else "TRUNCATE"
+            )
+            txn.execute(f"{truncate} user_directory")
+            txn.execute(f"{truncate} user_directory_search")
+            txn.execute(f"{truncate} users_in_public_rooms")
+            txn.execute(f"{truncate} users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
 
         await self.db_pool.runInteraction(

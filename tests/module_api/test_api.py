@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -21,6 +21,7 @@ from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
+from synapse.handlers.device import DeviceHandler
 from synapse.handlers.presence import UserPresenceState
 from synapse.handlers.push_rules import InvalidRuleException
 from synapse.module_api import ModuleApi
@@ -772,6 +773,54 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
 
         # Check room alias.
         self.assertIsNone(room_alias)
+
+    def test_on_logged_out(self) -> None:
+        """Test that on_logged_out module hook is properly called when logging out
+        a device, and that related pushers are still available at this time.
+        """
+        device_id = "AAAAAAA"
+        user_id = self.register_user("test_on_logged_out", "secret")
+        self.login("test_on_logged_out", "secret", device_id)
+
+        self.get_success(
+            self.hs.get_pusherpool().add_or_update_pusher(
+                user_id=user_id,
+                device_id=device_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={"url": "http://example.com/_matrix/push/v1/notify"},
+            )
+        )
+
+        # Setup a callback counting the number of pushers.
+        number_of_pushers_in_callback: Optional[int] = None
+
+        async def _on_logged_out_mock(
+            user_id: str, device_id: Optional[str], access_token: str
+        ) -> None:
+            nonlocal number_of_pushers_in_callback
+            number_of_pushers_in_callback = len(
+                self.hs.get_pusherpool().pushers[user_id].values()
+            )
+
+        self.module_api.register_password_auth_provider_callbacks(
+            on_logged_out=_on_logged_out_mock
+        )
+
+        # Delete the device.
+        device_handler = self.hs.get_device_handler()
+        assert isinstance(device_handler, DeviceHandler)
+        self.get_success(device_handler.delete_devices(user_id, [device_id]))
+
+        # Check that the callback was called and the pushers still existed.
+        self.assertEqual(number_of_pushers_in_callback, 1)
+
+        # Ensure the pushers were deleted after the callback.
+        self.assertEqual(len(self.hs.get_pusherpool().pushers[user_id].values()), 0)
 
 
 class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCase):

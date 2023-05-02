@@ -943,6 +943,8 @@ class SyncHandler:
 
                 timeline_state = {}
 
+                # Membership events to fetch that can be found in the room state, or in
+                # the case of partial state rooms, the auth events of timeline events.
                 members_to_fetch = set()
                 first_event_by_sender_map = {}
                 for event in batch.events:
@@ -964,9 +966,19 @@ class SyncHandler:
                     # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
                     # We only need apply this on full state syncs given we disabled
                     # LL for incr syncs in #3840.
-                    members_to_fetch.add(sync_config.user.to_string())
-
-                state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
+                    # We don't insert ourselves into `members_to_fetch`, because in some
+                    # rare cases (an empty event batch with a now_token after the user's
+                    # leave in a partial state room which another local user has
+                    # joined), the room state will be missing our membership and there
+                    # is no guarantee that our membership will be in the auth events of
+                    # timeline events when the room is partial stated.
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        members_to_fetch.union((sync_config.user.to_string(),))
+                    )
+                else:
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        members_to_fetch
+                    )
 
                 # We are happy to use partial state to compute the `/sync` response.
                 # Since partial state may not include the lazy-loaded memberships we
@@ -988,7 +1000,9 @@ class SyncHandler:
             # sync's timeline and the start of the current sync's timeline.
             # See the docstring above for details.
             state_ids: StateMap[str]
-
+            # We need to know whether the state we fetch may be partial, so check
+            # whether the room is partial stated *before* fetching it.
+            is_partial_state_room = await self.store.is_partial_state_room(room_id)
             if full_state:
                 if batch:
                     state_at_timeline_end = (
@@ -1119,7 +1133,7 @@ class SyncHandler:
             # If we only have partial state for the room, `state_ids` may be missing the
             # memberships we wanted. We attempt to find some by digging through the auth
             # events of timeline events.
-            if lazy_load_members and await self.store.is_partial_state_room(room_id):
+            if lazy_load_members and is_partial_state_room:
                 assert members_to_fetch is not None
                 assert first_event_by_sender_map is not None
 
@@ -1226,6 +1240,10 @@ class SyncHandler:
                 continue
 
             event_with_membership_auth = events_with_membership_auth[member]
+            is_create = (
+                event_with_membership_auth.is_state()
+                and event_with_membership_auth.type == EventTypes.Create
+            )
             is_join = (
                 event_with_membership_auth.is_state()
                 and event_with_membership_auth.type == EventTypes.Member
@@ -1233,9 +1251,10 @@ class SyncHandler:
                 and event_with_membership_auth.content.get("membership")
                 == Membership.JOIN
             )
-            if not is_join:
+            if not is_create and not is_join:
                 # The event must include the desired membership as an auth event, unless
-                # it's the first join event for a given user.
+                # it's the `m.room.create` event for a room or the first join event for
+                # a given user.
                 missing_members.add(member)
             auth_event_ids.update(event_with_membership_auth.auth_event_ids())
 

@@ -20,6 +20,7 @@ from synapse.rest.client import (
     account,
     account_data,
     account_validity,
+    appservice_ping,
     auth,
     capabilities,
     devices,
@@ -99,8 +100,7 @@ class ClientRestResource(JsonResource):
         login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
-        if is_main_process:
-            directory.register_servlets(hs, client_resource)
+        directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
         if is_main_process:
             pusher.register_servlets(hs, client_resource)
@@ -133,13 +133,13 @@ class ClientRestResource(JsonResource):
         if is_main_process:
             room_upgrade_rest_servlet.register_servlets(hs, client_resource)
         room_batch.register_servlets(hs, client_resource)
+        capabilities.register_servlets(hs, client_resource)
         if is_main_process:
-            capabilities.register_servlets(hs, client_resource)
             account_validity.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)
-        if is_main_process:
-            password_policy.register_servlets(hs, client_resource)
+        password_policy.register_servlets(hs, client_resource)
         knock.register_servlets(hs, client_resource)
+        appservice_ping.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
         if is_main_process:

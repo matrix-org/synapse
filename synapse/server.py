@@ -23,8 +23,11 @@ import functools
 import logging
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, cast
 
+from typing_extensions import TypeAlias
+
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
+from twisted.web.client import HTTPConnectionPool
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
@@ -40,7 +43,6 @@ from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.presence_router import PresenceRouter
-from synapse.events.spamcheck import SpamChecker
 from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
@@ -108,6 +110,7 @@ from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.media.media_repository import MediaRepository
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
+from synapse.module_api.callbacks import ModuleApiCallbacks
 from synapse.notifier import Notifier, ReplicationNotifier
 from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
@@ -142,10 +145,31 @@ if TYPE_CHECKING:
     from synapse.handlers.saml import SamlHandler
 
 
-T = TypeVar("T")
+# The annotation for `cache_in_self` used to be
+#     def (builder: Callable[["HomeServer"],T]) -> Callable[["HomeServer"],T]
+# which mypy was happy with.
+#
+# But PyCharm was confused by this. If `foo` was decorated by `@cache_in_self`, then
+# an expression like `hs.foo()`
+#
+# - would erroneously warn that we hadn't provided a `hs` argument to foo (PyCharm
+#   confused about boundmethods and unbound methods?), and
+# - would be considered to have type `Any`, making for a poor autocomplete and
+#   cross-referencing experience.
+#
+# Instead, use a typevar `F` to express that `@cache_in_self` returns exactly the
+# same type it receives. This isn't strictly true [*], but it's more than good
+# enough to keep PyCharm and mypy happy.
+#
+# [*]: (e.g. `builder` could be an object with a __call__ attribute rather than a
+#      types.FunctionType instance, whereas the return value is always a
+#      types.FunctionType instance.)
+
+T: TypeAlias = object
+F = TypeVar("F", bound=Callable[["HomeServer"], T])
 
 
-def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer"], T]:
+def cache_in_self(builder: F) -> F:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -183,7 +207,7 @@ def cache_in_self(builder: Callable[["HomeServer"], T]) -> Callable[["HomeServer
 
         return dep
 
-    return _get
+    return cast(F, _get)
 
 
 class HomeServer(metaclass=abc.ABCMeta):
@@ -431,6 +455,26 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
+    def get_pusher_http_client(self) -> SimpleHttpClient:
+        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
+        # do so in batches, so we need to allow the pool to keep lots of idle
+        # connections around.
+        pool = HTTPConnectionPool(self.get_reactor())
+        # XXX: The justification for using the cache factor here is that larger
+        # instances will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max(int(100 * self.config.caches.global_factor), 5)
+        pool.cachedConnectionTimeout = 2 * 60
+
+        return SimpleHttpClient(
+            self,
+            ip_whitelist=self.config.server.ip_range_whitelist,
+            ip_blacklist=self.config.server.ip_range_blacklist,
+            use_proxy=True,
+            connection_pool=pool,
+        )
+
+    @cache_in_self
     def get_federation_http_client(self) -> MatrixFederationHttpClient:
         """
         An HTTP client for federation.
@@ -664,10 +708,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker(self)
-
-    @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
         return ThirdPartyEventRules(self)
 
@@ -743,7 +783,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(
+            msc3970_enabled=self.config.experimental.msc3970_enabled
+        )
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -776,6 +818,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
         return ModuleApi(self, self.get_auth_handler())
+
+    @cache_in_self
+    def get_module_api_callbacks(self) -> ModuleApiCallbacks:
+        return ModuleApiCallbacks(self)
 
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:

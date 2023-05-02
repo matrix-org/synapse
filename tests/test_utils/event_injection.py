@@ -102,3 +102,34 @@ async def create_event(
     context = await unpersisted_context.persist(event)
 
     return event, context
+
+
+async def mark_event_as_partial_state(
+    hs: synapse.server.HomeServer,
+    event_id: str,
+    room_id: str,
+) -> None:
+    """
+    (Falsely) mark an event as having partial state.
+
+    Naughty, but occasionally useful when checking that partial state doesn't
+    block something from happening.
+
+    If the event already has partial state, this insert will fail (event_id is unique
+    in this table).
+    """
+    store = hs.get_datastores().main
+    await store.db_pool.simple_upsert(
+        table="partial_state_rooms",
+        keyvalues={"room_id": room_id},
+        values={},
+        insertion_values={"room_id": room_id},
+    )
+
+    await store.db_pool.simple_insert(
+        table="partial_state_events",
+        values={
+            "room_id": room_id,
+            "event_id": event_id,
+        },
+    )

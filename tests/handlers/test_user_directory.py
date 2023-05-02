@@ -19,17 +19,18 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
+from synapse.api.errors import SynapseError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.appservice import ApplicationService
 from synapse.rest.client import login, register, room, user_directory
 from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import UserProfile, create_requester
+from synapse.types import JsonDict, UserProfile, create_requester
 from synapse.util import Clock
 
 from tests import unittest
 from tests.storage.test_user_directory import GetUserDirectoryTables
-from tests.test_utils import make_awaitable
+from tests.test_utils import event_injection, make_awaitable
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import override_config
 
@@ -791,7 +792,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             return False
 
         # Configure a spam checker that does not filter any users.
-        spam_checker = self.hs.get_spam_checker()
+        spam_checker = self.hs.get_module_api_callbacks().spam_checker
         spam_checker._check_username_for_spam_callbacks = [allow_all]
 
         # The results do not change:
@@ -1103,3 +1104,185 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         )
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
+
+
+class UserDirectoryRemoteProfileTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        synapse.rest.admin.register_servlets,
+        register.register_servlets,
+        room.register_servlets,
+    ]
+
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        # Re-enables updating the user directory, as that functionality is needed below.
+        config["update_user_directory_from_worker"] = None
+        return config
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+        self.alice = self.register_user("alice", "alice123")
+        self.alice_tok = self.login("alice", "alice123")
+        self.user_dir_helper = GetUserDirectoryTables(self.store)
+        self.user_dir_handler = hs.get_user_directory_handler()
+        self.profile_handler = hs.get_profile_handler()
+
+        # Cancel the startup call: in the steady-state case we can't rely on it anyway.
+        assert self.user_dir_handler._refresh_remote_profiles_call_later is not None
+        self.user_dir_handler._refresh_remote_profiles_call_later.cancel()
+
+    def test_public_rooms_have_profiles_collected(self) -> None:
+        """
+        In a public room, member state events are treated as reflecting the user's
+        real profile and they are accepted.
+        (The main motivation for accepting this is to prevent having to query
+        *every* single profile change over federation.)
+        """
+        room_id = self.helper.create_room_as(
+            self.alice, is_public=True, tok=self.alice_tok
+        )
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs,
+                room_id,
+                "@bruce:remote",
+                "join",
+                "@bruce:remote",
+                extra_content={
+                    "displayname": "Bruce!",
+                    "avatar_url": "mxc://remote/123",
+                },
+            )
+        )
+        # Sending this event makes the streams move forward after the injection...
+        self.helper.send(room_id, "Test", tok=self.alice_tok)
+        self.pump(0.1)
+
+        profiles = self.get_success(
+            self.user_dir_helper.get_profiles_in_user_directory()
+        )
+        self.assertEqual(
+            profiles.get("@bruce:remote"),
+            ProfileInfo(display_name="Bruce!", avatar_url="mxc://remote/123"),
+        )
+
+    def test_private_rooms_do_not_have_profiles_collected(self) -> None:
+        """
+        In a private room, member state events are not pulled out and used to populate
+        the user directory.
+        """
+        room_id = self.helper.create_room_as(
+            self.alice, is_public=False, tok=self.alice_tok
+        )
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs,
+                room_id,
+                "@bruce:remote",
+                "join",
+                "@bruce:remote",
+                extra_content={
+                    "displayname": "super-duper bruce",
+                    "avatar_url": "mxc://remote/456",
+                },
+            )
+        )
+        # Sending this event makes the streams move forward after the injection...
+        self.helper.send(room_id, "Test", tok=self.alice_tok)
+        self.pump(0.1)
+
+        profiles = self.get_success(
+            self.user_dir_helper.get_profiles_in_user_directory()
+        )
+        self.assertNotIn("@bruce:remote", profiles)
+
+    def test_private_rooms_have_profiles_requested(self) -> None:
+        """
+        When a name changes in a private room, the homeserver instead requests
+        the user's global profile over federation.
+        """
+
+        async def get_remote_profile(
+            user_id: str, ignore_backoff: bool = True
+        ) -> JsonDict:
+            if user_id == "@bruce:remote":
+                return {
+                    "displayname": "Sir Bruce Bruceson",
+                    "avatar_url": "mxc://remote/789",
+                }
+            else:
+                raise ValueError(f"unable to fetch {user_id}")
+
+        with patch.object(self.profile_handler, "get_profile", get_remote_profile):
+            # Continue from the earlier test...
+            self.test_private_rooms_do_not_have_profiles_collected()
+
+            # Advance by a minute
+            self.reactor.advance(61.0)
+
+        profiles = self.get_success(
+            self.user_dir_helper.get_profiles_in_user_directory()
+        )
+        self.assertEqual(
+            profiles.get("@bruce:remote"),
+            ProfileInfo(
+                display_name="Sir Bruce Bruceson", avatar_url="mxc://remote/789"
+            ),
+        )
+
+    def test_profile_requests_are_retried(self) -> None:
+        """
+        When we fail to fetch the user's profile over federation,
+        we try again later.
+        """
+        has_failed_once = False
+
+        async def get_remote_profile(
+            user_id: str, ignore_backoff: bool = True
+        ) -> JsonDict:
+            nonlocal has_failed_once
+            if user_id == "@bruce:remote":
+                if not has_failed_once:
+                    has_failed_once = True
+                    raise SynapseError(502, "temporary network problem")
+
+                return {
+                    "displayname": "Sir Bruce Bruceson",
+                    "avatar_url": "mxc://remote/789",
+                }
+            else:
+                raise ValueError(f"unable to fetch {user_id}")
+
+        with patch.object(self.profile_handler, "get_profile", get_remote_profile):
+            # Continue from the earlier test...
+            self.test_private_rooms_do_not_have_profiles_collected()
+
+            # Advance by a minute
+            self.reactor.advance(61.0)
+
+            # The request has already failed once
+            self.assertTrue(has_failed_once)
+
+            # The profile has yet to be updated.
+            profiles = self.get_success(
+                self.user_dir_helper.get_profiles_in_user_directory()
+            )
+            self.assertNotIn(
+                "@bruce:remote",
+                profiles,
+            )
+
+            # Advance by five minutes, after the backoff has finished
+            self.reactor.advance(301.0)
+
+            # The profile should have been updated now
+            profiles = self.get_success(
+                self.user_dir_helper.get_profiles_in_user_directory()
+            )
+            self.assertEqual(
+                profiles.get("@bruce:remote"),
+                ProfileInfo(
+                    display_name="Sir Bruce Bruceson", avatar_url="mxc://remote/789"
+                ),
+            )

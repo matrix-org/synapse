@@ -425,7 +425,6 @@ class UserRestServletV2(RestServlet):
                     ):
                         await self.pusher_pool.add_or_update_pusher(
                             user_id=user_id,
-                            access_token=None,
                             kind="email",
                             app_id="m.email",
                             app_display_name="Email Notifications",
@@ -683,19 +682,18 @@ class AccountValidityRenewServlet(RestServlet):
     PATTERNS = admin_patterns("/account_validity/validity$")
 
     def __init__(self, hs: "HomeServer"):
-        self.account_activity_handler = hs.get_account_validity_handler()
+        self.account_validity_handler = hs.get_account_validity_handler()
+        self.account_validity_module_callbacks = (
+            hs.get_module_api_callbacks().account_validity
+        )
         self.auth = hs.get_auth()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        if self.account_activity_handler.on_legacy_admin_request_callback:
-            expiration_ts = (
-                await (
-                    self.account_activity_handler.on_legacy_admin_request_callback(
-                        request
-                    )
-                )
+        if self.account_validity_module_callbacks.on_legacy_admin_request_callback:
+            expiration_ts = await self.account_validity_module_callbacks.on_legacy_admin_request_callback(
+                request
             )
         else:
             body = parse_json_object_from_request(request)
@@ -706,7 +704,7 @@ class AccountValidityRenewServlet(RestServlet):
                     "Missing property 'user_id' in the request body",
                 )
 
-            expiration_ts = await self.account_activity_handler.renew_account_for_user(
+            expiration_ts = await self.account_validity_handler.renew_account_for_user(
                 body["user_id"],
                 body.get("expiration_ts"),
                 not body.get("enable_renewal_emails", True),

@@ -508,7 +508,7 @@ class EventCreationHandler:
 
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.third_party_event_rules: "ThirdPartyEventRules" = (
             self.hs.get_third_party_event_rules()
         )
@@ -560,6 +560,8 @@ class EventCreationHandler:
                 self.clock,
                 expiry_ms=30 * 60 * 1000,
             )
+
+        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
 
     async def create_event(
         self,
@@ -701,8 +703,15 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
+        # Save the access token ID, the device ID and the transaction ID in the event
+        # internal metadata. This is useful to determine if we should echo the
+        # transaction_id in events.
+        # See `synapse.events.utils.EventClientSerializer.serialize_event`
         if requester.access_token_id is not None:
             builder.internal_metadata.token_id = requester.access_token_id
+
+        if requester.device_id is not None:
+            builder.internal_metadata.device_id = requester.device_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
@@ -897,12 +906,31 @@ class EventCreationHandler:
         Returns:
             An event if one could be found, None otherwise.
         """
+
+        if self._msc3970_enabled and requester.device_id:
+            # When MSC3970 is enabled, we lookup for events sent by the same device first,
+            # and fallback to the old behaviour if none were found.
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_device_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.device_id,
+                    txn_id,
+                )
+            )
+            if existing_event_id:
+                return await self.store.get_event(existing_event_id)
+
+        # Pre-MSC3970, we looked up for events that were sent by the same session by
+        # using the access token ID.
         if requester.access_token_id:
-            existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id,
-                requester.user.to_string(),
-                requester.access_token_id,
-                txn_id,
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_token_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.access_token_id,
+                    txn_id,
+                )
             )
             if existing_event_id:
                 return await self.store.get_event(existing_event_id)
@@ -987,10 +1015,11 @@ class EventCreationHandler:
         # a situation where event persistence can't keep up, causing
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
-        async with self.limiter.queue(event_dict["room_id"]):
+        room_id = event_dict["room_id"]
+        async with self.limiter.queue(room_id):
             if txn_id:
                 event = await self.get_event_from_transaction(
-                    requester, txn_id, event_dict["room_id"]
+                    requester, txn_id, room_id
                 )
                 if event:
                     # we know it was persisted, so must have a stream ordering
@@ -999,6 +1028,18 @@ class EventCreationHandler:
                         event,
                         event.internal_metadata.stream_ordering,
                     )
+
+        # If we don't have any prev event IDs specified then we need to
+        # check that the host is in the room (as otherwise populating the
+        # prev events will fail), at which point we may as well check the
+        # local user is in the room.
+        if not prev_event_ids:
+            user_id = requester.user.to_string()
+            is_user_in_room = await self.store.check_local_user_in_room(
+                user_id, room_id
+            )
+            if not is_user_in_room:
+                raise AuthError(403, f"User {user_id} not in room {room_id}")
 
         # Try several times, it could fail with PartialStateConflictError
         # in handle_new_client_event, cf comment in except block.
@@ -1022,8 +1063,12 @@ class EventCreationHandler:
                     event.sender,
                 )
 
-                spam_check_result = await self.spam_checker.check_event_for_spam(event)
-                if spam_check_result != self.spam_checker.NOT_SPAM:
+                spam_check_result = (
+                    await self._spam_checker_module_callbacks.check_event_for_spam(
+                        event
+                    )
+                )
+                if spam_check_result != self._spam_checker_module_callbacks.NOT_SPAM:
                     if isinstance(spam_check_result, tuple):
                         try:
                             [code, dict] = spam_check_result
@@ -1896,7 +1941,12 @@ class EventCreationHandler:
                 room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
                 create_event = await self.store.get_create_event_for_room(event.room_id)
-                room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+                if not room_version_obj.msc2175_implicit_room_creator:
+                    room_creator = create_event.content.get(
+                        EventContentFields.ROOM_CREATOR
+                    )
+                else:
+                    room_creator = create_event.sender
 
                 # Only check an insertion event if the room version
                 # supports it or the event is from the room creator.
