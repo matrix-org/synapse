@@ -5,10 +5,10 @@ Features
 --------
 
 - Experimental support to recursively provide relations per [MSC3981](https://github.com/matrix-org/matrix-spec-proposals/pull/3981). ([\#15315](https://github.com/matrix-org/synapse/issues/15315))
-- Experimental support for MSC3970: Scope transaction IDs to devices. ([\#15318](https://github.com/matrix-org/synapse/issues/15318))
-- Add an admin API endpoint to support per-user feature flags. ([\#15344](https://github.com/matrix-org/synapse/issues/15344))
+- Experimental support for [MSC3970](https://github.com/matrix-org/matrix-spec-proposals/pull/3970): Scope transaction IDs to devices. ([\#15318](https://github.com/matrix-org/synapse/issues/15318))
+- Add an [admin API endpoint](https://matrix-org.github.io/synapse/v1.83/admin_api/experimental_features.html) to support per-user feature flags. ([\#15344](https://github.com/matrix-org/synapse/issues/15344))
 - Add a module API to send an HTTP push notification. ([\#15387](https://github.com/matrix-org/synapse/issues/15387))
-- Add admin endpoint to query the largest rooms by disk space used in the database. ([\#15482](https://github.com/matrix-org/synapse/issues/15482))
+- Add an [admin API endpoint](https://matrix-org.github.io/synapse/v1.83/admin_api/statistics.html#get-largest-rooms-by-size-in-database) to query the largest rooms by disk space used in the database. ([\#15482](https://github.com/matrix-org/synapse/issues/15482))
 
 
 Bugfixes
@@ -16,14 +16,13 @@ Bugfixes
 
 - Disable push rule evaluation for rooms excluded from sync. ([\#15361](https://github.com/matrix-org/synapse/issues/15361))
 - Fix a long-standing bug where cached key results which were directly fetched would not be properly re-used. ([\#15417](https://github.com/matrix-org/synapse/issues/15417))
-- Update the check_schema_delta script to account for when the schema version has been bumped locally. ([\#15466](https://github.com/matrix-org/synapse/issues/15466))
 - Fix a bug introduced in Synapse 1.73.0 where some experimental push rules were returned by default. ([\#15494](https://github.com/matrix-org/synapse/issues/15494))
 
 
 Improved Documentation
 ----------------------
 
-- Docs: Add Nginx loadbalancing example with sticky mxid for workers. ([\#15411](https://github.com/matrix-org/synapse/issues/15411))
+- Add Nginx loadbalancing example with sticky mxid for workers. ([\#15411](https://github.com/matrix-org/synapse/issues/15411))
 - Update outdated development docs that mention restrictions in versions of SQLite that we no longer support. ([\#15498](https://github.com/matrix-org/synapse/issues/15498))
 
 
@@ -50,6 +49,7 @@ Internal Changes
 - Bump types-requests from 2.28.11.16 to 2.29.0.0. ([\#15511](https://github.com/matrix-org/synapse/issues/15511))
 - Bump setuptools-rust from 1.5.2 to 1.6.0. ([\#15512](https://github.com/matrix-org/synapse/issues/15512))
 - Reduce the size of the HTTP connection pool for non-pushers. ([\#15514](https://github.com/matrix-org/synapse/issues/15514))
+- Update the check_schema_delta script to account for when the schema version has been bumped locally. ([\#15466](https://github.com/matrix-org/synapse/issues/15466))
 
 
 Synapse 1.82.0 (2023-04-25)
