@@ -1372,17 +1372,12 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         """Indicate that user_id wishes to discard history for room_id."""
 
         def f(txn: LoggingTransaction) -> None:
-            sql = (
-                "UPDATE"
-                "  room_memberships"
-                " SET"
-                "  forgotten = 1"
-                " WHERE"
-                "  user_id = ?"
-                " AND"
-                "  room_id = ?"
+            self.db_pool.simple_update_txn(
+                txn,
+                table="room_memberships",
+                keyvalues={"user_id": user_id, "room_id": room_id},
+                updatevalues={"forgotten": 1},
             )
-            txn.execute(sql, (user_id, room_id))
 
             self._invalidate_cache_and_stream(txn, self.did_forget, (user_id, room_id))
             self._invalidate_cache_and_stream(
