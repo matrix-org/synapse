@@ -835,7 +835,7 @@ class SimpleReplicationClient(BaseHttpClient):
     ):
         """
         Args:
-            hs
+            hs: The HomeServer instance to pass in
         """
         super().__init__(hs)
 

@@ -99,7 +99,6 @@ class ReplicationAgent(_AgentBase):
 
         Args:
             reactor: A reactor for this Agent to place outgoing connections.
-            hs: The HomeServer instance
             contextFactory: A factory for TLS contexts, to control the
                 verification parameters of OpenSSL.  The default is to use a
                 BrowserLikePolicyForHTTPS, so unless you have special
