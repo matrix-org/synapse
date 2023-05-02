@@ -28,7 +28,6 @@ from synapse.api.constants import (
     ReceiptTypes,
     RelationTypes,
 )
-from synapse.rest.admin.experimental_features import ExperimentalFeature
 from synapse.rest.client import devices, knock, login, read_marker, receipts, room, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -539,12 +538,14 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
     def default_config(self) -> JsonDict:
         config = super().default_config()
+        config["experimental_features"] = {
+            "msc2654_enabled": True,
+        }
         return config
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.url = "/sync?since=%s"
         self.next_batch = "s0"
-        self.hs = hs
 
         # Register the first user (used to check the unread counts).
         self.user_id = self.register_user("kermit", "monkey")
@@ -587,12 +588,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
     def test_unread_counts(self) -> None:
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
-        # add per-user flag to the DB
-        self.get_success(
-            self.hs.get_datastores().main.set_features_for_user(
-                self.user_id, {ExperimentalFeature.MSC2654: True}
-            )
-        )
 
         # Check that our own messages don't increase the unread count.
         self.helper.send(self.room_id, "hello", tok=self.tok)

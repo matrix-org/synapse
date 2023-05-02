@@ -100,6 +100,7 @@ class SyncRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
+        self._msc2654_enabled = hs.config.experimental.msc2654_enabled
         self._msc3773_enabled = hs.config.experimental.msc3773_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -260,7 +261,7 @@ class SyncRestServlet(RestServlet):
         )
 
         joined = await self.encode_joined(
-            sync_result.joined, time_now, serialize_options, requester
+            sync_result.joined, time_now, serialize_options
         )
 
         invited = await self.encode_invited(
@@ -272,7 +273,7 @@ class SyncRestServlet(RestServlet):
         )
 
         archived = await self.encode_archived(
-            sync_result.archived, time_now, serialize_options, requester
+            sync_result.archived, time_now, serialize_options
         )
 
         logger.debug("building sync response dict")
@@ -343,7 +344,6 @@ class SyncRestServlet(RestServlet):
         rooms: List[JoinedSyncResult],
         time_now: int,
         serialize_options: SerializeEventConfig,
-        requester: Requester,
     ) -> JsonDict:
         """
         Encode the joined rooms in a sync result
@@ -352,7 +352,6 @@ class SyncRestServlet(RestServlet):
             rooms: list of sync results for rooms this user is joined to
             time_now: current time - used as a baseline for age calculations
             serialize_options: Event serializer options
-            requester: The requester of the sync
         Returns:
             The joined rooms list, in our response format
         """
@@ -363,7 +362,6 @@ class SyncRestServlet(RestServlet):
                 time_now,
                 joined=True,
                 serialize_options=serialize_options,
-                requester=requester,
             )
 
         return joined
@@ -454,7 +452,6 @@ class SyncRestServlet(RestServlet):
         rooms: List[ArchivedSyncResult],
         time_now: int,
         serialize_options: SerializeEventConfig,
-        requester: Requester,
     ) -> JsonDict:
         """
         Encode the archived rooms in a sync result
@@ -463,7 +460,6 @@ class SyncRestServlet(RestServlet):
             rooms: list of sync results for rooms this user is joined to
             time_now: current time - used as a baseline for age calculations
             serialize_options: Event serializer options
-            requester: the requester of the sync
         Returns:
             The archived rooms list, in our response format
         """
@@ -474,7 +470,6 @@ class SyncRestServlet(RestServlet):
                 time_now,
                 joined=False,
                 serialize_options=serialize_options,
-                requester=requester,
             )
 
         return joined
@@ -485,7 +480,6 @@ class SyncRestServlet(RestServlet):
         time_now: int,
         joined: bool,
         serialize_options: SerializeEventConfig,
-        requester: Requester,
     ) -> JsonDict:
         """
         Args:
@@ -498,7 +492,6 @@ class SyncRestServlet(RestServlet):
             only_fields: Optional. The list of event fields to include.
             event_formatter: function to convert from federation format
                 to client format
-            Requester: The requester of the sync
         Returns:
             The room, encoded in our response format
         """
@@ -552,14 +545,7 @@ class SyncRestServlet(RestServlet):
                         "org.matrix.msc3773.unread_thread_notifications"
                     ] = room.unread_thread_notifications
             result["summary"] = room.summary
-
-            msc2654_enabled = await self.hs.get_datastores().main.get_feature_enabled(
-                requester.user.to_string(), "msc2654"
-            )
-            if not msc2654_enabled:
-                msc2654_enabled = self.hs.config.experimental.msc2654_enabled
-
-            if msc2654_enabled:
+            if self._msc2654_enabled:
                 result["org.matrix.msc2654.unread_count"] = room.unread_count
 
         return result
