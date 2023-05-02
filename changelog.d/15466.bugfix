@@ -1,0 +1,1 @@
+Update the check_schema_delta script to account for when the schema version has been bumped locally.

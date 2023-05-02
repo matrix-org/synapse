@@ -4,6 +4,7 @@ on:
   push:
     branches: ["develop", "release-*"]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -33,6 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.58.1
+      - uses: Swatinem/rust-cache@v2
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
@@ -61,9 +65,59 @@ jobs:
       - run: .ci/scripts/check_lockfile.py
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v2"
-    with:
-      typechecking-extras: "all"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Poetry
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          install-project: "false"
+
+      - name: Import order (isort)
+        run: poetry run isort --check --diff .
+
+      - name: Code style (black)
+        run: poetry run black --check --diff .
+
+      - name: Semantic checks (ruff)
+        # --quiet suppresses the update check.
+        run: poetry run ruff --quiet .
+
+  lint-mypy:
+    runs-on: ubuntu-latest
+    name: Typechecking
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Poetry
+        uses: matrix-org/setup-python-poetry@v1
+        with:
+          # We want to make use of type hints in optional dependencies too.
+          extras: all
+          # We have seen odd mypy failures that were resolved when we started
+          # installing the project again:
+          # https://github.com/matrix-org/synapse/pull/15376#issuecomment-1498983775
+          # To make CI green, err towards caution and install the project.
+          install-project: "true"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.58.1
+      - uses: Swatinem/rust-cache@v2
+
+      # NB: I have two concerns with this action:
+      # 1. We occasionally see odd mypy problems that aren't reproducible
+      #    locally with clean caches. I suspect some dodgy caching behaviour.
+      # 2. The action uses GHA machinery that's deprecated
+      #    (https://github.com/AustinScola/mypy-cache-github-action/issues/277)
+      # It may be simpler to use actions/cache ourselves to restore .mypy_cache.
+      - name: Restore/persist mypy's cache
+        uses: AustinScola/mypy-cache-github-action@df56268388422ee282636ee2c7a9cc55ec644a41
+
+      - name: Run mypy
+        run: poetry run mypy
 
   lint-crlf:
     runs-on: ubuntu-latest
@@ -94,6 +148,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.58.1
+      - uses: Swatinem/rust-cache@v2
       - uses: matrix-org/setup-python-poetry@v1
         with:
           poetry-version: "1.3.2"
@@ -109,12 +166,8 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@1.58.1
         with:
-            toolchain: 1.58.1
             components: clippy
       - uses: Swatinem/rust-cache@v2
 
@@ -131,10 +184,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: nightly-2022-12-01
             components: clippy
@@ -151,10 +201,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@master
         with:
           # We use nightly so that it correctly groups together imports
           toolchain: nightly-2022-12-01
@@ -168,6 +215,7 @@ jobs:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     needs:
       - lint
+      - lint-mypy
       - lint-crlf
       - lint-newsfile
       - lint-pydantic
@@ -219,12 +267,7 @@ jobs:
             postgres:${{ matrix.job.postgres-version }}
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -264,12 +307,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
 
       # There aren't wheels for some of the older deps, so we need to install
@@ -385,12 +423,7 @@ jobs:
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
 
       - name: Run SyTest
@@ -530,13 +563,10 @@ jobs:
           path: synapse
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-go@v4
 
       - name: Prepare Complement's Prerequisites
         run: synapse/.ci/scripts/setup_complement_prerequisites.sh
@@ -561,12 +591,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
-        with:
-            toolchain: 1.58.1
+        uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo test
@@ -584,10 +609,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        # There don't seem to be versioned releases of this action per se: for each rust
-        # version there is a branch which gets constantly rebased on top of master.
-        # We pin to a specific commit for paranoia's sake.
-        uses: dtolnay/rust-toolchain@e12eda571dc9a5ee5d58eecf4738ec291c66f295
+        uses: dtolnay/rust-toolchain@master
         with:
             toolchain: nightly-2022-12-01
       - uses: Swatinem/rust-cache@v2

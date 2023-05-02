@@ -106,13 +106,16 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         "depth",
         "prev_events",
         "auth_events",
-        "origin",
         "origin_server_ts",
     ]
 
     # Room versions from before MSC2176 had additional allowed keys.
     if not room_version.msc2176_redaction_rules:
         allowed_keys.extend(["prev_state", "membership"])
+
+    # Room versions before MSC3989 kept the origin field.
+    if not room_version.msc3989_redaction_rules:
+        allowed_keys.append("origin")
 
     event_type = event_dict["type"]
 
@@ -336,6 +339,7 @@ def serialize_event(
     time_now_ms: int,
     *,
     config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
+    msc3970_enabled: bool = False,
 ) -> JsonDict:
     """Serialize event for clients
 
@@ -343,6 +347,8 @@ def serialize_event(
         e
         time_now_ms
         config: Event serialization config
+        msc3970_enabled: Whether MSC3970 is enabled. It changes whether we should
+            include the `transaction_id` in the event's `unsigned` section.
 
     Returns:
         The serialized event dictionary.
@@ -355,7 +361,7 @@ def serialize_event(
     time_now_ms = int(time_now_ms)
 
     # Should this strip out None's?
-    d = {k: v for k, v in e.get_dict().items()}
+    d = dict(e.get_dict().items())
 
     d["event_id"] = e.event_id
 
@@ -365,27 +371,43 @@ def serialize_event(
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms, config=config
+            e.unsigned["redacted_because"],
+            time_now_ms,
+            config=config,
+            msc3970_enabled=msc3970_enabled,
         )
 
     # If we have a txn_id saved in the internal_metadata, we should include it in the
     # unsigned section of the event if it was sent by the same session as the one
     # requesting the event.
-    # There is a special case for guests, because they only have one access token
-    # without associated access_token_id, so we always include the txn_id for events
-    # they sent.
-    txn_id = getattr(e.internal_metadata, "txn_id", None)
+    txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
     if txn_id is not None and config.requester is not None:
-        event_token_id = getattr(e.internal_metadata, "token_id", None)
-        if config.requester.user.to_string() == e.sender and (
-            (
-                event_token_id is not None
-                and config.requester.access_token_id is not None
-                and event_token_id == config.requester.access_token_id
+        # For the MSC3970 rules to be applied, we *need* to have the device ID in the
+        # event internal metadata. Since we were not recording them before, if it hasn't
+        # been recorded, we fallback to the old behaviour.
+        event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
+        if msc3970_enabled and event_device_id is not None:
+            if event_device_id == config.requester.device_id:
+                d["unsigned"]["transaction_id"] = txn_id
+
+        else:
+            # The pre-MSC3970 behaviour is to only include the transaction ID if the
+            # event was sent from the same access token. For regular users, we can use
+            # the access token ID to determine this. For guests, we can't, but since
+            # each guest only has one access token, we can just check that the event was
+            # sent by the same user as the one requesting the event.
+            event_token_id: Optional[int] = getattr(
+                e.internal_metadata, "token_id", None
             )
-            or config.requester.is_guest
-        ):
-            d["unsigned"]["transaction_id"] = txn_id
+            if config.requester.user.to_string() == e.sender and (
+                (
+                    event_token_id is not None
+                    and config.requester.access_token_id is not None
+                    and event_token_id == config.requester.access_token_id
+                )
+                or config.requester.is_guest
+            ):
+                d["unsigned"]["transaction_id"] = txn_id
 
     # invite_room_state and knock_room_state are a list of stripped room state events
     # that are meant to provide metadata about a room to an invitee/knocker. They are
@@ -416,6 +438,9 @@ class EventClientSerializer:
     clients.
     """
 
+    def __init__(self, *, msc3970_enabled: bool = False):
+        self._msc3970_enabled = msc3970_enabled
+
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
@@ -440,7 +465,9 @@ class EventClientSerializer:
         if not isinstance(event, EventBase):
             return event
 
-        serialized_event = serialize_event(event, time_now, config=config)
+        serialized_event = serialize_event(
+            event, time_now, config=config, msc3970_enabled=self._msc3970_enabled
+        )
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
@@ -498,7 +525,9 @@ class EventClientSerializer:
             # `sender` of the edit; however MSC3925 proposes extending it to the whole
             # of the edit, which is what we do here.
             serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
-                event_aggregations.replace, time_now, config=config
+                event_aggregations.replace,
+                time_now,
+                config=config,
             )
 
         # Include any threaded replies to this event.
@@ -567,7 +596,7 @@ PowerLevelsContent = Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
 def copy_and_fixup_power_levels_contents(
     old_power_levels: PowerLevelsContent,
 ) -> Dict[str, Union[int, Dict[str, int]]]:
-    """Copy the content of a power_levels event, unfreezing frozendicts along the way.
+    """Copy the content of a power_levels event, unfreezing immutabledicts along the way.
 
     We accept as input power level values which are strings, provided they represent an
     integer, e.g. `"`100"` instead of 100. Such strings are converted to integers

@@ -35,7 +35,7 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 from signedjson.key import decode_verify_key_bytes
 from signedjson.types import VerifyKey
 from typing_extensions import Final, TypedDict
@@ -50,6 +50,7 @@ from twisted.internet.interfaces import (
     IReactorTCP,
     IReactorThreads,
     IReactorTime,
+    IReactorUNIX,
 )
 
 from synapse.api.errors import Codes, SynapseError
@@ -91,6 +92,7 @@ StrCollection = Union[Tuple[str, ...], List[str], AbstractSet[str]]
 class ISynapseReactor(
     IReactorTCP,
     IReactorSSL,
+    IReactorUNIX,
     IReactorPluggableNameResolver,
     IReactorTime,
     IReactorCore,
@@ -490,12 +492,12 @@ class RoomStreamToken:
     )
     stream: int = attr.ib(validator=attr.validators.instance_of(int))
 
-    instance_map: "frozendict[str, int]" = attr.ib(
-        factory=frozendict,
+    instance_map: "immutabledict[str, int]" = attr.ib(
+        factory=immutabledict,
         validator=attr.validators.deep_mapping(
             key_validator=attr.validators.instance_of(str),
             value_validator=attr.validators.instance_of(int),
-            mapping_validator=attr.validators.instance_of(frozendict),
+            mapping_validator=attr.validators.instance_of(immutabledict),
         ),
     )
 
@@ -531,7 +533,7 @@ class RoomStreamToken:
                 return cls(
                     topological=None,
                     stream=stream,
-                    instance_map=frozendict(instance_map),
+                    instance_map=immutabledict(instance_map),
                 )
         except CancelledError:
             raise
@@ -566,7 +568,7 @@ class RoomStreamToken:
             for instance in set(self.instance_map).union(other.instance_map)
         }
 
-        return RoomStreamToken(None, max_stream, frozendict(instance_map))
+        return RoomStreamToken(None, max_stream, immutabledict(instance_map))
 
     def as_historical_tuple(self) -> Tuple[int, int]:
         """Returns a tuple of `(topological, stream)` for historical tokens.

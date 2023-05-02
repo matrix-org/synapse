@@ -11,6 +11,119 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+The Federation Sender is responsible for sending Persistent Data Units (PDUs)
+and Ephemeral Data Units (EDUs) to other homeservers using
+the `/send` Federation API.
+
+
+## How do PDUs get sent?
+
+The Federation Sender is made aware of new PDUs due to `FederationSender.notify_new_events`.
+When the sender is notified about a newly-persisted PDU that originates from this homeserver
+and is not an out-of-band event, we pass the PDU to the `_PerDestinationQueue` for each
+remote homeserver that is in the room at that point in the DAG.
+
+
+### Per-Destination Queues
+
+There is one `PerDestinationQueue` per 'destination' homeserver.
+The `PerDestinationQueue` maintains the following information about the destination:
+
+- whether the destination is currently in [catch-up mode (see below)](#catch-up-mode);
+- a queue of PDUs to be sent to the destination; and
+- a queue of EDUs to be sent to the destination (not considered in this section).
+
+Upon a new PDU being enqueued, `attempt_new_transaction` is called to start a new
+transaction if there is not already one in progress.
+
+
+### Transactions and the Transaction Transmission Loop
+
+Each federation HTTP request to the `/send` endpoint is referred to as a 'transaction'.
+The body of the HTTP request contains a list of PDUs and EDUs to send to the destination.
+
+The *Transaction Transmission Loop* (`_transaction_transmission_loop`) is responsible
+for emptying the queued PDUs (and EDUs) from a `PerDestinationQueue` by sending
+them to the destination.
+
+There can only be one transaction in flight for a given destination at any time.
+(Other than preventing us from overloading the destination, this also makes it easier to
+reason about because we process events sequentially for each destination.
+This is useful for *Catch-Up Mode*, described later.)
+
+The loop continues so long as there is anything to send. At each iteration of the loop, we:
+
+- dequeue up to 50 PDUs (and up to 100 EDUs).
+- make the `/send` request to the destination homeserver with the dequeued PDUs and EDUs.
+- if successful, make note of the fact that we succeeded in transmitting PDUs up to
+  the given `stream_ordering` of the latest PDU by
+- if unsuccessful, back off from the remote homeserver for some time.
+  If we have been unsuccessful for too long (when the backoff interval grows to exceed 1 hour),
+  the in-memory queues are emptied and we enter [*Catch-Up Mode*, described below](#catch-up-mode).
+
+
+### Catch-Up Mode
+
+When the `PerDestinationQueue` has the catch-up flag set, the *Catch-Up Transmission Loop*
+(`_catch_up_transmission_loop`) is used in lieu of the regular `_transaction_transmission_loop`.
+(Only once the catch-up mode has been exited can the regular tranaction transmission behaviour
+be resumed.)
+
+*Catch-Up Mode*, entered upon Synapse startup or once a homeserver has fallen behind due to
+connection problems, is responsible for sending PDUs that have been missed by the destination
+homeserver. (PDUs can be missed because the `PerDestinationQueue` is volatile — i.e. resets
+on startup — and it does not hold PDUs forever if `/send` requests to the destination fail.)
+
+The catch-up mechanism makes use of the `last_successful_stream_ordering` column in the
+`destinations` table (which gives the `stream_ordering` of the most recent successfully
+sent PDU) and the `stream_ordering` column in the `destination_rooms` table (which gives,
+for each room, the `stream_ordering` of the most recent PDU that needs to be sent to this
+destination).
+
+Each iteration of the loop pulls out 50 `destination_rooms` entries with the oldest
+`stream_ordering`s that are greater than the `last_successful_stream_ordering`.
+In other words, from the set of latest PDUs in each room to be sent to the destination,
+the 50 oldest such PDUs are pulled out.
+
+These PDUs could, in principle, now be directly sent to the destination. However, as an
+optimisation intended to prevent overloading destination homeservers, we instead attempt
+to send the latest forward extremities so long as the destination homeserver is still
+eligible to receive those.
+This reduces load on the destination **in aggregate** because all Synapse homeservers
+will behave according to this principle and therefore avoid sending lots of different PDUs
+at different points in the DAG to a recovering homeserver.
+*This optimisation is not currently valid in rooms which are partial-state on this homeserver,
+since we are unable to determine whether the destination homeserver is eligible to receive
+the latest forward extremities unless this homeserver sent those PDUs — in this case, we
+just send the latest PDUs originating from this server and skip this optimisation.*
+
+Whilst PDUs are sent through this mechanism, the position of `last_successful_stream_ordering`
+is advanced as normal.
+Once there are no longer any rooms containing outstanding PDUs to be sent to the destination
+*that are not already in the `PerDestinationQueue` because they arrived since Catch-Up Mode
+was enabled*, Catch-Up Mode is exited and we return to `_transaction_transmission_loop`.
+
+
+#### A note on failures and back-offs
+
+If a remote server is unreachable over federation, we back off from that server,
+with an exponentially-increasing retry interval.
+Whilst we don't automatically retry after the interval, we prevent making new attempts
+until such time as the back-off has cleared.
+Once the back-off is cleared and a new PDU or EDU arrives for transmission, the transmission
+loop resumes and empties the queue by making federation requests.
+
+If the backoff grows too large (> 1 hour), the in-memory queue is emptied (to prevent
+unbounded growth) and Catch-Up Mode is entered.
+
+It is worth noting that the back-off for a remote server is cleared once an inbound
+request from that remote server is received (see `notify_remote_server_up`).
+At this point, the transaction transmission loop is also started up, to proactively
+send missed PDUs and EDUs to the destination (i.e. you don't need to wait for a new PDU
+or EDU, destined for that destination, to be created in order to send out missed PDUs and
+EDUs).
+"""
 
 import abc
 import logging
@@ -783,7 +896,7 @@ class FederationSender(AbstractFederationSender):
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
         if destination == self.server_name:
             logger.warning("Not sending device update to ourselves")
             return

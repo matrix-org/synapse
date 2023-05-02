@@ -129,8 +129,6 @@ class DirectoryWorkerStore(CacheInvalidationWorkerStore):
                 409, "Room alias %s already exists" % room_alias.to_string()
             )
 
-
-class DirectoryStore(DirectoryWorkerStore):
     async def delete_room_alias(self, room_alias: RoomAlias) -> Optional[str]:
         room_id = await self.db_pool.runInteraction(
             "delete_room_alias", self._delete_room_alias_txn, room_alias
@@ -201,3 +199,7 @@ class DirectoryStore(DirectoryWorkerStore):
         await self.db_pool.runInteraction(
             "_update_aliases_for_room_txn", _update_aliases_for_room_txn
         )
+
+
+class DirectoryStore(DirectoryWorkerStore):
+    pass

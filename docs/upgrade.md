@@ -88,6 +88,34 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.81.0
+
+## Application service path & authentication deprecations
+
+Synapse now attempts the versioned appservice paths before falling back to the
+[legacy paths](https://spec.matrix.org/v1.6/application-service-api/#legacy-routes).
+Usage of the legacy routes should be considered deprecated.
+
+Additionally, Synapse has supported sending the application service access token
+via [the `Authorization` header](https://spec.matrix.org/v1.6/application-service-api/#authorization)
+since v1.70.0. For backwards compatibility it is *also* sent as the `access_token`
+query parameter. This is insecure and should be considered deprecated.
+
+A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service routes and query parameter authorization.
+
+# Upgrading to v1.80.0
+
+## Reporting events error code change
+
+Before this update, the
+[`POST /_matrix/client/v3/rooms/{roomId}/report/{eventId}`](https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3roomsroomidreporteventid)
+endpoint would return a `403` if a user attempted to report an event that they did not have access to.
+This endpoint will now return a `404` in this case instead.
+
+Clients that implement event reporting should check that their error handling code will handle this
+change.
+
 # Upgrading to v1.79.0
 
 ## The `on_threepid_bind` module callback method has been deprecated
@@ -170,6 +198,17 @@ and then do `pip install matrix-synapse[user-search]` for a PyPI install.
 Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.
 
+
+## User directory rebuild
+
+Synapse 1.74 queues a background update
+[to rebuild the user directory](https://github.com/matrix-org/synapse/pull/14643),
+in order to fix missing or erroneous entries.
+
+When this update begins, the user directory will be cleared out and rebuilt from
+scratch. User directory lookups will be incomplete until the rebuild completes.
+Admins can monitor the rebuild's progress by using the
+[Background update Admin API](usage/administration/admin_api/background_updates.md#status).
 
 # Upgrading to v1.73.0
 

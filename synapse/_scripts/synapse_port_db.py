@@ -18,6 +18,7 @@
 import argparse
 import curses
 import logging
+import os
 import sys
 import time
 import traceback
@@ -53,11 +54,12 @@ from synapse.logging.context import (
 )
 from synapse.notifier import ReplicationNotifier
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
-from synapse.storage.databases.main import PushRuleStore
+from synapse.storage.databases.main import FilteringWorkerStore, PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
+from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyBackgroundStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
 from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
@@ -67,7 +69,11 @@ from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
 from synapse.storage.databases.main.presence import PresenceBackgroundUpdateStore
-from synapse.storage.databases.main.pusher import PusherWorkerStore
+from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.pusher import (
+    PusherBackgroundUpdatesStore,
+    PusherWorkerStore,
+)
 from synapse.storage.databases.main.receipts import ReceiptsBackgroundUpdateStore
 from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
@@ -119,6 +125,7 @@ BOOLEAN_COLUMNS = {
     "users": ["shadow_banned", "approved"],
     "un_partial_stated_event_stream": ["rejection_status_changed"],
     "users_who_share_rooms": ["share_private"],
+    "per_user_experimental_features": ["enabled"],
 }
 
 
@@ -221,10 +228,14 @@ class Store(
     MainStateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
+    EndToEndRoomKeyBackgroundStore,
     StatsStore,
     AccountDataWorkerStore,
+    FilteringWorkerStore,
+    ProfileWorkerStore,
     PushRuleStore,
     PusherWorkerStore,
+    PusherBackgroundUpdatesStore,
     PresenceBackgroundUpdateStore,
     ReceiptsBackgroundUpdateStore,
     RelationsWorkerStore,
@@ -1326,10 +1337,17 @@ def main() -> None:
         filename="port-synapse.log" if args.curses else None,
     )
 
+    if not os.path.isfile(args.sqlite_database):
+        sys.stderr.write(
+            "The sqlite database you specified does not exist, please check that you have the"
+            "correct path."
+        )
+        sys.exit(1)
+
     sqlite_config = {
         "name": "sqlite3",
         "args": {
-            "database": "file:{}?mode=rw".format(args.sqlite_database),
+            "database": args.sqlite_database,
             "cp_min": 1,
             "cp_max": 1,
             "check_same_thread": False,

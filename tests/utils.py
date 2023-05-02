@@ -131,6 +131,9 @@ def default_config(
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
+        # Disable trusted key servers, otherwise unit tests might try to actually
+        # reach out to matrix.org.
+        "trusted_key_servers": [],
         "event_cache_size": 1,
         "enable_registration": True,
         "enable_registration_captcha": False,

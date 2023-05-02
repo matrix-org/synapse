@@ -31,14 +31,14 @@ from typing_extensions import Protocol
 Some very basic protocol definitions for the DB-API2 classes specified in PEP-249
 """
 
-_Parameters = Union[Sequence[Any], Mapping[str, Any]]
+SQLQueryParameters = Union[Sequence[Any], Mapping[str, Any]]
 
 
 class Cursor(Protocol):
-    def execute(self, sql: str, parameters: _Parameters = ...) -> Any:
+    def execute(self, sql: str, parameters: SQLQueryParameters = ...) -> Any:
         ...
 
-    def executemany(self, sql: str, parameters: Sequence[_Parameters]) -> Any:
+    def executemany(self, sql: str, parameters: Sequence[SQLQueryParameters]) -> Any:
         ...
 
     def fetchone(self) -> Optional[Tuple]:

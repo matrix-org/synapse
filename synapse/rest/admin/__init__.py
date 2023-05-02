@@ -39,6 +39,7 @@ from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
 )
+from synapse.rest.admin.experimental_features import ExperimentalFeaturesRestServlet
 from synapse.rest.admin.federation import (
     DestinationMembershipRestServlet,
     DestinationResetConnectionRestServlet,
@@ -68,7 +69,10 @@ from synapse.rest.admin.rooms import (
     RoomTimestampToEventRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
-from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
+from synapse.rest.admin.statistics import (
+    LargestRoomsStatistics,
+    UserMediaStatisticsRestServlet,
+)
 from synapse.rest.admin.username_available import UsernameAvailableRestServlet
 from synapse.rest.admin.users import (
     AccountDataRestServlet,
@@ -259,6 +263,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     UserMediaStatisticsRestServlet(hs).register(http_server)
+    LargestRoomsStatistics(hs).register(http_server)
     EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
     AccountDataRestServlet(hs).register(http_server)
@@ -288,6 +293,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     BackgroundUpdateEnabledRestServlet(hs).register(http_server)
     BackgroundUpdateRestServlet(hs).register(http_server)
     BackgroundUpdateStartJobRestServlet(hs).register(http_server)
+    ExperimentalFeaturesRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(

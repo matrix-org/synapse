@@ -26,7 +26,7 @@ from twisted.web.http import HTTPChannel
 
 from synapse.api.errors import RequestSendFailed
 from synapse.http.matrixfederationclient import (
-    JsonParser,
+    ByteParser,
     MatrixFederationHttpClient,
     MatrixFederationRequest,
 )
@@ -618,9 +618,9 @@ class FederationClientTests(HomeserverTestCase):
         while not test_d.called:
             protocol.dataReceived(b"a" * chunk_size)
             sent += chunk_size
-            self.assertLessEqual(sent, JsonParser.MAX_RESPONSE_SIZE)
+            self.assertLessEqual(sent, ByteParser.MAX_RESPONSE_SIZE)
 
-        self.assertEqual(sent, JsonParser.MAX_RESPONSE_SIZE)
+        self.assertEqual(sent, ByteParser.MAX_RESPONSE_SIZE)
 
         f = self.failureResultOf(test_d)
         self.assertIsInstance(f.value, RequestSendFailed)

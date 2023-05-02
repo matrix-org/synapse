@@ -802,9 +802,21 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         # Set avatar URL to all users, that no user has a NULL value to avoid
         # different sort order between SQlite and PostreSQL
-        self.get_success(self.store.set_profile_avatar_url("user1", "mxc://url3"))
-        self.get_success(self.store.set_profile_avatar_url("user2", "mxc://url2"))
-        self.get_success(self.store.set_profile_avatar_url("admin", "mxc://url1"))
+        self.get_success(
+            self.store.set_profile_avatar_url(
+                UserID.from_string("@user1:test"), "mxc://url3"
+            )
+        )
+        self.get_success(
+            self.store.set_profile_avatar_url(
+                UserID.from_string("@user2:test"), "mxc://url2"
+            )
+        )
+        self.get_success(
+            self.store.set_profile_avatar_url(
+                UserID.from_string("@admin:test"), "mxc://url1"
+            )
+        )
 
         # order by default (name)
         self._order_test([self.admin_user, user1, user2], None)
@@ -1127,7 +1139,9 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         # set attributes for user
         self.get_success(
-            self.store.set_profile_avatar_url("user", "mxc://servername/mediaid")
+            self.store.set_profile_avatar_url(
+                UserID.from_string("@user:test"), "mxc://servername/mediaid"
+            )
         )
         self.get_success(
             self.store.user_add_threepid("@user:test", "email", "foo@bar.com", 0, 0)
@@ -1257,7 +1271,9 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         Reproduces #12257.
         """
         # Patch `self.other_user` to have an empty string as their avatar.
-        self.get_success(self.store.set_profile_avatar_url("user", ""))
+        self.get_success(
+            self.store.set_profile_avatar_url(UserID.from_string("@user:test"), "")
+        )
 
         # Check we can still erase them.
         channel = self.make_request(
@@ -2311,7 +2327,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # set attributes for user
         self.get_success(
-            self.store.set_profile_avatar_url("user", "mxc://servername/mediaid")
+            self.store.set_profile_avatar_url(
+                UserID.from_string("@user:test"), "mxc://servername/mediaid"
+            )
         )
         self.get_success(
             self.store.user_add_threepid("@user:test", "email", "foo@bar.com", 0, 0)
@@ -3047,12 +3065,12 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             self.store.get_user_by_access_token(other_user_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=self.other_user,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",

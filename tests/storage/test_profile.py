@@ -27,11 +27,9 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         self.u_frank = UserID.from_string("@frank:test")
 
     def test_displayname(self) -> None:
-        self.get_success(self.store.create_profile(self.u_frank.localpart))
+        self.get_success(self.store.create_profile(self.u_frank))
 
-        self.get_success(
-            self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
-        )
+        self.get_success(self.store.set_profile_displayname(self.u_frank, "Frank"))
 
         self.assertEqual(
             "Frank",
@@ -43,21 +41,17 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         )
 
         # test set to None
-        self.get_success(
-            self.store.set_profile_displayname(self.u_frank.localpart, None)
-        )
+        self.get_success(self.store.set_profile_displayname(self.u_frank, None))
 
         self.assertIsNone(
             self.get_success(self.store.get_profile_displayname(self.u_frank.localpart))
         )
 
     def test_avatar_url(self) -> None:
-        self.get_success(self.store.create_profile(self.u_frank.localpart))
+        self.get_success(self.store.create_profile(self.u_frank))
 
         self.get_success(
-            self.store.set_profile_avatar_url(
-                self.u_frank.localpart, "http://my.site/here"
-            )
+            self.store.set_profile_avatar_url(self.u_frank, "http://my.site/here")
         )
 
         self.assertEqual(
@@ -70,9 +64,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         )
 
         # test set to None
-        self.get_success(
-            self.store.set_profile_avatar_url(self.u_frank.localpart, None)
-        )
+        self.get_success(self.store.set_profile_avatar_url(self.u_frank, None))
 
         self.assertIsNone(
             self.get_success(self.store.get_profile_avatar_url(self.u_frank.localpart))

@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import os.path
+import sqlite3
 import time
 import uuid
 import warnings
@@ -72,14 +73,16 @@ from twisted.web.server import Request, Site
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events.presence_router import load_legacy_presence_router
-from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import ContextResourceUsage
+from synapse.module_api.callbacks.spamchecker_callbacks import load_legacy_spam_checkers
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import PostgresEngine, create_engine
+from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
 
@@ -103,6 +106,10 @@ P = ParamSpec("P")
 
 # the type of thing that can be passed into `make_request` in the headers list
 CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
+
+# A pre-prepared SQLite DB that is used as a template when creating new SQLite
+# DB each test run. This dramatically speeds up test set up when using SQLite.
+PREPPED_SQLITE_DB_CONN: Optional[LoggingDatabaseConnection] = None
 
 
 class TimedOutException(Exception):
@@ -899,6 +906,22 @@ def setup_test_homeserver(
             "args": {"database": test_db_location, "cp_min": 1, "cp_max": 1},
         }
 
+        # Check if we have set up a DB that we can use as a template.
+        global PREPPED_SQLITE_DB_CONN
+        if PREPPED_SQLITE_DB_CONN is None:
+            temp_engine = create_engine(database_config)
+            PREPPED_SQLITE_DB_CONN = LoggingDatabaseConnection(
+                sqlite3.connect(":memory:"), temp_engine, "PREPPED_CONN"
+            )
+
+            database = DatabaseConnectionConfig("master", database_config)
+            config.database.databases = [database]
+            prepare_database(
+                PREPPED_SQLITE_DB_CONN, create_engine(database_config), config
+            )
+
+        database_config["_TEST_PREPPED_CONN"] = PREPPED_SQLITE_DB_CONN
+
     if "db_txn_limit" in kwargs:
         database_config["txn_limit"] = kwargs["db_txn_limit"]
 
@@ -983,7 +1006,9 @@ def setup_test_homeserver(
                     dropped = True
                 except psycopg2.OperationalError as e:
                     warnings.warn(
-                        "Couldn't drop old db: " + str(e), category=UserWarning
+                        "Couldn't drop old db: " + str(e),
+                        category=UserWarning,
+                        stacklevel=2,
                     )
                     time.sleep(0.5)
 
@@ -991,7 +1016,11 @@ def setup_test_homeserver(
             db_conn.close()
 
             if not dropped:
-                warnings.warn("Failed to drop old DB.", category=UserWarning)
+                warnings.warn(
+                    "Failed to drop old DB.",
+                    category=UserWarning,
+                    stacklevel=2,
+                )
 
         if not LEAVE_DB:
             # Register the cleanup hook
