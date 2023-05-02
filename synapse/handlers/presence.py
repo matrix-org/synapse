@@ -608,6 +608,8 @@ class WorkerPresenceHandler(BasePresenceHandler):
         busy_presence_enabled = await self.hs.get_datastores().main.get_feature_enabled(
             target_user.to_string(), "msc3026"
         )
+        if not busy_presence_enabled:
+            busy_presence_enabled = self.hs.config.experimental.msc3026_enabled
 
         if presence not in valid_presence or (
             presence == PresenceState.BUSY and not busy_presence_enabled
@@ -1241,6 +1243,8 @@ class PresenceHandler(BasePresenceHandler):
         busy_presence_enabled = await self.hs.get_datastores().main.get_feature_enabled(
             target_user.to_string(), "msc3026"
         )
+        if not busy_presence_enabled:
+            busy_presence_enabled = self.hs.config.experimental.msc3026_enabled
 
         if presence not in valid_presence or (
             presence == PresenceState.BUSY and not busy_presence_enabled

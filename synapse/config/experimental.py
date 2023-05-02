@@ -43,6 +43,9 @@ class ExperimentalConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         experimental = config.get("experimental_features") or {}
 
+        # MSC3026 (busy presence state)
+        self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
+
         # MSC2716 (importing historical messages)
         self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
@@ -96,6 +99,12 @@ class ExperimentalConfig(Config):
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
 
+        # MSC2654: Unread counts
+        #
+        # Note that enabling this will result in an incorrect unread count for
+        # previously calculated push actions.
+        self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
+
         # MSC2815 (allow room moderators to view redacted event content)
         self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
 
@@ -117,6 +126,9 @@ class ExperimentalConfig(Config):
         # MSC3866: M_USER_AWAITING_APPROVAL error code
         raw_msc3866_config = experimental.get("msc3866", {})
         self.msc3866 = MSC3866Config(**raw_msc3866_config)
+
+        # MSC3881: Remotely toggle push notifications for another client
+        self.msc3881_enabled: bool = experimental.get("msc3881_enabled", False)
 
         # MSC3882: Allow an existing session to sign in a new session
         self.msc3882_enabled: bool = experimental.get("msc3882_enabled", False)
@@ -173,6 +185,9 @@ class ExperimentalConfig(Config):
         self.msc3958_supress_edit_notifs = experimental.get(
             "msc3958_supress_edit_notifs", False
         )
+
+        # MSC3967: Do not require UIA when first uploading cross signing keys
+        self.msc3967_enabled = experimental.get("msc3967_enabled", False)
 
         # MSC2659: Application service ping endpoint
         self.msc2659_enabled = experimental.get("msc2659_enabled", False)

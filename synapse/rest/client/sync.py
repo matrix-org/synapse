@@ -552,9 +552,14 @@ class SyncRestServlet(RestServlet):
                         "org.matrix.msc3773.unread_thread_notifications"
                     ] = room.unread_thread_notifications
             result["summary"] = room.summary
-            if await self.store.get_feature_enabled(
+
+            msc2654_enabled = await self.hs.get_datastores().main.get_feature_enabled(
                 requester.user.to_string(), "msc2654"
-            ):
+            )
+            if not msc2654_enabled:
+                msc2654_enabled = self.hs.config.experimental.msc2654_enabled
+
+            if msc2654_enabled:
                 result["org.matrix.msc2654.unread_count"] = room.unread_count
 
         return result

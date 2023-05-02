@@ -438,6 +438,9 @@ class BulkPushRuleEvaluator:
 
             # check whether unread counts are enabled for this user
             unread_enabled = await self.store.get_feature_enabled(uid, "msc2654")
+            if not unread_enabled:
+                unread_enabled = self.hs.config.experimental.msc2654_enabled
+
             if unread_enabled:
                 count_as_unread = _should_count_as_unread(event, context)
             else:
