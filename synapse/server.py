@@ -459,13 +459,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_replication_client(self) -> ReplicationClient:
-        """
-        An HTTP client for HTTP replication.
-        """
-        return ReplicationClient(self)
-
-    @cache_in_self
     def get_federation_http_client(self) -> MatrixFederationHttpClient:
         """
         An HTTP client for federation.
@@ -474,6 +467,13 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config
         )
         return MatrixFederationHttpClient(self, tls_client_options_factory)
+
+    @cache_in_self
+    def get_replication_client(self) -> ReplicationClient:
+        """
+        An HTTP client for HTTP replication.
+        """
+        return ReplicationClient(self)
 
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
