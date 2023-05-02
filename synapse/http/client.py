@@ -76,7 +76,7 @@ from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_u
 from synapse.http.proxyagent import ProxyAgent
 from synapse.http.replicationagent import ReplicationAgent
 from synapse.http.types import QueryParams
-from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import ISynapseReactor
 from synapse.util import json_decoder
@@ -895,15 +895,26 @@ class ReplicationClient(BaseHttpClient):
                 method_bytes = method.encode("ascii")
                 uri_bytes = uri.encode("ascii")
 
-                request_deferred = self.agent.request(
+                # To preserve the logging context, the timeout is treated
+                # in a similar way to `defer.gatherResults`:
+                # * Each logging context-preserving fork is wrapped in
+                #   `run_in_background`. In this case there is only one,
+                #   since the timeout fork is not logging-context aware.
+                # * The `Deferred` that joins the forks back together is
+                #   wrapped in `make_deferred_yieldable` to restore the
+                #   logging context regardless of the path taken.
+                # (The logic/comments for this came from MatrixFederationHttpClient)
+                request_deferred = run_in_background(
+                    self.agent.request,
                     method_bytes,
                     uri_bytes,
                     headers,
                     bodyProducer=body_producer,
                 )
 
-                # we use our own timeout mechanism rather than treq's as a workaround
+                # we use our own timeout mechanism rather than twisted's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
+                # (Updated url https://github.com/twisted/twisted/issues/9534)
                 request_deferred = timeout_deferred(
                     request_deferred,
                     60,
