@@ -1,1 +1,1 @@
-Remove references to supporting per-user flag for msc2654 (#15522).
+Remove references to supporting per-user flag for [MSC2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654) (#15522).
