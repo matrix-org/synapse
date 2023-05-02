@@ -375,11 +375,10 @@ class SigningKeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
-        msc3967_enabled = await self.hs.get_datastores().main.get_feature_enabled(
-            user_id, "msc3967"
+        msc3967_enabled = (
+            await self.hs.get_datastores().main.get_feature_enabled(user_id, "msc3967")
+            or self.hs.config.experimental.msc2654_enabled
         )
-        if not msc3967_enabled:
-            msc3967_enabled = self.hs.config.experimental.msc2654_enabled
 
         if msc3967_enabled:
             if await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id):

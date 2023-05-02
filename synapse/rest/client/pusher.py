@@ -53,11 +53,12 @@ class PushersRestServlet(RestServlet):
 
         pusher_dicts = [p.as_dict() for p in pushers]
 
-        msc3881_enabled = await self.hs.get_datastores().main.get_feature_enabled(
-            user.to_string(), "msc3881"
+        msc3881_enabled = (
+            await self.hs.get_datastores().main.get_feature_enabled(
+                user.to_string(), "msc3881"
+            )
+            or self.hs.config.experimental.msc3881_enabled
         )
-        if not msc3881_enabled:
-            msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
         for pusher in pusher_dicts:
             if msc3881_enabled:
@@ -117,11 +118,12 @@ class PushersSetRestServlet(RestServlet):
             append = content["append"]
 
         enabled = True
-        msc3881_enabled = await self.hs.get_datastores().main.get_feature_enabled(
-            user.to_string(), "msc3881"
+        msc3881_enabled = (
+            await self.hs.get_datastores().main.get_feature_enabled(
+                user.to_string(), "msc3881"
+            )
+            or self.hs.config.experimental.msc3881_enabled
         )
-        if not msc3881_enabled:
-            msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
         if msc3881_enabled and "org.matrix.msc3881.enabled" in content:
             enabled = content["org.matrix.msc3881.enabled"]
