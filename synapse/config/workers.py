@@ -240,7 +240,7 @@ class WorkerConfig(Config):
                 for k, v in instance_map[MAIN_PROCESS_INSTANCE_MAP_NAME].items():
                     instance_map[MAIN_PROCESS_INSTANCE_NAME].setdefault(k, v)
                 del instance_map[MAIN_PROCESS_INSTANCE_MAP_NAME]
-                logger.error(f"config.workers: {instance_map}")
+
             # This is the backwards compatibility bit that handles the
             # worker_replication_* bits using setdefault() to not overwrite anything.
             elif main_host is not None and main_port is not None:
@@ -252,7 +252,6 @@ class WorkerConfig(Config):
                         "tls": main_tls,
                     },
                 )
-                logger.error(f"config.workers: {instance_map}")
 
             else:
                 # If we've gotten here, it means that the main process is not on the
