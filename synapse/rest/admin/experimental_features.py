@@ -33,7 +33,6 @@ class ExperimentalFeature(str, Enum):
     """
 
     MSC3026 = "msc3026"
-    MSC2654 = "msc2654"
     MSC3881 = "msc3881"
     MSC3967 = "msc3967"
 
