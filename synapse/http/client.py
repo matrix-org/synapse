@@ -826,7 +826,6 @@ class SimpleReplicationClient(BaseHttpClient):
     Uses existing BaseHttpClient methods but replaces the 'agent' used to make the
     request with one that supports HTTP and HTTPS.
     Attributes:
-            endpoints.
         agent: The custom Twisted Agent used for constructing the connection.
     """
 
