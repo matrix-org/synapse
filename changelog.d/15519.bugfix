@@ -1,0 +1,1 @@
+Fix bug where we didn't clean out old highlight push notifications from the database. Introduced in v1.62.0.
