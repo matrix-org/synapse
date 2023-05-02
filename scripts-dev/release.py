@@ -280,7 +280,7 @@ def _prepare() -> None:
     )
 
     print("Opening the changelog in your browser...")
-    print("Please ask others to give it a check.")
+    print("Please ask #synapse-dev to give it a check.")
     click.launch(
         f"https://github.com/matrix-org/synapse/blob/{synapse_repo.active_branch.name}/CHANGES.md"
     )

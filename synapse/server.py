@@ -42,7 +42,6 @@ from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.presence_router import PresenceRouter
-from synapse.events.spamcheck import SpamChecker
 from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
@@ -689,10 +688,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker(self)
-
-    @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
         return ThirdPartyEventRules(self)
 
@@ -804,7 +799,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_module_api_callbacks(self) -> ModuleApiCallbacks:
-        return ModuleApiCallbacks()
+        return ModuleApiCallbacks(self)
 
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:

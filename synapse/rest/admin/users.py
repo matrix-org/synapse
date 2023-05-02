@@ -427,7 +427,6 @@ class UserRestServletV2(RestServlet):
                     ):
                         await self.pusher_pool.add_or_update_pusher(
                             user_id=user_id,
-                            access_token=None,
                             kind="email",
                             app_id="m.email",
                             app_display_name="Email Notifications",

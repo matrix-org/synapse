@@ -14,7 +14,7 @@
 
 import logging
 
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -200,7 +200,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.storage.state.get_state_for_event(
                 e5.event_id,
                 state_filter=StateFilter(
-                    types=frozendict(
+                    types=immutabledict(
                         {EventTypes.Member: frozenset({self.u_alice.to_string()})}
                     ),
                     include_others=True,
@@ -222,7 +222,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.storage.state.get_state_for_event(
                 e5.event_id,
                 state_filter=StateFilter(
-                    types=frozendict({EventTypes.Member: frozenset()}),
+                    types=immutabledict({EventTypes.Member: frozenset()}),
                     include_others=True,
                 ),
             )
@@ -248,7 +248,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+                types=immutabledict({EventTypes.Member: frozenset()}),
+                include_others=True,
             ),
         )
 
@@ -265,7 +266,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+                types=immutabledict({EventTypes.Member: frozenset()}),
+                include_others=True,
             ),
         )
 
@@ -278,7 +280,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: None}), include_others=True
+                types=immutabledict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -295,7 +297,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: None}), include_others=True
+                types=immutabledict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -315,7 +317,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({e5.state_key})}),
+                types=immutabledict({EventTypes.Member: frozenset({e5.state_key})}),
                 include_others=True,
             ),
         )
@@ -333,7 +335,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({e5.state_key})}),
+                types=immutabledict({EventTypes.Member: frozenset({e5.state_key})}),
                 include_others=True,
             ),
         )
@@ -347,7 +349,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({e5.state_key})}),
+                types=immutabledict({EventTypes.Member: frozenset({e5.state_key})}),
                 include_others=False,
             ),
         )
@@ -398,7 +400,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+                types=immutabledict({EventTypes.Member: frozenset()}),
+                include_others=True,
             ),
         )
 
@@ -410,7 +413,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+                types=immutabledict({EventTypes.Member: frozenset()}),
+                include_others=True,
             ),
         )
 
@@ -423,7 +427,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: None}), include_others=True
+                types=immutabledict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -434,7 +438,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: None}), include_others=True
+                types=immutabledict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -453,7 +457,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({e5.state_key})}),
+                types=immutabledict({EventTypes.Member: frozenset({e5.state_key})}),
                 include_others=True,
             ),
         )
@@ -465,7 +469,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({e5.state_key})}),
+                types=immutabledict({EventTypes.Member: frozenset({e5.state_key})}),
                 include_others=True,
             ),
         )
@@ -479,7 +483,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({e5.state_key})}),
+                types=immutabledict({EventTypes.Member: frozenset({e5.state_key})}),
                 include_others=False,
             ),
         )
@@ -491,7 +495,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({e5.state_key})}),
+                types=immutabledict({EventTypes.Member: frozenset({e5.state_key})}),
                 include_others=False,
             ),
         )

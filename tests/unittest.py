@@ -146,6 +146,9 @@ class TestCase(unittest.TestCase):
                     % (current_context(),)
                 )
 
+            # Disable GC for duration of test. See below for why.
+            gc.disable()
+
             old_level = logging.getLogger().level
             if level is not None and old_level != level:
 
@@ -163,12 +166,19 @@ class TestCase(unittest.TestCase):
 
             return orig()
 
+        # We want to force a GC to workaround problems with deferreds leaking
+        # logcontexts when they are GCed (see the logcontext docs).
+        #
+        # The easiest way to do this would be to do a full GC after each test
+        # run, but that is very expensive. Instead, we disable GC (above) for
+        # the duration of the test so that we only need to run a gen-0 GC, which
+        # is a lot quicker.
+
         @around(self)
         def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
-            # force a GC to workaround problems with deferreds leaking logcontexts when
-            # they are GCed (see the logcontext docs)
-            gc.collect()
+            gc.collect(0)
+            gc.enable()
             set_current_context(SENTINEL_CONTEXT)
 
             return ret
@@ -783,16 +793,12 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             hs.get_datastores().main.store_server_verify_keys(
                 from_server=self.OTHER_SERVER_NAME,
                 ts_added_ms=clock.time_msec(),
-                verify_keys=[
-                    (
-                        self.OTHER_SERVER_NAME,
-                        verify_key_id,
-                        FetchKeyResult(
-                            verify_key=verify_key,
-                            valid_until_ts=clock.time_msec() + 10000,
-                        ),
-                    )
-                ],
+                verify_keys={
+                    (self.OTHER_SERVER_NAME, verify_key_id): FetchKeyResult(
+                        verify_key=verify_key,
+                        valid_until_ts=clock.time_msec() + 10000,
+                    ),
+                },
             )
         )
 

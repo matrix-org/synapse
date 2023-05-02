@@ -412,8 +412,9 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         self.get_success(
             self.master_store.add_push_actions_to_staging(
                 event.event_id,
-                {user_id: actions for user_id, actions in push_actions},
+                dict(push_actions),
                 {user_id: False for user_id, _ in push_actions},
+                False,
                 "main",
             )
         )

@@ -28,7 +28,7 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 from synapse.api.constants import EventTypes
 from synapse.types import MutableStateMap, StateKey, StateMap
@@ -56,7 +56,7 @@ class StateFilter:
             appear in `types`.
     """
 
-    types: "frozendict[str, Optional[FrozenSet[str]]]"
+    types: "immutabledict[str, Optional[FrozenSet[str]]]"
     include_others: bool = False
 
     def __attrs_post_init__(self) -> None:
@@ -67,7 +67,7 @@ class StateFilter:
             object.__setattr__(
                 self,
                 "types",
-                frozendict({k: v for k, v in self.types.items() if v is not None}),
+                immutabledict({k: v for k, v in self.types.items() if v is not None}),
             )
 
     @staticmethod
@@ -112,7 +112,7 @@ class StateFilter:
             type_dict.setdefault(typ, set()).add(s)  # type: ignore
 
         return StateFilter(
-            types=frozendict(
+            types=immutabledict(
                 (k, frozenset(v) if v is not None else None)
                 for k, v in type_dict.items()
             )
@@ -139,7 +139,7 @@ class StateFilter:
             The new state filter
         """
         return StateFilter(
-            types=frozendict({EventTypes.Member: frozenset(members)}),
+            types=immutabledict({EventTypes.Member: frozenset(members)}),
             include_others=True,
         )
 
@@ -159,7 +159,7 @@ class StateFilter:
                 types_with_frozen_values[state_types] = None
 
         return StateFilter(
-            frozendict(types_with_frozen_values), include_others=include_others
+            immutabledict(types_with_frozen_values), include_others=include_others
         )
 
     def return_expanded(self) -> "StateFilter":
@@ -217,7 +217,7 @@ class StateFilter:
             # We want to return all non-members, but only particular
             # memberships
             return StateFilter(
-                types=frozendict({EventTypes.Member: self.types[EventTypes.Member]}),
+                types=immutabledict({EventTypes.Member: self.types[EventTypes.Member]}),
                 include_others=True,
             )
         else:
@@ -381,14 +381,16 @@ class StateFilter:
             if state_keys is None:
                 member_filter = StateFilter.all()
             else:
-                member_filter = StateFilter(frozendict({EventTypes.Member: state_keys}))
+                member_filter = StateFilter(
+                    immutabledict({EventTypes.Member: state_keys})
+                )
         elif self.include_others:
             member_filter = StateFilter.all()
         else:
             member_filter = StateFilter.none()
 
         non_member_filter = StateFilter(
-            types=frozendict(
+            types=immutabledict(
                 {k: v for k, v in self.types.items() if k != EventTypes.Member}
             ),
             include_others=self.include_others,
@@ -578,8 +580,8 @@ class StateFilter:
         return False
 
 
-_ALL_STATE_FILTER = StateFilter(types=frozendict(), include_others=True)
+_ALL_STATE_FILTER = StateFilter(types=immutabledict(), include_others=True)
 _ALL_NON_MEMBER_STATE_FILTER = StateFilter(
-    types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+    types=immutabledict({EventTypes.Member: frozenset()}), include_others=True
 )
-_NONE_STATE_FILTER = StateFilter(types=frozendict(), include_others=False)
+_NONE_STATE_FILTER = StateFilter(types=immutabledict(), include_others=False)

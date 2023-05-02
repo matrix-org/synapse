@@ -41,7 +41,12 @@ from typing_extensions import ParamSpec
 
 import twisted
 from twisted.internet import defer, error, reactor as _reactor
-from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorSSL, IReactorTCP
+from twisted.internet.interfaces import (
+    IOpenSSLContextFactory,
+    IReactorSSL,
+    IReactorTCP,
+    IReactorUNIX,
+)
 from twisted.internet.protocol import ServerFactory
 from twisted.internet.tcp import Port
 from twisted.logger import LoggingFile, LogLevel
@@ -56,10 +61,9 @@ from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config import ConfigError
 from synapse.config._base import format_config_error
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.server import ListenerConfig, ManholeConfig
+from synapse.config.server import ListenerConfig, ManholeConfig, TCPListenerConfig
 from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
-from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseSite
@@ -68,6 +72,7 @@ from synapse.logging.opentracing import init_tracer
 from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
+from synapse.module_api.callbacks.spamchecker_callbacks import load_legacy_spam_checkers
 from synapse.types import ISynapseReactor
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
@@ -351,6 +356,28 @@ def listen_tcp(
     return r  # type: ignore[return-value]
 
 
+def listen_unix(
+    path: str,
+    mode: int,
+    factory: ServerFactory,
+    reactor: IReactorUNIX = reactor,
+    backlog: int = 50,
+) -> List[Port]:
+    """
+    Create a UNIX socket for a given path and 'mode' permission
+
+    Returns:
+        list of twisted.internet.tcp.Port listening for TCP connections
+    """
+    wantPID = True
+
+    return [
+        # IReactorUNIX returns an object implementing IListeningPort from listenUNIX,
+        # but we know it will be a Port instance.
+        cast(Port, reactor.listenUNIX(path, factory, backlog, mode, wantPID))
+    ]
+
+
 def listen_http(
     listener_config: ListenerConfig,
     root_resource: Resource,
@@ -359,18 +386,13 @@ def listen_http(
     context_factory: Optional[IOpenSSLContextFactory],
     reactor: ISynapseReactor = reactor,
 ) -> List[Port]:
-    port = listener_config.port
-    bind_addresses = listener_config.bind_addresses
-    tls = listener_config.tls
-
     assert listener_config.http_options is not None
 
-    site_tag = listener_config.http_options.tag
-    if site_tag is None:
-        site_tag = str(port)
+    site_tag = listener_config.get_site_tag()
 
     site = SynapseSite(
-        "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
+        "synapse.access.%s.%s"
+        % ("https" if listener_config.is_tls() else "http", site_tag),
         site_tag,
         listener_config,
         root_resource,
@@ -378,25 +400,41 @@ def listen_http(
         max_request_body_size=max_request_body_size,
         reactor=reactor,
     )
-    if tls:
-        # refresh_certificate should have been called before this.
-        assert context_factory is not None
-        ports = listen_ssl(
-            bind_addresses,
-            port,
-            site,
-            context_factory,
-            reactor=reactor,
-        )
-        logger.info("Synapse now listening on TCP port %d (TLS)", port)
+
+    if isinstance(listener_config, TCPListenerConfig):
+        if listener_config.is_tls():
+            # refresh_certificate should have been called before this.
+            assert context_factory is not None
+            ports = listen_ssl(
+                listener_config.bind_addresses,
+                listener_config.port,
+                site,
+                context_factory,
+                reactor=reactor,
+            )
+            logger.info(
+                "Synapse now listening on TCP port %d (TLS)", listener_config.port
+            )
+        else:
+            ports = listen_tcp(
+                listener_config.bind_addresses,
+                listener_config.port,
+                site,
+                reactor=reactor,
+            )
+            logger.info("Synapse now listening on TCP port %d", listener_config.port)
+
     else:
-        ports = listen_tcp(
-            bind_addresses,
-            port,
-            site,
-            reactor=reactor,
+        ports = listen_unix(
+            listener_config.path, listener_config.mode, site, reactor=reactor
         )
-        logger.info("Synapse now listening on TCP port %d", port)
+        # getHost() returns a UNIXAddress which contains an instance variable of 'name'
+        # encoded as a byte string. Decode as utf-8 so pretty.
+        logger.info(
+            "Synapse now listening on Unix Socket at: "
+            f"{ports[0].getHost().name.decode('utf-8')}"
+        )
+
     return ports
 
 

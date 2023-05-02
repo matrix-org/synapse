@@ -46,10 +46,10 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
             store.store_server_verify_keys(
                 "from_server",
                 10,
-                [
-                    ("server1", key_id_1, FetchKeyResult(KEY_1, 100)),
-                    ("server1", key_id_2, FetchKeyResult(KEY_2, 200)),
-                ],
+                {
+                    ("server1", key_id_1): FetchKeyResult(KEY_1, 100),
+                    ("server1", key_id_2): FetchKeyResult(KEY_2, 200),
+                },
             )
         )
 
@@ -90,10 +90,10 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
             store.store_server_verify_keys(
                 "from_server",
                 0,
-                [
-                    ("srv1", key_id_1, FetchKeyResult(KEY_1, 100)),
-                    ("srv1", key_id_2, FetchKeyResult(KEY_2, 200)),
-                ],
+                {
+                    ("srv1", key_id_1): FetchKeyResult(KEY_1, 100),
+                    ("srv1", key_id_2): FetchKeyResult(KEY_2, 200),
+                },
             )
         )
 
@@ -119,7 +119,7 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
             signedjson.key.generate_signing_key("key2")
         )
         d = store.store_server_verify_keys(
-            "from_server", 10, [("srv1", key_id_2, FetchKeyResult(new_key_2, 300))]
+            "from_server", 10, {("srv1", key_id_2): FetchKeyResult(new_key_2, 300)}
         )
         self.get_success(d)
 

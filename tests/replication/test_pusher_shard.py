@@ -51,12 +51,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_dict is not None
-        token_id = user_dict.token_id
+        device_id = user_dict.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",

@@ -105,7 +105,7 @@ class EmailPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(self.access_token)
         )
         assert user_tuple is not None
-        self.token_id = user_tuple.token_id
+        self.device_id = user_tuple.device_id
 
         # We need to add email to account before we can create a pusher.
         self.get_success(
@@ -117,7 +117,7 @@ class EmailPusherTests(HomeserverTestCase):
         pusher = self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=self.user_id,
-                access_token=self.token_id,
+                device_id=self.device_id,
                 kind="email",
                 app_id="m.email",
                 app_display_name="Email Notifications",
@@ -141,7 +141,7 @@ class EmailPusherTests(HomeserverTestCase):
             self.get_success_or_raise(
                 self.hs.get_pusherpool().add_or_update_pusher(
                     user_id=self.user_id,
-                    access_token=self.token_id,
+                    device_id=self.device_id,
                     kind="email",
                     app_id="m.email",
                     app_display_name="Email Notifications",

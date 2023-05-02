@@ -67,13 +67,13 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         def test_data(data: Any) -> None:
             self.get_failure(
                 self.hs.get_pusherpool().add_or_update_pusher(
                     user_id=user_id,
-                    access_token=token_id,
+                    device_id=device_id,
                     kind="http",
                     app_id="m.http",
                     app_display_name="HTTP Push Notifications",
@@ -114,12 +114,12 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -235,12 +235,12 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -356,12 +356,12 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -444,12 +444,12 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -523,12 +523,12 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -631,12 +631,12 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -767,12 +767,12 @@ class HTTPPusherTests(HomeserverTestCase):
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
+        device_id = user_tuple.device_id
 
         self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -781,7 +781,6 @@ class HTTPPusherTests(HomeserverTestCase):
                 lang=None,
                 data={"url": "http://example.com/_matrix/push/v1/notify"},
                 enabled=enabled,
-                device_id=user_tuple.device_id,
             )
         )
 
@@ -898,19 +897,17 @@ class HTTPPusherTests(HomeserverTestCase):
 
     def test_update_different_device_access_token_device_id(self) -> None:
         """Tests that if we create a pusher from one device, the update it from another
-        device, the access token and device ID associated with the pusher stays the
-        same.
+        device, the device ID associated with the pusher stays the same.
         """
         # Create a user with a pusher.
         user_id, access_token = self._make_user_with_pusher("user")
 
-        # Get the token ID for the current access token, since that's what we store in
-        # the pushers table. Also get the device ID from it.
+        # Get the device ID for the current access token, since that's what we store in
+        # the pushers table.
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         assert user_tuple is not None
-        token_id = user_tuple.token_id
         device_id = user_tuple.device_id
 
         # Generate a new access token, and update the pusher with it.
@@ -923,10 +920,9 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         pushers: List[PusherConfig] = list(ret)
 
-        # Check that we still have one pusher, and that the access token and device ID
-        # associated with it didn't change.
+        # Check that we still have one pusher, and that the device ID associated with
+        # it didn't change.
         self.assertEqual(len(pushers), 1)
-        self.assertEqual(pushers[0].access_token, token_id)
         self.assertEqual(pushers[0].device_id, device_id)
 
     @override_config({"experimental_features": {"msc3881_enabled": True}})

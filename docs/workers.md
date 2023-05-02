@@ -234,6 +234,8 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
     ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*$
+    ^/_matrix/client/(r0|v3|unstable)/capabilities$
 
     # Encryption requests
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
@@ -247,6 +249,7 @@ information.
     ^/_matrix/client/(r0|v3|unstable)/register$
     ^/_matrix/client/(r0|v3|unstable)/register/available$
     ^/_matrix/client/v1/register/m.login.registration_token/validity$
+    ^/_matrix/client/(r0|v3|unstable)/password_policy$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact

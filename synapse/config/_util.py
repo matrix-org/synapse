@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Iterable
+from typing import Any, Dict, Iterable, Type, TypeVar
 
 import jsonschema
+from pydantic import BaseModel, ValidationError, parse_obj_as
 
 from synapse.config._base import ConfigError
 from synapse.types import JsonDict
@@ -64,3 +65,28 @@ def json_error_to_config_error(
         else:
             path.append(str(p))
     return ConfigError(e.message, path)
+
+
+Model = TypeVar("Model", bound=BaseModel)
+
+
+def parse_and_validate_mapping(
+    config: Any,
+    model_type: Type[Model],
+) -> Dict[str, Model]:
+    """Parse `config` as a mapping from strings to a given `Model` type.
+    Args:
+        config: The configuration data to check
+        model_type: The BaseModel to validate and parse against.
+    Returns:
+        Fully validated and parsed Dict[str, Model].
+    Raises:
+        ConfigError, if given improper input.
+    """
+    try:
+        # type-ignore: mypy doesn't like constructing `Dict[str, model_type]` because
+        # `model_type` is a runtime variable. Pydantic is fine with this.
+        instances = parse_obj_as(Dict[str, model_type], config)  # type: ignore[valid-type]
+    except ValidationError as e:
+        raise ConfigError(str(e)) from e
+    return instances
