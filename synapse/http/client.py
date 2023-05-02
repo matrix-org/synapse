@@ -820,7 +820,7 @@ class SimpleHttpClient(BaseHttpClient):
             )
 
 
-class SimpleReplicationClient(BaseHttpClient):
+class ReplicationClient(BaseHttpClient):
     """Client for connecting to replication endpoints via HTTP and HTTPS.
 
     Attributes:

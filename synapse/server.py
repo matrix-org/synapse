@@ -107,8 +107,8 @@ from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import (
     InsecureInterceptableContextFactory,
+    ReplicationClient,
     SimpleHttpClient,
-    SimpleReplicationClient,
 )
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.media.media_repository import MediaRepository
@@ -459,11 +459,11 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
-    def get_replication_client(self) -> SimpleReplicationClient:
+    def get_replication_client(self) -> ReplicationClient:
         """
         An HTTP client for HTTP replication.
         """
-        return SimpleReplicationClient(self)
+        return ReplicationClient(self)
 
     @cache_in_self
     def get_federation_http_client(self) -> MatrixFederationHttpClient:
