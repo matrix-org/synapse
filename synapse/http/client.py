@@ -873,8 +873,7 @@ class SimpleReplicationClient(BaseHttpClient):
         """
         outgoing_requests_counter.labels(method).inc()
 
-        # log request but strip `access_token` (AS requests for example include this)
-        logger.debug("Sending request %s %s", method, redact_uri(uri))
+        logger.debug("Sending request %s %s", method, uri)
 
         with start_active_span(
             "outgoing-replication-request",
@@ -922,7 +921,7 @@ class SimpleReplicationClient(BaseHttpClient):
                 logger.info(
                     "Received response to %s %s: %s",
                     method,
-                    redact_uri(uri),
+                    uri,
                     response.code,
                 )
                 return response
@@ -931,7 +930,7 @@ class SimpleReplicationClient(BaseHttpClient):
                 logger.info(
                     "Error sending request to  %s %s: %s %s",
                     method,
-                    redact_uri(uri),
+                    uri,
                     type(e).__name__,
                     e.args[0],
                 )
