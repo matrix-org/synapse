@@ -962,3 +962,40 @@ class HTTPPusherTests(HomeserverTestCase):
             channel.json_body["pushers"][0]["org.matrix.msc3881.device_id"],
             lookup_result.device_id,
         )
+
+    @override_config({"push": {"jitter_delay": "10s"}})
+    def test_jitter(self) -> None:
+        """Tests that enabling jitter actually delays sending push."""
+        user_id, access_token = self._make_user_with_pusher("user")
+        other_user_id, other_access_token = self._make_user_with_pusher("otheruser")
+
+        room = self.helper.create_room_as(user_id, tok=access_token)
+        self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # Send a message and check that it did not generate a push, as it should
+        # be delayed.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 0)
+
+        # Now advance time past the max jitter, and assert the message was sent.
+        self.reactor.advance(15)
+        self.assertEqual(len(self.push_attempts), 1)
+
+        self.push_attempts[0][0].callback({})
+
+        # Now we send a bunch of messages and assert that they were all sent
+        # within the 10s max delay.
+        for _ in range(10):
+            self.helper.send(room, body="Hi!", tok=other_access_token)
+
+        index = 1
+        for _ in range(11):
+            while len(self.push_attempts) > index:
+                self.push_attempts[index][0].callback({})
+                self.pump()
+                index += 1
+
+            self.reactor.advance(1)
+            self.pump()
+
+        self.assertEqual(len(self.push_attempts), 11)

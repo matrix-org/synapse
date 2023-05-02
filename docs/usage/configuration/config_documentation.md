@@ -3442,6 +3442,9 @@ This option has a number of sub-options. They are as follows:
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
+* `jitter_delay`: Delays push notifications by a random amount up to the given
+  duration. Useful for mitigating timing attacks. Optional, defaults to no
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
@@ -3449,6 +3452,7 @@ push:
   enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: "10s"
 ```
 ---
 ## Rooms
