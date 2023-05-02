@@ -1593,14 +1593,14 @@ tests = ["Sphinx", "doubles", "flake8", "flake8-quotes", "gevent", "mock", "pyte
 
 [[package]]
 name = "packaging"
-version = "23.0"
+version = "23.1"
 description = "Core utilities for Python packages"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "packaging-23.0-py3-none-any.whl", hash = "sha256:714ac14496c3e68c99c29b00845f7a2b85f3bb6f1078fd9f72fd20f0570002b2"},
-    {file = "packaging-23.0.tar.gz", hash = "sha256:b6ad297f8907de0fa2fe1ccbd26fdaf387f5f47c7275fedf8cce89f99446cf97"},
+    {file = "packaging-23.1-py3-none-any.whl", hash = "sha256:994793af429502c4ea2ebf6bf664629d07c1a9fe974af92966e4b8d2df7edc61"},
+    {file = "packaging-23.1.tar.gz", hash = "sha256:a392980d2b6cffa644431898be54b0045151319d1e7ec34f0cfed48767dd334f"},
 ]
 
 [[package]]
@@ -2466,14 +2466,14 @@ testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (
 
 [[package]]
 name = "setuptools-rust"
-version = "1.5.2"
+version = "1.6.0"
 description = "Setuptools Rust extension plugin"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "setuptools-rust-1.5.2.tar.gz", hash = "sha256:d8daccb14dc0eae1b6b6eb3ecef79675bd37b4065369f79c35393dd5c55652c7"},
-    {file = "setuptools_rust-1.5.2-py3-none-any.whl", hash = "sha256:8eb45851e34288f2296cd5ab9e924535ac1757318b730a13fe6836867843f206"},
+    {file = "setuptools-rust-1.6.0.tar.gz", hash = "sha256:c86e734deac330597998bfbc08da45187e6b27837e23bd91eadb320732392262"},
+    {file = "setuptools_rust-1.6.0-py3-none-any.whl", hash = "sha256:e28ae09fb7167c44ab34434eb49279307d611547cb56cb9789955cdb54a1aed9"},
 ]
 
 [package.dependencies]
@@ -3058,14 +3058,14 @@ files = [
 
 [[package]]
 name = "types-pillow"
-version = "9.4.0.19"
+version = "9.5.0.2"
 description = "Typing stubs for Pillow"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-Pillow-9.4.0.19.tar.gz", hash = "sha256:a04401181979049977e318dae4523ab5ae8246314fc68fcf50b043ac885a5468"},
-    {file = "types_Pillow-9.4.0.19-py3-none-any.whl", hash = "sha256:b55f2508be21e68a39f0a41830f1f1725aba0888e727e2eccd253c78cd5357a5"},
+    {file = "types-Pillow-9.5.0.2.tar.gz", hash = "sha256:b3f9f621f259566c19c1deca21901017c8b1e3e200ed2e49e0a2d83c0a5175db"},
+    {file = "types_Pillow-9.5.0.2-py3-none-any.whl", hash = "sha256:58fdebd0ffa2353ecccdd622adde23bce89da5c0c8b96c34f2d1eca7b7e42d0e"},
 ]
 
 [[package]]
@@ -3109,14 +3109,14 @@ files = [
 
 [[package]]
 name = "types-requests"
-version = "2.28.11.16"
+version = "2.29.0.0"
 description = "Typing stubs for requests"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-requests-2.28.11.16.tar.gz", hash = "sha256:9d4002056df7ebc4ec1f28fd701fba82c5c22549c4477116cb2656aa30ace6db"},
-    {file = "types_requests-2.28.11.16-py3-none-any.whl", hash = "sha256:a86921028335fdcc3aaf676c9d3463f867db6af2303fc65aa309b13ae1e6dd53"},
+    {file = "types-requests-2.29.0.0.tar.gz", hash = "sha256:c86f4a955d943d2457120dbe719df24ef0924e11177164d10a0373cf311d7b4d"},
+    {file = "types_requests-2.29.0.0-py3-none-any.whl", hash = "sha256:4cf6e323e856c779fbe8815bb977a5bf5d6c5034713e4c17ff2a9a20610f5b27"},
 ]
 
 [package.dependencies]

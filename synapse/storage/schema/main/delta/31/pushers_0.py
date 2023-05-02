@@ -20,14 +20,17 @@
 
 import logging
 
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine
+
 logger = logging.getLogger(__name__)
 
 
-def token_to_stream_ordering(token):
+def token_to_stream_ordering(token: str) -> int:
     return int(token[1:].split("_")[0])
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     logger.info("Porting pushers table, delta 31...")
     cur.execute(
         """
@@ -61,8 +64,8 @@ def run_create(cur, database_engine, *args, **kwargs):
     """
     )
     count = 0
-    for row in cur.fetchall():
-        row = list(row)
+    for tuple_row in cur.fetchall():
+        row = list(tuple_row)
         row[12] = token_to_stream_ordering(row[12])
         cur.execute(
             """
@@ -80,7 +83,3 @@ def run_create(cur, database_engine, *args, **kwargs):
     cur.execute("DROP TABLE pushers")
     cur.execute("ALTER TABLE pushers2 RENAME TO pushers")
     logger.info("Moved %d pushers to new table", count)
-
-
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass
