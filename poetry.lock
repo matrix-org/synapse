@@ -2028,17 +2028,6 @@ files = [
 plugins = ["importlib-metadata"]
 
 [[package]]
-name = "pyicu"
-version = "2.10.2"
-description = "Python extension wrapping the ICU C++ API"
-category = "main"
-optional = true
-python-versions = "*"
-files = [
-    {file = "PyICU-2.10.2.tar.gz", hash = "sha256:0c3309eea7fab6857507ace62403515b60fe096cbfb4f90d14f55ff75c5441c1"},
-]
-
-[[package]]
 name = "pyjwt"
 version = "2.6.0"
 description = "JSON Web Token implementation in Python"
@@ -3469,7 +3458,7 @@ docs = ["Sphinx", "repoze.sphinx.autointerface"]
 test = ["zope.i18nmessageid", "zope.testing", "zope.testrunner"]
 
 [extras]
-all = ["Pympler", "authlib", "hiredis", "jaeger-client", "jump-consistent-hash", "lxml", "matrix-synapse-ldap3", "opentracing", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pyicu", "pysaml2", "sentry-sdk", "txredisapi"]
+all = ["Pympler", "authlib", "hiredis", "jaeger-client", "jump-consistent-hash", "lxml", "matrix-synapse-ldap3", "opentracing", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "sentry-sdk", "txredisapi"]
 cache-memory = ["Pympler"]
 jwt = ["authlib"]
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
@@ -3482,9 +3471,8 @@ sentry = ["sentry-sdk"]
 systemd = ["systemd-python"]
 test = ["idna", "parameterized"]
 url-preview = ["lxml"]
-user-search = ["pyicu"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7.1"
-content-hash = "3b42e96643d75c50e5200c3dfd7d022f24970e2b169978c9ca25c2852b8d521a"
+content-hash = "d56fc3649ee8119a6413791131859f2992091a72344d55e15c0d6dc0c8004994"

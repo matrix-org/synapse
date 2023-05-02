@@ -242,7 +242,7 @@ hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
-pyicu = { version = ">=2.10.2", optional = true }
+# pyicu = { version = ">=2.10.2", optional = true }
 jump-consistent-hash = { version = "^3.2.0", optional = true }
 
 [tool.poetry.extras]
@@ -269,7 +269,7 @@ test = ["parameterized", "idna"]
 # Allows for better search for international characters in the user directory. This
 # requires libicu's development headers installed on the system (e.g. libicu-dev on
 # Debian-based distributions).
-user-search = ["pyicu"]
+# user-search = ["pyicu"]
 
 # The duplication here is awful. I hate hate hate hate hate it. However, for now I want
 # to ensure you can still `pip install matrix-synapse[all]` like today. Two motivations:
@@ -302,7 +302,7 @@ all = [
     # cache-memory
     "pympler",
     # improved user search
-    "pyicu",
+    # "pyicu",
     # omitted:
     #   - test: it's useful to have this separate from dev deps in the olddeps job
     #   - systemd: this is a system-based requirement
