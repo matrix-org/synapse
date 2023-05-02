@@ -1,0 +1,1 @@
+Add column `full_user_id` to tables `profiles` and `user_filters`.

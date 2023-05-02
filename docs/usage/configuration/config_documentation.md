@@ -577,6 +577,10 @@ delete any device that hasn't been accessed for more than the specified amount o
 
 Defaults to no duration, which means devices are never pruned.
 
+**Note:** This task will always run on the main process, regardless of the value of
+`run_background_tasks_on`. This is due to workers currently not having the ability to
+delete devices.
+
 Example configuration:
 ```yaml
 delete_stale_devices_after: 1y

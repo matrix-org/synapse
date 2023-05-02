@@ -66,9 +66,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.handler = hs.get_profile_handler()
 
     def test_get_my_name(self) -> None:
-        self.get_success(
-            self.store.set_profile_displayname(self.frank.localpart, "Frank")
-        )
+        self.get_success(self.store.set_profile_displayname(self.frank, "Frank"))
 
         displayname = self.get_success(self.handler.get_displayname(self.frank))
 
@@ -121,9 +119,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.hs.config.registration.enable_set_displayname = False
 
         # Setting displayname for the first time is allowed
-        self.get_success(
-            self.store.set_profile_displayname(self.frank.localpart, "Frank")
-        )
+        self.get_success(self.store.set_profile_displayname(self.frank, "Frank"))
 
         self.assertEqual(
             (
@@ -166,8 +162,14 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_incoming_fed_query(self) -> None:
-        self.get_success(self.store.create_profile("caroline"))
-        self.get_success(self.store.set_profile_displayname("caroline", "Caroline"))
+        self.get_success(
+            self.store.create_profile(UserID.from_string("@caroline:test"))
+        )
+        self.get_success(
+            self.store.set_profile_displayname(
+                UserID.from_string("@caroline:test"), "Caroline"
+            )
+        )
 
         response = self.get_success(
             self.query_handlers["profile"](
@@ -183,9 +185,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_get_my_avatar(self) -> None:
         self.get_success(
-            self.store.set_profile_avatar_url(
-                self.frank.localpart, "http://my.server/me.png"
-            )
+            self.store.set_profile_avatar_url(self.frank, "http://my.server/me.png")
         )
         avatar_url = self.get_success(self.handler.get_avatar_url(self.frank))
 
@@ -237,9 +237,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         # Setting displayname for the first time is allowed
         self.get_success(
-            self.store.set_profile_avatar_url(
-                self.frank.localpart, "http://my.server/me.png"
-            )
+            self.store.set_profile_avatar_url(self.frank, "http://my.server/me.png")
         )
 
         self.assertEqual(

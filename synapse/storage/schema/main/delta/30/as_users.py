@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Dict, Iterable, List, Tuple, cast
 
 from synapse.config.appservice import load_appservices
+from synapse.config.homeserver import HomeServerConfig
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine
 
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     # NULL indicates user was not registered by an appservice.
     try:
         cur.execute("ALTER TABLE users ADD COLUMN appservice_id TEXT")
@@ -27,9 +31,13 @@ def run_create(cur, database_engine, *args, **kwargs):
         pass
 
 
-def run_upgrade(cur, database_engine, config, *args, **kwargs):
+def run_upgrade(
+    cur: LoggingTransaction,
+    database_engine: BaseDatabaseEngine,
+    config: HomeServerConfig,
+) -> None:
     cur.execute("SELECT name FROM users")
-    rows = cur.fetchall()
+    rows = cast(Iterable[Tuple[str]], cur.fetchall())
 
     config_files = []
     try:
@@ -39,7 +47,7 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
 
     appservices = load_appservices(config.server.server_name, config_files)
 
-    owned = {}
+    owned: Dict[str, List[str]] = {}
 
     for row in rows:
         user_id = row[0]

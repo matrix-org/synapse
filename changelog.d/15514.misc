@@ -1,0 +1,1 @@
+Reduce the size of the HTTP connection pool for non-pushers.

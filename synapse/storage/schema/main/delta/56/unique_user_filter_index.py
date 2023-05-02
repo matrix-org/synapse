@@ -1,7 +1,8 @@
 import logging
 from io import StringIO
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.storage.prepare_database import execute_statements_from_stream
 
 logger = logging.getLogger(__name__)
@@ -16,11 +17,7 @@ This migration updates the user_filters table as follows:
 """
 
 
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass
-
-
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if isinstance(database_engine, PostgresEngine):
         select_clause = """
             SELECT DISTINCT ON (user_id, filter_id) user_id, filter_id, filter_json

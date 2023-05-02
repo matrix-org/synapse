@@ -27,6 +27,7 @@ from typing_extensions import TypeAlias
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
+from twisted.web.client import HTTPConnectionPool
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
@@ -42,7 +43,6 @@ from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.presence_router import PresenceRouter
-from synapse.events.spamcheck import SpamChecker
 from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
@@ -455,6 +455,26 @@ class HomeServer(metaclass=abc.ABCMeta):
         )
 
     @cache_in_self
+    def get_pusher_http_client(self) -> SimpleHttpClient:
+        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
+        # do so in batches, so we need to allow the pool to keep lots of idle
+        # connections around.
+        pool = HTTPConnectionPool(self.get_reactor())
+        # XXX: The justification for using the cache factor here is that larger
+        # instances will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max(int(100 * self.config.caches.global_factor), 5)
+        pool.cachedConnectionTimeout = 2 * 60
+
+        return SimpleHttpClient(
+            self,
+            ip_whitelist=self.config.server.ip_range_whitelist,
+            ip_blacklist=self.config.server.ip_range_blacklist,
+            use_proxy=True,
+            connection_pool=pool,
+        )
+
+    @cache_in_self
     def get_federation_http_client(self) -> MatrixFederationHttpClient:
         """
         An HTTP client for federation.
@@ -688,10 +708,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker(self)
-
-    @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
         return ThirdPartyEventRules(self)
 
@@ -767,7 +783,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(
+            msc3970_enabled=self.config.experimental.msc3970_enabled
+        )
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -803,7 +821,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_module_api_callbacks(self) -> ModuleApiCallbacks:
-        return ModuleApiCallbacks()
+        return ModuleApiCallbacks(self)
 
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:
