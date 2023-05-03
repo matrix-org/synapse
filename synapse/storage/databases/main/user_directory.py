@@ -388,18 +388,23 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     user_id, profile.display_name, profile.avatar_url
                 )
 
-            # We've finished processing a user. Delete it from the table.
-            await self.db_pool.simple_delete_one(
-                TEMP_TABLE + "_users", {"user_id": user_id}
-            )
-            # Update the remaining counter.
-            progress["remaining"] -= 1
-            await self.db_pool.runInteraction(
-                "populate_user_directory",
-                self.db_pool.updates._background_update_progress_txn,
-                "populate_user_directory_process_users",
-                progress,
-            )
+        # We've finished processing the users. Delete it from the table.
+        await self.db_pool.simple_delete_many(
+            table=TEMP_TABLE + "_users",
+            column="user_id",
+            iterable=users_to_work_on,
+            keyvalues={},
+            desc="populate_user_directory_process_users_delete",
+        )
+
+        # Update the remaining counter.
+        progress["remaining"] -= len(users_to_work_on)
+        await self.db_pool.runInteraction(
+            "populate_user_directory",
+            self.db_pool.updates._background_update_progress_txn,
+            "populate_user_directory_process_users",
+            progress,
+        )
 
         return len(users_to_work_on)
 
