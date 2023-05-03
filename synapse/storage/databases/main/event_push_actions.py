@@ -1612,6 +1612,15 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             # deletes.
             batch_size = self._rotate_count
 
+            if isinstance(self.database_engine, PostgresEngine):
+                # Temporarily disable sequential scans in this transaction. We
+                # need to do this as the postgres statistics don't take into
+                # account the `highlight = 0` part when estimating the
+                # distribution of `stream_ordering`. I.e. since we keep old
+                # highlight rows the query planner thinks there are way more old
+                # rows to delete than there actually are.
+                txn.execute("SET LOCAL enable_seqscan=off")
+
             txn.execute(
                 """
                 SELECT stream_ordering FROM event_push_actions
