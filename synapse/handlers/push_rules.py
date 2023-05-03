@@ -129,6 +129,8 @@ def check_actions(actions: List[Union[str, JsonDict]]) -> None:
         raise InvalidRuleException("No actions found")
 
     for a in actions:
+        # "dont_notify" and "coalesce" are legacy actions. They are allowed, but
+        # ignore (resulting in no action from the pusher).
         if a in ["notify", "dont_notify", "coalesce"]:
             pass
         elif isinstance(a, dict) and "set_tweak" in a:

@@ -140,7 +140,7 @@ impl PushRuleEvaluator {
     /// name.
     ///
     /// Returns the set of actions, if any, that match (filtering out any
-    /// `dont_notify` actions).
+    /// `dont_notify` and `coalesce` actions).
     pub fn run(
         &self,
         push_rules: &FilteredPushRules,
@@ -198,8 +198,9 @@ impl PushRuleEvaluator {
             let actions = push_rule
                 .actions
                 .iter()
-                // Filter out "dont_notify" actions, as we don't store them.
-                .filter(|a| **a != Action::DontNotify)
+                // Filter out "dont_notify" and "coalesce" actions, as we don't store them
+                // (since they result in no action by the pushers).
+                .filter(|a| **a != Action::DontNotify && **a != Action::Coalesce)
                 .cloned()
                 .collect();
 
