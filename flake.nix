@@ -93,6 +93,7 @@
 
                   # Native dependencies for unit tests (SyTest also requires OpenSSL).
                   openssl
+                  xmlsec
 
                   # Native dependencies for running Complement.
                   olm
