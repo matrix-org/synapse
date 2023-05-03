@@ -733,7 +733,9 @@ class SsoHandler:
 
         return registered_user_id
 
-    async def set_avatar(self, user_id: str, picture_https_url: str) -> bool:
+    async def set_avatar(
+        self, user_id: str, picture_https_url: str, delete_previous_avatar: bool = True
+    ) -> bool:
         """Set avatar of the user.
 
         This downloads the image file from the URL provided, stores that in
@@ -755,6 +757,8 @@ class SsoHandler:
             user_id: matrix user ID in the form @localpart:domain as a string.
 
             picture_https_url: HTTPS url for the picture image file.
+
+            delete_previous_avatar: whether to delete the previous avatar
 
         Returns: `True` if the user's avatar has been successfully set to the image at
             `picture_https_url`.
@@ -799,11 +803,14 @@ class SsoHandler:
 
             # bail if user already has the same avatar
             profile = await self._profile_handler.get_profile(user_id)
+            existing_media_id = None
             if profile["avatar_url"] is not None:
                 server_name = profile["avatar_url"].split("/")[-2]
-                media_id = profile["avatar_url"].split("/")[-1]
+                existing_media_id = profile["avatar_url"].split("/")[-1]
                 if server_name == self._server_name:
-                    media = await self._media_repo.store.get_local_media(media_id)
+                    media = await self._media_repo.store.get_local_media(
+                        existing_media_id
+                    )
                     if media is not None and upload_name == media["upload_name"]:
                         logger.info("skipping saving the user avatar")
                         return True
@@ -823,6 +830,10 @@ class SsoHandler:
                 create_requester(uid),
                 str(avatar_mxc_url),
             )
+
+            # delete previous avatar, if one existed
+            if delete_previous_avatar and existing_media_id is not None:
+                await self._media_repo.delete_local_media_ids(existing_media_id)
 
             logger.info("successfully saved the user avatar")
             return True
