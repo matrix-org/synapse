@@ -8,16 +8,16 @@
         "pre-commit-hooks": "pre-commit-hooks"
       },
       "locked": {
-        "lastModified": 1682534083,
-        "narHash": "sha256-lBgFaLNHRQtD3InZbBXzIS8HgZUgcPJ6jiqGa4FJPrk=",
-        "owner": "anoadragon453",
+        "lastModified": 1683102061,
+        "narHash": "sha256-kOphT6V0uQUlFNBP3GBjs7DAU7fyZGGqCs9ue1gNY6E=",
+        "owner": "cachix",
         "repo": "devenv",
-        "rev": "9694bd0a845dd184d4468cc3d3461089aace787a",
+        "rev": "ff1f29e41756553174d596cafe3a9fa77595100b",
         "type": "github"
       },
       "original": {
-        "owner": "anoadragon453",
-        "ref": "anoa/fix_languages_python",
+        "owner": "cachix",
+        "ref": "main",
         "repo": "devenv",
         "type": "github"
       }
