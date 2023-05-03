@@ -80,15 +80,8 @@ for port in 8080 8081 8082; do
             echo "tls_certificate_path: \"$DIR/$port/localhost:$port.tls.crt\""
             echo "tls_private_key_path: \"$DIR/$port/localhost:$port.tls.key\""
 
-            # Ignore keys from the trusted keys server
-            echo '# Ignore keys from the trusted keys server.'
-            echo '# Specifically, we do this by omitting the "verify_keys" option'
-            echo '# and enabling "accept_keys_insecurely"'
-            echo 'trusted_key_servers:'
-            echo '  - server_name: "matrix.org"'
-            echo '    accept_keys_insecurely: true'
-            echo 'suppress_key_server_warning: true'
-            echo ''
+            # Request keys directly from servers contacted over federation
+            echo 'trusted_key_servers: []'
 
 			# Allow the servers to communicate over localhost.
 			allow_list=$(cat <<-ALLOW_LIST
