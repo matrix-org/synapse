@@ -46,7 +46,7 @@ for port in 8080 8081 8082; do
             echo ''
 
 			# Warning, this heredoc depends on the interaction of tabs and spaces.
-			# Please don't accidentaly bork me with your fancy settings.
+			# Please don't accidentally bork me with your fancy settings.
 			listeners=$(cat <<-PORTLISTENERS
 			# Configure server to listen on both $https_port and $port
 			# This overides some of the default settings above
@@ -85,6 +85,7 @@ for port in 8080 8081 8082; do
             echo 'trusted_key_servers:'
             echo '  - server_name: "matrix.org"'
             echo '    accept_keys_insecurely: true'
+            echo 'suppress_key_server_warning: true'
             echo ''
 
 			# Allow the servers to communicate over localhost.
