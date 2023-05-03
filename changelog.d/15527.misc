@@ -1,1 +1,1 @@
-Suppress the trusted key server warning when running the demo scripts.
+Don't use a trusted key server when running the demo scripts.
