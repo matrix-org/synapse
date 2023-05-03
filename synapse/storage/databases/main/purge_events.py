@@ -249,13 +249,12 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # Mark all state and own events as outliers
         logger.info("[purge] marking remaining events as outliers")
         txn.execute(
-            "UPDATE events SET outlier = ?"
-            " WHERE event_id IN ("
-            "    SELECT event_id FROM events_to_purge "
-            "    WHERE NOT should_delete"
-            ")",
-            (True,),
-        )
+            "UPDATE events SET outlier = TRUE"
+            "WHERE event_id IN ("
+            "SELECT event_id FROM events_to_purge"
+            "WHERE NOT should_delete"
+            ")"
+            )
 
         # synapse tries to take out an exclusive lock on room_depth whenever it
         # persists events (because upsert), and once we run this update, we
