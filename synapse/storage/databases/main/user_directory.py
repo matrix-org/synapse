@@ -75,8 +75,10 @@ class _UserDirProfile:
     """
 
     user_id: str
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+
+    # If the display name or avatar URL are unexpected types, replace with None
+    display_name: Optional[str] = attr.ib(default=None, converter=non_null_str_or_none)
+    avatar_url: Optional[str] = attr.ib(default=None, converter=non_null_str_or_none)
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
@@ -637,10 +639,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         Update or add a user's profile in the user directory.
         If the user is remote, the profile will be marked as not stale.
         """
-        # If the display name or avatar URL are unexpected types, replace with None.
-        display_name = non_null_str_or_none(display_name)
-        avatar_url = non_null_str_or_none(avatar_url)
-
         await self.db_pool.runInteraction(
             "update_profile_in_user_dir",
             self._update_profile_in_user_dir_txn,
@@ -660,8 +658,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             value_names=("display_name", "avatar_url"),
             value_values=[
                 (
-                    non_null_str_or_none(p.display_name),
-                    non_null_str_or_none(p.avatar_url),
+                    p.display_name,
+                    p.avatar_url,
                 )
                 for p in profiles
             ],
