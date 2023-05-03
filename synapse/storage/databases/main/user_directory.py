@@ -593,68 +593,78 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         display_name = non_null_str_or_none(display_name)
         avatar_url = non_null_str_or_none(avatar_url)
 
-        def _update_profile_in_user_dir_txn(txn: LoggingTransaction) -> None:
-            self.db_pool.simple_upsert_txn(
+        await self.db_pool.runInteraction(
+            "update_profile_in_user_dir",
+            self._update_profile_in_user_dir_txn,
+            user_id,
+            display_name,
+            avatar_url,
+        )
+
+    def _update_profile_in_user_dir_txn(
+        self,
+        txn: LoggingTransaction,
+        user_id: str,
+        display_name: Optional[str],
+        avatar_url: Optional[str],
+    ) -> None:
+        self.db_pool.simple_upsert_txn(
+            txn,
+            table="user_directory",
+            keyvalues={"user_id": user_id},
+            values={"display_name": display_name, "avatar_url": avatar_url},
+        )
+
+        if not self.hs.is_mine_id(user_id):
+            # Remote users: Make sure the profile is not marked as stale anymore.
+            self.db_pool.simple_delete_txn(
                 txn,
-                table="user_directory",
+                table="user_directory_stale_remote_users",
                 keyvalues={"user_id": user_id},
-                values={"display_name": display_name, "avatar_url": avatar_url},
             )
 
-            if not self.hs.is_mine_id(user_id):
-                # Remote users: Make sure the profile is not marked as stale anymore.
-                self.db_pool.simple_delete_txn(
-                    txn,
-                    table="user_directory_stale_remote_users",
-                    keyvalues={"user_id": user_id},
-                )
+        # The display name that goes into the database index.
+        index_display_name = display_name
+        if index_display_name is not None:
+            index_display_name = _filter_text_for_index(index_display_name)
 
-            # The display name that goes into the database index.
-            index_display_name = display_name
-            if index_display_name is not None:
-                index_display_name = _filter_text_for_index(index_display_name)
+        if isinstance(self.database_engine, PostgresEngine):
+            # We weight the localpart most highly, then display name and finally
+            # server name
+            sql = """
+                    INSERT INTO user_directory_search(user_id, vector)
+                    VALUES (?,
+                        setweight(to_tsvector('simple', ?), 'A')
+                        || setweight(to_tsvector('simple', ?), 'D')
+                        || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
+                    ) ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
+                """
+            txn.execute(
+                sql,
+                (
+                    user_id,
+                    get_localpart_from_id(user_id),
+                    get_domain_from_id(user_id),
+                    index_display_name,
+                ),
+            )
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            value = (
+                "%s %s" % (user_id, index_display_name)
+                if index_display_name
+                else user_id
+            )
+            self.db_pool.simple_upsert_txn(
+                txn,
+                table="user_directory_search",
+                keyvalues={"user_id": user_id},
+                values={"value": value},
+            )
+        else:
+            # This should be unreachable.
+            raise Exception("Unrecognized database engine")
 
-            if isinstance(self.database_engine, PostgresEngine):
-                # We weight the localpart most highly, then display name and finally
-                # server name
-                sql = """
-                        INSERT INTO user_directory_search(user_id, vector)
-                        VALUES (?,
-                            setweight(to_tsvector('simple', ?), 'A')
-                            || setweight(to_tsvector('simple', ?), 'D')
-                            || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
-                        ) ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
-                    """
-                txn.execute(
-                    sql,
-                    (
-                        user_id,
-                        get_localpart_from_id(user_id),
-                        get_domain_from_id(user_id),
-                        index_display_name,
-                    ),
-                )
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                value = (
-                    "%s %s" % (user_id, index_display_name)
-                    if index_display_name
-                    else user_id
-                )
-                self.db_pool.simple_upsert_txn(
-                    txn,
-                    table="user_directory_search",
-                    keyvalues={"user_id": user_id},
-                    values={"value": value},
-                )
-            else:
-                # This should be unreachable.
-                raise Exception("Unrecognized database engine")
-
-            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
-
-        await self.db_pool.runInteraction(
-            "update_profile_in_user_dir", _update_profile_in_user_dir_txn
-        )
+        txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
     async def add_users_who_share_private_room(
         self, room_id: str, user_id_tuples: Iterable[Tuple[str, str]]
