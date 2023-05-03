@@ -81,7 +81,9 @@ for port in 8080 8081 8082; do
             echo "tls_private_key_path: \"$DIR/$port/localhost:$port.tls.key\""
 
             # Ignore keys from the trusted keys server
-            echo '# Ignore keys from the trusted keys server'
+            echo '# Ignore keys from the trusted keys server.'
+            echo '# Specifically, we do this by omitting the "verify_keys" option'
+            echo '# and enabling "accept_keys_insecurely"'
             echo 'trusted_key_servers:'
             echo '  - server_name: "matrix.org"'
             echo '    accept_keys_insecurely: true'
