@@ -345,7 +345,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 _outgoing_request_counter.labels(cls.NAME, 200).inc()
 
                 # Wait on any streams that the remote may have written to.
-                for stream_name, position in result.get(
+                for stream_name, position in result.pop(
                     _STREAM_POSITION_KEY, {}
                 ).items():
                     await replication.wait_for_stream_position(
@@ -426,6 +426,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             code, response = await self.response_cache.wrap(
                 txn_id, self._handle_request, request, content, **kwargs
             )
+            # Take a copy so we don't mutate things in the cache.
+            response = dict(response)
         else:
             # The `@cancellable` decorator may be applied to `_handle_request`. But we
             # told `HttpServer.register_paths` that our handler is `_check_auth_and_handle`,

@@ -23,6 +23,7 @@ from typing import (
     Collection,
     Dict,
     List,
+    Mapping,
     Optional,
     Tuple,
     Union,
@@ -47,6 +48,7 @@ from synapse.api.errors import (
     FederationError,
     IncompatibleRoomVersionError,
     NotFoundError,
+    PartialStateConflictError,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -80,12 +82,11 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.lock import Lock
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
 from synapse.types import JsonDict, StateMap, get_domain_from_id
-from synapse.util import json_decoder, unwrapFirstError
+from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_server_name
@@ -129,11 +130,12 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.handler = hs.get_federation_handler()
-        self._spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._room_member_handler = hs.get_room_member_handler()
+        self._e2e_keys_handler = hs.get_e2e_keys_handler()
 
         self._state_storage_controller = hs.get_storage_controllers().state
 
@@ -1003,23 +1005,19 @@ class FederationServer(FederationBase):
 
     @trace
     async def on_claim_client_keys(
-        self, origin: str, content: JsonDict
+        self, query: List[Tuple[str, str, str, int]], always_include_fallback_keys: bool
     ) -> Dict[str, Any]:
-        query = []
-        for user_id, device_keys in content.get("one_time_keys", {}).items():
-            for device_id, algorithm in device_keys.items():
-                query.append((user_id, device_id, algorithm))
-
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
-        results = await self.store.claim_e2e_one_time_keys(query)
+        results = await self._e2e_keys_handler.claim_local_one_time_keys(
+            query, always_include_fallback_keys=always_include_fallback_keys
+        )
 
-        json_result: Dict[str, Dict[str, dict]] = {}
-        for user_id, device_keys in results.items():
-            for device_id, keys in device_keys.items():
-                for key_id, json_str in keys.items():
-                    json_result.setdefault(user_id, {})[device_id] = {
-                        key_id: json_decoder.decode(json_str)
-                    }
+        json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
+        for result in results:
+            for user_id, device_keys in result.items():
+                for device_id, keys in device_keys.items():
+                    for key_id, key in keys.items():
+                        json_result.setdefault(user_id, {})[device_id] = {key_id: key}
 
         logger.info(
             "Claimed one-time-keys: %s",
@@ -1128,7 +1126,7 @@ class FederationServer(FederationBase):
             logger.warning("event id %s: %s", pdu.event_id, e)
             raise FederationError("ERROR", 403, str(e), affected=pdu.event_id)
 
-        if await self._spam_checker.should_drop_federated_event(pdu):
+        if await self._spam_checker_module_callbacks.should_drop_federated_event(pdu):
             logger.warning(
                 "Unstaged federated event contains spam, dropping %s", pdu.event_id
             )
@@ -1173,7 +1171,9 @@ class FederationServer(FederationBase):
 
             origin, event = next
 
-            if await self._spam_checker.should_drop_federated_event(event):
+            if await self._spam_checker_module_callbacks.should_drop_federated_event(
+                event
+            ):
                 logger.warning(
                     "Staged federated event contains spam, dropping %s",
                     event.event_id,
@@ -1512,7 +1512,7 @@ class FederationHandlerRegistry:
 def _get_event_ids_for_partial_state_join(
     join_event: EventBase,
     prev_state_ids: StateMap[str],
-    summary: Dict[str, MemberSummary],
+    summary: Mapping[str, MemberSummary],
 ) -> Collection[str]:
     """Calculate state to be returned in a partial_state send_join
 

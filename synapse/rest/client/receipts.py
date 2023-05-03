@@ -36,6 +36,7 @@ class ReceiptRestServlet(RestServlet):
         "/receipt/(?P<receipt_type>[^/]*)"
         "/(?P<event_id>[^/]*)$"
     )
+    CATEGORY = "Receipts requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

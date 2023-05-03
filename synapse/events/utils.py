@@ -38,8 +38,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
-from synapse.types import JsonDict
-from synapse.util.frozenutils import unfreeze
+from synapse.types import JsonDict, Requester
 
 from . import EventBase
 
@@ -107,13 +106,16 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         "depth",
         "prev_events",
         "auth_events",
-        "origin",
         "origin_server_ts",
     ]
 
     # Room versions from before MSC2176 had additional allowed keys.
     if not room_version.msc2176_redaction_rules:
         allowed_keys.extend(["prev_state", "membership"])
+
+    # Room versions before MSC3989 kept the origin field.
+    if not room_version.msc3989_redaction_rules:
+        allowed_keys.append("origin")
 
     event_type = event_dict["type"]
 
@@ -317,8 +319,9 @@ class SerializeEventConfig:
     as_client_event: bool = True
     # Function to convert from federation format to client format
     event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1
-    # ID of the user's auth token - used for namespacing of transaction IDs
-    token_id: Optional[int] = None
+    # The entity that requested the event. This is used to determine whether to include
+    # the transaction_id in the unsigned section of the event.
+    requester: Optional[Requester] = None
     # List of event fields to include. If empty, all fields will be returned.
     only_event_fields: Optional[List[str]] = None
     # Some events can have stripped room state stored in the `unsigned` field.
@@ -336,6 +339,7 @@ def serialize_event(
     time_now_ms: int,
     *,
     config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
+    msc3970_enabled: bool = False,
 ) -> JsonDict:
     """Serialize event for clients
 
@@ -343,6 +347,8 @@ def serialize_event(
         e
         time_now_ms
         config: Event serialization config
+        msc3970_enabled: Whether MSC3970 is enabled. It changes whether we should
+            include the `transaction_id` in the event's `unsigned` section.
 
     Returns:
         The serialized event dictionary.
@@ -355,7 +361,7 @@ def serialize_event(
     time_now_ms = int(time_now_ms)
 
     # Should this strip out None's?
-    d = {k: v for k, v in e.get_dict().items()}
+    d = dict(e.get_dict().items())
 
     d["event_id"] = e.event_id
 
@@ -365,13 +371,42 @@ def serialize_event(
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms, config=config
+            e.unsigned["redacted_because"],
+            time_now_ms,
+            config=config,
+            msc3970_enabled=msc3970_enabled,
         )
 
-    if config.token_id is not None:
-        if config.token_id == getattr(e.internal_metadata, "token_id", None):
-            txn_id = getattr(e.internal_metadata, "txn_id", None)
-            if txn_id is not None:
+    # If we have a txn_id saved in the internal_metadata, we should include it in the
+    # unsigned section of the event if it was sent by the same session as the one
+    # requesting the event.
+    txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
+    if txn_id is not None and config.requester is not None:
+        # For the MSC3970 rules to be applied, we *need* to have the device ID in the
+        # event internal metadata. Since we were not recording them before, if it hasn't
+        # been recorded, we fallback to the old behaviour.
+        event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
+        if msc3970_enabled and event_device_id is not None:
+            if event_device_id == config.requester.device_id:
+                d["unsigned"]["transaction_id"] = txn_id
+
+        else:
+            # The pre-MSC3970 behaviour is to only include the transaction ID if the
+            # event was sent from the same access token. For regular users, we can use
+            # the access token ID to determine this. For guests, we can't, but since
+            # each guest only has one access token, we can just check that the event was
+            # sent by the same user as the one requesting the event.
+            event_token_id: Optional[int] = getattr(
+                e.internal_metadata, "token_id", None
+            )
+            if config.requester.user.to_string() == e.sender and (
+                (
+                    event_token_id is not None
+                    and config.requester.access_token_id is not None
+                    and event_token_id == config.requester.access_token_id
+                )
+                or config.requester.is_guest
+            ):
                 d["unsigned"]["transaction_id"] = txn_id
 
     # invite_room_state and knock_room_state are a list of stripped room state events
@@ -403,13 +438,8 @@ class EventClientSerializer:
     clients.
     """
 
-    def __init__(self, inhibit_replacement_via_edits: bool = False):
-        """
-        Args:
-            inhibit_replacement_via_edits: If this is set to True, then events are
-               never replaced by their edits.
-        """
-        self._inhibit_replacement_via_edits = inhibit_replacement_via_edits
+    def __init__(self, *, msc3970_enabled: bool = False):
+        self._msc3970_enabled = msc3970_enabled
 
     def serialize_event(
         self,
@@ -418,7 +448,6 @@ class EventClientSerializer:
         *,
         config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
         bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
-        apply_edits: bool = True,
     ) -> JsonDict:
         """Serializes a single event.
 
@@ -428,10 +457,7 @@ class EventClientSerializer:
             config: Event serialization config
             bundle_aggregations: A map from event_id to the aggregations to be bundled
                into the event.
-            apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `bundle_aggregations[<event_id>].replace`.
-               See also the `inhibit_replacement_via_edits` constructor arg: if that is
-               set to True, then this argument is ignored.
+
         Returns:
             The serialized event
         """
@@ -439,7 +465,9 @@ class EventClientSerializer:
         if not isinstance(event, EventBase):
             return event
 
-        serialized_event = serialize_event(event, time_now, config=config)
+        serialized_event = serialize_event(
+            event, time_now, config=config, msc3970_enabled=self._msc3970_enabled
+        )
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
@@ -450,37 +478,9 @@ class EventClientSerializer:
                     config,
                     bundle_aggregations,
                     serialized_event,
-                    apply_edits=apply_edits,
                 )
 
         return serialized_event
-
-    def _apply_edit(
-        self, orig_event: EventBase, serialized_event: JsonDict, edit: EventBase
-    ) -> None:
-        """Replace the content, preserving existing relations of the serialized event.
-
-        Args:
-            orig_event: The original event.
-            serialized_event: The original event, serialized. This is modified.
-            edit: The event which edits the above.
-        """
-
-        # Ensure we take copies of the edit content, otherwise we risk modifying
-        # the original event.
-        edit_content = edit.content.copy()
-
-        # Unfreeze the event content if necessary, so that we may modify it below
-        edit_content = unfreeze(edit_content)
-        serialized_event["content"] = edit_content.get("m.new_content", {})
-
-        # Check for existing relations
-        relates_to = orig_event.content.get("m.relates_to")
-        if relates_to:
-            # Keep the relations, ensuring we use a dict copy of the original
-            serialized_event["content"]["m.relates_to"] = relates_to.copy()
-        else:
-            serialized_event["content"].pop("m.relates_to", None)
 
     def _inject_bundled_aggregations(
         self,
@@ -489,7 +489,6 @@ class EventClientSerializer:
         config: SerializeEventConfig,
         bundled_aggregations: Dict[str, "BundledAggregations"],
         serialized_event: JsonDict,
-        apply_edits: bool,
     ) -> None:
         """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
 
@@ -504,9 +503,6 @@ class EventClientSerializer:
                 While serializing the bundled aggregations this map may be searched
                 again for additional events in a recursive manner.
             serialized_event: The serialized event which may be modified.
-            apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `aggregations.replace` (subject to the
-               `inhibit_replacement_via_edits` constructor arg).
         """
 
         # We have already checked that aggregations exist for this event.
@@ -516,22 +512,12 @@ class EventClientSerializer:
         # being serialized.
         serialized_aggregations = {}
 
-        if event_aggregations.annotations:
-            serialized_aggregations[
-                RelationTypes.ANNOTATION
-            ] = event_aggregations.annotations
-
         if event_aggregations.references:
             serialized_aggregations[
                 RelationTypes.REFERENCE
             ] = event_aggregations.references
 
         if event_aggregations.replace:
-            # If there is an edit, optionally apply it to the event.
-            edit = event_aggregations.replace
-            if apply_edits and not self._inhibit_replacement_via_edits:
-                self._apply_edit(event, serialized_event, edit)
-
             # Include information about it in the relations dict.
             #
             # Matrix spec v1.5 (https://spec.matrix.org/v1.5/client-server-api/#server-side-aggregation-of-mreplace-relationships)
@@ -539,10 +525,9 @@ class EventClientSerializer:
             # `sender` of the edit; however MSC3925 proposes extending it to the whole
             # of the edit, which is what we do here.
             serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
-                edit,
+                event_aggregations.replace,
                 time_now,
                 config=config,
-                apply_edits=False,
             )
 
         # Include any threaded replies to this event.
@@ -611,7 +596,7 @@ PowerLevelsContent = Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
 def copy_and_fixup_power_levels_contents(
     old_power_levels: PowerLevelsContent,
 ) -> Dict[str, Union[int, Dict[str, int]]]:
-    """Copy the content of a power_levels event, unfreezing frozendicts along the way.
+    """Copy the content of a power_levels event, unfreezing immutabledicts along the way.
 
     We accept as input power level values which are strings, provided they represent an
     integer, e.g. `"`100"` instead of 100. Such strings are converted to integers

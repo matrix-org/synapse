@@ -170,11 +170,9 @@ class Filtering:
         result = await self.store.get_user_filter(user_localpart, filter_id)
         return FilterCollection(self._hs, result)
 
-    def add_user_filter(
-        self, user_localpart: str, user_filter: JsonDict
-    ) -> Awaitable[int]:
+    def add_user_filter(self, user_id: UserID, user_filter: JsonDict) -> Awaitable[int]:
         self.check_valid_filter(user_filter)
-        return self.store.add_user_filter(user_localpart, user_filter)
+        return self.store.add_user_filter(user_id, user_filter)
 
     # TODO(paul): surely we should probably add a delete_user_filter or
     #   replace_user_filter at some point? There's no REST API specified for
@@ -219,9 +217,13 @@ class FilterCollection:
         self._room_timeline_filter = Filter(hs, room_filter_json.get("timeline", {}))
         self._room_state_filter = Filter(hs, room_filter_json.get("state", {}))
         self._room_ephemeral_filter = Filter(hs, room_filter_json.get("ephemeral", {}))
-        self._room_account_data = Filter(hs, room_filter_json.get("account_data", {}))
+        self._room_account_data_filter = Filter(
+            hs, room_filter_json.get("account_data", {})
+        )
         self._presence_filter = Filter(hs, filter_json.get("presence", {}))
-        self._account_data = Filter(hs, filter_json.get("account_data", {}))
+        self._global_account_data_filter = Filter(
+            hs, filter_json.get("account_data", {})
+        )
 
         self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
@@ -256,8 +258,10 @@ class FilterCollection:
     ) -> List[UserPresenceState]:
         return await self._presence_filter.filter(presence_states)
 
-    async def filter_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
-        return await self._account_data.filter(events)
+    async def filter_global_account_data(
+        self, events: Iterable[JsonDict]
+    ) -> List[JsonDict]:
+        return await self._global_account_data_filter.filter(events)
 
     async def filter_room_state(self, events: Iterable[EventBase]) -> List[EventBase]:
         return await self._room_state_filter.filter(
@@ -279,7 +283,7 @@ class FilterCollection:
     async def filter_room_account_data(
         self, events: Iterable[JsonDict]
     ) -> List[JsonDict]:
-        return await self._room_account_data.filter(
+        return await self._room_account_data_filter.filter(
             await self._room_filter.filter(events)
         )
 
@@ -292,11 +296,25 @@ class FilterCollection:
             or self._presence_filter.filters_all_senders()
         )
 
+    def blocks_all_global_account_data(self) -> bool:
+        """True if all global acount data will be filtered out."""
+        return (
+            self._global_account_data_filter.filters_all_types()
+            or self._global_account_data_filter.filters_all_senders()
+        )
+
     def blocks_all_room_ephemeral(self) -> bool:
         return (
             self._room_ephemeral_filter.filters_all_types()
             or self._room_ephemeral_filter.filters_all_senders()
             or self._room_ephemeral_filter.filters_all_rooms()
+        )
+
+    def blocks_all_room_account_data(self) -> bool:
+        return (
+            self._room_account_data_filter.filters_all_types()
+            or self._room_account_data_filter.filters_all_senders()
+            or self._room_account_data_filter.filters_all_rooms()
         )
 
     def blocks_all_room_timeline(self) -> bool:

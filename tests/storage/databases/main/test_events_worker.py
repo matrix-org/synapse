@@ -120,6 +120,7 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
         # Persist the event which should invalidate or prefill the
         # `have_seen_event` cache so we don't return stale values.
         persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
         self.get_success(
             persistence.persist_event(
                 event,

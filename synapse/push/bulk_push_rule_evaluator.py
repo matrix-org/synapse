@@ -22,7 +22,7 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Set,
+    Sequence,
     Tuple,
     Union,
 )
@@ -43,6 +43,7 @@ from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
+from synapse.types import JsonValue
 from synapse.types.state import StateFilter
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
@@ -148,7 +149,7 @@ class BulkPushRuleEvaluator:
         # little, we can skip fetching a huge number of push rules in large rooms.
         # This helps make joins and leaves faster.
         if event.type == EventTypes.Member:
-            local_users = []
+            local_users: Sequence[str] = []
             # We never notify a user about their own actions. This is enforced in
             # `_action_for_event_by_user` in the loop over `rules_by_user`, but we
             # do the same check here to avoid unnecessary DB queries.
@@ -183,7 +184,6 @@ class BulkPushRuleEvaluator:
         if event.type == EventTypes.Member and event.membership == Membership.INVITE:
             invited = event.state_key
             if invited and self.hs.is_mine_id(invited) and invited not in local_users:
-                local_users = list(local_users)
                 local_users.append(invited)
 
         if not local_users:
@@ -256,13 +256,15 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def _related_events(self, event: EventBase) -> Dict[str, Dict[str, str]]:
+    async def _related_events(
+        self, event: EventBase
+    ) -> Dict[str, Dict[str, JsonValue]]:
         """Fetches the related events for 'event'. Sets the im.vector.is_falling_back key if the event is from a fallback relation
 
         Returns:
             Mapping of relation type to flattened events.
         """
-        related_events: Dict[str, Dict[str, str]] = {}
+        related_events: Dict[str, Dict[str, JsonValue]] = {}
         if self._related_event_match_enabled:
             related_event_id = event.content.get("m.relates_to", {}).get("event_id")
             relation_type = event.content.get("m.relates_to", {}).get("rel_type")
@@ -321,10 +323,10 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
-
         if (
             not event.internal_metadata.is_notifiable()
             or event.internal_metadata.is_historical()
+            or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync
         ):
             # Push rules for events that aren't notifiable can't be processed by this and
             # we want to skip push notification actions for historical messages
@@ -388,27 +390,14 @@ class BulkPushRuleEvaluator:
                         del notification_levels[key]
 
         # Pull out any user and room mentions.
-        mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
-        has_mentions = self._intentional_mentions_enabled and isinstance(mentions, dict)
-        user_mentions: Set[str] = set()
-        room_mention = False
-        if has_mentions:
-            # mypy seems to have lost the type even though it must be a dict here.
-            assert isinstance(mentions, dict)
-            # Remove out any non-string items and convert to a set.
-            user_mentions_raw = mentions.get("user_ids")
-            if isinstance(user_mentions_raw, list):
-                user_mentions = set(
-                    filter(lambda item: isinstance(item, str), user_mentions_raw)
-                )
-            # Room mention is only true if the value is exactly true.
-            room_mention = mentions.get("room") is True
+        has_mentions = (
+            self._intentional_mentions_enabled
+            and EventContentFields.MSC3952_MENTIONS in event.content
+        )
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
             has_mentions,
-            user_mentions,
-            room_mention,
             room_member_count,
             sender_power_level,
             notification_levels,
@@ -489,16 +478,20 @@ RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
 
 
+def _is_simple_value(value: Any) -> bool:
+    return isinstance(value, (bool, str)) or type(value) is int or value is None
+
+
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
-    result: Optional[Dict[str, str]] = None,
-) -> Dict[str, str]:
+    result: Optional[Dict[str, JsonValue]] = None,
+) -> Dict[str, JsonValue]:
     """
     Given a JSON dictionary (or event) which might contain sub dictionaries,
     flatten it into a single layer dictionary by combining the keys & sub-keys.
 
-    Any (non-dictionary), non-string value is dropped.
+    String, integer, boolean, null or lists of those values are kept. All others are dropped.
 
     Transforms:
 
@@ -521,8 +514,15 @@ def _flatten_dict(
     if result is None:
         result = {}
     for key, value in d.items():
-        if isinstance(value, str):
-            result[".".join(prefix + [key])] = value.lower()
+        # Escape periods in the key with a backslash (and backslashes with an
+        # extra backslash). This is since a period is used as a separator between
+        # nested fields.
+        key = key.replace("\\", "\\\\").replace(".", "\\.")
+
+        if _is_simple_value(value):
+            result[".".join(prefix + [key])] = value
+        elif isinstance(value, (list, tuple)):
+            result[".".join(prefix + [key])] = [v for v in value if _is_simple_value(v)]
         elif isinstance(value, Mapping):
             # do not set `room_version` due to recursion considerations below
             _flatten_dict(value, prefix=(prefix + [key]), result=result)

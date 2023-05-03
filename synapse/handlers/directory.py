@@ -14,7 +14,7 @@
 
 import logging
 import string
-from typing import TYPE_CHECKING, Iterable, List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence
 
 from typing_extensions import Literal
 
@@ -60,7 +60,7 @@ class DirectoryHandler:
             "directory", self.on_directory_query
         )
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
 
     async def _create_association(
         self,
@@ -145,10 +145,12 @@ class DirectoryHandler:
                         403, "You must be in the room to create an alias for it"
                     )
 
-            spam_check = await self.spam_checker.user_may_create_room_alias(
-                user_id, room_alias
+            spam_check = (
+                await self._spam_checker_module_callbacks.user_may_create_room_alias(
+                    user_id, room_alias
+                )
             )
-            if spam_check != self.spam_checker.NOT_SPAM:
+            if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                 raise AuthError(
                     403,
                     "This user is not permitted to create this alias",
@@ -444,7 +446,9 @@ class DirectoryHandler:
         """
         user_id = requester.user.to_string()
 
-        spam_check = await self.spam_checker.user_may_publish_room(user_id, room_id)
+        spam_check = await self._spam_checker_module_callbacks.user_may_publish_room(
+            user_id, room_id
+        )
         if spam_check != NOT_SPAM:
             raise AuthError(
                 403,
@@ -485,7 +489,8 @@ class DirectoryHandler:
                 )
             )
             if canonical_alias:
-                room_aliases.append(canonical_alias)
+                # Ensure we do not mutate room_aliases.
+                room_aliases = list(room_aliases) + [canonical_alias]
 
             if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
@@ -496,9 +501,11 @@ class DirectoryHandler:
                 raise SynapseError(403, "Not allowed to publish room")
 
             # Check if publishing is blocked by a third party module
-            allowed_by_third_party_rules = await (
-                self.third_party_event_rules.check_visibility_can_be_modified(
-                    room_id, visibility
+            allowed_by_third_party_rules = (
+                await (
+                    self.third_party_event_rules.check_visibility_can_be_modified(
+                        room_id, visibility
+                    )
                 )
             )
             if not allowed_by_third_party_rules:
@@ -528,7 +535,7 @@ class DirectoryHandler:
 
     async def get_aliases_for_room(
         self, requester: Requester, room_id: str
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """
         Get a list of the aliases that currently point to this room on this server
         """

@@ -33,7 +33,6 @@ from tests.unittest import HomeserverTestCase, override_config
 
 
 class TestBulkPushRuleEvaluator(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -131,7 +130,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
 
         # Create a new message event, and try to evaluate it under the dodgy
         # power level event.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -146,6 +145,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 prev_event_ids=[pl_event_id],
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # should not raise
@@ -171,7 +171,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         """Ensure that push rules are not calculated when disabled in the config"""
 
         # Create a new message event which should cause a notification.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -185,6 +185,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
 
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
         # Mock the method which calculates push rules -- we do this instead of
@@ -201,7 +202,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
     ) -> bool:
         """Returns true iff the `mentions` trigger an event push action."""
         # Create a new message event which should cause a notification.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -212,7 +213,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
-
+        context = self.get_success(unpersisted_context.persist(event))
         # Execute the push rule machinery.
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
 
@@ -242,22 +243,28 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
 
         # Non-dict mentions should be ignored.
-        mentions: Any
-        for mentions in (None, True, False, 1, "foo", []):
-            self.assertFalse(
-                self._create_and_process(
-                    bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: mentions}
+        #
+        # Avoid C-S validation as these aren't expected.
+        with patch(
+            "synapse.events.validator.EventValidator.validate_new",
+            new=lambda s, event, config: True,
+        ):
+            mentions: Any
+            for mentions in (None, True, False, 1, "foo", []):
+                self.assertFalse(
+                    self._create_and_process(
+                        bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: mentions}
+                    )
                 )
-            )
 
-        # A non-list should be ignored.
-        for mentions in (None, True, False, 1, "foo", {}):
-            self.assertFalse(
-                self._create_and_process(
-                    bulk_evaluator,
-                    {EventContentFields.MSC3952_MENTIONS: {"user_ids": mentions}},
+            # A non-list should be ignored.
+            for mentions in (None, True, False, 1, "foo", {}):
+                self.assertFalse(
+                    self._create_and_process(
+                        bulk_evaluator,
+                        {EventContentFields.MSC3952_MENTIONS: {"user_ids": mentions}},
+                    )
                 )
-            )
 
         # The Matrix ID appearing anywhere in the list should notify.
         self.assertTrue(
@@ -290,26 +297,32 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
 
         # Invalid entries in the list are ignored.
-        self.assertFalse(
-            self._create_and_process(
-                bulk_evaluator,
-                {
-                    EventContentFields.MSC3952_MENTIONS: {
-                        "user_ids": [None, True, False, {}, []]
-                    }
-                },
+        #
+        # Avoid C-S validation as these aren't expected.
+        with patch(
+            "synapse.events.validator.EventValidator.validate_new",
+            new=lambda s, event, config: True,
+        ):
+            self.assertFalse(
+                self._create_and_process(
+                    bulk_evaluator,
+                    {
+                        EventContentFields.MSC3952_MENTIONS: {
+                            "user_ids": [None, True, False, {}, []]
+                        }
+                    },
+                )
             )
-        )
-        self.assertTrue(
-            self._create_and_process(
-                bulk_evaluator,
-                {
-                    EventContentFields.MSC3952_MENTIONS: {
-                        "user_ids": [None, True, False, {}, [], self.alice]
-                    }
-                },
+            self.assertTrue(
+                self._create_and_process(
+                    bulk_evaluator,
+                    {
+                        EventContentFields.MSC3952_MENTIONS: {
+                            "user_ids": [None, True, False, {}, [], self.alice]
+                        }
+                    },
+                )
             )
-        )
 
         # The legacy push rule should not mention if the mentions field exists.
         self.assertFalse(
@@ -350,14 +363,20 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
 
         # Invalid data should not notify.
-        mentions: Any
-        for mentions in (None, False, 1, "foo", [], {}):
-            self.assertFalse(
-                self._create_and_process(
-                    bulk_evaluator,
-                    {EventContentFields.MSC3952_MENTIONS: {"room": mentions}},
+        #
+        # Avoid C-S validation as these aren't expected.
+        with patch(
+            "synapse.events.validator.EventValidator.validate_new",
+            new=lambda s, event, config: True,
+        ):
+            mentions: Any
+            for mentions in (None, False, 1, "foo", [], {}):
+                self.assertFalse(
+                    self._create_and_process(
+                        bulk_evaluator,
+                        {EventContentFields.MSC3952_MENTIONS: {"room": mentions}},
+                    )
                 )
-            )
 
         # The legacy push rule should not mention if the mentions field exists.
         self.assertFalse(
@@ -377,7 +396,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
 
         # Create & persist an event to use as the parent of the relation.
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_event(
                 self.requester,
                 {
@@ -391,6 +410,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 },
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
             self.event_creation_handler.handle_new_client_event(
                 self.requester, events_and_context=[(event, context)]

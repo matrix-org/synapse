@@ -44,6 +44,9 @@ class PushRuleRestServlet(RestServlet):
         "Unrecognised request: You probably wanted a trailing slash"
     )
 
+    WORKERS_DENIED_METHODS = ["PUT", "DELETE"]
+    CATEGORY = "Push rule requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()

@@ -26,7 +26,6 @@ from tests.unittest import HomeserverTestCase
 
 
 class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
@@ -62,6 +61,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                 keys and expected receipt key-values after duplicate receipts have been
                 removed.
         """
+
         # First, undo the background update.
         def drop_receipts_unique_index(txn: LoggingTransaction) -> None:
             txn.execute(f"DROP INDEX IF EXISTS {index_name}")

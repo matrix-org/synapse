@@ -178,7 +178,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
                 RoomVersions.V9,
             )
         )
-        self.assertIsNotNone(pulled_pdu_info2)
+        assert pulled_pdu_info2 is not None
         remote_pdu2 = pulled_pdu_info2.pdu
 
         # Sanity check that we are working against the same event
@@ -226,7 +226,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
                 RoomVersions.V9,
             )
         )
-        self.assertIsNotNone(pulled_pdu_info)
+        assert pulled_pdu_info is not None
         remote_pdu = pulled_pdu_info.pdu
 
         # check the right call got made to the agent

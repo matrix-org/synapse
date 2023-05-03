@@ -72,7 +72,6 @@ from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
-    AbstractStreamIdTracker,
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
@@ -187,8 +186,8 @@ class EventsWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self._stream_id_gen: AbstractStreamIdTracker
-        self._backfill_id_gen: AbstractStreamIdTracker
+        self._stream_id_gen: AbstractStreamIdGenerator
+        self._backfill_id_gen: AbstractStreamIdGenerator
         if isinstance(database.engine, PostgresEngine):
             # If we're using Postgres than we can use `MultiWriterIdGenerator`
             # regardless of whether this process writes to the streams or not.
@@ -806,7 +805,6 @@ class EventsWorkerStore(SQLBaseStore):
                 # the events have been redacted, and if so pulling the redaction event
                 # out of the database to check it.
                 #
-                missing_events = {}
                 try:
                     # Try to fetch from any external cache. We already checked the
                     # in-memory cache above.
@@ -1493,7 +1491,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             txn.execute(redactions_sql + clause, args)
 
-            for (redacter, redacted) in txn:
+            for redacter, redacted in txn:
                 d = event_dict.get(redacted)
                 if d:
                     d.redactions.append(redacter)
@@ -2024,7 +2022,7 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
-    async def get_event_id_from_transaction_id(
+    async def get_event_id_from_transaction_id_and_token_id(
         self, room_id: str, user_id: str, token_id: int, txn_id: str
     ) -> Optional[str]:
         """Look up if we have already persisted an event for the transaction ID,
@@ -2040,7 +2038,26 @@ class EventsWorkerStore(SQLBaseStore):
             },
             retcol="event_id",
             allow_none=True,
-            desc="get_event_id_from_transaction_id",
+            desc="get_event_id_from_transaction_id_and_token_id",
+        )
+
+    async def get_event_id_from_transaction_id_and_device_id(
+        self, room_id: str, user_id: str, device_id: str, txn_id: str
+    ) -> Optional[str]:
+        """Look up if we have already persisted an event for the transaction ID,
+        returning the event ID if so.
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="event_txn_id_device_id",
+            keyvalues={
+                "room_id": room_id,
+                "user_id": user_id,
+                "device_id": device_id,
+                "txn_id": txn_id,
+            },
+            retcol="event_id",
+            allow_none=True,
+            desc="get_event_id_from_transaction_id_and_device_id",
         )
 
     async def get_already_persisted_events(
@@ -2070,7 +2087,7 @@ class EventsWorkerStore(SQLBaseStore):
 
                 # Check if this is a duplicate of an event we've already
                 # persisted.
-                existing = await self.get_event_id_from_transaction_id(
+                existing = await self.get_event_id_from_transaction_id_and_token_id(
                     event.room_id, event.sender, token_id, txn_id
                 )
                 if existing:
@@ -2086,11 +2103,17 @@ class EventsWorkerStore(SQLBaseStore):
         """Cleans out transaction id mappings older than 24hrs."""
 
         def _cleanup_old_transaction_ids_txn(txn: LoggingTransaction) -> None:
+            one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
             sql = """
                 DELETE FROM event_txn_id
                 WHERE inserted_ts < ?
             """
-            one_day_ago = self._clock.time_msec() - 24 * 60 * 60 * 1000
+            txn.execute(sql, (one_day_ago,))
+
+            sql = """
+                DELETE FROM event_txn_id_device_id
+                WHERE inserted_ts < ?
+            """
             txn.execute(sql, (one_day_ago,))
 
         return await self.db_pool.runInteraction(

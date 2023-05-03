@@ -160,7 +160,18 @@ recommend the use of `systemd` where available: for information on setting up
 [Systemd with Workers](systemd-with-workers/). To use `synctl`, see
 [Using synctl with Workers](synctl_workers.md).
 
+## Start Synapse with Poetry
 
+The following applies to Synapse installations that have been installed from source using `poetry`.
+
+You can start the main Synapse process with Poetry by running the following command:
+```console
+poetry run synapse_homeserver -c [your homeserver.yaml]
+```
+For worker setups, you can run the following command
+```console
+poetry run synapse_worker -c [your worker.yaml]
+```
 ## Available worker applications
 
 ### `synapse.app.generic_worker`
@@ -220,7 +231,11 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/v1/rooms/.*/timestamp_to_event$
+    ^/_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
+    ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*$
+    ^/_matrix/client/(r0|v3|unstable)/capabilities$
 
     # Encryption requests
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
@@ -232,7 +247,9 @@ information.
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
     ^/_matrix/client/(r0|v3|unstable)/register$
+    ^/_matrix/client/(r0|v3|unstable)/register/available$
     ^/_matrix/client/v1/register/m.login.registration_token/validity$
+    ^/_matrix/client/(r0|v3|unstable)/password_policy$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
@@ -240,6 +257,7 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/knock/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
     # Account data requests
@@ -307,8 +325,7 @@ load balancing can be done in different ways.
 
 For `/sync` and `/initialSync` requests it will be more efficient if all
 requests from a particular user are routed to a single instance. This can
-be done e.g. in nginx via IP `hash $http_x_forwarded_for;` or via
-`hash $http_authorization consistent;` which contains the users access token.
+be done in reverse proxy by extracting username part from the users access token.
 
 Admins may additionally wish to separate out `/sync`
 requests that have a `since` query parameter from those that don't (and
@@ -316,6 +333,69 @@ requests that have a `since` query parameter from those that don't (and
 when a user logs in on a new device and can be *very* resource intensive, so
 isolating these requests will stop them from interfering with other users ongoing
 syncs.
+
+Example `nginx` configuration snippet that handles the cases above. This is just an
+example and probably requires some changes according to your particular setup:
+
+```nginx
+# Choose sync worker based on the existence of "since" query parameter
+map $arg_since $sync {
+    default synapse_sync;
+    '' synapse_initial_sync;
+}
+
+# Extract username from access token passed as URL parameter
+map $arg_access_token $accesstoken_from_urlparam {
+    # Defaults to just passing back the whole accesstoken
+    default   $arg_access_token;
+    # Try to extract username part from accesstoken URL parameter
+    "~syt_(?<username>.*?)_.*"           $username;
+}
+
+# Extract username from access token passed as authorization header
+map $http_authorization $mxid_localpart {
+    # Defaults to just passing back the whole accesstoken
+    default                              $http_authorization;
+    # Try to extract username part from accesstoken header
+    "~Bearer syt_(?<username>.*?)_.*"    $username;
+    # if no authorization-header exist, try mapper for URL parameter "access_token"
+    ""                                   $accesstoken_from_urlparam;
+}
+
+upstream synapse_initial_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8016;
+    server 127.0.0.1:8036;
+}
+
+upstream synapse_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8013;
+    server 127.0.0.1:8037;
+    server 127.0.0.1:8038;
+    server 127.0.0.1:8039;
+}
+
+# Sync initial/normal
+location ~ ^/_matrix/client/(r0|v3)/sync$ {
+	proxy_pass http://$sync;
+}
+
+# Normal sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/events$ {
+	proxy_pass http://synapse_sync;
+}
+
+# Initial_sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/initialSync$ {
+	proxy_pass http://synapse_initial_sync;
+}
+location ~ ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$ {
+	proxy_pass http://synapse_initial_sync;
+}
+```
 
 Federation and client requests can be balanced via simple round robin.
 

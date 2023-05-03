@@ -74,8 +74,8 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         mock_keyring.verify_json_for_server.return_value = make_awaitable(True)
 
         # we mock out the federation client too
-        mock_federation_client = Mock(spec=["put_json"])
-        mock_federation_client.put_json.return_value = make_awaitable((200, "OK"))
+        self.mock_federation_client = Mock(spec=["put_json"])
+        self.mock_federation_client.put_json.return_value = make_awaitable((200, "OK"))
 
         # the tests assume that we are starting at unix time 1000
         reactor.pump((1000,))
@@ -83,7 +83,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.mock_hs_notifier = Mock()
         hs = self.setup_test_homeserver(
             notifier=self.mock_hs_notifier,
-            federation_http_client=mock_federation_client,
+            federation_http_client=self.mock_federation_client,
             keyring=mock_keyring,
             replication_streams={},
         )
@@ -233,8 +233,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        put_json = self.hs.get_federation_http_client().put_json
-        put_json.assert_called_once_with(
+        self.mock_federation_client.put_json.assert_called_once_with(
             "farm",
             path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(
@@ -349,8 +348,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
 
-        put_json = self.hs.get_federation_http_client().put_json
-        put_json.assert_called_once_with(
+        self.mock_federation_client.put_json.assert_called_once_with(
             "farm",
             path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(

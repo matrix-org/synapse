@@ -34,7 +34,6 @@ from tests.unittest import override_config
 
 
 class FederationServerTests(unittest.FederatingHomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,

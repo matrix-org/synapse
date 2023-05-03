@@ -16,7 +16,17 @@
 import logging
 from enum import Enum
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from typing_extensions import Counter
 
@@ -461,7 +471,7 @@ class StatsStore(StateDeltasStore):
         insert_cols = []
         qargs = []
 
-        for (key, val) in chain(
+        for key, val in chain(
             keyvalues.items(), absolutes.items(), additive_relatives.items()
         ):
             insert_cols.append(key)
@@ -523,7 +533,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (room_id,),
             )
-            membership_counts = {membership: cnt for membership, cnt in txn}
+            membership_counts = dict(cast(Iterable[Tuple[str, int]], txn))
 
             txn.execute(
                 """

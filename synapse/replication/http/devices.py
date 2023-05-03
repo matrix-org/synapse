@@ -28,62 +28,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
-    """Ask master to resync the device list for a user by contacting their
-    server.
-
-    This must happen on master so that the results can be correctly cached in
-    the database and streamed to workers.
-
-    Request format:
-
-        POST /_synapse/replication/user_device_resync/:user_id
-
-        {}
-
-    Response is equivalent to ` /_matrix/federation/v1/user/devices/:user_id`
-    response, e.g.:
-
-        {
-            "user_id": "@alice:example.org",
-            "devices": [
-                {
-                    "device_id": "JLAFKJWSCS",
-                    "keys": { ... },
-                    "device_display_name": "Alice's Mobile Phone"
-                }
-            ]
-        }
-    """
-
-    NAME = "user_device_resync"
-    PATH_ARGS = ("user_id",)
-    CACHE = False
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
-        from synapse.handlers.device import DeviceHandler
-
-        handler = hs.get_device_handler()
-        assert isinstance(handler, DeviceHandler)
-        self.device_list_updater = handler.device_list_updater
-
-        self.store = hs.get_datastores().main
-        self.clock = hs.get_clock()
-
-    @staticmethod
-    async def _serialize_payload(user_id: str) -> JsonDict:  # type: ignore[override]
-        return {}
-
-    async def _handle_request(  # type: ignore[override]
-        self, request: Request, content: JsonDict, user_id: str
-    ) -> Tuple[int, Optional[JsonDict]]:
-        user_devices = await self.device_list_updater.user_device_resync(user_id)
-
-        return 200, user_devices
-
-
 class ReplicationMultiUserDevicesResyncRestServlet(ReplicationEndpoint):
     """Ask master to resync the device list for multiple users from the same
     remote server by contacting their server.
@@ -195,7 +139,6 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
     async def _serialize_payload(  # type: ignore[override]
         user_id: str, device_id: str, keys: JsonDict
     ) -> JsonDict:
-
         return {
             "user_id": user_id,
             "device_id": device_id,
@@ -217,6 +160,5 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    ReplicationUserDevicesResyncRestServlet(hs).register(http_server)
     ReplicationMultiUserDevicesResyncRestServlet(hs).register(http_server)
     ReplicationUploadKeysForUserRestServlet(hs).register(http_server)

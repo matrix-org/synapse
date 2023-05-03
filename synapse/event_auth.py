@@ -16,18 +16,7 @@
 import collections.abc
 import logging
 import typing
-from typing import (
-    Any,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -56,7 +45,13 @@ from synapse.api.room_versions import (
     RoomVersions,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.types import MutableStateMap, StateMap, UserID, get_domain_from_id
+from synapse.types import (
+    MutableStateMap,
+    StateMap,
+    StrCollection,
+    UserID,
+    get_domain_from_id,
+)
 
 if typing.TYPE_CHECKING:
     # conditional imports to avoid import cycle
@@ -69,7 +64,7 @@ logger = logging.getLogger(__name__)
 class _EventSourceStore(Protocol):
     async def get_events(
         self,
-        event_ids: Collection[str],
+        event_ids: StrCollection,
         redact_behaviour: EventRedactBehaviour,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
@@ -173,13 +168,24 @@ async def check_state_independent_auth_rules(
         return
 
     # 2. Reject if event has auth_events that: ...
-    auth_events = await store.get_events(
-        event.auth_event_ids(),
-        redact_behaviour=EventRedactBehaviour.as_is,
-        allow_rejected=True,
-    )
     if batched_auth_events:
-        auth_events.update(batched_auth_events)
+        # Copy the batched auth events to avoid mutating them.
+        auth_events = dict(batched_auth_events)
+        needed_auth_event_ids = set(event.auth_event_ids()) - batched_auth_events.keys()
+        if needed_auth_event_ids:
+            auth_events.update(
+                await store.get_events(
+                    needed_auth_event_ids,
+                    redact_behaviour=EventRedactBehaviour.as_is,
+                    allow_rejected=True,
+                )
+            )
+    else:
+        auth_events = await store.get_events(
+            event.auth_event_ids(),
+            redact_behaviour=EventRedactBehaviour.as_is,
+            allow_rejected=True,
+        )
 
     room_id = event.room_id
     auth_dict: MutableStateMap[str] = {}
@@ -449,8 +455,11 @@ def _check_create(event: "EventBase") -> None:
             "room appears to have unsupported version %s" % (room_version_prop,),
         )
 
-    # 1.4 If content has no creator field, reject.
-    if EventContentFields.ROOM_CREATOR not in event.content:
+    # 1.4 If content has no creator field, reject if the room version requires it.
+    if (
+        not event.room_version.msc2175_implicit_room_creator
+        and EventContentFields.ROOM_CREATOR not in event.content
+    ):
         raise AuthError(403, "Create event lacks a 'creator' property")
 
 
@@ -485,7 +494,11 @@ def _is_membership_change_allowed(
         key = (EventTypes.Create, "")
         create = auth_events.get(key)
         if create and event.prev_event_ids()[0] == create.event_id:
-            if create.content["creator"] == event.state_key:
+            if room_version.msc2175_implicit_room_creator:
+                creator = create.sender
+            else:
+                creator = create.content[EventContentFields.ROOM_CREATOR]
+            if creator == event.state_key:
                 return
 
     target_user_id = event.state_key
@@ -780,7 +793,7 @@ def check_redaction(
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
-        True if the the sender is allowed to redact the target event if the
+        True if the sender is allowed to redact the target event if the
         target event was created by them.
         False if the sender is allowed to redact the target event with no
         further checks.
@@ -998,10 +1011,14 @@ def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> in
         # that.
         key = (EventTypes.Create, "")
         create_event = auth_events.get(key)
-        if create_event is not None and create_event.content["creator"] == user_id:
-            return 100
-        else:
-            return 0
+        if create_event is not None:
+            if create_event.room_version.msc2175_implicit_room_creator:
+                creator = create_event.sender
+            else:
+                creator = create_event.content[EventContentFields.ROOM_CREATOR]
+            if creator == user_id:
+                return 100
+        return 0
 
 
 def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int) -> int:

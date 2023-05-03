@@ -269,6 +269,8 @@ class SyncHandler:
         self._state_storage_controller = self._storage_controllers.state
         self._device_handler = hs.get_device_handler()
 
+        self.should_calculate_push_rules = hs.config.push.enable_push
+
         # TODO: flush cache entries on subsequent sync request.
         #    Once we get the next /sync request (ie, one with the same access token
         #    that sets 'since' to 'next_batch'), we know that device won't need a
@@ -941,6 +943,8 @@ class SyncHandler:
 
                 timeline_state = {}
 
+                # Membership events to fetch that can be found in the room state, or in
+                # the case of partial state rooms, the auth events of timeline events.
                 members_to_fetch = set()
                 first_event_by_sender_map = {}
                 for event in batch.events:
@@ -962,9 +966,19 @@ class SyncHandler:
                     # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
                     # We only need apply this on full state syncs given we disabled
                     # LL for incr syncs in #3840.
-                    members_to_fetch.add(sync_config.user.to_string())
-
-                state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
+                    # We don't insert ourselves into `members_to_fetch`, because in some
+                    # rare cases (an empty event batch with a now_token after the user's
+                    # leave in a partial state room which another local user has
+                    # joined), the room state will be missing our membership and there
+                    # is no guarantee that our membership will be in the auth events of
+                    # timeline events when the room is partial stated.
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        members_to_fetch.union((sync_config.user.to_string(),))
+                    )
+                else:
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        members_to_fetch
+                    )
 
                 # We are happy to use partial state to compute the `/sync` response.
                 # Since partial state may not include the lazy-loaded memberships we
@@ -986,7 +1000,9 @@ class SyncHandler:
             # sync's timeline and the start of the current sync's timeline.
             # See the docstring above for details.
             state_ids: StateMap[str]
-
+            # We need to know whether the state we fetch may be partial, so check
+            # whether the room is partial stated *before* fetching it.
+            is_partial_state_room = await self.store.is_partial_state_room(room_id)
             if full_state:
                 if batch:
                     state_at_timeline_end = (
@@ -1117,7 +1133,7 @@ class SyncHandler:
             # If we only have partial state for the room, `state_ids` may be missing the
             # memberships we wanted. We attempt to find some by digging through the auth
             # events of timeline events.
-            if lazy_load_members and await self.store.is_partial_state_room(room_id):
+            if lazy_load_members and is_partial_state_room:
                 assert members_to_fetch is not None
                 assert first_event_by_sender_map is not None
 
@@ -1224,6 +1240,10 @@ class SyncHandler:
                 continue
 
             event_with_membership_auth = events_with_membership_auth[member]
+            is_create = (
+                event_with_membership_auth.is_state()
+                and event_with_membership_auth.type == EventTypes.Create
+            )
             is_join = (
                 event_with_membership_auth.is_state()
                 and event_with_membership_auth.type == EventTypes.Member
@@ -1231,9 +1251,10 @@ class SyncHandler:
                 and event_with_membership_auth.content.get("membership")
                 == Membership.JOIN
             )
-            if not is_join:
+            if not is_create and not is_join:
                 # The event must include the desired membership as an auth event, unless
-                # it's the first join event for a given user.
+                # it's the `m.room.create` event for a room or the first join event for
+                # a given user.
                 missing_members.add(member)
             auth_event_ids.update(event_with_membership_auth.auth_event_ids())
 
@@ -1288,8 +1309,13 @@ class SyncHandler:
     async def unread_notifs_for_room_id(
         self, room_id: str, sync_config: SyncConfig
     ) -> RoomNotifCounts:
-        with Measure(self.clock, "unread_notifs_for_room_id"):
+        if not self.should_calculate_push_rules:
+            # If push rules have been universally disabled then we know we won't
+            # have any unread counts in the DB, so we may as well skip asking
+            # the DB.
+            return RoomNotifCounts.empty()
 
+        with Measure(self.clock, "unread_notifs_for_room_id"):
             return await self.store.get_unread_event_push_actions_by_room_for_user(
                 room_id,
                 sync_config.user.to_string(),
@@ -1391,6 +1417,11 @@ class SyncHandler:
                 for room_id, is_partial_state in results.items()
                 if is_partial_state
             )
+            membership_change_events = [
+                event
+                for event in membership_change_events
+                if not results.get(event.room_id, False)
+            ]
 
         # Incremental eager syncs should additionally include rooms that
         # - we are joined to
@@ -1444,9 +1475,9 @@ class SyncHandler:
 
         logger.debug("Fetching account data")
 
-        account_data_by_room = await self._generate_sync_entry_for_account_data(
-            sync_result_builder
-        )
+        # Global account data is included if it is not filtered out.
+        if not sync_config.filter_collection.blocks_all_global_account_data():
+            await self._generate_sync_entry_for_account_data(sync_result_builder)
 
         # Presence data is included if the server has it enabled and not filtered out.
         include_presence_data = bool(
@@ -1472,9 +1503,7 @@ class SyncHandler:
             (
                 newly_joined_rooms,
                 newly_left_rooms,
-            ) = await self._generate_sync_entry_for_rooms(
-                sync_result_builder, account_data_by_room
-            )
+            ) = await self._generate_sync_entry_for_rooms(sync_result_builder)
 
             # Work out which users have joined or left rooms we're in. We use this
             # to build the presence and device_list parts of the sync response in
@@ -1521,7 +1550,7 @@ class SyncHandler:
             one_time_keys_count = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
-            unused_fallback_key_types = (
+            unused_fallback_key_types = list(
                 await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
             )
 
@@ -1717,35 +1746,29 @@ class SyncHandler:
 
     async def _generate_sync_entry_for_account_data(
         self, sync_result_builder: "SyncResultBuilder"
-    ) -> Dict[str, Dict[str, JsonDict]]:
-        """Generates the account data portion of the sync response.
+    ) -> None:
+        """Generates the global account data portion of the sync response.
 
         Account data (called "Client Config" in the spec) can be set either globally
         or for a specific room. Account data consists of a list of events which
         accumulate state, much like a room.
 
-        This function retrieves global and per-room account data. The former is written
-        to the given `sync_result_builder`. The latter is returned directly, to be
-        later written to the `sync_result_builder` on a room-by-room basis.
+        This function retrieves global account data and writes it to the given
+        `sync_result_builder`. See `_generate_sync_entry_for_rooms` for handling
+         of per-room account data.
 
         Args:
             sync_result_builder
-
-        Returns:
-            A dictionary whose keys (room ids) map to the per room account data for that
-            room.
         """
         sync_config = sync_result_builder.sync_config
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
-            # TODO Do not fetch room account data if it will be unused.
-            (
-                global_account_data,
-                account_data_by_room,
-            ) = await self.store.get_updated_account_data_for_user(
-                user_id, since_token.account_data_key
+            global_account_data = (
+                await self.store.get_updated_global_account_data_for_user(
+                    user_id, since_token.account_data_key
+                )
             )
 
             push_rules_changed = await self.store.have_push_rules_changed_for_user(
@@ -1753,30 +1776,30 @@ class SyncHandler:
             )
 
             if push_rules_changed:
+                global_account_data = dict(global_account_data)
                 global_account_data["m.push_rules"] = await self.push_rules_for_user(
                     sync_config.user
                 )
         else:
-            # TODO Do not fetch room account data if it will be unused.
-            (
-                global_account_data,
-                account_data_by_room,
-            ) = await self.store.get_account_data_for_user(sync_config.user.to_string())
+            all_global_account_data = await self.store.get_global_account_data_for_user(
+                user_id
+            )
 
+            global_account_data = dict(all_global_account_data)
             global_account_data["m.push_rules"] = await self.push_rules_for_user(
                 sync_config.user
             )
 
-        account_data_for_user = await sync_config.filter_collection.filter_account_data(
-            [
-                {"type": account_data_type, "content": content}
-                for account_data_type, content in global_account_data.items()
-            ]
+        account_data_for_user = (
+            await sync_config.filter_collection.filter_global_account_data(
+                [
+                    {"type": account_data_type, "content": content}
+                    for account_data_type, content in global_account_data.items()
+                ]
+            )
         )
 
         sync_result_builder.account_data = account_data_for_user
-
-        return account_data_by_room
 
     async def _generate_sync_entry_for_presence(
         self,
@@ -1837,9 +1860,7 @@ class SyncHandler:
         sync_result_builder.presence = presence
 
     async def _generate_sync_entry_for_rooms(
-        self,
-        sync_result_builder: "SyncResultBuilder",
-        account_data_by_room: Dict[str, Dict[str, JsonDict]],
+        self, sync_result_builder: "SyncResultBuilder"
     ) -> Tuple[AbstractSet[str], AbstractSet[str]]:
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.
@@ -1850,7 +1871,6 @@ class SyncHandler:
 
         Args:
             sync_result_builder
-            account_data_by_room: Dictionary of per room account data
 
         Returns:
             Returns a 2-tuple describing rooms the user has joined or left.
@@ -1863,9 +1883,30 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
         user_id = sync_result_builder.sync_config.user.to_string()
 
+        blocks_all_rooms = (
+            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+        )
+
+        # 0. Start by fetching room account data (if required).
+        if (
+            blocks_all_rooms
+            or sync_result_builder.sync_config.filter_collection.blocks_all_room_account_data()
+        ):
+            account_data_by_room: Mapping[str, Mapping[str, JsonDict]] = {}
+        elif since_token and not sync_result_builder.full_state:
+            account_data_by_room = (
+                await self.store.get_updated_room_account_data_for_user(
+                    user_id, since_token.account_data_key
+                )
+            )
+        else:
+            account_data_by_room = await self.store.get_room_account_data_for_user(
+                user_id
+            )
+
         # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         block_all_room_ephemeral = (
-            sync_result_builder.sync_config.filter_collection.blocks_all_rooms()
+            blocks_all_rooms
             or sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
         if block_all_room_ephemeral:
@@ -2291,8 +2332,8 @@ class SyncHandler:
         sync_result_builder: "SyncResultBuilder",
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
-        tags: Optional[Dict[str, Dict[str, Any]]],
-        account_data: Dict[str, JsonDict],
+        tags: Optional[Mapping[str, Mapping[str, Any]]],
+        account_data: Mapping[str, JsonDict],
         always_include: bool = False,
     ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`

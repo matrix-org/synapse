@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional, Set, Union, cast
-
-import frozendict
+from typing import Any, Dict, List, Optional, Union, cast
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -32,6 +30,7 @@ from synapse.storage.databases.main.appservice import _make_exclusive_regex
 from synapse.synapse_rust.push import PushRuleEvaluator
 from synapse.types import JsonDict, JsonMapping, UserID
 from synapse.util import Clock
+from synapse.util.frozenutils import freeze
 
 from tests import unittest
 from tests.test_utils.event_injection import create_event, inject_member_event
@@ -48,17 +47,30 @@ class FlattenDictTestCase(unittest.TestCase):
         input = {"foo": {"bar": "abc"}}
         self.assertEqual({"foo.bar": "abc"}, _flatten_dict(input))
 
+        # If a field has a dot in it, escape it.
+        input = {"m.foo": {"b\\ar": "abc"}}
+        self.assertEqual({"m\\.foo.b\\\\ar": "abc"}, _flatten_dict(input))
+
     def test_non_string(self) -> None:
-        """Non-string items are dropped."""
+        """String, booleans, ints, nulls and list of those should be kept while other items are dropped."""
         input: Dict[str, Any] = {
             "woo": "woo",
             "foo": True,
             "bar": 1,
             "baz": None,
-            "fuzz": [],
+            "fuzz": ["woo", True, 1, None, [], {}],
             "boo": {},
         }
-        self.assertEqual({"woo": "woo"}, _flatten_dict(input))
+        self.assertEqual(
+            {
+                "woo": "woo",
+                "foo": True,
+                "bar": 1,
+                "baz": None,
+                "fuzz": ["woo", True, 1, None],
+            },
+            _flatten_dict(input),
+        )
 
     def test_event(self) -> None:
         """Events can also be flattened."""
@@ -78,9 +90,9 @@ class FlattenDictTestCase(unittest.TestCase):
         )
         expected = {
             "content.msgtype": "m.text",
-            "content.body": "hello world!",
+            "content.body": "Hello world!",
             "content.format": "org.matrix.custom.html",
-            "content.formatted_body": "<h1>hello world!</h1>",
+            "content.formatted_body": "<h1>Hello world!</h1>",
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
@@ -107,6 +119,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
+            "content.org\\.matrix\\.msc1767\\.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
@@ -118,6 +131,7 @@ class FlattenDictTestCase(unittest.TestCase):
             "room_id": "!test:test",
             "sender": "@alice:test",
             "type": "m.room.message",
+            "content.org\\.matrix\\.msc1767\\.markup": [],
         }
         self.assertEqual(expected, _flatten_dict(event))
 
@@ -127,9 +141,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self,
         content: JsonMapping,
         *,
-        has_mentions: bool = False,
-        user_mentions: Optional[Set[str]] = None,
-        room_mention: bool = False,
         related_events: Optional[JsonDict] = None,
     ) -> PushRuleEvaluator:
         event = FrozenEvent(
@@ -148,9 +159,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluator(
             _flatten_dict(event),
-            has_mentions,
-            user_mentions or set(),
-            room_mention,
+            False,
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
@@ -183,53 +192,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # A display name with spaces should work fine.
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo bar"))
-
-    def test_user_mentions(self) -> None:
-        """Check for user mentions."""
-        condition = {"kind": "org.matrix.msc3952.is_user_mention"}
-
-        # No mentions shouldn't match.
-        evaluator = self._get_evaluator({}, has_mentions=True)
-        self.assertFalse(evaluator.matches(condition, "@user:test", None))
-
-        # An empty set shouldn't match
-        evaluator = self._get_evaluator({}, has_mentions=True, user_mentions=set())
-        self.assertFalse(evaluator.matches(condition, "@user:test", None))
-
-        # The Matrix ID appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@user:test"}
-        )
-        self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@another:test", "@user:test"}
-        )
-        self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
-        # since the BulkPushRuleEvaluator is what handles data sanitisation.
-
-    def test_room_mentions(self) -> None:
-        """Check for room mentions."""
-        condition = {"kind": "org.matrix.msc3952.is_room_mention"}
-
-        # No room mention shouldn't match.
-        evaluator = self._get_evaluator({}, has_mentions=True)
-        self.assertFalse(evaluator.matches(condition, None, None))
-
-        # Room mention should match.
-        evaluator = self._get_evaluator({}, has_mentions=True, room_mention=True)
-        self.assertTrue(evaluator.matches(condition, None, None))
-
-        # A room mention and user mention is valid.
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@another:test"}, room_mention=True
-        )
-        self.assertTrue(evaluator.matches(condition, None, None))
-
-        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
-        # since the BulkPushRuleEvaluator is what handles data sanitisation.
 
     def _assert_matches(
         self, condition: JsonDict, content: JsonMapping, msg: Optional[str] = None
@@ -354,11 +316,11 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "pattern should only match at the start/end of the value",
         )
 
-        # it should work on frozendicts too
+        # it should work on frozen dictionaries too
         self._assert_matches(
             condition,
-            frozendict.frozendict({"value": "FoobaZ"}),
-            "patterns should match on frozendicts",
+            freeze({"value": "FoobaZ"}),
+            "patterns should match on frozen dictionaries",
         )
 
         # wildcards should match
@@ -400,6 +362,193 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             condition,
             {"value": "fooxbaz\nx"},
             "pattern should not match before a newline",
+        )
+
+    def test_event_match_pattern(self) -> None:
+        """Check that event_match conditions do not use a "pattern_type" from user data."""
+
+        # The pattern_type should not be deserialized into anything valid.
+        condition = {
+            "kind": "event_match",
+            "key": "content.value",
+            "pattern_type": "user_id",
+        }
+        self._assert_not_matches(
+            condition,
+            {"value": "@user:test"},
+            "should not be possible to pass a pattern_type in",
+        )
+
+        # This is an internal-only condition which shouldn't get deserialized.
+        condition = {
+            "kind": "event_match_type",
+            "key": "content.value",
+            "pattern_type": "user_id",
+        }
+        self._assert_not_matches(
+            condition,
+            {"value": "@user:test"},
+            "should not be possible to pass a pattern_type in",
+        )
+
+    def test_exact_event_match_string(self) -> None:
+        """Check that exact_event_match conditions work as expected for strings."""
+
+        # Test against a string value.
+        condition = {
+            "kind": "event_property_is",
+            "key": "content.value",
+            "value": "foobaz",
+        }
+        self._assert_matches(
+            condition,
+            {"value": "foobaz"},
+            "exact value should match",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "FoobaZ"},
+            "values should match and be case-sensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "test foobaz test"},
+            "values must exactly match",
+        )
+        value: Any
+        for value in (True, False, 1, 1.1, None, [], {}):
+            self._assert_not_matches(
+                condition,
+                {"value": value},
+                "incorrect types should not match",
+            )
+
+        # it should work on frozen dictionaries too
+        self._assert_matches(
+            condition,
+            freeze({"value": "foobaz"}),
+            "values should match on frozen dictionaries",
+        )
+
+    def test_exact_event_match_boolean(self) -> None:
+        """Check that exact_event_match conditions work as expected for booleans."""
+
+        # Test against a True boolean value.
+        condition = {"kind": "event_property_is", "key": "content.value", "value": True}
+        self._assert_matches(
+            condition,
+            {"value": True},
+            "exact value should match",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": False},
+            "incorrect values should not match",
+        )
+        for value in ("foobaz", 1, 1.1, None, [], {}):
+            self._assert_not_matches(
+                condition,
+                {"value": value},
+                "incorrect types should not match",
+            )
+
+        # Test against a False boolean value.
+        condition = {
+            "kind": "event_property_is",
+            "key": "content.value",
+            "value": False,
+        }
+        self._assert_matches(
+            condition,
+            {"value": False},
+            "exact value should match",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": True},
+            "incorrect values should not match",
+        )
+        # Choose false-y values to ensure there's no type coercion.
+        for value in ("", 0, 1.1, None, [], {}):
+            self._assert_not_matches(
+                condition,
+                {"value": value},
+                "incorrect types should not match",
+            )
+
+    def test_exact_event_match_null(self) -> None:
+        """Check that exact_event_match conditions work as expected for null."""
+
+        condition = {"kind": "event_property_is", "key": "content.value", "value": None}
+        self._assert_matches(
+            condition,
+            {"value": None},
+            "exact value should match",
+        )
+        for value in ("foobaz", True, False, 1, 1.1, [], {}):
+            self._assert_not_matches(
+                condition,
+                {"value": value},
+                "incorrect types should not match",
+            )
+
+    def test_exact_event_match_integer(self) -> None:
+        """Check that exact_event_match conditions work as expected for integers."""
+
+        condition = {"kind": "event_property_is", "key": "content.value", "value": 1}
+        self._assert_matches(
+            condition,
+            {"value": 1},
+            "exact value should match",
+        )
+        value: Any
+        for value in (1.1, -1, 0):
+            self._assert_not_matches(
+                condition,
+                {"value": value},
+                "incorrect values should not match",
+            )
+        for value in ("1", True, False, None, [], {}):
+            self._assert_not_matches(
+                condition,
+                {"value": value},
+                "incorrect types should not match",
+            )
+
+    def test_exact_event_property_contains(self) -> None:
+        """Check that exact_event_property_contains conditions work as expected."""
+
+        condition = {
+            "kind": "event_property_contains",
+            "key": "content.value",
+            "value": "foobaz",
+        }
+        self._assert_matches(
+            condition,
+            {"value": ["foobaz"]},
+            "exact value should match",
+        )
+        self._assert_matches(
+            condition,
+            {"value": ["foobaz", "bugz"]},
+            "extra values should match",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": ["FoobaZ"]},
+            "values should match and be case-sensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "foobaz"},
+            "does not search in a string",
+        )
+
+        # it should work on frozen dictionaries too
+        self._assert_matches(
+            condition,
+            freeze({"value": ["foobaz"]}),
+            "values should match on frozen dictionaries",
         )
 
     def test_no_body(self) -> None:

@@ -23,7 +23,6 @@ from tests.unittest import HomeserverTestCase
 
 
 class PurgeTests(HomeserverTestCase):
-
     user_id = "@red:server"
     servlets = [room.register_servlets]
 
@@ -112,7 +111,7 @@ class PurgeTests(HomeserverTestCase):
                 self.room_id, "m.room.create", ""
             )
         )
-        self.assertIsNotNone(create_event)
+        assert create_event is not None
 
         # Purge everything before this topological token
         self.get_success(

@@ -27,7 +27,7 @@ from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
     from synapse.config.homeserver import HomeServerConfig
-    from synapse.types import JsonDict
+    from synapse.types import JsonDict, StrCollection
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,15 @@ class Codes(str, Enum):
     UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
 
     USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
+
+    AS_PING_URL_NOT_SET = "FI.MAU.MSC2659_URL_NOT_SET"
+    AS_PING_BAD_STATUS = "FI.MAU.MSC2659_BAD_STATUS"
+    AS_PING_CONNECTION_TIMEOUT = "FI.MAU.MSC2659_CONNECTION_TIMEOUT"
+    AS_PING_CONNECTION_FAILED = "FI.MAU.MSC2659_CONNECTION_FAILED"
+
+    # Attempt to send a second annotation with the same event type & annotation key
+    # MSC2677
+    DUPLICATE_ANNOTATION = "M_DUPLICATE_ANNOTATION"
 
 
 class CodeMessageException(RuntimeError):
@@ -673,17 +682,26 @@ class FederationPullAttemptBackoffError(RuntimeError):
     Attributes:
         event_id: The event_id which we are refusing to pull
         message: A custom error message that gives more context
+        retry_after_ms: The remaining backoff interval, in milliseconds
     """
 
-    def __init__(self, event_ids: List[str], message: Optional[str]):
-        self.event_ids = event_ids
+    def __init__(
+        self, event_ids: "StrCollection", message: Optional[str], retry_after_ms: int
+    ):
+        event_ids = list(event_ids)
 
         if message:
             error_message = message
         else:
-            error_message = f"Not attempting to pull event_ids={self.event_ids} because we already tried to pull them recently (backing off)."
+            error_message = (
+                f"Not attempting to pull event_ids={event_ids} because we already "
+                "tried to pull them recently (backing off)."
+            )
 
         super().__init__(error_message)
+
+        self.event_ids = event_ids
+        self.retry_after_ms = retry_after_ms
 
 
 class HttpResponseException(CodeMessageException):
@@ -751,3 +769,25 @@ class ModuleFailedException(Exception):
     Raised when a module API callback fails, for example because it raised an
     exception.
     """
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    @staticmethod
+    def message() -> str:
+        return "Cannot persist partial state event in un-partial stated room"
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg=PartialStateConflictError.message(),
+            errcode=Codes.UNKNOWN,
+        )

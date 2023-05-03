@@ -30,7 +30,6 @@ from typing import (
     Iterable,
     Iterator,
     List,
-    NoReturn,
     Optional,
     Pattern,
     Tuple,
@@ -47,6 +46,13 @@ from twisted.internet import defer, interfaces
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
 from twisted.web import resource
+
+try:
+    from twisted.web.pages import notFound
+except ImportError:
+    from twisted.web.resource import NoResource as notFound  # type: ignore[assignment]
+
+from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import File
 from twisted.web.util import redirectTo
@@ -340,7 +346,8 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
             return callback_return
 
-        return _unrecognised_request_handler(request)
+        # A request with an unknown method (for a known endpoint) was received.
+        raise UnrecognizedRequestError(code=405)
 
     @abc.abstractmethod
     def _send_response(
@@ -396,7 +403,6 @@ class DirectServeJsonResource(_AsyncResource):
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _PathEntry:
-    pattern: Pattern
     callback: ServletCallback
     servlet_classname: str
 
@@ -425,13 +431,14 @@ class JsonResource(DirectServeJsonResource):
     ):
         super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
-        self.path_regexs: Dict[bytes, List[_PathEntry]] = {}
+        # Map of path regex -> method -> callback.
+        self._routes: Dict[Pattern[str], Dict[bytes, _PathEntry]] = {}
         self.hs = hs
 
     def register_paths(
         self,
         method: str,
-        path_patterns: Iterable[Pattern],
+        path_patterns: Iterable[Pattern[str]],
         callback: ServletCallback,
         servlet_classname: str,
     ) -> None:
@@ -455,8 +462,8 @@ class JsonResource(DirectServeJsonResource):
 
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
-            self.path_regexs.setdefault(method_bytes, []).append(
-                _PathEntry(path_pattern, callback, servlet_classname)
+            self._routes.setdefault(path_pattern, {})[method_bytes] = _PathEntry(
+                callback, servlet_classname
             )
 
     def _get_handler_for_request(
@@ -478,14 +485,17 @@ class JsonResource(DirectServeJsonResource):
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request_method, []):
-            m = path_entry.pattern.match(request_path)
+        for path_pattern, methods in self._routes.items():
+            m = path_pattern.match(request_path)
             if m:
-                # We found a match!
+                # We found a matching path!
+                path_entry = methods.get(request_method)
+                if not path_entry:
+                    raise UnrecognizedRequestError(code=405)
                 return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
-        # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        return _unrecognised_request_handler, "unrecognised_request_handler", {}
+        # Huh. No one wanted to handle that? Fiiiiiine.
+        raise UnrecognizedRequestError(code=404)
 
     async def _async_render(self, request: SynapseRequest) -> Tuple[int, Any]:
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
@@ -566,18 +576,8 @@ class StaticResource(File):
         set_clickjacking_protection_headers(request)
         return super().render_GET(request)
 
-
-def _unrecognised_request_handler(request: Request) -> NoReturn:
-    """Request handler for unrecognised requests
-
-    This is a request handler suitable for return from
-    _get_handler_for_request. It actually just raises an
-    UnrecognizedRequestError.
-
-    Args:
-        request: Unused, but passed in to match the signature of ServletCallback.
-    """
-    raise UnrecognizedRequestError(code=404)
+    def directoryListing(self) -> IResource:
+        return notFound()
 
 
 class UnrecognizedRequestResource(resource.Resource):
@@ -901,6 +901,10 @@ def set_cors_headers(request: SynapseRequest) -> None:
         request.setHeader(
             b"Access-Control-Allow-Headers",
             b"X-Requested-With, Content-Type, Authorization, Date",
+        )
+        request.setHeader(
+            b"Access-Control-Expose-Headers",
+            b"Synapse-Trace-Id",
         )
 
 

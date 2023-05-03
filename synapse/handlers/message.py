@@ -38,6 +38,7 @@ from synapse.api.errors import (
     Codes,
     ConsentNotGivenError,
     NotFoundError,
+    PartialStateConflictError,
     ShadowBanError,
     SynapseError,
     UnstableSpecAuthError,
@@ -48,8 +49,8 @@ from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
-from synapse.events.snapshot import EventContext
-from synapse.events.utils import maybe_upsert_event_field
+from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
+from synapse.events.utils import SerializeEventConfig, maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
 from synapse.logging import opentracing
@@ -57,7 +58,6 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.replication.http.send_events import ReplicationSendEventsRestServlet
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
     MutableStateMap,
@@ -245,8 +245,11 @@ class MessageHandler:
                 )
                 room_state = room_state_events[membership_event_id]
 
-        now = self.clock.time_msec()
-        events = self._event_serializer.serialize_events(room_state.values(), now)
+        events = self._event_serializer.serialize_events(
+            room_state.values(),
+            self.clock.time_msec(),
+            config=SerializeEventConfig(requester=requester),
+        )
         return events
 
     async def _user_can_see_state_at_event(
@@ -499,13 +502,13 @@ class EventCreationHandler:
 
         self.request_ratelimiter = hs.get_request_ratelimiter()
 
-        # We arbitrarily limit concurrent event creation for a room to 5.
-        # This is to stop us from diverging history *too* much.
-        self.limiter = Linearizer(max_count=5, name="room_event_creation_limit")
+        # We limit concurrent event creation for a room to 1. This prevents state resolution
+        # from occurring when sending bursts of events to a local room
+        self.limiter = Linearizer(max_count=1, name="room_event_creation_limit")
 
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.third_party_event_rules: "ThirdPartyEventRules" = (
             self.hs.get_third_party_event_rules()
         )
@@ -558,6 +561,8 @@ class EventCreationHandler:
                 expiry_ms=30 * 60 * 1000,
             )
 
+        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
+
     async def create_event(
         self,
         requester: Requester,
@@ -574,7 +579,7 @@ class EventCreationHandler:
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
         current_state_group: Optional[int] = None,
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         """
         Given a dict from a client, create a new event. If bool for_batch is true, will
         create an event using the prev_event_ids, and will create an event context for
@@ -698,8 +703,15 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
+        # Save the access token ID, the device ID and the transaction ID in the event
+        # internal metadata. This is useful to determine if we should echo the
+        # transaction_id in events.
+        # See `synapse.events.utils.EventClientSerializer.serialize_event`
         if requester.access_token_id is not None:
             builder.internal_metadata.token_id = requester.access_token_id
+
+        if requester.device_id is not None:
+            builder.internal_metadata.device_id = requester.device_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
@@ -708,7 +720,7 @@ class EventCreationHandler:
 
         builder.internal_metadata.historical = historical
 
-        event, context = await self.create_new_client_event(
+        event, unpersisted_context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
             allow_no_prev_events=allow_no_prev_events,
@@ -737,7 +749,7 @@ class EventCreationHandler:
                 assert state_map is not None
                 prev_event_id = state_map.get((EventTypes.Member, event.sender))
             else:
-                prev_state_ids = await context.get_prev_state_ids(
+                prev_state_ids = await unpersisted_context.get_prev_state_ids(
                     StateFilter.from_types([(EventTypes.Member, None)])
                 )
                 prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
@@ -762,8 +774,7 @@ class EventCreationHandler:
                 )
 
         self.validator.validate_new(event, self.config)
-
-        return event, context
+        return event, unpersisted_context
 
     async def _is_exempt_from_privacy_policy(
         self, builder: EventBuilder, requester: Requester
@@ -895,12 +906,31 @@ class EventCreationHandler:
         Returns:
             An event if one could be found, None otherwise.
         """
+
+        if self._msc3970_enabled and requester.device_id:
+            # When MSC3970 is enabled, we lookup for events sent by the same device first,
+            # and fallback to the old behaviour if none were found.
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_device_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.device_id,
+                    txn_id,
+                )
+            )
+            if existing_event_id:
+                return await self.store.get_event(existing_event_id)
+
+        # Pre-MSC3970, we looked up for events that were sent by the same session by
+        # using the access token ID.
         if requester.access_token_id:
-            existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id,
-                requester.user.to_string(),
-                requester.access_token_id,
-                txn_id,
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_token_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.access_token_id,
+                    txn_id,
+                )
             )
             if existing_event_id:
                 return await self.store.get_event(existing_event_id)
@@ -985,10 +1015,11 @@ class EventCreationHandler:
         # a situation where event persistence can't keep up, causing
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
-        async with self.limiter.queue(event_dict["room_id"]):
+        room_id = event_dict["room_id"]
+        async with self.limiter.queue(room_id):
             if txn_id:
                 event = await self.get_event_from_transaction(
-                    requester, txn_id, event_dict["room_id"]
+                    requester, txn_id, room_id
                 )
                 if event:
                     # we know it was persisted, so must have a stream ordering
@@ -998,12 +1029,24 @@ class EventCreationHandler:
                         event.internal_metadata.stream_ordering,
                     )
 
+        # If we don't have any prev event IDs specified then we need to
+        # check that the host is in the room (as otherwise populating the
+        # prev events will fail), at which point we may as well check the
+        # local user is in the room.
+        if not prev_event_ids:
+            user_id = requester.user.to_string()
+            is_user_in_room = await self.store.check_local_user_in_room(
+                user_id, room_id
+            )
+            if not is_user_in_room:
+                raise AuthError(403, f"User {user_id} not in room {room_id}")
+
         # Try several times, it could fail with PartialStateConflictError
         # in handle_new_client_event, cf comment in except block.
         max_retries = 5
         for i in range(max_retries):
             try:
-                event, context = await self.create_event(
+                event, unpersisted_context = await self.create_event(
                     requester,
                     event_dict,
                     txn_id=txn_id,
@@ -1014,13 +1057,18 @@ class EventCreationHandler:
                     historical=historical,
                     depth=depth,
                 )
+                context = await unpersisted_context.persist(event)
 
                 assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
                     event.sender,
                 )
 
-                spam_check_result = await self.spam_checker.check_event_for_spam(event)
-                if spam_check_result != self.spam_checker.NOT_SPAM:
+                spam_check_result = (
+                    await self._spam_checker_module_callbacks.check_event_for_spam(
+                        event
+                    )
+                )
+                if spam_check_result != self._spam_checker_module_callbacks.NOT_SPAM:
                     if isinstance(spam_check_result, tuple):
                         try:
                             [code, dict] = spam_check_result
@@ -1083,13 +1131,14 @@ class EventCreationHandler:
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
         current_state_group: Optional[int] = None,
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         """Create a new event for a local client. If bool for_batch is true, will
         create an event using the prev_event_ids, and will create an event context for
         the event using the parameters state_map and current_state_group, thus these parameters
         must be provided in this case if for_batch is True. The subsequently created event
         and context are suitable for being batched up and bulk persisted to the database
-        with other similarly created events.
+        with other similarly created events. Note that this returns an UnpersistedEventContext,
+        which must be converted to an EventContext before it can be sent to the DB.
 
         Args:
             builder:
@@ -1131,7 +1180,7 @@ class EventCreationHandler:
                 batch persisting
 
         Returns:
-            Tuple of created event, context
+            Tuple of created event, UnpersistedEventContext
         """
         # Strip down the state_event_ids to only what we need to auth the event.
         # For example, we don't need extra m.room.member that don't match event.sender
@@ -1187,14 +1236,20 @@ class EventCreationHandler:
         if for_batch:
             assert prev_event_ids is not None
             assert state_map is not None
-            assert current_state_group is not None
             auth_ids = self._event_auth_handler.compute_auth_events(builder, state_map)
             event = await builder.build(
                 prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
             )
-            context = await self.state.compute_event_context_for_batched(
-                event, state_map, current_state_group
+
+            context: UnpersistedEventContextBase = (
+                await self.state.calculate_context_info(
+                    event,
+                    state_ids_before_event=state_map,
+                    partial_state=False,
+                    state_group_before_event=current_state_group,
+                )
             )
+
         else:
             event = await builder.build(
                 prev_event_ids=prev_event_ids,
@@ -1244,16 +1299,17 @@ class EventCreationHandler:
 
                     state_map_for_event[(data.event_type, data.state_key)] = state_id
 
-                context = await self.state.compute_event_context(
+                # TODO(faster_joins): check how MSC2716 works and whether we can have
+                #   partial state here
+                #   https://github.com/matrix-org/synapse/issues/13003
+                context = await self.state.calculate_context_info(
                     event,
                     state_ids_before_event=state_map_for_event,
-                    # TODO(faster_joins): check how MSC2716 works and whether we can have
-                    #   partial state here
-                    #   https://github.com/matrix-org/synapse/issues/13003
                     partial_state=False,
                 )
+
             else:
-                context = await self.state.compute_event_context(event)
+                context = await self.state.calculate_context_info(event)
 
         if requester:
             context.app_service = requester.app_service
@@ -1326,7 +1382,11 @@ class EventCreationHandler:
                 relation.parent_id, event.type, aggregation_key, event.sender
             )
             if already_exists:
-                raise SynapseError(400, "Can't send same reaction twice")
+                raise SynapseError(
+                    400,
+                    "Can't send same reaction twice",
+                    errcode=Codes.DUPLICATE_ANNOTATION,
+                )
 
         # Don't attempt to start a thread if the parent event is a relation.
         elif relation.rel_type == RelationTypes.THREAD:
@@ -1881,7 +1941,12 @@ class EventCreationHandler:
                 room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
                 create_event = await self.store.get_create_event_for_room(event.room_id)
-                room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+                if not room_version_obj.msc2175_implicit_room_creator:
+                    room_creator = create_event.content.get(
+                        EventContentFields.ROOM_CREATOR
+                    )
+                else:
+                    room_creator = create_event.sender
 
                 # Only check an insertion event if the room version
                 # supports it or the event is from the room creator.
@@ -2031,7 +2096,7 @@ class EventCreationHandler:
                 max_retries = 5
                 for i in range(max_retries):
                     try:
-                        event, context = await self.create_event(
+                        event, unpersisted_context = await self.create_event(
                             requester,
                             {
                                 "type": EventTypes.Dummy,
@@ -2040,6 +2105,7 @@ class EventCreationHandler:
                                 "sender": user_id,
                             },
                         )
+                        context = await unpersisted_context.persist(event)
 
                         event.internal_metadata.proactively_send = False
 
@@ -2082,9 +2148,9 @@ class EventCreationHandler:
 
     async def _rebuild_event_after_third_party_rules(
         self, third_party_result: dict, original_event: EventBase
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         # the third_party_event_rules want to replace the event.
-        # we do some basic checks, and then return the replacement event and context.
+        # we do some basic checks, and then return the replacement event.
 
         # Construct a new EventBuilder and validate it, which helps with the
         # rest of these checks.
@@ -2138,5 +2204,6 @@ class EventCreationHandler:
 
         # we rebuild the event context, to be on the safe side. If nothing else,
         # delta_ids might need an update.
-        context = await self.state.compute_event_context(event)
+        context = await self.state.calculate_context_info(event)
+
         return event, context
