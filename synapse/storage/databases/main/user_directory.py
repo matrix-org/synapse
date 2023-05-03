@@ -434,7 +434,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         # Actually insert the users with their profiles into the directory.
         await self.db_pool.runInteraction(
             "populate_user_directory_process_users_insertion",
-            self._update_profile_in_user_dir_txn,
+            self._update_profiles_in_user_dir_txn,
             profiles_to_insert,
         )
 
@@ -640,12 +640,12 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         If the user is remote, the profile will be marked as not stale.
         """
         await self.db_pool.runInteraction(
-            "update_profile_in_user_dir",
-            self._update_profile_in_user_dir_txn,
+            "update_profiles_in_user_dir",
+            self._update_profiles_in_user_dir_txn,
             [_UserDirProfile(user_id, display_name, avatar_url)],
         )
 
-    def _update_profile_in_user_dir_txn(
+    def _update_profiles_in_user_dir_txn(
         self,
         txn: LoggingTransaction,
         profiles: Sequence[_UserDirProfile],
