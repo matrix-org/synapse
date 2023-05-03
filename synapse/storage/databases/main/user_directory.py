@@ -394,12 +394,47 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             % (len(users_to_work_on), progress["remaining"])
         )
 
-        for user_id in users_to_work_on:
-            if await self.should_include_local_user_in_dir(user_id):
-                profile = await self.get_profileinfo(get_localpart_from_id(user_id))  # type: ignore[attr-defined]
-                await self.update_profile_in_user_dir(
-                    user_id, profile.display_name, profile.avatar_url
-                )
+        # First filter down to users we want to insert into the user directory.
+        users_to_insert = [
+            user_id
+            for user_id in users_to_work_on
+            if await self.should_include_local_user_in_dir(user_id)
+        ]
+
+        # Next fetch their profiles. Note that the `user_id` here is the
+        # *localpart*, and that not all users have profiles.
+        profile_rows = await self.db_pool.simple_select_many_batch(
+            table="profiles",
+            column="user_id",
+            iterable=[get_localpart_from_id(u) for u in users_to_insert],
+            retcols=(
+                "user_id",
+                "displayname",
+                "avatar_url",
+            ),
+            keyvalues={},
+            desc="populate_user_directory_process_users_get_profiles",
+        )
+        profiles = {
+            f"@{row['user_id']}:{self.server_name}": _UserDirProfile(
+                f"@{row['user_id']}:{self.server_name}",
+                row["displayname"],
+                row["avatar_url"],
+            )
+            for row in profile_rows
+        }
+
+        profiles_to_insert = [
+            profiles.get(user_id) or _UserDirProfile(user_id)
+            for user_id in users_to_insert
+        ]
+
+        # Actually insert the users with their profiles into the directory.
+        await self.db_pool.runInteraction(
+            "populate_user_directory_process_users_insertion",
+            self._update_profile_in_user_dir_txn,
+            profiles_to_insert,
+        )
 
         # We've finished processing the users. Delete it from the table.
         await self.db_pool.simple_delete_many(
