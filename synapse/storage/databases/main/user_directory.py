@@ -27,6 +27,8 @@ from typing import (
     cast,
 )
 
+import attr
+
 try:
     # Figure out if ICU support is available for searching users.
     import icu
@@ -64,6 +66,17 @@ from synapse.util.caches.descriptors import cached
 logger = logging.getLogger(__name__)
 
 TEMP_TABLE = "_temp_populate_user_directory"
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class _UserDirProfile:
+    """Helper type for the user directory code for an entry to be inserted into
+    the directory.
+    """
+
+    user_id: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
@@ -596,75 +609,99 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         await self.db_pool.runInteraction(
             "update_profile_in_user_dir",
             self._update_profile_in_user_dir_txn,
-            user_id,
-            display_name,
-            avatar_url,
+            [_UserDirProfile(user_id, display_name, avatar_url)],
         )
 
     def _update_profile_in_user_dir_txn(
         self,
         txn: LoggingTransaction,
-        user_id: str,
-        display_name: Optional[str],
-        avatar_url: Optional[str],
+        profiles: Sequence[_UserDirProfile],
     ) -> None:
-        self.db_pool.simple_upsert_txn(
+        self.db_pool.simple_upsert_many_txn(
             txn,
             table="user_directory",
-            keyvalues={"user_id": user_id},
-            values={"display_name": display_name, "avatar_url": avatar_url},
+            key_names=("user_id",),
+            key_values=[(p.user_id,) for p in profiles],
+            value_names=("display_name", "avatar_url"),
+            value_values=[
+                (
+                    non_null_str_or_none(p.display_name),
+                    non_null_str_or_none(p.avatar_url),
+                )
+                for p in profiles
+            ],
         )
 
-        if not self.hs.is_mine_id(user_id):
-            # Remote users: Make sure the profile is not marked as stale anymore.
-            self.db_pool.simple_delete_txn(
+        # Remote users: Make sure the profile is not marked as stale anymore.
+        remote_users = [
+            p.user_id for p in profiles if not self.hs.is_mine_id(p.user_id)
+        ]
+        if remote_users:
+            self.db_pool.simple_delete_many_txn(
                 txn,
                 table="user_directory_stale_remote_users",
-                keyvalues={"user_id": user_id},
+                column="user_id",
+                values=remote_users,
+                keyvalues={},
             )
-
-        # The display name that goes into the database index.
-        index_display_name = display_name
-        if index_display_name is not None:
-            index_display_name = _filter_text_for_index(index_display_name)
 
         if isinstance(self.database_engine, PostgresEngine):
             # We weight the localpart most highly, then display name and finally
             # server name
+            template = """
+                (
+                    %s,
+                    setweight(to_tsvector('simple', %s), 'A')
+                    || setweight(to_tsvector('simple', %s), 'D')
+                    || setweight(to_tsvector('simple', COALESCE(%s, '')), 'B')
+                )
+            """
+
             sql = """
                     INSERT INTO user_directory_search(user_id, vector)
-                    VALUES (?,
-                        setweight(to_tsvector('simple', ?), 'A')
-                        || setweight(to_tsvector('simple', ?), 'D')
-                        || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
-                    ) ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
+                    VALUES ? ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
                 """
-            txn.execute(
+            txn.execute_values(
                 sql,
-                (
-                    user_id,
-                    get_localpart_from_id(user_id),
-                    get_domain_from_id(user_id),
-                    index_display_name,
-                ),
+                [
+                    (
+                        p.user_id,
+                        get_localpart_from_id(p.user_id),
+                        get_domain_from_id(p.user_id),
+                        _filter_text_for_index(p.display_name)
+                        if p.display_name
+                        else None,
+                    )
+                    for p in profiles
+                ],
+                template=template,
+                fetch=False,
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
-            value = (
-                "%s %s" % (user_id, index_display_name)
-                if index_display_name
-                else user_id
-            )
-            self.db_pool.simple_upsert_txn(
+            values = []
+            for p in profiles:
+                if p.display_name is not None:
+                    index_display_name = _filter_text_for_index(p.display_name)
+                    value = f"{p.user_id} {index_display_name}"
+                else:
+                    value = p.user_id
+
+                values.append((value,))
+
+            self.db_pool.simple_upsert_many_txn(
                 txn,
                 table="user_directory_search",
-                keyvalues={"user_id": user_id},
-                values={"value": value},
+                key_names=("user_id",),
+                key_values=[(p.user_id,) for p in profiles],
+                value_names=("value",),
+                value_values=values,
             )
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
-        txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
+        for p in profiles:
+            txn.call_after(self.get_user_in_directory.invalidate, (p.user_id,))
 
     async def add_users_who_share_private_room(
         self, room_id: str, user_id_tuples: Iterable[Tuple[str, str]]
