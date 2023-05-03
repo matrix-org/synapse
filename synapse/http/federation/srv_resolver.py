@@ -22,7 +22,7 @@ import attr
 
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
-from twisted.names.error import DNSNameError, DomainError, DNSNotImplementedError
+from twisted.names.error import DNSNameError, DNSNotImplementedError, DomainError
 
 from synapse.logging.context import make_deferred_yieldable
 
