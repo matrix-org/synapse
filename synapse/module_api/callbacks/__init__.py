@@ -23,8 +23,9 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
 from synapse.module_api.callbacks.spamchecker_callbacks import (
     SpamCheckerModuleApiCallbacks,
 )
-
-from .third_party_event_rules_callbacks import ThirdPartyEventRulesModuleApiCallbacks
+from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
+    ThirdPartyEventRulesModuleApiCallbacks,
+)
 
 
 class ModuleApiCallbacks:
