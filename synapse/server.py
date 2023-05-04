@@ -42,7 +42,6 @@ from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.presence_router import PresenceRouter
-from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
@@ -690,10 +689,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_stats_handler(self) -> StatsHandler:
         return StatsHandler(self)
-
-    @cache_in_self
-    def get_third_party_event_rules(self) -> ThirdPartyEventRules:
-        return ThirdPartyEventRules(self)
 
     @cache_in_self
     def get_password_auth_provider(self) -> PasswordAuthProvider:
