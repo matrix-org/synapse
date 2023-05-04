@@ -335,7 +335,7 @@ class DeviceWorkerHandler:
         # Check if the application services have any results.
         if self._query_appservices_for_keys:
             # Query the appservice for all devices for this user.
-            query: Dict[str, List[str]] = {user_id: None}
+            query: Dict[str, Optional[List[str]]] = {user_id: None}
 
             # Query the appservices for any keys.
             appservice_results = await self._appservice_handler.query_keys(query)
