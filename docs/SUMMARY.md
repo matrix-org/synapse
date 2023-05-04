@@ -57,6 +57,7 @@
       - [Account Validity](admin_api/account_validity.md)
       - [Background Updates](usage/administration/admin_api/background_updates.md)
       - [Event Reports](admin_api/event_reports.md)
+      - [Experimental Features](admin_api/experimental_features.md)
       - [Media](admin_api/media_admin_api.md)
       - [Purge History](admin_api/purge_history_api.md)
       - [Register Users](admin_api/register_api.md)
