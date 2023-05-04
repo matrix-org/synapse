@@ -75,10 +75,14 @@ class DeviceWorkerHandler:
         self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
+        self._appservice_handler = hs.get_application_service_handler()
         self._state_storage = hs.get_storage_controllers().state
         self._auth_handler = hs.get_auth_handler()
         self.server_name = hs.hostname
         self._msc3852_enabled = hs.config.experimental.msc3852_enabled
+        self._query_appservices_for_keys = (
+            hs.config.experimental.msc3984_appservice_key_query
+        )
 
         self.device_list_updater = DeviceListWorkerUpdater(hs)
 
@@ -327,6 +331,29 @@ class DeviceWorkerHandler:
         self_signing_key = await self.store.get_e2e_cross_signing_key(
             user_id, "self_signing"
         )
+
+        # Check if the application services have any results.
+        if self._query_appservices_for_keys:
+            # Query the appservice for all devices for this user.
+            query: Dict[str, List[str]] = {user_id: None}
+
+            # Query the appservices for any keys.
+            appservice_results = await self._appservice_handler.query_keys(query)
+
+            # Merge results, overriding anything in the database.
+            appservice_devices = appservice_results.get("device_keys", {}).get(
+                user_id, {}
+            )
+
+            # Filter the database to only those the appservice has *not* responded with.
+            devices = [d for d in devices if d["device_id"] not in appservice_devices]
+            # Add a slimmed down appservice response.
+            devices.extend(
+                {"device_id": device["device_id"], "keys": device["keys"]}
+                for device in appservice_devices.values()
+            )
+
+            # TODO Handle cross-signing keys.
 
         return {
             "user_id": user_id,
