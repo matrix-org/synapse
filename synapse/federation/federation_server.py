@@ -129,6 +129,7 @@ class FederationServer(FederationBase):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
+        self.server_name = hs.hostname
         self.handler = hs.get_federation_handler()
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self._federation_event_handler = hs.get_federation_event_handler()
