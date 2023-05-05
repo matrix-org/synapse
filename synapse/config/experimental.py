@@ -199,3 +199,6 @@ class ExperimentalConfig(Config):
 
         # MSC3970: Scope transaction IDs to devices
         self.msc3970_enabled = experimental.get("msc3970_enabled", False)
+
+        # MSC4009: E.164 Matrix IDs
+        self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)
