@@ -118,9 +118,10 @@ Body parameters:
 
 - `password` - string, optional. If provided, the user's password is updated and all
   devices are logged out, unless `logout_devices` is set to `false`.
-- `logout_devices` - bool, optional, defaults to `true`. If set to false, devices aren't
+- `logout_devices` - bool, optional, defaults to `true`. If set to `false`, devices aren't
   logged out even when `password` is provided.
-- `displayname` - string, optional, defaults to the value of `user_id`.
+- `displayname` - string, optional. If set to an empty string (`""`), the user's display name
+  will be removed.
 - `threepids` - array, optional, allows setting the third-party IDs (email, msisdn)
   - `medium` - string. Kind of third-party ID, either `email` or `msisdn`.
   - `address` - string. Value of third-party ID.
