@@ -340,12 +340,13 @@ class DeviceWorkerHandler:
             # Query the appservices for any keys.
             appservice_results = await self._appservice_handler.query_keys(query)
 
-            # Merge results, overriding anything in the database.
+            # Merge results, overriding anything from the database.
             appservice_devices = appservice_results.get("device_keys", {}).get(
                 user_id, {}
             )
 
-            # Filter the database to only those the appservice has *not* responded with.
+            # Filter the database results to only those devices that the appservice has
+            # *not* responded with.
             devices = [d for d in devices if d["device_id"] not in appservice_devices]
             # Add a slimmed down appservice response.
             devices.extend(
