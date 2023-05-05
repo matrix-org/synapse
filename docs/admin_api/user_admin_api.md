@@ -122,10 +122,15 @@ Body parameters:
   logged out even when `password` is provided.
 - `displayname` - string, optional. If set to an empty string (`""`), the user's display name
   will be removed.
-- `threepids` - array, optional, allows setting the third-party IDs (email, msisdn)
-  - `medium` - string. Kind of third-party ID, either `email` or `msisdn`.
-  - `address` - string. Value of third-party ID.
-  belonging to a user.
+- `threepids` - array, optional. If provided, the user's third-party IDs (email, msisdn) are
+  entirely replaced with the given list. Each item in the array is an object with the following
+  fields:
+  - `medium` - string, required. The type of third-party ID, either `email` or `msisdn` (phone number).
+  - `address` - string, required. The third-party ID itself, e.g. `alice@example.com` for `email` or
+    `447470274584` (for a phone number with country code "44") and `19254857364` (for a phone number
+    with country code "1") for `msisdn`.
+  Note: If a threepid is removed from a user via this option, Synapse will also attempt to remove
+  that threepid from any identity servers it is aware has a binding for it.
 - `external_ids` - array, optional. Allow setting the identifier of the external identity
   provider for SSO (Single sign-on). Details in the configuration manual under the
   sections [sso](../usage/configuration/config_documentation.md#sso) and [oidc_providers](../usage/configuration/config_documentation.md#oidc_providers).
