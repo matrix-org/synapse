@@ -62,7 +62,7 @@ URL parameters:
 
 - `user_id`: fully-qualified user id: for example, `@user:server.com`.
 
-## Create or modify Account
+## Create or modify account
 
 This API allows an administrator to create or modify a user account with a
 specific `user_id`.
