@@ -154,9 +154,9 @@ Body parameters:
 
   Note: a user cannot be erased with this API. For more details on
   deactivating and erasing users see [Deactivate Account](#deactivate-account).
-- `user_type` - string or null, optional. If provided, the user type will be
-  adjusted. If `null` given, the user type will be cleared. Other 
-  allowed options are: `bot` and `support`.
+- `user_type` - string or null, optional. If not provided, the user type will be
+  not be changed. If `null` is given, the user type will be cleared.
+  Other allowed options are: `bot` and `support`.
 
 If the user already exists then optional parameters default to the current value.
 
