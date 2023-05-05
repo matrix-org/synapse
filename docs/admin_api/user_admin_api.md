@@ -122,6 +122,9 @@ Body parameters:
   logged out even when `password` is provided.
 - `displayname` - string, optional. If set to an empty string (`""`), the user's display name
   will be removed.
+- `avatar_url` - string, optional. Must be a
+  [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
+  If set to an empty string (`""`), the user's avatar is removed.
 - `threepids` - array, optional. If provided, the user's third-party IDs (email, msisdn) are
   entirely replaced with the given list. Each item in the array is an object with the following
   fields:
@@ -139,8 +142,6 @@ Body parameters:
     provided value is not in the homeserver configuration.
   - `external_id` - string, required. An identifier for the user in the external identity provider.
     When the user logs in to the identity provider, this must be the unique ID that they map to.
-- `avatar_url` - string, optional, must be a
-  [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
 - `admin` - bool, optional, defaults to `false`.
 - `deactivated` - bool, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to `false` for new accounts.
