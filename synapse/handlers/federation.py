@@ -141,6 +141,7 @@ class FederationHandler:
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.event_builder_factory = hs.get_event_builder_factory()
@@ -453,7 +454,7 @@ class FederationHandler:
 
             for dom in domains:
                 # We don't want to ask our own server for information we don't have
-                if dom == self.server_name:
+                if self.is_mine_server_name(dom):
                     continue
 
                 try:

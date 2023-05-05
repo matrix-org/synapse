@@ -194,6 +194,7 @@ class SsoHandler:
         self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -802,7 +803,7 @@ class SsoHandler:
             if profile["avatar_url"] is not None:
                 server_name = profile["avatar_url"].split("/")[-2]
                 media_id = profile["avatar_url"].split("/")[-1]
-                if server_name == self._server_name:
+                if self._is_mine_server_name(server_name):
                     media = await self._media_repo.store.get_local_media(media_id)
                     if media is not None and upload_name == media["upload_name"]:
                         logger.info("skipping saving the user avatar")
