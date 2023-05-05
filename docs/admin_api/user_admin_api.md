@@ -78,28 +78,29 @@ with a body of:
 ```json
 {
     "password": "user_password",
-    "displayname": "User",
+    "logout_devices": false,
+    "displayname": "Alice Marigold",
+    "avatar_url": "mxc://example.com/abcde12345",
     "threepids": [
         {
             "medium": "email",
-            "address": "<user_mail_1>"
+            "address": "alice@example.com"
         },
         {
             "medium": "email",
-            "address": "<user_mail_2>"
+            "address": "alice@domain.org"
         }
     ],
     "external_ids": [
         {
-            "auth_provider": "<provider1>",
-            "external_id": "<user_id_provider_1>"
+            "auth_provider": "example",
+            "external_id": "12345"
         },
         {
-            "auth_provider": "<provider2>",
-            "external_id": "<user_id_provider_2>"
+            "auth_provider": "example2",
+            "external_id": "abc54321"
         }
     ],
-    "avatar_url": "<avatar_url>",
     "admin": false,
     "deactivated": false,
     "user_type": null
