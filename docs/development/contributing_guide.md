@@ -346,6 +346,7 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
     A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
     See the [worker documentation](../workers.md) for additional information on workers.
 - Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
+- Passing `PODMAN=1` will use the [podman](https://podman.io/) container runtime, instead of docker.
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh
