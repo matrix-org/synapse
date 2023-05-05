@@ -117,35 +117,35 @@ URL parameters:
 
 Body parameters:
 
-- `password` - string, optional. If provided, the user's password is updated and all
+- `password` - **string**, optional. If provided, the user's password is updated and all
   devices are logged out, unless `logout_devices` is set to `false`.
-- `logout_devices` - bool, optional, defaults to `true`. If set to `false`, devices aren't
+- `logout_devices` - **bool**, optional, defaults to `true`. If set to `false`, devices aren't
   logged out even when `password` is provided.
-- `displayname` - string, optional. If set to an empty string (`""`), the user's display name
+- `displayname` - **string**, optional. If set to an empty string (`""`), the user's display name
   will be removed.
-- `avatar_url` - string, optional. Must be a
+- `avatar_url` - **string**, optional. Must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
   If set to an empty string (`""`), the user's avatar is removed.
-- `threepids` - array, optional. If provided, the user's third-party IDs (email, msisdn) are
+- `threepids` - **array**, optional. If provided, the user's third-party IDs (email, msisdn) are
   entirely replaced with the given list. Each item in the array is an object with the following
   fields:
-  - `medium` - string, required. The type of third-party ID, either `email` or `msisdn` (phone number).
-  - `address` - string, required. The third-party ID itself, e.g. `alice@example.com` for `email` or
+  - `medium` - **string**, required. The type of third-party ID, either `email` or `msisdn` (phone number).
+  - `address` - **string**, required. The third-party ID itself, e.g. `alice@example.com` for `email` or
     `447470274584` (for a phone number with country code "44") and `19254857364` (for a phone number
     with country code "1") for `msisdn`.
   Note: If a threepid is removed from a user via this option, Synapse will also attempt to remove
   that threepid from any identity servers it is aware has a binding for it.
-- `external_ids` - array, optional. Allow setting the identifier of the external identity
+- `external_ids` - **array**, optional. Allow setting the identifier of the external identity
   provider for SSO (Single sign-on). More details are in the configuration manual under the
   sections [sso](../usage/configuration/config_documentation.md#sso) and [oidc_providers](../usage/configuration/config_documentation.md#oidc_providers).
-  - `auth_provider` - string, required. The unique, internal ID of the external identity provider.
+  - `auth_provider` - **string**, required. The unique, internal ID of the external identity provider.
     The same as `idp_id` from the homeserver configuration. Note that no error is raised if the
     provided value is not in the homeserver configuration.
-  - `external_id` - string, required. An identifier for the user in the external identity provider.
+  - `external_id` - **string**, required. An identifier for the user in the external identity provider.
     When the user logs in to the identity provider, this must be the unique ID that they map to.
-- `admin` - bool, optional, defaults to `false`. Whether the user is a homeserver administrator,
+- `admin` - **bool**, optional, defaults to `false`. Whether the user is a homeserver administrator,
   granting them access to the Admin API, among other things.
-- `deactivated` - bool, optional. If unspecified, deactivation state will be left unchanged.
+- `deactivated` - **bool**, optional. If unspecified, deactivation state will be left unchanged.
 
   Note: the `password` field must also be set if both of the following are true:
   - `deactivated` is set to `false` and the user was previously deactivated (you are reactivating this user)
@@ -155,7 +155,7 @@ Body parameters:
 
   Note: a user cannot be erased with this API. For more details on
   deactivating and erasing users see [Deactivate Account](#deactivate-account).
-- `user_type` - string or null, optional. If not provided, the user type will be
+- `user_type` - **string** or null, optional. If not provided, the user type will be
   not be changed. If `null` is given, the user type will be cleared.
   Other allowed options are: `bot` and `support`.
 
