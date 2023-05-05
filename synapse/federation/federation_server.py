@@ -942,7 +942,7 @@ class FederationServer(FederationBase):
             authorising_server = get_domain_from_id(
                 event.content[EventContentFields.AUTHORISING_USER]
             )
-            if authorising_server != self.server_name:
+            if not self._is_mine_server_name(authorising_server):
                 raise SynapseError(
                     400,
                     f"Cannot authorise request from resident server: {authorising_server}",

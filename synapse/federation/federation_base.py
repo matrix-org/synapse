@@ -50,6 +50,7 @@ class FederationBase:
         self.hs = hs
 
         self.server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self.keyring = hs.get_keyring()
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.store = hs.get_datastores().main

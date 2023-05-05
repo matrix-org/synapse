@@ -57,6 +57,7 @@ class Authenticator:
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self.store = hs.get_datastores().main
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist
@@ -100,7 +101,9 @@ class Authenticator:
                 json_request["signatures"].setdefault(origin, {})[key] = sig
 
                 # if the origin_server sent a destination along it needs to match our own server_name
-                if destination is not None and destination != self.server_name:
+                if destination is not None and not self._is_mine_server_name(
+                    destination
+                ):
                     raise AuthenticationError(
                         HTTPStatus.UNAUTHORIZED,
                         "Destination mismatch in auth header",
