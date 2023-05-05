@@ -13495,7 +13495,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api/">A
 <ul>
 <li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
 </ul>
-<h2 id="create-or-modify-account"><a class="header" href="#create-or-modify-account">Create or modify Account</a></h2>
+<h2 id="create-or-modify-account"><a class="header" href="#create-or-modify-account">Create or modify account</a></h2>
 <p>This API allows an administrator to create or modify a user account with a
 specific <code>user_id</code>.</p>
 <p>This api is:</p>
@@ -13504,28 +13504,29 @@ specific <code>user_id</code>.</p>
 <p>with a body of:</p>
 <pre><code class="language-json">{
     &quot;password&quot;: &quot;user_password&quot;,
-    &quot;displayname&quot;: &quot;User&quot;,
+    &quot;logout_devices&quot;: false,
+    &quot;displayname&quot;: &quot;Alice Marigold&quot;,
+    &quot;avatar_url&quot;: &quot;mxc://example.com/abcde12345&quot;,
     &quot;threepids&quot;: [
         {
             &quot;medium&quot;: &quot;email&quot;,
-            &quot;address&quot;: &quot;&lt;user_mail_1&gt;&quot;
+            &quot;address&quot;: &quot;alice@example.com&quot;
         },
         {
             &quot;medium&quot;: &quot;email&quot;,
-            &quot;address&quot;: &quot;&lt;user_mail_2&gt;&quot;
+            &quot;address&quot;: &quot;alice@domain.org&quot;
         }
     ],
     &quot;external_ids&quot;: [
         {
-            &quot;auth_provider&quot;: &quot;&lt;provider1&gt;&quot;,
-            &quot;external_id&quot;: &quot;&lt;user_id_provider_1&gt;&quot;
+            &quot;auth_provider&quot;: &quot;example&quot;,
+            &quot;external_id&quot;: &quot;12345&quot;
         },
         {
-            &quot;auth_provider&quot;: &quot;&lt;provider2&gt;&quot;,
-            &quot;external_id&quot;: &quot;&lt;user_id_provider_2&gt;&quot;
+            &quot;auth_provider&quot;: &quot;example2&quot;,
+            &quot;external_id&quot;: &quot;abc54321&quot;
         }
     ],
-    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
     &quot;admin&quot;: false,
     &quot;deactivated&quot;: false,
     &quot;user_type&quot;: null
@@ -13538,46 +13539,74 @@ specific <code>user_id</code>.</p>
 </ul>
 <p>URL parameters:</p>
 <ul>
-<li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
+<li><code>user_id</code> - A fully-qualified user id. For example, <code>@user:server.com</code>.</li>
 </ul>
 <p>Body parameters:</p>
 <ul>
-<li><code>password</code> - string, optional. If provided, the user's password is updated and all
-devices are logged out, unless <code>logout_devices</code> is set to <code>false</code>.</li>
-<li><code>logout_devices</code> - bool, optional, defaults to <code>true</code>. If set to false, devices aren't
-logged out even when <code>password</code> is provided.</li>
-<li><code>displayname</code> - string, optional, defaults to the value of <code>user_id</code>.</li>
-<li><code>threepids</code> - array, optional, allows setting the third-party IDs (email, msisdn)
+<li>
+<p><code>password</code> - <strong>string</strong>, optional. If provided, the user's password is updated and all
+devices are logged out, unless <code>logout_devices</code> is set to <code>false</code>.</p>
+</li>
+<li>
+<p><code>logout_devices</code> - <strong>bool</strong>, optional, defaults to <code>true</code>. If set to <code>false</code>, devices aren't
+logged out even when <code>password</code> is provided.</p>
+</li>
+<li>
+<p><code>displayname</code> - <strong>string</strong>, optional. If set to an empty string (<code>&quot;&quot;</code>), the user's display name
+will be removed.</p>
+</li>
+<li>
+<p><code>avatar_url</code> - <strong>string</strong>, optional. Must be a
+<a href="https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris">MXC URI</a>.
+If set to an empty string (<code>&quot;&quot;</code>), the user's avatar is removed.</p>
+</li>
+<li>
+<p><code>threepids</code> - <strong>array</strong>, optional. If provided, the user's third-party IDs (email, msisdn) are
+entirely replaced with the given list. Each item in the array is an object with the following
+fields:</p>
 <ul>
-<li><code>medium</code> - string. Kind of third-party ID, either <code>email</code> or <code>msisdn</code>.</li>
-<li><code>address</code> - string. Value of third-party ID.
-belonging to a user.</li>
+<li><code>medium</code> - <strong>string</strong>, required. The type of third-party ID, either <code>email</code> or <code>msisdn</code> (phone number).</li>
+<li><code>address</code> - <strong>string</strong>, required. The third-party ID itself, e.g. <code>alice@example.com</code> for <code>email</code> or
+<code>447470274584</code> (for a phone number with country code &quot;44&quot;) and <code>19254857364</code> (for a phone number
+with country code &quot;1&quot;) for <code>msisdn</code>.
+Note: If a threepid is removed from a user via this option, Synapse will also attempt to remove
+that threepid from any identity servers it is aware has a binding for it.</li>
 </ul>
 </li>
-<li><code>external_ids</code> - array, optional. Allow setting the identifier of the external identity
-provider for SSO (Single sign-on). Details in the configuration manual under the
-sections <a href="admin_api/../usage/configuration/config_documentation.html#sso">sso</a> and <a href="admin_api/../usage/configuration/config_documentation.html#oidc_providers">oidc_providers</a>.
+<li>
+<p><code>external_ids</code> - <strong>array</strong>, optional. Allow setting the identifier of the external identity
+provider for SSO (Single sign-on). More details are in the configuration manual under the
+sections <a href="admin_api/../usage/configuration/config_documentation.html#sso">sso</a> and <a href="admin_api/../usage/configuration/config_documentation.html#oidc_providers">oidc_providers</a>.</p>
 <ul>
-<li><code>auth_provider</code> - string. ID of the external identity provider. Value of <code>idp_id</code>
-in the homeserver configuration. Note that no error is raised if the provided
-value is not in the homeserver configuration.</li>
-<li><code>external_id</code> - string, user ID in the external identity provider.</li>
+<li><code>auth_provider</code> - <strong>string</strong>, required. The unique, internal ID of the external identity provider.
+The same as <code>idp_id</code> from the homeserver configuration. Note that no error is raised if the
+provided value is not in the homeserver configuration.</li>
+<li><code>external_id</code> - <strong>string</strong>, required. An identifier for the user in the external identity provider.
+When the user logs in to the identity provider, this must be the unique ID that they map to.</li>
 </ul>
 </li>
-<li><code>avatar_url</code> - string, optional, must be a
-<a href="https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris">MXC URI</a>.</li>
-<li><code>admin</code> - bool, optional, defaults to <code>false</code>.</li>
-<li><code>deactivated</code> - bool, optional. If unspecified, deactivation state will be left
-unchanged on existing accounts and set to <code>false</code> for new accounts.
-A user cannot be erased by deactivating with this API. For details on
-deactivating users see <a href="admin_api/user_admin_api.html#deactivate-account">Deactivate Account</a>.</li>
-<li><code>user_type</code> - string or null, optional. If provided, the user type will be
-adjusted. If <code>null</code> given, the user type will be cleared. Other 
-allowed options are: <code>bot</code> and <code>support</code>.</li>
+<li>
+<p><code>admin</code> - <strong>bool</strong>, optional, defaults to <code>false</code>. Whether the user is a homeserver administrator,
+granting them access to the Admin API, among other things.</p>
+</li>
+<li>
+<p><code>deactivated</code> - <strong>bool</strong>, optional. If unspecified, deactivation state will be left unchanged.</p>
+<p>Note: the <code>password</code> field must also be set if both of the following are true:</p>
+<ul>
+<li><code>deactivated</code> is set to <code>false</code> and the user was previously deactivated (you are reactivating this user)</li>
+<li>Users are allowed to set their password on this homeserver (both <code>password_config.enabled</code> and
+<code>password_config.localdb_enabled</code> config options are set to <code>true</code>).
+Users' passwords are wiped upon account deactivation, hence the need to set a new one here.</li>
 </ul>
-<p>If the user already exists then optional parameters default to the current value.</p>
-<p>In order to re-activate an account <code>deactivated</code> must be set to <code>false</code>. If
-users do not login via single-sign-on, a new <code>password</code> must be provided.</p>
+<p>Note: a user cannot be erased with this API. For more details on
+deactivating and erasing users see <a href="admin_api/user_admin_api.html#deactivate-account">Deactivate Account</a>.</p>
+</li>
+<li>
+<p><code>user_type</code> - <strong>string</strong> or null, optional. If not provided, the user type will be
+not be changed. If <code>null</code> is given, the user type will be cleared.
+Other allowed options are: <code>bot</code> and <code>support</code>.</p>
+</li>
+</ul>
 <h2 id="list-accounts"><a class="header" href="#list-accounts">List Accounts</a></h2>
 <p>This API returns all local user accounts.
 By default, the response is ordered by ascending user ID.</p>
