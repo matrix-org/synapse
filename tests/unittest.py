@@ -587,6 +587,7 @@ class HomeserverTestCase(TestCase):
 
         # Parse the config from a config dict into a HomeServerConfig
         config_obj = make_homeserver_config_obj(config)
+        kwargs["name"] = config_obj.server.server_name
         kwargs["config"] = config_obj
 
         async def run_bg_updates() -> None:
