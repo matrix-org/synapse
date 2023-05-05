@@ -348,10 +348,10 @@ class DeviceWorkerHandler:
             # Filter the database results to only those devices that the appservice has
             # *not* responded with.
             devices = [d for d in devices if d["device_id"] not in appservice_devices]
-            # Add a slimmed down appservice response.
+            # Append the appservice response by wrapping each result in another dictionary.
             devices.extend(
-                {"device_id": device["device_id"], "keys": device["keys"]}
-                for device in appservice_devices.values()
+                {"device_id": device_id, "keys": device}
+                for device_id, device in appservice_devices.items()
             )
 
             # TODO Handle cross-signing keys.
