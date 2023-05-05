@@ -144,10 +144,16 @@ Body parameters:
     When the user logs in to the identity provider, this must be the unique ID that they map to.
 - `admin` - bool, optional, defaults to `false`. Whether the user is a homeserver administrator,
   granting them access to the Admin API, among other things.
-- `deactivated` - bool, optional. If unspecified, deactivation state will be left
-  unchanged on existing accounts and set to `false` for new accounts.
-  A user cannot be erased by deactivating with this API. For details on
-  deactivating users see [Deactivate Account](#deactivate-account).
+- `deactivated` - bool, optional. If unspecified, deactivation state will be left unchanged.
+
+  Note: the `password` field must also be set if both of the following are true:
+  - `deactivated` is set to `false` and the user was previously deactivated (you are reactivating this user)
+  - Users are allowed to set their password on this homeserver (both `password_config.enabled` and
+    `password_config.localdb_enabled` config options are set to `true`).
+  Users' passwords are wiped upon account deactivation, hence the need to set a new one here.
+
+  Note: a user cannot be erased with this API. For more details on
+  deactivating and erasing users see [Deactivate Account](#deactivate-account).
 - `user_type` - string or null, optional. If provided, the user type will be
   adjusted. If `null` given, the user type will be cleared. Other 
   allowed options are: `bot` and `support`.
