@@ -113,7 +113,7 @@ Returns HTTP status code:
 
 URL parameters:
 
-- `user_id`: fully-qualified user id: for example, `@user:server.com`.
+- `user_id` - A fully-qualified user id. For example, `@user:server.com`.
 
 Body parameters:
 
