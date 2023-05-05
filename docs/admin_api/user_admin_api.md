@@ -142,7 +142,8 @@ Body parameters:
     provided value is not in the homeserver configuration.
   - `external_id` - string, required. An identifier for the user in the external identity provider.
     When the user logs in to the identity provider, this must be the unique ID that they map to.
-- `admin` - bool, optional, defaults to `false`.
+- `admin` - bool, optional, defaults to `false`. Whether the user is a homeserver administrator,
+  granting them access to the Admin API, among other things.
 - `deactivated` - bool, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to `false` for new accounts.
   A user cannot be erased by deactivating with this API. For details on
