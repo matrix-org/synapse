@@ -158,11 +158,6 @@ Body parameters:
   not be changed. If `null` is given, the user type will be cleared.
   Other allowed options are: `bot` and `support`.
 
-If the user already exists then optional parameters default to the current value.
-
-In order to re-activate an account `deactivated` must be set to `false`. If
-users do not login via single-sign-on, a new `password` must be provided.
-
 ## List Accounts
 
 This API returns all local user accounts.
