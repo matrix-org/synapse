@@ -132,12 +132,13 @@ Body parameters:
   Note: If a threepid is removed from a user via this option, Synapse will also attempt to remove
   that threepid from any identity servers it is aware has a binding for it.
 - `external_ids` - array, optional. Allow setting the identifier of the external identity
-  provider for SSO (Single sign-on). Details in the configuration manual under the
+  provider for SSO (Single sign-on). More details are in the configuration manual under the
   sections [sso](../usage/configuration/config_documentation.md#sso) and [oidc_providers](../usage/configuration/config_documentation.md#oidc_providers).
-  - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
-    in the homeserver configuration. Note that no error is raised if the provided
-    value is not in the homeserver configuration.
-  - `external_id` - string, user ID in the external identity provider.
+  - `auth_provider` - string, required. The unique, internal ID of the external identity provider.
+    The same as `idp_id` from the homeserver configuration. Note that no error is raised if the
+    provided value is not in the homeserver configuration.
+  - `external_id` - string, required. An identifier for the user in the external identity provider.
+    When the user logs in to the identity provider, this must be the unique ID that they map to.
 - `avatar_url` - string, optional, must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
 - `admin` - bool, optional, defaults to `false`.
