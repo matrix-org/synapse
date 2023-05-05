@@ -96,7 +96,7 @@ for the main process
 [redis-based replication](usage/configuration/config_documentation.md#redis)
 * You will need to add an [`instance_map`](usage/configuration/config_documentation.md#instance_map) 
 with the `main` process defined, as well as the relevant connection information from 
-it's HTTP`replication` listener(defined in step 1 above). Note that the `host` defined 
+it's HTTP `replication` listener (defined in step 1 above). Note that the `host` defined 
 is the address the worker needs to look for the `main` process at, not necessarily the same address that is bound to.
 * Optionally, a [shared secret](usage/configuration/config_documentation.md#worker_replication_secret)
 can be used to authenticate HTTP traffic between workers. For example:
