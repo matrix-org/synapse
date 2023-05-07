@@ -62,17 +62,8 @@ class ReadMarkerTestCase(unittest.HomeserverTestCase):
     def test_send_read_marker(self) -> None:
         room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
 
-        def send_message():
-            res = self.helper.send_event(
-                room_id=room_id,
-                type=EventTypes.Message,
-                content={
-                    "msgtype": "m.text",
-                    "body": "with right label",
-                    EventContentFields.LABELS: ["#fun"],
-                },
-                tok=self.owner_tok,
-            )
+        def send_message() -> str:
+            res = self.helper.send(room_id=room_id, body="1", tok=self.owner_tok)
             return res["event_id"]
 
         # Test setting the read marker on the room
@@ -116,7 +107,7 @@ class ReadMarkerTestCase(unittest.HomeserverTestCase):
             tok=self.owner_tok,
         )
 
-        def send_message():
+        def send_message() -> str:
             res = self.helper.send(room_id=room_id, body="1", tok=self.owner_tok)
             return res["event_id"]
 
