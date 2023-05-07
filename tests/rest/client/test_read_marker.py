@@ -14,7 +14,7 @@
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import EventContentFields, EventTypes
+from synapse.api.constants import EventTypes
 from synapse.rest import admin
 from synapse.rest.client import login, read_marker, register, room
 from synapse.server import HomeServer
