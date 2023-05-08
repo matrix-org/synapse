@@ -1783,7 +1783,7 @@ Defaults to an empty list (nothing blocked).
 
 Example configuration:
 ```yaml
-prevent_downloads_from:
+prevent_media_downloads_from:
   - evil.example.org
   - evil2.example.org
 ```

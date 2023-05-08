@@ -68,7 +68,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         {
             # Disable downloads from the domain we'll be trying to download from.
             # Should result in a 404.
-            "prevent_downloads_from": ["evil.com"]
+            "prevent_media_downloads_from": ["evil.com"]
         }
     )
     def test_cannot_download_blocked_media(self) -> None:
@@ -86,7 +86,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         {
             # Disable downloads from a domain we won't be requesting downloads from.
             # This proves we haven't broken anything.
-            "prevent_downloads_from": ["not-listed.com"]
+            "prevent_media_downloads_from": ["not-listed.com"]
         }
     )
     def test_remote_media_normally_unblocked(self) -> None:
@@ -105,7 +105,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         {
             # Disable downloads from the domain we'll be trying to download from.
             # Should result in a 404.
-            "prevent_downloads_from": ["evil.com"],
+            "prevent_media_downloads_from": ["evil.com"],
             "dynamic_thumbnails": True,
         }
     )
@@ -125,7 +125,7 @@ class MediaDomainBlockingTests(unittest.HomeserverTestCase):
         {
             # Disable downloads from a domain we won't be requesting downloads from.
             # This proves we haven't broken anything.
-            "prevent_downloads_from": ["not-listed.com"],
+            "prevent_media_downloads_from": ["not-listed.com"],
             "dynamic_thumbnails": True,
         }
     )
