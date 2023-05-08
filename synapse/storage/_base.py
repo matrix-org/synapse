@@ -118,7 +118,10 @@ class SQLBaseStore(metaclass=ABCMeta):
         self._attempt_to_invalidate_cache("get_partial_current_state_ids", (room_id,))
 
     def _attempt_to_invalidate_cache(
-        self, cache_name: str, key: Optional[Collection[Any]]
+        self,
+        cache_name: str,
+        key: Optional[Collection[Any]],
+        store_name: Optional[str] = None,
     ) -> bool:
         """Attempts to invalidate the cache of the given name, ignoring if the
         cache doesn't exist. Mainly used for invalidating caches on workers,
@@ -132,10 +135,21 @@ class SQLBaseStore(metaclass=ABCMeta):
             cache_name
             key: Entry to invalidate. If None then invalidates the entire
                 cache.
+            store_name: The name of the store, leave as None for stores which
+                have not yet been split out.
         """
 
+        # First get the store.
+        store = self
+        if store_name is not None:
+            try:
+                store = getattr(self, store_name)
+            except AttributeError:
+                pass
+
+        # Then attempt to find the cache on that store.
         try:
-            cache = getattr(self, cache_name)
+            cache = getattr(store, cache_name)
         except AttributeError:
             # Check if an externally defined module cache has been registered
             cache = self.external_cached_functions.get(cache_name)
