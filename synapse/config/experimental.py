@@ -74,6 +74,16 @@ class ExperimentalConfig(Config):
             "msc3202_transaction_extensions", False
         )
 
+        # MSC3983: Proxying OTK claim requests to exclusive ASes.
+        self.msc3983_appservice_otk_claims: bool = experimental.get(
+            "msc3983_appservice_otk_claims", False
+        )
+
+        # MSC3984: Proxying key queries to exclusive ASes.
+        self.msc3984_appservice_key_query: bool = experimental.get(
+            "msc3984_appservice_key_query", False
+        )
+
         # MSC3706 (server-side support for partial state in /send_join responses)
         # Synapse will always serve partial state responses to requests using the stable
         # query parameter `omit_members`. If this flag is set, Synapse will also serve
@@ -181,3 +191,14 @@ class ExperimentalConfig(Config):
 
         # MSC2659: Application service ping endpoint
         self.msc2659_enabled = experimental.get("msc2659_enabled", False)
+
+        # MSC3981: Recurse relations
+        self.msc3981_recurse_relations = experimental.get(
+            "msc3981_recurse_relations", False
+        )
+
+        # MSC3970: Scope transaction IDs to devices
+        self.msc3970_enabled = experimental.get("msc3970_enabled", False)
+
+        # MSC4009: E.164 Matrix IDs
+        self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)

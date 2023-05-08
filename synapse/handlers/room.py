@@ -106,7 +106,7 @@ class RoomCreationHandler:
         self.auth_blocking = hs.get_auth_blocking()
         self.clock = hs.get_clock()
         self.hs = hs
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -160,7 +160,9 @@ class RoomCreationHandler:
         )
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
 
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
 
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
@@ -449,7 +451,9 @@ class RoomCreationHandler:
         """
         user_id = requester.user.to_string()
 
-        spam_check = await self.spam_checker.user_may_create_room(user_id)
+        spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+            user_id
+        )
         if spam_check != NOT_SPAM:
             raise SynapseError(
                 403,
@@ -567,6 +571,7 @@ class RoomCreationHandler:
         await self._send_events_for_new_room(
             requester,
             new_room_id,
+            new_room_version,
             # we expect to override all the presets with initial_state, so this is
             # somewhat arbitrary.
             room_config={"preset": RoomCreationPreset.PRIVATE_CHAT},
@@ -739,7 +744,7 @@ class RoomCreationHandler:
 
         # Let the third party rules modify the room creation config if needed, or abort
         # the room creation entirely with an exception.
-        await self.third_party_event_rules.on_create_room(
+        await self._third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
 
@@ -760,7 +765,9 @@ class RoomCreationHandler:
                 )
 
         if not is_requester_admin:
-            spam_check = await self.spam_checker.user_may_create_room(user_id)
+            spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+                user_id
+            )
             if spam_check != NOT_SPAM:
                 raise SynapseError(
                     403,
@@ -874,7 +881,7 @@ class RoomCreationHandler:
         # Check whether this visibility value is blocked by a third party module
         allowed_by_third_party_rules = (
             await (
-                self.third_party_event_rules.check_visibility_can_be_modified(
+                self._third_party_event_rules.check_visibility_can_be_modified(
                     room_id, visibility
                 )
             )
@@ -922,6 +929,7 @@ class RoomCreationHandler:
         ) = await self._send_events_for_new_room(
             requester,
             room_id,
+            room_version,
             room_config=config,
             invite_list=invite_list,
             initial_state=initial_state,
@@ -998,6 +1006,7 @@ class RoomCreationHandler:
         self,
         creator: Requester,
         room_id: str,
+        room_version: RoomVersion,
         room_config: JsonDict,
         invite_list: List[str],
         initial_state: MutableStateMap,
@@ -1020,6 +1029,8 @@ class RoomCreationHandler:
                 the user requesting the room creation
             room_id:
                 room id for the room being created
+            room_version:
+                The room version of the new room.
             room_config:
                 A dict of configuration options. This will be the body of
                 a /createRoom request; see
@@ -1053,14 +1064,6 @@ class RoomCreationHandler:
         # (as this info can't be pulled from the db)
         state_map: MutableStateMap[str] = {}
 
-        def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
-            e = {"type": etype, "content": content}
-
-            e.update(event_keys)
-            e.update(kwargs)
-
-            return e
-
         async def create_event(
             etype: str,
             content: JsonDict,
@@ -1083,7 +1086,10 @@ class RoomCreationHandler:
             nonlocal depth
             nonlocal prev_event
 
-            event_dict = create_event_dict(etype, content, **kwargs)
+            # Create the event dictionary.
+            event_dict = {"type": etype, "content": content}
+            event_dict.update(event_keys)
+            event_dict.update(kwargs)
 
             (
                 new_event,
@@ -1120,7 +1126,9 @@ class RoomCreationHandler:
                 400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
             )
 
-        creation_content.update({"creator": creator_id})
+        # MSC2175 removes the creator field from the create event.
+        if not room_version.msc2175_implicit_room_creator:
+            creation_content["creator"] = creator_id
         creation_event, unpersisted_creation_context = await create_event(
             EventTypes.Create, creation_content, False
         )
@@ -1725,7 +1733,7 @@ class RoomShutdownHandler:
         self.room_member_handler = hs.get_room_member_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastores().main
 

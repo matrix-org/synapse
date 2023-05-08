@@ -577,6 +577,10 @@ delete any device that hasn't been accessed for more than the specified amount o
 
 Defaults to no duration, which means devices are never pruned.
 
+**Note:** This task will always run on the main process, regardless of the value of
+`run_background_tasks_on`. This is due to workers currently not having the ability to
+delete devices.
+
 Example configuration:
 ```yaml
 delete_stale_devices_after: 1y
@@ -1521,7 +1525,7 @@ This option specifies several limits for login:
       address. Defaults to `per_second: 0.003`, `burst_count: 5`.
 
 * `account` ratelimits login requests based on the account the
-  client is attempting to log into. Defaults to `per_second: 0.03`,
+  client is attempting to log into. Defaults to `per_second: 0.003`,
   `burst_count: 5`.
 
 * `failed_attempts` ratelimits login requests based on the account the
@@ -3124,6 +3128,11 @@ Options for each entry include:
    match a pre-existing account instead of failing. This could be used if
    switching from password logins to OIDC. Defaults to false.
 
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the OIDC SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
 * `user_mapping_provider`: Configuration for how attributes returned from a OIDC
    provider are mapped onto a matrix user. This setting has the following
    sub-properties:
@@ -3240,6 +3249,7 @@ oidc_providers:
     userinfo_endpoint: "https://accounts.example.com/userinfo"
     jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
     skip_verification: true
+    enable_registration: true
     user_mapping_provider:
       config:
         subject_claim: "id"
@@ -3456,6 +3466,9 @@ This option has a number of sub-options. They are as follows:
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
+* `jitter_delay`: Delays push notifications by a random amount up to the given
+  duration. Useful for mitigating timing attacks. Optional, defaults to no
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
@@ -3463,6 +3476,7 @@ push:
   enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: "10s"
 ```
 ---
 ## Rooms
@@ -3708,6 +3722,16 @@ default_power_level_content_override:
    private_chat: { "events": { "com.example.foo" : 0 } }
    trusted_private_chat: null
    public_chat: null
+```
+---
+### `forget_rooms_on_leave`
+
+Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.
+
+Example configuration:
+```yaml
+forget_rooms_on_leave: false
 ```
 
 ---

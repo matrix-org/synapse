@@ -194,6 +194,7 @@ class SsoHandler:
         self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -223,6 +224,8 @@ class SsoHandler:
         self._identity_providers: Dict[str, SsoIdentityProvider] = {}
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
+
+        self._e164_mxids = hs.config.experimental.msc4009_e164_mxids
 
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
@@ -383,6 +386,7 @@ class SsoHandler:
         grandfather_existing_users: Callable[[], Awaitable[Optional[str]]],
         extra_login_attributes: Optional[JsonDict] = None,
         auth_provider_session_id: Optional[str] = None,
+        registration_enabled: bool = True,
     ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -435,6 +439,10 @@ class SsoHandler:
 
             auth_provider_session_id: An optional session ID from the IdP.
 
+            registration_enabled: An optional boolean to enable/disable automatic
+            registrations of new users. If false and the user does not exist then the
+            flow is aborted. Defaults to true.
+
         Raises:
             MappingException if there was a problem mapping the response to a user.
             RedirectException: if the mapping provider needs to redirect the user
@@ -462,8 +470,16 @@ class SsoHandler:
                         auth_provider_id, remote_user_id, user_id
                     )
 
-            # Otherwise, generate a new user.
-            if not user_id:
+            if not user_id and not registration_enabled:
+                logger.info(
+                    "User does not exist and registration are disabled for IdP '%s' and remote_user_id '%s'",
+                    auth_provider_id,
+                    remote_user_id,
+                )
+                raise MappingException(
+                    "User does not exist and registrations are disabled"
+                )
+            elif not user_id:  # Otherwise, generate a new user.
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
 
                 next_step_url = self._get_url_for_next_new_user_step(
@@ -697,7 +713,7 @@ class SsoHandler:
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
         if not attributes.localpart or contains_invalid_mxid_characters(
-            attributes.localpart
+            attributes.localpart, self._e164_mxids
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
@@ -789,7 +805,7 @@ class SsoHandler:
             if profile["avatar_url"] is not None:
                 server_name = profile["avatar_url"].split("/")[-2]
                 media_id = profile["avatar_url"].split("/")[-1]
-                if server_name == self._server_name:
+                if self._is_mine_server_name(server_name):
                     media = await self._media_repo.store.get_local_media(media_id)
                     if media is not None and upload_name == media["upload_name"]:
                         logger.info("skipping saving the user avatar")
@@ -930,7 +946,7 @@ class SsoHandler:
             localpart,
         )
 
-        if contains_invalid_mxid_characters(localpart):
+        if contains_invalid_mxid_characters(localpart, self._e164_mxids):
             raise SynapseError(400, "localpart is invalid: %s" % (localpart,))
         user_id = UserID(localpart, self._server_name).to_string()
         user_infos = await self._store.get_users_by_id_case_insensitive(user_id)

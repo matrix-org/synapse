@@ -41,6 +41,7 @@ from typing import (
     Any,
     Collection,
     Dict,
+    Iterable,
     List,
     Optional,
     Set,
@@ -1343,7 +1344,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             GROUP BY type
         """
         txn.execute(sql)
-        min_positions = {typ: pos for typ, pos in txn}  # Map from type -> min position
+        min_positions = dict(
+            cast(Iterable[Tuple[str, int]], txn)
+        )  # Map from type -> min position
 
         # Ensure we do actually have some values here
         assert set(min_positions) == {"federation", "events"}
