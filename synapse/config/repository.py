@@ -137,7 +137,9 @@ class ContentRepositoryConfig(Config):
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
-        self.prevent_media_downloads_from = config.get("prevent_media_downloads_from", [])
+        self.prevent_media_downloads_from = config.get(
+            "prevent_media_downloads_from", []
+        )
 
         self.media_store_path = self.ensure_directory(
             config.get("media_store_path", "media_store")
