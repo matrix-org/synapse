@@ -77,9 +77,9 @@ class ReplicationEndpointFactory:
 @implementer(IAgent)
 class ReplicationAgent(_AgentBase):
     """
-    This Agent is solely for the purposes of connecting to Synapse replication
-    endpoints, and can handle https and http connections. Appropriate comments are
-    copied from Twisted's Agent Class.
+    Client for connecting to replication endpoints via HTTP and HTTPS.
+    
+    Much of this code is copied from Twisted's twisted.web.client.Agent.
 
     Attributes:
         _endpointFactory: The IAgentEndpointFactory which will
@@ -139,15 +139,20 @@ class ReplicationAgent(_AgentBase):
     ) -> "defer.Deferred[IResponse]":
         """
         Issue a request to the server indicated by the given uri.
+
         An existing connection from the connection pool may be used or a new
         one may be created.
+
         Currently, HTTP and HTTPS schemes are supported in uri.
+
+        This is copied from twisted.web.client.Agent, except:
+        
+        * It uses a different pool key (combining the host & port).
+        * It does not call _ensureValidURI(...) since it breaks on some
+          UNIX paths.
 
         See: twisted.web.iweb.IAgent.request
         """
-        # This function is overridden in preparation of future work:
-        # * So as to properly set a key for the pool and
-        # * to remove an _ensureValidURI() that will be in the way.
         parsedURI = URI.fromBytes(uri)
         try:
             endpoint = self._getEndpoint(parsedURI)
