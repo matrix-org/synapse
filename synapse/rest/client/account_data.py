@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import AccountDataTypes, ReceiptTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
@@ -99,19 +99,28 @@ class AccountDataServlet(RestServlet):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
-        event = await self.store.get_global_account_data_by_type_for_user(
-            user_id, account_data_type
-        )
+        # Push rules are stored in a separate table and must be queried separately.
+        if (
+            self._hs.config.experimental.msc4010_push_rules_account_data
+            and account_data_type == AccountDataTypes.PUSH_RULES
+        ):
+            account_data: Optional[JsonDict] = await self.handler.push_rules_for_user(
+                requester.user
+            )
+        else:
+            account_data = await self.store.get_global_account_data_by_type_for_user(
+                user_id, account_data_type
+            )
 
-        if event is None:
+        if account_data is None:
             raise NotFoundError("Account data not found")
 
         # If experimental support for MSC3391 is enabled, then this endpoint should
         # return a 404 if the content for an account data type is an empty dict.
-        if self._hs.config.experimental.msc3391_enabled and event == {}:
+        if self._hs.config.experimental.msc3391_enabled and account_data == {}:
             raise NotFoundError("Account data not found")
 
-        return 200, event
+        return 200, account_data
 
 
 class UnstableAccountDataServlet(RestServlet):
@@ -238,19 +247,26 @@ class RoomAccountDataServlet(RestServlet):
                 Codes.INVALID_PARAM,
             )
 
-        event = await self.store.get_account_data_for_room_and_type(
-            user_id, room_id, account_data_type
-        )
+        # Room-specific push rules are not currently supported.
+        if (
+            self._hs.config.experimental.msc4010_push_rules_account_data
+            and account_data_type == AccountDataTypes.PUSH_RULES
+        ):
+            account_data: Optional[JsonDict] = {}
+        else:
+            account_data = await self.store.get_account_data_for_room_and_type(
+                user_id, room_id, account_data_type
+            )
 
-        if event is None:
+        if account_data is None:
             raise NotFoundError("Room account data not found")
 
         # If experimental support for MSC3391 is enabled, then this endpoint should
         # return a 404 if the content for an account data type is an empty dict.
-        if self._hs.config.experimental.msc3391_enabled and event == {}:
+        if self._hs.config.experimental.msc3391_enabled and account_data == {}:
             raise NotFoundError("Room account data not found")
 
-        return 200, event
+        return 200, account_data
 
 
 class UnstableRoomAccountDataServlet(RestServlet):
