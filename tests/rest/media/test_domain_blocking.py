@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from binascii import unhexlify
 from typing import Dict
 
 from twisted.test.proto_helpers import MemoryReactor
