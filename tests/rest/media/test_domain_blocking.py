@@ -22,9 +22,8 @@ from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests import unittest
-from tests.unittest import override_config
-
 from tests.test_utils import SMALL_PNG
+from tests.unittest import override_config
 
 
 class MediaDomainBlockingTests(unittest.HomeserverTestCase):
