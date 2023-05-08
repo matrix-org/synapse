@@ -1777,18 +1777,18 @@ class SyncHandler:
 
             if push_rules_changed:
                 global_account_data = dict(global_account_data)
-                global_account_data["m.push_rules"] = await self.push_rules_for_user(
-                    sync_config.user
-                )
+                global_account_data[
+                    AccountDataTypes.PUSH_RULES
+                ] = await self.push_rules_for_user(sync_config.user)
         else:
             all_global_account_data = await self.store.get_global_account_data_for_user(
                 user_id
             )
 
             global_account_data = dict(all_global_account_data)
-            global_account_data["m.push_rules"] = await self.push_rules_for_user(
-                sync_config.user
-            )
+            global_account_data[
+                AccountDataTypes.PUSH_RULES
+            ] = await self.push_rules_for_user(sync_config.user)
 
         account_data_for_user = (
             await sync_config.filter_collection.filter_global_account_data(
