@@ -1764,18 +1764,20 @@ Example configuration:
 max_image_pixels: 35M
 ```
 ---
-### `prevent_downloads_from`
+### `prevent_media_downloads_from`
 
-A list of domains where users will be unable to download media from. If
-media from these domains is already cached, it will not be deleted but
-also not able to be downloaded. This option does not affect admin APIs
-trying to download/operate on media.
+A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.
 
 This will not prevent the listed domains from accessing media themselves.
 It simply prevents users on this server from downloading media originating
 from the listed servers.
 
 This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see [`url_preview_url_blacklist`](#url_preview_url_blacklist).
 
 Defaults to an empty list (nothing blocked).
 

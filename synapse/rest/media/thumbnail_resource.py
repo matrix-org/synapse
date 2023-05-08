@@ -83,9 +83,9 @@ class ThumbnailResource(DirectServeJsonResource):
                 )
             self.media_repo.mark_recently_accessed(None, media_id)
         else:
-            # Don't let users download media from domains listed in the config, even
-            # if we might have the media to serve. This is Trust & Safety tooling to
-            # block some servers' media from being accessible to local users.
+            # Don't let users download media from configured domains, even if it
+            # is already downloaded. This is Trust & Safety tooling to make some
+            # media inaccessible to local users.
             # See `prevent_downloads_from` config docs for more info.
             if server_name in self.prevent_downloads_from:
                 respond_404(request)

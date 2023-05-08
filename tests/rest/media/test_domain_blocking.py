@@ -24,11 +24,7 @@ from synapse.util import Clock
 from tests import unittest
 from tests.unittest import override_config
 
-SMALL_PNG = unhexlify(
-    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-    b"0000001f15c4890000000a49444154789c63000100000500010d"
-    b"0a2db40000000049454e44ae426082"
-)
+from tests.test_utils import SMALL_PNG
 
 
 class MediaDomainBlockingTests(unittest.HomeserverTestCase):
