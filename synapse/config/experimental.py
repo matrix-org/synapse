@@ -202,3 +202,8 @@ class ExperimentalConfig(Config):
 
         # MSC4009: E.164 Matrix IDs
         self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)
+
+        # MSC4010: Do not allow setting m.push_rules account data.
+        self.msc4010_push_rules_account_data = experimental.get(
+            "msc4010_push_rules_account_data", False
+        )
