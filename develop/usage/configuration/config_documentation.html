@@ -1669,6 +1669,24 @@ See <a href="../../reverse_proxy.html">here</a> for more on using a reverse prox
 <pre><code class="language-yaml">max_image_pixels: 35M
 </code></pre>
 <hr />
+<h3 id="prevent_media_downloads_from"><a class="header" href="#prevent_media_downloads_from"><code>prevent_media_downloads_from</code></a></h3>
+<p>A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.</p>
+<p>This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.</p>
+<p>This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see <a href="#url_preview_url_blacklist"><code>url_preview_url_blacklist</code></a>.</p>
+<p>Defaults to an empty list (nothing blocked).</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">prevent_media_downloads_from:
+  - evil.example.org
+  - evil2.example.org
+</code></pre>
+<hr />
 <h3 id="dynamic_thumbnails"><a class="header" href="#dynamic_thumbnails"><code>dynamic_thumbnails</code></a></h3>
 <p>Whether to generate new thumbnails on the fly to precisely match
 the resolution requested by the client. If true then whenever
