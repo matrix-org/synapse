@@ -274,7 +274,7 @@ class AuthHandler:
         # response.
         self._extra_attributes: Dict[str, SsoLoginExtraAttributes] = {}
 
-        self.oauth_delegation_enabled = hs.config.auth.oauth_delegation_enabled
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
     async def validate_user_via_ui_auth(
         self,
@@ -325,7 +325,7 @@ class AuthHandler:
             LimitExceededError if the ratelimiter's failed request count for this
                 user is too high to proceed
         """
-        if self.oauth_delegation_enabled:
+        if self.msc3861_oauth_delegation_enabled:
             raise SynapseError(
                 HTTPStatus.INTERNAL_SERVER_ERROR, "UIA shouldn't be used with MSC3861"
             )

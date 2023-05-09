@@ -47,7 +47,7 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
     }
 
     # Expose the JWKS endpoint if OAuth2 delegation is enabled
-    if hs.config.auth.oauth_delegation_enabled:
+    if hs.config.experimental.msc3861.enabled:
         from synapse.rest.synapse.client.jwks import JwksResource
 
         resources["/_synapse/jwks"] = JwksResource(hs)

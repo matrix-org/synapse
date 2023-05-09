@@ -386,7 +386,7 @@ class SigningKeyUploadServlet(RestServlet):
         # time. Because there is no UIA in MSC3861, for now we throw an error if the
         # user tries to reset the device signing key when MSC3861 is enabled, but allow
         # first-time setup.
-        if self.hs.config.auth.oauth_delegation_enabled:
+        if self.hs.config.experimental.msc3861.enabled:
             # There is no way to reset the device signing key with MSC3861
             if is_cross_signing_setup:
                 raise SynapseError(

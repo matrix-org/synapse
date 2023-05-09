@@ -38,6 +38,7 @@ from twisted.web.resource import Resource
 
 from synapse.api import errors
 from synapse.api.errors import SynapseError
+from synapse.config import ConfigError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
     GET_INTERESTED_USERS_CALLBACK,
@@ -252,6 +253,7 @@ class ModuleApi:
         self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -419,6 +421,11 @@ class ModuleApi:
 
         Added in Synapse v1.46.0.
         """
+        if self.msc3861_oauth_delegation_enabled:
+            raise ConfigError(
+                "Cannot use password auth provider callbacks when OAuth delegation is enabled"
+            )
+
         return self._password_auth_provider.register_password_auth_provider_callbacks(
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,

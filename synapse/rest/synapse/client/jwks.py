@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 
 class JwksResource(DirectServeJsonResource):
     def __init__(self, hs: "HomeServer"):
-        from authlib.jose.rfc7517 import Key
-
         super().__init__(extract_context=True)
 
         # Parameters that are allowed to be exposed in the public key.
@@ -53,10 +51,10 @@ class JwksResource(DirectServeJsonResource):
             "ext",
         }
 
-        secret = hs.config.auth.oauth_delegation_client_secret
+        key = hs.config.experimental.msc3861.jwk
 
-        if isinstance(secret, Key):
-            private_key = secret.as_dict()
+        if key is not None:
+            private_key = key.as_dict()
             public_key = {
                 k: v for k, v in private_key.items() if k in public_parameters
             }

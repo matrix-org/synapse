@@ -109,12 +109,15 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def default_config(self) -> Dict[str, Any]:
         config = super().default_config()
         config["public_baseurl"] = BASE_URL
-        config["oauth_delegation"] = {
-            "enabled": True,
-            "issuer": ISSUER,
-            "client_id": CLIENT_ID,
-            "client_auth_method": "client_secret_post",
-            "client_secret": CLIENT_SECRET,
+        config["disable_registration"] = True
+        config["experimental_features"] = {
+            "msc3861": {
+                "enabled": True,
+                "issuer": ISSUER,
+                "client_id": CLIENT_ID,
+                "client_auth_method": "client_secret_post",
+                "client_secret": CLIENT_SECRET,
+            }
         }
         return config
 

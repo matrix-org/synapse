@@ -135,7 +135,7 @@ class DeviceRestServlet(RestServlet):
         self.device_handler = handler
         self.auth_handler = hs.get_auth_handler()
         self._msc3852_enabled = hs.config.experimental.msc3852_enabled
-        self.oauth_delegation_enabled = hs.config.auth.oauth_delegation_enabled
+        self._msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
     async def on_GET(
         self, request: SynapseRequest, device_id: str
@@ -167,7 +167,7 @@ class DeviceRestServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, device_id: str
     ) -> Tuple[int, JsonDict]:
-        if self.oauth_delegation_enabled:
+        if self._msc3861_oauth_delegation_enabled:
             raise UnrecognizedRequestError(code=404)
 
         requester = await self.auth.get_user_by_req(request)
@@ -350,7 +350,7 @@ class ClaimDehydratedDeviceServlet(RestServlet):
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if (
         hs.config.worker.worker_app is None
-        and not hs.config.auth.oauth_delegation_enabled
+        and not hs.config.experimental.msc3861.enabled
     ):
         DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
