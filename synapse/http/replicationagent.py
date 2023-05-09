@@ -21,11 +21,7 @@ from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.internet.interfaces import IStreamClientEndpoint
 from twisted.python.failure import Failure
-from twisted.web.client import (
-    URI,
-    HTTPConnectionPool,
-    _AgentBase,
-)
+from twisted.web.client import URI, HTTPConnectionPool, _AgentBase
 from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import (
