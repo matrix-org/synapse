@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.constants import ReceiptTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -166,7 +167,7 @@ class RoomAccountDataServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        if account_data_type == "m.fully_read":
+        if account_data_type == ReceiptTypes.FULLY_READ:
             raise SynapseError(
                 405,
                 "Cannot set m.fully_read through this API."
