@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import AccountDataTypes
 from synapse.push.clientformat import format_push_rules_for_user
@@ -303,7 +303,9 @@ class AccountDataHandler:
             )
             return response["max_stream_id"]
 
-    async def push_rules_for_user(self, user: UserID) -> Dict[str, Dict[str, list]]:
+    async def push_rules_for_user(
+        self, user: UserID
+    ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
         """
         Push rules aren't really account data, but get formatted as such for /sync.
         """
