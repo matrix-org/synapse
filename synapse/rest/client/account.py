@@ -601,7 +601,7 @@ class ThreepidRestServlet(RestServlet):
     # ThreePidBindRestServelet.PostBody with an `alias_generator` to handle
     # `threePidCreds` versus `three_pid_creds`.
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if self.hs.config.auth.oauth_delegation_enabled:
+        if self.hs.config.experimental.msc3861.enabled:
             raise NotFoundError(errcode=Codes.UNRECOGNIZED)
 
         if not self.hs.config.registration.enable_3pid_changes:
@@ -894,7 +894,7 @@ class AccountStatusRestServlet(RestServlet):
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.worker.worker_app is None:
-        if not hs.config.auth.oauth_delegation_enabled:
+        if not hs.config.experimental.msc3861.enabled:
             EmailPasswordRequestTokenRestServlet(hs).register(http_server)
             DeactivateAccountRestServlet(hs).register(http_server)
             PasswordRestServlet(hs).register(http_server)
@@ -906,7 +906,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.worker.worker_app is None:
         ThreepidBindRestServlet(hs).register(http_server)
         ThreepidUnbindRestServlet(hs).register(http_server)
-        if not hs.config.auth.oauth_delegation_enabled:
+        if not hs.config.experimental.msc3861.enabled:
             ThreepidAddRestServlet(hs).register(http_server)
             ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
