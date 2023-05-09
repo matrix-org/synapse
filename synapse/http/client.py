@@ -856,6 +856,8 @@ class ReplicationClient(BaseHttpClient):
         headers: Optional[Headers] = None,
     ) -> IResponse:
         """
+        Make a request, differs from BaseHttpClient.request in that it does not use treq.
+
         Args:
             method: HTTP method to use.
             uri: URI to query.
