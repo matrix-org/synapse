@@ -64,6 +64,7 @@ class AccountDataServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
+        self._push_rules_handler = hs.get_push_rules_handler()
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str, account_data_type: str
@@ -104,9 +105,9 @@ class AccountDataServlet(RestServlet):
             self._hs.config.experimental.msc4010_push_rules_account_data
             and account_data_type == AccountDataTypes.PUSH_RULES
         ):
-            account_data: Optional[JsonDict] = await self.handler.push_rules_for_user(
-                requester.user
-            )
+            account_data: Optional[
+                JsonDict
+            ] = await self._push_rules_handler.push_rules_for_user(requester.user)
         else:
             account_data = await self.store.get_global_account_data_by_type_for_user(
                 user_id, account_data_type

@@ -14,10 +14,9 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
 
 from synapse.api.constants import AccountDataTypes
-from synapse.push.clientformat import format_push_rules_for_user
 from synapse.replication.http.account_data import (
     ReplicationAddRoomAccountDataRestServlet,
     ReplicationAddTagRestServlet,
@@ -302,17 +301,6 @@ class AccountDataHandler:
                 tag=tag,
             )
             return response["max_stream_id"]
-
-    async def push_rules_for_user(
-        self, user: UserID
-    ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
-        """
-        Push rules aren't really account data, but get formatted as such for /sync.
-        """
-        user_id = user.to_string()
-        rules_raw = await self._store.get_push_rules_for_user(user_id)
-        rules = format_push_rules_for_user(user, rules_raw)
-        return rules
 
 
 class AccountDataEventSource(EventSource[int, JsonDict]):
