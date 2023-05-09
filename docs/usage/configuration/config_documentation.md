@@ -3960,6 +3960,8 @@ This setting has the following sub-options:
 
   _Added in Synapse 1.78.0._
 
+  _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
+
 Example configuration:
 ```yaml
 redis:
