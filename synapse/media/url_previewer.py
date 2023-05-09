@@ -203,42 +203,10 @@ class UrlPreviewer:
             )
 
     async def preview(self, url: str, user: UserID, ts: int) -> bytes:
-        # XXX: we could move this into _do_preview if we wanted.
-        url_tuple = urlsplit(url)
-        for entry in self.url_preview_url_blacklist:
-            match = True
-            for attrib in entry:
-                pattern = entry[attrib]
-                value = getattr(url_tuple, attrib)
-                logger.debug(
-                    "Matching attrib '%s' with value '%s' against pattern '%s'",
-                    attrib,
-                    value,
-                    pattern,
-                )
-
-                if value is None:
-                    match = False
-                    continue
-
-                # Some attributes might not be parsed as strings by urlsplit (such as the
-                # port, which is parsed as an int). Because we use match functions that
-                # expect strings, we want to make sure that's what we give them.
-                value_str = str(value)
-
-                if pattern.startswith("^"):
-                    if not re.match(pattern, value_str):
-                        match = False
-                        continue
-                else:
-                    if not fnmatch.fnmatch(value_str, pattern):
-                        match = False
-                        continue
-            if match:
-                logger.warning("URL %s blocked by url_blacklist entry %s", url, entry)
-                raise SynapseError(
-                    403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
-                )
+        if self._is_url_blocked(url):
+            raise SynapseError(
+                403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
+            )
 
         # the in-memory cache:
         # * ensures that only one request is active at a time
@@ -410,6 +378,55 @@ class UrlPreviewer:
         )
 
         return jsonog.encode("utf8")
+
+    def _is_url_blocked(self, url: str) -> bool:
+        """
+        Check whether the URL is allowed to be previewed (according to the homeserver
+        configuration).
+
+        Args:
+            url: The requested URL.
+
+        Return:
+            True if the URL is blocked, False if it is allowed.
+        """
+        # XXX: we could move this into _do_preview if we wanted.
+        url_tuple = urlsplit(url)
+        for entry in self.url_preview_url_blacklist:
+            match = True
+            for attrib in entry:
+                pattern = entry[attrib]
+                value = getattr(url_tuple, attrib)
+                logger.debug(
+                    "Matching attrib '%s' with value '%s' against pattern '%s'",
+                    attrib,
+                    value,
+                    pattern,
+                )
+
+                if value is None:
+                    match = False
+                    continue
+
+                # Some attributes might not be parsed as strings by urlsplit (such as the
+                # port, which is parsed as an int). Because we use match functions that
+                # expect strings, we want to make sure that's what we give them.
+                value_str = str(value)
+
+                if pattern.startswith("^"):
+                    if not re.match(pattern, value_str):
+                        match = False
+                        continue
+                else:
+                    if not fnmatch.fnmatch(value_str, pattern):
+                        match = False
+                        continue
+
+            if match:
+                logger.warning("URL %s blocked by url_blacklist entry %s", url, entry)
+                return match
+
+        return False
 
     async def _download_url(self, url: str, output_stream: BinaryIO) -> DownloadResult:
         """
