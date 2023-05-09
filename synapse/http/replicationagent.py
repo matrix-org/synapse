@@ -25,7 +25,6 @@ from twisted.web.client import (
     URI,
     HTTPConnectionPool,
     _AgentBase,
-    _DeprecatedToCurrentPolicyForHTTPS,
 )
 from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
@@ -78,18 +77,14 @@ class ReplicationEndpointFactory:
 class ReplicationAgent(_AgentBase):
     """
     Client for connecting to replication endpoints via HTTP and HTTPS.
-    
-    Much of this code is copied from Twisted's twisted.web.client.Agent.
 
-    Attributes:
-        _endpointFactory: The IAgentEndpointFactory which will
-            be used to create endpoints for outgoing TCP connections.
+    Much of this code is copied from Twisted's twisted.web.client.Agent.
     """
 
     def __init__(
         self,
         reactor: ISynapseReactor,
-        contextFactory: Optional[IPolicyForHTTPS] = None,
+        contextFactory: IPolicyForHTTPS,
         connectTimeout: Optional[float] = None,
         bindAddress: Optional[bytes] = None,
         pool: Optional[HTTPConnectionPool] = None,
@@ -110,25 +105,9 @@ class ReplicationAgent(_AgentBase):
                 case a non-persistent HTTPConnectionPool instance will be
                 created.
         """
-        if not IPolicyForHTTPS.providedBy(contextFactory):
-            logger.warning(
-                f"{contextFactory} was passed as the HTTPS policy for an "
-                "Agent, but it does not provide IPolicyForHTTPS.  Since Twisted 14.0, "
-                "you must pass a provider of IPolicyForHTTPS.",
-            )
-            contextFactory = _DeprecatedToCurrentPolicyForHTTPS(contextFactory)
-
         _AgentBase.__init__(self, reactor, pool)
         endpoint_factory = ReplicationEndpointFactory(reactor, contextFactory)
         self._endpointFactory = endpoint_factory
-
-    def _getEndpoint(self, uri: URI) -> IStreamClientEndpoint:
-        """
-        Get an endpoint for the given URI, using self._endpointFactory.
-            uri: The URI of the request.
-        Returns: An endpoint which can be used to connect to given address.
-        """
-        return self._endpointFactory.endpointForURI(uri)
 
     def request(
         self,
@@ -146,7 +125,7 @@ class ReplicationAgent(_AgentBase):
         Currently, HTTP and HTTPS schemes are supported in uri.
 
         This is copied from twisted.web.client.Agent, except:
-        
+
         * It uses a different pool key (combining the host & port).
         * It does not call _ensureValidURI(...) since it breaks on some
           UNIX paths.
@@ -155,7 +134,7 @@ class ReplicationAgent(_AgentBase):
         """
         parsedURI = URI.fromBytes(uri)
         try:
-            endpoint = self._getEndpoint(parsedURI)
+            endpoint = self._endpointFactory.endpointForURI(parsedURI)
         except SchemeNotSupported:
             return defer.fail(Failure())
 
