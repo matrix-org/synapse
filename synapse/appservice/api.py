@@ -326,7 +326,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         await self.post_json_get_json(
-            uri=f"{service.url}{APP_SERVICE_UNSTABLE_PREFIX}/fi.mau.msc2659/ping",
+            uri=f"{service.url}{APP_SERVICE_PREFIX}/ping",
             post_json={"transaction_id": txn_id},
             headers={"Authorization": [f"Bearer {service.hs_token}"]},
         )
