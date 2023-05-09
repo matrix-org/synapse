@@ -59,7 +59,7 @@ class ThumbnailResource(DirectServeJsonResource):
         self.media_repo = media_repo
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
-        self.server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
@@ -71,7 +71,7 @@ class ThumbnailResource(DirectServeJsonResource):
         # TODO Parse the Accept header to get an prioritised list of thumbnail types.
         m_type = "image/png"
 
-        if server_name == self.server_name:
+        if self._is_mine_server_name(server_name):
             if self.dynamic_thumbnails:
                 await self._select_or_generate_local_thumbnail(
                     request, media_id, width, height, method, m_type

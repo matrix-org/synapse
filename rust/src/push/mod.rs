@@ -164,10 +164,12 @@ impl PushRule {
 /// The "action" Synapse should perform for a matching push rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
-    DontNotify,
     Notify,
-    Coalesce,
     SetTweak(SetTweak),
+
+    // Legacy actions that should be understood, but are equivalent to no-ops.
+    DontNotify,
+    Coalesce,
 
     // An unrecognized custom action.
     Unknown(Value),

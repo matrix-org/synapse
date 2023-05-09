@@ -27,7 +27,6 @@ from typing_extensions import TypeAlias
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
-from twisted.web.client import HTTPConnectionPool
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
@@ -43,7 +42,6 @@ from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.presence_router import PresenceRouter
-from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
@@ -94,7 +92,11 @@ from synapse.handlers.room import (
 )
 from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
+from synapse.handlers.room_member import (
+    RoomForgetterHandler,
+    RoomMemberHandler,
+    RoomMemberMasterHandler,
+)
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
@@ -233,6 +235,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         "message",
         "pagination",
         "profile",
+        "room_forgetter",
         "stats",
     ]
 
@@ -374,6 +377,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             return False
         return localpart_hostname[1] == self.hostname
 
+    def is_mine_server_name(self, server_name: str) -> bool:
+        """Determines whether a server name refers to this homeserver."""
+        return server_name == self.hostname
+
     @cache_in_self
     def get_clock(self) -> Clock:
         return Clock(self._reactor)
@@ -452,26 +459,6 @@ class HomeServer(metaclass=abc.ABCMeta):
             ip_whitelist=self.config.server.ip_range_whitelist,
             ip_blacklist=self.config.server.ip_range_blacklist,
             use_proxy=True,
-        )
-
-    @cache_in_self
-    def get_pusher_http_client(self) -> SimpleHttpClient:
-        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
-        # do so in batches, so we need to allow the pool to keep lots of idle
-        # connections around.
-        pool = HTTPConnectionPool(self.get_reactor())
-        # XXX: The justification for using the cache factor here is that larger
-        # instances will need both more cache and more connections.
-        # Still, this should probably be a separate dial
-        pool.maxPersistentPerHost = max(int(100 * self.config.caches.global_factor), 5)
-        pool.cachedConnectionTimeout = 2 * 60
-
-        return SimpleHttpClient(
-            self,
-            ip_whitelist=self.config.server.ip_range_whitelist,
-            ip_blacklist=self.config.server.ip_range_blacklist,
-            use_proxy=True,
-            connection_pool=pool,
         )
 
     @cache_in_self
@@ -708,10 +695,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_third_party_event_rules(self) -> ThirdPartyEventRules:
-        return ThirdPartyEventRules(self)
-
-    @cache_in_self
     def get_password_auth_provider(self) -> PasswordAuthProvider:
         return PasswordAuthProvider()
 
@@ -846,6 +829,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_push_rules_handler(self) -> PushRulesHandler:
         return PushRulesHandler(self)
+
+    @cache_in_self
+    def get_room_forgetter_handler(self) -> RoomForgetterHandler:
+        return RoomForgetterHandler(self)
 
     @cache_in_self
     def get_outbound_redis_connection(self) -> "ConnectionHandler":
