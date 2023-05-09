@@ -3442,6 +3442,9 @@ This option has a number of sub-options. They are as follows:
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
+* `jitter_delay`: Delays push notifications by a random amount up to the given
+  duration. Useful for mitigating timing attacks. Optional, defaults to no
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
@@ -3449,6 +3452,7 @@ push:
   enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: "10s"
 ```
 ---
 ## Rooms
@@ -3694,6 +3698,16 @@ default_power_level_content_override:
    private_chat: { "events": { "com.example.foo" : 0 } }
    trusted_private_chat: null
    public_chat: null
+```
+---
+### `forget_rooms_on_leave`
+
+Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.
+
+Example configuration:
+```yaml
+forget_rooms_on_leave: false
 ```
 
 ---

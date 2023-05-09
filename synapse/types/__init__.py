@@ -335,18 +335,35 @@ class EventID(DomainSpecificString):
 mxid_localpart_allowed_characters = set(
     "_-./=" + string.ascii_lowercase + string.digits
 )
+# MSC4007 adds the + to the allowed characters.
+#
+# TODO If this was accepted, update the SSO code to support this, see the callers
+#      of map_username_to_mxid_localpart.
+extended_mxid_localpart_allowed_characters = mxid_localpart_allowed_characters | {"+"}
+
+# Guest user IDs are purely numeric.
+GUEST_USER_ID_PATTERN = re.compile(r"^\d+$")
 
 
-def contains_invalid_mxid_characters(localpart: str) -> bool:
+def contains_invalid_mxid_characters(
+    localpart: str, use_extended_character_set: bool
+) -> bool:
     """Check for characters not allowed in an mxid or groupid localpart
 
     Args:
         localpart: the localpart to be checked
+        use_extended_character_set: True to use the extended allowed characters
+            from MSC4009.
 
     Returns:
         True if there are any naughty characters
     """
-    return any(c not in mxid_localpart_allowed_characters for c in localpart)
+    allowed_characters = (
+        extended_mxid_localpart_allowed_characters
+        if use_extended_character_set
+        else mxid_localpart_allowed_characters
+    )
+    return any(c not in allowed_characters for c in localpart)
 
 
 UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")

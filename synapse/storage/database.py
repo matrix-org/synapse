@@ -386,13 +386,20 @@ class LoggingTransaction:
             self.executemany(sql, args)
 
     def execute_values(
-        self, sql: str, values: Iterable[Iterable[Any]], fetch: bool = True
+        self,
+        sql: str,
+        values: Iterable[Iterable[Any]],
+        template: Optional[str] = None,
+        fetch: bool = True,
     ) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
         The `fetch` parameter must be set to False if the query does not return
         rows (e.g. INSERTs).
+
+        The `template` is the snippet to merge to every item in argslist to
+        compose the query.
         """
         assert isinstance(self.database_engine, PostgresEngine)
         from psycopg2.extras import execute_values
@@ -400,7 +407,9 @@ class LoggingTransaction:
         return self._do_execute(
             # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
             # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
-            lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
+            lambda the_sql: execute_values(
+                self.txn, the_sql, values, template=template, fetch=fetch
+            ),
             sql,
         )
 

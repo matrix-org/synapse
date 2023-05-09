@@ -30,6 +30,7 @@ from tests import unittest
 from tests.server import FakeChannel
 from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import inject_event
+from tests.unittest import override_config
 
 
 class BaseRelationsTestCase(unittest.HomeserverTestCase):
@@ -947,6 +948,125 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             self.assertIn(
                 annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
             )
+
+
+class RecursiveRelationTestCase(BaseRelationsTestCase):
+    @override_config({"experimental_features": {"msc3981_recurse_relations": True}})
+    def test_recursive_relations(self) -> None:
+        """Generate a complex, multi-level relationship tree and query it."""
+        # Create a thread with a few messages in it.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_2 = channel.json_body["event_id"]
+
+        # Add annotations.
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_2
+        )
+        annotation_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "b", parent_id=thread_1
+        )
+        annotation_2 = channel.json_body["event_id"]
+
+        # Add a reference to part of the thread, then edit the reference and annotate it.
+        channel = self._send_relation(
+            RelationTypes.REFERENCE, "m.room.test", parent_id=thread_2
+        )
+        reference_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "c", parent_id=reference_1
+        )
+        annotation_3 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.test",
+            parent_id=reference_1,
+        )
+        edit = channel.json_body["event_id"]
+
+        # Also more events off the root.
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "d")
+        annotation_4 = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}"
+            "?dir=f&limit=20&org.matrix.msc3981.recurse=true",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # The above events should be returned in creation order.
+        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(
+            event_ids,
+            [
+                thread_1,
+                thread_2,
+                annotation_1,
+                annotation_2,
+                reference_1,
+                annotation_3,
+                edit,
+                annotation_4,
+            ],
+        )
+
+    @override_config({"experimental_features": {"msc3981_recurse_relations": True}})
+    def test_recursive_relations_with_filter(self) -> None:
+        """The event_type and rel_type still apply."""
+        # Create a thread with a few messages in it.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_1 = channel.json_body["event_id"]
+
+        # Add annotations.
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "b", parent_id=thread_1
+        )
+        annotation_1 = channel.json_body["event_id"]
+
+        # Add a reference to part of the thread, then edit the reference and annotate it.
+        channel = self._send_relation(
+            RelationTypes.REFERENCE, "m.room.test", parent_id=thread_1
+        )
+        reference_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "org.matrix.reaction", "c", parent_id=reference_1
+        )
+        annotation_2 = channel.json_body["event_id"]
+
+        # Fetch only annotations, but recursively.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}/{RelationTypes.ANNOTATION}"
+            "?dir=f&limit=20&org.matrix.msc3981.recurse=true",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # The above events should be returned in creation order.
+        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(event_ids, [annotation_1, annotation_2])
+
+        # Fetch only m.reactions, but recursively.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}/{RelationTypes.ANNOTATION}/m.reaction"
+            "?dir=f&limit=20&org.matrix.msc3981.recurse=true",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # The above events should be returned in creation order.
+        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(event_ids, [annotation_1])
 
 
 class BundledAggregationsTestCase(BaseRelationsTestCase):

@@ -164,10 +164,12 @@ impl PushRule {
 /// The "action" Synapse should perform for a matching push rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
-    DontNotify,
     Notify,
-    Coalesce,
     SetTweak(SetTweak),
+
+    // Legacy actions that should be understood, but are equivalent to no-ops.
+    DontNotify,
+    Coalesce,
 
     // An unrecognized custom action.
     Unknown(Value),
@@ -568,7 +570,10 @@ impl FilteredPushRules {
             .filter(|rule| {
                 // Ignore disabled experimental push rules
 
-                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                if !self.msc1767_enabled
+                    && (rule.rule_id.contains("org.matrix.msc1767")
+                        || rule.rule_id.contains("org.matrix.msc3933"))
+                {
                     return false;
                 }
 

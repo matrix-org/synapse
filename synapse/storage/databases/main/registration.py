@@ -2414,8 +2414,8 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             # *obviously* the 'profiles' table uses localpart for user_id
             # while everything else uses the full mxid.
             txn.execute(
-                "INSERT INTO profiles(user_id, displayname) VALUES (?,?)",
-                (user_id_obj.localpart, create_profile_with_displayname),
+                "INSERT INTO profiles(full_user_id, user_id, displayname) VALUES (?,?,?)",
+                (user_id, user_id_obj.localpart, create_profile_with_displayname),
             )
 
         if self.hs.config.stats.stats_enabled:
