@@ -50,7 +50,6 @@ from synapse.logging.opentracing import (
     start_active_span,
     trace,
 )
-from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.databases.main.event_push_actions import RoomNotifCounts
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
@@ -261,6 +260,7 @@ class SyncHandler:
         self.notifier = hs.get_notifier()
         self.presence_handler = hs.get_presence_handler()
         self._relations_handler = hs.get_relations_handler()
+        self._push_rules_handler = hs.get_push_rules_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
@@ -427,12 +427,6 @@ class SyncHandler:
 
             set_tag(SynapseTags.SYNC_RESULT, bool(sync_result))
             return sync_result
-
-    async def push_rules_for_user(self, user: UserID) -> Dict[str, Dict[str, list]]:
-        user_id = user.to_string()
-        rules_raw = await self.store.get_push_rules_for_user(user_id)
-        rules = format_push_rules_for_user(user, rules_raw)
-        return rules
 
     async def ephemeral_by_room(
         self,
@@ -1779,7 +1773,7 @@ class SyncHandler:
                 global_account_data = dict(global_account_data)
                 global_account_data[
                     AccountDataTypes.PUSH_RULES
-                ] = await self.push_rules_for_user(sync_config.user)
+                ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
         else:
             all_global_account_data = await self.store.get_global_account_data_for_user(
                 user_id
@@ -1788,7 +1782,7 @@ class SyncHandler:
             global_account_data = dict(all_global_account_data)
             global_account_data[
                 AccountDataTypes.PUSH_RULES
-            ] = await self.push_rules_for_user(sync_config.user)
+            ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
 
         account_data_for_user = (
             await sync_config.filter_collection.filter_global_account_data(
