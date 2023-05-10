@@ -3992,7 +3992,7 @@ worker_name: generic_worker1
 ```
 ---
 ### `worker_replication_host`
-*Deprecated as of version 1.83.0. Place `host` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
+*Deprecated as of version 1.84.0. Place `host` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -4004,7 +4004,7 @@ worker_replication_host: 127.0.0.1
 ```
 ---
 ### `worker_replication_http_port`
-*Deprecated as of version 1.83.0. Place `port` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
+*Deprecated as of version 1.84.0. Place `port` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -4016,7 +4016,7 @@ worker_replication_http_port: 9093
 ```
 ---
 ### `worker_replication_http_tls`
-*Deprecated as of version 1.83.0. Place `tls` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
+*Deprecated as of version 1.84.0. Place `tls` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
