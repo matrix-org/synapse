@@ -50,7 +50,7 @@ from twisted.internet.interfaces import IReactorTime
 from twisted.internet.task import Cooperator
 from twisted.web.client import ResponseFailed
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IBodyProducer, IResponse
+from twisted.web.iweb import IAgent, IBodyProducer, IResponse
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -398,7 +398,7 @@ class MatrixFederationHttpClient:
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
-        self.agent = BlacklistingAgentWrapper(
+        self.agent: IAgent = BlacklistingAgentWrapper(
             federation_agent,
             ip_blacklist=hs.config.server.federation_ip_range_blacklist,
         )
