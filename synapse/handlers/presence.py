@@ -63,6 +63,7 @@ from synapse.replication.http.streams import ReplicationGetStreamUpdates
 from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import PresenceFederationStream, PresenceStream
 from synapse.storage.databases.main import DataStore
+from synapse.storage.databases.main.experimental_features import ExperimentalFeature
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
@@ -605,11 +606,8 @@ class WorkerPresenceHandler(BasePresenceHandler):
             PresenceState.BUSY,
         )
 
-        busy_presence_enabled = (
-            await self.hs.get_datastores().main.get_feature_enabled(
-                target_user.to_string(), "msc3026"
-            )
-            or self.hs.config.experimental.msc3026_enabled
+        busy_presence_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            target_user.to_string(), ExperimentalFeature.MSC3026
         )
 
         if presence not in valid_presence or (
@@ -1241,11 +1239,8 @@ class PresenceHandler(BasePresenceHandler):
             PresenceState.BUSY,
         )
 
-        busy_presence_enabled = (
-            await self.hs.get_datastores().main.get_feature_enabled(
-                target_user.to_string(), "msc3026"
-            )
-            or self.hs.config.experimental.msc3026_enabled
+        busy_presence_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            target_user.to_string(), ExperimentalFeature.MSC3026
         )
 
         if presence not in valid_presence or (

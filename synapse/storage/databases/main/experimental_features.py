@@ -34,6 +34,7 @@ class ExperimentalFeature(str, Enum):
     MSC3881 = "msc3881"
     MSC3967 = "msc3967"
 
+
 class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
     def __init__(
         self,
@@ -84,19 +85,32 @@ class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
 
             await self.invalidate_cache_and_stream("list_enabled_features", (user,))
 
-    async def get_feature_enabled(self, user_id: str, feature: str) -> bool:
+    async def get_feature_enabled(
+        self, user_id: str, feature: "ExperimentalFeature"
+    ) -> bool:
         """
         Checks to see if a given feature is enabled for the user
+
         Args:
-            user:
-                the user to be queried on
-            feature:
-                the feature in question
+            user_id: the user to be queried on
+            feature: the feature in question
         Returns:
                 True if the feature is enabled, False if it is not or if the feature was
                 not found.
         """
 
+        # check first if feature is enabled in the config
+        if feature == ExperimentalFeature.MSC3026:
+            globally_enabled = self.hs.config.experimental.msc3026_enabled
+        elif feature == ExperimentalFeature.MSC3881:
+            globally_enabled = self.hs.config.experimental.msc3881_enabled
+        else:
+            globally_enabled = self.hs.config.experimental.msc3967_enabled
+
+        if globally_enabled:
+            return globally_enabled
+
+        # if it's not enabled globally, check if it is enabled per-user
         res = await self.db_pool.simple_select_one(
             "per_user_experimental_features",
             {"user_id": user_id, "feature": feature},
@@ -104,13 +118,7 @@ class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
             allow_none=True,
         )
 
-        if not res:
-            res = {"enabled": False}
+        # None and false are treated the same
+        db_enabled = bool(res)
 
-        # Deal with Sqlite boolean return values
-        if res["enabled"] == 0:
-            res["enabled"] = False
-        if res["enabled"] == 1:
-            res["enabled"] = True
-
-        return res["enabled"]
+        return db_enabled

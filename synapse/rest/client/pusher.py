@@ -27,6 +27,7 @@ from synapse.http.site import SynapseRequest
 from synapse.push import PusherConfigException
 from synapse.rest.client._base import client_patterns
 from synapse.rest.synapse.client.unsubscribe import UnsubscribeResource
+from synapse.storage.databases.main.experimental_features import ExperimentalFeature
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -53,11 +54,8 @@ class PushersRestServlet(RestServlet):
 
         pusher_dicts = [p.as_dict() for p in pushers]
 
-        msc3881_enabled = (
-            await self.hs.get_datastores().main.get_feature_enabled(
-                user.to_string(), "msc3881"
-            )
-            or self.hs.config.experimental.msc3881_enabled
+        msc3881_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            user.to_string(), ExperimentalFeature.MSC3881
         )
 
         for pusher in pusher_dicts:
@@ -118,11 +116,8 @@ class PushersSetRestServlet(RestServlet):
             append = content["append"]
 
         enabled = True
-        msc3881_enabled = (
-            await self.hs.get_datastores().main.get_feature_enabled(
-                user.to_string(), "msc3881"
-            )
-            or self.hs.config.experimental.msc3881_enabled
+        msc3881_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            user.to_string(), ExperimentalFeature.MSC3881
         )
 
         if msc3881_enabled and "org.matrix.msc3881.enabled" in content:
