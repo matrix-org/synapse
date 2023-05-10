@@ -77,7 +77,6 @@ from synapse.util.metrics import measure_func
 from synapse.visibility import get_effective_room_visibility_from_state
 
 if TYPE_CHECKING:
-    from synapse.events.third_party_rules import ThirdPartyEventRules
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -509,8 +508,8 @@ class EventCreationHandler:
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
-        self.third_party_event_rules: "ThirdPartyEventRules" = (
-            self.hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            self.hs.get_module_api_callbacks().third_party_event_rules
         )
 
         self._block_events_without_consent_error = (
@@ -1314,7 +1313,7 @@ class EventCreationHandler:
         if requester:
             context.app_service = requester.app_service
 
-        res, new_content = await self.third_party_event_rules.check_event_allowed(
+        res, new_content = await self._third_party_event_rules.check_event_allowed(
             event, context
         )
         if res is False:

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 import urllib.parse
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
@@ -113,6 +114,8 @@ class HttpPusher(Pusher):
             hs.config.push.push_group_unread_count_by_room
         )
         self._pusherpool = hs.get_pusherpool()
+
+        self.push_jitter_delay_ms = hs.config.push.push_jitter_delay_ms
 
         self.data = pusher_config.data
         if self.data is None:
@@ -326,6 +329,21 @@ class HttpPusher(Pusher):
         event = await self.store.get_event(push_action.event_id, allow_none=True)
         if event is None:
             return True  # It's been redacted
+
+        # Check if we should delay sending out the notification by a random
+        # amount.
+        #
+        # Note: we base the delay off of when the event was sent, rather than
+        # now, to handle the case where we need to send out many notifications
+        # at once. If we just slept the random amount each loop then the last
+        # push notification in the set could be delayed by many times the max
+        # delay.
+        if self.push_jitter_delay_ms:
+            delay_ms = random.randint(1, self.push_jitter_delay_ms)
+            diff_ms = event.origin_server_ts + delay_ms - self.clock.time_msec()
+            if diff_ms > 0:
+                await self.clock.sleep(diff_ms / 1000)
+
         rejected = await self.dispatch_push_event(event, tweaks, badge)
         if rejected is False:
             return False

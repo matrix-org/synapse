@@ -854,7 +854,7 @@ class FederationClient(FederationBase):
 
         for destination in destinations:
             # We don't want to ask our own server for information we don't have
-            if destination == self.server_name:
+            if self._is_mine_server_name(destination):
                 continue
 
             try:
@@ -1536,7 +1536,7 @@ class FederationClient(FederationBase):
         self, destinations: Iterable[str], room_id: str, event_dict: JsonDict
     ) -> None:
         for destination in destinations:
-            if destination == self.server_name:
+            if self._is_mine_server_name(destination):
                 continue
 
             try:

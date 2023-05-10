@@ -50,11 +50,7 @@
     # Output a development shell for x86_64/aarch64 Linux/Darwin (MacOS).
     systems.url = "github:nix-systems/default";
     # A development environment manager built on Nix. See https://devenv.sh.
-    # This is temporarily overridden to a fork that fixes a quirk between
-    # devenv's service and python language features. This can be removed
-    # when https://github.com/cachix/devenv/pull/559 is merged upstream.
-    devenv.url = "github:anoadragon453/devenv/anoa/fix_languages_python";
-    #devenv.url = "github:cachix/devenv/main";
+    devenv.url = "github:cachix/devenv/main";
     # Rust toolchains and rust-analyzer nightly.
     fenix = {
       url = "github:nix-community/fenix";
@@ -97,9 +93,13 @@
 
                   # Native dependencies for unit tests (SyTest also requires OpenSSL).
                   openssl
+                  xmlsec
 
                   # Native dependencies for running Complement.
                   olm
+
+                  # For building the Synapse documentation website.
+                  mdbook
                 ];
 
                 # Install Python and manage a virtualenv with Poetry.
