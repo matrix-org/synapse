@@ -102,7 +102,7 @@ Changes in SCHEMA_VERSION = 76:
     - Adds a full_user_id column to tables profiles and user_filters.
 
 Changes in SCHEMA_VERSION = 77
-    - Add CHECK (full_user_id IS NOT NULL) to tables profiles and user_filters
+    - (Postgres) Add NOT VALID CHECK (full_user_id IS NOT NULL) to tables profiles and user_filters
 """
 
 
