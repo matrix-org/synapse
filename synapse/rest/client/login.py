@@ -633,6 +633,9 @@ class CasTicketServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.auth.oauth_delegation_enabled:
+        return
+
     LoginRestServlet(hs).register(http_server)
     if (
         hs.config.worker.worker_app is None

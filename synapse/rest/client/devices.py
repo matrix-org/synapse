@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 from pydantic import Extra, StrictStr
 
 from synapse.api import errors
-from synapse.api.errors import NotFoundError
+from synapse.api.errors import NotFoundError, UnrecognizedRequestError
 from synapse.handlers.device import DeviceHandler
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
@@ -135,6 +135,7 @@ class DeviceRestServlet(RestServlet):
         self.device_handler = handler
         self.auth_handler = hs.get_auth_handler()
         self._msc3852_enabled = hs.config.experimental.msc3852_enabled
+        self.oauth_delegation_enabled = hs.config.auth.oauth_delegation_enabled
 
     async def on_GET(
         self, request: SynapseRequest, device_id: str
@@ -166,6 +167,9 @@ class DeviceRestServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, device_id: str
     ) -> Tuple[int, JsonDict]:
+        if self.oauth_delegation_enabled:
+            raise UnrecognizedRequestError(code=404)
+
         requester = await self.auth.get_user_by_req(request)
 
         try:
@@ -344,7 +348,10 @@ class ClaimDehydratedDeviceServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    if hs.config.worker.worker_app is None:
+    if (
+        hs.config.worker.worker_app is None
+        and not hs.config.auth.oauth_delegation_enabled
+    ):
         DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     if hs.config.worker.worker_app is None:

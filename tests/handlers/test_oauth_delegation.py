@@ -11,14 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
+
+from http import HTTPStatus
+from typing import Any, Dict, Union
 from unittest.mock import ANY, Mock
 from urllib.parse import parse_qs
 
+from signedjson.key import (
+    encode_verify_key_base64,
+    generate_signing_key,
+    get_verify_key,
+)
+from signedjson.sign import sign_json
+
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.errors import InvalidClientTokenError, OAuthInsufficientScopeError
-from synapse.rest.client import devices
+from synapse.api.errors import (
+    Codes,
+    InvalidClientTokenError,
+    OAuthInsufficientScopeError,
+)
+from synapse.rest.client import account, devices, keys, login, logout, register
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -57,6 +70,7 @@ DEVICE = "AABBCCDD"
 MATRIX_DEVICE_SCOPE = "urn:matrix:org.matrix.msc2967.client:device:" + DEVICE
 SUBJECT = "abc-def-ghi"
 USERNAME = "test-user"
+USER_ID = "@" + USERNAME + ":" + SERVER_NAME
 
 
 async def get_json(url: str) -> JsonDict:
@@ -84,7 +98,12 @@ async def get_json(url: str) -> JsonDict:
 @skip_unless(HAS_AUTHLIB, "requires authlib")
 class MSC3861OAuthDelegation(HomeserverTestCase):
     servlets = [
+        account.register_servlets,
         devices.register_servlets,
+        keys.register_servlets,
+        register.register_servlets,
+        login.register_servlets,
+        logout.register_servlets,
     ]
 
     def default_config(self) -> Dict[str, Any]:
@@ -380,3 +399,158 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             get_awaitable_result(self.auth.is_server_admin(requester)), False
         )
         self.assertEqual(requester.device_id, DEVICE)
+
+    def make_device_keys(self, user_id: str, device_id: str) -> JsonDict:
+        # We only generate a master key to simplify the test.
+        master_signing_key = generate_signing_key(device_id)
+        master_verify_key = encode_verify_key_base64(get_verify_key(master_signing_key))
+
+        return {
+            "master_key": sign_json(
+                {
+                    "user_id": user_id,
+                    "usage": ["master"],
+                    "keys": {"ed25519:" + master_verify_key: master_verify_key},
+                },
+                user_id,
+                master_signing_key,
+            ),
+        }
+
+    def test_cross_signing(self) -> None:
+        """Try uploading device keys with OAuth delegation enabled."""
+
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(
+                code=200,
+                payload={
+                    "active": True,
+                    "sub": SUBJECT,
+                    "scope": " ".join([MATRIX_USER_SCOPE, MATRIX_DEVICE_SCOPE]),
+                    "username": USERNAME,
+                },
+            )
+        )
+        keys_upload_body = self.make_device_keys(USER_ID, DEVICE)
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/keys/device_signing/upload",
+            keys_upload_body,
+            access_token="mockAccessToken",
+        )
+
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/keys/device_signing/upload",
+            keys_upload_body,
+            access_token="mockAccessToken",
+        )
+
+        self.assertEqual(channel.code, HTTPStatus.NOT_IMPLEMENTED, channel.json_body)
+
+    def expect_unauthorized(
+        self, method: str, path: str, content: Union[bytes, str, JsonDict] = ""
+    ) -> None:
+        channel = self.make_request(method, path, content, shorthand=False)
+
+        self.assertEqual(channel.code, 401, channel.json_body)
+
+    def expect_unrecognized(
+        self, method: str, path: str, content: Union[bytes, str, JsonDict] = ""
+    ) -> None:
+        channel = self.make_request(method, path, content)
+
+        self.assertEqual(channel.code, 404, channel.json_body)
+        self.assertEqual(
+            channel.json_body["errcode"], Codes.UNRECOGNIZED, channel.json_body
+        )
+
+    def test_uia_endpoints(self) -> None:
+        """Test that endpoints that were removed in MSC2964 are no longer available."""
+
+        # This is just an endpoint that should remain visible (but requires auth):
+        self.expect_unauthorized("GET", "/_matrix/client/v3/devices")
+
+        # This remains usable, but will require a uia scope:
+        self.expect_unauthorized(
+            "POST", "/_matrix/client/v3/keys/device_signing/upload"
+        )
+
+    def test_3pid_endpoints(self) -> None:
+        """Test that 3pid account management endpoints that were removed in MSC2964 are no longer available."""
+
+        # Remains and requires auth:
+        self.expect_unauthorized("GET", "/_matrix/client/v3/account/3pid")
+        self.expect_unauthorized(
+            "POST",
+            "/_matrix/client/v3/account/3pid/bind",
+            {
+                "client_secret": "foo",
+                "id_access_token": "bar",
+                "id_server": "foo",
+                "sid": "bar",
+            },
+        )
+        self.expect_unauthorized("POST", "/_matrix/client/v3/account/3pid/unbind", {})
+
+        # These are gone:
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/account/3pid"
+        )  # deprecated
+        self.expect_unrecognized("POST", "/_matrix/client/v3/account/3pid/add")
+        self.expect_unrecognized("POST", "/_matrix/client/v3/account/3pid/delete")
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/account/3pid/email/requestToken"
+        )
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/account/3pid/msisdn/requestToken"
+        )
+
+    def test_account_management_endpoints_removed(self) -> None:
+        """Test that account management endpoints that were removed in MSC2964 are no longer available."""
+        self.expect_unrecognized("POST", "/_matrix/client/v3/account/deactivate")
+        self.expect_unrecognized("POST", "/_matrix/client/v3/account/password")
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/account/password/email/requestToken"
+        )
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/account/password/msisdn/requestToken"
+        )
+
+    def test_registration_endpoints_removed(self) -> None:
+        """Test that registration endpoints that were removed in MSC2964 are no longer available."""
+        self.expect_unrecognized(
+            "GET", "/_matrix/client/v1/register/m.login.registration_token/validity"
+        )
+        self.expect_unrecognized("POST", "/_matrix/client/v3/register")
+        self.expect_unrecognized("GET", "/_matrix/client/v3/register")
+        self.expect_unrecognized("GET", "/_matrix/client/v3/register/available")
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/register/email/requestToken"
+        )
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/register/msisdn/requestToken"
+        )
+
+    def test_session_management_endpoints_removed(self) -> None:
+        """Test that session management endpoints that were removed in MSC2964 are no longer available."""
+        self.expect_unrecognized("GET", "/_matrix/client/v3/login")
+        self.expect_unrecognized("POST", "/_matrix/client/v3/login")
+        self.expect_unrecognized("GET", "/_matrix/client/v3/login/sso/redirect")
+        self.expect_unrecognized("POST", "/_matrix/client/v3/logout")
+        self.expect_unrecognized("POST", "/_matrix/client/v3/logout/all")
+        self.expect_unrecognized("POST", "/_matrix/client/v3/refresh")
+        self.expect_unrecognized("GET", "/_matrix/static/client/login")
+
+    def test_device_management_endpoints_removed(self) -> None:
+        """Test that device management endpoints that were removed in MSC2964 are no longer available."""
+        self.expect_unrecognized("POST", "/_matrix/client/v3/delete_devices")
+        self.expect_unrecognized("DELETE", "/_matrix/client/v3/devices/{DEVICE}")
+
+    def test_openid_endpoints_removed(self) -> None:
+        """Test that OpenID id_token endpoints that were removed in MSC2964 are no longer available."""
+        self.expect_unrecognized(
+            "POST", "/_matrix/client/v3/user/{USERNAME}/openid/request_token"
+        )
