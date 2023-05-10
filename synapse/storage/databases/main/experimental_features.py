@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from enum import Enum
 from typing import TYPE_CHECKING, Dict
 
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
@@ -20,9 +21,18 @@ from synapse.types import StrCollection
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
-    from synapse.rest.admin.experimental_features import ExperimentalFeature
     from synapse.server import HomeServer
 
+
+class ExperimentalFeature(str, Enum):
+    """
+    Currently supported per-user features
+    """
+
+    MSC3026 = "msc3026"
+    MSC2654 = "msc2654"
+    MSC3881 = "msc3881"
+    MSC3967 = "msc3967"
 
 class ExperimentalFeaturesStore(CacheInvalidationWorkerStore):
     def __init__(

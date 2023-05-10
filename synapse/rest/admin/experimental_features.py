@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 
-from enum import Enum
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Tuple
 
@@ -21,21 +20,11 @@ from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin import admin_patterns, assert_requester_is_admin
+from synapse.storage.databases.main.experimental_features import ExperimentalFeature
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-
-
-class ExperimentalFeature(str, Enum):
-    """
-    Currently supported per-user features
-    """
-
-    MSC3026 = "msc3026"
-    MSC2654 = "msc2654"
-    MSC3881 = "msc3881"
-    MSC3967 = "msc3967"
 
 
 class ExperimentalFeaturesRestServlet(RestServlet):
