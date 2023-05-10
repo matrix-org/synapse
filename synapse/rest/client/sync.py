@@ -358,7 +358,7 @@ class SyncRestServlet(RestServlet):
         joined = {}
         for room in rooms:
             joined[room.room_id] = await self.encode_room(
-                room, time_now, joined=True, serialize_options=serialize_options,
+                room, time_now, joined=True, serialize_options=serialize_options
             )
 
         return joined
@@ -463,7 +463,7 @@ class SyncRestServlet(RestServlet):
         joined = {}
         for room in rooms:
             joined[room.room_id] = await self.encode_room(
-                room, time_now, joined=False, serialize_options=serialize_options,
+                room, time_now, joined=False, serialize_options=serialize_options
             )
 
         return joined
