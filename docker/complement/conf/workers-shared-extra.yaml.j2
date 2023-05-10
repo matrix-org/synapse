@@ -17,6 +17,16 @@ url_preview_ip_range_blacklist: []
 
 ## Registration ##
 
+# At present, there is no way to expire a refreshing access token without also logging
+# out the device. (The spec mandates that a refresh token is invalidated when a newer
+# access token or refresh token is used, but the original access token continues on
+# until expiry.) The default lifetime of a refreshing access tokens is 5 minutes; this
+# is too long to wait in tests that probe the behaviour of refreshing access tokens.
+#
+# As a stopgap, make refreshing access tokens last for only a second. Tests can sleep
+# for (a little over) 1s to ensure the token really has expired.
+refreshable_access_token_lifetime: 1s
+
 # Needed by Complement to register admin users
 # DO NOT USE in a production configuration! This should be a random secret.
 registration_shared_secret: complement
