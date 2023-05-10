@@ -130,7 +130,7 @@ class RemoteKey(RestServlet):
             # with earlier versions and is allowed in order to support both.
             # A warning is issued to help determine when it is safe to drop this.
             logger.warning(
-                "Request received for remote key for server: %s with key ID: %s",
+                "Request for remote server key with deprecated key ID (logging to determine usage level for future removal): %s / %s",
                 server,
                 key_id,
             )

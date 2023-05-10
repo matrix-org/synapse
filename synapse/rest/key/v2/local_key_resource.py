@@ -106,7 +106,10 @@ class LocalKey(RestServlet):
         # with earlier versions and is allowed in order to support both.
         # A warning is issued to help determine when it is safe to drop this.
         if key_id:
-            logger.warning("Request received for local key with key ID: %s", key_id)
+            logger.warning(
+                "Request for local server key with deprecated key ID (logging to determine usage level for future removal): %s",
+                key_id,
+            )
 
         time_now = self.clock.time_msec()
         # Update the expiry time if less than half the interval remains.
