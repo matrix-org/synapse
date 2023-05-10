@@ -276,6 +276,24 @@ class WorkerConfig(Config):
             self.writers.events
         )
 
+        # Patch the event shard config to point specific rooms to a specific worker.
+        # All other rooms should have events persisted by a different worker.
+        chosen_worker_instance = "event_persister-4"
+        self.events_shard_config.instances.remove(chosen_worker_instance)
+
+        def get_instance_patched(self, key: str) -> str:
+            rooms_to_repoint = [
+                "!ioWEdTBHIhOGYVKWyq:libera.chat",
+                "!bBgnAGciIvrtPXkHkp:libera.chat",
+            ]
+            if key in rooms_to_repoint:
+                return chosen_worker_instance
+
+            # Return another, deterministic instance.
+            return self._get_instance(key)
+
+        self.events_shard_config.get_instance = get_instance_patched
+
         # Handle sharded push
         pusher_instances = self._worker_names_performing_this_duty(
             config,
