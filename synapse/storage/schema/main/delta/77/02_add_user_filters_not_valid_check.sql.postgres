@@ -13,4 +13,4 @@
  * limitations under the License.
  */
 
-ALTER TABLE user_filters ADD CHECK (full_user_id IS NOT NULL) NOT VALID;
+ALTER TABLE user_filters ADD CONSTRAINT full_user_id_not_null CHECK (full_user_id IS NOT NULL) NOT VALID;
