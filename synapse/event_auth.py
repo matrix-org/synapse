@@ -1054,9 +1054,14 @@ def _verify_third_party_invite(
     """
     if "third_party_invite" not in event.content:
         return False
-    if "signed" not in event.content["third_party_invite"]:
+    third_party_invite = event.content["third_party_invite"]
+    if not isinstance(third_party_invite, collections.abc.Mapping):
         return False
-    signed = event.content["third_party_invite"]["signed"]
+    if "signed" not in third_party_invite:
+        return False
+    signed = third_party_invite["signed"]
+    if not isinstance(signed, collections.abc.Mapping):
+        return False
     for key in {"mxid", "token"}:
         if key not in signed:
             return False
