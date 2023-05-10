@@ -126,9 +126,16 @@ class ProxyAgent(_AgentBase):
 
         self.no_proxy = no_proxy
 
+        self._federation_proxy_endpoint: Optional[IStreamClientEndpoint] = None
+        if federation_proxy:
+            self._federation_proxy_endpoint = HostnameEndpoint(
+                self.proxy_reactor,
+                federation_proxy.host,
+                federation_proxy.port,
+            )
+
         self._policy_for_https = contextFactory
         self._reactor = reactor
-        self._federation_proxy = federation_proxy
 
     def request(
         self,
@@ -217,12 +224,13 @@ class ProxyAgent(_AgentBase):
                 parsed_uri.port,
                 self.https_proxy_creds,
             )
-        elif parsed_uri.scheme == b"matrix-federation" and self._federation_proxy:
-            endpoint = HostnameEndpoint(
-                self.proxy_reactor,
-                self._federation_proxy.host,
-                self._federation_proxy.port,
-            )
+        elif (
+            parsed_uri.scheme == b"matrix-federation"
+            and self._federation_proxy_endpoint
+        ):
+            # Cache *all* connections under the same key, since we are only
+            # connecting to a single destination, the proxy:
+            endpoint = self._federation_proxy_endpoint
             request_path = uri
         else:
             # not using a proxy
@@ -243,7 +251,10 @@ class ProxyAgent(_AgentBase):
             endpoint = wrapClientTLS(tls_connection_creator, endpoint)
         elif parsed_uri.scheme == b"http":
             pass
-        elif parsed_uri.scheme == b"matrix-federation" and self._federation_proxy:
+        elif (
+            parsed_uri.scheme == b"matrix-federation"
+            and self._federation_proxy_endpoint
+        ):
             pass
         else:
             return defer.fail(
