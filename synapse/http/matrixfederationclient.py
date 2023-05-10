@@ -396,12 +396,18 @@ class MatrixFederationHttpClient:
         if hs.config.server.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
 
-        if hs.config.federation.federation_proxy:
+        if (
+            hs.get_instance_name()
+            not in hs.config.worker.outbound_federation_restricted_to
+        ):
+            federation_proxies = (
+                hs.config.worker.outbound_federation_restricted_to.locations
+            )
             federation_agent: IAgent = ProxyAgent(
                 self.reactor,
                 self.reactor,
                 tls_client_options_factory,
-                federation_proxy=hs.config.federation.federation_proxy,
+                federation_proxies=federation_proxies,
             )
         else:
             federation_agent = MatrixFederationAgent(

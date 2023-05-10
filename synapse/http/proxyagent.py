@@ -42,7 +42,7 @@ from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS, IResponse
 
-from synapse.config.federation import FederationProxy
+from synapse.config.workers import InstanceLocationConfig
 from synapse.http import redact_uri
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
 from synapse.logging.context import run_in_background
@@ -97,7 +97,7 @@ class ProxyAgent(_AgentBase):
         bindAddress: Optional[bytes] = None,
         pool: Optional[HTTPConnectionPool] = None,
         use_proxy: bool = False,
-        federation_proxies: Collection[FederationProxy] = None,
+        federation_proxies: Collection[InstanceLocationConfig] = (),
     ):
         contextFactory = contextFactory or BrowserLikePolicyForHTTPS()
 
@@ -133,21 +133,29 @@ class ProxyAgent(_AgentBase):
 
         self.no_proxy = no_proxy
 
+        self._policy_for_https = contextFactory
+        self._reactor = reactor
+
         self._federation_proxy_endpoint: Optional[IStreamClientEndpoint] = None
         if federation_proxies:
-            self._federation_proxy_endpoint = _ProxyEndpoints(
-                [
-                    HostnameEndpoint(
-                        self.proxy_reactor,
+            endpoints = []
+            for federation_proxy in federation_proxies:
+                endpoint = HostnameEndpoint(
+                    self.proxy_reactor,
+                    federation_proxy.host,
+                    federation_proxy.port,
+                )
+
+                if federation_proxy.tls:
+                    tls_connection_creator = self._policy_for_https.creatorForNetloc(
                         federation_proxy.host,
                         federation_proxy.port,
                     )
-                    for federation_proxy in federation_proxies
-                ]
-            )
+                    endpoint = wrapClientTLS(tls_connection_creator, endpoint)
 
-        self._policy_for_https = contextFactory
-        self._reactor = reactor
+                endpoints.append(endpoint)
+
+            self._federation_proxy_endpoint = _ProxyEndpoints(endpoints)
 
     def request(
         self,

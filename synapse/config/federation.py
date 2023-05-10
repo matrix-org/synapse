@@ -61,12 +61,5 @@ class FederationConfig(Config):
             "allow_device_name_lookup_over_federation", False
         )
 
-        self.federation_proxy = None
-        federation_proxy = config.get("federation_proxy")
-        if federation_proxy:
-            host = federation_proxy["host"]
-            port = int(federation_proxy["port"])
-            self.federation_proxy = FederationProxy(host, port)
-
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}
