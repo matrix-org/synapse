@@ -31,6 +31,7 @@ from synapse.api.errors import (
     InvalidClientTokenError,
     OAuthInsufficientScopeError,
 )
+from synapse.rest import admin
 from synapse.rest.client import account, devices, keys, login, logout, register
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -104,6 +105,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         register.register_servlets,
         login.register_servlets,
         logout.register_servlets,
+        admin.register_servlets,
     ]
 
     def default_config(self) -> Dict[str, Any]:
@@ -557,3 +559,20 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.expect_unrecognized(
             "POST", "/_matrix/client/v3/user/{USERNAME}/openid/request_token"
         )
+
+    def test_admin_api_endpoints_removed(self) -> None:
+        """Test that admin API endpoints that were removed in MSC2964 are no longer available."""
+        self.expect_unrecognized("GET", "/_synapse/admin/v1/registration_tokens")
+        self.expect_unrecognized("POST", "/_synapse/admin/v1/registration_tokens/new")
+        self.expect_unrecognized("GET", "/_synapse/admin/v1/registration_tokens/abcd")
+        self.expect_unrecognized("PUT", "/_synapse/admin/v1/registration_tokens/abcd")
+        self.expect_unrecognized(
+            "DELETE", "/_synapse/admin/v1/registration_tokens/abcd"
+        )
+        self.expect_unrecognized("POST", "/_synapse/admin/v1/reset_password/foo")
+        self.expect_unrecognized("POST", "/_synapse/admin/v1/users/foo/login")
+        self.expect_unrecognized("GET", "/_synapse/admin/v1/register")
+        self.expect_unrecognized("POST", "/_synapse/admin/v1/register")
+        self.expect_unrecognized("GET", "/_synapse/admin/v1/users/foo/admin")
+        self.expect_unrecognized("PUT", "/_synapse/admin/v1/users/foo/admin")
+        self.expect_unrecognized("POST", "/_synapse/admin/v1/account_validity/validity")
