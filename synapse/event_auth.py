@@ -1080,8 +1080,6 @@ def _verify_third_party_invite(
 
     if signed["mxid"] != event.state_key:
         return False
-    if signed["token"] != token:
-        return False
 
     for public_key_object in get_public_keys(invite_event):
         public_key = public_key_object["public_key"]
