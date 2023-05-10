@@ -171,6 +171,18 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
     elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_MARKER:
         add_fields(EventContentFields.MSC2716_INSERTION_EVENT_REFERENCE)
 
+    # Protect the rel_type and event_id fields under the m.relates_to field.
+    if room_version.msc3389_relation_redactions:
+        relates_to = event_dict["content"].get("m.relates_to")
+        if relates_to and isinstance(relates_to, collections.abc.Mapping):
+            new_relates_to = {}
+            for field in ("rel_type", "event_id"):
+                if field in relates_to:
+                    new_relates_to[field] = relates_to[field]
+            # Only include a non-empty relates_to field.
+            if new_relates_to:
+                new_content["m.relates_to"] = new_relates_to
+
     allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 
     allowed_fields["content"] = new_content
