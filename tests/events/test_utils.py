@@ -467,6 +467,24 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "type": "m.room.member",
                 "content": {
                     "membership": "invite",
+                    "third_party_invite": {},
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {"membership": "invite", "third_party_invite": {}},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC3821,
+        )
+
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
                     "third_party_invite": "stripped",
                     "other_key": "stripped",
                 },
