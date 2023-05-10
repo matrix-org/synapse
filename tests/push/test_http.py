@@ -20,9 +20,9 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.logging.context import make_deferred_yieldable
 from synapse.push import PusherConfig, PusherConfigException
-from synapse.rest.admin.experimental_features import ExperimentalFeature
 from synapse.rest.client import login, push_rule, pusher, receipts, room
 from synapse.server import HomeServer
+from synapse.storage.databases.main.experimental_features import ExperimentalFeature
 from synapse.types import JsonDict
 from synapse.util import Clock
 
@@ -37,6 +37,7 @@ class HTTPPusherTests(HomeserverTestCase):
         receipts.register_servlets,
         push_rule.register_servlets,
         pusher.register_servlets,
+        synapse.rest.admin.register_servlets,
     ]
     user_id = True
     hijack_auth = False
@@ -820,20 +821,60 @@ class HTTPPusherTests(HomeserverTestCase):
         self.helper.send(room, body="Hello", tok=access_token)
         self.assertEqual(len(self.push_attempts), 1)
 
-    def test_disable(self) -> None:
-        """Tests that disabling a pusher means it's not pushed to anymore."""
+    @override_config({"experimental_features": {"msc3881_enabled": True}})
+    def test_disable_via_config(self) -> None:
+        """Tests that disabling a pusher means it's not pushed to anymore, with the
+        ability to disable a pusher enabled via the config.
+        """
         user_id, access_token = self._make_user_with_pusher("user")
         other_user_id, other_access_token = self._make_user_with_pusher("otheruser")
 
         room = self.helper.create_room_as(user_id, tok=access_token)
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
-        # enable msc3881 per_user flag
-        self.get_success(
-            self.hs.get_datastores().main.set_features_for_user(
-                user_id, {ExperimentalFeature.MSC3881: True}
-            )
+        # Send a message and check that it generated a push.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 1)
+
+        # Disable the pusher.
+        self._set_pusher(user_id, access_token, enabled=False)
+
+        # Send another message and check that it did not generate a push.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 1)
+
+        # Get the pushers for the user and check that it is marked as disabled.
+        channel = self.make_request("GET", "/pushers", access_token=access_token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["pushers"]), 1)
+
+        enabled = channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"]
+        self.assertFalse(enabled)
+        self.assertTrue(isinstance(enabled, bool))
+
+    def test_disable_via_admin(self) -> None:
+        """Tests that disabling a pusher means it's not pushed to anymore,
+        with the ability to disable a pusher enabled via the admin api.
+        """
+        user_id, access_token = self._make_user_with_pusher("user")
+        other_user_id, other_access_token = self._make_user_with_pusher("otheruser")
+        self.register_user("admin", "pass", True)
+        admin_tok = self.login("admin", "pass")
+
+        room = self.helper.create_room_as(user_id, tok=access_token)
+        self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # enable msc3881 per_user flag via the admin api
+        url = f"/_synapse/admin/v1/experimental_features/{user_id}"
+        channel = self.make_request(
+            "PUT",
+            url,
+            content={
+                "features": {"msc3881": True},
+            },
+            access_token=admin_tok,
         )
+        self.assertEqual(channel.code, 200)
 
         # Send a message and check that it generated a push.
         self.helper.send(room, body="Hi!", tok=other_access_token)

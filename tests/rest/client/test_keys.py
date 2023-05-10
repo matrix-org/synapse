@@ -23,7 +23,6 @@ from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes
 from synapse.rest import admin
-from synapse.rest.admin.experimental_features import ExperimentalFeature
 from synapse.rest.client import keys, login
 from synapse.types import JsonDict
 
@@ -37,6 +36,7 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
         keys.register_servlets,
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
+        admin.register_servlets,
     ]
 
     def test_rejects_device_id_ice_key_outside_of_list(self) -> None:
@@ -207,21 +207,84 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "ui_auth": {"session_timeout": "15s"},
+            "experimental_features": {"msc3967_enabled": True},
         }
     )
-    def test_device_signing_with_msc3967(self) -> None:
-        """Device signing key follows MSC3967 behaviour when enabled."""
+    def test_device_signing_with_msc3967_via_config(self) -> None:
+        """Device signing key follows MSC3967 behaviour when enabled in config."""
         password = "wonderland"
         device_id = "ABCDEFGHI"
         alice_id = self.register_user("alice", password)
         alice_token = self.login("alice", password, device_id=device_id)
 
-        # enable msc3967 in db
-        self.get_success(
-            self.hs.get_datastores().main.set_features_for_user(
-                alice_id, {ExperimentalFeature.MSC3967: True}
-            )
+        keys1 = self.make_device_keys(alice_id, device_id)
+
+        # Initial request should succeed as no existing keys are present.
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/keys/device_signing/upload",
+            keys1,
+            alice_token,
         )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
+
+        keys2 = self.make_device_keys(alice_id, device_id)
+
+        # Subsequent request should require UIA as keys already exist even though session_timeout is set.
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/keys/device_signing/upload",
+            keys2,
+            alice_token,
+        )
+        self.assertEqual(channel.code, HTTPStatus.UNAUTHORIZED, channel.result)
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # add UI auth
+        keys2["auth"] = {
+            "type": "m.login.password",
+            "identifier": {"type": "m.id.user", "user": alice_id},
+            "password": password,
+            "session": session,
+        }
+
+        # Request should complete
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/keys/device_signing/upload",
+            keys2,
+            alice_token,
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
+
+    @override_config(
+        {
+            "ui_auth": {"session_timeout": "15s"},
+        }
+    )
+    def test_device_signing_with_msc3967_via_admin(self) -> None:
+        """Device signing key follows MSC3967 behaviour when enabled for user via admin api."""
+        password = "wonderland"
+        device_id = "ABCDEFGHI"
+        alice_id = self.register_user("alice", password)
+        alice_token = self.login("alice", password, device_id=device_id)
+        self.register_user("admin", "pass", True)
+        admin_tok = self.login("admin", "pass")
+
+        url = f"/_synapse/admin/v1/experimental_features/{alice_id}"
+        channel = self.make_request(
+            "PUT",
+            url,
+            content={
+                "features": {"msc3967": True},
+            },
+            access_token=admin_tok,
+        )
+        self.assertEqual(channel.code, 200)
 
         keys1 = self.make_device_keys(alice_id, device_id)
 
