@@ -97,7 +97,8 @@ When using workers,
 * `worker_replication_http_port`
 * `worker_replication_http_tls`
  
-can now be removed from individual worker yaml if you add the main process to the `instance_map` in the shared yaml configuration. 
+can now be removed from individual worker YAML configuration if you add the main process to the `instance_map` in the shared YAML configuration,
+using the name `main`.
 
 Example:
 ```yaml
