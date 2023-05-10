@@ -392,7 +392,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
         )
 
     def test_member(self) -> None:
-        """Member events have changed behavior starting with MSC3375."""
+        """Member events have changed behavior in MSC3375 and MSC3821."""
         self.run_test(
             {
                 "type": "m.room.member",
@@ -433,6 +433,51 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "unsigned": {},
             },
             room_version=RoomVersions.V9,
+        )
+
+        # After MSC3821, the signed key under third_party_invite is protected
+        # from redaction.
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": {
+                        "signed": "foo",
+                        "display_name": "stripped",
+                    },
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": {"signed": "foo"},
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC3821,
+        )
+
+        # Ensure this doesn't break if an invalid field is sent.
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": "stripped",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {"membership": "invite"},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC3821,
         )
 
 
