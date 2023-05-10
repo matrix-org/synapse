@@ -947,6 +947,10 @@ class ShardedWorkerHandlingConfig:
 
     instances: List[str]
 
+    # A map of key to instance name. If any of these keys are used,
+    # the associated instance is *always* returned.
+    instances_reserved_for_keys: Dict[str, str] = {}
+
     def should_handle(self, instance_name: str, key: str) -> bool:
         """Whether this instance is responsible for handling the given key."""
         # If no instances are defined we assume some other worker is handling
@@ -963,6 +967,10 @@ class ShardedWorkerHandlingConfig:
         is sending is known only to the sender instance, so we don't expose this
         method by default.
         """
+
+        reserved_instance = self.instances_reserved_for_keys.get(key)
+        if reserved_instance is not None:
+            return reserved_instance
 
         if not self.instances:
             raise Exception("Unknown worker")

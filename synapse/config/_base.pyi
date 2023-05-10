@@ -199,7 +199,10 @@ def find_config_files(search_paths: List[str]) -> List[str]: ...
 
 class ShardedWorkerHandlingConfig:
     instances: List[str]
-    def __init__(self, instances: List[str]) -> None: ...
+    instances_reserved_for_keys: Dict[str, str]
+    def __init__(
+        self, instances: List[str], instances_reserved_for_keys: Dict[str, str] = {}
+    ) -> None: ...
     def should_handle(self, instance_name: str, key: str) -> bool: ...  # noqa: F811
 
 class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
