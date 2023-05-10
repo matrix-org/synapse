@@ -384,6 +384,10 @@ def parse_proxy(
 
 @implementer(IStreamClientEndpoint)
 class _ProxyEndpoints:
+    """An endpoint that randomly iterates through a given list of endpoints at
+    each connection attempt.
+    """
+
     def __init__(self, endpoints: Sequence[IStreamClientEndpoint]) -> None:
         assert endpoints
         self._endpoints = endpoints
