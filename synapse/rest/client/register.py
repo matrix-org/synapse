@@ -955,6 +955,9 @@ def _calculate_registration_flows(
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.auth.oauth_delegation_enabled:
+        return
+
     if hs.config.worker.worker_app is None:
         EmailRegisterRequestTokenRestServlet(hs).register(http_server)
         MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)

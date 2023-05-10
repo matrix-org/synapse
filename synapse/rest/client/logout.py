@@ -80,5 +80,8 @@ class LogoutAllRestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.auth.oauth_delegation_enabled:
+        return
+
     LogoutRestServlet(hs).register(http_server)
     LogoutAllRestServlet(hs).register(http_server)
