@@ -1768,6 +1768,30 @@ Example configuration:
 max_image_pixels: 35M
 ```
 ---
+### `prevent_media_downloads_from`
+
+A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.
+
+This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.
+
+This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see [`url_preview_url_blacklist`](#url_preview_url_blacklist).
+
+Defaults to an empty list (nothing blocked).
+
+Example configuration:
+```yaml
+prevent_media_downloads_from:
+  - evil.example.org
+  - evil2.example.org
+```
+---
 ### `dynamic_thumbnails`
 
 Whether to generate new thumbnails on the fly to precisely match
@@ -3442,6 +3466,9 @@ This option has a number of sub-options. They are as follows:
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
+* `jitter_delay`: Delays push notifications by a random amount up to the given
+  duration. Useful for mitigating timing attacks. Optional, defaults to no
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
@@ -3449,6 +3476,7 @@ push:
   enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: "10s"
 ```
 ---
 ## Rooms
@@ -3694,6 +3722,16 @@ default_power_level_content_override:
    private_chat: { "events": { "com.example.foo" : 0 } }
    trusted_private_chat: null
    public_chat: null
+```
+---
+### `forget_rooms_on_leave`
+
+Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.
+
+Example configuration:
+```yaml
+forget_rooms_on_leave: false
 ```
 
 ---

@@ -70,7 +70,7 @@ class RoomRestV2Servlet(RestServlet):
         self._auth = hs.get_auth()
         self._store = hs.get_datastores().main
         self._pagination_handler = hs.get_pagination_handler()
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str

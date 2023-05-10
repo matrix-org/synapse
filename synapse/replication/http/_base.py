@@ -194,7 +194,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         the `instance_map` config).
         """
         clock = hs.get_clock()
-        client = hs.get_simple_http_client()
+        client = hs.get_replication_client()
         local_instance_name = hs.get_instance_name()
 
         # The value of these option should match the replication listener settings
