@@ -25,6 +25,7 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
+from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict, UserID
 from synapse.util.caches.descriptors import cached
 
@@ -41,6 +42,7 @@ class FilteringWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
         self.server_name: str = hs.hostname
+        self.database_engine = database.engine
         self.db_pool.updates.register_background_index_update(
             "full_users_filters_unique_idx",
             index_name="full_users_unique_idx",
@@ -82,26 +84,38 @@ class FilteringWorkerStore(SQLBaseStore):
         def _process_batch(
             txn: LoggingTransaction, lower_bound_id: str, upper_bound_id: str
         ) -> None:
-            sql = f"""
+            sql = """
                     UPDATE user_filters
-                    SET full_user_id = user_id || ':{self.server_name}'
+                    SET full_user_id = '@' || user_id || ?
                     WHERE ? < user_id AND user_id <= ? AND full_user_id IS NULL
                    """
-            txn.execute(sql, (lower_bound_id, upper_bound_id))
+            txn.execute(sql, (f":{self.server_name}", lower_bound_id, upper_bound_id))
 
         def _final_batch(txn: LoggingTransaction, lower_bound_id: str) -> None:
-            sql = f"""
+            sql = """
                     UPDATE user_filters
-                    SET full_user_id = user_id || ':{self.server_name}'
+                    SET full_user_id = '@' || user_id || ?
                     WHERE ? < user_id AND full_user_id IS NULL
                    """
-            txn.execute(sql, (lower_bound_id,))
+            txn.execute(
+                sql,
+                (
+                    f":{self.server_name}",
+                    lower_bound_id,
+                ),
+            )
+
+            if isinstance(self.database_engine, PostgresEngine):
+                sql = """
+                        ALTER TABLE user_filters VALIDATE CONSTRAINT full_user_id_not_null
+                      """
+                txn.execute(sql)
 
         upper_bound_id = await self.db_pool.runInteraction(
             "populate_full_user_id_user_filters", _get_last_id
         )
 
-        if not upper_bound_id:
+        if upper_bound_id is None:
             await self.db_pool.runInteraction(
                 "populate_full_user_id_user_filters", _final_batch, lower_bound_id
             )
