@@ -236,9 +236,9 @@ class WorkerConfig(Config):
             # For now, accept 'main' in the instance_map, but the replication system
             # expects 'master', force that into being until it's changed later.
             if MAIN_PROCESS_INSTANCE_MAP_NAME in instance_map:
-                instance_map.setdefault(MAIN_PROCESS_INSTANCE_NAME, {})
-                for k, v in instance_map[MAIN_PROCESS_INSTANCE_MAP_NAME].items():
-                    instance_map[MAIN_PROCESS_INSTANCE_NAME].setdefault(k, v)
+                instance_map[MAIN_PROCESS_INSTANCE_NAME] = instance_map[
+                    MAIN_PROCESS_INSTANCE_MAP_NAME
+                ]
                 del instance_map[MAIN_PROCESS_INSTANCE_MAP_NAME]
 
             # This is the backwards compatibility bit that handles the

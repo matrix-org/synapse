@@ -3869,8 +3869,7 @@ instance_map:
 
 Experimental: When using workers you can define which workers should
 handle writing to streams such as event persistence and typing notifications.
-Any worker specified here must also be in the [`instance_map`](#instance_map), the 
-exception being the main process.
+Any worker specified here must also be in the [`instance_map`](#instance_map).
 
 See the list of available streams in the
 [worker documentation](../../workers.md#stream-writers).
