@@ -232,7 +232,7 @@ class Notifier:
 
         self._federation_client = hs.get_federation_http_client()
 
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()

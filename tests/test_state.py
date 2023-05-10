@@ -228,6 +228,7 @@ class StateTestCase(unittest.TestCase):
                 "get_macaroon_generator",
                 "get_instance_name",
                 "get_simple_http_client",
+                "get_replication_client",
                 "hostname",
             ]
         )

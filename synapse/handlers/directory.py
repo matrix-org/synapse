@@ -52,7 +52,9 @@ class DirectoryHandler:
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.require_membership = hs.config.server.require_membership_for_aliases
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
         self.server_name = hs.hostname
 
         self.federation = hs.get_federation_client()
@@ -503,7 +505,7 @@ class DirectoryHandler:
             # Check if publishing is blocked by a third party module
             allowed_by_third_party_rules = (
                 await (
-                    self.third_party_event_rules.check_visibility_can_be_modified(
+                    self._third_party_event_rules.check_visibility_can_be_modified(
                         room_id, visibility
                     )
                 )
