@@ -23,7 +23,7 @@ from synapse.util import Clock
 from tests import unittest
 
 
-class ProfileStoreTestCase(unittest.HomeserverTestCase):
+class UserFiltersStoreTestCase(unittest.HomeserverTestCase):
     """
     Test background migration that copies entries from column user_id to full_user_id, adding
     the hostname in the process.
