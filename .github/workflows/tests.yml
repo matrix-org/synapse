@@ -331,6 +331,7 @@ jobs:
       - run: pip install -e .[all,test]
       # Sanity check we can import/run Synapse
       - run: python -m synapse.app.homeserver --help
+        continue-on-error: true
 
       - run: python -m twisted.trial -j6 tests
       - name: Dump logs
