@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       rust: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.rust }}
-      dependencies: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.dependencies }}
     steps:
     - uses: dorny/paths-filter@v2
       id: filter
@@ -30,9 +29,6 @@ jobs:
             - 'rust/**'
             - 'Cargo.toml'
             - 'Cargo.lock'
-          dependencies:
-            - 'pyproject.toml'
-            - 'poetry.lock'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
@@ -324,34 +320,19 @@ jobs:
         with:
           python-version: '3.7'
 
-      # Calculating the old-deps actually takes a bunch of time, so we cache the
-      # pyproject.toml / poetry.lock. We need to cache pyproject.toml as
-      # otherwise the `poetry install` step will error due to the poetry.lock
-      # file being outdated.
-      #
-      # This caches the output of `Prepare old deps`, which should generate the
-      # same `pyproject.toml` and `poetry.lock` for a given `pyproject.toml` input.
-      - uses: actions/cache@v3
-        id: cache-poetry-old-deps
-        name: Cache poetry.lock
-        with:
-          path: |
-            poetry.lock
-            pyproject.toml
-          key: poetry-old-deps2-${{ hashFiles('pyproject.toml') }}
       - name: Prepare old deps
         if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
         run: .ci/scripts/prepare_old_deps.sh
 
-      # We only now install poetry so that `setup-python-poetry` caches the
-      # right poetry.lock's dependencies.
-      - uses: matrix-org/setup-python-poetry@v1
-        with:
-          python-version: '3.7'
-          poetry-version: "1.3.2"
-          extras: "all test"
+      # Note: we install using `pip` here, not poetry. `poetry install` ignores the
+      # build-system section (https://github.com/python-poetry/poetry/issues/6154), but
+      # we explicitly want to test that you can `pip install` using the oldest version
+      # of poetry-core and setuptools-rust.
+      - run: pip install .[all, test]
+      # Sanity check we can import/run Synapse
+      - run: python -m synapse.app.homeserver --help
 
-      - run: poetry run trial -j6 tests
+      - run: python -m twisted.trial -j6 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -619,34 +600,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo bench --no-run
-
-  # Sanity check that Synapse can be `pip install`ed with the oldest set of deps.
-  # This occasionally bites us when we use some poetry feature but forget to bump the
-  # poetry-core version in the build-system.
-  installable-with-olddeps:
-#    if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    runs-on: ubuntu-latest
-    needs:
-      - changes
-#      - linting-done
-    steps:
-      - run: echo '${{ toJSON(needs) }}'
-      - run: echo ${{ needs.changes.outputs.dependencies == 'true' }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.7'  # oldest upstream supported CPython version
-      - uses: dtolnay/rust-toolchain@1.58.1
-      - uses: Swatinem/rust-cache@v2
-      # There aren't wheels for some of the older deps, so we need to install
-      # their build dependencies
-      - run: |
-          sudo apt-get -qq install build-essential libffi-dev python-dev \
-          libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
-      - run: .ci/scripts/prepare_old_deps.sh
-      - run: pip install .[all]
-      # Sanity check we can import/run Synapse
-      - run: python -m synapse.app.homeserver --help
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
