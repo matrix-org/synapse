@@ -330,6 +330,7 @@ jobs:
       # of poetry-core and setuptools-rust.
       - run: pip install -e .[all,test]
       # Sanity check we can import/run Synapse
+      - run: ls . synapse
       - run: python -m synapse.app.homeserver --help
         continue-on-error: true
 
