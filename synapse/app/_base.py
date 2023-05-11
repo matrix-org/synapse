@@ -210,7 +210,7 @@ def quit_with_error(error_string: str) -> NoReturn:
 
 
 # via https://peps.python.org/pep-3134/#enhanced-reporting
-def format_exception_chain(exc: Exception) -> str:
+def format_exception_chain(exc: BaseException) -> str:
     if exc.__cause__:
         result = format_exception_chain(exc.__cause__)
         result += "\nThe above exception was the direct cause..."
