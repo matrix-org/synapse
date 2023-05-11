@@ -29,6 +29,9 @@ jobs:
             - 'rust/**'
             - 'Cargo.toml'
             - 'Cargo.lock'
+          dependencies:
+            - 'pyproject.toml'
+            - 'poetry.lock'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
@@ -615,6 +618,27 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo bench --no-run
+
+  # Sanity check that Synapse can be `pip install`ed with the oldest set of deps.
+  # This occasionally bites us when we use some poetry feature but forget to bump the
+  # poetry-core version in the build-system.
+  installable-with-olddeps:
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - linting-done
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.7'  # oldest upstream supported CPython version
+      - uses: dtolnay/rust-toolchain@1.58.1
+      - uses: Swatinem/rust-cache@v2
+      - run: .ci/scripts/prepare_old_deps.sh
+      - run: pip install .[all]
+      # Sanity check we can import/run Synapse
+      - run: python -m synapse.app.homeserver --help
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
