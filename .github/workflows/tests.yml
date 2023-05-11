@@ -328,11 +328,15 @@ jobs:
       # build-system section (https://github.com/python-poetry/poetry/issues/6154), but
       # we explicitly want to test that you can `pip install` using the oldest version
       # of poetry-core and setuptools-rust.
-      - run: pip install -e .[all,test] -vv
+      - run: pip install .[all,test]
+
+      # We nuke the local copy, as we've installed synapse into the virtualenv
+      # (rather than use an editable install, which we no longer support). If we
+      # don't do this then python can't find the native lib.
+      - run: rm -rf synapse/
+
       # Sanity check we can import/run Synapse
-      - run: ls . synapse
       - run: python -m synapse.app.homeserver --help
-        continue-on-error: true
 
       - run: python -m twisted.trial -j6 tests
       - name: Dump logs
