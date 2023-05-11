@@ -623,12 +623,13 @@ jobs:
   # This occasionally bites us when we use some poetry feature but forget to bump the
   # poetry-core version in the build-system.
   installable-with-olddeps:
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+#    if: ${{ needs.changes.outputs.dependencies == 'true' }}
     runs-on: ubuntu-latest
     needs:
       - changes
       - linting-done
     steps:
+      - run: echo ${{ toJSON(needs) }}
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
