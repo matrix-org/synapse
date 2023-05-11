@@ -631,6 +631,7 @@ jobs:
 #      - linting-done
     steps:
       - run: echo '${{ toJSON(needs) }}'
+      - run: echo ${{ needs.changes.outputs.dependencies == 'true' }}
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
