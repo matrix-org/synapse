@@ -22,7 +22,7 @@ jobs:
           path: book
 
       - name: 📤 Deploy to Netlify
-        uses: matrix-org/netlify-pr-preview@v1
+        uses: matrix-org/netlify-pr-preview@v2
         with:
           path: book
           owner: ${{ github.event.workflow_run.head_repository.owner.login }}
