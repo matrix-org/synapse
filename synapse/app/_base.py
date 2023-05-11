@@ -209,24 +209,12 @@ def quit_with_error(error_string: str) -> NoReturn:
     sys.exit(1)
 
 
-# via https://peps.python.org/pep-3134/#enhanced-reporting
-def format_exception_chain(exc: BaseException) -> str:
-    if exc.__cause__:
-        result = format_exception_chain(exc.__cause__)
-        result += "\nThe above exception was the direct cause..."
-    elif exc.__context__:
-        result = format_exception_chain(exc.__context__)
-        result += "\nDuring handling of the above exception, ..."
-
-    return "".join(traceback.format_exception(exc))
-
-
 def handle_startup_exception(e: Exception) -> NoReturn:
     # Exceptions that occur between setting up the logging and forking or starting
     # the reactor are written to the logs, followed by a summary to stderr.
     logger.exception("Exception during startup")
 
-    error_string = format_exception_chain(e)
+    error_string = "".join(traceback.format_exception(e))
     indendeted_error_string = indent(error_string, "    ")
 
     quit_with_error(
