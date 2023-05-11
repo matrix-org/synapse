@@ -7044,7 +7044,23 @@ localhost and 6379</p>
 </li>
 <li>
 <p><code>dbid</code>: Optional redis dbid if needs to connect to specific redis logical db.</p>
+</li>
+<li>
+<p><code>use_tls</code>: Whether to use tls connection. Defaults to false.</p>
+</li>
+<li>
+<p><code>certificate_file</code>: Optional path to the certificate file</p>
+</li>
+<li>
+<p><code>private_key_file</code>: Optional path to the private key file</p>
+</li>
+<li>
+<p><code>ca_file</code>: Optional path to the CA certificate file. Use this one or:</p>
+</li>
+<li>
+<p><code>ca_path</code>: Optional path to the folder containing the CA certificate file</p>
 <p><em>Added in Synapse 1.78.0.</em></p>
+<p><em>Changed in Synapse 1.84.0: Added use_tls, certificate_file, private_key_file, ca_file and ca_path attributes</em></p>
 </li>
 </ul>
 <p>Example configuration:</p>
@@ -7054,6 +7070,10 @@ localhost and 6379</p>
   port: 6379
   password: &lt;secret_password&gt;
   dbid: &lt;dbid&gt;
+  #use_tls: True
+  #certificate_file: &lt;path_to_the_certificate_file&gt;
+  #private_key_file: &lt;path_to_the_private_key_file&gt;
+  #ca_file: &lt;path_to_the_ca_certificate_file&gt;
 </code></pre>
 <hr />
 <h2 id="individual-worker-configuration"><a class="header" href="#individual-worker-configuration">Individual worker configuration</a></h2>
