@@ -15,6 +15,7 @@ app_service_config_files:
 The format of the AS configuration file is as follows:
 
 ```yaml
+id: <your-AS-id>
 url: <base url of AS>
 as_token: <token AS will add to requests to HS>
 hs_token: <token HS will add to requests to AS>

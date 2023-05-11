@@ -22,20 +22,29 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Union,
 )
 
 from prometheus_client import Counter
 
-from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
+from synapse.api.constants import (
+    MAIN_TIMELINE,
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+)
+from synapse.api.room_versions import PushRuleRoomFlag
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
-from synapse.storage.state import StateFilter
 from synapse.synapse_rust.push import FilteredPushRules, PushRuleEvaluator
+from synapse.types import JsonValue
+from synapse.types.state import StateFilter
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_event_for_clients_with_state
@@ -59,6 +68,9 @@ STATE_EVENT_TYPES_TO_MARK_UNREAD = {
     EventTypes.RoomAvatar,
     EventTypes.Tombstone,
 }
+
+
+SENTINEL = object()
 
 
 def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
@@ -105,8 +117,12 @@ class BulkPushRuleEvaluator:
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
+        self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
+        self._intentional_mentions_enabled = (
+            self.hs.config.experimental.msc3952_intentional_mentions
+        )
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -127,15 +143,34 @@ class BulkPushRuleEvaluator:
         Returns:
             Mapping of user ID to their push rules.
         """
-        # We get the users who may need to be notified by first fetching the
-        # local users currently in the room, finding those that have push rules,
-        # and *then* checking which users are actually allowed to see the event.
-        #
-        # The alternative is to first fetch all users that were joined at the
-        # event, but that requires fetching the full state at the event, which
-        # may be expensive for large rooms with few local users.
+        # If this is a membership event, only calculate push rules for the target.
+        # While it's possible for users to configure push rules to respond to such an
+        # event, in practise nobody does this. At the cost of violating the spec a
+        # little, we can skip fetching a huge number of push rules in large rooms.
+        # This helps make joins and leaves faster.
+        if event.type == EventTypes.Member:
+            local_users: Sequence[str] = []
+            # We never notify a user about their own actions. This is enforced in
+            # `_action_for_event_by_user` in the loop over `rules_by_user`, but we
+            # do the same check here to avoid unnecessary DB queries.
+            if event.sender != event.state_key and self.hs.is_mine_id(event.state_key):
+                # Check the target is in the room, to avoid notifying them of
+                # e.g. a pre-emptive ban.
+                target_already_in_room = await self.store.check_local_user_in_room(
+                    event.state_key, event.room_id
+                )
+                if target_already_in_room:
+                    local_users = [event.state_key]
+        else:
+            # We get the users who may need to be notified by first fetching the
+            # local users currently in the room, finding those that have push rules,
+            # and *then* checking which users are actually allowed to see the event.
+            #
+            # The alternative is to first fetch all users that were joined at the
+            # event, but that requires fetching the full state at the event, which
+            # may be expensive for large rooms with few local users.
 
-        local_users = await self.store.get_local_users_in_room(event.room_id)
+            local_users = await self.store.get_local_users_in_room(event.room_id)
 
         # Filter out appservice users.
         local_users = [
@@ -149,8 +184,10 @@ class BulkPushRuleEvaluator:
         if event.type == EventTypes.Member and event.membership == Membership.INVITE:
             invited = event.state_key
             if invited and self.hs.is_mine_id(invited) and invited not in local_users:
-                local_users = list(local_users)
                 local_users.append(invited)
+
+        if not local_users:
+            return {}
 
         rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
@@ -219,13 +256,15 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def _related_events(self, event: EventBase) -> Dict[str, Dict[str, str]]:
+    async def _related_events(
+        self, event: EventBase
+    ) -> Dict[str, Dict[str, JsonValue]]:
         """Fetches the related events for 'event'. Sets the im.vector.is_falling_back key if the event is from a fallback relation
 
         Returns:
             Mapping of relation type to flattened events.
         """
-        related_events: Dict[str, Dict[str, str]] = {}
+        related_events: Dict[str, Dict[str, JsonValue]] = {}
         if self._related_event_match_enabled:
             related_event_id = event.content.get("m.relates_to", {}).get("event_id")
             relation_type = event.content.get("m.relates_to", {}).get("rel_type")
@@ -268,6 +307,8 @@ class BulkPushRuleEvaluator:
         for each event, check if the message should increment the unread count, and
         insert the results into the event_push_actions_staging table.
         """
+        if not self.should_calculate_push_rules:
+            return
         # For batched events the power level events may not have been persisted yet,
         # so we pass in the batched events. Thus if the event cannot be found in the
         # database we can check in the batch.
@@ -282,10 +323,10 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
-
         if (
             not event.internal_metadata.is_notifiable()
             or event.internal_metadata.is_historical()
+            or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync
         ):
             # Push rules for events that aren't notifiable can't be processed by this and
             # we want to skip push notification actions for historical messages
@@ -332,19 +373,38 @@ class BulkPushRuleEvaluator:
         related_events = await self._related_events(event)
 
         # It's possible that old room versions have non-integer power levels (floats or
-        # strings). Workaround this by explicitly converting to int.
+        # strings; even the occasional `null`). For old rooms, we interpret these as if
+        # they were integers. Do this here for the `@room` power level threshold.
+        # Note that this is done automatically for the sender's power level by
+        # _get_power_levels_and_sender_level in its call to get_user_power_level
+        # (even for room V10.)
         notification_levels = power_levels.get("notifications", {})
         if not event.room_version.msc3667_int_only_power_levels:
-            for user_id, level in notification_levels.items():
-                notification_levels[user_id] = int(level)
+            keys = list(notification_levels.keys())
+            for key in keys:
+                level = notification_levels.get(key, SENTINEL)
+                if level is not SENTINEL and type(level) is not int:
+                    try:
+                        notification_levels[key] = int(level)
+                    except (TypeError, ValueError):
+                        del notification_levels[key]
+
+        # Pull out any user and room mentions.
+        has_mentions = (
+            self._intentional_mentions_enabled
+            and EventContentFields.MSC3952_MENTIONS in event.content
+        )
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
+            has_mentions,
             room_member_count,
             sender_power_level,
             notification_levels,
             related_events,
             self._related_event_match_enabled,
+            event.room_version.msc3931_push_features,
+            self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
         )
 
         users = rules_by_user.keys()
@@ -418,19 +478,76 @@ RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
 
 
+def _is_simple_value(value: Any) -> bool:
+    return isinstance(value, (bool, str)) or type(value) is int or value is None
+
+
 def _flatten_dict(
     d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
-    result: Optional[Dict[str, str]] = None,
-) -> Dict[str, str]:
+    result: Optional[Dict[str, JsonValue]] = None,
+) -> Dict[str, JsonValue]:
+    """
+    Given a JSON dictionary (or event) which might contain sub dictionaries,
+    flatten it into a single layer dictionary by combining the keys & sub-keys.
+
+    String, integer, boolean, null or lists of those values are kept. All others are dropped.
+
+    Transforms:
+
+        {"foo": {"bar": "test"}}
+
+    To:
+
+        {"foo.bar": "test"}
+
+    Args:
+        d: The event or content to continue flattening.
+        prefix: The key prefix (from outer dictionaries).
+        result: The result to mutate.
+
+    Returns:
+        The resulting dictionary.
+    """
     if prefix is None:
         prefix = []
     if result is None:
         result = {}
     for key, value in d.items():
-        if isinstance(value, str):
-            result[".".join(prefix + [key])] = value.lower()
+        # Escape periods in the key with a backslash (and backslashes with an
+        # extra backslash). This is since a period is used as a separator between
+        # nested fields.
+        key = key.replace("\\", "\\\\").replace(".", "\\.")
+
+        if _is_simple_value(value):
+            result[".".join(prefix + [key])] = value
+        elif isinstance(value, (list, tuple)):
+            result[".".join(prefix + [key])] = [v for v in value if _is_simple_value(v)]
         elif isinstance(value, Mapping):
+            # do not set `room_version` due to recursion considerations below
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
+
+    # `room_version` should only ever be set when looking at the top level of an event
+    if (
+        isinstance(d, EventBase)
+        and PushRuleRoomFlag.EXTENSIBLE_EVENTS in d.room_version.msc3931_push_features
+    ):
+        # Room supports extensible events: replace `content.body` with the plain text
+        # representation from `m.markup`, as per MSC1767.
+        markup = d.get("content").get("m.markup")
+        if d.room_version.identifier.startswith("org.matrix.msc1767."):
+            markup = d.get("content").get("org.matrix.msc1767.markup")
+        if markup is not None and isinstance(markup, list):
+            text = ""
+            for rep in markup:
+                if not isinstance(rep, dict):
+                    # invalid markup - skip all processing
+                    break
+                if rep.get("mimetype", "text/plain") == "text/plain":
+                    rep_text = rep.get("body")
+                    if rep_text is not None and isinstance(rep_text, str):
+                        text = rep_text.lower()
+                        break
+            result["content.body"] = text
 
     return result

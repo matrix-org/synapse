@@ -16,15 +16,38 @@
 from typing import Optional, Tuple, Union, cast
 
 from canonicaljson import encode_canonical_json
+from typing_extensions import TYPE_CHECKING
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import LoggingTransaction
-from synapse.types import JsonDict
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
+from synapse.types import JsonDict, UserID
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class FilteringWorkerStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+        self.db_pool.updates.register_background_index_update(
+            "full_users_filters_unique_idx",
+            index_name="full_users_unique_idx",
+            table="user_filters",
+            columns=["full_user_id, filter_id"],
+            unique=True,
+        )
+
     @cached(num_args=2)
     async def get_user_filter(
         self, user_localpart: str, filter_id: Union[int, str]
@@ -46,9 +69,7 @@ class FilteringWorkerStore(SQLBaseStore):
 
         return db_to_json(def_json)
 
-
-class FilteringStore(FilteringWorkerStore):
-    async def add_user_filter(self, user_localpart: str, user_filter: JsonDict) -> int:
+    async def add_user_filter(self, user_id: UserID, user_filter: JsonDict) -> int:
         def_json = encode_canonical_json(user_filter)
 
         # Need an atomic transaction to SELECT the maximal ID so far then
@@ -58,13 +79,13 @@ class FilteringStore(FilteringWorkerStore):
                 "SELECT filter_id FROM user_filters "
                 "WHERE user_id = ? AND filter_json = ?"
             )
-            txn.execute(sql, (user_localpart, bytearray(def_json)))
+            txn.execute(sql, (user_id.localpart, bytearray(def_json)))
             filter_id_response = txn.fetchone()
             if filter_id_response is not None:
                 return filter_id_response[0]
 
             sql = "SELECT MAX(filter_id) FROM user_filters WHERE user_id = ?"
-            txn.execute(sql, (user_localpart,))
+            txn.execute(sql, (user_id.localpart,))
             max_id = cast(Tuple[Optional[int]], txn.fetchone())[0]
             if max_id is None:
                 filter_id = 0
@@ -72,11 +93,38 @@ class FilteringStore(FilteringWorkerStore):
                 filter_id = max_id + 1
 
             sql = (
-                "INSERT INTO user_filters (user_id, filter_id, filter_json)"
-                "VALUES(?, ?, ?)"
+                "INSERT INTO user_filters (full_user_id, user_id, filter_id, filter_json)"
+                "VALUES(?, ?, ?, ?)"
             )
-            txn.execute(sql, (user_localpart, filter_id, bytearray(def_json)))
+            txn.execute(
+                sql,
+                (
+                    user_id.to_string(),
+                    user_id.localpart,
+                    filter_id,
+                    bytearray(def_json),
+                ),
+            )
 
             return filter_id
 
-        return await self.db_pool.runInteraction("add_user_filter", _do_txn)
+        attempts = 0
+        while True:
+            # Try a few times.
+            # This is technically needed if a user tries to create two filters at once,
+            # leading to two concurrent transactions.
+            # The failure case would be:
+            # - SELECT filter_id ... filter_json = ? → both transactions return no rows
+            # - SELECT MAX(filter_id) ... → both transactions return e.g. 5
+            # - INSERT INTO ... → both transactions insert filter_id = 6
+            # One of the transactions will commit. The other will get a unique key
+            # constraint violation error (IntegrityError). This is not the same as a
+            # serialisability violation, which would be automatically retried by
+            # `runInteraction`.
+            try:
+                return await self.db_pool.runInteraction("add_user_filter", _do_txn)
+            except self.db_pool.engine.module.IntegrityError:
+                attempts += 1
+
+                if attempts >= 5:
+                    raise StoreError(500, "Couldn't generate a filter ID.")

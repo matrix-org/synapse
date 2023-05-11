@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+import hashlib
+import io
 import logging
 from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
-    Collection,
     Dict,
     Iterable,
     List,
@@ -45,6 +46,7 @@ from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
 from synapse.types import (
     JsonDict,
+    StrCollection,
     UserID,
     contains_invalid_mxid_characters,
     create_requester,
@@ -138,7 +140,9 @@ class UserAttributes:
     localpart: Optional[str]
     confirm_localpart: bool = False
     display_name: Optional[str] = None
-    emails: Collection[str] = attr.Factory(list)
+    picture: Optional[str] = None
+    # mypy thinks these are incompatible for some reason.
+    emails: StrCollection = attr.Factory(list)  # type: ignore[assignment]
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -156,7 +160,7 @@ class UsernameMappingSession:
 
     # attributes returned by the ID mapper
     display_name: Optional[str]
-    emails: Collection[str]
+    emails: StrCollection
 
     # An optional dictionary of extra attributes to be provided to the client in the
     # login response.
@@ -171,7 +175,7 @@ class UsernameMappingSession:
     # choices made by the user
     chosen_localpart: Optional[str] = None
     use_display_name: bool = True
-    emails_to_use: Collection[str] = ()
+    emails_to_use: StrCollection = ()
     terms_accepted_version: Optional[str] = None
 
 
@@ -190,12 +194,17 @@ class SsoHandler:
         self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
         self._error_template = hs.config.sso.sso_error_template
         self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
+        self._media_repo = (
+            hs.get_media_repository() if hs.config.media.can_load_media_repo else None
+        )
+        self._http_client = hs.get_proxied_blacklisted_http_client()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
@@ -215,6 +224,8 @@ class SsoHandler:
         self._identity_providers: Dict[str, SsoIdentityProvider] = {}
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
+
+        self._e164_mxids = hs.config.experimental.msc4009_e164_mxids
 
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
@@ -375,6 +386,7 @@ class SsoHandler:
         grandfather_existing_users: Callable[[], Awaitable[Optional[str]]],
         extra_login_attributes: Optional[JsonDict] = None,
         auth_provider_session_id: Optional[str] = None,
+        registration_enabled: bool = True,
     ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -427,6 +439,10 @@ class SsoHandler:
 
             auth_provider_session_id: An optional session ID from the IdP.
 
+            registration_enabled: An optional boolean to enable/disable automatic
+            registrations of new users. If false and the user does not exist then the
+            flow is aborted. Defaults to true.
+
         Raises:
             MappingException if there was a problem mapping the response to a user.
             RedirectException: if the mapping provider needs to redirect the user
@@ -454,8 +470,16 @@ class SsoHandler:
                         auth_provider_id, remote_user_id, user_id
                     )
 
-            # Otherwise, generate a new user.
-            if not user_id:
+            if not user_id and not registration_enabled:
+                logger.info(
+                    "User does not exist and registration are disabled for IdP '%s' and remote_user_id '%s'",
+                    auth_provider_id,
+                    remote_user_id,
+                )
+                raise MappingException(
+                    "User does not exist and registrations are disabled"
+                )
+            elif not user_id:  # Otherwise, generate a new user.
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
 
                 next_step_url = self._get_url_for_next_new_user_step(
@@ -495,6 +519,8 @@ class SsoHandler:
                         await self._profile_handler.set_displayname(
                             user_id_obj, requester, attributes.display_name, True
                         )
+                if attributes.picture:
+                    await self.set_avatar(user_id, attributes.picture)
 
         await self._auth_handler.complete_sso_login(
             user_id,
@@ -687,7 +713,7 @@ class SsoHandler:
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
         if not attributes.localpart or contains_invalid_mxid_characters(
-            attributes.localpart
+            attributes.localpart, self._e164_mxids
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
@@ -703,7 +729,109 @@ class SsoHandler:
         await self._store.record_user_external_id(
             auth_provider_id, remote_user_id, registered_user_id
         )
+
+        # Set avatar, if available
+        if attributes.picture:
+            await self.set_avatar(registered_user_id, attributes.picture)
+
         return registered_user_id
+
+    async def set_avatar(self, user_id: str, picture_https_url: str) -> bool:
+        """Set avatar of the user.
+
+        This downloads the image file from the URL provided, stores that in
+        the media repository and then sets the avatar on the user's profile.
+
+        It can detect if the same image is being saved again and bails early by storing
+        the hash of the file in the `upload_name` of the avatar image.
+
+        Currently, it only supports server configurations which run the media repository
+        within the same process.
+
+        It silently fails and logs a warning by raising an exception and catching it
+        internally if:
+         * it is unable to fetch the image itself (non 200 status code) or
+         * the image supplied is bigger than max allowed size or
+         * the image type is not one of the allowed image types.
+
+        Args:
+            user_id: matrix user ID in the form @localpart:domain as a string.
+
+            picture_https_url: HTTPS url for the picture image file.
+
+        Returns: `True` if the user's avatar has been successfully set to the image at
+            `picture_https_url`.
+        """
+        if self._media_repo is None:
+            logger.info(
+                "failed to set user avatar because out-of-process media repositories "
+                "are not supported yet "
+            )
+            return False
+
+        try:
+            uid = UserID.from_string(user_id)
+
+            def is_allowed_mime_type(content_type: str) -> bool:
+                if (
+                    self._profile_handler.allowed_avatar_mimetypes
+                    and content_type
+                    not in self._profile_handler.allowed_avatar_mimetypes
+                ):
+                    return False
+                return True
+
+            # download picture, enforcing size limit & mime type check
+            picture = io.BytesIO()
+
+            content_length, headers, uri, code = await self._http_client.get_file(
+                url=picture_https_url,
+                output_stream=picture,
+                max_size=self._profile_handler.max_avatar_size,
+                is_allowed_content_type=is_allowed_mime_type,
+            )
+
+            if code != 200:
+                raise Exception(
+                    "GET request to download sso avatar image returned {}".format(code)
+                )
+
+            # upload name includes hash of the image file's content so that we can
+            # easily check if it requires an update or not, the next time user logs in
+            upload_name = "sso_avatar_" + hashlib.sha256(picture.read()).hexdigest()
+
+            # bail if user already has the same avatar
+            profile = await self._profile_handler.get_profile(user_id)
+            if profile["avatar_url"] is not None:
+                server_name = profile["avatar_url"].split("/")[-2]
+                media_id = profile["avatar_url"].split("/")[-1]
+                if self._is_mine_server_name(server_name):
+                    media = await self._media_repo.store.get_local_media(media_id)
+                    if media is not None and upload_name == media["upload_name"]:
+                        logger.info("skipping saving the user avatar")
+                        return True
+
+            # store it in media repository
+            avatar_mxc_url = await self._media_repo.create_content(
+                media_type=headers[b"Content-Type"][0].decode("utf-8"),
+                upload_name=upload_name,
+                content=picture,
+                content_length=content_length,
+                auth_user=uid,
+            )
+
+            # save it as user avatar
+            await self._profile_handler.set_avatar_url(
+                uid,
+                create_requester(uid),
+                str(avatar_mxc_url),
+            )
+
+            logger.info("successfully saved the user avatar")
+            return True
+        except Exception:
+            logger.warning("failed to save the user avatar")
+            return False
 
     async def complete_sso_ui_auth_request(
         self,
@@ -818,7 +946,7 @@ class SsoHandler:
             localpart,
         )
 
-        if contains_invalid_mxid_characters(localpart):
+        if contains_invalid_mxid_characters(localpart, self._e164_mxids):
             raise SynapseError(400, "localpart is invalid: %s" % (localpart,))
         user_id = UserID(localpart, self._server_name).to_string()
         user_infos = await self._store.get_users_by_id_case_insensitive(user_id)

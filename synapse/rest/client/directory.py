@@ -39,12 +39,14 @@ logger = logging.getLogger(__name__)
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ClientDirectoryServer(hs).register(http_server)
-    ClientDirectoryListServer(hs).register(http_server)
-    ClientAppserviceDirectoryListServer(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        ClientDirectoryListServer(hs).register(http_server)
+        ClientAppserviceDirectoryListServer(hs).register(http_server)
 
 
 class ClientDirectoryServer(RestServlet):
     PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$", v1=True)
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

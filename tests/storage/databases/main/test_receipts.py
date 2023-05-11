@@ -26,14 +26,13 @@ from tests.unittest import HomeserverTestCase
 
 
 class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
         self.token = self.login("foo", "pass")
@@ -47,7 +46,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
         table: str,
         receipts: Dict[Tuple[str, str, str], Sequence[Dict[str, Any]]],
         expected_unique_receipts: Dict[Tuple[str, str, str], Optional[Dict[str, Any]]],
-    ):
+    ) -> None:
         """Test that the background update to uniqueify non-thread receipts in
         the given receipts table works properly.
 
@@ -62,6 +61,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                 keys and expected receipt key-values after duplicate receipts have been
                 removed.
         """
+
         # First, undo the background update.
         def drop_receipts_unique_index(txn: LoggingTransaction) -> None:
             txn.execute(f"DROP INDEX IF EXISTS {index_name}")
@@ -154,7 +154,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                     f"Background update did not remove all duplicate receipts from {table}",
                 )
 
-    def test_background_receipts_linearized_unique_index(self):
+    def test_background_receipts_linearized_unique_index(self) -> None:
         """Test that the background update to uniqueify non-thread receipts in
         `receipts_linearized` works properly.
         """
@@ -168,7 +168,9 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                     {"stream_id": 6, "event_id": "$some_event"},
                 ],
                 (self.other_room_id, "m.read", self.user_id): [
-                    {"stream_id": 7, "event_id": "$some_event"}
+                    # It is possible for stream IDs to be duplicated.
+                    {"stream_id": 7, "event_id": "$some_event"},
+                    {"stream_id": 7, "event_id": "$some_event"},
                 ],
             },
             expected_unique_receipts={
@@ -177,7 +179,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
             },
         )
 
-    def test_background_receipts_graph_unique_index(self):
+    def test_background_receipts_graph_unique_index(self) -> None:
         """Test that the background update to uniqueify non-thread receipts in
         `receipts_graph` works properly.
         """

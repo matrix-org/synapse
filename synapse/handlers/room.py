@@ -20,22 +20,14 @@ import random
 import string
 from collections import OrderedDict
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Collection,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 import attr
 from typing_extensions import TypedDict
 
 import synapse.events.snapshot
 from synapse.api.constants import (
+    Direction,
     EventContentFields,
     EventTypes,
     GuestAccess,
@@ -51,6 +43,7 @@ from synapse.api.errors import (
     Codes,
     LimitExceededError,
     NotFoundError,
+    PartialStateConflictError,
     StoreError,
     SynapseError,
 )
@@ -58,11 +51,11 @@ from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
+from synapse.events.snapshot import UnpersistedEventContext
 from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
 from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
-from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
@@ -72,11 +65,13 @@ from synapse.types import (
     RoomID,
     RoomStreamToken,
     StateMap,
+    StrCollection,
     StreamKeyType,
     StreamToken,
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import stringutils
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -111,7 +106,7 @@ class RoomCreationHandler:
         self.auth_blocking = hs.get_auth_blocking()
         self.clock = hs.get_clock()
         self.hs = hs
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -165,7 +160,9 @@ class RoomCreationHandler:
         )
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
 
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
 
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
@@ -207,46 +204,67 @@ class RoomCreationHandler:
 
         new_room_id = self._generate_room_id()
 
-        # Check whether the user has the power level to carry out the upgrade.
-        # `check_auth_rules_from_context` will check that they are in the room and have
-        # the required power level to send the tombstone event.
-        (
-            tombstone_event,
-            tombstone_context,
-        ) = await self.event_creation_handler.create_event(
-            requester,
-            {
-                "type": EventTypes.Tombstone,
-                "state_key": "",
-                "room_id": old_room_id,
-                "sender": user_id,
-                "content": {
-                    "body": "This room has been replaced",
-                    "replacement_room": new_room_id,
-                },
-            },
-        )
-        validate_event_for_room_version(tombstone_event)
-        await self._event_auth_handler.check_auth_rules_from_context(tombstone_event)
+        # Try several times, it could fail with PartialStateConflictError
+        # in _upgrade_room, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                # Check whether the user has the power level to carry out the upgrade.
+                # `check_auth_rules_from_context` will check that they are in the room and have
+                # the required power level to send the tombstone event.
+                (
+                    tombstone_event,
+                    tombstone_unpersisted_context,
+                ) = await self.event_creation_handler.create_event(
+                    requester,
+                    {
+                        "type": EventTypes.Tombstone,
+                        "state_key": "",
+                        "room_id": old_room_id,
+                        "sender": user_id,
+                        "content": {
+                            "body": "This room has been replaced",
+                            "replacement_room": new_room_id,
+                        },
+                    },
+                )
+                tombstone_context = await tombstone_unpersisted_context.persist(
+                    tombstone_event
+                )
+                validate_event_for_room_version(tombstone_event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    tombstone_event
+                )
 
-        # Upgrade the room
-        #
-        # If this user has sent multiple upgrade requests for the same room
-        # and one of them is not complete yet, cache the response and
-        # return it to all subsequent requests
-        ret = await self._upgrade_response_cache.wrap(
-            (old_room_id, user_id),
-            self._upgrade_room,
-            requester,
-            old_room_id,
-            old_room,  # args for _upgrade_room
-            new_room_id,
-            new_version,
-            tombstone_event,
-            tombstone_context,
-        )
+                # Upgrade the room
+                #
+                # If this user has sent multiple upgrade requests for the same room
+                # and one of them is not complete yet, cache the response and
+                # return it to all subsequent requests
+                ret = await self._upgrade_response_cache.wrap(
+                    (old_room_id, user_id),
+                    self._upgrade_room,
+                    requester,
+                    old_room_id,
+                    old_room,  # args for _upgrade_room
+                    new_room_id,
+                    new_version,
+                    tombstone_event,
+                    tombstone_context,
+                )
 
-        return ret
+                return ret
+            except PartialStateConflictError as e:
+                # Clean up the cache so we can retry properly
+                self._upgrade_response_cache.unset((old_room_id, user_id))
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
+
+        # This is to satisfy mypy and should never happen
+        raise PartialStateConflictError()
 
     async def _upgrade_room(
         self,
@@ -433,7 +451,9 @@ class RoomCreationHandler:
         """
         user_id = requester.user.to_string()
 
-        spam_check = await self.spam_checker.user_may_create_room(user_id)
+        spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+            user_id
+        )
         if spam_check != NOT_SPAM:
             raise SynapseError(
                 403,
@@ -551,9 +571,10 @@ class RoomCreationHandler:
         await self._send_events_for_new_room(
             requester,
             new_room_id,
+            new_room_version,
             # we expect to override all the presets with initial_state, so this is
             # somewhat arbitrary.
-            preset_config=RoomCreationPreset.PRIVATE_CHAT,
+            room_config={"preset": RoomCreationPreset.PRIVATE_CHAT},
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
@@ -678,13 +699,14 @@ class RoomCreationHandler:
         config: JsonDict,
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
-    ) -> Tuple[dict, int]:
+    ) -> Tuple[str, Optional[RoomAlias], int]:
         """Creates a new room.
 
         Args:
-            requester:
-                The user who requested the room creation.
-            config : A dict of configuration options.
+            requester: The user who requested the room creation.
+            config: A dict of configuration options. This will be the body of
+                a /createRoom request; see
+                https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
             ratelimit: set to False to disable the rate limiter
 
             creator_join_profile:
@@ -695,14 +717,17 @@ class RoomCreationHandler:
                 `avatar_url` and/or `displayname`.
 
         Returns:
-                First, a dict containing the keys `room_id` and, if an alias
-                was, requested, `room_alias`. Secondly, the stream_id of the
-                last persisted event.
+            A 3-tuple containing:
+                - the room ID;
+                - if requested, the room alias, otherwise None; and
+                - the `stream_id` of the last persisted event.
         Raises:
-            SynapseError if the room ID couldn't be stored, 3pid invitation config
-            validation failed, or something went horribly wrong.
-            ResourceLimitError if server is blocked to some resource being
-            exceeded
+            SynapseError:
+                if the room ID couldn't be stored, 3pid invitation config
+                validation failed, or something went horribly wrong.
+            ResourceLimitError:
+                if server is blocked to some resource being
+                exceeded
         """
         user_id = requester.user.to_string()
 
@@ -719,7 +744,7 @@ class RoomCreationHandler:
 
         # Let the third party rules modify the room creation config if needed, or abort
         # the room creation entirely with an exception.
-        await self.third_party_event_rules.on_create_room(
+        await self._third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
 
@@ -740,7 +765,9 @@ class RoomCreationHandler:
                 )
 
         if not is_requester_admin:
-            spam_check = await self.spam_checker.user_may_create_room(user_id)
+            spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+                user_id
+            )
             if spam_check != NOT_SPAM:
                 raise SynapseError(
                     403,
@@ -852,9 +879,11 @@ class RoomCreationHandler:
         )
 
         # Check whether this visibility value is blocked by a third party module
-        allowed_by_third_party_rules = await (
-            self.third_party_event_rules.check_visibility_can_be_modified(
-                room_id, visibility
+        allowed_by_third_party_rules = (
+            await (
+                self._third_party_event_rules.check_visibility_can_be_modified(
+                    room_id, visibility
+                )
             )
         )
         if not allowed_by_third_party_rules:
@@ -882,13 +911,6 @@ class RoomCreationHandler:
                 check_membership=False,
             )
 
-        preset_config = config.get(
-            "preset",
-            RoomCreationPreset.PRIVATE_CHAT
-            if visibility == "private"
-            else RoomCreationPreset.PUBLIC_CHAT,
-        )
-
         raw_initial_state = config.get("initial_state", [])
 
         initial_state = OrderedDict()
@@ -907,7 +929,8 @@ class RoomCreationHandler:
         ) = await self._send_events_for_new_room(
             requester,
             room_id,
-            preset_config=preset_config,
+            room_version,
+            room_config=config,
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
@@ -915,48 +938,6 @@ class RoomCreationHandler:
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
         )
-
-        if "name" in config:
-            name = config["name"]
-            (
-                name_event,
-                last_stream_id,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
-                {
-                    "type": EventTypes.Name,
-                    "room_id": room_id,
-                    "sender": user_id,
-                    "state_key": "",
-                    "content": {"name": name},
-                },
-                ratelimit=False,
-                prev_event_ids=[last_sent_event_id],
-                depth=depth,
-            )
-            last_sent_event_id = name_event.event_id
-            depth += 1
-
-        if "topic" in config:
-            topic = config["topic"]
-            (
-                topic_event,
-                last_stream_id,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
-                {
-                    "type": EventTypes.Topic,
-                    "room_id": room_id,
-                    "sender": user_id,
-                    "state_key": "",
-                    "content": {"topic": topic},
-                },
-                ratelimit=False,
-                prev_event_ids=[last_sent_event_id],
-                depth=depth,
-            )
-            last_sent_event_id = topic_event.event_id
-            depth += 1
 
         # we avoid dropping the lock between invites, as otherwise joins can
         # start coming in and making the createRoom slow.
@@ -1012,11 +993,6 @@ class RoomCreationHandler:
             last_sent_event_id = member_event_id
             depth += 1
 
-        result = {"room_id": room_id}
-
-        if room_alias:
-            result["room_alias"] = room_alias.to_string()
-
         # Always wait for room creation to propagate before returning
         await self._replication.wait_for_stream_position(
             self.hs.config.worker.events_shard_config.get_instance(room_id),
@@ -1024,13 +1000,14 @@ class RoomCreationHandler:
             last_stream_id,
         )
 
-        return result, last_stream_id
+        return room_id, room_alias, last_stream_id
 
     async def _send_events_for_new_room(
         self,
         creator: Requester,
         room_id: str,
-        preset_config: str,
+        room_version: RoomVersion,
+        room_config: JsonDict,
         invite_list: List[str],
         initial_state: MutableStateMap,
         creation_content: JsonDict,
@@ -1047,11 +1024,35 @@ class RoomCreationHandler:
 
         Rate limiting should already have been applied by this point.
 
+        Args:
+            creator:
+                the user requesting the room creation
+            room_id:
+                room id for the room being created
+            room_version:
+                The room version of the new room.
+            room_config:
+                A dict of configuration options. This will be the body of
+                a /createRoom request; see
+                https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
+            invite_list:
+                a list of user ids to invite to the room
+            initial_state:
+                A list of state events to set in the new room.
+            creation_content:
+                Extra keys, such as m.federate, to be added to the content of the m.room.create event.
+            room_alias:
+                alias for the room
+            power_level_content_override:
+                The power level content to override in the default power level event.
+            creator_join_profile:
+                Set to override the displayname and avatar for the creating
+                user in this room.
+
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
             event sent to the room.
         """
-
         creator_id = creator.user.to_string()
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
         depth = 1
@@ -1062,24 +1063,13 @@ class RoomCreationHandler:
         # created (but not persisted to the db) to determine state for future created events
         # (as this info can't be pulled from the db)
         state_map: MutableStateMap[str] = {}
-        # current_state_group of last event created. Used for computing event context of
-        # events to be batched
-        current_state_group = None
-
-        def create_event_dict(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
-            e = {"type": etype, "content": content}
-
-            e.update(event_keys)
-            e.update(kwargs)
-
-            return e
 
         async def create_event(
             etype: str,
             content: JsonDict,
             for_batch: bool,
             **kwargs: Any,
-        ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
+        ) -> Tuple[EventBase, synapse.events.snapshot.UnpersistedEventContextBase]:
             """
             Creates an event and associated event context.
             Args:
@@ -1096,22 +1086,38 @@ class RoomCreationHandler:
             nonlocal depth
             nonlocal prev_event
 
-            event_dict = create_event_dict(etype, content, **kwargs)
+            # Create the event dictionary.
+            event_dict = {"type": etype, "content": content}
+            event_dict.update(event_keys)
+            event_dict.update(kwargs)
 
-            new_event, new_context = await self.event_creation_handler.create_event(
+            (
+                new_event,
+                new_unpersisted_context,
+            ) = await self.event_creation_handler.create_event(
                 creator,
                 event_dict,
                 prev_event_ids=prev_event,
                 depth=depth,
-                state_map=state_map,
+                # Take a copy to ensure each event gets a unique copy of
+                # state_map since it is modified below.
+                state_map=dict(state_map),
                 for_batch=for_batch,
-                current_state_group=current_state_group,
             )
+
             depth += 1
             prev_event = [new_event.event_id]
             state_map[(new_event.type, new_event.state_key)] = new_event.event_id
 
-            return new_event, new_context
+            return new_event, new_unpersisted_context
+
+        visibility = room_config.get("visibility", "private")
+        preset_config = room_config.get(
+            "preset",
+            RoomCreationPreset.PRIVATE_CHAT
+            if visibility == "private"
+            else RoomCreationPreset.PUBLIC_CHAT,
+        )
 
         try:
             config = self._presets_dict[preset_config]
@@ -1120,11 +1126,13 @@ class RoomCreationHandler:
                 400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
             )
 
-        creation_content.update({"creator": creator_id})
-        creation_event, creation_context = await create_event(
+        # MSC2175 removes the creator field from the create event.
+        if not room_version.msc2175_implicit_room_creator:
+            creation_content["creator"] = creator_id
+        creation_event, unpersisted_creation_context = await create_event(
             EventTypes.Create, creation_content, False
         )
-
+        creation_context = await unpersisted_creation_context.persist(creation_event)
         logger.debug("Sending %s in new room", EventTypes.Member)
         ev = await self.event_creation_handler.handle_new_client_event(
             requester=creator,
@@ -1168,7 +1176,6 @@ class RoomCreationHandler:
             power_event, power_context = await create_event(
                 EventTypes.PowerLevels, pl_content, True
             )
-            current_state_group = power_context._state_group
             events_to_send.append((power_event, power_context))
         else:
             power_level_content: JsonDict = {
@@ -1217,14 +1224,12 @@ class RoomCreationHandler:
                 power_level_content,
                 True,
             )
-            current_state_group = pl_context._state_group
             events_to_send.append((pl_event, pl_context))
 
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
             room_alias_event, room_alias_context = await create_event(
                 EventTypes.CanonicalAlias, {"alias": room_alias.to_string()}, True
             )
-            current_state_group = room_alias_context._state_group
             events_to_send.append((room_alias_event, room_alias_context))
 
         if (EventTypes.JoinRules, "") not in initial_state:
@@ -1233,7 +1238,6 @@ class RoomCreationHandler:
                 {"join_rule": config["join_rules"]},
                 True,
             )
-            current_state_group = join_rules_context._state_group
             events_to_send.append((join_rules_event, join_rules_context))
 
         if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
@@ -1242,7 +1246,6 @@ class RoomCreationHandler:
                 {"history_visibility": config["history_visibility"]},
                 True,
             )
-            current_state_group = visibility_context._state_group
             events_to_send.append((visibility_event, visibility_context))
 
         if config["guest_can_join"]:
@@ -1252,14 +1255,12 @@ class RoomCreationHandler:
                     {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
                     True,
                 )
-                current_state_group = guest_access_context._state_group
                 events_to_send.append((guest_access_event, guest_access_context))
 
         for (etype, state_key), content in initial_state.items():
             event, context = await create_event(
                 etype, content, True, state_key=state_key
             )
-            current_state_group = context._state_group
             events_to_send.append((event, context))
 
         if config["encrypted"]:
@@ -1271,9 +1272,34 @@ class RoomCreationHandler:
             )
             events_to_send.append((encryption_event, encryption_context))
 
+        if "name" in room_config:
+            name = room_config["name"]
+            name_event, name_context = await create_event(
+                EventTypes.Name,
+                {"name": name},
+                True,
+            )
+            events_to_send.append((name_event, name_context))
+
+        if "topic" in room_config:
+            topic = room_config["topic"]
+            topic_event, topic_context = await create_event(
+                EventTypes.Topic,
+                {"topic": topic},
+                True,
+            )
+            events_to_send.append((topic_event, topic_context))
+
+        datastore = self.hs.get_datastores().state
+        events_and_context = (
+            await UnpersistedEventContext.batch_persist_unpersisted_contexts(
+                events_to_send, room_id, current_state_group, datastore
+            )
+        )
+
         last_event = await self.event_creation_handler.handle_new_client_event(
             creator,
-            events_to_send,
+            events_and_context,
             ignore_shadow_ban=True,
             ratelimit=False,
         )
@@ -1476,7 +1502,7 @@ class TimestampLookupHandler:
         requester: Requester,
         room_id: str,
         timestamp: int,
-        direction: str,
+        direction: Direction,
     ) -> Tuple[str, int]:
         """Find the closest event to the given timestamp in the given direction.
         If we can't find an event locally or the event we have locally is next to a gap,
@@ -1487,7 +1513,7 @@ class TimestampLookupHandler:
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1522,13 +1548,13 @@ class TimestampLookupHandler:
                 local_event_id, allow_none=False, allow_rejected=False
             )
 
-            if direction == "f":
+            if direction == Direction.FORWARDS:
                 # We only need to check for a backward gap if we're looking forwards
                 # to ensure there is nothing in between.
                 is_event_next_to_backward_gap = (
                     await self.store.is_event_next_to_backward_gap(local_event)
                 )
-            elif direction == "b":
+            elif direction == Direction.BACKWARDS:
                 # We only need to check for a forward gap if we're looking backwards
                 # to ensure there is nothing in between
                 is_event_next_to_forward_gap = (
@@ -1625,7 +1651,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         user: UserID,
         from_key: RoomStreamToken,
         limit: int,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:
@@ -1707,7 +1733,7 @@ class RoomShutdownHandler:
         self.room_member_handler = hs.get_room_member_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastores().main
 
@@ -1813,7 +1839,7 @@ class RoomShutdownHandler:
                 new_room_user_id, authenticated_entity=requester_user_id
             )
 
-            info, stream_id = await self._room_creation_handler.create_room(
+            new_room_id, _, stream_id = await self._room_creation_handler.create_room(
                 room_creator_requester,
                 config={
                     "preset": RoomCreationPreset.PUBLIC_CHAT,
@@ -1822,7 +1848,6 @@ class RoomShutdownHandler:
                 },
                 ratelimit=False,
             )
-            new_room_id = info["room_id"]
 
             logger.info(
                 "Shutting down room %r, joining to new room: %r", room_id, new_room_id
@@ -1875,6 +1900,7 @@ class RoomShutdownHandler:
 
                 # Join users to new room
                 if new_room_user_id:
+                    assert new_room_id is not None
                     await self.room_member_handler.update_membership(
                         requester=target_requester,
                         target=target_requester.user,
@@ -1907,6 +1933,7 @@ class RoomShutdownHandler:
 
             aliases_for_room = await self.store.get_aliases_for_room(room_id)
 
+            assert new_room_id is not None
             await self.store.update_aliases_for_room(
                 room_id, new_room_id, requester_user_id
             )
@@ -1916,6 +1943,6 @@ class RoomShutdownHandler:
         return {
             "kicked_users": kicked_users,
             "failed_to_kick_users": failed_to_kick_users,
-            "local_aliases": aliases_for_room,
+            "local_aliases": list(aliases_for_room),
             "new_room_id": new_room_id,
         }

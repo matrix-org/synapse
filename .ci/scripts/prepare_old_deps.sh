@@ -35,9 +35,9 @@ sed -i \
 # compatible (as far the package metadata declares, anyway); pip's package resolver
 # is more lax.
 #
-# Rather than `poetry install --no-dev`, we drop all dev dependencies from the
-# toml file. This means we don't have to ensure compatibility between old deps and
-# dev tools.
+# Rather than `poetry install --no-dev`, we drop all dev dependencies and the dev-docs
+# group from the toml file. This means we don't have to ensure compatibility between
+# old deps and dev tools.
 
 pip install toml wheel
 
@@ -47,13 +47,14 @@ with open('pyproject.toml', 'r') as f:
     data = toml.loads(f.read())
 
 del data['tool']['poetry']['dev-dependencies']
+del data['tool']['poetry']['group']['dev-docs']
 
 with open('pyproject.toml', 'w') as f:
     toml.dump(data, f)
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
-pip install poetry==1.2.0
+pip install poetry==1.3.2
 poetry lock
 
 echo "::group::Patched pyproject.toml"

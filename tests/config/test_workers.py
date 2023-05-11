@@ -14,14 +14,14 @@
 from typing import Any, Mapping, Optional
 from unittest.mock import Mock
 
-from frozendict import frozendict
+from immutabledict import immutabledict
 
 from synapse.config import ConfigError
 from synapse.config.workers import WorkerConfig
 
 from tests.unittest import TestCase
 
-_EMPTY_FROZENDICT: Mapping[str, Any] = frozendict()
+_EMPTY_IMMUTABLEDICT: Mapping[str, Any] = immutabledict()
 
 
 class WorkerDutyConfigTestCase(TestCase):
@@ -29,7 +29,7 @@ class WorkerDutyConfigTestCase(TestCase):
         self,
         worker_app: str,
         worker_name: Optional[str],
-        extras: Mapping[str, Any] = _EMPTY_FROZENDICT,
+        extras: Mapping[str, Any] = _EMPTY_IMMUTABLEDICT,
     ) -> WorkerConfig:
         root_config = Mock()
         root_config.worker_app = worker_app

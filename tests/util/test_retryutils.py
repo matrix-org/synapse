@@ -22,7 +22,7 @@ from tests.unittest import HomeserverTestCase
 
 
 class RetryLimiterTestCase(HomeserverTestCase):
-    def test_new_destination(self):
+    def test_new_destination(self) -> None:
         """A happy-path case with a new destination and a successful operation"""
         store = self.hs.get_datastores().main
         limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
@@ -36,7 +36,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertIsNone(new_timings)
 
-    def test_limiter(self):
+    def test_limiter(self) -> None:
         """General test case which walks through the process of a failing request"""
         store = self.hs.get_datastores().main
 
@@ -54,6 +54,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         self.pump()
 
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
+        assert new_timings is not None
         self.assertEqual(new_timings.failure_ts, failure_ts)
         self.assertEqual(new_timings.retry_last_ts, failure_ts)
         self.assertEqual(new_timings.retry_interval, MIN_RETRY_INTERVAL)
@@ -82,6 +83,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         self.pump()
 
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
+        assert new_timings is not None
         self.assertEqual(new_timings.failure_ts, failure_ts)
         self.assertEqual(new_timings.retry_last_ts, retry_ts)
         self.assertGreaterEqual(

@@ -544,6 +544,92 @@ class BackgroundUpdater:
                 The named index will be dropped upon completion of the new index.
         """
 
+        async def updater(progress: JsonDict, batch_size: int) -> int:
+            await self.create_index_in_background(
+                index_name=index_name,
+                table=table,
+                columns=columns,
+                where_clause=where_clause,
+                unique=unique,
+                psql_only=psql_only,
+                replaces_index=replaces_index,
+            )
+            await self._end_background_update(update_name)
+            return 1
+
+        self._background_update_handlers[update_name] = _BackgroundUpdateHandler(
+            updater, oneshot=True
+        )
+
+    def register_background_validate_constraint(
+        self, update_name: str, constraint_name: str, table: str
+    ) -> None:
+        """Helper for store classes to do a background validate constraint.
+
+        This only applies on PostgreSQL.
+
+        To use:
+
+        1. use a schema delta file to add a background update. Example:
+            INSERT INTO background_updates (update_name, progress_json) VALUES
+                ('validate_my_constraint', '{}');
+
+        2. In the Store constructor, call this method
+
+        Args:
+            update_name: update_name to register for
+            constraint_name: name of constraint to validate
+            table: table the constraint is applied to
+        """
+
+        def runner(conn: Connection) -> None:
+            c = conn.cursor()
+
+            sql = f"""
+            ALTER TABLE {table} VALIDATE CONSTRAINT {constraint_name};
+            """
+            logger.debug("[SQL] %s", sql)
+            c.execute(sql)
+
+        async def updater(progress: JsonDict, batch_size: int) -> int:
+            assert isinstance(
+                self.db_pool.engine, engines.PostgresEngine
+            ), "validate constraint background update registered for non-Postres database"
+
+            logger.info("Validating constraint %s to %s", constraint_name, table)
+            await self.db_pool.runWithConnection(runner)
+            await self._end_background_update(update_name)
+            return 1
+
+        self._background_update_handlers[update_name] = _BackgroundUpdateHandler(
+            updater, oneshot=True
+        )
+
+    async def create_index_in_background(
+        self,
+        index_name: str,
+        table: str,
+        columns: Iterable[str],
+        where_clause: Optional[str] = None,
+        unique: bool = False,
+        psql_only: bool = False,
+        replaces_index: Optional[str] = None,
+    ) -> None:
+        """Add an index in the background.
+
+        Args:
+            update_name: update_name to register for
+            index_name: name of index to add
+            table: table to add index to
+            columns: columns/expressions to include in index
+            where_clause: A WHERE clause to specify a partial unique index.
+            unique: true to make a UNIQUE index
+            psql_only: true to only create this index on psql databases (useful
+                for virtual sqlite tables)
+            replaces_index: The name of an index that this index replaces.
+                The named index will be dropped upon completion of the new index.
+        """
+
         def create_index_psql(conn: Connection) -> None:
             conn.rollback()
             # postgres insists on autocommit for the index
@@ -618,16 +704,11 @@ class BackgroundUpdater:
         else:
             runner = create_index_sqlite
 
-        async def updater(progress: JsonDict, batch_size: int) -> int:
-            if runner is not None:
-                logger.info("Adding index %s to %s", index_name, table)
-                await self.db_pool.runWithConnection(runner)
-            await self._end_background_update(update_name)
-            return 1
+        if runner is None:
+            return
 
-        self._background_update_handlers[update_name] = _BackgroundUpdateHandler(
-            updater, oneshot=True
-        )
+        logger.info("Adding index %s to %s", index_name, table)
+        await self.db_pool.runWithConnection(runner)
 
     async def _end_background_update(self, update_name: str) -> None:
         """Removes a completed background update task from the queue.

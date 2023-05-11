@@ -16,6 +16,8 @@ from typing import Any, Optional
 
 import attr
 
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
+from synapse.config import ConfigError
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -53,9 +55,6 @@ class ExperimentalConfig(Config):
         # MSC3266 (room summary api)
         self.msc3266_enabled: bool = experimental.get("msc3266_enabled", False)
 
-        # MSC3030 (Jump to date API endpoint)
-        self.msc3030_enabled: bool = experimental.get("msc3030_enabled", False)
-
         # MSC2409 (this setting only relates to optionally sending to-device messages).
         # Presence, typing and read receipt EDUs are already sent to application services that
         # have opted in to receive them. If enabled, this adds to-device messages to that list.
@@ -75,13 +74,27 @@ class ExperimentalConfig(Config):
             "msc3202_transaction_extensions", False
         )
 
+        # MSC3983: Proxying OTK claim requests to exclusive ASes.
+        self.msc3983_appservice_otk_claims: bool = experimental.get(
+            "msc3983_appservice_otk_claims", False
+        )
+
+        # MSC3984: Proxying key queries to exclusive ASes.
+        self.msc3984_appservice_key_query: bool = experimental.get(
+            "msc3984_appservice_key_query", False
+        )
+
         # MSC3706 (server-side support for partial state in /send_join responses)
+        # Synapse will always serve partial state responses to requests using the stable
+        # query parameter `omit_members`. If this flag is set, Synapse will also serve
+        # partial state responses to requests using the unstable query parameter
+        # `org.matrix.msc3706.partial_state`.
         self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
 
         # experimental support for faster joins over federation
         # (MSC2775, MSC3706, MSC3895)
-        # requires a target server with msc3706_enabled enabled.
-        self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
+        # requires a target server that can provide a partial join response (MSC3706)
+        self.faster_joins_enabled: bool = experimental.get("faster_joins", True)
 
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
@@ -94,6 +107,9 @@ class ExperimentalConfig(Config):
 
         # MSC2815 (allow room moderators to view redacted event content)
         self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
+
+        # MSC3391: Removing account data.
+        self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
         # MSC3773: Thread notifications
         self.msc3773_enabled: bool = experimental.get("msc3773_enabled", False)
@@ -129,5 +145,62 @@ class ExperimentalConfig(Config):
             "msc3886_endpoint", None
         )
 
+        # MSC3890: Remotely silence local notifications
+        # Note: This option requires "experimental_features.msc3391_enabled" to be
+        # set to "true", in order to communicate account data deletions to clients.
+        self.msc3890_enabled: bool = experimental.get("msc3890_enabled", False)
+        if self.msc3890_enabled and not self.msc3391_enabled:
+            raise ConfigError(
+                "Option 'experimental_features.msc3391' must be set to 'true' to "
+                "enable 'experimental_features.msc3890'. MSC3391 functionality is "
+                "required to communicate account data deletions to clients."
+            )
+
+        # MSC3381: Polls.
+        # In practice, supporting polls in Synapse only requires an implementation of
+        # MSC3930: Push rules for MSC3391 polls; which is what this option enables.
+        self.msc3381_polls_enabled: bool = experimental.get(
+            "msc3381_polls_enabled", False
+        )
+
         # MSC3912: Relation-based redactions.
         self.msc3912_enabled: bool = experimental.get("msc3912_enabled", False)
+
+        # MSC1767 and friends: Extensible Events
+        self.msc1767_enabled: bool = experimental.get("msc1767_enabled", False)
+        if self.msc1767_enabled:
+            # Enable room version (and thus applicable push rules from MSC3931/3932)
+            version_id = RoomVersions.MSC1767v10.identifier
+            KNOWN_ROOM_VERSIONS[version_id] = RoomVersions.MSC1767v10
+
+        # MSC3391: Removing account data.
+        self.msc3391_enabled = experimental.get("msc3391_enabled", False)
+
+        # MSC3952: Intentional mentions, this depends on MSC3966.
+        self.msc3952_intentional_mentions = experimental.get(
+            "msc3952_intentional_mentions", False
+        )
+
+        # MSC3959: Do not generate notifications for edits.
+        self.msc3958_supress_edit_notifs = experimental.get(
+            "msc3958_supress_edit_notifs", False
+        )
+
+        # MSC3967: Do not require UIA when first uploading cross signing keys
+        self.msc3967_enabled = experimental.get("msc3967_enabled", False)
+
+        # MSC3981: Recurse relations
+        self.msc3981_recurse_relations = experimental.get(
+            "msc3981_recurse_relations", False
+        )
+
+        # MSC3970: Scope transaction IDs to devices
+        self.msc3970_enabled = experimental.get("msc3970_enabled", False)
+
+        # MSC4009: E.164 Matrix IDs
+        self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)
+
+        # MSC4010: Do not allow setting m.push_rules account data.
+        self.msc4010_push_rules_account_data = experimental.get(
+            "msc4010_push_rules_account_data", False
+        )

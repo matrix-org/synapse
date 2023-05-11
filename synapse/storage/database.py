@@ -34,6 +34,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -57,7 +58,7 @@ from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Connection, Cursor
+from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter
 
@@ -98,6 +99,15 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "receipts_linearized": "receipts_linearized_unique_index",
     "receipts_graph": "receipts_graph_unique_index",
 }
+
+
+class _PoolConnection(Connection):
+    """
+    A Connection from twisted.enterprise.adbapi.Connection.
+    """
+
+    def reconnect(self) -> None:
+        ...
 
 
 def make_pool(
@@ -361,33 +371,56 @@ class LoggingTransaction:
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
 
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_batch
+            # suggests each arg in args should be a sequence or mapping
             self._do_execute(
                 lambda the_sql: execute_batch(self.txn, the_sql, args), sql
             )
         else:
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#sqlite3.Cursor.executemany
+            # suggests that the outer collection may be iterable, but
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#how-to-use-placeholders-to-bind-values-in-sql-queries
+            # suggests that the inner collection should be a sequence or dict.
             self.executemany(sql, args)
 
     def execute_values(
-        self, sql: str, values: Iterable[Iterable[Any]], fetch: bool = True
+        self,
+        sql: str,
+        values: Iterable[Iterable[Any]],
+        template: Optional[str] = None,
+        fetch: bool = True,
     ) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
         The `fetch` parameter must be set to False if the query does not return
         rows (e.g. INSERTs).
+
+        The `template` is the snippet to merge to every item in argslist to
+        compose the query.
         """
         assert isinstance(self.database_engine, PostgresEngine)
         from psycopg2.extras import execute_values
 
         return self._do_execute(
-            lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
+            lambda the_sql: execute_values(
+                self.txn, the_sql, values, template=template, fetch=fetch
+            ),
             sql,
         )
 
-    def execute(self, sql: str, *args: Any) -> None:
-        self._do_execute(self.txn.execute, sql, *args)
+    def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
+        self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
+        # TODO: we should add a type for *args here. Looking at Cursor.executemany
+        # and DBAPI2 it ought to be Sequence[_Parameter], but we pass in
+        # Iterable[Iterable[Any]] in execute_batch and execute_values above, which mypy
+        # complains about.
         self._do_execute(self.txn.executemany, sql, *args)
 
     def executescript(self, sql: str) -> None:
@@ -499,6 +532,7 @@ class DatabasePool:
     """
 
     _TXN_ID = 0
+    engine: BaseDatabaseEngine
 
     def __init__(
         self,
@@ -667,10 +701,19 @@ class DatabasePool:
                 )
         # also check variables referenced in func's closure
         if inspect.isfunction(func):
-            f = cast(types.FunctionType, func)
+            # Keep the cast for now---it helps PyCharm to understand what `func` is.
+            f = cast(types.FunctionType, func)  # type: ignore[redundant-cast]
             if f.__closure__:
                 for i, cell in enumerate(f.__closure__):
-                    if inspect.isgenerator(cell.cell_contents):
+                    try:
+                        contents = cell.cell_contents
+                    except ValueError:
+                        # cell.cell_contents can raise if the "cell" is empty,
+                        # which indicates that the variable is currently
+                        # unbound.
+                        continue
+
+                    if inspect.isgenerator(contents):
                         logger.error(
                             "Programming error: function %s references generator %s "
                             "via its closure",
@@ -846,7 +889,8 @@ class DatabasePool:
             try:
                 with opentracing.start_active_span(f"db.{desc}"):
                     result = await self.runWithConnection(
-                        self.new_transaction,
+                        # mypy seems to have an issue with this, maybe a bug?
+                        self.new_transaction,  # type: ignore[arg-type]
                         desc,
                         after_callbacks,
                         async_after_callbacks,
@@ -882,7 +926,7 @@ class DatabasePool:
 
     async def runWithConnection(
         self,
-        func: Callable[..., R],
+        func: Callable[Concatenate[LoggingDatabaseConnection, P], R],
         *args: Any,
         db_autocommit: bool = False,
         isolation_level: Optional[int] = None,
@@ -916,7 +960,7 @@ class DatabasePool:
 
         start_time = monotonic_time()
 
-        def inner_func(conn, *args, **kwargs):
+        def inner_func(conn: _PoolConnection, *args: P.args, **kwargs: P.kwargs) -> R:
             # We shouldn't be in a transaction. If we are then something
             # somewhere hasn't committed after doing work. (This is likely only
             # possible during startup, as `run*` will ensure changes are
@@ -1009,7 +1053,7 @@ class DatabasePool:
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
         *args: Any,
-    ) -> R:
+    ) -> Union[List[Tuple[Any, ...]], R]:
         """Runs a single query for a result set.
 
         Args:
@@ -1022,7 +1066,7 @@ class DatabasePool:
             The result of decoder(results)
         """
 
-        def interaction(txn):
+        def interaction(txn: LoggingTransaction) -> Union[List[Tuple[Any, ...]], R]:
             txn.execute(query, args)
             if decoder:
                 return decoder(txn)
@@ -1129,7 +1173,6 @@ class DatabasePool:
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
         desc: str = "simple_upsert",
-        lock: bool = True,
     ) -> bool:
         """Insert a row with values + insertion_values; on conflict, update with values.
 
@@ -1154,21 +1197,12 @@ class DatabasePool:
         requiring that a unique index exist on the column names used to detect a
         conflict (i.e. `keyvalues.keys()`).
 
-        If there is no such index, we can "emulate" an upsert with a SELECT followed
-        by either an INSERT or an UPDATE. This is unsafe: we cannot make the same
-        atomicity guarantees that a native upsert can and are very vulnerable to races
-        and crashes. Therefore if we wish to upsert without an appropriate unique index,
-        we must either:
-
-        1. Acquire a table-level lock before the emulated upsert (`lock=True`), or
-        2. VERY CAREFULLY ensure that we are the only thread and worker which will be
-           writing to this table, in which case we can proceed without a lock
-           (`lock=False`).
-
-        Generally speaking, you should use `lock=True`. If the table in question has a
-        unique index[*], this class will use a native upsert (which is atomic and so can
-        ignore the `lock` argument). Otherwise this class will use an emulated upsert,
-        in which case we want the safer option unless we been VERY CAREFUL.
+        If there is no such index yet[*], we can "emulate" an upsert with a SELECT
+        followed by either an INSERT or an UPDATE. This is unsafe unless *all* upserters
+        run at the SERIALIZABLE isolation level: we cannot make the same atomicity
+        guarantees that a native upsert can and are very vulnerable to races and
+        crashes. Therefore to upsert without an appropriate unique index, we acquire a
+        table-level lock before the emulated upsert.
 
         [*]: Some tables have unique indices added to them in the background. Those
              tables `T` are keys in the dictionary UNIQUE_INDEX_BACKGROUND_UPDATES,
@@ -1189,7 +1223,6 @@ class DatabasePool:
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
             desc: description of the transaction, for logging and metrics
-            lock: True to lock the table when doing the upsert.
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
             not empty then this always returns True)
@@ -1209,7 +1242,6 @@ class DatabasePool:
                     keyvalues,
                     values,
                     insertion_values,
-                    lock=lock,
                     db_autocommit=autocommit,
                 )
             except self.engine.module.IntegrityError as e:
@@ -1232,7 +1264,6 @@ class DatabasePool:
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
         where_clause: Optional[str] = None,
-        lock: bool = True,
     ) -> bool:
         """
         Pick the UPSERT method which works best on the platform. Either the
@@ -1245,8 +1276,6 @@ class DatabasePool:
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
             where_clause: An index predicate to apply to the upsert.
-            lock: True to lock the table when doing the upsert. Unused when performing
-                a native upsert.
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
             not empty then this always returns True)
@@ -1270,7 +1299,6 @@ class DatabasePool:
                 values,
                 insertion_values=insertion_values,
                 where_clause=where_clause,
-                lock=lock,
             )
 
     def simple_upsert_txn_emulated(
@@ -1291,14 +1319,15 @@ class DatabasePool:
             insertion_values: additional key/values to use only when inserting
             where_clause: An index predicate to apply to the upsert.
             lock: True to lock the table when doing the upsert.
+                Must not be False unless the table has already been locked.
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
             not empty then this always returns True)
         """
         insertion_values = insertion_values or {}
 
-        # We need to lock the table :(, unless we're *really* careful
         if lock:
+            # We need to lock the table :(
             self.engine.lock_table(txn, table)
 
         def _getwhere(key: str) -> str:
@@ -1406,7 +1435,6 @@ class DatabasePool:
         value_names: Collection[str],
         value_values: Collection[Collection[Any]],
         desc: str,
-        lock: bool = True,
     ) -> None:
         """
         Upsert, many times.
@@ -1418,8 +1446,6 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
-            lock: True to lock the table when doing the upsert. Unused when performing
-                a native upsert.
         """
 
         # We can autocommit if it safe to upsert
@@ -1433,7 +1459,6 @@ class DatabasePool:
             key_values,
             value_names,
             value_values,
-            lock=lock,
             db_autocommit=autocommit,
         )
 
@@ -1445,7 +1470,6 @@ class DatabasePool:
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
         value_values: Iterable[Iterable[Any]],
-        lock: bool = True,
     ) -> None:
         """
         Upsert, many times.
@@ -1457,8 +1481,6 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
-            lock: True to lock the table when doing the upsert. Unused when performing
-                a native upsert.
         """
         if table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
@@ -1466,7 +1488,12 @@ class DatabasePool:
             )
         else:
             return self.simple_upsert_many_txn_emulated(
-                txn, table, key_names, key_values, value_names, value_values, lock=lock
+                txn,
+                table,
+                key_names,
+                key_values,
+                value_names,
+                value_values,
             )
 
     def simple_upsert_many_txn_emulated(
@@ -1477,7 +1504,6 @@ class DatabasePool:
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
         value_values: Iterable[Iterable[Any]],
-        lock: bool = True,
     ) -> None:
         """
         Upsert, many times, but without native UPSERT support or batching.
@@ -1489,22 +1515,20 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
-            lock: True to lock the table when doing the upsert.
         """
         # No value columns, therefore make a blank list so that the following
         # zip() works correctly.
         if not value_names:
             value_values = [() for x in range(len(key_values))]
 
-        if lock:
-            # Lock the table just once, to prevent it being done once per row.
-            # Note that, according to Postgres' documentation, once obtained,
-            # the lock is held for the remainder of the current transaction.
-            self.engine.lock_table(txn, "user_ips")
+        # Lock the table just once, to prevent it being done once per row.
+        # Note that, according to Postgres' documentation, once obtained,
+        # the lock is held for the remainder of the current transaction.
+        self.engine.lock_table(txn, "user_ips")
 
         for keyv, valv in zip(key_values, value_values):
-            _keys = {x: y for x, y in zip(key_names, keyv)}
-            _vals = {x: y for x, y in zip(value_names, valv)}
+            _keys = dict(zip(key_names, keyv))
+            _vals = dict(zip(value_names, valv))
 
             self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=False)
 
@@ -1781,7 +1805,8 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
 
         Returns:
-            A list of dictionaries.
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         return await self.runInteraction(
             desc,
@@ -1810,6 +1835,10 @@ class DatabasePool:
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+
+        Returns:
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
@@ -1833,7 +1862,7 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
-    ) -> List[Any]:
+    ) -> List[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1917,6 +1946,19 @@ class DatabasePool:
         updatevalues: Dict[str, Any],
         desc: str,
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+            desc: description of the transaction, for logging and metrics.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         return await self.runInteraction(
             desc, self.simple_update_txn, table, keyvalues, updatevalues
         )
@@ -1928,6 +1970,19 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            txn: The database transaction object.
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         if keyvalues:
             where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
         else:

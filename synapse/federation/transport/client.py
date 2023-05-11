@@ -16,6 +16,7 @@
 import logging
 import urllib
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Collection,
@@ -32,7 +33,7 @@ from typing import (
 import attr
 import ijson
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Direction, Membership
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.api.urls import (
@@ -42,10 +43,13 @@ from synapse.api.urls import (
 )
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
-from synapse.http.matrixfederationclient import ByteParser
+from synapse.http.matrixfederationclient import ByteParser, LegacyJsonSendParser
 from synapse.http.types import QueryParams
 from synapse.types import JsonDict
 from synapse.util import ExceptionBundle
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +57,10 @@ logger = logging.getLogger(__name__)
 class TransportLayerClient:
     """Sends federation HTTP requests to other servers"""
 
-    def __init__(self, hs):
-        self.server_name = hs.hostname
+    def __init__(self, hs: "HomeServer"):
         self.client = hs.get_federation_http_client()
         self._faster_joins_enabled = hs.config.experimental.faster_joins_enabled
+        self._is_mine_server_name = hs.is_mine_server_name
 
     async def get_room_state_ids(
         self, destination: str, room_id: str, event_id: str
@@ -102,6 +106,10 @@ class TransportLayerClient:
             destination,
             path=path,
             args={"event_id": event_id},
+            # This can take a looooooong time for large rooms. Give this a generous
+            # timeout of 10 minutes to avoid the partial state resync timing out early
+            # and trying a bunch of servers who haven't seen our join yet.
+            timeout=600_000,
             parser=_StateParser(room_version),
         )
 
@@ -129,7 +137,7 @@ class TransportLayerClient:
 
     async def backfill(
         self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
-    ) -> Optional[JsonDict]:
+    ) -> Optional[Union[JsonDict, list]]:
         """Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
@@ -165,7 +173,7 @@ class TransportLayerClient:
         )
 
     async def timestamp_to_event(
-        self, destination: str, room_id: str, timestamp: int, direction: str
+        self, destination: str, room_id: str, timestamp: int, direction: Direction
     ) -> Union[JsonDict, List]:
         """
         Calls a remote federating server at `destination` asking for their
@@ -176,7 +184,7 @@ class TransportLayerClient:
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -185,13 +193,12 @@ class TransportLayerClient:
         Raises:
             Various exceptions when the request fails
         """
-        path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX,
-            "/org.matrix.msc3030/timestamp_to_event/%s",
+        path = _create_v1_path(
+            "/timestamp_to_event/%s",
             room_id,
         )
 
-        args = {"ts": [str(timestamp)], "dir": [direction]}
+        args = {"ts": [str(timestamp)], "dir": [direction.value]}
 
         remote_response = await self.client.get_json(
             destination, path=path, args=args, try_trailing_slash_on_400=True
@@ -228,7 +235,7 @@ class TransportLayerClient:
             transaction.transaction_id,
         )
 
-        if transaction.destination == self.server_name:
+        if self._is_mine_server_name(transaction.destination):
             raise RuntimeError("Transport layer cannot send to itself!")
 
         # FIXME: This is only used by the tests. The actual json sent is
@@ -352,12 +359,16 @@ class TransportLayerClient:
         room_id: str,
         event_id: str,
         content: JsonDict,
+        omit_members: bool,
     ) -> "SendJoinResponse":
         path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
         query_params: Dict[str, str] = {}
         if self._faster_joins_enabled:
             # lazy-load state on join
-            query_params["org.matrix.msc3706.partial_state"] = "true"
+            query_params["org.matrix.msc3706.partial_state"] = (
+                "true" if omit_members else "false"
+            )
+            query_params["omit_members"] = "true" if omit_members else "false"
 
         return await self.client.put_json(
             destination=destination,
@@ -381,6 +392,7 @@ class TransportLayerClient:
             # server was just having a momentary blip, the room will be out of
             # sync.
             ignore_backoff=True,
+            parser=LegacyJsonSendParser(),
         )
 
     async def send_leave_v2(
@@ -438,7 +450,11 @@ class TransportLayerClient:
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+            parser=LegacyJsonSendParser(),
         )
 
     async def send_invite_v2(
@@ -634,10 +650,10 @@ class TransportLayerClient:
 
         Response:
             {
-              "device_keys": {
+              "one_time_keys": {
                 "<user_id>": {
                   "<device_id>": {
-                    "<algorithm>:<key_id>": "<key_base64>"
+                    "<algorithm>:<key_id>": <OTK JSON>
                   }
                 }
               }
@@ -653,7 +669,50 @@ class TransportLayerClient:
         path = _create_v1_path("/user/keys/claim")
 
         return await self.client.post_json(
-            destination=destination, path=path, data=query_content, timeout=timeout
+            destination=destination,
+            path=path,
+            data={"one_time_keys": query_content},
+            timeout=timeout,
+        )
+
+    async def claim_client_keys_unstable(
+        self, destination: str, query_content: JsonDict, timeout: Optional[int]
+    ) -> JsonDict:
+        """Claim one-time keys for a list of devices hosted on a remote server.
+
+        Request:
+            {
+              "one_time_keys": {
+                "<user_id>": {
+                  "<device_id>": {"<algorithm>": <count>}
+                }
+              }
+            }
+
+        Response:
+            {
+              "one_time_keys": {
+                "<user_id>": {
+                  "<device_id>": {
+                    "<algorithm>:<key_id>": <OTK JSON>
+                  }
+                }
+              }
+            }
+
+        Args:
+            destination: The server to query.
+            query_content: The user ids to query.
+        Returns:
+            A dict containing the one-time keys.
+        """
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/user/keys/claim")
+
+        return await self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"one_time_keys": query_content},
+            timeout=timeout,
         )
 
     async def get_missing_events(
@@ -795,7 +854,7 @@ class SendJoinResponse:
     event: Optional[EventBase] = None
 
     # The room state is incomplete
-    partial_state: bool = False
+    members_omitted: bool = False
 
     # List of servers in the room
     servers_in_room: Optional[List[str]] = None
@@ -835,16 +894,18 @@ def _event_list_parser(
 
 
 @ijson.coroutine
-def _partial_state_parser(response: SendJoinResponse) -> Generator[None, Any, None]:
+def _members_omitted_parser(response: SendJoinResponse) -> Generator[None, Any, None]:
     """Helper function for use with `ijson.items_coro`
 
-    Parses the partial_state field in send_join responses
+    Parses the members_omitted field in send_join responses
     """
     while True:
         val = yield
         if not isinstance(val, bool):
-            raise TypeError("partial_state must be a boolean")
-        response.partial_state = val
+            raise TypeError(
+                "members_omitted (formerly org.matrix.msc370c.partial_state) must be a boolean"
+            )
+        response.members_omitted = val
 
 
 @ijson.coroutine
@@ -905,8 +966,16 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
         if not v1_api:
             self._coros.append(
                 ijson.items_coro(
-                    _partial_state_parser(self._response),
+                    _members_omitted_parser(self._response),
                     "org.matrix.msc3706.partial_state",
+                    use_float="True",
+                )
+            )
+            # The stable field name comes last, so it "wins" if the fields disagree
+            self._coros.append(
+                ijson.items_coro(
+                    _members_omitted_parser(self._response),
+                    "members_omitted",
                     use_float="True",
                 )
             )
@@ -915,6 +984,15 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
                 ijson.items_coro(
                     _servers_in_room_parser(self._response),
                     "org.matrix.msc3706.servers_in_room",
+                    use_float="True",
+                )
+            )
+
+            # Again, stable field name comes last
+            self._coros.append(
+                ijson.items_coro(
+                    _servers_in_room_parser(self._response),
+                    "servers_in_room",
                     use_float="True",
                 )
             )

@@ -26,7 +26,6 @@ endpoint = "/_matrix/client/unstable/org.matrix.msc3882/login/token"
 
 
 class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         login.register_servlets,
         admin.register_servlets,
@@ -48,13 +47,13 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
     def test_disabled(self) -> None:
         channel = self.make_request("POST", endpoint, {}, access_token=None)
-        self.assertEqual(channel.code, 400)
+        self.assertEqual(channel.code, 404)
 
         self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
         channel = self.make_request("POST", endpoint, {}, access_token=token)
-        self.assertEqual(channel.code, 400)
+        self.assertEqual(channel.code, 404)
 
     @override_config({"experimental_features": {"msc3882_enabled": True}})
     def test_require_auth(self) -> None:

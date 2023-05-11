@@ -174,7 +174,7 @@ class JsonResourceTests(unittest.TestCase):
             self.reactor, FakeSite(res, self.reactor), b"GET", b"/_matrix/foobar"
         )
 
-        self.assertEqual(channel.code, 400)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
@@ -265,6 +265,10 @@ class OptionsResourceTests(unittest.TestCase):
             channel.headers.getRawHeaders(b"Access-Control-Allow-Headers"),
             [b"X-Requested-With, Content-Type, Authorization, Date"],
             "has correct CORS Headers header",
+        )
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
+            [b"Synapse-Trace-Id"],
         )
 
     def _check_cors_msc3886_headers(self, channel: FakeChannel) -> None:

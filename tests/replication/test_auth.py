@@ -13,7 +13,11 @@
 # limitations under the License.
 import logging
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.rest.client import register
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import FakeChannel, make_request
@@ -27,7 +31,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
 
     servlets = [register.register_servlets]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         # This isn't a real configuration option but is used to provide the main
         # homeserver and worker homeserver different options.
@@ -38,10 +42,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
 
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
-        config["worker_app"] = "synapse.app.client_reader"
-        config["worker_replication_host"] = "testserv"
-        config["worker_replication_http_port"] = "8765"
-
+        config["worker_app"] = "synapse.app.generic_worker"
         return config
 
     def _test_register(self) -> FakeChannel:
@@ -53,7 +54,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         4. Return the final request.
 
         """
-        worker_hs = self.make_worker_hs("synapse.app.client_reader")
+        worker_hs = self.make_worker_hs("synapse.app.generic_worker")
         site = self._hs_to_site[worker_hs]
 
         channel_1 = make_request(
@@ -77,7 +78,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
             {"auth": {"session": session, "type": "m.login.dummy"}},
         )
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """With no authentication the request should finish."""
         channel = self._test_register()
         self.assertEqual(channel.code, 200)
@@ -86,7 +87,7 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(channel.json_body["user_id"], "@user:test")
 
     @override_config({"main_replication_secret": "my-secret"})
-    def test_missing_auth(self):
+    def test_missing_auth(self) -> None:
         """If the main process expects a secret that is not provided, an error results."""
         channel = self._test_register()
         self.assertEqual(channel.code, 500)
@@ -97,13 +98,13 @@ class WorkerAuthenticationTestCase(BaseMultiWorkerStreamTestCase):
             "worker_replication_secret": "wrong-secret",
         }
     )
-    def test_unauthorized(self):
+    def test_unauthorized(self) -> None:
         """If the main process receives the wrong secret, an error results."""
         channel = self._test_register()
         self.assertEqual(channel.code, 500)
 
     @override_config({"worker_replication_secret": "my-secret"})
-    def test_authorized(self):
+    def test_authorized(self) -> None:
         """The request should finish when the worker provides the authentication header."""
         channel = self._test_register()
         self.assertEqual(channel.code, 200)

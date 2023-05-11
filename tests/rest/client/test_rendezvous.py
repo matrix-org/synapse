@@ -25,7 +25,6 @@ endpoint = "/_matrix/client/unstable/org.matrix.msc3886/rendezvous"
 
 
 class RendezvousServletTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         rendezvous.register_servlets,
     ]
@@ -36,7 +35,7 @@ class RendezvousServletTestCase(unittest.HomeserverTestCase):
 
     def test_disabled(self) -> None:
         channel = self.make_request("POST", endpoint, {}, access_token=None)
-        self.assertEqual(channel.code, 400)
+        self.assertEqual(channel.code, 404)
 
     @override_config({"experimental_features": {"msc3886_endpoint": "/asd"}})
     def test_redirect(self) -> None:

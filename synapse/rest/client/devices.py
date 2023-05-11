@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 class DevicesRestServlet(RestServlet):
     PATTERNS = client_patterns("/devices$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -123,6 +124,7 @@ class DeleteDevicesRestServlet(RestServlet):
 
 class DeviceRestServlet(RestServlet):
     PATTERNS = client_patterns("/devices/(?P<device_id>[^/]*)$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -255,7 +257,7 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
-    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device", releases=())
+    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device$", releases=())
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -342,8 +344,10 @@ class ClaimDehydratedDeviceServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    DeleteDevicesRestServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
-    DeviceRestServlet(hs).register(http_server)
-    DehydratedDeviceServlet(hs).register(http_server)
-    ClaimDehydratedDeviceServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        DeviceRestServlet(hs).register(http_server)
+        DehydratedDeviceServlet(hs).register(http_server)
+        ClaimDehydratedDeviceServlet(hs).register(http_server)

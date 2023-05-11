@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, List, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, List, Tuple, Union
 
 from synapse.api.errors import (
     NotFoundError,
@@ -28,7 +28,6 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.http.site import SynapseRequest
-from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
@@ -43,6 +42,9 @@ class PushRuleRestServlet(RestServlet):
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash"
     )
+
+    WORKERS_DENIED_METHODS = ["PUT", "DELETE"]
+    CATEGORY = "Push rule requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -143,14 +145,12 @@ class PushRuleRestServlet(RestServlet):
 
     async def on_GET(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester.user.to_string()
 
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rules_raw = await self.store.get_push_rules_for_user(user_id)
-
-        rules = format_push_rules_for_user(requester.user, rules_raw)
+        rules = await self._push_rules_handler.push_rules_for_user(requester.user)
 
         path_parts = path.split("/")[1:]
 
@@ -169,7 +169,7 @@ class PushRuleRestServlet(RestServlet):
             raise UnrecognizedRequestError()
 
 
-def _rule_spec_from_path(path: Sequence[str]) -> RuleSpec:
+def _rule_spec_from_path(path: List[str]) -> RuleSpec:
     """Turn a sequence of path components into a rule spec
 
     Args:

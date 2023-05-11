@@ -136,6 +136,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # Send a first event, which should be filtered out at the end of the test.
         resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
         first_event_id = resp.get("event_id")
+        assert isinstance(first_event_id, str)
 
         # Advance the time by 2 days. We're using the default retention policy, therefore
         # after this the first event will still be valid.
@@ -144,6 +145,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # Send another event, which shouldn't get filtered out.
         resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
         valid_event_id = resp.get("event_id")
+        assert isinstance(valid_event_id, str)
 
         # Advance the time by another 2 days. After this, the first event should be
         # outdated but not the second one.
@@ -229,7 +231,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         # Check that we can still access state events that were sent before the event that
         # has been purged.
-        self.get_event(room_id, create_event.event_id)
+        self.get_event(room_id, bool(create_event))
 
     def get_event(self, event_id: str, expect_none: bool = False) -> JsonDict:
         event = self.get_success(self.store.get_event(event_id, allow_none=True))
@@ -238,7 +240,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
             self.assertIsNone(event)
             return {}
 
-        self.assertIsNotNone(event)
+        assert event is not None
 
         time_now = self.clock.time_msec()
         serialized = self.serializer.serialize_event(event, time_now)

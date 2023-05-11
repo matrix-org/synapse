@@ -78,4 +78,4 @@ If you would like to set up your own statistics collection server and send metri
 consider using one of the following known implementations:
 
 * [Matrix.org's Panopticon](https://github.com/matrix-org/panopticon)
-* [Famedly's Barad-dûr](https://gitlab.com/famedly/company/devops/services/barad-dur)
+* [Famedly's Barad-dûr](https://gitlab.com/famedly/infra/services/barad-dur)
