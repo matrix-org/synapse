@@ -1779,6 +1779,77 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1840"><a class="header" href="#upgrading-to-v1840">Upgrading to v1.84.0</a></h1>
+<h2 id="deprecation-of-worker_replication_-configuration-settings"><a class="header" href="#deprecation-of-worker_replication_-configuration-settings">Deprecation of <code>worker_replication_*</code> configuration settings</a></h2>
+<p>When using workers, </p>
+<ul>
+<li><code>worker_replication_host</code></li>
+<li><code>worker_replication_http_port</code></li>
+<li><code>worker_replication_http_tls</code></li>
+</ul>
+<p>can now be removed from individual worker YAML configuration <em><strong>if</strong></em> you add the main process to the <code>instance_map</code> in the shared YAML configuration,
+using the name <code>main</code>.</p>
+<h3 id="before"><a class="header" href="#before">Before:</a></h3>
+<p>Shared YAML</p>
+<pre><code class="language-yaml">instance_map:
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+</code></pre>
+<p>Worker YAML</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_replication_host: localhost
+worker_replication_http_port: 3456
+worker_replication_http_tls: false
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+</code></pre>
+<h3 id="after"><a class="header" href="#after">After:</a></h3>
+<p>Shared YAML</p>
+<pre><code class="language-yaml">instance_map:
+  main:
+    host: localhost
+    port: 3456
+    tls: false
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+</code></pre>
+<p>Worker YAML</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+
+</code></pre>
+<p>Notes: </p>
+<ul>
+<li><code>tls</code> is optional but mirrors the functionality of <code>worker_replication_http_tls</code></li>
+</ul>
 <h1 id="upgrading-to-v1810"><a class="header" href="#upgrading-to-v1810">Upgrading to v1.81.0</a></h1>
 <h2 id="application-service-path--authentication-deprecations"><a class="header" href="#application-service-path--authentication-deprecations">Application service path &amp; authentication deprecations</a></h2>
 <p>Synapse now attempts the versioned appservice paths before falling back to the
@@ -6894,13 +6965,17 @@ events may be dropped).</p>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
 <p>When using workers this should be a map from <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a> to the
-HTTP replication listener of the worker, if configured.
+HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under <a href="usage/configuration/../../workers.html#stream-writers"><code>stream_writers</code></a> needs
 a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the <code>instance_map</code>.)</p>
+The main process also needs an entry on the <code>instance_map</code>, and it should be listed under
+<code>main</code> <strong>if even one other worker exists</strong>. Ensure the port matches with what is declared 
+inside the <code>listener</code> block for a <code>replication</code> listener.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
@@ -7006,6 +7081,7 @@ giving each worker a unique <code>worker_name</code>.</p>
 </code></pre>
 <hr />
 <h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>host</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
@@ -7014,6 +7090,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>port</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
@@ -7022,6 +7099,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_tls"><a class="header" href="#worker_replication_http_tls"><code>worker_replication_http_tls</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>tls</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
 The main Synapse process defines this with the <code>tls</code> option on its <a href="usage/configuration/config_documentation.html#listeners">listener</a> that
@@ -7039,9 +7117,9 @@ See <a href="usage/configuration/config_documentation.html#worker_replication_se
 <p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option
 must be declared, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>
 in the shared config.</p>
-<p>Workers declared in <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a> will need to include a
-<code>replication</code> listener here, in order to accept internal HTTP requests from
-other workers.</p>
+<p>Workers declared in <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a> and <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a>
+will need to include a <code>replication</code> listener here, in order to accept internal HTTP 
+requests from other workers.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">worker_listeners:
   - type: http
@@ -10653,13 +10731,21 @@ the processes.</p>
 need its own configuration file and can take all of its configuration from the
 shared configuration file.</p>
 <h3 id="shared-configuration"><a class="header" href="#shared-configuration">Shared configuration</a></h3>
-<p>Normally, only a couple of changes are needed to make an existing configuration
-file suitable for use with workers. First, you need to enable an
+<p>Normally, only a few changes are needed to make an existing configuration
+file suitable for use with workers:</p>
+<ul>
+<li>First, you need to enable an
 <a href="usage/configuration/config_documentation.html#listeners">&quot;HTTP replication listener&quot;</a>
-for the main process; and secondly, you need to enable
-<a href="usage/configuration/config_documentation.html#redis">redis-based replication</a>.
-Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
-can be used to authenticate HTTP traffic between workers. For example:</p>
+for the main process</li>
+<li>Secondly, you need to enable
+<a href="usage/configuration/config_documentation.html#redis">redis-based replication</a></li>
+<li>You will need to add an <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> 
+with the <code>main</code> process defined, as well as the relevant connection information from 
+it's HTTP <code>replication</code> listener (defined in step 1 above). Note that the <code>host</code> defined 
+is the address the worker needs to look for the <code>main</code> process at, not necessarily the same address that is bound to.</li>
+<li>Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
+can be used to authenticate HTTP traffic between workers. For example:</li>
+</ul>
 <pre><code class="language-yaml"># extend the existing `listeners` section. This defines the ports that the
 # main process will listen on.
 listeners:
@@ -10675,6 +10761,11 @@ worker_replication_secret: &quot;&quot;
 
 redis:
     enabled: true
+
+instance_map:
+    main:
+        host: 'localhost'
+        port: 9093
 </code></pre>
 <p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a>
 for the full documentation of each option.</p>
@@ -10691,21 +10782,17 @@ is configured</li>
 <li>The type of worker (<a href="usage/configuration/config_documentation.html#worker_app"><code>worker_app</code></a>).
 The currently available worker applications are listed <a href="workers.html#available-worker-applications">below</a>.</li>
 <li>A unique name for the worker (<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>).</li>
-<li>The HTTP replication endpoint that it should talk to on the main synapse process
-(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
-<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>).</li>
 <li>If handling HTTP requests, a <a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a> option
 with an <code>http</code> listener.</li>
 <li><strong>Synapse 1.72 and older:</strong> if handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>). This config option is no longer required and is ignored when running Synapse 1.73 and newer.</li>
+<li><strong>Synapse 1.83 and older:</strong> The HTTP replication endpoint that the worker should talk to on the main synapse process
+(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
+<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>). If using Synapse 1.84 and newer, these are not needed if <code>main</code> is defined on the <a href="workers.html#shared-configuration">shared configuration</a> <code>instance_map</code></li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: generic_worker1
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http
@@ -10960,15 +11047,22 @@ effects of bursts of events from that bridge on events sent by normal users.</p>
 <h4 id="stream-writers"><a class="header" href="#stream-writers">Stream writers</a></h4>
 <p>Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.</p>
-<p>To enable this, the worker must have a
-<a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,
-have a <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
+<p>To enable this, the worker must have:</p>
+<ul>
+<li>An <a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,</li>
+<li>Have a <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
 and be listed in the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a>
-config. The same worker can handle multiple streams, but unless otherwise documented,
+config. </li>
+<li>Have the main process declared on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> as well.</li>
+</ul>
+<p>Note: The same worker can handle multiple streams, but unless otherwise documented,
 each stream can only have a single writer.</p>
 <p>For example, to move event persistence off to a dedicated worker, the shared
 configuration would include:</p>
 <pre><code class="language-yaml">instance_map:
+    main:
+        host: localhost
+        port: 8030
     event_persister1:
         host: localhost
         port: 8034
@@ -11340,10 +11434,6 @@ configuration files and reverse-proxy correctly.
 Below is a sample <code>generic_worker</code> worker configuration file.</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: generic_worker1
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http

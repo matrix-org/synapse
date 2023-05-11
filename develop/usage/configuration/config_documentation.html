@@ -3477,13 +3477,17 @@ events may be dropped).</p>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
 <p>When using workers this should be a map from <a href="#worker_name"><code>worker_name</code></a> to the
-HTTP replication listener of the worker, if configured.
+HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under <a href="../../workers.html#stream-writers"><code>stream_writers</code></a> needs
 a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the <code>instance_map</code>.)</p>
+The main process also needs an entry on the <code>instance_map</code>, and it should be listed under
+<code>main</code> <strong>if even one other worker exists</strong>. Ensure the port matches with what is declared 
+inside the <code>listener</code> block for a <code>replication</code> listener.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
@@ -3589,6 +3593,7 @@ giving each worker a unique <code>worker_name</code>.</p>
 </code></pre>
 <hr />
 <h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>host</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="#listeners"><code>listeners</code> option</a>.</p>
@@ -3597,6 +3602,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>port</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="#listeners"><code>listeners</code> option</a>.</p>
@@ -3605,6 +3611,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_tls"><a class="header" href="#worker_replication_http_tls"><code>worker_replication_http_tls</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>tls</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
 The main Synapse process defines this with the <code>tls</code> option on its <a href="#listeners">listener</a> that
@@ -3622,9 +3629,9 @@ See <a href="#worker_replication_secret"><code>worker_replication_secret</code><
 <p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option
 must be declared, in the same way as the <a href="#listeners"><code>listeners</code> option</a>
 in the shared config.</p>
-<p>Workers declared in <a href="#stream_writers"><code>stream_writers</code></a> will need to include a
-<code>replication</code> listener here, in order to accept internal HTTP requests from
-other workers.</p>
+<p>Workers declared in <a href="#stream_writers"><code>stream_writers</code></a> and <a href="#instance_map"><code>instance_map</code></a>
+will need to include a <code>replication</code> listener here, in order to accept internal HTTP 
+requests from other workers.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">worker_listeners:
   - type: http
