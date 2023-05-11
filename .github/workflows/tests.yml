@@ -328,7 +328,7 @@ jobs:
       # build-system section (https://github.com/python-poetry/poetry/issues/6154), but
       # we explicitly want to test that you can `pip install` using the oldest version
       # of poetry-core and setuptools-rust.
-      - run: pip install .[all, test]
+      - run: pip install .[all,test]
       # Sanity check we can import/run Synapse
       - run: python -m synapse.app.homeserver --help
 
