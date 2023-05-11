@@ -19,6 +19,7 @@ import os
 import signal
 import socket
 import sys
+from textwrap import indent
 import traceback
 import warnings
 from typing import (
@@ -208,22 +209,28 @@ def quit_with_error(error_string: str) -> NoReturn:
     sys.exit(1)
 
 
-# Get the full class name like `psycopg2.OperationalError` instead of just
-# `OperationalError` which a naive `type(e).__name__` would give.
-# via https://stackoverflow.com/a/58045927/796832
-def get_full_class_name(obj) -> str:
-    module = obj.__class__.__module__
-    if module is None or module == str.__class__.__module__:
-        return obj.__class__.__name__
-    return module + "." + obj.__class__.__name__
+# via https://peps.python.org/pep-3134/#enhanced-reporting
+def format_exception_chain(exc: Exception) -> str:
+    if exc.__cause__:
+        result = format_exception_chain(exc.__cause__)
+        result += "\nThe above exception was the direct cause..."
+    elif exc.__context__:
+        result = format_exception_chain(exc.__context__)
+        result += "\nDuring handling of the above exception, ..."
+
+    return "".join(traceback.format_exception(exc))
 
 
 def handle_startup_exception(e: Exception) -> NoReturn:
     # Exceptions that occur between setting up the logging and forking or starting
     # the reactor are written to the logs, followed by a summary to stderr.
     logger.exception("Exception during startup")
+
+    error_string = format_exception_chain(e)
+    indendeted_error_string = indent(error_string, "    ")
+
     quit_with_error(
-        f"Error during initialisation:\n   {get_full_class_name(e)}: {e}\nThere may be more information in the logs."
+        f"Error during initialisation:\n{indendeted_error_string}\nThere may be more information in the logs."
     )
 
 
