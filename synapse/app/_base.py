@@ -215,10 +215,10 @@ def handle_startup_exception(e: Exception) -> NoReturn:
     logger.exception("Exception during startup")
 
     error_string = "".join(traceback.format_exception(e))
-    indendeted_error_string = indent(error_string, "    ")
+    indented_error_string = indent(error_string, "    ")
 
     quit_with_error(
-        f"Error during initialisation:\n{indendeted_error_string}\nThere may be more information in the logs."
+        f"Error during initialisation:\n{indented_error_string}\nThere may be more information in the logs."
     )
 
 
