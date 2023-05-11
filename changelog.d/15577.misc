@@ -1,0 +1,1 @@
+Expose `run_as_background_process` in the module API.
