@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       rust: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.rust }}
+      dependencies: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.dependencies }}
     steps:
     - uses: dorny/paths-filter@v2
       id: filter
