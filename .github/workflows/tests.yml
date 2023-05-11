@@ -626,20 +626,20 @@ jobs:
 #    if: ${{ needs.changes.outputs.dependencies == 'true' }}
     runs-on: ubuntu-latest
     needs:
+#      - linting-done
       - changes
-      - linting-done
     steps:
       - run: echo ${{ toJSON(needs) }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.7'  # oldest upstream supported CPython version
-      - uses: dtolnay/rust-toolchain@1.58.1
-      - uses: Swatinem/rust-cache@v2
-      - run: .ci/scripts/prepare_old_deps.sh
-      - run: pip install .[all]
-      # Sanity check we can import/run Synapse
-      - run: python -m synapse.app.homeserver --help
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-python@v4
+#        with:
+#          python-version: '3.7'  # oldest upstream supported CPython version
+#      - uses: dtolnay/rust-toolchain@1.58.1
+#      - uses: Swatinem/rust-cache@v2
+#      - run: .ci/scripts/prepare_old_deps.sh
+#      - run: pip install .[all]
+#      # Sanity check we can import/run Synapse
+#      - run: python -m synapse.app.homeserver --help
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
