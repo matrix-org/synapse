@@ -638,6 +638,11 @@ jobs:
           python-version: '3.7'  # oldest upstream supported CPython version
       - uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
+      # There aren't wheels for some of the older deps, so we need to install
+      # their build dependencies
+      - run: |
+          sudo apt-get -qq install build-essential libffi-dev python-dev \
+          libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
       - run: .ci/scripts/prepare_old_deps.sh
       - run: pip install .[all]
       # Sanity check we can import/run Synapse
