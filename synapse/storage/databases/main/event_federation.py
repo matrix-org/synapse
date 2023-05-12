@@ -1606,6 +1606,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             desc="get_event_failed_pull_attempt_info",
         )
 
+        if res is None:
+            return None
+
         return EventFailedPullAttemptInfo(
             event_id=event_id,
             room_id=room_id,
