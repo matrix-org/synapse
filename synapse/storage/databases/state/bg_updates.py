@@ -21,7 +21,7 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import MutableStateMap, StateMap
 from synapse.types.state import StateFilter
 from synapse.util.caches import intern_string
@@ -189,14 +189,14 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     )
                 )
 
-            overall_select_clause = (
-                " UNION ".join(select_clause_list)
+            overall_select_clause = " UNION ".join(select_clause_list)
+
+            if isinstance(self.database_engine, Sqlite3Engine):
                 # We `ORDER` after the union results because it's compatible with both
                 # Postgres and SQLite. And we need the rows to by ordered by
-                # `state_group` in both cases so the greatest state_group pairs are
-                # first and we only care about the first distinct (type, state_key) pair later on.
-                + " ORDER BY type, state_key, state_group DESC"
-            )
+                # `state_group` so the greatest state_group pairs are first and we only
+                # care about the first distinct (type, state_key) pair later on.
+                overall_select_clause += " ORDER BY type, state_key, state_group DESC"
         else:
             where_clause, where_args = state_filter.make_sql_filter_clause()
             # Unless the filter clause is empty, we're going to append it after an
