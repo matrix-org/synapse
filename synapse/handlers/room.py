@@ -1703,6 +1703,45 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         return self.store.get_current_room_stream_token_for_room_id(room_id)
 
 
+class ShutdownRoomParams(TypedDict):
+    """
+    Attributes:
+        requester_user_id:
+            User who requested the action. Will be recorded as putting the room on the
+            blocking list.
+        new_room_user_id:
+            If set, a new room will be created with this user ID
+            as the creator and admin, and all users in the old room will be
+            moved into that room. If not set, no new room will be created
+            and the users will just be removed from the old room.
+        new_room_name:
+            A string representing the name of the room that new users will
+            be invited to. Defaults to `Content Violation Notification`
+        message:
+            A string containing the first message that will be sent as
+            `new_room_user_id` in the new room. Ideally this will clearly
+            convey why the original room was shut down.
+            Defaults to `Sharing illegal content on this server is not
+            permitted and rooms in violation will be blocked.`
+        block:
+            If set to `true`, this room will be added to a blocking list,
+            preventing future attempts to join the room. Defaults to `false`.
+        purge:
+            If set to `true`, purge the given room from the database.
+        force_purge:
+            If set to `true`, the room will be purged from database
+            also if it fails to remove some users from room.
+    """
+
+    requester_user_id: str
+    new_room_user_id: Optional[str]
+    new_room_name: Optional[str]
+    message: Optional[str]
+    block: bool
+    purge: bool
+    force_purge: bool
+
+
 class ShutdownRoomResponse(TypedDict):
     """
     Attributes:
@@ -1719,6 +1758,46 @@ class ShutdownRoomResponse(TypedDict):
     failed_to_kick_users: List[str]
     local_aliases: List[str]
     new_room_id: Optional[str]
+
+
+@attr.s(slots=True, auto_attribs=True)
+class DeleteStatus:
+    """Object tracking the status of a delete room request
+
+    This class contains information on the progress of a delete room request, for
+    return by get_delete_status.
+    """
+
+    STATUS_PURGING = "purging"
+    STATUS_COMPLETE = "complete"
+    STATUS_FAILED = "failed"
+    STATUS_SHUTTING_DOWN = "shutting_down"
+    # Purge waiting to be launch at a specific time
+    STATUS_WAIT_PURGE = "wait_purge"
+
+    # Tracks whether this request has completed.
+    # One of STATUS_{PURGING,COMPLETE,FAILED,SHUTTING_DOWN,WAIT_PURGE}.
+    status: str = STATUS_PURGING
+
+    # Save the error message if an error occurs
+    error: str = ""
+
+    # Saves the result of an action to give it back to REST API
+    shutdown_room: ShutdownRoomResponse = {
+        "kicked_users": [],
+        "failed_to_kick_users": [],
+        "local_aliases": [],
+        "new_room_id": None,
+    }
+
+    def asdict(self) -> JsonDict:
+        ret = {
+            "status": self.status,
+            "shutdown_room": self.shutdown_room,
+        }
+        if self.error:
+            ret["error"] = self.error
+        return ret
 
 
 class RoomShutdownHandler:

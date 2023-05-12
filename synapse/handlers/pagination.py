@@ -72,51 +72,6 @@ class PurgeStatus:
         return ret
 
 
-@attr.s(slots=True, auto_attribs=True)
-class DeleteStatus:
-    """Object tracking the status of a delete room request
-
-    This class contains information on the progress of a delete room request, for
-    return by get_delete_status.
-    """
-
-    STATUS_PURGING = 0
-    STATUS_COMPLETE = 1
-    STATUS_FAILED = 2
-    STATUS_SHUTTING_DOWN = 3
-
-    STATUS_TEXT = {
-        STATUS_PURGING: "purging",
-        STATUS_COMPLETE: "complete",
-        STATUS_FAILED: "failed",
-        STATUS_SHUTTING_DOWN: "shutting_down",
-    }
-
-    # Tracks whether this request has completed.
-    # One of STATUS_{PURGING,COMPLETE,FAILED,SHUTTING_DOWN}.
-    status: int = STATUS_PURGING
-
-    # Save the error message if an error occurs
-    error: str = ""
-
-    # Saves the result of an action to give it back to REST API
-    shutdown_room: ShutdownRoomResponse = {
-        "kicked_users": [],
-        "failed_to_kick_users": [],
-        "local_aliases": [],
-        "new_room_id": None,
-    }
-
-    def asdict(self) -> JsonDict:
-        ret = {
-            "status": DeleteStatus.STATUS_TEXT[self.status],
-            "shutdown_room": self.shutdown_room,
-        }
-        if self.error:
-            ret["error"] = self.error
-        return ret
-
-
 class PaginationHandler:
     """Handles pagination and purge history requests.
 
