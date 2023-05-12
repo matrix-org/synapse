@@ -175,13 +175,17 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                         INNER JOIN sgs USING (state_group)
                         WHERE {where_clause}
                         """,
-                        # The `LIMIT` is an extra nicety that saves us from having to
-                        # ferry a bunch of duplicate state pairs back from the database
-                        # since we only need the one with the greatest state_group (most
-                        # recent). Since this only applies to postgres, we do have to be
-                        # careful to take care of the duplicate pairs in the downstream
-                        # code when running with SQLite.
-                        "LIMIT 1",
+                        # The `ORDER BY`/`LIMIT` is an extra nicety that saves us from
+                        # having to ferry a bunch of duplicate state pairs back from the
+                        # database since we only need the one with the greatest
+                        # state_group (most recent). Since this only applies to
+                        # postgres, we do have to be careful to take care of the
+                        # duplicate pairs in the downstream code when running with
+                        # SQLite.
+                        """
+                        ORDER BY type, state_key, state_group DESC
+                        LIMIT 1
+                        """,
                     )
                 )
 
