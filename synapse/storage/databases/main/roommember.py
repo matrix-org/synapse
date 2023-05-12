@@ -17,6 +17,7 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
+    Any,
     Collection,
     Dict,
     FrozenSet,
@@ -1283,6 +1284,83 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         # `count(*)` returns always an integer
         # If any rows still exist it means someone has not forgotten this room yet
         return not rows[0][0]
+
+    async def upsert_room_to_purge(
+        self,
+        room_id: str,
+        delete_id: str,
+        status: str,
+        error: Optional[str] = None,
+        timestamp: Optional[int] = None,
+        shutdown_params: Optional[str] = None,
+        shutdown_response: Optional[str] = None,
+    ) -> None:
+        """Insert or update a room to shutdown/purge.
+
+        Args:
+            room_id: The room ID to shutdown/purge
+            delete_id: The delete ID identifying this action
+            status: Current status of the delete. Cf `DeleteStatus` for possible values
+            error: Error message to return, if any
+            timestamp: Time of the last update. If status is `wait_purge`,
+                then it specifies when to do the purge, with an empty value specifying ASAP
+            shutdown_params: JSON representation of shutdown parameters, cf `ShutdownRoomParams`
+            shutdown_response: JSON representation of shutdown current status, cf `ShutdownRoomResponse`
+        """
+        await self.db_pool.simple_upsert(
+            "rooms_to_purge",
+            {
+                "room_id": room_id,
+                "delete_id": delete_id,
+            },
+            {
+                "room_id": room_id,
+                "delete_id": delete_id,
+                "status": status,
+                "error": error,
+                "timestamp": timestamp,
+                "shutdown_params": shutdown_params,
+                "shutdown_response": shutdown_response,
+            },
+            desc="upsert_room_to_purge",
+        )
+
+    async def delete_room_to_purge(self, room_id: str, delete_id: str) -> None:
+        """Remove a room from the list of rooms to purge.
+
+        Args:
+            room_id: The room ID matching the delete to remove
+            delete_id: The delete ID identifying the delete to remove
+        """
+
+        await self.db_pool.simple_delete(
+            "rooms_to_purge",
+            keyvalues={
+                "room_id": room_id,
+                "delete_id": delete_id,
+            },
+            desc="delete_room_to_purge",
+        )
+
+    async def get_rooms_to_purge(self) -> List[Dict[str, Any]]:
+        """Returns all rooms to shutdown/purge. This includes those that has
+        been interrupted by a stop/restart of synapse, but also scheduled ones
+        like locally forgotten rooms.
+        """
+        return await self.db_pool.simple_select_list(
+            table="rooms_to_purge",
+            keyvalues={},
+            retcols=(
+                "room_id",
+                "delete_id",
+                "timestamp",
+                "status",
+                "error",
+                "shutdown_params",
+                "shutdown_response",
+            ),
+            desc="rooms_to_purge_fetch",
+        )
 
     async def get_rooms_user_has_been_in(self, user_id: str) -> Set[str]:
         """Get all rooms that the user has ever been in.
