@@ -106,9 +106,6 @@ Changes in SCHEMA_VERSION = 76:
 SCHEMA_COMPAT_VERSION = (
     # Queries against `event_stream_ordering` columns in membership tables must
     # be disambiguated.
-    #
-    # The threads_id column must written to with non-null values for the
-    # event_push_actions, event_push_actions_staging, and event_push_summary tables.
     74
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
