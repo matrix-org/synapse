@@ -100,7 +100,7 @@ it should be enough to get a rough idea of where database disk space is going.
 The API is:
 
 ```
-GET /_synapse/admin/v1/statistics/statistics/database/rooms
+GET /_synapse/admin/v1/statistics/database/rooms
 ```
 
 A response body like the following is returned:

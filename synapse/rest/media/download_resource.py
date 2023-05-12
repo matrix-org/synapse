@@ -37,7 +37,7 @@ class DownloadResource(DirectServeJsonResource):
     def __init__(self, hs: "HomeServer", media_repo: "MediaRepository"):
         super().__init__()
         self.media_repo = media_repo
-        self.server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
@@ -59,7 +59,7 @@ class DownloadResource(DirectServeJsonResource):
             b"no-referrer",
         )
         server_name, media_id, name = parse_media_id(request)
-        if server_name == self.server_name:
+        if self._is_mine_server_name(server_name):
             await self.media_repo.get_local_media(request, media_id, name)
         else:
             allow_remote = parse_boolean(request, "allow_remote", default=True)

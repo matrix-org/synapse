@@ -586,6 +586,19 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         d = self.store.is_support_user(user_id)
         self.assertFalse(self.get_success(d))
 
+    def test_invalid_user_id(self) -> None:
+        invalid_user_id = "+abcd"
+        self.get_failure(
+            self.handler.register_user(localpart=invalid_user_id), SynapseError
+        )
+
+    @override_config({"experimental_features": {"msc4009_e164_mxids": True}})
+    def text_extended_user_ids(self) -> None:
+        """+ should be allowed according to MSC4009."""
+        valid_user_id = "+1234"
+        user_id = self.get_success(self.handler.register_user(localpart=valid_user_id))
+        self.assertEqual(user_id, valid_user_id)
+
     def test_invalid_user_id_length(self) -> None:
         invalid_user_id = "x" * 256
         self.get_failure(

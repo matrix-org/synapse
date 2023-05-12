@@ -140,7 +140,7 @@ def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
     api.register_third_party_rules_callbacks(**hooks)
 
 
-class ThirdPartyEventRules:
+class ThirdPartyEventRulesModuleApiCallbacks:
     """Allows server admins to provide a Python module implementing an extra
     set of rules to apply when processing events.
 
@@ -149,8 +149,6 @@ class ThirdPartyEventRules:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.third_party_rules = None
-
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
 

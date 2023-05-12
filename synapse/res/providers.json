@@ -11,5 +11,18 @@
                 "url": "https://publish.twitter.com/oembed"
             }
         ]
+    },
+    {
+        "provider_name": "YouTube Shorts",
+        "provider_url": "http://www.youtube.com/",
+        "endpoints": [
+            {
+                "schemes": [
+                    "https://youtube.com/shorts/*",
+                    "https://*.youtube.com/shorts/*"
+                ],
+                "url": "https://www.youtube.com/oembed"
+            }
+        ]
     }
 ]

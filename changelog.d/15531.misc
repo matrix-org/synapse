@@ -1,0 +1,1 @@
+Speed up deleting of old rows in `event_push_actions`.

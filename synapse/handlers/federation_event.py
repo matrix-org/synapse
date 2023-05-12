@@ -157,10 +157,13 @@ class FederationEventHandler:
         self._get_room_member_handler = hs.get_room_member_handler
 
         self._federation_client = hs.get_federation_client()
-        self._third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
         self._notifier = hs.get_notifier()
 
         self._is_mine_id = hs.is_mine_id
+        self._is_mine_server_name = hs.is_mine_server_name
         self._server_name = hs.hostname
         self._instance_name = hs.get_instance_name()
 
@@ -686,7 +689,7 @@ class FederationEventHandler:
         server from invalid events (there is probably no point in trying to
         re-fetch invalid events from every other HS in the room.)
         """
-        if dest == self._server_name:
+        if self._is_mine_server_name(dest):
             raise SynapseError(400, "Can't backfill from self.")
 
         events = await self._federation_client.backfill(

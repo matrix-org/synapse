@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING
 
+from synapse.api.constants import ReceiptTypes
 from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ class ReadMarkerHandler:
 
         async with self.read_marker_linearizer.queue((room_id, user_id)):
             existing_read_marker = await self.store.get_account_data_for_room_and_type(
-                user_id, room_id, "m.fully_read"
+                user_id, room_id, ReceiptTypes.FULLY_READ
             )
 
             should_update = True
@@ -56,5 +57,5 @@ class ReadMarkerHandler:
             if should_update:
                 content = {"event_id": event_id}
                 await self.account_data_handler.add_account_data_to_room(
-                    user_id, room_id, "m.fully_read", content
+                    user_id, room_id, ReceiptTypes.FULLY_READ, content
                 )

@@ -107,14 +107,15 @@ jobs:
         uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
 
-      # NB: I have two concerns with this action:
-      # 1. We occasionally see odd mypy problems that aren't reproducible
-      #    locally with clean caches. I suspect some dodgy caching behaviour.
-      # 2. The action uses GHA machinery that's deprecated
-      #    (https://github.com/AustinScola/mypy-cache-github-action/issues/277)
-      # It may be simpler to use actions/cache ourselves to restore .mypy_cache.
+      # Cribbed from
+      # https://github.com/AustinScola/mypy-cache-github-action/blob/85ea4f2972abed39b33bd02c36e341b28ca59213/src/restore.ts#L10-L17
       - name: Restore/persist mypy's cache
-        uses: AustinScola/mypy-cache-github-action@df56268388422ee282636ee2c7a9cc55ec644a41
+        uses: actions/cache@v3
+        with:
+          path: |
+            .mypy_cache
+          key: mypy-cache-${{ github.context.sha }}
+          restore-keys: mypy-cache-
 
       - name: Run mypy
         run: poetry run mypy
