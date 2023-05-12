@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional, Set
 
@@ -359,6 +360,7 @@ class PaginationHandler:
         room_id: str,
         delete_id: str,
         force: bool = False,
+        shutdown_response: Optional[ShutdownRoomResponse] = None,
     ) -> None:
         """Purge the given room from the database.
 
@@ -366,6 +368,7 @@ class PaginationHandler:
             room_id: room to be purged
             delete_id: the delete ID for this purge
             force: set true to skip checking for joined users.
+            shutdown_response: optional response coming from the shutdown phase
         """
         logger.info("starting purge room_id %s", room_id)
 
@@ -376,7 +379,22 @@ class PaginationHandler:
                 if joined:
                     raise SynapseError(400, "Users are still joined to this room")
 
-            await self._storage_controllers.purge_events.purge_room(room_id, delete_id)
+            await self.store.upsert_room_to_purge(
+                room_id,
+                delete_id,
+                DeleteStatus.STATUS_PURGING,
+                shutdown_response=json.dumps(shutdown_response),
+            )
+
+            await self._storage_controllers.purge_events.purge_room(room_id)
+
+            await self.store.upsert_room_to_purge(
+                room_id,
+                delete_id,
+                DeleteStatus.STATUS_COMPLETE,
+                timestamp=self.clock.time_msec(),
+                shutdown_response=json.dumps(shutdown_response),
+            )
 
         logger.info("purge complete for room_id %s", room_id)
 
@@ -572,6 +590,7 @@ class PaginationHandler:
         room_id: str,
         delete_id: str,
         shutdown_params: ShutdownRoomParams,
+        shutdown_response: Optional[ShutdownRoomResponse] = None,
     ) -> None:
         """
         Shuts down and purges a room.
@@ -582,8 +601,9 @@ class PaginationHandler:
             delete_id: The ID for this delete.
             room_id: The ID of the room to shut down.
             shutdown_params: parameters for the shutdown, cf `RoomShutdownHandler.ShutdownRoomParams`
+            shutdown_response: current status of the shutdown, if it was interrupted
 
-        Saves a `RoomShutdownHandler.ShutdownRoomResponse` in `DeleteStatus`:
+        Saves a `RoomShutdownHandler.ShutdownRoomResponse` in `DeleteStatus` and in DB
         """
 
         self._purges_in_progress_by_room.add(room_id)
@@ -593,6 +613,7 @@ class PaginationHandler:
                 room_id=room_id,
                 delete_id=delete_id,
                 shutdown_params=shutdown_params,
+                shutdown_response=shutdown_response,
             )
             self._delete_by_id[delete_id].shutdown_room = shutdown_response
 
@@ -602,25 +623,16 @@ class PaginationHandler:
                     room_id,
                     delete_id,
                     shutdown_params["force_purge"],
+                    shutdown_response=self._delete_by_id[delete_id].shutdown_room,
                 )
 
-
-                if purge:
-                    logger.info("starting purge room_id %s", room_id)
-
-                    # first check that we have no users in this room
-                    if not force_purge:
-                        joined = await self.store.is_host_joined(
-                            room_id, self._server_name
-                        )
-                        if joined:
-                            raise SynapseError(
-                                400, "Users are still joined to this room"
-                            )
-
-                    await self._storage_controllers.purge_events.purge_room(room_id)
-
-            logger.info("purge complete for room_id %s", room_id)
+            await self.store.upsert_room_to_purge(
+                room_id,
+                delete_id,
+                DeleteStatus.STATUS_COMPLETE,
+                timestamp=self.clock.time_msec(),
+                shutdown_response=json.dumps(shutdown_response),
+            )
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_COMPLETE
         except Exception:
             f = Failure()
@@ -630,6 +642,12 @@ class PaginationHandler:
             )
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_FAILED
             self._delete_by_id[delete_id].error = f.getErrorMessage()
+            await self.store.upsert_room_to_purge(
+                room_id,
+                delete_id,
+                DeleteStatus.STATUS_FAILED,
+                error=f.getErrorMessage(),
+            )
         finally:
             self._purges_in_progress_by_room.discard(room_id)
 
