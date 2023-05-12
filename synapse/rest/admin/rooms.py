@@ -19,6 +19,7 @@ from urllib import parse as urlparse
 from synapse.api.constants import Direction, EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.api.filtering import Filter
+from synapse.handlers.room import DeleteStatus
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
@@ -39,6 +40,7 @@ from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, RoomID, UserID, create_requester
 from synapse.types.state import StateFilter
 from synapse.util import json_decoder
+from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.api.auth import Auth
@@ -154,19 +156,23 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
 
         delete_ids = self._pagination_handler.get_delete_ids_by_room(room_id)
         if delete_ids is None:
-            raise NotFoundError("No delete task for room_id '%s' found" % room_id)
+            delete_ids = []
 
         response = []
         for delete_id in delete_ids:
             delete = self._pagination_handler.get_delete_status(delete_id)
-            if delete:
+            if delete and delete.status != DeleteStatus.STATUS_WAIT_PURGE:
                 response += [
                     {
                         "delete_id": delete_id,
                         **delete.asdict(),
                     }
                 ]
-        return HTTPStatus.OK, {"results": cast(JsonDict, response)}
+
+        if response:
+            return HTTPStatus.OK, {"results": cast(JsonDict, response)}
+        else:
+            raise NotFoundError("No delete task for room_id '%s' found" % room_id)
 
 
 class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
