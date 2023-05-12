@@ -103,8 +103,6 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         # against `state_groups_state` to fetch the latest state.
         # It assumes that previous state groups are always numerically
         # lesser.
-        # This may return multiple rows per (type, state_key), but last_value
-        # should be the same.
         sql = """
             WITH RECURSIVE sgs(state_group) AS (
                 VALUES(CAST(? AS bigint))
@@ -125,8 +123,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             not state_filter.include_others and not state_filter.is_full()
         )
         state_filter_condition_combos: List[Tuple[str, Optional[str]]] = []
-        # We don't need to caclculate this list if we're not using the condition
-        # optimization
+        # We only need to caclculate this list if we're using the condition optimization
         if use_condition_optimization:
             for etype, state_keys in state_filter.types.items():
                 if state_keys is None:
@@ -150,15 +147,20 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     where_clause = "(type = ? AND state_key = ?)"
                     overall_select_query_args.extend([etype, skey])
 
+                # We could use `SELECT DISTINCT ON` here to align with the query below
+                # but that isn't compatible with SQLite and we can get away with `LIMIT
+                # 1` here instead because the `WHERE` clause will only ever match and
+                # target one event; and is simpler anyway. And it's better to use
+                # something that's simpler and compatible with both Database engines.
                 select_clause_list.append(
                     f"""
                     (
-                        SELECT DISTINCT ON (type, state_key)
-                            type, state_key, event_id
+                        SELECT type, state_key, event_id
                         FROM state_groups_state
                         INNER JOIN sgs USING (state_group)
                         WHERE {where_clause}
                         ORDER BY type, state_key, state_group DESC
+                        LIMIT 1
                     )
                     """
                 )
@@ -173,15 +175,28 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
             overall_select_query_args.extend(where_args)
 
-            overall_select_clause = f"""
-                SELECT DISTINCT ON (type, state_key)
-                    type, state_key, event_id
-                FROM state_groups_state
-                WHERE state_group IN (
-                    SELECT state_group FROM sgs
-                ) {where_clause}
-                ORDER BY type, state_key, state_group DESC
-            """
+            if isinstance(self.database_engine, PostgresEngine):
+                overall_select_clause = f"""
+                    SELECT DISTINCT ON (type, state_key)
+                        type, state_key, event_id
+                    FROM state_groups_state
+                    WHERE state_group IN (
+                        SELECT state_group FROM sgs
+                    ) {where_clause}
+                    ORDER BY type, state_key, state_group DESC
+                """
+            else:
+                # SQLite doesn't support `SELECT DISTINCT ON`, so we have to just get
+                # some potential duplicate (state_key, type) pairs and then only use the
+                # first of each kind we see.
+                overall_select_clause = f"""
+                    SELECT type, state_key, event_id
+                    FROM state_groups_state
+                    WHERE state_group IN (
+                        SELECT state_group FROM sgs
+                    ) {where_clause}
+                    ORDER BY type, state_key, state_group DESC
+                """
 
         for group in groups:
             args: List[Union[int, str]] = [group]
@@ -191,7 +206,12 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             for row in txn:
                 typ, state_key, event_id = row
                 key = (intern_string(typ), intern_string(state_key))
-                results[group][key] = event_id
+                # Deal with the potential duplicate (type, state_key) pairs from the
+                # SQLite specific query above. We only want to use the first row which
+                # is from the most-recent state group (`state_group DESC`) because that
+                # is that applicable state in that state group.
+                if key not in results[group]:
+                    results[group][key] = event_id
 
         # The results shouldn't be considered mutable.
         return results
