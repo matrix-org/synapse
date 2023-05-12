@@ -953,6 +953,41 @@ class FederationEventHandler:
             )
             return
 
+        # Check if we've already tried to process this event
+        failed_pull_attempt_info = await self._store.get_event_failed_pull_attempt_info(
+            event.room_id, event_id
+        )
+        if failed_pull_attempt_info:
+            # Process previously failed backfill events in the background
+            # to not waste something that is bound to fail again.
+            run_as_background_process(
+                "_try_process_pulled_event",
+                self._try_process_pulled_event,
+                origin,
+                event,
+                backfilled,
+            )
+        else:
+            # Otherwise, we can optimistically try to process and wait for the event to
+            # be fully persisted.
+            await self._try_process_pulled_event(origin, event, backfilled)
+
+    async def _try_process_pulled_event(
+        self, origin: str, event: EventBase, backfilled: bool
+    ) -> None:
+        """
+        Handles all of the async tasks necessary to process a pulled event. You should
+        not use this method directly, instead use `_process_pulled_event` which will
+        handle all of the quick sync checks that should happen before-hand.
+
+        Params:
+            origin: The server we received this event from
+            events: The received event
+            backfilled: True if this is part of a historical batch of events (inhibits
+                notification to clients, and validation of device keys.)
+        """
+        event_id = event.event_id
+
         try:
             try:
                 context = await self._compute_event_context_with_maybe_missing_prevs(

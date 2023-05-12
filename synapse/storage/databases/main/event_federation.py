@@ -108,6 +108,15 @@ class BackfillQueueNavigationItem:
     type: str
 
 
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class EventFailedPullAttemptInfo:
+    event_id: str
+    room_id: str
+    num_attempts: int
+    last_attempt_ts: int
+    last_cause: str
+
+
 class _NoChainCoverIndex(Exception):
     def __init__(self, room_id: str):
         super().__init__("Unexpectedly no chain cover for events in %s" % (room_id,))
@@ -1582,6 +1591,28 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
+
+    @trace
+    async def get_event_failed_pull_attempt_info(
+        self,
+        room_id: str,
+        event_id: str,
+    ) -> Optional[EventFailedPullAttemptInfo]:
+        res = await self.db_pool.simple_select_one(
+            table="event_failed_pull_attempts",
+            keyvalues={"room_id": room_id, "event_id": event_id},
+            retcols=["num_attempts", "last_attempt_ts", "last_cause"],
+            allow_none=True,
+            desc="get_event_failed_pull_attempt_info",
+        )
+
+        return EventFailedPullAttemptInfo(
+            event_id=event_id,
+            room_id=room_id,
+            num_attempts=res["num_attempts"],
+            last_attempt_ts=res["last_attempt_ts"],
+            last_cause=res["last_cause"],
+        )
 
     @trace
     async def get_event_ids_to_not_pull_from_backoff(
