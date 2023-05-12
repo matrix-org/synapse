@@ -957,6 +957,7 @@ class FederationEventHandler:
         failed_pull_attempt_info = await self._store.get_event_failed_pull_attempt_info(
             event.room_id, event_id
         )
+        # TODO: Should we only do this for `backfilled=true`?
         if failed_pull_attempt_info:
             # Process previously failed backfill events in the background
             # to not waste something that is bound to fail again.
