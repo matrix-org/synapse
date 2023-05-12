@@ -32,7 +32,7 @@ class UserFiltersStoreTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
-    def test_bg_migration2(self) -> None:
+    def test_bg_migration(self) -> None:
         updater = self.hs.get_datastores().main.db_pool.updates
 
         # drop the constraint so we can insert nulls in full_user_id to populate the test
