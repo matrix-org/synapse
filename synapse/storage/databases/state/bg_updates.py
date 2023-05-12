@@ -167,6 +167,8 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 # something that's simpler and compatible with both Database engines.
                 select_clause_list.append(
                     wrap_union_if_postgres(
+                        # We only select `state_group` here for use in the `ORDER`
+                        # clause later after the `UNION`
                         f"""
                         SELECT type, state_key, event_id, state_group
                         FROM state_groups_state
@@ -203,7 +205,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             if isinstance(self.database_engine, PostgresEngine):
                 overall_select_clause = f"""
                     SELECT DISTINCT ON (type, state_key)
-                        type, state_key, event_id, state_group
+                        type, state_key, event_id
                     FROM state_groups_state
                     WHERE state_group IN (
                         SELECT state_group FROM sgs
@@ -215,7 +217,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 # some potential duplicate (type, state_key) pairs and then only use the
                 # first of each kind we see.
                 overall_select_clause = f"""
-                    SELECT type, state_key, event_id, state_group
+                    SELECT type, state_key, event_id
                     FROM state_groups_state
                     WHERE state_group IN (
                         SELECT state_group FROM sgs
@@ -229,7 +231,9 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
             txn.execute(sql % (overall_select_clause,), args)
             for row in txn:
-                typ, state_key, event_id, _ = row
+                # The `*_` rest syntax is to ignore the `state_group` column which we
+                # only select in the optimized case
+                typ, state_key, event_id, *_ = row
                 key = (intern_string(typ), intern_string(state_key))
                 # Deal with the potential duplicate (type, state_key) pairs from the
                 # SQLite specific query above. We only want to use the first row which
