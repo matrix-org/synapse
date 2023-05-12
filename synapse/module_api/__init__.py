@@ -17,7 +17,6 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
     Callable,
     Collection,
     Dict,
