@@ -38,6 +38,7 @@ from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.handlers.room import DeleteStatus
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
@@ -56,6 +57,7 @@ from synapse.types import (
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
+from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -175,6 +177,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         hs.get_notifier().add_new_join_in_room_callback(self._on_user_joined_room)
 
         self._msc3970_enabled = hs.config.experimental.msc3970_enabled
+
+        self._purge_retention_period = hs.config.server.purge_retention_period
 
     def _on_user_joined_room(self, event_id: str, room_id: str) -> None:
         """Notify the rate limiter that a room join has occurred.
@@ -304,6 +308,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # `_background_remove_left_rooms` is deleting rows related to this room from
         # the table `current_state_events` and `get_current_state_events` is `None`.
         await self.store.forget(user_id, room_id)
+
+        if self._purge_retention_period and await self.store.is_locally_forgotten_room(
+            room_id
+        ):
+            delete_id = random_string(16)
+            await self.store.upsert_room_to_purge(
+                room_id,
+                delete_id,
+                DeleteStatus.STATUS_WAIT_PURGE,
+                timestamp=self.clock.time_msec() + self._purge_retention_period,
+            )
 
     async def ratelimit_multiple_invites(
         self,
