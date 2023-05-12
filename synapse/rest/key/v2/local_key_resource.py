@@ -34,6 +34,8 @@ class LocalKey(RestServlet):
     """HTTP resource containing encoding the TLS X.509 certificate and NACL
     signature verification keys for this server::
 
+        GET /_matrix/key/v2/server HTTP/1.1
+
         GET /_matrix/key/v2/server/a.key.id HTTP/1.1
 
         HTTP/1.1 200 OK
@@ -100,6 +102,15 @@ class LocalKey(RestServlet):
     def on_GET(
         self, request: Request, key_id: Optional[str] = None
     ) -> Tuple[int, JsonDict]:
+        # Matrix 1.6 drops support for passing the key_id, this is incompatible
+        # with earlier versions and is allowed in order to support both.
+        # A warning is issued to help determine when it is safe to drop this.
+        if key_id:
+            logger.warning(
+                "Request for local server key with deprecated key ID (logging to determine usage level for future removal): %s",
+                key_id,
+            )
+
         time_now = self.clock.time_msec()
         # Update the expiry time if less than half the interval remains.
         if time_now + self.config.key.key_refresh_interval / 2 > self.valid_until_ts:
