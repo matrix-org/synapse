@@ -60,11 +60,18 @@ class ReplicationEndpointFactory:
 
         Returns: The correct client endpoint object
         """
+        # The place to connect to now comes in as the name of the worker, similar to
+        # a hostname in placement. Use the instance_map data to get the actual
+        # connection information.
+        netloc = self.instance_map[uri.netloc.decode("utf-8")].netloc()
         if uri.scheme in (b"http", b"https"):
-            endpoint = HostnameEndpoint(self.reactor, uri.host, uri.port)
+            host, port = netloc.split(":", maxsplit=1)
+            endpoint = HostnameEndpoint(self.reactor, host, int(port))
             if uri.scheme == b"https":
                 endpoint = wrapClientTLS(
-                    self.context_factory.creatorForNetloc(uri.host, uri.port), endpoint
+                    # The 'port' argument below isn't actually used by the function
+                    self.context_factory.creatorForNetloc(host, port),
+                    endpoint,
                 )
             return endpoint
         else:
