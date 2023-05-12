@@ -1091,7 +1091,9 @@ def _verify_third_party_invite(
                     verify_key = decode_verify_key_bytes(
                         key_name, decode_base64(public_key)
                     )
-                    verify_signed_json(signed, server, verify_key)
+                    # verify_signed_json incorrectly states it wants a dict, it
+                    # just needs a mapping.
+                    verify_signed_json(signed, server, verify_key)  # type: ignore[arg-type]
 
                     # We got the public key from the invite, so we know that the
                     # correct server signed the signed bundle.
