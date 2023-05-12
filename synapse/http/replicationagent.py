@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from zope.interface import implementer
 
@@ -44,9 +44,11 @@ class ReplicationEndpointFactory:
     def __init__(
         self,
         reactor: ISynapseReactor,
+        instance_map: Dict[str, Any],
         context_factory: IPolicyForHTTPS,
     ) -> None:
         self.reactor = reactor
+        self.instance_map = instance_map
         self.context_factory = context_factory
 
     def endpointForURI(self, uri: URI) -> IStreamClientEndpoint:
@@ -80,6 +82,7 @@ class ReplicationAgent(_AgentBase):
     def __init__(
         self,
         reactor: ISynapseReactor,
+        instance_map: Dict[str, Any],
         contextFactory: IPolicyForHTTPS,
         connectTimeout: Optional[float] = None,
         bindAddress: Optional[bytes] = None,
@@ -102,7 +105,9 @@ class ReplicationAgent(_AgentBase):
                 created.
         """
         _AgentBase.__init__(self, reactor, pool)
-        endpoint_factory = ReplicationEndpointFactory(reactor, contextFactory)
+        endpoint_factory = ReplicationEndpointFactory(
+            reactor, instance_map, contextFactory
+        )
         self._endpointFactory = endpoint_factory
 
     def request(
