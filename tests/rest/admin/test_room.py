@@ -24,9 +24,10 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
-from synapse.handlers.pagination import PaginationHandler, PurgeStatus
+from synapse.handlers.pagination import DeleteStatus, PaginationHandler, PurgeStatus
 from synapse.rest.client import directory, events, login, room
 from synapse.server import HomeServer
+from synapse.types import UserID
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -502,6 +503,9 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         )
         self.url_status_by_delete_id = "/_synapse/admin/v2/rooms/delete_status/"
 
+        self.room_member_handler = hs.get_room_member_handler()
+        self.pagination_handler = hs.get_pagination_handler()
+
     @parameterized.expand(
         [
             ("DELETE", "/_synapse/admin/v2/rooms/%s"),
@@ -971,6 +975,114 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         # Assert we can no longer peek into the room
         self._assert_peek(self.room_id, expect_code=403)
+
+    @unittest.override_config({"purge_retention_period": "1d"})
+    def test_purge_forgotten_room(self) -> None:
+        # Create a test room
+        room_id = self.helper.create_room_as(
+            self.admin_user,
+            tok=self.admin_user_tok,
+        )
+
+        self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
+        self.get_success(
+            self.room_member_handler.forget(
+                UserID.from_string(self.admin_user), room_id
+            )
+        )
+
+        # Test that room is not yet purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(room_id)
+
+        self.reactor.advance(3600 * 24)
+
+        self._is_purged(room_id)
+
+    def test_resume_purge_room(self) -> None:
+        # Create a test room
+        room_id = self.helper.create_room_as(
+            self.admin_user,
+            tok=self.admin_user_tok,
+        )
+        self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
+
+        self.get_success(
+            self.store.upsert_room_to_purge(
+                room_id,
+                random_string(16),
+                DeleteStatus.STATUS_PURGING,
+            )
+        )
+
+        # Test that room is not yet purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(room_id)
+
+        self.reactor.advance(3600 * 1)
+
+        self._is_purged(room_id)
+
+    def test_resume_shutdown_room(self) -> None:
+        # Create a test room
+        room_id = self.helper.create_room_as(
+            self.other_user,
+            tok=self.other_user_tok,
+        )
+
+        delete_id = random_string(16)
+
+        self.get_success(
+            self.store.upsert_room_to_purge(
+                room_id,
+                delete_id,
+                DeleteStatus.STATUS_SHUTTING_DOWN,
+                shutdown_params=json.dumps(
+                    {
+                        "requester_user_id": self.admin_user,
+                        "new_room_user_id": self.admin_user,
+                        "new_room_name": None,
+                        "message": None,
+                        "block": False,
+                        "purge": True,
+                        "force_purge": True,
+                    }
+                ),
+            )
+        )
+
+        # Test that room is not yet shutdown
+        self._is_member(room_id, self.other_user)
+
+        # Test that room is not yet purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(room_id)
+
+        self.reactor.advance(3600 * 1)
+
+        # Test that all users has been kicked (room is shutdown)
+        self._has_no_members(room_id)
+
+        self._is_purged(room_id)
+
+        # Retrieve delete results
+        result = self.make_request(
+            "GET",
+            self.url_status_by_delete_id + delete_id,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, result.code, msg=result.json_body)
+
+        # Check that the user is in kicked_users
+        self.assertIn(
+            self.other_user, result.json_body["shutdown_room"]["kicked_users"]
+        )
+
+        new_room_id = result.json_body["shutdown_room"]["new_room_id"]
+        self.assertTrue(new_room_id)
+
+        # Check that the user is actually in the new room
+        self._is_member(new_room_id, self.other_user)
 
     def _is_blocked(self, room_id: str, expect: bool = True) -> None:
         """Assert that the room is blocked or not"""
