@@ -157,6 +157,7 @@ __all__ = [
     "parse_json_object_from_request",
     "respond_with_html",
     "run_in_background",
+    "run_as_background_process",
     "cached",
     "NOT_SPAM",
     "UserID",
@@ -1665,46 +1666,6 @@ class ModuleApi:
             new_displayname=new_displayname,
             by_admin=True,
             deactivation=deactivation,
-        )
-
-    R = TypeVar("R")
-
-    def run_as_background_process(
-        self,
-        desc: str,
-        func: Callable[..., Awaitable[Optional[R]]],
-        *args: Any,
-        bg_start_span: bool = True,
-        **kwargs: Any,
-    ) -> "defer.Deferred[Optional[R]]":
-        """Run the given function in its own logcontext, with resource metrics
-
-        This should be used to wrap processes which are fired off to run in the
-        background, instead of being associated with a particular request.
-
-        It returns a Deferred which completes when the function completes, but it doesn't
-        follow the synapse logcontext rules, which makes it appropriate for passing to
-        clock.looping_call and friends (or for firing-and-forgetting in the middle of a
-        normal synapse async function).
-
-        Added in Synapse v1.84.0
-
-        Args:
-            desc: a description for this background process type
-            func: a function, which may return a Deferred or a coroutine
-            bg_start_span: Whether to start an opentracing span. Defaults to True.
-                Should only be disabled for processes that will not log to or tag
-                a span.
-            args: positional args for func
-            kwargs: keyword args for func
-
-        Returns:
-            Deferred which returns the result of func, or `None` if func raises.
-            Note that the returned Deferred does not follow the synapse logcontext
-            rules.
-        """
-        return run_as_background_process(
-            desc, func, *args, bg_start_span=bg_start_span, **kwargs
         )
 
 
