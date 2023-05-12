@@ -272,19 +272,8 @@ class WorkerConfig(Config):
                 "Must only specify one instance to handle `presence` messages."
             )
 
-        # Make the event shard config point specific rooms to a specific worker.
-        # All other rooms should have events persisted by a different worker.
-        chosen_worker_instance = "event_persister-4"
-        event_instances = self.writers.events.copy()
-        event_instances.remove(chosen_worker_instance)
-
-        instances_reserved_for_keys = {
-            "!ioWEdTBHIhOGYVKWyq:libera.chat": chosen_worker_instance,
-            "!bBgnAGciIvrtPXkHkp:libera.chat": chosen_worker_instance,
-        }
-
         self.events_shard_config = RoutableShardedWorkerHandlingConfig(
-            event_instances, instances_reserved_for_keys
+            self.writers.events
         )
 
         # Handle sharded push
