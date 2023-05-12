@@ -147,25 +147,50 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     where_clause = "(type = ? AND state_key = ?)"
                     overall_select_query_args.extend([etype, skey])
 
+                # Small helper function to wrap the union clause in parenthesis if we're
+                # using postgres. This is because SQLite doesn't allow `LIMIT`/`ORDER`
+                # clauses in the union subquery but postgres does as long as they are
+                # wrapped in parenthesis which this function handles the complexity of
+                # handling.
+                def wrap_union_if_postgres(
+                    union_clause: str, extra_order_or_limit_clause: str = ""
+                ) -> str:
+                    if isinstance(self.database_engine, PostgresEngine):
+                        return f"""({union_clause} {extra_order_or_limit_clause})"""
+
+                    return union_clause
+
                 # We could use `SELECT DISTINCT ON` here to align with the query below
                 # but that isn't compatible with SQLite and we can get away with `LIMIT
                 # 1` here instead because the `WHERE` clause will only ever match and
                 # target one event; and is simpler anyway. And it's better to use
                 # something that's simpler and compatible with both Database engines.
                 select_clause_list.append(
-                    f"""
-                    (
-                        SELECT type, state_key, event_id
+                    wrap_union_if_postgres(
+                        f"""
+                        SELECT type, state_key, event_id, state_group
                         FROM state_groups_state
                         INNER JOIN sgs USING (state_group)
                         WHERE {where_clause}
-                        ORDER BY type, state_key, state_group DESC
-                        LIMIT 1
+                        """,
+                        # The `LIMIT` is an extra nicety that saves us from having to
+                        # ferry a bunch of duplicate state pairs back from the database
+                        # since we only need the one with the greatest state_group (most
+                        # recent). Since this only applies to postgres, we do have to be
+                        # careful to take care of the duplicate pairs in the downstream
+                        # code when running with SQLite.
+                        "LIMIT 1",
                     )
-                    """
                 )
 
-            overall_select_clause = " UNION ".join(select_clause_list)
+            overall_select_clause = (
+                " UNION ".join(select_clause_list)
+                # We `ORDER` after the union results because it's compatible with both
+                # Postgres and SQLite. And we need the rows to by ordered by
+                # `state_group` in both cases so the greatest state_group pairs are
+                # first and we only care about the first distinct (type, state_key) pair later on.
+                + " ORDER BY type, state_key, state_group DESC"
+            )
         else:
             where_clause, where_args = state_filter.make_sql_filter_clause()
             # Unless the filter clause is empty, we're going to append it after an
@@ -178,7 +203,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             if isinstance(self.database_engine, PostgresEngine):
                 overall_select_clause = f"""
                     SELECT DISTINCT ON (type, state_key)
-                        type, state_key, event_id
+                        type, state_key, event_id, state_group
                     FROM state_groups_state
                     WHERE state_group IN (
                         SELECT state_group FROM sgs
@@ -187,10 +212,10 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 """
             else:
                 # SQLite doesn't support `SELECT DISTINCT ON`, so we have to just get
-                # some potential duplicate (state_key, type) pairs and then only use the
+                # some potential duplicate (type, state_key) pairs and then only use the
                 # first of each kind we see.
                 overall_select_clause = f"""
-                    SELECT type, state_key, event_id
+                    SELECT type, state_key, event_id, state_group
                     FROM state_groups_state
                     WHERE state_group IN (
                         SELECT state_group FROM sgs
@@ -204,12 +229,12 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
             txn.execute(sql % (overall_select_clause,), args)
             for row in txn:
-                typ, state_key, event_id = row
+                typ, state_key, event_id, _ = row
                 key = (intern_string(typ), intern_string(state_key))
                 # Deal with the potential duplicate (type, state_key) pairs from the
                 # SQLite specific query above. We only want to use the first row which
-                # is from the most-recent state group (`state_group DESC`) because that
-                # is that applicable state in that state group.
+                # is from the greatest state group (most-recent) because that is that
+                # applicable state in that state group.
                 if key not in results[group]:
                     results[group][key] = event_id
 
