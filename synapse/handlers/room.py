@@ -1819,11 +1819,8 @@ class RoomShutdownHandler:
     async def shutdown_room(
         self,
         room_id: str,
-        requester_user_id: str,
-        new_room_user_id: Optional[str] = None,
-        new_room_name: Optional[str] = None,
-        message: Optional[str] = None,
-        block: bool = False,
+        delete_id: str,
+        shutdown_params: ShutdownRoomParams,
     ) -> ShutdownRoomResponse:
         """
         Shuts down a room. Moves all local users and room aliases automatically
@@ -1840,48 +1837,26 @@ class RoomShutdownHandler:
 
         Args:
             room_id: The ID of the room to shut down.
-            requester_user_id:
-                User who requested the action and put the room on the
-                blocking list.
-            new_room_user_id:
-                If set, a new room will be created with this user ID
-                as the creator and admin, and all users in the old room will be
-                moved into that room. If not set, no new room will be created
-                and the users will just be removed from the old room.
-            new_room_name:
-                A string representing the name of the room that new users will
-                be invited to. Defaults to `Content Violation Notification`
-            message:
-                A string containing the first message that will be sent as
-                `new_room_user_id` in the new room. Ideally this will clearly
-                convey why the original room was shut down.
-                Defaults to `Sharing illegal content on this server is not
-                permitted and rooms in violation will be blocked.`
-            block:
-                If set to `True`, users will be prevented from joining the old
-                room. This option can also be used to pre-emptively block a room,
-                even if it's unknown to this homeserver. In this case, the room
-                will be blocked, and no further action will be taken. If `False`,
-                attempting to delete an unknown room is invalid.
+            delete_id: The delete ID identifying this delete request
+            shutdown_params: parameters for the shutdown, cf `ShutdownRoomParams`
 
-                Defaults to `False`.
-
-        Returns: a dict containing the following keys:
-            kicked_users: An array of users (`user_id`) that were kicked.
-            failed_to_kick_users:
-                An array of users (`user_id`) that that were not kicked.
-            local_aliases:
-                An array of strings representing the local aliases that were
-                migrated from the old room to the new.
-            new_room_id:
-                A string representing the room ID of the new room, or None if
-                no such room was created.
+        Returns: a dict matching `ShutdownRoomResponse`.
         """
 
-        if not new_room_name:
-            new_room_name = self.DEFAULT_ROOM_NAME
-        if not message:
-            message = self.DEFAULT_MESSAGE
+        requester_user_id = shutdown_params["requester_user_id"]
+        new_room_user_id = shutdown_params["new_room_user_id"]
+        block = shutdown_params["block"]
+
+        new_room_name = (
+            shutdown_params["new_room_name"]
+            if shutdown_params["new_room_name"]
+            else self.DEFAULT_ROOM_NAME
+        )
+        message = (
+            shutdown_params["message"]
+            if shutdown_params["message"]
+            else self.DEFAULT_MESSAGE
+        )
 
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))

@@ -119,13 +119,15 @@ class RoomRestV2Servlet(RestServlet):
 
         delete_id = self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
-            new_room_user_id=content.get("new_room_user_id"),
-            new_room_name=content.get("room_name"),
-            message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
-            block=block,
-            purge=purge,
-            force_purge=force_purge,
+            shutdown_params={
+                "new_room_user_id": content.get("new_room_user_id"),
+                "new_room_name": content.get("room_name"),
+                "message": content.get("message"),
+                "requester_user_id": requester.user.to_string(),
+                "block": block,
+                "purge": purge,
+                "force_purge": force_purge,
+            },
         )
 
         return HTTPStatus.OK, {"delete_id": delete_id}
@@ -347,19 +349,28 @@ class RoomRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        delete_id = random_string(16)
+
         ret = await room_shutdown_handler.shutdown_room(
             room_id=room_id,
-            new_room_user_id=content.get("new_room_user_id"),
-            new_room_name=content.get("room_name"),
-            message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
-            block=block,
+            delete_id=delete_id,
+            shutdown_params={
+                "new_room_user_id": content.get("new_room_user_id"),
+                "new_room_name": content.get("room_name"),
+                "message": content.get("message"),
+                "requester_user_id": requester.user.to_string(),
+                "block": block,
+                "purge": purge,
+                "force_purge": force_purge,
+            },
         )
 
         # Purge room
         if purge:
             try:
-                await pagination_handler.purge_room(room_id, force=force_purge)
+                await pagination_handler.purge_room(
+                    room_id, delete_id, force=force_purge
+                )
             except NotFoundError:
                 if block:
                     # We can block unknown rooms with this endpoint, in which case

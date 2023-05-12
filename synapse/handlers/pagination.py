@@ -354,14 +354,21 @@ class PaginationHandler:
         """
         return self._delete_by_room.get(room_id)
 
-    async def purge_room(self, room_id: str, force: bool = False) -> None:
+    async def purge_room(
+        self,
+        room_id: str,
+        delete_id: str,
+        force: bool = False,
+    ) -> None:
         """Purge the given room from the database.
-        This function is part the delete room v1 API.
 
         Args:
             room_id: room to be purged
+            delete_id: the delete ID for this purge
             force: set true to skip checking for joined users.
         """
+        logger.info("starting purge room_id %s", room_id)
+
         async with self.pagination_lock.write(room_id):
             # first check that we have no users in this room
             if not force:
@@ -369,7 +376,9 @@ class PaginationHandler:
                 if joined:
                     raise SynapseError(400, "Users are still joined to this room")
 
-            await self._storage_controllers.purge_events.purge_room(room_id)
+            await self._storage_controllers.purge_events.purge_room(room_id, delete_id)
+
+        logger.info("purge complete for room_id %s", room_id)
 
     @trace
     async def get_messages(
@@ -560,15 +569,9 @@ class PaginationHandler:
 
     async def _shutdown_and_purge_room(
         self,
-        delete_id: str,
         room_id: str,
-        requester_user_id: str,
-        new_room_user_id: Optional[str] = None,
-        new_room_name: Optional[str] = None,
-        message: Optional[str] = None,
-        block: bool = False,
-        purge: bool = True,
-        force_purge: bool = False,
+        delete_id: str,
+        shutdown_params: ShutdownRoomParams,
     ) -> None:
         """
         Shuts down and purges a room.
@@ -578,50 +581,29 @@ class PaginationHandler:
         Args:
             delete_id: The ID for this delete.
             room_id: The ID of the room to shut down.
-            requester_user_id:
-                User who requested the action. Will be recorded as putting the room on the
-                blocking list.
-            new_room_user_id:
-                If set, a new room will be created with this user ID
-                as the creator and admin, and all users in the old room will be
-                moved into that room. If not set, no new room will be created
-                and the users will just be removed from the old room.
-            new_room_name:
-                A string representing the name of the room that new users will
-                be invited to. Defaults to `Content Violation Notification`
-            message:
-                A string containing the first message that will be sent as
-                `new_room_user_id` in the new room. Ideally this will clearly
-                convey why the original room was shut down.
-                Defaults to `Sharing illegal content on this server is not
-                permitted and rooms in violation will be blocked.`
-            block:
-                If set to `true`, this room will be added to a blocking list,
-                preventing future attempts to join the room. Defaults to `false`.
-            purge:
-                If set to `true`, purge the given room from the database.
-            force_purge:
-                If set to `true`, the room will be purged from database
-                also if it fails to remove some users from room.
+            shutdown_params: parameters for the shutdown, cf `RoomShutdownHandler.ShutdownRoomParams`
 
         Saves a `RoomShutdownHandler.ShutdownRoomResponse` in `DeleteStatus`:
         """
 
         self._purges_in_progress_by_room.add(room_id)
         try:
-            async with self.pagination_lock.write(room_id):
-                self._delete_by_id[delete_id].status = DeleteStatus.STATUS_SHUTTING_DOWN
-                self._delete_by_id[
-                    delete_id
-                ].shutdown_room = await self._room_shutdown_handler.shutdown_room(
-                    room_id=room_id,
-                    requester_user_id=requester_user_id,
-                    new_room_user_id=new_room_user_id,
-                    new_room_name=new_room_name,
-                    message=message,
-                    block=block,
-                )
+            self._delete_by_id[delete_id].status = DeleteStatus.STATUS_SHUTTING_DOWN
+            shutdown_response = await self._room_shutdown_handler.shutdown_room(
+                room_id=room_id,
+                delete_id=delete_id,
+                shutdown_params=shutdown_params,
+            )
+            self._delete_by_id[delete_id].shutdown_room = shutdown_response
+
+            if shutdown_params["purge"]:
                 self._delete_by_id[delete_id].status = DeleteStatus.STATUS_PURGING
+                await self.purge_room(
+                    room_id,
+                    delete_id,
+                    shutdown_params["force_purge"],
+                )
+
 
                 if purge:
                     logger.info("starting purge room_id %s", room_id)
@@ -665,43 +647,13 @@ class PaginationHandler:
     def start_shutdown_and_purge_room(
         self,
         room_id: str,
-        requester_user_id: str,
-        new_room_user_id: Optional[str] = None,
-        new_room_name: Optional[str] = None,
-        message: Optional[str] = None,
-        block: bool = False,
-        purge: bool = True,
-        force_purge: bool = False,
+        shutdown_params: ShutdownRoomParams,
     ) -> str:
         """Start off shut down and purge on a room.
 
         Args:
             room_id: The ID of the room to shut down.
-            requester_user_id:
-                User who requested the action and put the room on the
-                blocking list.
-            new_room_user_id:
-                If set, a new room will be created with this user ID
-                as the creator and admin, and all users in the old room will be
-                moved into that room. If not set, no new room will be created
-                and the users will just be removed from the old room.
-            new_room_name:
-                A string representing the name of the room that new users will
-                be invited to. Defaults to `Content Violation Notification`
-            message:
-                A string containing the first message that will be sent as
-                `new_room_user_id` in the new room. Ideally this will clearly
-                convey why the original room was shut down.
-                Defaults to `Sharing illegal content on this server is not
-                permitted and rooms in violation will be blocked.`
-            block:
-                If set to `true`, this room will be added to a blocking list,
-                preventing future attempts to join the room. Defaults to `false`.
-            purge:
-                If set to `true`, purge the given room from the database.
-            force_purge:
-                If set to `true`, the room will be purged from database
-                also if it fails to remove some users from room.
+            shutdown_params: parameters for the shutdown, cf `RoomShutdownHandler.ShutdownRoomParams`
 
         Returns:
             unique ID for this delete transaction.
@@ -714,6 +666,7 @@ class PaginationHandler:
         # This check is double to `RoomShutdownHandler.shutdown_room`
         # But here the requester get a direct response / error with HTTP request
         # and do not have to check the purge status
+        new_room_user_id = shutdown_params["new_room_user_id"]
         if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):
                 raise SynapseError(
@@ -735,14 +688,8 @@ class PaginationHandler:
         run_as_background_process(
             "shutdown_and_purge_room",
             self._shutdown_and_purge_room,
-            delete_id,
             room_id,
-            requester_user_id,
-            new_room_user_id,
-            new_room_name,
-            message,
-            block,
-            purge,
-            force_purge,
+            delete_id,
+            shutdown_params,
         )
         return delete_id
