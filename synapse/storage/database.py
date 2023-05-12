@@ -466,7 +466,6 @@ class LoggingTransaction:
                     opentracing.tags.DATABASE_STATEMENT: one_line_sql,
                 },
             ):
-                logger.info("Executing SQL=%s args=%s", sql, args)
                 return func(sql, *args, **kwargs)
         except Exception as e:
             sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
