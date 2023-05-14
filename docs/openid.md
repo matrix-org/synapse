@@ -585,7 +585,9 @@ oidc_providers:
     scopes: ["read"]
     user_mapping_provider:
       config:
-        subject_claim: "id"
+        subject_template: "{{ user.id }}"
+        localpart_template: "{{ user.username }}"
+        display_name_template: "{{ user.display_name }}"
 ```
 
 Note that the fields `client_id` and `client_secret` are taken from the CURL response above.
