@@ -25,6 +25,3 @@ ALTER TABLE event_push_actions
 -- only needs a SHARE UPDATE EXCLUSIVE lock but can still take a while to complete.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (7605, 'event_push_actions_thread_id', '{}');
-
--- Drop the indexes used to find null thread_ids.
-DROP INDEX IF EXISTS event_push_actions_thread_id_null;

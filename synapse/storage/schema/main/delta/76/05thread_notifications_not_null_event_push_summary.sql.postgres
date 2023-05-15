@@ -24,7 +24,6 @@ ALTER TABLE event_push_summary
 -- We then validate the constraint which doesn't need to worry about new data. It
 -- only needs a SHARE UPDATE EXCLUSIVE lock but can still take a while to complete.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7605, 'event_push_summary_thread_id', '{}');
-
--- Drop the indexes used to find null thread_ids.
-DROP INDEX IF EXISTS event_push_summary_thread_id_null;
+  (7605, 'event_push_summary_thread_id', '{}'),
+  -- Also clean-up the old indexes.
+  (7605, 'event_push_drop_null_thread_id_indexes', '{}');;
