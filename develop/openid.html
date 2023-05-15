@@ -655,7 +655,7 @@ This can be optionally enabled by setting <code>backchannel_logout_enabled</code
 <p>You should receive a response similar to the following. Make sure to save it.</p>
 <pre><code class="language-json">{&quot;client_id&quot;:&quot;someclientid_123&quot;,&quot;client_secret&quot;:&quot;someclientsecret_123&quot;,&quot;id&quot;:&quot;12345&quot;,&quot;name&quot;:&quot;my_synapse_app&quot;,&quot;redirect_uri&quot;:&quot;https://[synapse_public_baseurl]/_synapse/client/oidc/callback&quot;,&quot;website&quot;:null,&quot;vapid_key&quot;:&quot;somerandomvapidkey_123&quot;}
 </code></pre>
-<p>As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set. Your Synapse configuration should include the following:</p>
+<p>As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a <code>sub</code> property, an alternative <code>subject_template</code> has to be set. Your Synapse configuration should include the following:</p>
 <pre><code class="language-yaml">oidc_providers:
   - idp_id: my_mastodon
     idp_name: &quot;Mastodon Instance Example&quot;
@@ -669,7 +669,9 @@ This can be optionally enabled by setting <code>backchannel_logout_enabled</code
     scopes: [&quot;read&quot;]
     user_mapping_provider:
       config:
-        subject_claim: &quot;id&quot;
+        subject_template: &quot;{{ user.id }}&quot;
+        localpart_template: &quot;{{ user.username }}&quot;
+        display_name_template: &quot;{{ user.display_name }}&quot;
 </code></pre>
 <p>Note that the fields <code>client_id</code> and <code>client_secret</code> are taken from the CURL response above.</p>
 <h3 id="shibboleth-with-oidc-plugin"><a class="header" href="#shibboleth-with-oidc-plugin">Shibboleth with OIDC Plugin</a></h3>
