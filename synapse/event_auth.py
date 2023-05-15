@@ -1062,7 +1062,7 @@ def _verify_third_party_invite(
     signed = third_party_invite["signed"]
     if not isinstance(signed, collections.abc.Mapping):
         return False
-    for key in {"mxid", "token"}:
+    for key in {"mxid", "token", "signatures"}:
         if key not in signed:
             return False
 
