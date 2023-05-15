@@ -126,6 +126,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3912": self.config.experimental.msc3912_enabled,
                     # Adds support for unstable "intentional mentions" behaviour.
                     "org.matrix.msc3952_intentional_mentions": self.config.experimental.msc3952_intentional_mentions,
+                    # Whether recursively provide relations is supported.
+                    "org.matrix.msc3981": self.config.experimental.msc3981_recurse_relations,
                     # Adds support for deleting account data.
                     "org.matrix.msc3391": self.config.experimental.msc3391_enabled,
                 },
