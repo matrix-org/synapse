@@ -209,7 +209,7 @@ class UrlPreviewer:
             )
 
         # the in-memory cache:
-        # * ensures that only one request is active at a time
+        # * ensures that only one request to a URL is active at a time
         # * takes load off the DB for the thundering herds
         # * also caches any failures (unlike the DB) so we don't keep
         #    requesting the same endpoint
@@ -251,10 +251,10 @@ class UrlPreviewer:
                 og = og.encode("utf8")
             return og
 
-        # If this URL can be accessed via oEmbed, use that instead.
+        # If this URL can be accessed via an allowed oEmbed, use that instead.
         url_to_download = url
         oembed_url = self._oembed.get_oembed_url(url)
-        if oembed_url:
+        if oembed_url and not self._is_url_blocked(oembed_url):
             url_to_download = oembed_url
 
         media_info = await self._handle_url(url_to_download, user)
@@ -297,7 +297,8 @@ class UrlPreviewer:
                 # defer to that.
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
-                if oembed_url:
+                # Only download to the oEmbed URL if it is allowed.
+                if oembed_url and not self._is_url_blocked(oembed_url):
                     try:
                         oembed_info = await self._handle_url(
                             oembed_url, user, allow_data_urls=True
@@ -390,7 +391,6 @@ class UrlPreviewer:
         Return:
             True if the URL is blocked, False if it is allowed.
         """
-        # XXX: we could move this into _do_preview if we wanted.
         url_tuple = urlsplit(url)
         for entry in self.url_preview_url_blacklist:
             match = True
@@ -422,10 +422,12 @@ class UrlPreviewer:
                         match = False
                         continue
 
+            # All fields matched, return true (the URL is blocked).
             if match:
                 logger.warning("URL %s blocked by url_blacklist entry %s", url, entry)
                 return match
 
+        # No matches were found, the URL is allowed.
         return False
 
     async def _download_url(self, url: str, output_stream: BinaryIO) -> DownloadResult:
@@ -638,6 +640,10 @@ class UrlPreviewer:
         # Remove the raw image URL, this will be replaced with an MXC URL, if successful.
         image_url = og.pop("og:image")
         if not image_url:
+            return
+
+        # Don't attempt to download the URL if it is blocked.
+        if self._is_url_blocked(image_url):
             return
 
         # The image URL from the HTML might be relative to the previewed page,
