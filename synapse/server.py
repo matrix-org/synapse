@@ -107,7 +107,11 @@ from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
-from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
+from synapse.http.client import (
+    InsecureInterceptableContextFactory,
+    ReplicationClient,
+    SimpleHttpClient,
+)
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.media.media_repository import MediaRepository
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
@@ -377,6 +381,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             return False
         return localpart_hostname[1] == self.hostname
 
+    def is_mine_server_name(self, server_name: str) -> bool:
+        """Determines whether a server name refers to this homeserver."""
+        return server_name == self.hostname
+
     @cache_in_self
     def get_clock(self) -> Clock:
         return Clock(self._reactor)
@@ -466,6 +474,13 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config
         )
         return MatrixFederationHttpClient(self, tls_client_options_factory)
+
+    @cache_in_self
+    def get_replication_client(self) -> ReplicationClient:
+        """
+        An HTTP client for HTTP replication.
+        """
+        return ReplicationClient(self)
 
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:

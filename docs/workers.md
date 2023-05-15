@@ -87,12 +87,18 @@ shared configuration file.
 
 ### Shared configuration
 
-Normally, only a couple of changes are needed to make an existing configuration
-file suitable for use with workers. First, you need to enable an
+Normally, only a few changes are needed to make an existing configuration
+file suitable for use with workers:
+* First, you need to enable an
 ["HTTP replication listener"](usage/configuration/config_documentation.md#listeners)
-for the main process; and secondly, you need to enable
-[redis-based replication](usage/configuration/config_documentation.md#redis).
-Optionally, a [shared secret](usage/configuration/config_documentation.md#worker_replication_secret)
+for the main process
+* Secondly, you need to enable
+[redis-based replication](usage/configuration/config_documentation.md#redis)
+* You will need to add an [`instance_map`](usage/configuration/config_documentation.md#instance_map) 
+with the `main` process defined, as well as the relevant connection information from 
+it's HTTP `replication` listener (defined in step 1 above). Note that the `host` defined 
+is the address the worker needs to look for the `main` process at, not necessarily the same address that is bound to.
+* Optionally, a [shared secret](usage/configuration/config_documentation.md#worker_replication_secret)
 can be used to authenticate HTTP traffic between workers. For example:
 
 ```yaml
@@ -111,6 +117,11 @@ worker_replication_secret: ""
 
 redis:
     enabled: true
+
+instance_map:
+    main:
+        host: 'localhost'
+        port: 9093
 ```
 
 See the [configuration manual](usage/configuration/config_documentation.md)
@@ -130,13 +141,13 @@ In the config file for each worker, you must specify:
  * The type of worker ([`worker_app`](usage/configuration/config_documentation.md#worker_app)).
    The currently available worker applications are listed [below](#available-worker-applications).
  * A unique name for the worker ([`worker_name`](usage/configuration/config_documentation.md#worker_name)).
- * The HTTP replication endpoint that it should talk to on the main synapse process
-   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
-   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)).
  * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners) option
    with an `http` listener.
  * **Synapse 1.72 and older:** if handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
    the main process (`worker_main_http_uri`). This config option is no longer required and is ignored when running Synapse 1.73 and newer.
+ * **Synapse 1.83 and older:** The HTTP replication endpoint that the worker should talk to on the main synapse process
+   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
+   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)). If using Synapse 1.84 and newer, these are not needed if `main` is defined on the [shared configuration](#shared-configuration) `instance_map`
 
 For example:
 
@@ -417,11 +428,14 @@ effects of bursts of events from that bridge on events sent by normal users.
 Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.
 
-To enable this, the worker must have a
-[HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
-have a [`worker_name`](usage/configuration/config_documentation.md#worker_name)
+To enable this, the worker must have:
+* An [HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
+* Have a [`worker_name`](usage/configuration/config_documentation.md#worker_name)
 and be listed in the [`instance_map`](usage/configuration/config_documentation.md#instance_map)
-config. The same worker can handle multiple streams, but unless otherwise documented,
+config. 
+* Have the main process declared on the [`instance_map`](usage/configuration/config_documentation.md#instance_map) as well.
+
+Note: The same worker can handle multiple streams, but unless otherwise documented,
 each stream can only have a single writer.
 
 For example, to move event persistence off to a dedicated worker, the shared
@@ -429,6 +443,9 @@ configuration would include:
 
 ```yaml
 instance_map:
+    main:
+        host: localhost
+        port: 8030
     event_persister1:
         host: localhost
         port: 8034

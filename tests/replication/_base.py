@@ -110,8 +110,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
         config["worker_app"] = "synapse.app.generic_worker"
-        config["worker_replication_host"] = "testserv"
-        config["worker_replication_http_port"] = "8765"
+        config["instance_map"] = {"main": {"host": "testserv", "port": 8765}}
         return config
 
     def _build_replication_data_handler(self) -> "TestReplicationDataHandler":
@@ -249,6 +248,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         """
         base = super().default_config()
         base["redis"] = {"enabled": True}
+        base["instance_map"] = {"main": {"host": "testserv", "port": 8765}}
         return base
 
     def setUp(self) -> None:
@@ -310,7 +310,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     def make_worker_hs(
         self, worker_app: str, extra_config: Optional[dict] = None, **kwargs: Any
     ) -> HomeServer:
-        """Make a new worker HS instance, correctly connecting replcation
+        """Make a new worker HS instance, correctly connecting replication
         stream to the master HS.
 
         Args:
@@ -388,8 +388,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
 
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
-        config["worker_replication_host"] = "testserv"
-        config["worker_replication_http_port"] = "8765"
         return config
 
     def replicate(self) -> None:
