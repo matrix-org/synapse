@@ -113,7 +113,7 @@ class UrlPreviewer:
        1. Checks URL and timestamp against the database cache and returns the result if it
           has not expired and was successful (a 2xx return code).
        2. Checks if the URL matches an oEmbed (https://oembed.com/) pattern. If it
-          does, update the URL to download.
+          does and the new URL is not blocked, update the URL to download.
        3. Downloads the URL and stores it into a file via the media storage provider
           and saves the local media metadata.
        4. If the media is an image:
@@ -127,14 +127,14 @@ class UrlPreviewer:
                 and saves the local media metadata.
              2. Convert the oEmbed response to an Open Graph response.
              3. Override any Open Graph data from the HTML with data from oEmbed.
-          4. If an image exists in the Open Graph response:
+          4. If an image URL exists in the Open Graph response:
              1. Downloads the URL and stores it into a file via the media storage
                 provider and saves the local media metadata.
              2. Generates thumbnails.
              3. Updates the Open Graph response based on image properties.
-       6. If the media is JSON and an oEmbed URL was found:
+       6. If an oEmbed URL was found and the media is JSON:
           1. Convert the oEmbed response to an Open Graph response.
-          2. If a thumbnail or image is in the oEmbed response:
+          2. If an image URL is in the oEmbed response:
              1. Downloads the URL and stores it into a file via the media storage
                 provider and saves the local media metadata.
              2. Generates thumbnails.
@@ -144,7 +144,8 @@ class UrlPreviewer:
 
     If any additional requests (e.g. from oEmbed autodiscovery, step 5.3 or
     image thumbnailing, step 5.4 or 6.4) fails then the URL preview as a whole
-    does not fail. As much information as possible is returned.
+    does not fail. If any of them are blocked, then those additional requests
+    are skipped. As much information as possible is returned.
 
     The in-memory cache expires after 1 hour.
 
@@ -212,7 +213,10 @@ class UrlPreviewer:
         # * ensures that only one request to a URL is active at a time
         # * takes load off the DB for the thundering herds
         # * also caches any failures (unlike the DB) so we don't keep
-        #    requesting the same endpoint
+        #   requesting the same endpoint
+        #
+        # Note that autodiscovered oEmbed URLs and pre-caching of images
+        # are not captured in the in-memory cache.
 
         observable = self._cache.get(url)
 
