@@ -130,6 +130,16 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         add_fields("membership")
         if room_version.msc3375_redaction_rules:
             add_fields(EventContentFields.AUTHORISING_USER)
+        if room_version.msc3821_redaction_rules:
+            # Preserve the signed field under third_party_invite.
+            third_party_invite = event_dict["content"].get("third_party_invite")
+            if isinstance(third_party_invite, collections.abc.Mapping):
+                new_content["third_party_invite"] = {}
+                if "signed" in third_party_invite:
+                    new_content["third_party_invite"]["signed"] = third_party_invite[
+                        "signed"
+                    ]
+
     elif event_type == EventTypes.Create:
         # MSC2176 rules state that create events cannot be redacted.
         if room_version.msc2176_redaction_rules:
