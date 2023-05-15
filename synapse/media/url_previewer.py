@@ -394,8 +394,9 @@ class UrlPreviewer:
         url_tuple = urlsplit(url)
         for entry in self.url_preview_url_blacklist:
             match = True
-            for attrib in entry:
-                pattern = entry[attrib]
+            # Iterate over each entry. If *all* attributes of that entry match
+            # the current URL, then reject it.
+            for attrib, pattern in entry.items():
                 value = getattr(url_tuple, attrib)
                 logger.debug(
                     "Matching attrib '%s' with value '%s' against pattern '%s'",
@@ -406,21 +407,23 @@ class UrlPreviewer:
 
                 if value is None:
                     match = False
-                    continue
+                    break
 
                 # Some attributes might not be parsed as strings by urlsplit (such as the
                 # port, which is parsed as an int). Because we use match functions that
                 # expect strings, we want to make sure that's what we give them.
                 value_str = str(value)
 
+                # Check the value against the pattern as either a regular expression or
+                # a glob. If it doesn't match, the entry doesn't match.
                 if pattern.startswith("^"):
                     if not re.match(pattern, value_str):
                         match = False
-                        continue
+                        break
                 else:
                     if not fnmatch.fnmatch(value_str, pattern):
                         match = False
-                        continue
+                        break
 
             # All fields matched, return true (the URL is blocked).
             if match:
