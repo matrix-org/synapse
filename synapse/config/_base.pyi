@@ -6,7 +6,6 @@ from typing import (
     Iterable,
     Iterator,
     List,
-    Literal,
     MutableMapping,
     Optional,
     Tuple,
@@ -17,6 +16,7 @@ from typing import (
 )
 
 import jinja2
+from typing_extensions import Literal
 
 from synapse.config import (  # noqa: F401
     account_validity,
