@@ -1,0 +1,1 @@
+Fix `Literal` being imported from `typing.Literal` which is only compatible with Python 3.8+.
