@@ -437,15 +437,25 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
 
         # After MSC3821, the signed key under third_party_invite is protected
         # from redaction.
+        THIRD_PARTY_INVITE = {
+            "display_name": "alice",
+            "signed": {
+                "mxid": "@alice:example.org",
+                "signatures": {
+                    "magic.forest": {
+                        "ed25519:3": "fQpGIW1Snz+pwLZu6sTy2aHy/DYWWTspTJRPyNp0PKkymfIsNffysMl6ObMMFdIJhk6g6pwlIqZ54rxo8SLmAg"
+                    }
+                },
+                "token": "abc123",
+            },
+        }
+
         self.run_test(
             {
                 "type": "m.room.member",
                 "content": {
                     "membership": "invite",
-                    "third_party_invite": {
-                        "signed": "foo",
-                        "display_name": "stripped",
-                    },
+                    "third_party_invite": THIRD_PARTY_INVITE,
                     "other_key": "stripped",
                 },
             },
@@ -453,7 +463,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "type": "m.room.member",
                 "content": {
                     "membership": "invite",
-                    "third_party_invite": {"signed": "foo"},
+                    "third_party_invite": {"signed": THIRD_PARTY_INVITE["signed"]},
                 },
                 "signatures": {},
                 "unsigned": {},
