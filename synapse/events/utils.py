@@ -174,7 +174,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
     # Protect the rel_type and event_id fields under the m.relates_to field.
     if room_version.msc3389_relation_redactions:
         relates_to = event_dict["content"].get("m.relates_to")
-        if relates_to and isinstance(relates_to, collections.abc.Mapping):
+        if isinstance(relates_to, collections.abc.Mapping):
             new_relates_to = {}
             for field in ("rel_type", "event_id"):
                 if field in relates_to:
