@@ -95,10 +95,6 @@ jobs:
       - name: Setup Poetry
         uses: matrix-org/setup-python-poetry@v1
         with:
-          # We set this as our minimum supported Python version. We use the oldest
-          # Python version because later Python versions can include some overloads
-          # which don't work in the older versions.
-          python-version: '3.8'
           # We want to make use of type hints in optional dependencies too.
           extras: all
           # We have seen odd mypy failures that were resolved when we started
