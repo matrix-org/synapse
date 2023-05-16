@@ -107,14 +107,15 @@ jobs:
         uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
 
-      # NB: I have two concerns with this action:
-      # 1. We occasionally see odd mypy problems that aren't reproducible
-      #    locally with clean caches. I suspect some dodgy caching behaviour.
-      # 2. The action uses GHA machinery that's deprecated
-      #    (https://github.com/AustinScola/mypy-cache-github-action/issues/277)
-      # It may be simpler to use actions/cache ourselves to restore .mypy_cache.
+      # Cribbed from
+      # https://github.com/AustinScola/mypy-cache-github-action/blob/85ea4f2972abed39b33bd02c36e341b28ca59213/src/restore.ts#L10-L17
       - name: Restore/persist mypy's cache
-        uses: AustinScola/mypy-cache-github-action@df56268388422ee282636ee2c7a9cc55ec644a41
+        uses: actions/cache@v3
+        with:
+          path: |
+            .mypy_cache
+          key: mypy-cache-${{ github.context.sha }}
+          restore-keys: mypy-cache-
 
       - name: Run mypy
         run: poetry run mypy
@@ -320,34 +321,25 @@ jobs:
         with:
           python-version: '3.7'
 
-      # Calculating the old-deps actually takes a bunch of time, so we cache the
-      # pyproject.toml / poetry.lock. We need to cache pyproject.toml as
-      # otherwise the `poetry install` step will error due to the poetry.lock
-      # file being outdated.
-      #
-      # This caches the output of `Prepare old deps`, which should generate the
-      # same `pyproject.toml` and `poetry.lock` for a given `pyproject.toml` input.
-      - uses: actions/cache@v3
-        id: cache-poetry-old-deps
-        name: Cache poetry.lock
-        with:
-          path: |
-            poetry.lock
-            pyproject.toml
-          key: poetry-old-deps2-${{ hashFiles('pyproject.toml') }}
       - name: Prepare old deps
         if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
         run: .ci/scripts/prepare_old_deps.sh
 
-      # We only now install poetry so that `setup-python-poetry` caches the
-      # right poetry.lock's dependencies.
-      - uses: matrix-org/setup-python-poetry@v1
-        with:
-          python-version: '3.7'
-          poetry-version: "1.3.2"
-          extras: "all test"
+      # Note: we install using `pip` here, not poetry. `poetry install` ignores the
+      # build-system section (https://github.com/python-poetry/poetry/issues/6154), but
+      # we explicitly want to test that you can `pip install` using the oldest version
+      # of poetry-core and setuptools-rust.
+      - run: pip install .[all,test]
 
-      - run: poetry run trial -j6 tests
+      # We nuke the local copy, as we've installed synapse into the virtualenv
+      # (rather than use an editable install, which we no longer support). If we
+      # don't do this then python can't find the native lib.
+      - run: rm -rf synapse/
+
+      # Sanity check we can import/run Synapse
+      - run: python -m synapse.app.homeserver --help
+
+      - run: python -m twisted.trial -j6 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
