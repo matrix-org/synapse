@@ -25,6 +25,7 @@ from typing import (
     MutableMapping,
     Optional,
     Union,
+    Match,
 )
 
 import attr
@@ -45,13 +46,6 @@ from . import EventBase
 if TYPE_CHECKING:
     from synapse.handlers.relations import BundledAggregations
 
-
-# Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
-# (?<!stuff) matches if the current position in the string is not preceded
-# by a match for 'stuff'.
-# TODO: This is fast, but fails to handle "foo\\.bar" which should be treated as
-#       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
-SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 CANONICALJSON_MAX_INT = (2**53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
@@ -259,7 +253,50 @@ def _split_field(field: str) -> List[str]:
     # 1. "content.body.thing\.with\.dots"
     # 2. ["content", "body", "thing\.with\.dots"]
     # 3. ["content", "body", "thing.with.dots"]
-    return [part.replace(r"\.", r".") for part in SPLIT_FIELD_REGEX.split(field)]
+
+    result = []
+
+    # The current field and whether the previous character was the escape
+    # character (a backslash).
+    part = ""
+    escaped = False
+
+    # Iterate over each character, and decide whether to append to the current
+    # part (following the escape rules) or to start a new part (based on the
+    # field separator).
+    for c in field:
+        # If the previous character was the escape character (a backslash)
+        # then decide what to append to the current part.
+        if escaped:
+            if c in ("\\", "."):
+                # An escaped backslash or dot just gets added.
+                part += c
+            else:
+                # A character that shouldn't be escaped gets the backslash prepended.
+                part += "\\" + c
+            # This always resets being escaped.
+            escaped = False
+
+        # Otherwise, the previous character was not the escape character.
+        else:
+            if c == ".":
+                # The field separator creates a new part.
+                result.append(part)
+                part = ""
+            elif c == "\\":
+                # A backslash adds no characters, but starts an escape sequence.
+                escaped = True
+            else:
+                # Otherwise, just add the current character.
+                part += c
+
+    # Ensure the final part is included. If there's an open escape sequence
+    # it should be included.
+    if escaped:
+        part += "\\"
+    result.append(part)
+
+    return result
 
 
 def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
@@ -269,7 +306,7 @@ def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
     If there are no event fields specified then all fields are included.
     The entries may include '.' characters to indicate sub-fields.
     So ['content.body'] will include the 'body' field of the 'content' object.
-    A literal '.' character in a field name may be escaped using a '\'.
+    A literal '.' or '\' character in a field name may be escaped using a '\'.
 
     Args:
         dictionary: The dictionary to read from.
