@@ -60,7 +60,7 @@ Internal Changes
 - Bump ruff from 0.0.259 to 0.0.265. ([\#15551](https://github.com/matrix-org/synapse/issues/15551))
 - Bump hiredis from 2.2.2 to 2.2.3. ([\#15552](https://github.com/matrix-org/synapse/issues/15552))
 - Bump types-requests from 2.29.0.0 to 2.30.0.0. ([\#15553](https://github.com/matrix-org/synapse/issues/15553))
-- Add `org.matrix.msc3981` info to `client/versions`. ([\#15558](https://github.com/matrix-org/synapse/issues/15558))
+- Add `org.matrix.msc3981` info to `/_matrix/client/versions`. ([\#15558](https://github.com/matrix-org/synapse/issues/15558))
 - Declare unstable support for [MSC3391](https://github.com/matrix-org/matrix-spec-proposals/pull/3391) under `/_matrix/client/versions` if the experimental implementation is enabled. ([\#15562](https://github.com/matrix-org/synapse/issues/15562))
 - Implement [MSC3821](https://github.com/matrix-org/matrix-spec-proposals/pull/3821) to update the redaction rules. ([\#15563](https://github.com/matrix-org/synapse/issues/15563))
 - Implement updated redaction rules from [MSC3389](https://github.com/matrix-org/matrix-spec-proposals/pull/3389). ([\#15565](https://github.com/matrix-org/synapse/issues/15565))
