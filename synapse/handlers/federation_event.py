@@ -953,13 +953,19 @@ class FederationEventHandler:
             )
             return
 
-        # Check if we've already tried to process this event
+        # Check if we've already tried to process this event at some point in the past.
+        # We aren't concerned with the expontntial backoff here, just whether it has
+        # failed before.
         failed_pull_attempt_info = await self._store.get_event_failed_pull_attempt_info(
             event.room_id, event_id
         )
         if failed_pull_attempt_info:
             # Process previously failed backfill events in the background to not waste
             # time on something that is bound to fail again.
+            #
+            # TODO: Are we concerned with processing too many events in parallel since
+            # we just fire and forget this off to the background? Should we instead have
+            # a background queue to chew through?
             run_as_background_process(
                 "_try_process_pulled_event",
                 self._try_process_pulled_event,
