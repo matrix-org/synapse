@@ -649,15 +649,15 @@ class UrlPreviewer:
         if not image_url:
             return
 
-        # Don't attempt to download the URL if it is blocked.
-        if self._is_url_blocked(image_url):
-            return
-
         # The image URL from the HTML might be relative to the previewed page,
-        # convert it to an URL which can be requested directly.
+        # convert it to a URL which can be requested directly.
         url_parts = urlparse(image_url)
         if url_parts.scheme != "data":
             image_url = urljoin(media_info.uri, image_url)
+
+        # Don't attempt to download the URL if it is blocked.
+        if self._is_url_blocked(image_url):
+            return
 
         # FIXME: it might be cleaner to use the same flow as the main /preview_url
         # request itself and benefit from the same caching etc.  But for now we
