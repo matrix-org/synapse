@@ -108,15 +108,6 @@ class BackfillQueueNavigationItem:
     type: str
 
 
-@attr.s(frozen=True, slots=True, auto_attribs=True)
-class EventFailedPullAttemptInfo:
-    event_id: str
-    room_id: str
-    num_attempts: int
-    last_attempt_ts: int
-    last_cause: str
-
-
 class _NoChainCoverIndex(Exception):
     def __init__(self, room_id: str):
         super().__init__("Unexpectedly no chain cover for events in %s" % (room_id,))
@@ -1592,30 +1583,35 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
 
+    # TODO: Add tests for this function
     @trace
-    async def get_event_failed_pull_attempt_info(
-        self,
-        room_id: str,
-        event_id: str,
-    ) -> Optional[EventFailedPullAttemptInfo]:
-        res = await self.db_pool.simple_select_one(
+    async def separate_event_ids_with_failed_pull_attempts(
+        self, event_ids: Collection[str]
+    ) -> Tuple[Collection[str], Collection[str]]:
+        """
+        Separate the given list of events into
+
+        Args:
+            event_ids: A list of events to separate
+
+        Returns:
+            A tuple with two lists that events separated into based on whether they have
+            failed pull attempts or not (event_ids_with_failed_pull_attempts,
+            fresh_event_ids).
+        """
+
+        rows = await self.db_pool.simple_select_many_batch(
             table="event_failed_pull_attempts",
-            keyvalues={"room_id": room_id, "event_id": event_id},
-            retcols=["num_attempts", "last_attempt_ts", "last_cause"],
-            allow_none=True,
-            desc="get_event_failed_pull_attempt_info",
+            column="event_id",
+            iterable=event_ids,
+            keyvalues={},
+            retcols=("event_id",),
+            desc="separate_event_ids_with_failed_pull_attempts",
         )
+        event_ids_with_failed_pull_attempts = {str(row["event_id"]) for row in rows}
+        fresh_event_ids = set(event_ids) - event_ids_with_failed_pull_attempts
 
-        if res is None:
-            return None
-
-        return EventFailedPullAttemptInfo(
-            event_id=event_id,
-            room_id=room_id,
-            num_attempts=res["num_attempts"],
-            last_attempt_ts=res["last_attempt_ts"],
-            last_cause=res["last_cause"],
-        )
+        return (event_ids_with_failed_pull_attempts, fresh_event_ids)
 
     @trace
     async def get_event_ids_to_not_pull_from_backoff(

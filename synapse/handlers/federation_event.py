@@ -890,12 +890,42 @@ class FederationEventHandler:
             # Continue on with the events that are new to us.
             new_events.append(event)
 
-        # We want to sort these by depth so we process them and
-        # tell clients about them in order.
-        sorted_events = sorted(new_events, key=lambda x: x.depth)
-        for ev in sorted_events:
-            with nested_logging_context(ev.event_id):
-                await self._process_pulled_event(origin, ev, backfilled=backfilled)
+        @trace
+        async def _process_new_pulled_events(new_events: Collection[EventBase]) -> None:
+            # We want to sort these by depth so we process them and
+            # tell clients about them in order.
+            sorted_events = sorted(new_events, key=lambda x: x.depth)
+            for ev in sorted_events:
+                with nested_logging_context(ev.event_id):
+                    await self._process_pulled_event(origin, ev, backfilled=backfilled)
+
+        # Check if we've already tried to process these events at some point in the
+        # past. We aren't concerned with the expontntial backoff here, just whether it
+        # has failed to be processed before.
+        new_event_dict = {event.event_id: event for event in new_events}
+        (
+            event_ids_with_failed_pull_attempts,
+            fresh_event_ids,
+        ) = await self._store.separate_event_ids_with_failed_pull_attempts(
+            new_event_dict.keys()
+        )
+
+        # Process previously failed backfill events in the background to not waste
+        # time on something that is bound to fail again.
+        run_as_background_process(
+            "_process_new_pulled_events",
+            _process_new_pulled_events,
+            [
+                new_event_dict[event_id]
+                for event_id in event_ids_with_failed_pull_attempts
+            ],
+        )
+
+        # We can optimistically try to process and wait for the event to be fully
+        # persisted.
+        await _process_new_pulled_events(
+            [new_event_dict[event_id] for event_id in fresh_event_ids]
+        )
 
     @trace
     @tag_args
@@ -952,47 +982,6 @@ class FederationEventHandler:
                 event.room_id, event_id, str(err)
             )
             return
-
-        # Check if we've already tried to process this event at some point in the past.
-        # We aren't concerned with the expontntial backoff here, just whether it has
-        # failed before.
-        failed_pull_attempt_info = await self._store.get_event_failed_pull_attempt_info(
-            event.room_id, event_id
-        )
-        if failed_pull_attempt_info:
-            # Process previously failed backfill events in the background to not waste
-            # time on something that is bound to fail again.
-            #
-            # TODO: Are we concerned with processing too many events in parallel since
-            # we just fire and forget this off to the background? Should we instead have
-            # a background queue to chew through?
-            run_as_background_process(
-                "_try_process_pulled_event",
-                self._try_process_pulled_event,
-                origin,
-                event,
-                backfilled,
-            )
-        else:
-            # Otherwise, we can optimistically try to process and wait for the event to
-            # be fully persisted.
-            await self._try_process_pulled_event(origin, event, backfilled)
-
-    async def _try_process_pulled_event(
-        self, origin: str, event: EventBase, backfilled: bool
-    ) -> None:
-        """
-        Handles all of the async tasks necessary to process a pulled event. You should
-        not use this method directly, instead use `_process_pulled_event` which will
-        handle all of the quick sync checks that should happen before-hand.
-
-        Params:
-            origin: The server we received this event from
-            events: The received event
-            backfilled: True if this is part of a historical batch of events (inhibits
-                notification to clients, and validation of device keys.)
-        """
-        event_id = event.event_id
 
         try:
             try:
