@@ -36,7 +36,7 @@ from synapse.util import Clock
 
 from tests.server import FakeTransport
 
-from ._base import BaseSlavedStoreTestCase
+from ._base import BaseWorkerStoreTestCase
 
 USER_ID = "@feeling:test"
 USER_ID_2 = "@bright:test"
@@ -63,7 +63,7 @@ def patch__eq__(cls: object) -> Callable[[], None]:
     return unpatch
 
 
-class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
+class EventsWorkerStoreTestCase(BaseWorkerStoreTestCase):
     STORE_TYPE = EventsWorkerStore
 
     def setUp(self) -> None:
@@ -294,7 +294,7 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
         assert j2.internal_metadata.stream_ordering is not None
 
         event_source = RoomEventSource(self.hs)
-        event_source.store = self.slaved_store
+        event_source.store = self.worker_store
         current_token = event_source.get_current_key()
 
         # gradually stream out the replication
@@ -310,12 +310,12 @@ class EventsWorkerStoreTestCase(BaseSlavedStoreTestCase):
             #
             # First, we get a list of the rooms we are joined to
             joined_rooms = self.get_success(
-                self.slaved_store.get_rooms_for_user_with_stream_ordering(USER_ID_2)
+                self.worker_store.get_rooms_for_user_with_stream_ordering(USER_ID_2)
             )
 
             # Then, we get a list of the events since the last sync
             membership_changes = self.get_success(
-                self.slaved_store.get_membership_changes_for_user(
+                self.worker_store.get_membership_changes_for_user(
                     USER_ID_2, prev_token, current_token
                 )
             )
