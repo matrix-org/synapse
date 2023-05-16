@@ -192,9 +192,7 @@ class ProfileHandler:
     async def get_avatar_url(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
             try:
-                avatar_url = await self.store.get_profile_avatar_url(
-                    target_user.localpart
-                )
+                avatar_url = await self.store.get_profile_avatar_url(target_user)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
@@ -370,9 +368,7 @@ class ProfileHandler:
                 response["displayname"] = await self.store.get_profile_displayname(user)
 
             if just_field is None or just_field == "avatar_url":
-                response["avatar_url"] = await self.store.get_profile_avatar_url(
-                    user.localpart
-                )
+                response["avatar_url"] = await self.store.get_profile_avatar_url(user)
         except StoreError as e:
             if e.code == 404:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
