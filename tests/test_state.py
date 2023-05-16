@@ -557,6 +557,8 @@ class StateTestCase(unittest.TestCase):
 
         self.assertIsNotNone(context.state_group_before_event)
         assert context.state_group_deltas is not None
+        assert context.state_group_before_event is not None
+        assert context.state_group is not None
         self.assertEqual(
             context.state_group_deltas.get(
                 (context.state_group_before_event, context.state_group)
