@@ -31,15 +31,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     if not lxml:
         skip = "url preview feature requires lxml"
 
-    hijack_auth = True
-    user_id = "@test:user"
-    end_content = (
-        b"<html><head>"
-        b'<meta property="og:title" content="~matrix~" />'
-        b'<meta property="og:description" content="hi" />'
-        b"</head></html>"
-    )
-
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["url_preview_enabled"] = True
