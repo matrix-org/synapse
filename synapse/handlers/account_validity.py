@@ -164,7 +164,7 @@ class AccountValidityHandler:
 
         try:
             user_display_name = await self.store.get_profile_displayname(
-                UserID.from_string(user_id).localpart
+                UserID.from_string(user_id)
             )
             if user_display_name is None:
                 user_display_name = user_id

@@ -35,18 +35,14 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             "Frank",
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.u_frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.u_frank))),
         )
 
         # test set to None
         self.get_success(self.store.set_profile_displayname(self.u_frank, None))
 
         self.assertIsNone(
-            self.get_success(self.store.get_profile_displayname(self.u_frank.localpart))
+            self.get_success(self.store.get_profile_displayname(self.u_frank))
         )
 
     def test_avatar_url(self) -> None:
