@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import pymacaroons
-from netaddr import IPAddress
-
-from twisted.web.server import Request
 
 from synapse.api.errors import (
     AuthError,
@@ -122,7 +119,7 @@ class InternalAuth(BaseAuth):
             access_token = self.get_access_token_from_request(request)
 
             # First check if it could be a request from an appservice
-            requester = await self._get_appservice_user(request)
+            requester = await self.get_appservice_user(request, access_token)
             if not requester:
                 # If not, it should be from a regular user
                 requester = await self.get_user_by_access_token(
@@ -188,81 +185,6 @@ class InternalAuth(BaseAuth):
             return requester
         except KeyError:
             raise MissingClientTokenError()
-
-    @cancellable
-    async def _get_appservice_user(self, request: Request) -> Optional[Requester]:
-        """
-        Given a request, reads the request parameters to determine:
-        - whether it's an application service that's making this request
-        - what user the application service should be treated as controlling
-          (the user_id URI parameter allows an application service to masquerade
-          any applicable user in its namespace)
-        - what device the application service should be treated as controlling
-          (the device_id[^1] URI parameter allows an application service to masquerade
-          as any device that exists for the relevant user)
-
-        [^1] Unstable and provided by MSC3202.
-             Must use `org.matrix.msc3202.device_id` in place of `device_id` for now.
-
-        Returns:
-            the application service `Requester` of that request
-
-        Postconditions:
-        - The `app_service` field in the returned `Requester` is set
-        - The `user_id` field in the returned `Requester` is either the application
-          service sender or the controlled user set by the `user_id` URI parameter
-        - The returned application service is permitted to control the returned user ID.
-        - The returned device ID, if present, has been checked to be a valid device ID
-          for the returned user ID.
-        """
-        DEVICE_ID_ARG_NAME = b"org.matrix.msc3202.device_id"
-
-        app_service = self.store.get_app_service_by_token(
-            self.get_access_token_from_request(request)
-        )
-        if app_service is None:
-            return None
-
-        if app_service.ip_range_whitelist:
-            ip_address = IPAddress(request.getClientAddress().host)
-            if ip_address not in app_service.ip_range_whitelist:
-                return None
-
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
-        if b"user_id" in request.args:
-            effective_user_id = request.args[b"user_id"][0].decode("utf8")
-            await self.validate_appservice_can_control_user_id(
-                app_service, effective_user_id
-            )
-        else:
-            effective_user_id = app_service.sender
-
-        effective_device_id: Optional[str] = None
-
-        if (
-            self.hs.config.experimental.msc3202_device_masquerading_enabled
-            and DEVICE_ID_ARG_NAME in request.args
-        ):
-            effective_device_id = request.args[DEVICE_ID_ARG_NAME][0].decode("utf8")
-            # We only just set this so it can't be None!
-            assert effective_device_id is not None
-            device_opt = await self.store.get_device(
-                effective_user_id, effective_device_id
-            )
-            if device_opt is None:
-                # For now, use 400 M_EXCLUSIVE if the device doesn't exist.
-                # This is an open thread of discussion on MSC3202 as of 2021-12-09.
-                raise AuthError(
-                    400,
-                    f"Application service trying to use a device that doesn't exist ('{effective_device_id}' for {effective_user_id})",
-                    Codes.EXCLUSIVE,
-                )
-
-        return create_requester(
-            effective_user_id, app_service=app_service, device_id=effective_device_id
-        )
 
     async def get_user_by_access_token(
         self,

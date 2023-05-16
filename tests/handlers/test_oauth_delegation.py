@@ -527,8 +527,8 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.expect_unrecognized(
             "GET", "/_matrix/client/v1/register/m.login.registration_token/validity"
         )
-        self.expect_unrecognized("POST", "/_matrix/client/v3/register")
-        self.expect_unrecognized("GET", "/_matrix/client/v3/register")
+        # This is still available for AS registrations
+        # self.expect_unrecognized("POST", "/_matrix/client/v3/register")
         self.expect_unrecognized("GET", "/_matrix/client/v3/register/available")
         self.expect_unrecognized(
             "POST", "/_matrix/client/v3/register/email/requestToken"
