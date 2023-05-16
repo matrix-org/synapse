@@ -137,11 +137,11 @@ class ProfileWorkerStore(SQLBaseStore):
 
         return 50
 
-    async def get_profileinfo(self, user_localpart: str) -> ProfileInfo:
+    async def get_profileinfo(self, user_id: UserID) -> ProfileInfo:
         try:
             profile = await self.db_pool.simple_select_one(
                 table="profiles",
-                keyvalues={"user_id": user_localpart},
+                keyvalues={"full_user_id": user_id.to_string()},
                 retcols=("displayname", "avatar_url"),
                 desc="get_profileinfo",
             )
