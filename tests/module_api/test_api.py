@@ -837,6 +837,7 @@ class ModuleApiWorkerTestCase(BaseModuleApiTestCase, BaseMultiWorkerStreamTestCa
         conf = super().default_config()
         conf["stream_writers"] = {"presence": ["presence_writer"]}
         conf["instance_map"] = {
+            "main": {"host": "testserv", "port": 8765},
             "presence_writer": {"host": "testserv", "port": 1001},
         }
         return conf

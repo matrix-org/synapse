@@ -183,6 +183,14 @@ class ProfileWorkerStore(SQLBaseStore):
     async def set_profile_displayname(
         self, user_id: UserID, new_displayname: Optional[str]
     ) -> None:
+        """
+        Set the display name of a user.
+
+        Args:
+            user_id: The user's ID.
+            new_displayname: The new display name. If this is None, the user's display
+                name is removed.
+        """
         user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",
@@ -197,6 +205,14 @@ class ProfileWorkerStore(SQLBaseStore):
     async def set_profile_avatar_url(
         self, user_id: UserID, new_avatar_url: Optional[str]
     ) -> None:
+        """
+        Set the avatar of a user.
+
+        Args:
+            user_id: The user's ID.
+            new_avatar_url: The new avatar URL. If this is None, the user's avatar is
+                removed.
+        """
         user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",

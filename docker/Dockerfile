@@ -37,7 +37,7 @@ RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update -qq && apt-get install -yqq \
-  build-essential curl git libffi-dev libssl-dev \
+  build-essential curl git libffi-dev libssl-dev pkg-config \
   && rm -rf /var/lib/apt/lists/*
 
 # Install rust and ensure its in the PATH.

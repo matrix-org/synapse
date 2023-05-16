@@ -194,6 +194,7 @@ class SsoHandler:
         self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -223,6 +224,8 @@ class SsoHandler:
         self._identity_providers: Dict[str, SsoIdentityProvider] = {}
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
+
+        self._e164_mxids = hs.config.experimental.msc4009_e164_mxids
 
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
@@ -710,7 +713,7 @@ class SsoHandler:
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
         if not attributes.localpart or contains_invalid_mxid_characters(
-            attributes.localpart
+            attributes.localpart, self._e164_mxids
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
@@ -802,7 +805,7 @@ class SsoHandler:
             if profile["avatar_url"] is not None:
                 server_name = profile["avatar_url"].split("/")[-2]
                 media_id = profile["avatar_url"].split("/")[-1]
-                if server_name == self._server_name:
+                if self._is_mine_server_name(server_name):
                     media = await self._media_repo.store.get_local_media(media_id)
                     if media is not None and upload_name == media["upload_name"]:
                         logger.info("skipping saving the user avatar")
@@ -943,7 +946,7 @@ class SsoHandler:
             localpart,
         )
 
-        if contains_invalid_mxid_characters(localpart):
+        if contains_invalid_mxid_characters(localpart, self._e164_mxids):
             raise SynapseError(400, "localpart is invalid: %s" % (localpart,))
         user_id = UserID(localpart, self._server_name).to_string()
         user_infos = await self._store.get_users_by_id_case_insensitive(user_id)

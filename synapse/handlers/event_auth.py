@@ -29,7 +29,7 @@ from synapse.event_auth import (
 )
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
-from synapse.types import StateMap, StrCollection, get_domain_from_id
+from synapse.types import StateMap, StrCollection
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -47,6 +47,7 @@ class EventAuthHandler:
         self._store = hs.get_datastores().main
         self._state_storage_controller = hs.get_storage_controllers().state
         self._server_name = hs.hostname
+        self._is_mine_id = hs.is_mine_id
 
     async def check_auth_rules_from_context(
         self,
@@ -247,7 +248,7 @@ class EventAuthHandler:
         if not await self.is_user_in_rooms(allowed_rooms, user_id):
             # If this is a remote request, the user might be in an allowed room
             # that we do not know about.
-            if get_domain_from_id(user_id) != self._server_name:
+            if not self._is_mine_id(user_id):
                 for room_id in allowed_rooms:
                     if not await self._store.is_host_joined(room_id, self._server_name):
                         raise SynapseError(

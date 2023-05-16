@@ -97,6 +97,9 @@
 
                   # Native dependencies for running Complement.
                   olm
+
+                  # For building the Synapse documentation website.
+                  mdbook
                 ];
 
                 # Install Python and manage a virtualenv with Poetry.
