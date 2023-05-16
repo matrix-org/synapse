@@ -126,7 +126,9 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
             expected_values.append((f"@hello{i:02}:{self.hs.hostname}",))
 
         res = self.get_success(
-            self.store.db_pool.execute("", None, "SELECT full_user_id from profiles ORDER BY full_user_id")
+            self.store.db_pool.execute(
+                "", None, "SELECT full_user_id from profiles ORDER BY full_user_id"
+            )
         )
         self.assertEqual(len(res), len(expected_values))
         self.assertEqual(res, expected_values)
