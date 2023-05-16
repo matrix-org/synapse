@@ -1583,7 +1583,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
 
-    # TODO: Add tests for this function
     @trace
     async def separate_event_ids_with_failed_pull_attempts(
         self, event_ids: Collection[str]
