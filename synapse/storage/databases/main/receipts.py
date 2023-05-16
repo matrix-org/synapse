@@ -85,13 +85,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
         else:
             self._can_write_to_receipts = True
 
+            # Multiple writers are not supported for SQLite.
+            #
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support it for unit tests.
-            #
-            # If this process is the writer than we need to use
-            # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
-            # updated over replication. (Multiple writers are not supported for
-            # SQLite).
             self._receipts_id_gen = StreamIdGenerator(
                 db_conn,
                 hs.get_replication_notifier(),
