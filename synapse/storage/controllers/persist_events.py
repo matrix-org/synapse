@@ -894,7 +894,6 @@ class EventsPersistenceStorageController:
             old_state_group = next(iter(old_state_groups))
 
             delta_ids = state_group_deltas.get((old_state_group, new_state_group), None)
-
             if delta_ids is not None:
                 # We have a delta from the existing to new current state,
                 # so lets just return that.
