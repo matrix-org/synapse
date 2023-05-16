@@ -106,9 +106,15 @@ class EventContext(UnpersistedEventContextBase):
         state_delta_due_to_event: If `state_group` and `state_group_before_event` are not None
             then this is the delta of the state between the two groups.
 
-        state_group_deltas: a dict containing information about the state groups associated with
-            the event and the state delta between these groups, ie a map from
-            (prev state group, new state group) -> delta state dict
+        state_group_deltas: if it exists, this is a dict collecting a mapping of two possible
+            sets of state groups and their deltas: the state group before the event and
+            after the event and the state map that represents the state group between the
+            two, i.e. (state_group_2, state_group_1) -> (state_key, event_type) -> event_id
+            or/and the state group preceding the state group before the event and the state
+            group before the event and the state map that represents the delta between those
+            two state groups.
+            This information is collected and stored as part of an optimization for persisting
+            events.
 
         partial_state: if True, we may be storing this event with a temporary,
             incomplete state.
@@ -119,9 +125,7 @@ class EventContext(UnpersistedEventContextBase):
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
     _state_delta_due_to_event: Optional[StateMap[str]] = None
-    state_group_deltas: Optional[
-        Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]
-    ] = None
+    state_group_deltas: Optional[Dict[Tuple[int, int], StateMap[str]]] = None
     app_service: Optional[ApplicationService] = None
 
     partial_state: bool = False
@@ -133,9 +137,7 @@ class EventContext(UnpersistedEventContextBase):
         state_group_before_event: Optional[int],
         state_delta_due_to_event: Optional[StateMap[str]],
         partial_state: bool,
-        state_group_deltas: Optional[
-            Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]
-        ],
+        state_group_deltas: Optional[Dict[Tuple[int, int], StateMap[str]]],
     ) -> "EventContext":
         return EventContext(
             storage=storage,
@@ -361,16 +363,8 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
 
         events_and_persisted_context = []
         for event, unpersisted_context in amended_events_and_context:
-            state_group_deltas = {
-                (
-                    unpersisted_context.state_group_before_event,
-                    unpersisted_context.state_group_after_event,
-                ): unpersisted_context.state_delta_due_to_event,
-                (
-                    unpersisted_context.prev_group_for_state_group_before_event,
-                    unpersisted_context.state_group_before_event,
-                ): unpersisted_context.delta_ids_to_state_group_before_event,
-            }
+            state_group_deltas = _build_state_group_deltas(unpersisted_context)
+
             context = EventContext(
                 storage=unpersisted_context._storage,
                 state_group=unpersisted_context.state_group_after_event,
@@ -442,18 +436,8 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
                 delta_ids=self.state_delta_due_to_event,
                 current_state_ids=None,
             )
-        state_group_deltas: Optional[
-            Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]
-        ] = {
-            (
-                self.state_group_before_event,
-                self.state_group_after_event,
-            ): self.state_delta_due_to_event,
-            (
-                self.prev_group_for_state_group_before_event,
-                self.state_group_before_event,
-            ): self.delta_ids_to_state_group_before_event,
-        }
+
+        state_group_deltas = _build_state_group_deltas(self)
 
         return EventContext.with_state(
             storage=self._storage,
@@ -478,13 +462,9 @@ def _encode_state_dict(
 
 
 def _encode_state_group_delta(
-    state_group_delta: Optional[
-        Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]
-    ]
-) -> Optional[
-    List[Tuple[Optional[int], Optional[int], Optional[List[Tuple[str, str, str]]]]]
-]:
-    if state_group_delta is None:
+    state_group_delta: Optional[Dict[Tuple[int, int], StateMap[str]]]
+) -> Optional[List[Tuple[int, int, Optional[List[Tuple[str, str, str]]]]]]:
+    if not state_group_delta:
         return None
 
     state_group_delta_encoded = []
@@ -495,16 +475,16 @@ def _encode_state_group_delta(
 
 
 def _decode_state_group_delta(
-    input: Optional[
-        List[Tuple[Optional[int], Optional[int], Optional[List[Tuple[str, str, str]]]]]
-    ]
-) -> Optional[Dict[Tuple[Optional[int], Optional[int]], Optional[StateMap[str]]]]:
-    if input is None:
+    input: Optional[List[Tuple[int, int, List[Tuple[str, str, str]]]]]
+) -> Optional[Dict[Tuple[int, int], StateMap[str]]]:
+    if not input:
         return None
 
     state_group_deltas = {}
     for element in input:
-        state_group_deltas[(element[0], element[1])] = _decode_state_dict(element[2])
+        state_map = _decode_state_dict(element[2])
+        assert state_map is not None
+        state_group_deltas[(element[0], element[1])] = state_map
 
     return state_group_deltas
 
@@ -517,3 +497,47 @@ def _decode_state_dict(
         return None
 
     return immutabledict({(etype, state_key): v for etype, state_key, v in input})
+
+
+def _build_state_group_deltas(
+    unpersisted_ctx: UnpersistedEventContext,
+) -> Dict[Tuple[int, int], StateMap]:
+    """
+    Internal function to take an UnpersistedEventContext and collect any known deltas
+    between the state groups associated with the context. This information is used in an
+    optimization when persisting events.
+    """
+    state_group_deltas = {}
+
+    # if we know the state group before the event and after the event, add them and the
+    # state delta between them to state_group_deltas
+    if (
+        unpersisted_ctx.state_group_before_event
+        and unpersisted_ctx.state_group_after_event
+    ):
+        # if we have the state groups we should have the delta
+        assert unpersisted_ctx.state_delta_due_to_event is not None
+        state_group_deltas[
+            (
+                unpersisted_ctx.state_group_before_event,
+                unpersisted_ctx.state_group_after_event,
+            )
+        ] = unpersisted_ctx.state_delta_due_to_event
+
+    # the state group before the event may also have a state group which precedes it, if
+    # we have that and the state group before the event, add them and the state
+    # delta between them to state_group_deltas
+    if (
+        unpersisted_ctx.prev_group_for_state_group_before_event
+        and unpersisted_ctx.state_group_before_event
+    ):
+        # if we have both state groups we should have the delta between them
+        assert unpersisted_ctx.delta_ids_to_state_group_before_event is not None
+        state_group_deltas[
+            (
+                unpersisted_ctx.prev_group_for_state_group_before_event,
+                unpersisted_ctx.state_group_before_event,
+            )
+        ] = unpersisted_ctx.delta_ids_to_state_group_before_event
+
+    return state_group_deltas
