@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,7 +24,6 @@ from typing import (
     MutableMapping,
     Optional,
     Union,
-    Match,
 )
 
 import attr
@@ -249,13 +247,7 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
 
 def _split_field(field: str) -> List[str]:
     """
-    Split strings on "." but not "\." and escape backslash escaped characters.
-
-    Convert the field and remove escaping:
-
-    1. "content.body.thing\.with\.dots"
-    2. ["content", "body", "thing\.with\.dots"]
-    3. ["content", "body", "thing.with.dots"]
+    Split strings unescaped dots and removes escaping.
 
     Args:
         field: A string representing a path to a field.
@@ -263,6 +255,13 @@ def _split_field(field: str) -> List[str]:
     Returns:
         A list of nested fields to traverse.
     """
+
+    # Convert the field and remove escaping:
+    #
+    # 1. "content.body.thing\.with\.dots"
+    # 2. ["content", "body", "thing\.with\.dots"]
+    # 3. ["content", "body", "thing.with.dots"]
+
     result = []
 
     # The current field and whether the previous character was the escape
