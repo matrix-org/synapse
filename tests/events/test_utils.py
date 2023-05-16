@@ -24,10 +24,11 @@ from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import (
     PowerLevelsContent,
     SerializeEventConfig,
+    _split_field,
     copy_and_fixup_power_levels_contents,
     maybe_upsert_event_field,
     prune_event,
-    serialize_event, _split_field,
+    serialize_event,
 )
 from synapse.types import JsonDict
 from synapse.util.frozenutils import freeze
@@ -798,35 +799,37 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
 
 
 class SplitFieldTestCase(stdlib_unittest.TestCase):
-    @parameterized.expand([
-        # A field with no dots.
-        ["m", ["m"]],
-        # Simple dotted fields.
-        ["m.foo", ["m", "foo"]],
-        ["m.foo.bar", ["m", "foo", "bar"]],
-        # Backslash is used as an escape character.
-        ["m\\.foo", ["m.foo"]],
-        ["m\\\\.foo", ["m\\", "foo"]],
-        ["m\\\\\\.foo", ["m\\.foo"]],
-        ["m\\\\\\\\.foo", ["m\\\\", "foo"]],
-        ["m\\foo", ["m\\foo"]],
-        ["m\\\\foo", ["m\\foo"]],
-        ["m\\\\\\foo", ["m\\\\foo"]],
-        ["m\\\\\\\\foo", ["m\\\\foo"]],
-        # Ensure that escapes at the end don't cause issues.
-        ["m.foo\\", ["m", "foo\\"]],
-        ["m.foo\\\\", ["m", "foo\\"]],
-        ["m.foo\\.", ["m", "foo."]],
-        ["m.foo\\\\.", ["m", "foo\\", ""]],
-        ["m.foo\\\\\\.", ["m", "foo\\."]],
-        # Empty parts (corresponding to properties which are an empty string) are allowed.
-        [".m", ["", "m"]],
-        ["..m", ["", "", "m"]],
-        ["m.", ["m", ""]],
-        ["m..", ["m", "", ""]],
-        ["m..foo", ["m", "", "foo"]],
-        # Invalid escape sequences.
-        ["\\m", ["\\m"]],
-    ])
+    @parameterized.expand(
+        [
+            # A field with no dots.
+            ["m", ["m"]],
+            # Simple dotted fields.
+            ["m.foo", ["m", "foo"]],
+            ["m.foo.bar", ["m", "foo", "bar"]],
+            # Backslash is used as an escape character.
+            ["m\\.foo", ["m.foo"]],
+            ["m\\\\.foo", ["m\\", "foo"]],
+            ["m\\\\\\.foo", ["m\\.foo"]],
+            ["m\\\\\\\\.foo", ["m\\\\", "foo"]],
+            ["m\\foo", ["m\\foo"]],
+            ["m\\\\foo", ["m\\foo"]],
+            ["m\\\\\\foo", ["m\\\\foo"]],
+            ["m\\\\\\\\foo", ["m\\\\foo"]],
+            # Ensure that escapes at the end don't cause issues.
+            ["m.foo\\", ["m", "foo\\"]],
+            ["m.foo\\\\", ["m", "foo\\"]],
+            ["m.foo\\.", ["m", "foo."]],
+            ["m.foo\\\\.", ["m", "foo\\", ""]],
+            ["m.foo\\\\\\.", ["m", "foo\\."]],
+            # Empty parts (corresponding to properties which are an empty string) are allowed.
+            [".m", ["", "m"]],
+            ["..m", ["", "", "m"]],
+            ["m.", ["m", ""]],
+            ["m..", ["m", "", ""]],
+            ["m..foo", ["m", "", "foo"]],
+            # Invalid escape sequences.
+            ["\\m", ["\\m"]],
+        ]
+    )
     def test_split_field(self, input: str, expected: str) -> None:
         self.assertEqual(_split_field(input), expected)
