@@ -957,10 +957,9 @@ class FederationEventHandler:
         failed_pull_attempt_info = await self._store.get_event_failed_pull_attempt_info(
             event.room_id, event_id
         )
-        # TODO: Should we only do this for `backfilled=true`?
         if failed_pull_attempt_info:
-            # Process previously failed backfill events in the background
-            # to not waste something that is bound to fail again.
+            # Process previously failed backfill events in the background to not waste
+            # time on something that is bound to fail again.
             run_as_background_process(
                 "_try_process_pulled_event",
                 self._try_process_pulled_event,
