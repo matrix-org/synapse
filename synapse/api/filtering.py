@@ -128,10 +128,7 @@ USER_FILTER_SCHEMA = {
         "account_data": {"$ref": "#/definitions/filter"},
         "room": {"$ref": "#/definitions/room_filter"},
         "event_format": {"type": "string", "enum": ["client", "federation"]},
-        "event_fields": {
-            "type": "array",
-            "items": {"type": "string"},
-        },
+        "event_fields": {"type": "array", "items": {"type": "string"}},
     },
     "additionalProperties": True,  # Allow new fields for forward compatibility
 }
