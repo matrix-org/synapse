@@ -156,6 +156,7 @@ __all__ = [
     "parse_json_object_from_request",
     "respond_with_html",
     "run_in_background",
+    "run_as_background_process",
     "cached",
     "NOT_SPAM",
     "UserID",

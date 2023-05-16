@@ -1,1 +1,0 @@
-Allow `pip install` to use setuptools_rust 1.6.0 when building Synapse.
