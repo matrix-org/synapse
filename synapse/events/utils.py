@@ -253,6 +253,15 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
     sub_out_dict[key_to_move] = sub_dict[key_to_move]
 
 
+def _split_field(field: str) -> List[str]:
+    # Convert the field and remove escaping:
+    #
+    # 1. "content.body.thing\.with\.dots"
+    # 2. ["content", "body", "thing\.with\.dots"]
+    # 3. ["content", "body", "thing.with.dots"]
+    return [part.replace(r"\.", r".") for part in SPLIT_FIELD_REGEX.split(field)]
+
+
 def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
     """Return a new dict with only the fields in 'dictionary' which are present
     in 'fields'.
@@ -275,13 +284,7 @@ def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
 
     # for each field, convert it:
     # ["content.body.thing\.with\.dots"] => [["content", "body", "thing\.with\.dots"]]
-    split_fields = [SPLIT_FIELD_REGEX.split(f) for f in fields]
-
-    # for each element of the output array of arrays:
-    # remove escaping so we can use the right key names.
-    split_fields[:] = [
-        [f.replace(r"\.", r".") for f in field_array] for field_array in split_fields
-    ]
+    split_fields = [_split_field(f) for f in fields]
 
     output: JsonDict = {}
     for field_array in split_fields:
