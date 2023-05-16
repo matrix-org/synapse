@@ -204,11 +204,6 @@ class UrlPreviewer:
             )
 
     async def preview(self, url: str, user: UserID, ts: int) -> bytes:
-        if self._is_url_blocked(url):
-            raise SynapseError(
-                403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
-            )
-
         # the in-memory cache:
         # * ensures that only one request to a URL is active at a time
         # * takes load off the DB for the thundering herds
@@ -258,7 +253,7 @@ class UrlPreviewer:
         # If this URL can be accessed via an allowed oEmbed, use that instead.
         url_to_download = url
         oembed_url = self._oembed.get_oembed_url(url)
-        if oembed_url and not self._is_url_blocked(oembed_url):
+        if oembed_url:
             url_to_download = oembed_url
 
         media_info = await self._handle_url(url_to_download, user)
@@ -302,7 +297,7 @@ class UrlPreviewer:
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
                 # Only download to the oEmbed URL if it is allowed.
-                if oembed_url and not self._is_url_blocked(oembed_url):
+                if oembed_url:
                     try:
                         oembed_info = await self._handle_url(
                             oembed_url, user, allow_data_urls=True
@@ -573,7 +568,15 @@ class UrlPreviewer:
 
         Returns:
             A MediaInfo object describing the fetched content.
+
+        Raises:
+            SynapseError if the URL is blocked.
         """
+
+        if self._is_url_blocked(url):
+            raise SynapseError(
+                403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
+            )
 
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
@@ -654,10 +657,6 @@ class UrlPreviewer:
         url_parts = urlparse(image_url)
         if url_parts.scheme != "data":
             image_url = urljoin(media_info.uri, image_url)
-
-        # Don't attempt to download the URL if it is blocked.
-        if self._is_url_blocked(image_url):
-            return
 
         # FIXME: it might be cleaner to use the same flow as the main /preview_url
         # request itself and benefit from the same caching etc.  But for now we

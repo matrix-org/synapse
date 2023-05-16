@@ -1044,10 +1044,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         {"url_preview_url_blacklist": [{"netloc": "publish.twitter.com"}]}
     )
     def test_oembed_blocked(self) -> None:
-        """The original URL, not the oEmbed URL, should be used if the oEmbed URL is blocked."""
+        """The oEmbed URL should not be downloaded if the oEmbed URL is blocked."""
         self.lookups["twitter.com"] = [(IPv4Address, "10.1.2.3")]
-
-        content = b"<html><body>Test</body></html>"
 
         channel = self.make_request(
             "GET",
@@ -1056,32 +1054,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             await_result=False,
         )
         self.pump()
-
-        client = self.reactor.tcpClients[0][2].buildProtocol(None)
-        server = AccumulatingProtocol()
-        server.makeConnection(FakeTransport(client, self.reactor))
-        client.makeConnection(FakeTransport(server, self.reactor))
-        client.dataReceived(
-            (
-                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
-            )
-            % (len(content),)
-            + content
-        )
-        self.pump()
-
-        # Double check that the proper host is being connected to. (Note that
-        # publish.twitter.com can't be resolved so this is already implicitly checked.)
-        self.assertIn(b"\r\nHost: twitter.com\r\n", server.data)
-
-        # There should not be a second request being made.
-        self.assertEqual(len(self.reactor.tcpClients), 1)
-
-        # It should be succssful, but there should be no image in the body.
-        self.assertEqual(channel.code, 200)
-        body = channel.json_body
-        self.assertEqual(body["og:description"], "Test")
+        self.assertEqual(channel.code, 403, channel.result)
 
     def test_oembed_autodiscovery(self) -> None:
         """
