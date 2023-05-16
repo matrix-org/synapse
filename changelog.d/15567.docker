@@ -1,1 +1,0 @@
-Add pkg-config package to Stage 0 to be able to build Dockerfile on ppc64le architecture.

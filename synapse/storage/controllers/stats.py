@@ -13,8 +13,7 @@
 # limitations under the License.
 
 import logging
-from collections import Counter
-from typing import TYPE_CHECKING, Collection, List, Tuple
+from typing import TYPE_CHECKING, Collection, Counter, List, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
