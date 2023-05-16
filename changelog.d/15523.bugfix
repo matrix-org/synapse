@@ -1,1 +1,0 @@
-Don't fail on federation over TOR where SRV queries are not supported. Contributed by Zdzichu.

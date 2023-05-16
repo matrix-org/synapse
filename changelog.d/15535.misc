@@ -1,1 +1,0 @@
-Move various module API callback registration methods to a dedicated class.
