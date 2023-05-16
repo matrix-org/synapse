@@ -1054,10 +1054,15 @@ def _verify_third_party_invite(
     """
     if "third_party_invite" not in event.content:
         return False
-    if "signed" not in event.content["third_party_invite"]:
+    third_party_invite = event.content["third_party_invite"]
+    if not isinstance(third_party_invite, collections.abc.Mapping):
         return False
-    signed = event.content["third_party_invite"]["signed"]
-    for key in {"mxid", "token"}:
+    if "signed" not in third_party_invite:
+        return False
+    signed = third_party_invite["signed"]
+    if not isinstance(signed, collections.abc.Mapping):
+        return False
+    for key in {"mxid", "token", "signatures"}:
         if key not in signed:
             return False
 
@@ -1075,8 +1080,6 @@ def _verify_third_party_invite(
 
     if signed["mxid"] != event.state_key:
         return False
-    if signed["token"] != token:
-        return False
 
     for public_key_object in get_public_keys(invite_event):
         public_key = public_key_object["public_key"]
@@ -1088,7 +1091,9 @@ def _verify_third_party_invite(
                     verify_key = decode_verify_key_bytes(
                         key_name, decode_base64(public_key)
                     )
-                    verify_signed_json(signed, server, verify_key)
+                    # verify_signed_json incorrectly states it wants a dict, it
+                    # just needs a mapping.
+                    verify_signed_json(signed, server, verify_key)  # type: ignore[arg-type]
 
                     # We got the public key from the invite, so we know that the
                     # correct server signed the signed bundle.

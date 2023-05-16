@@ -1016,7 +1016,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 If it is `None` media will be removed from quarantine
         """
         logger.info("Quarantining media: %s/%s", server_name, media_id)
-        is_local = server_name == self.config.server.server_name
+        is_local = self.hs.is_mine_server_name(server_name)
 
         def _quarantine_media_by_id_txn(txn: LoggingTransaction) -> int:
             local_mxcs = [media_id] if is_local else []

@@ -39,9 +39,8 @@ logger = logging.getLogger(__name__)
 
 class AppservicePingRestServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/fi.mau.msc2659/appservice/(?P<appservice_id>[^/]*)/ping",
-        unstable=True,
-        releases=(),
+        "/appservice/(?P<appservice_id>[^/]*)/ping",
+        releases=("v1",),
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -107,9 +106,8 @@ class AppservicePingRestServlet(RestServlet):
 
         duration = time.monotonic() - start
 
-        return HTTPStatus.OK, {"duration": int(duration * 1000)}
+        return HTTPStatus.OK, {"duration_ms": int(duration * 1000)}
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    if hs.config.experimental.msc2659_enabled:
-        AppservicePingRestServlet(hs).register(http_server)
+    AppservicePingRestServlet(hs).register(http_server)

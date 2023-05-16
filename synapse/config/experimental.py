@@ -189,9 +189,6 @@ class ExperimentalConfig(Config):
         # MSC3967: Do not require UIA when first uploading cross signing keys
         self.msc3967_enabled = experimental.get("msc3967_enabled", False)
 
-        # MSC2659: Application service ping endpoint
-        self.msc2659_enabled = experimental.get("msc2659_enabled", False)
-
         # MSC3981: Recurse relations
         self.msc3981_recurse_relations = experimental.get(
             "msc3981_recurse_relations", False
@@ -199,3 +196,11 @@ class ExperimentalConfig(Config):
 
         # MSC3970: Scope transaction IDs to devices
         self.msc3970_enabled = experimental.get("msc3970_enabled", False)
+
+        # MSC4009: E.164 Matrix IDs
+        self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)
+
+        # MSC4010: Do not allow setting m.push_rules account data.
+        self.msc4010_push_rules_account_data = experimental.get(
+            "msc4010_push_rules_account_data", False
+        )

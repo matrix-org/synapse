@@ -130,6 +130,16 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         add_fields("membership")
         if room_version.msc3375_redaction_rules:
             add_fields(EventContentFields.AUTHORISING_USER)
+        if room_version.msc3821_redaction_rules:
+            # Preserve the signed field under third_party_invite.
+            third_party_invite = event_dict["content"].get("third_party_invite")
+            if isinstance(third_party_invite, collections.abc.Mapping):
+                new_content["third_party_invite"] = {}
+                if "signed" in third_party_invite:
+                    new_content["third_party_invite"]["signed"] = third_party_invite[
+                        "signed"
+                    ]
+
     elif event_type == EventTypes.Create:
         # MSC2176 rules state that create events cannot be redacted.
         if room_version.msc2176_redaction_rules:
@@ -170,6 +180,18 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         add_fields(EventContentFields.MSC2716_BATCH_ID)
     elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_MARKER:
         add_fields(EventContentFields.MSC2716_INSERTION_EVENT_REFERENCE)
+
+    # Protect the rel_type and event_id fields under the m.relates_to field.
+    if room_version.msc3389_relation_redactions:
+        relates_to = event_dict["content"].get("m.relates_to")
+        if isinstance(relates_to, collections.abc.Mapping):
+            new_relates_to = {}
+            for field in ("rel_type", "event_id"):
+                if field in relates_to:
+                    new_relates_to[field] = relates_to[field]
+            # Only include a non-empty relates_to field.
+            if new_relates_to:
+                new_content["m.relates_to"] = new_relates_to
 
     allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 

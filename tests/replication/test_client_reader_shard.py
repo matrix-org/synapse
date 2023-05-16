@@ -29,8 +29,6 @@ class ClientReaderTestCase(BaseMultiWorkerStreamTestCase):
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
         config["worker_app"] = "synapse.app.generic_worker"
-        config["worker_replication_host"] = "testserv"
-        config["worker_replication_http_port"] = "8765"
         return config
 
     def test_register_single_worker(self) -> None:

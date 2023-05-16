@@ -15,6 +15,8 @@
 import unittest as stdlib_unittest
 from typing import Any, List, Mapping, Optional
 
+import attr
+
 from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
@@ -392,7 +394,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
         )
 
     def test_member(self) -> None:
-        """Member events have changed behavior starting with MSC3375."""
+        """Member events have changed behavior in MSC3375 and MSC3821."""
         self.run_test(
             {
                 "type": "m.room.member",
@@ -433,6 +435,167 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "unsigned": {},
             },
             room_version=RoomVersions.V9,
+        )
+
+        # After MSC3821, the signed key under third_party_invite is protected
+        # from redaction.
+        THIRD_PARTY_INVITE = {
+            "display_name": "alice",
+            "signed": {
+                "mxid": "@alice:example.org",
+                "signatures": {
+                    "magic.forest": {
+                        "ed25519:3": "fQpGIW1Snz+pwLZu6sTy2aHy/DYWWTspTJRPyNp0PKkymfIsNffysMl6ObMMFdIJhk6g6pwlIqZ54rxo8SLmAg"
+                    }
+                },
+                "token": "abc123",
+            },
+        }
+
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": THIRD_PARTY_INVITE,
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": {"signed": THIRD_PARTY_INVITE["signed"]},
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC3821,
+        )
+
+        # Ensure this doesn't break if an invalid field is sent.
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": {},
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {"membership": "invite", "third_party_invite": {}},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC3821,
+        )
+
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "invite",
+                    "third_party_invite": "stripped",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {"membership": "invite"},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC3821,
+        )
+
+    def test_relations(self) -> None:
+        """Event relations get redacted until MSC3389."""
+        # Normally the m._relates_to field is redacted.
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {
+                    "body": "foo",
+                    "m.relates_to": {
+                        "rel_type": "rel_type",
+                        "event_id": "$parent:domain",
+                        "other": "stripped",
+                    },
+                },
+            },
+            {
+                "type": "m.room.message",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V10,
+        )
+
+        # Create a new room version.
+        msc3389_room_ver = attr.evolve(
+            RoomVersions.V10, msc3389_relation_redactions=True
+        )
+
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {
+                    "body": "foo",
+                    "m.relates_to": {
+                        "rel_type": "rel_type",
+                        "event_id": "$parent:domain",
+                        "other": "stripped",
+                    },
+                },
+            },
+            {
+                "type": "m.room.message",
+                "content": {
+                    "m.relates_to": {
+                        "rel_type": "rel_type",
+                        "event_id": "$parent:domain",
+                    },
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=msc3389_room_ver,
+        )
+
+        # If the field is not an object, redact it.
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {
+                    "body": "foo",
+                    "m.relates_to": "stripped",
+                },
+            },
+            {
+                "type": "m.room.message",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=msc3389_room_ver,
+        )
+
+        # If the m.relates_to property would be empty, redact it.
+        self.run_test(
+            {
+                "type": "m.room.message",
+                "content": {"body": "foo", "m.relates_to": {"foo": "stripped"}},
+            },
+            {
+                "type": "m.room.message",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=msc3389_room_ver,
         )
 
 
