@@ -248,12 +248,21 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
 
 
 def _split_field(field: str) -> List[str]:
-    # Convert the field and remove escaping:
-    #
-    # 1. "content.body.thing\.with\.dots"
-    # 2. ["content", "body", "thing\.with\.dots"]
-    # 3. ["content", "body", "thing.with.dots"]
+    """
+    Split strings on "." but not "\." and escape backslash escaped characters.
 
+    Convert the field and remove escaping:
+
+    1. "content.body.thing\.with\.dots"
+    2. ["content", "body", "thing\.with\.dots"]
+    3. ["content", "body", "thing.with.dots"]
+
+    Args:
+        field: A string representing a path to a field.
+
+    Returns:
+        A list of nested fields to traverse.
+    """
     result = []
 
     # The current field and whether the previous character was the escape

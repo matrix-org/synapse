@@ -825,6 +825,8 @@ class SplitFieldTestCase(stdlib_unittest.TestCase):
         ["m.", ["m", ""]],
         ["m..", ["m", "", ""]],
         ["m..foo", ["m", "", "foo"]],
+        # Invalid escape sequences.
+        ["\\m", ["\\m"]],
     ])
     def test_split_field(self, input: str, expected: str) -> None:
         self.assertEqual(_split_field(input), expected)
