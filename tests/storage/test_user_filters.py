@@ -50,7 +50,7 @@ class UserFiltersStoreTestCase(unittest.HomeserverTestCase):
                 self.store.db_pool.simple_insert(
                     "user_filters",
                     {
-                        "user_id": f"hello{i}",
+                        "user_id": f"hello{i:02}",
                         "filter_id": i,
                         "filter_json": bytearray(i),
                     },
@@ -83,7 +83,7 @@ class UserFiltersStoreTestCase(unittest.HomeserverTestCase):
 
         expected_values = []
         for i in range(0, 70):
-            expected_values.append((f"@hello{i}:{self.hs.hostname}",))
+            expected_values.append((f"@hello{i:02}:{self.hs.hostname}",))
 
         res = self.get_success(
             self.store.db_pool.execute(
@@ -91,7 +91,4 @@ class UserFiltersStoreTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertEqual(len(res), len(expected_values))
-        for value in res:
-            self.assertEqual(True, value in expected_values)
-        for value in expected_values:
-            self.assertEqual(True, value in res)
+        self.assertEqual(res, expected_values)

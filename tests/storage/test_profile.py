@@ -93,7 +93,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
             self.get_success(
                 self.store.db_pool.simple_insert(
                     "profiles",
-                    {"user_id": f"hello{i}"},
+                    {"user_id": f"hello{i:02}"},
                 )
             )
 
@@ -123,13 +123,10 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         expected_values = []
         for i in range(0, 70):
-            expected_values.append((f"@hello{i}:{self.hs.hostname}",))
+            expected_values.append((f"@hello{i:02}:{self.hs.hostname}",))
 
         res = self.get_success(
-            self.store.db_pool.execute("", None, "SELECT full_user_id from profiles")
+            self.store.db_pool.execute("", None, "SELECT full_user_id from profiles ORDER BY full_user_id")
         )
         self.assertEqual(len(res), len(expected_values))
-        for value in res:
-            self.assertEqual(True, value in expected_values)
-        for value in expected_values:
-            self.assertEqual(True, value in res)
+        self.assertEqual(res, expected_values)
