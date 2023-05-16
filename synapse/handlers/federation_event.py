@@ -922,7 +922,7 @@ class FederationEventHandler:
         )
 
         # We can optimistically try to process and wait for the event to be fully
-        # persisted.
+        # persisted if we've never tried before.
         await _process_new_pulled_events(
             [new_event_dict[event_id] for event_id in fresh_event_ids]
         )

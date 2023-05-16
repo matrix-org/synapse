@@ -1589,15 +1589,16 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self, event_ids: Collection[str]
     ) -> Tuple[Collection[str], Collection[str]]:
         """
-        Separate the given list of events into
+        Separate the given list of events into two lists based on whether they have any
+        failed pull attempts or not.
 
         Args:
             event_ids: A list of events to separate
 
         Returns:
-            A tuple with two lists that events separated into based on whether they have
-            failed pull attempts or not (event_ids_with_failed_pull_attempts,
-            fresh_event_ids).
+            A tuple with two lists where the given event_ids are separated based on
+            whether they have any failed pull attempts or not
+            (event_ids_with_failed_pull_attempts, fresh_event_ids).
         """
 
         rows = await self.db_pool.simple_select_many_batch(
