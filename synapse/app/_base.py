@@ -214,7 +214,7 @@ def handle_startup_exception(e: Exception) -> NoReturn:
     # the reactor are written to the logs, followed by a summary to stderr.
     logger.exception("Exception during startup")
 
-    error_string = "".join(traceback.format_exception(e))
+    error_string = "".join(traceback.format_exception(type(e), e, e.__traceback__))
     indented_error_string = indent(error_string, "    ")
 
     quit_with_error(
