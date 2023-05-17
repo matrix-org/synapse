@@ -555,7 +555,6 @@ class StateTestCase(unittest.TestCase):
             (e.event_id for e in old_state + [event]), current_state_ids.values()
         )
 
-        assert context.state_group_deltas is not None
         assert context.state_group_before_event is not None
         assert context.state_group is not None
         self.assertEqual(

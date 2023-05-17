@@ -106,7 +106,7 @@ class EventContext(UnpersistedEventContextBase):
         state_delta_due_to_event: If `state_group` and `state_group_before_event` are not None
             then this is the delta of the state between the two groups.
 
-        state_group_deltas: if it exists, this is a dict collecting a mapping of the state
+        state_group_deltas: If not empty, this is a dict collecting a mapping of the state
             difference between state groups.
 
             The keys are a tuple of two integers: the initial group and final state group.
@@ -127,11 +127,11 @@ class EventContext(UnpersistedEventContextBase):
     """
 
     _storage: "StorageControllers"
+    state_group_deltas: Dict[Tuple[int, int], StateMap[str]]
     rejected: Optional[str] = None
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
     _state_delta_due_to_event: Optional[StateMap[str]] = None
-    state_group_deltas: Optional[Dict[Tuple[int, int], StateMap[str]]] = None
     app_service: Optional[ApplicationService] = None
 
     partial_state: bool = False
@@ -143,7 +143,7 @@ class EventContext(UnpersistedEventContextBase):
         state_group_before_event: Optional[int],
         state_delta_due_to_event: Optional[StateMap[str]],
         partial_state: bool,
-        state_group_deltas: Optional[Dict[Tuple[int, int], StateMap[str]]],
+        state_group_deltas: Dict[Tuple[int, int], StateMap[str]],
     ) -> "EventContext":
         return EventContext(
             storage=storage,
@@ -159,7 +159,7 @@ class EventContext(UnpersistedEventContextBase):
         storage: "StorageControllers",
     ) -> "EventContext":
         """Return an EventContext instance suitable for persisting an outlier event"""
-        return EventContext(storage=storage)
+        return EventContext(storage=storage, state_group_deltas={})
 
     async def persist(self, event: EventBase) -> "EventContext":
         return self
@@ -496,10 +496,10 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
 
 
 def _encode_state_group_delta(
-    state_group_delta: Optional[Dict[Tuple[int, int], StateMap[str]]]
-) -> Optional[List[Tuple[int, int, Optional[List[Tuple[str, str, str]]]]]]:
+    state_group_delta: Dict[Tuple[int, int], StateMap[str]]
+) -> List[Tuple[int, int, Optional[List[Tuple[str, str, str]]]]]:
     if not state_group_delta:
-        return None
+        return []
 
     state_group_delta_encoded = []
     for key, value in state_group_delta.items():
@@ -509,10 +509,10 @@ def _encode_state_group_delta(
 
 
 def _decode_state_group_delta(
-    input: Optional[List[Tuple[int, int, List[Tuple[str, str, str]]]]]
-) -> Optional[Dict[Tuple[int, int], StateMap[str]]]:
+    input: List[Tuple[int, int, List[Tuple[str, str, str]]]]
+) -> Dict[Tuple[int, int], StateMap[str]]:
     if not input:
-        return None
+        return {}
 
     state_group_deltas = {}
     for state_group_1, state_group_2, state_dict in input:
