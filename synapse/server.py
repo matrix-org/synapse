@@ -460,8 +460,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         return SimpleHttpClient(
             self,
-            ip_allowlist=self.config.server.ip_range_whitelist,
-            ip_blocklist=self.config.server.ip_range_blacklist,
+            ip_allowlist=self.config.server.ip_range_allowlist,
+            ip_blocklist=self.config.server.ip_range_blocklist,
             use_proxy=True,
         )
 

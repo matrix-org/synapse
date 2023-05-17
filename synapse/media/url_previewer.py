@@ -167,8 +167,8 @@ class UrlPreviewer:
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
-            ip_allowlist=hs.config.media.url_preview_ip_range_whitelist,
-            ip_blocklist=hs.config.media.url_preview_ip_range_blacklist,
+            ip_allowlist=hs.config.media.url_preview_ip_range_allowlist,
+            ip_blocklist=hs.config.media.url_preview_ip_range_blocklist,
             use_proxy=True,
         )
         self.media_repo = media_repo
@@ -186,7 +186,7 @@ class UrlPreviewer:
             or instance_running_jobs == hs.get_instance_name()
         )
 
-        self.url_preview_url_blacklist = hs.config.media.url_preview_url_blacklist
+        self.url_preview_url_blacklist = hs.config.media.url_preview_url_blocklist
         self.url_preview_accept_language = hs.config.media.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning

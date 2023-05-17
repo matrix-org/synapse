@@ -54,8 +54,8 @@ class IdentityHandler:
         # An HTTP client for contacting identity servers specified by clients.
         self._http_client = SimpleHttpClient(
             hs,
-            ip_blocklist=hs.config.server.federation_ip_range_blacklist,
-            ip_allowlist=hs.config.server.federation_ip_range_whitelist,
+            ip_blocklist=hs.config.server.federation_ip_range_blocklist,
+            ip_allowlist=hs.config.server.federation_ip_range_allowlist,
         )
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
