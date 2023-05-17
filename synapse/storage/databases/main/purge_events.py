@@ -64,6 +64,9 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         token: RoomStreamToken,
         delete_local_events: bool,
     ) -> Set[int]:
+        # TODO: Also stream this
+        txn.call_after(self._invalidate_caches_for_room, room_id)
+
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
@@ -346,6 +349,11 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         return state_groups_to_delete
 
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
+        # TODO: Also stream this
+        txn.call_after(self._invalidate_caches_for_room, room_id)
+
+        # TODO: Also clear all state caches?
+
         # This collides with event persistence so we cannot write new events and metadata into
         # a room while deleting it or this transaction will fail.
         if isinstance(self.database_engine, PostgresEngine):

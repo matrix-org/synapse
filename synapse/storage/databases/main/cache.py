@@ -226,6 +226,9 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         relates_to: Optional[str],
         backfilled: bool,
     ) -> None:
+        # XXX: If you add something to this function make sure you add it to
+        # `_invalidate_caches_for_room` as well.
+
         # This invalidates any local in-memory cached event objects, the original
         # process triggering the invalidation is responsible for clearing any external
         # cached objects.
@@ -270,6 +273,71 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_thread_summary", (relates_to,))
             self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
             self._attempt_to_invalidate_cache("get_threads", (room_id,))
+
+    def _invalidate_caches_for_room(self, room_id: str) -> None:
+        """Invalidate caches associated with rooms.
+
+        Used when we delete events in rooms, but don't know which events we've
+        deleted.
+        """
+
+        self._invalidate_local_get_event_cache_all()  # type: ignore[attr-defined]
+
+        self._attempt_to_invalidate_cache("have_seen_event", (room_id,))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
+
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", None)
+        self._attempt_to_invalidate_cache("get_relations_for_event", None)
+        self._attempt_to_invalidate_cache("get_applicable_edit", None)
+        self._attempt_to_invalidate_cache("get_thread_id", None)
+        self._attempt_to_invalidate_cache("get_thread_id_for_receipts", None)
+        self._attempt_to_invalidate_cache("get_invited_rooms_for_local_user", None)
+        self._attempt_to_invalidate_cache(
+            "get_rooms_for_user_with_stream_ordering", None
+        )
+        self._attempt_to_invalidate_cache("get_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("get_references_for_event", None)
+        self._attempt_to_invalidate_cache("get_thread_summary", None)
+        self._attempt_to_invalidate_cache("get_thread_participated", None)
+        self._attempt_to_invalidate_cache("get_threads", (room_id,))
+
+        self._attempt_to_invalidate_cache("_get_state_group_for_event", None)
+
+        # List of caches to also invalidate. Lines ending with `room_id` can be
+        # invalidated by room_id, the rest must be cleared entirely.
+
+        # get_account_data_for_room
+        # get_account_data_for_room_and_type
+        # get_aliases_for_room
+        # get_latest_event_ids_in_room
+        # _get_forward_extremeties_for_room
+        # get_unread_event_push_actions_by_room_for_user room_id
+        # get_event_ordering
+        # is_partial_state_event
+        # _get_linearized_receipts_for_room room_id
+        # is_room_blocked room_id
+        # get_retention_policy_for_room room_id
+        # _get_partial_state_servers_at_join room_id
+        # is_partial_state_room room_id
+        # get_invited_rooms_for_local_user
+        # _get_joined_profile_from_event_id
+        # is_host_invited
+        # get_current_hosts_in_room_ordered room_id
+        # did_forget
+        # get_forgotten_rooms_for_user
+        # _get_membership_from_event_id
+        # get_room_version_id room_id
+        # get_partial_current_state_ids room_id
+        #
+
+        # ... plus state caches for delete room? c.f. _invalidate_state_caches
+        # in `synapse.storage._base` for a list of such caches. Maybe we can
+        # just reuse that function?
+
+        # Plus we should clear the state cache in the state handler.
 
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]

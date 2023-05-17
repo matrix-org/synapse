@@ -903,6 +903,15 @@ class EventsWorkerStore(SQLBaseStore):
         self._event_ref.pop(event_id, None)
         self._current_event_fetches.pop(event_id, None)
 
+    def _invalidate_local_get_event_cache_all(self) -> None:
+        """Clears the in-memory get event caches.
+
+        Used when we purge room history.
+        """
+        self._get_event_cache.clear()
+        self._event_ref.clear()
+        self._current_event_fetches.clear()
+
     async def _get_events_from_cache(
         self, events: Iterable[str], update_metrics: bool = True
     ) -> Dict[str, EventCacheEntry]:
