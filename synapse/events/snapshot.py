@@ -19,10 +19,7 @@ from immutabledict import immutabledict
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
-from synapse.logging.opentracing import (
-    tag_args,
-    trace,
-)
+from synapse.logging.opentracing import tag_args, trace
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:

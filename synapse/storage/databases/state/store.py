@@ -20,10 +20,7 @@ import attr
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.events.snapshot import UnpersistedEventContext, UnpersistedEventContextBase
-from synapse.logging.opentracing import (
-    tag_args,
-    trace,
-)
+from synapse.logging.opentracing import tag_args, trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
