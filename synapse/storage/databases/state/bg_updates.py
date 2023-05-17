@@ -89,6 +89,11 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         groups: List[int],
         state_filter: Optional[StateFilter] = None,
     ) -> Mapping[int, StateMap[str]]:
+        """
+        We can sort from smallest to largest state_group and re-use the work from the
+        small state_group for a larger one if we see that the edge chain links up.
+        """
+
         state_filter = state_filter or StateFilter.all()
 
         results: Dict[int, MutableStateMap[str]] = {group: {} for group in groups}
