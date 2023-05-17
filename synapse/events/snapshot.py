@@ -106,13 +106,19 @@ class EventContext(UnpersistedEventContextBase):
         state_delta_due_to_event: If `state_group` and `state_group_before_event` are not None
             then this is the delta of the state between the two groups.
 
-        state_group_deltas: if it exists, this is a dict collecting a mapping of two possible
-            sets of state groups and their deltas: the state group before the event and
-            after the event and the state map that represents the state group between the
-            two, i.e. (state_group_2, state_group_1) -> (state_key, event_type) -> event_id
-            or/and the state group preceding the state group before the event and the state
-            group before the event and the state map that represents the delta between those
-            two state groups.
+        state_group_deltas: if it exists, this is a dict collecting a mapping of the state
+            difference between state groups.
+
+            The keys are a tuple of two integers: the initial group and final state group.
+            The corresponding value is a state map representing the state delta between
+            these state groups.
+
+            The dictionary is expected to have at most two entries with state groups of:
+
+            1. The state group before the event and after the event.
+            2. The state group preceding the state group before the event and the
+               state group before the event.
+
             This information is collected and stored as part of an optimization for persisting
             events.
 
