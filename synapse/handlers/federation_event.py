@@ -865,7 +865,7 @@ class FederationEventHandler:
             [event.event_id for event in events]
         )
 
-        new_events = []
+        new_events: Collection[EventBase] = []
         for event in events:
             event_id = event.event_id
 
@@ -899,28 +899,21 @@ class FederationEventHandler:
                 with nested_logging_context(ev.event_id):
                     await self._process_pulled_event(origin, ev, backfilled=backfilled)
 
-        # We use an `OrderedDict` because even though we sort by depth when we process
-        # the list, it's still important that we maintain the order of the given events
-        # in case the depth of two events is the same. MSC2716 relies on events at the
-        # same depth and `/backfill`` gives a carefully crafted order that we should try
-        # to maintain.
-        new_event_dict = collections.OrderedDict(
-            (event.event_id, event) for event in new_events
-        )
         # Check if we've already tried to process these events at some point in the
         # past. We aren't concerned with the expontntial backoff here, just whether it
         # has failed to be processed before.
-        (
-            event_ids_with_failed_pull_attempts,
-            fresh_event_ids,
-        ) = await self._store.separate_event_ids_with_failed_pull_attempts(
-            new_event_dict.keys()
+        event_ids_with_failed_pull_attempts = (
+            await self._store.get_event_ids_with_failed_pull_attempts(
+                [event.event_id for event in new_events]
+            )
         )
 
         # Process previously failed backfill events in the background to not waste
         # time on something that is bound to fail again.
         events_with_failed_pull_attempts = [
-            new_event_dict[event_id] for event_id in event_ids_with_failed_pull_attempts
+            event
+            for event in new_events
+            if event.event_id in event_ids_with_failed_pull_attempts
         ]
         if len(events_with_failed_pull_attempts) > 0:
             run_as_background_process(
@@ -931,7 +924,11 @@ class FederationEventHandler:
 
         # We can optimistically try to process and wait for the event to be fully
         # persisted if we've never tried before.
-        fresh_events = [new_event_dict[event_id] for event_id in fresh_event_ids]
+        fresh_events = [
+            event
+            for event in new_events
+            if event.event_id not in event_ids_with_failed_pull_attempts
+        ]
         if len(fresh_events) > 0:
             await _process_new_pulled_events(fresh_events)
 

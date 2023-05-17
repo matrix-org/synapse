@@ -1134,21 +1134,21 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertEqual(backfill_event_ids, ["insertion_eventA"])
 
-    def test_separate_event_ids_with_failed_pull_attempts(self) -> None:
+    def test_get_event_ids_with_failed_pull_attempts(self) -> None:
         """
-        Test to make sure we properly separate event_ids based on whether they have any
-        failed pull attempts
+        Test to make sure we properly get event_ids based on whether they have any
+        failed pull attempts.
         """
         # Create the room
         user_id = self.register_user("alice", "test")
         tok = self.login("alice", "test")
         room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
 
-        # We purposely record the failed pull attempt for `$failed_event_id3` first to
-        # make sure we return results in the order of the event_ids passed in instead of
-        # the order in which we find things in the database or the unordered collections
-        # we might accidentally use. They also purposely have reverse prefixed a-c in
-        # front to better test dubious sorting happening somewhere.
+        # We purposely record the failed pull attempt for `$c_failed_event_id3` first to
+        # make sure we return results in the order of the `event_ids` passed in instead
+        # of the order in which we find things in the database or the unordered
+        # collections we might accidentally use. They also purposely have reverse
+        # prefixed a-c in front to better test dubious sorting happening somewhere.
         self.get_success(
             self.store.record_event_failed_pull_attempt(
                 room_id, "$a_failed_event_id3", "fake cause"
@@ -1165,8 +1165,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             )
         )
 
-        (event_ids_with_failed_pull_attempts, fresh_event_ids) = self.get_success(
-            self.store.separate_event_ids_with_failed_pull_attempts(
+        event_ids_with_failed_pull_attempts = self.get_success(
+            self.store.get_event_ids_with_failed_pull_attempts(
                 event_ids=[
                     "$c_failed_event_id1",
                     "$c_fresh_event_id1",
@@ -1180,14 +1180,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         self.assertEqual(
             event_ids_with_failed_pull_attempts,
-            # We expect a 2^1 hour backoff after a single failed attempt.
             ["$c_failed_event_id1", "$b_failed_event_id2", "$a_failed_event_id3"],
-        )
-
-        self.assertEqual(
-            fresh_event_ids,
-            # We expect a 2^1 hour backoff after a single failed attempt.
-            ["$c_fresh_event_id1", "$b_fresh_event_id2", "$a_fresh_event_id3"],
         )
 
     def test_get_event_ids_to_not_pull_from_backoff(self) -> None:
