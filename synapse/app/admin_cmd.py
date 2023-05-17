@@ -64,7 +64,7 @@ from synapse.util.logcontext import LoggingContext
 logger = logging.getLogger("synapse.app.admin_cmd")
 
 
-class AdminCmdSlavedStore(
+class AdminCmdStore(
     FilteringWorkerStore,
     ClientIpWorkerStore,
     DeviceWorkerStore,
@@ -103,7 +103,7 @@ class AdminCmdSlavedStore(
 
 
 class AdminCmdServer(HomeServer):
-    DATASTORE_CLASS = AdminCmdSlavedStore  # type: ignore
+    DATASTORE_CLASS = AdminCmdStore  # type: ignore
 
 
 async def export_data_command(hs: HomeServer, args: argparse.Namespace) -> None:

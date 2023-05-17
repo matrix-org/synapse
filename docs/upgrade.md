@@ -90,6 +90,8 @@ process, for example:
 
 # Upgrading to v1.84.0
 
+## Changes to event replication 
+
 Synapse has changed the format of `EventContext` which impacts how events to be persisted
 are sent over replication. This is a forwards- and backwards-incompatible change: v1.83.0 and below workers will not be
 able to send events to v1.84.0 workers or main process over replication, and vice versa. 
@@ -98,6 +100,82 @@ function.
 This will also require a restart of the upgraded workers.
 
 Once all workers are upgraded to v1.84 and restarted event replication will be able to resume.  
+
+
+## Deprecation of `worker_replication_*` configuration settings
+
+When using workers, 
+* `worker_replication_host`
+* `worker_replication_http_port`
+* `worker_replication_http_tls`
+ 
+can now be removed from individual worker YAML configuration ***if*** you add the main process to the `instance_map` in the shared YAML configuration,
+using the name `main`.
+
+### Before:
+Shared YAML
+```yaml
+instance_map:
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+```
+Worker YAML
+```yaml
+worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_replication_host: localhost
+worker_replication_http_port: 3456
+worker_replication_http_tls: false
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+```
+### After:
+Shared YAML
+```yaml
+instance_map:
+  main:
+    host: localhost
+    port: 3456
+    tls: false
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+```
+Worker YAML
+```yaml
+worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+
+```
+Notes: 
+* `tls` is optional but mirrors the functionality of `worker_replication_http_tls`
+
 
 # Upgrading to v1.81.0
 

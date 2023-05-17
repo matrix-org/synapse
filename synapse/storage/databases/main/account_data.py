@@ -85,13 +85,10 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 writers=hs.config.worker.writers.account_data,
             )
         else:
+            # Multiple writers are not supported for SQLite.
+            #
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support it for unit tests.
-            #
-            # If this process is the writer than we need to use
-            # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
-            # updated over replication. (Multiple writers are not supported for
-            # SQLite).
             self._account_data_id_gen = StreamIdGenerator(
                 db_conn,
                 hs.get_replication_notifier(),
