@@ -878,6 +878,26 @@ devices was last seen. (May be a few minutes out of date, for efficiency reasons
 <p><code>total</code> - Total number of user's devices.</p>
 </li>
 </ul>
+<h3 id="create-a-device"><a class="header" href="#create-a-device">Create a device</a></h3>
+<p>Creates a new device for a specific <code>user_id</code> and <code>device_id</code>. Does nothing if the <code>device_id</code> 
+exists already.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v2/users/&lt;user_id&gt;/devices
+
+{
+  &quot;device_id&quot;: &quot;QBUAZIFURK&quot;
+}
+</code></pre>
+<p>An empty JSON dict is returned.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p>The following fields are required in the JSON request body:</p>
+<ul>
+<li><code>device_id</code> - The device ID to create.</li>
+</ul>
 <h3 id="delete-multiple-devices"><a class="header" href="#delete-multiple-devices">Delete multiple devices</a></h3>
 <p>Deletes the given devices for a specific <code>user_id</code>, and invalidates
 any access token associated with them.</p>
