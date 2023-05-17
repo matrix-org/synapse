@@ -899,12 +899,17 @@ class FederationEventHandler:
                 with nested_logging_context(ev.event_id):
                     await self._process_pulled_event(origin, ev, backfilled=backfilled)
 
-        # Check if we've already tried to process these events at some point in the
-        # past. We aren't concerned with the expontntial backoff here, just whether it
-        # has failed to be processed before.
+        # We use an `OrderedDict` because even though we sort by depth when we process
+        # the list, it's still important that we maintain the order of the given events
+        # in case the depth of two events is the same. MSC2716 relies on events at the
+        # same depth and `/backfill`` gives a carefully crafted order that we should try
+        # to maintain.
         new_event_dict = collections.OrderedDict(
             (event.event_id, event) for event in new_events
         )
+        # Check if we've already tried to process these events at some point in the
+        # past. We aren't concerned with the expontntial backoff here, just whether it
+        # has failed to be processed before.
         (
             event_ids_with_failed_pull_attempts,
             fresh_event_ids,
