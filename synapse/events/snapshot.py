@@ -363,7 +363,7 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
 
         events_and_persisted_context = []
         for event, unpersisted_context in amended_events_and_context:
-            state_group_deltas = _build_state_group_deltas(unpersisted_context)
+            state_group_deltas = unpersisted_context._build_state_group_deltas()
 
             context = EventContext(
                 storage=unpersisted_context._storage,
@@ -437,7 +437,7 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
                 current_state_ids=None,
             )
 
-        state_group_deltas = _build_state_group_deltas(self)
+        state_group_deltas = self._build_state_group_deltas()
 
         return EventContext.with_state(
             storage=self._storage,
@@ -448,17 +448,45 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
             partial_state=self.partial_state,
         )
 
+    def _build_state_group_deltas(
+        self,
+    ) -> Dict[Tuple[int, int], StateMap]:
+        """
+        Internal function to take an UnpersistedEventContext and collect any known deltas
+        between the state groups associated with the context. This information is used in an
+        optimization when persisting events.
+        """
+        state_group_deltas = {}
 
-def _encode_state_dict(
-    state_dict: Optional[StateMap[str]],
-) -> Optional[List[Tuple[str, str, str]]]:
-    """Since dicts of (type, state_key) -> event_id cannot be serialized in
-    JSON we need to convert them to a form that can.
-    """
-    if state_dict is None:
-        return None
+        # if we know the state group before the event and after the event, add them and the
+        # state delta between them to state_group_deltas
+        if self.state_group_before_event and self.state_group_after_event:
+            # if we have the state groups we should have the delta
+            assert self.state_delta_due_to_event is not None
+            state_group_deltas[
+                (
+                    self.state_group_before_event,
+                    self.state_group_after_event,
+                )
+            ] = self.state_delta_due_to_event
 
-    return [(etype, state_key, v) for (etype, state_key), v in state_dict.items()]
+        # the state group before the event may also have a state group which precedes it, if
+        # we have that and the state group before the event, add them and the state
+        # delta between them to state_group_deltas
+        if (
+            self.prev_group_for_state_group_before_event
+            and self.state_group_before_event
+        ):
+            # if we have both state groups we should have the delta between them
+            assert self.delta_ids_to_state_group_before_event is not None
+            state_group_deltas[
+                (
+                    self.prev_group_for_state_group_before_event,
+                    self.state_group_before_event,
+                )
+            ] = self.delta_ids_to_state_group_before_event
+
+        return state_group_deltas
 
 
 def _encode_state_group_delta(
@@ -487,6 +515,18 @@ def _decode_state_group_delta(
         state_group_deltas[(element[0], element[1])] = state_map
 
     return state_group_deltas
+
+
+def _encode_state_dict(
+    state_dict: Optional[StateMap[str]],
+) -> Optional[List[Tuple[str, str, str]]]:
+    """Since dicts of (type, state_key) -> event_id cannot be serialized in
+    JSON we need to convert them to a form that can.
+    """
+    if state_dict is None:
+        return None
+
+    return [(etype, state_key, v) for (etype, state_key), v in state_dict.items()]
 
 
 def _decode_state_dict(
