@@ -1136,7 +1136,8 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
     def test_separate_event_ids_with_failed_pull_attempts(self) -> None:
         """
-        Test to make sure TODO
+        Test to make sure we properly separate event_ids based on whether they have any
+        failed pull attempts
         """
         # Create the room
         user_id = self.register_user("alice", "test")
