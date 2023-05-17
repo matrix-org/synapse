@@ -815,7 +815,8 @@ The following fields are returned in the JSON response body:
 
 ### Create a device
 
-Creates a new device for a specific `user_id`.
+Creates a new device for a specific `user_id` and `device_id`. Does nothing if the `device_id` 
+exists already.
 
 The API is:
 
