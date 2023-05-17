@@ -487,10 +487,10 @@ def _decode_state_group_delta(
         return None
 
     state_group_deltas = {}
-    for element in input:
-        state_map = _decode_state_dict(element[2])
+    for state_group_1, state_group_2, state_dict in input:
+        state_map = _decode_state_dict(state_dict)
         assert state_map is not None
-        state_group_deltas[(element[0], element[1])] = state_map
+        state_group_deltas[(state_group_1, state_group_2)] = state_map
 
     return state_group_deltas
 
