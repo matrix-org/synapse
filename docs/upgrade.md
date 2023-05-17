@@ -88,19 +88,20 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.84.0
+# Upgrading to v1.85.0
 
 ## Changes to event replication 
 
 Synapse has changed the format of `EventContext` which impacts how events to be persisted
-are sent over replication. This is a forwards- and backwards-incompatible change: v1.83.0 and below workers will not be
-able to send events to v1.84.0 workers or main process over replication, and vice versa. 
-If the master is updated to v1.84.0 then the workers must be updated to v1.84.0 for event replication to 
+are sent over replication. This is a forwards- and backwards-incompatible change: v1.84.0 and below workers will not be
+able to send events to v1.85.0 workers or main process over replication, and vice versa. 
+If the master is updated to v1.85.0 then the workers must be updated to v1.84.0 for event replication to 
 function.
 This will also require a restart of the upgraded workers.
 
-Once all workers are upgraded to v1.84 and restarted event replication will be able to resume.  
+Once all workers are upgraded to v1.85.0 and restarted event replication will be able to resume.  
 
+# Upgrading to v1.84.0
 
 ## Deprecation of `worker_replication_*` configuration settings
 
