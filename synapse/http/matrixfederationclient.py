@@ -64,7 +64,7 @@ from synapse.api.errors import (
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
-    BlacklistingAgentWrapper,
+    BlocklistingAgentWrapper,
     BodyExceededMaxSize,
     ByteWriteable,
     _make_scheduler,
@@ -396,11 +396,11 @@ class MatrixFederationHttpClient:
             hs.config.server.federation_ip_range_blacklist,
         )
 
-        # Use a BlacklistingAgentWrapper to prevent circumventing the IP
-        # blacklist via IP literals in server names
-        self.agent = BlacklistingAgentWrapper(
+        # Use a BlocklistingAgentWrapper to prevent circumventing the IP
+        # blocking via IP literals in server names
+        self.agent = BlocklistingAgentWrapper(
             federation_agent,
-            ip_blacklist=hs.config.server.federation_ip_range_blacklist,
+            ip_blocklist=hs.config.server.federation_ip_range_blacklist,
         )
 
         self.clock = hs.get_clock()

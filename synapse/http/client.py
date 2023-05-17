@@ -117,22 +117,22 @@ RawHeaderValue = Union[
 ]
 
 
-def check_against_blacklist(
-    ip_address: IPAddress, ip_whitelist: Optional[IPSet], ip_blacklist: IPSet
+def _is_ip_allowed(
+    ip_address: IPAddress, allowlist: Optional[IPSet], blocklist: IPSet
 ) -> bool:
     """
     Compares an IP address to allowed and disallowed IP sets.
 
     Args:
         ip_address: The IP address to check
-        ip_whitelist: Allowed IP addresses.
-        ip_blacklist: Disallowed IP addresses.
+        allowlist: Allowed IP addresses.
+        blocklist: Disallowed IP addresses.
 
     Returns:
-        True if the IP address is in the blacklist and not in the whitelist.
+        True if the IP address is in the blocklist and not in the allowlist.
     """
-    if ip_address in ip_blacklist:
-        if ip_whitelist is None or ip_address not in ip_whitelist:
+    if ip_address in blocklist:
+        if allowlist is None or ip_address not in allowlist:
             return True
     return False
 
@@ -154,27 +154,27 @@ def _make_scheduler(
     return _scheduler
 
 
-class _IPBlacklistingResolver:
+class _IPBlockingResolver:
     """
-    A proxy for reactor.nameResolver which only produces non-blacklisted IP
-    addresses, preventing DNS rebinding attacks on URL preview.
+    A proxy for reactor.nameResolver which only produces non-blocklisted IP
+    addresses, preventing DNS rebinding attacks.
     """
 
     def __init__(
         self,
         reactor: IReactorPluggableNameResolver,
-        ip_whitelist: Optional[IPSet],
-        ip_blacklist: IPSet,
+        ip_allowlist: Optional[IPSet],
+        ip_blocklist: IPSet,
     ):
         """
         Args:
             reactor: The twisted reactor.
-            ip_whitelist: IP addresses to allow.
-            ip_blacklist: IP addresses to disallow.
+            ip_allowlist: IP addresses to allow.
+            ip_blocklist: IP addresses to disallow.
         """
         self._reactor = reactor
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
+        self._ip_allowlist = ip_allowlist
+        self._ip_blocklist = ip_blocklist
 
     def resolveHostName(
         self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
@@ -191,16 +191,13 @@ class _IPBlacklistingResolver:
 
                 ip_address = IPAddress(address.host)
 
-                if check_against_blacklist(
-                    ip_address, self._ip_whitelist, self._ip_blacklist
-                ):
+                if _is_ip_allowed(ip_address, self._ip_allowlist, self._ip_blocklist):
                     logger.info(
-                        "Dropped %s from DNS resolution to %s due to blacklist"
-                        % (ip_address, hostname)
+                        "Blocked %s from DNS resolution to %s" % (ip_address, hostname)
                     )
                     has_bad_ip = True
 
-            # if we have a blacklisted IP, we'd like to raise an error to block the
+            # if we have a blocked IP, we'd like to raise an error to block the
             # request, but all we can really do from here is claim that there were no
             # valid results.
             if not has_bad_ip:
@@ -232,24 +229,24 @@ class _IPBlacklistingResolver:
 # ISynapseReactor implies IReactorCore, but explicitly marking it this as an implementer
 # of IReactorCore seems to keep mypy-zope happier.
 @implementer(IReactorCore, ISynapseReactor)
-class BlacklistingReactorWrapper:
+class BlocklistingReactorWrapper:
     """
-    A Reactor wrapper which will prevent DNS resolution to blacklisted IP
+    A Reactor wrapper which will prevent DNS resolution to blocked IP
     addresses, to prevent DNS rebinding.
     """
 
     def __init__(
         self,
         reactor: IReactorPluggableNameResolver,
-        ip_whitelist: Optional[IPSet],
-        ip_blacklist: IPSet,
+        ip_allowlist: Optional[IPSet],
+        ip_blocklist: IPSet,
     ):
         self._reactor = reactor
 
-        # We need to use a DNS resolver which filters out blacklisted IP
+        # We need to use a DNS resolver which filters out blocked IP
         # addresses, to prevent DNS rebinding.
-        self._nameResolver = _IPBlacklistingResolver(
-            self._reactor, ip_whitelist, ip_blacklist
+        self._nameResolver = _IPBlockingResolver(
+            self._reactor, ip_allowlist, ip_blocklist
         )
 
     def __getattr__(self, attr: str) -> Any:
@@ -260,7 +257,7 @@ class BlacklistingReactorWrapper:
             return getattr(self._reactor, attr)
 
 
-class BlacklistingAgentWrapper(Agent):
+class BlocklistingAgentWrapper(Agent):
     """
     An Agent wrapper which will prevent access to IP addresses being accessed
     directly (without an IP address lookup).
@@ -269,18 +266,18 @@ class BlacklistingAgentWrapper(Agent):
     def __init__(
         self,
         agent: IAgent,
-        ip_blacklist: IPSet,
-        ip_whitelist: Optional[IPSet] = None,
+        ip_blocklist: IPSet,
+        ip_allowlist: Optional[IPSet] = None,
     ):
         """
         Args:
             agent: The Agent to wrap.
-            ip_whitelist: IP addresses to allow.
-            ip_blacklist: IP addresses to disallow.
+            ip_allowlist: IP addresses to allow.
+            ip_blocklist: IP addresses to disallow.
         """
         self._agent = agent
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
+        self._ip_allowlist = ip_allowlist
+        self._ip_blocklist = ip_blocklist
 
     def request(
         self,
@@ -299,13 +296,9 @@ class BlacklistingAgentWrapper(Agent):
             # Not an IP
             pass
         else:
-            if check_against_blacklist(
-                ip_address, self._ip_whitelist, self._ip_blacklist
-            ):
-                logger.info("Blocking access to %s due to blacklist" % (ip_address,))
-                e = SynapseError(
-                    HTTPStatus.FORBIDDEN, "IP address blocked by IP blacklist entry"
-                )
+            if _is_ip_allowed(ip_address, self._ip_allowlist, self._ip_blocklist):
+                logger.info("Blocking access to %s" % (ip_address,))
+                e = SynapseError(HTTPStatus.FORBIDDEN, "IP address blocked")
                 return defer.fail(Failure(e))
 
         return self._agent.request(
@@ -763,10 +756,9 @@ class SimpleHttpClient(BaseHttpClient):
     Args:
         hs: The HomeServer instance to pass in
         treq_args: Extra keyword arguments to be given to treq.request.
-        ip_blacklist: The IP addresses that are blacklisted that
-            we may not request.
-        ip_whitelist: The whitelisted IP addresses, that we can
-           request if it were otherwise caught in a blacklist.
+        ip_blocklist: The IP addresses that we may not request.
+        ip_allowlist: The allowed IP addresses, that we can
+           request if it were otherwise caught in a blocklist.
         use_proxy: Whether proxy settings should be discovered and used
             from conventional environment variables.
     """
@@ -775,19 +767,19 @@ class SimpleHttpClient(BaseHttpClient):
         self,
         hs: "HomeServer",
         treq_args: Optional[Dict[str, Any]] = None,
-        ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
+        ip_allowlist: Optional[IPSet] = None,
+        ip_blocklist: Optional[IPSet] = None,
         use_proxy: bool = False,
     ):
         super().__init__(hs, treq_args=treq_args)
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
+        self._ip_allowlist = ip_allowlist
+        self._ip_blocklist = ip_blocklist
 
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we need to use a DNS resolver which
-            # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
-                self.reactor, self._ip_whitelist, self._ip_blacklist
+        if self._ip_blocklist:
+            # If we have an IP blocklist, we need to use a DNS resolver which
+            # filters out blocked IP addresses, to prevent DNS rebinding.
+            self.reactor: ISynapseReactor = BlocklistingReactorWrapper(
+                self.reactor, self._ip_allowlist, self._ip_blocklist
             )
 
         # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
@@ -809,14 +801,13 @@ class SimpleHttpClient(BaseHttpClient):
             use_proxy=use_proxy,
         )
 
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we then install the blacklisting Agent
-            # which prevents direct access to IP addresses, that are not caught
-            # by the DNS resolution.
-            self.agent = BlacklistingAgentWrapper(
+        if self._ip_blocklist:
+            # If we have an IP blocklist, we then install the Agent which prevents
+            # direct access to IP addresses, that are not caught by the DNS resolution.
+            self.agent = BlocklistingAgentWrapper(
                 self.agent,
-                ip_blacklist=self._ip_blacklist,
-                ip_whitelist=self._ip_whitelist,
+                ip_blocklist=self._ip_blocklist,
+                ip_allowlist=self._ip_allowlist,
             )
 
 

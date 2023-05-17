@@ -167,8 +167,8 @@ class UrlPreviewer:
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
-            ip_whitelist=hs.config.media.url_preview_ip_range_whitelist,
-            ip_blacklist=hs.config.media.url_preview_ip_range_blacklist,
+            ip_allowlist=hs.config.media.url_preview_ip_range_whitelist,
+            ip_blocklist=hs.config.media.url_preview_ip_range_blacklist,
             use_proxy=True,
         )
         self.media_repo = media_repo

@@ -148,7 +148,7 @@ class FederationHandler:
         self._event_auth_handler = hs.get_event_auth_handler()
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
-        self.http_client = hs.get_proxied_blacklisted_http_client()
+        self.http_client = hs.get_proxied_blocklisting_http_client()
         self._replication = hs.get_replication_data_handler()
         self._federation_event_handler = hs.get_federation_event_handler()
         self._device_handler = hs.get_device_handler()
