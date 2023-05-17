@@ -123,8 +123,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             id_column="id",
         )
 
-    @trace
-    @tag_args
     @cached(max_entries=10000, iterable=True)
     async def get_state_group_delta(self, state_group: int) -> _GetStateGroupDelta:
         """Given a state group try to return a previous group and a delta between
