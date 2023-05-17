@@ -912,20 +912,21 @@ class FederationEventHandler:
 
         # Process previously failed backfill events in the background to not waste
         # time on something that is bound to fail again.
-        run_as_background_process(
-            "_process_new_pulled_events",
-            _process_new_pulled_events,
-            [
-                new_event_dict[event_id]
-                for event_id in event_ids_with_failed_pull_attempts
-            ],
-        )
+        events_with_failed_pull_attempts = [
+            new_event_dict[event_id] for event_id in event_ids_with_failed_pull_attempts
+        ]
+        if len(events_with_failed_pull_attempts) > 0:
+            run_as_background_process(
+                "_process_new_pulled_events",
+                _process_new_pulled_events,
+                events_with_failed_pull_attempts,
+            )
 
         # We can optimistically try to process and wait for the event to be fully
         # persisted if we've never tried before.
-        await _process_new_pulled_events(
-            [new_event_dict[event_id] for event_id in fresh_event_ids]
-        )
+        fresh_events = [new_event_dict[event_id] for event_id in fresh_event_ids]
+        if len(fresh_events) > 0:
+            await _process_new_pulled_events(fresh_events)
 
     @trace
     @tag_args
