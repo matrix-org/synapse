@@ -902,7 +902,9 @@ class FederationEventHandler:
         # Check if we've already tried to process these events at some point in the
         # past. We aren't concerned with the expontntial backoff here, just whether it
         # has failed to be processed before.
-        new_event_dict = {event.event_id: event for event in new_events}
+        new_event_dict = collections.OrderedDict(
+            (event.event_id, event) for event in new_events
+        )
         (
             event_ids_with_failed_pull_attempts,
             fresh_event_ids,
@@ -917,7 +919,7 @@ class FederationEventHandler:
         ]
         if len(events_with_failed_pull_attempts) > 0:
             run_as_background_process(
-                "_process_new_pulled_events",
+                "_process_new_pulled_events_with_failed_pull_attempts",
                 _process_new_pulled_events,
                 events_with_failed_pull_attempts,
             )
