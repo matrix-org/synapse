@@ -1143,9 +1143,17 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         tok = self.login("alice", "test")
         room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
 
+        # We purposely record the failed pull attempt for `$failed_event_id3` first
+        # to make sure we return results in the order of the event_ids passed in instead of
+        # the order in which we find things in the database.
         self.get_success(
             self.store.record_event_failed_pull_attempt(
-                room_id, "$failed_event_id", "fake cause"
+                room_id, "$failed_event_id3", "fake cause"
+            )
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(
+                room_id, "$failed_event_id1", "fake cause"
             )
         )
         self.get_success(
@@ -1157,10 +1165,12 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         (event_ids_with_failed_pull_attempts, fresh_event_ids) = self.get_success(
             self.store.separate_event_ids_with_failed_pull_attempts(
                 event_ids=[
-                    "$failed_event_id",
-                    "$fresh_event_id",
+                    "$failed_event_id1",
+                    "$fresh_event_id1",
                     "$failed_event_id2",
                     "$fresh_event_id2",
+                    "$failed_event_id3",
+                    "$fresh_event_id3",
                 ]
             )
         )
@@ -1168,13 +1178,13 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertEqual(
             event_ids_with_failed_pull_attempts,
             # We expect a 2^1 hour backoff after a single failed attempt.
-            {"$failed_event_id", "$failed_event_id2"},
+            {"$failed_event_id1", "$failed_event_id2", "$failed_event_id3"},
         )
 
         self.assertEqual(
             fresh_event_ids,
             # We expect a 2^1 hour backoff after a single failed attempt.
-            {"$fresh_event_id", "$fresh_event_id2"},
+            {"$fresh_event_id1", "$fresh_event_id2", "$fresh_event_id3"},
         )
 
     def test_get_event_ids_to_not_pull_from_backoff(self) -> None:
