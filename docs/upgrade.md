@@ -178,6 +178,7 @@ Notes:
 * `tls` is optional but mirrors the functionality of `worker_replication_http_tls`
 
 
+
 # Upgrading to v1.81.0
 
 ## Application service path & authentication deprecations
