@@ -105,7 +105,7 @@ class UrlPreviewer:
 
     When Synapse is asked to preview a URL it does the following:
 
-    1. Checks against a URL blacklist (defined as `url_preview_url_blacklist` in the
+    1. Checks against a URL blocklist (defined as `url_preview_url_blacklist` in the
        config).
     2. Checks the URL against an in-memory cache and returns the result if it exists. (This
        is also used to de-duplicate processing of multiple in-flight requests at once.)
@@ -186,7 +186,7 @@ class UrlPreviewer:
             or instance_running_jobs == hs.get_instance_name()
         )
 
-        self.url_preview_url_blacklist = hs.config.media.url_preview_url_blocklist
+        self.url_preview_url_blocklist = hs.config.media.url_preview_url_blocklist
         self.url_preview_accept_language = hs.config.media.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning
@@ -391,7 +391,7 @@ class UrlPreviewer:
             True if the URL is blocked, False if it is allowed.
         """
         url_tuple = urlsplit(url)
-        for entry in self.url_preview_url_blacklist:
+        for entry in self.url_preview_url_blocklist:
             match = True
             # Iterate over each entry. If *all* attributes of that entry match
             # the current URL, then reject it.
@@ -426,7 +426,7 @@ class UrlPreviewer:
 
             # All fields matched, return true (the URL is blocked).
             if match:
-                logger.warning("URL %s blocked by url_blacklist entry %s", url, entry)
+                logger.warning("URL %s blocked by entry %s", url, entry)
                 return match
 
         # No matches were found, the URL is allowed.
@@ -472,7 +472,7 @@ class UrlPreviewer:
         except DNSLookupError:
             # DNS lookup returned no results
             # Note: This will also be the case if one of the resolved IP
-            # addresses is blacklisted
+            # addresses is blocked.
             raise SynapseError(
                 502,
                 "DNS resolution failure during URL preview generation",
@@ -575,7 +575,7 @@ class UrlPreviewer:
 
         if self._is_url_blocked(url):
             raise SynapseError(
-                403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
+                403, "URL blocked by url pattern blocklist entry", Codes.UNKNOWN
             )
 
         # TODO: we should probably honour robots.txt... except in practice
