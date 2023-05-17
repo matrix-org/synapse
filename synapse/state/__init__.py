@@ -516,6 +516,7 @@ class StateHandler:
 
         state_to_resolve = await self._state_storage_controller.get_state_for_groups(
             state_group_ids_set
+            # TODO: Can we use a state_filter here to only grab auth events (and maybe history visibility)?
         )
 
         result = await self._state_resolution_handler.resolve_state_groups(
