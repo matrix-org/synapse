@@ -45,6 +45,7 @@ from synapse.events.snapshot import (
     UnpersistedEventContextBase,
 )
 from synapse.logging.context import ContextResourceUsage
+from synapse.logging.opentracing import tag_args, trace
 from synapse.replication.http.state import ReplicationUpdateCurrentStateRestServlet
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
@@ -270,6 +271,8 @@ class StateHandler:
         state = await entry.get_state(self._state_storage_controller, StateFilter.all())
         return await self.store.get_joined_hosts(room_id, state, entry)
 
+    @trace
+    @tag_args
     async def calculate_context_info(
         self,
         event: EventBase,
@@ -465,6 +468,7 @@ class StateHandler:
 
         return await unpersisted_context.persist(event)
 
+    @trace
     @measure_func()
     async def resolve_state_groups_for_events(
         self, room_id: str, event_ids: Collection[str], await_full_state: bool = True

@@ -355,6 +355,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
 
+    @trace
     @cached(max_entries=50000)
     async def _get_state_group_for_event(self, event_id: str) -> Optional[int]:
         return await self.db_pool.simple_select_one_onecol(
@@ -365,6 +366,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             desc="_get_state_group_for_event",
         )
 
+    @trace
     @cachedList(
         cached_method_name="_get_state_group_for_event",
         list_name="event_ids",
