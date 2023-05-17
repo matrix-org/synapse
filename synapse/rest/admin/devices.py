@@ -140,6 +140,7 @@ class DevicesRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
+        """Creates a new device for the user."""
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)

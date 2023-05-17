@@ -813,6 +813,32 @@ The following fields are returned in the JSON response body:
 
 - `total` - Total number of user's devices.
 
+### Create a device
+
+Creates a new device for a specific `user_id`.
+
+The API is:
+
+```
+POST /_synapse/admin/v2/users/<user_id>/devices
+
+{
+  "device_id": "QBUAZIFURK"
+}
+```
+
+An empty JSON dict is returned.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `user_id` - fully qualified: for example, `@user:server.com`.
+
+The following fields are required in the JSON request body:
+
+- `device_id` - The device ID to create.
+
 ### Delete multiple devices
 Deletes the given devices for a specific `user_id`, and invalidates
 any access token associated with them.
