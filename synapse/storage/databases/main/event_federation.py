@@ -1597,7 +1597,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         Returns:
             A tuple with two lists where the given event_ids are separated based on
             whether they have any failed pull attempts or not
-            (event_ids_with_failed_pull_attempts, fresh_event_ids).
+            (event_ids_with_failed_pull_attempts, fresh_event_ids). Lists are ordered
+            the same as the given event_ids.
         """
 
         rows = await self.db_pool.simple_select_many_batch(
@@ -1608,8 +1609,20 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             retcols=("event_id",),
             desc="separate_event_ids_with_failed_pull_attempts",
         )
-        event_ids_with_failed_pull_attempts = {str(row["event_id"]) for row in rows}
-        fresh_event_ids = set(event_ids) - event_ids_with_failed_pull_attempts
+        event_ids_with_failed_pull_attempts_from_database = [
+            str(row["event_id"]) for row in rows
+        ]
+        # We want to maintain the order of the given event_ids so re-construct things
+        event_ids_with_failed_pull_attempts = [
+            event_id
+            for event_id in event_ids
+            if event_id in event_ids_with_failed_pull_attempts_from_database
+        ]
+        fresh_event_ids = [
+            event_id
+            for event_id in event_ids
+            if event_id not in event_ids_with_failed_pull_attempts
+        ]
 
         return (event_ids_with_failed_pull_attempts, fresh_event_ids)
 
