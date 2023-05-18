@@ -90,7 +90,15 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         state_filter: Optional[StateFilter] = None,
     ) -> Mapping[int, StateMap[str]]:
         """
-        TODO
+        Given a number of state groups, fetch the latest state for each group.
+
+        Args:
+            txn: The transaction object.
+            groups: The given state groups that you want to fetch the latest state for.
+            state_filter: The state filter to apply the state we fetch state from the database.
+
+        Returns:
+            Map from state_group to a StateMap at that point.
         """
 
         state_filter = state_filter or StateFilter.all()
@@ -102,13 +110,11 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             # a temporary hack until we can add the right indices in
             txn.execute("SET LOCAL enable_seqscan=off")
 
-            # The below query walks the state_group tree so that the "state"
+            # The query below walks the state_group tree so that the "state"
             # table includes all state_groups in the tree. It then joins
             # against `state_groups_state` to fetch the latest state.
             # It assumes that previous state groups are always numerically
             # lesser.
-            # This may return multiple rows per (type, state_key), but last_value
-            # should be the same.
             sql = """
                 WITH RECURSIVE sgs(state_group, state_group_reached) AS (
                     VALUES(?::bigint, NULL::bigint)
@@ -214,13 +220,19 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     ORDER BY type, state_key, state_group DESC
                 """
 
-            # We can sort from smallest to largest state_group and re-use the work from
-            # the small state_group for a larger one if we see that the edge chain links
+            # We can sort from least to greatest state_group and re-use the work from a
+            # lesser state_group for a greater one if we see that the edge chain links
             # up.
+            #
+            # What this means in practice is that if we fetch the latest state for
+            # `state_group = 20`, and then we want `state_group = 30`, it will traverse
+            # down the edge chain to `20`, see that we linked up to `20` and bail out
+            # early and re-use the work we did for `20`.
             sorted_groups = sorted(groups)
             state_groups_we_have_already_fetched: Set[int] = set(
-                # We default to `[-1]` just to fill in the query with something
-                # that will have no effect but not bork our query when it would be empty otherwise
+                # We default to `[-1]` just to fill in the query with something that
+                # will have no effect but not bork our query when it would be empty
+                # otherwise
                 [-1]
             )
             for group in sorted_groups:
@@ -244,7 +256,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 # The first row is always our special `state_group_reached` row which
                 # tells us if we linked up to any other existing state_group that we
                 # already fetched and if so, which one we linked up to (see the `UNION
-                # ALL` above)
+                # ALL` above which drives this special row)
                 first_row = txn.fetchone()
                 if first_row:
                     _, _, _, state_group_reached = first_row
@@ -255,7 +267,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     key = (intern_string(typ), intern_string(state_key))
                     partial_state_map_for_state_group[key] = event_id
 
-                # If we see a state group edge link to a previous state_group that we
+                # If we see a state_group edge link to a previous state_group that we
                 # already fetched from the database, link up the base state to the
                 # partial state we retrieved from the database to build on top of.
                 if state_group_reached in results:
