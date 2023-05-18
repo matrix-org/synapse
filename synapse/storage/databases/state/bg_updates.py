@@ -227,14 +227,16 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             # What this means in practice is that if we fetch the latest state for
             # `state_group = 20`, and then we want `state_group = 30`, it will traverse
             # down the edge chain to `20`, see that we linked up to `20` and bail out
-            # early and re-use the work we did for `20`.
+            # early and re-use the work we did for `20`. This can have massive savings
+            # in rooms like Matrix HQ where the edge chain is 88k events long and
+            # fetching the mostly-same chain over and over isn't very efficient.
             sorted_groups = sorted(groups)
-            state_groups_we_have_already_fetched: Set[int] = set(
+            state_groups_we_have_already_fetched: Set[int] = {
                 # We default to `[-1]` just to fill in the query with something that
                 # will have no effect but not bork our query when it would be empty
                 # otherwise
-                [-1]
-            )
+                -1
+            }
             for group in sorted_groups:
                 args: List[Union[int, str]] = [group]
                 args.extend(state_groups_we_have_already_fetched)
