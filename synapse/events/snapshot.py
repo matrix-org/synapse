@@ -174,6 +174,7 @@ class EventContext(UnpersistedEventContextBase):
         Returns:
             The serialized event.
         """
+
         return {
             "state_group": self._state_group,
             "state_group_before_event": self.state_group_before_event,
@@ -458,7 +459,7 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
         self,
     ) -> Dict[Tuple[int, int], StateMap]:
         """
-        Internal function to take an UnpersistedEventContext and collect any known deltas
+        A function to take an UnpersistedEventContext and collect any known deltas
         between the state groups associated with the context. This information is used in an
         optimization when persisting events.
         """
@@ -543,47 +544,3 @@ def _decode_state_dict(
         return None
 
     return immutabledict({(etype, state_key): v for etype, state_key, v in input})
-
-
-def _build_state_group_deltas(
-    unpersisted_ctx: UnpersistedEventContext,
-) -> Dict[Tuple[int, int], StateMap]:
-    """
-    Internal function to take an UnpersistedEventContext and collect any known deltas
-    between the state groups associated with the context. This information is used in an
-    optimization when persisting events.
-    """
-    state_group_deltas = {}
-
-    # if we know the state group before the event and after the event, add them and the
-    # state delta between them to state_group_deltas
-    if (
-        unpersisted_ctx.state_group_before_event
-        and unpersisted_ctx.state_group_after_event
-    ):
-        # if we have the state groups we should have the delta
-        assert unpersisted_ctx.state_delta_due_to_event is not None
-        state_group_deltas[
-            (
-                unpersisted_ctx.state_group_before_event,
-                unpersisted_ctx.state_group_after_event,
-            )
-        ] = unpersisted_ctx.state_delta_due_to_event
-
-    # the state group before the event may also have a state group which precedes it, if
-    # we have that and the state group before the event, add them and the state
-    # delta between them to state_group_deltas
-    if (
-        unpersisted_ctx.prev_group_for_state_group_before_event
-        and unpersisted_ctx.state_group_before_event
-    ):
-        # if we have both state groups we should have the delta between them
-        assert unpersisted_ctx.delta_ids_to_state_group_before_event is not None
-        state_group_deltas[
-            (
-                unpersisted_ctx.prev_group_for_state_group_before_event,
-                unpersisted_ctx.state_group_before_event,
-            )
-        ] = unpersisted_ctx.delta_ids_to_state_group_before_event
-
-    return state_group_deltas
