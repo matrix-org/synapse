@@ -92,9 +92,9 @@ process, for example:
 
 ## Changes to event replication 
 
-Synapse has changed the format of `EventContext` which impacts how events to be persisted
-are sent over replication. This is a forwards- and backwards-incompatible change: v1.84.0 and below workers will not be
-able to send events to v1.85.0 workers or main process over replication, and vice versa. 
+Synapse has changed the format of serialization format used when persisting events over replication.
+This is a forwards- and backwards-incompatible change: v1.84.0 and below workers will not be
+able to send events to v1.85.0 workers, and vice versa. 
 If the master is updated to v1.85.0 then the workers must be updated to v1.85.0 for event replication to 
 function.
 This will also require a restart of the upgraded workers.

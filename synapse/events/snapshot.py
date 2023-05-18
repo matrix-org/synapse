@@ -455,13 +455,9 @@ class UnpersistedEventContext(UnpersistedEventContextBase):
             partial_state=self.partial_state,
         )
 
-    def _build_state_group_deltas(
-        self,
-    ) -> Dict[Tuple[int, int], StateMap]:
+    def _build_state_group_deltas(self) -> Dict[Tuple[int, int], StateMap]:
         """
-        A function to take an UnpersistedEventContext and collect any known deltas
-        between the state groups associated with the context. This information is used in an
-        optimization when persisting events.
+        Collect deltas between the state groups associated with this context
         """
         state_group_deltas = {}
 
