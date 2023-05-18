@@ -93,6 +93,7 @@ class MediaRepository:
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist
         )
+        self.prevent_media_downloads_from = hs.config.media.prevent_media_downloads_from
 
         # List of StorageProviders where we should search for media and
         # potentially upload to.
@@ -275,6 +276,14 @@ class MediaRepository:
             and server_name not in self.federation_domain_whitelist
         ):
             raise FederationDeniedError(server_name)
+
+        # Don't let users download media from domains listed in the config, even
+        # if we might have the media to serve. This is Trust & Safety tooling to
+        # block some servers' media from being accessible to local users.
+        # See `prevent_media_downloads_from` config docs for more info.
+        if server_name in self.prevent_media_downloads_from:
+            respond_404(request)
+            return
 
         self.mark_recently_accessed(server_name, media_id)
 

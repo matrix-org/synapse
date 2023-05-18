@@ -85,6 +85,7 @@ class RelationsHandler:
         event_id: str,
         room_id: str,
         pagin_config: PaginationConfig,
+        recurse: bool,
         include_original_event: bool,
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
@@ -98,6 +99,7 @@ class RelationsHandler:
             event_id: Fetch events that relate to this event ID.
             room_id: The room the event belongs to.
             pagin_config: The pagination config rules to apply, if any.
+            recurse: Whether to recursively find relations.
             include_original_event: Whether to include the parent event.
             relation_type: Only fetch events with this relation type, if given.
             event_type: Only fetch events with this event type, if given.
@@ -132,6 +134,7 @@ class RelationsHandler:
             direction=pagin_config.direction,
             from_token=pagin_config.from_token,
             to_token=pagin_config.to_token,
+            recurse=recurse,
         )
 
         events = await self._main_store.get_events_as_list(

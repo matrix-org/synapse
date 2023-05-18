@@ -126,6 +126,15 @@ class RemoteKey(RestServlet):
         self, request: Request, server: str, key_id: Optional[str] = None
     ) -> Tuple[int, JsonDict]:
         if server and key_id:
+            # Matrix 1.6 drops support for passing the key_id, this is incompatible
+            # with earlier versions and is allowed in order to support both.
+            # A warning is issued to help determine when it is safe to drop this.
+            logger.warning(
+                "Request for remote server key with deprecated key ID (logging to determine usage level for future removal): %s / %s",
+                server,
+                key_id,
+            )
+
             minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
             arguments = {}
             if minimum_valid_until_ts is not None:
@@ -161,7 +170,7 @@ class RemoteKey(RestServlet):
 
         time_now_ms = self.clock.time_msec()
 
-        # Map server_name->key_id->int. Note that the value of the init is unused.
+        # Map server_name->key_id->int. Note that the value of the int is unused.
         # XXX: why don't we just use a set?
         cache_misses: Dict[str, Dict[str, int]] = {}
         for (server_name, key_id, _), key_results in cached.items():

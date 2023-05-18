@@ -501,7 +501,7 @@ class PublicRoomListRestServlet(RestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server and server != self.hs.config.server.server_name:
+        if server and not self.hs.is_mine_server_name(server):
             # Ensure the server is valid.
             try:
                 parse_and_validate_server_name(server)
@@ -551,7 +551,7 @@ class PublicRoomListRestServlet(RestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server and server != self.hs.config.server.server_name:
+        if server and not self.hs.is_mine_server_name(server):
             # Ensure the server is valid.
             try:
                 parse_and_validate_server_name(server)

@@ -87,12 +87,18 @@ shared configuration file.
 
 ### Shared configuration
 
-Normally, only a couple of changes are needed to make an existing configuration
-file suitable for use with workers. First, you need to enable an
+Normally, only a few changes are needed to make an existing configuration
+file suitable for use with workers:
+* First, you need to enable an
 ["HTTP replication listener"](usage/configuration/config_documentation.md#listeners)
-for the main process; and secondly, you need to enable
-[redis-based replication](usage/configuration/config_documentation.md#redis).
-Optionally, a [shared secret](usage/configuration/config_documentation.md#worker_replication_secret)
+for the main process
+* Secondly, you need to enable
+[redis-based replication](usage/configuration/config_documentation.md#redis)
+* You will need to add an [`instance_map`](usage/configuration/config_documentation.md#instance_map) 
+with the `main` process defined, as well as the relevant connection information from 
+it's HTTP `replication` listener (defined in step 1 above). Note that the `host` defined 
+is the address the worker needs to look for the `main` process at, not necessarily the same address that is bound to.
+* Optionally, a [shared secret](usage/configuration/config_documentation.md#worker_replication_secret)
 can be used to authenticate HTTP traffic between workers. For example:
 
 ```yaml
@@ -111,6 +117,11 @@ worker_replication_secret: ""
 
 redis:
     enabled: true
+
+instance_map:
+    main:
+        host: 'localhost'
+        port: 9093
 ```
 
 See the [configuration manual](usage/configuration/config_documentation.md)
@@ -130,13 +141,13 @@ In the config file for each worker, you must specify:
  * The type of worker ([`worker_app`](usage/configuration/config_documentation.md#worker_app)).
    The currently available worker applications are listed [below](#available-worker-applications).
  * A unique name for the worker ([`worker_name`](usage/configuration/config_documentation.md#worker_name)).
- * The HTTP replication endpoint that it should talk to on the main synapse process
-   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
-   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)).
  * If handling HTTP requests, a [`worker_listeners`](usage/configuration/config_documentation.md#worker_listeners) option
    with an `http` listener.
  * **Synapse 1.72 and older:** if handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
    the main process (`worker_main_http_uri`). This config option is no longer required and is ignored when running Synapse 1.73 and newer.
+ * **Synapse 1.83 and older:** The HTTP replication endpoint that the worker should talk to on the main synapse process
+   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
+   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)). If using Synapse 1.84 and newer, these are not needed if `main` is defined on the [shared configuration](#shared-configuration) `instance_map`
 
 For example:
 
@@ -325,8 +336,7 @@ load balancing can be done in different ways.
 
 For `/sync` and `/initialSync` requests it will be more efficient if all
 requests from a particular user are routed to a single instance. This can
-be done e.g. in nginx via IP `hash $http_x_forwarded_for;` or via
-`hash $http_authorization consistent;` which contains the users access token.
+be done in reverse proxy by extracting username part from the users access token.
 
 Admins may additionally wish to separate out `/sync`
 requests that have a `since` query parameter from those that don't (and
@@ -334,6 +344,69 @@ requests that have a `since` query parameter from those that don't (and
 when a user logs in on a new device and can be *very* resource intensive, so
 isolating these requests will stop them from interfering with other users ongoing
 syncs.
+
+Example `nginx` configuration snippet that handles the cases above. This is just an
+example and probably requires some changes according to your particular setup:
+
+```nginx
+# Choose sync worker based on the existence of "since" query parameter
+map $arg_since $sync {
+    default synapse_sync;
+    '' synapse_initial_sync;
+}
+
+# Extract username from access token passed as URL parameter
+map $arg_access_token $accesstoken_from_urlparam {
+    # Defaults to just passing back the whole accesstoken
+    default   $arg_access_token;
+    # Try to extract username part from accesstoken URL parameter
+    "~syt_(?<username>.*?)_.*"           $username;
+}
+
+# Extract username from access token passed as authorization header
+map $http_authorization $mxid_localpart {
+    # Defaults to just passing back the whole accesstoken
+    default                              $http_authorization;
+    # Try to extract username part from accesstoken header
+    "~Bearer syt_(?<username>.*?)_.*"    $username;
+    # if no authorization-header exist, try mapper for URL parameter "access_token"
+    ""                                   $accesstoken_from_urlparam;
+}
+
+upstream synapse_initial_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8016;
+    server 127.0.0.1:8036;
+}
+
+upstream synapse_sync {
+    # Use the username mapper result for hash key
+    hash $mxid_localpart consistent;
+    server 127.0.0.1:8013;
+    server 127.0.0.1:8037;
+    server 127.0.0.1:8038;
+    server 127.0.0.1:8039;
+}
+
+# Sync initial/normal
+location ~ ^/_matrix/client/(r0|v3)/sync$ {
+	proxy_pass http://$sync;
+}
+
+# Normal sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/events$ {
+	proxy_pass http://synapse_sync;
+}
+
+# Initial_sync
+location ~ ^/_matrix/client/(api/v1|r0|v3)/initialSync$ {
+	proxy_pass http://synapse_initial_sync;
+}
+location ~ ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$ {
+	proxy_pass http://synapse_initial_sync;
+}
+```
 
 Federation and client requests can be balanced via simple round robin.
 
@@ -355,11 +428,14 @@ effects of bursts of events from that bridge on events sent by normal users.
 Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.
 
-To enable this, the worker must have a
-[HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
-have a [`worker_name`](usage/configuration/config_documentation.md#worker_name)
+To enable this, the worker must have:
+* An [HTTP `replication` listener](usage/configuration/config_documentation.md#listeners) configured,
+* Have a [`worker_name`](usage/configuration/config_documentation.md#worker_name)
 and be listed in the [`instance_map`](usage/configuration/config_documentation.md#instance_map)
-config. The same worker can handle multiple streams, but unless otherwise documented,
+config. 
+* Have the main process declared on the [`instance_map`](usage/configuration/config_documentation.md#instance_map) as well.
+
+Note: The same worker can handle multiple streams, but unless otherwise documented,
 each stream can only have a single writer.
 
 For example, to move event persistence off to a dedicated worker, the shared
@@ -367,6 +443,9 @@ configuration would include:
 
 ```yaml
 instance_map:
+    main:
+        host: localhost
+        port: 8030
     event_persister1:
         host: localhost
         port: 8034

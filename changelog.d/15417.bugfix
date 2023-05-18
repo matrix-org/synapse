@@ -1,1 +1,0 @@
-Fix a long-standing bug where cached key results which were directly fetched would not be properly re-used.

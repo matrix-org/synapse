@@ -81,3 +81,52 @@ The following fields are returned in the JSON response body:
   - `user_id` - string - Fully-qualified user ID (ex. `@user:server.com`).
 * `next_token` - integer - Opaque value used for pagination. See above.
 * `total` - integer - Total number of users after filtering.
+
+
+# Get largest rooms by size in database
+
+Returns the 10 largest rooms and an estimate of how much space in the database
+they are taking.
+
+This does not include the size of any associated media associated with the room.
+
+Returns an error on SQLite.
+
+*Note:* This uses the planner statistics from PostgreSQL to do the estimates,
+which means that the returned information can vary widely from reality. However,
+it should be enough to get a rough idea of where database disk space is going.
+
+
+The API is:
+
+```
+GET /_synapse/admin/v1/statistics/database/rooms
+```
+
+A response body like the following is returned:
+
+```json
+{
+  "rooms": [
+    {
+      "room_id": "!OGEhHVWSdvArJzumhm:matrix.org",
+      "estimated_size": 47325417353
+    }
+  ],
+}
+```
+
+
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+* `rooms` - An array of objects, sorted by largest room first. Objects contain
+  the following fields:
+  - `room_id` - string - The room ID.
+  - `estimated_size` - integer - Estimated disk space used in bytes by the room
+    in the database.
+
+
+*Added in Synapse 1.83.0*
