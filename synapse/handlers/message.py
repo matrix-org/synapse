@@ -560,8 +560,6 @@ class EventCreationHandler:
                 expiry_ms=30 * 60 * 1000,
             )
 
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
-
     async def create_event(
         self,
         requester: Requester,
@@ -906,7 +904,7 @@ class EventCreationHandler:
             An event if one could be found, None otherwise.
         """
 
-        if self._msc3970_enabled and requester.device_id:
+        if requester.device_id:
             # When MSC3970 is enabled, we lookup for events sent by the same device first,
             # and fallback to the old behaviour if none were found.
             existing_event_id = (

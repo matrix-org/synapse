@@ -361,7 +361,6 @@ def serialize_event(
     time_now_ms: int,
     *,
     config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
-    msc3970_enabled: bool = False,
 ) -> JsonDict:
     """Serialize event for clients
 
@@ -369,8 +368,6 @@ def serialize_event(
         e
         time_now_ms
         config: Event serialization config
-        msc3970_enabled: Whether MSC3970 is enabled. It changes whether we should
-            include the `transaction_id` in the event's `unsigned` section.
 
     Returns:
         The serialized event dictionary.
@@ -396,7 +393,6 @@ def serialize_event(
             e.unsigned["redacted_because"],
             time_now_ms,
             config=config,
-            msc3970_enabled=msc3970_enabled,
         )
 
     # If we have a txn_id saved in the internal_metadata, we should include it in the
@@ -408,7 +404,7 @@ def serialize_event(
         # event internal metadata. Since we were not recording them before, if it hasn't
         # been recorded, we fallback to the old behaviour.
         event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
-        if msc3970_enabled and event_device_id is not None:
+        if event_device_id is not None:
             if event_device_id == config.requester.device_id:
                 d["unsigned"]["transaction_id"] = txn_id
 
@@ -460,9 +456,6 @@ class EventClientSerializer:
     clients.
     """
 
-    def __init__(self, *, msc3970_enabled: bool = False):
-        self._msc3970_enabled = msc3970_enabled
-
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
@@ -487,9 +480,7 @@ class EventClientSerializer:
         if not isinstance(event, EventBase):
             return event
 
-        serialized_event = serialize_event(
-            event, time_now, config=config, msc3970_enabled=self._msc3970_enabled
-        )
+        serialized_event = serialize_event(event, time_now, config=config)
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:

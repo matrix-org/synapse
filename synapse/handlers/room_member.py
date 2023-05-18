@@ -174,8 +174,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.request_ratelimiter = hs.get_request_ratelimiter()
         hs.get_notifier().add_new_join_in_room_callback(self._on_user_joined_room)
 
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
-
     def _on_user_joined_room(self, event_id: str, room_id: str) -> None:
         """Notify the rate limiter that a room join has occurred.
 
@@ -424,7 +422,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # do it up front for efficiency.)
         if txn_id:
             existing_event_id = None
-            if self._msc3970_enabled and requester.device_id:
+            if requester.device_id:
                 # When MSC3970 is enabled, we lookup for events sent by the same device
                 # first, and fallback to the old behaviour if none were found.
                 existing_event_id = (

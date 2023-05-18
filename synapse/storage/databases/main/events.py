@@ -127,8 +127,6 @@ class PersistEventsStore:
         self._backfill_id_gen: AbstractStreamIdGenerator = self.store._backfill_id_gen
         self._stream_id_gen: AbstractStreamIdGenerator = self.store._stream_id_gen
 
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
-
     @trace
     async def _persist_events_and_state_updates(
         self,
@@ -1033,7 +1031,7 @@ class PersistEventsStore:
         # With MSC3970, we rely on the device_id instead to scope the txn_id for events.
         # We're only inserting if MSC3970 is *enabled*, because else the pre-MSC3970
         # behaviour would allow for a UNIQUE constraint violation on this table
-        if to_insert_device_id and self._msc3970_enabled:
+        if to_insert_device_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="event_txn_id_device_id",
