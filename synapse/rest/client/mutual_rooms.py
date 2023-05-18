@@ -62,7 +62,7 @@ class UserMutualRoomsServlet(RestServlet):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Unknown batch_token",
-                errcode=Codes.BAD_PAGINATION,
+                errcode=Codes.INVALID_PARAM,
             )
 
         user_id = user_ids[0]
