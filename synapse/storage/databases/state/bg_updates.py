@@ -117,7 +117,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                         prev_state_group,
                         CASE
                             /* Specify state_groups we have already done the work for */
-                            WHEN @prev_state_group IN (%s) THEN prev_state_group
+                            WHEN @prev_state_group IN (%s /* state_groups_we_have_already_fetched_string */) THEN prev_state_group
                             ELSE NULL
                         END AS state_group_reached
                     FROM
@@ -127,13 +127,14 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                         /* Stop when we connect up to another state_group that we already did the work for */
                         AND s.state_group_reached IS NULL
                 )
-                %s
+                %s /* overall_select_clause */
             """
 
             overall_select_query_args: List[Union[int, str]] = []
             # Make sure we always have a row that tells us if we linked up to another
-            # state group that we already processed (`state_group_reached`) regardless
-            # of whether we find any state according to the state_filter.
+            # state_group chain that we already processed (indicated by
+            # `state_group_reached`) regardless of whether we find any state according
+            # to the state_filter.
             #
             # We use a `UNION ALL` to make sure it is always the first row returned.
             # `UNION` will merge and sort in with the rows from the next query
@@ -144,7 +145,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     FROM sgs
                     ORDER BY state_group ASC
                     LIMIT 1
-                ) UNION ALL (%s)
+                ) UNION ALL (%s /* main_select_clause */)
             """
 
             # This is an optimization to create a select clause per-condition. This
@@ -217,19 +218,18 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             # the small state_group for a larger one if we see that the edge chain links
             # up.
             sorted_groups = sorted(groups)
-            state_groups_we_have_already_fetched: Set[int] = set()
+            state_groups_we_have_already_fetched: Set[int] = set(
+                # We default to `[-1]` just to fill in the query with something
+                # that will have no effect but not bork our query when it would be empty otherwise
+                [-1]
+            )
             for group in sorted_groups:
                 args: List[Union[int, str]] = [group]
+                args.extend(state_groups_we_have_already_fetched)
                 args.extend(overall_select_query_args)
 
                 state_groups_we_have_already_fetched_string = ", ".join(
-                    [
-                        # TODO: Is this string manipulation safe?
-                        f"{state_group}::bigint"
-                        # We default to `[-1]` just to fill in the query with something
-                        # that will have no effct
-                        for state_group in state_groups_we_have_already_fetched or [-1]
-                    ]
+                    ["?::bigint"] * len(state_groups_we_have_already_fetched)
                 )
 
                 txn.execute(
