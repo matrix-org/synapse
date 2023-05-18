@@ -42,7 +42,7 @@ from tests.test_utils.html_parsers import TestHtmlParser
 from tests.unittest import HomeserverTestCase, override_config, skip_unless
 
 try:
-    from authlib.jose import jwk, jwt
+    from authlib.jose import JsonWebKey, jwt
 
     HAS_JWT = True
 except ImportError:
@@ -1121,7 +1121,7 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_privatekey) -> str:
         header = {"alg": "RS256"}
         if secret.startswith("-----BEGIN RSA PRIVATE KEY-----"):
-            secret = jwk.dumps(secret, kty="RSA")
+            secret = JsonWebKey.import_key(secret, {"kty": "RSA"})
         result: bytes = jwt.encode(header, payload, secret)
         return result.decode("ascii")
 
