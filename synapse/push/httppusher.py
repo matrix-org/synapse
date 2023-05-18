@@ -431,7 +431,7 @@ class HttpPusher(Pusher):
             rejected push keys otherwise. If this array is empty, the push fully
             succeeded.
         """
-        priority = "low"
+        priority = "high"  # Beeper: always use high priority notifications
         if (
             event.type == EventTypes.Encrypted
             or tweaks.get("highlight")
