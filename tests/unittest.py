@@ -229,13 +229,20 @@ class TestCase(unittest.TestCase):
         #
         # The easiest way to do this would be to do a full GC after each test
         # run, but that is very expensive. Instead, we disable GC (above) for
-        # the duration of the test so that we only need to run a gen-0 GC, which
-        # is a lot quicker.
+        # the duration of the test and only run a gen-0 GC, which is a lot
+        # quicker. This doesn't clean up everything, since the TestCase
+        # instance still holds references to objects created during the test,
+        # such as HomeServers, so we do a full GC every so often.
 
         @around(self)
         def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
             gc.collect(0)
+            # Run a full GC every 50 gen-0 GCs.
+            gen0_stats = gc.get_stats()[0]
+            gen0_collections = gen0_stats["collections"]
+            if gen0_collections % 50 == 0:
+                gc.collect()
             gc.enable()
             set_current_context(SENTINEL_CONTEXT)
 
