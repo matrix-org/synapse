@@ -11,17 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, Iterable, Type, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
 import jsonschema
 from pydantic import BaseModel, ValidationError, parse_obj_as
 
 from synapse.config._base import ConfigError
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrSequence
 
 
 def validate_config(
-    json_schema: JsonDict, config: Any, config_path: Iterable[str]
+    json_schema: JsonDict, config: Any, config_path: StrSequence
 ) -> None:
     """Validates a config setting against a JsonSchema definition
 
@@ -45,7 +45,7 @@ def validate_config(
 
 
 def json_error_to_config_error(
-    e: jsonschema.ValidationError, config_path: Iterable[str]
+    e: jsonschema.ValidationError, config_path: StrSequence
 ) -> ConfigError:
     """Converts a json validation error to a user-readable ConfigError
 
