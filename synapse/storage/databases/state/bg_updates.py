@@ -280,8 +280,9 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 else:
                     # It's also completely normal for us not to have a previous
                     # state_group to build on top of if this is the first group being
-                    # processes or we are processing a bunch of groups from different
-                    # rooms which of course will never link together.
+                    # processed or we are processing a bunch of groups from different
+                    # rooms which of course will never link together (competely
+                    # different DAGs).
                     results[group] = partial_state_map_for_state_group
 
                 state_groups_we_have_already_fetched.add(group)
