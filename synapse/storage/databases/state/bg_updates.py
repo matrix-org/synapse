@@ -210,7 +210,9 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 state_groups_we_have_already_fetched_string = ", ".join(
                     [
                         f"{state_group}::bigint"
-                        for state_group in state_groups_we_have_already_fetched
+                        # We default to `[-1]` just to fill in the query with something
+                        # that will have no effct
+                        for state_group in state_groups_we_have_already_fetched or [-1]
                     ]
                 )
 
@@ -230,7 +232,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     key = (intern_string(typ), intern_string(state_key))
                     partial_state_map_for_state_group[key] = event_id
 
-                    if state_group < min_state_group or min_state_group is None:
+                    if min_state_group is None or state_group < min_state_group:
                         min_state_group = state_group
 
                 # If we see a state group edge link to a previous state_group that we
