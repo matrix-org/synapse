@@ -22,15 +22,8 @@
 # You should now be dropped into a new shell with all programs and dependencies
 # availabile to you!
 #
-# You can start up pre-configured, local PostgreSQL and Redis instances by
+# You can start up pre-configured local Synapse, PostgreSQL and Redis instances by
 # running: `devenv up`. To stop them, use Ctrl-C.
-#
-# A PostgreSQL database called 'synapse' will be set up for you, along with
-# a PostgreSQL user named 'synapse_user'.
-# The 'host' can be found by running `echo $PGHOST` with the development
-# shell activated. Use these values to configure your Synapse to connect
-# to the local PostgreSQL database. You do not need to specify a password.
-# https://matrix-org.github.io/synapse/latest/postgres
 #
 # All state (the venv, postgres and redis data and config) are stored in
 # .devenv/state. Deleting a file from here and then re-entering the shell
