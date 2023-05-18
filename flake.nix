@@ -180,6 +180,7 @@
                     enabled: true
                   EOF
                 '';
+                # Start synapse when `devenv up` is run.
                 processes.synapse.exec = "poetry run python -m synapse.app.homeserver -c homeserver.yaml --config-directory homeserver-config-overrides.d";
 
                 # Define the perl modules we require to run SyTest.
