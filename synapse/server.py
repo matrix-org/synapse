@@ -453,7 +453,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
-    def get_proxied_blocklisting_http_client(self) -> SimpleHttpClient:
+    def get_proxied_blocklisted_http_client(self) -> SimpleHttpClient:
         """
         An HTTP client that uses configured HTTP(S) proxies and blocks IPs
         based on the configured IP ranges.

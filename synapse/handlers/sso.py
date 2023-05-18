@@ -204,7 +204,7 @@ class SsoHandler:
         self._media_repo = (
             hs.get_media_repository() if hs.config.media.can_load_media_repo else None
         )
-        self._http_client = hs.get_proxied_blocklisting_http_client()
+        self._http_client = hs.get_proxied_blocklisted_http_client()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
