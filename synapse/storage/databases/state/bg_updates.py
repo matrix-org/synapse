@@ -241,16 +241,6 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     args,
                 )
 
-                logger.info(
-                    "sql=%s, args=%s",
-                    sql
-                    % (
-                        state_groups_we_have_already_fetched_string,
-                        overall_select_clause,
-                    ),
-                    args,
-                )
-
                 # The first row is always our special `state_group_reached` row which
                 # tells us if we linked up to any other existing state_group that we
                 # already fetched and if so, which one we linked up to (see the `UNION
@@ -262,22 +252,8 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 partial_state_map_for_state_group: MutableStateMap[str] = {}
                 for row in txn:
                     typ, state_key, event_id, _state_group = row
-                    logger.info(
-                        "row from db -> group=%s type=%s state_key=%s event_id=%s",
-                        group,
-                        typ,
-                        state_key,
-                        event_id,
-                    )
                     key = (intern_string(typ), intern_string(state_key))
                     partial_state_map_for_state_group[key] = event_id
-
-                logger.info(
-                    "group=%s state_group_reached=%s, partial_state_map_for_state_group=%s",
-                    group,
-                    state_group_reached,
-                    partial_state_map_for_state_group,
-                )
 
                 # If we see a state group edge link to a previous state_group that we
                 # already fetched from the database, link up the base state to the
@@ -351,7 +327,6 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                         allow_none=True,
                     )
 
-        logger.info("_get_state_groups_from_groups_txn results=%s", results)
         # The results shouldn't be considered mutable.
         return results
 
