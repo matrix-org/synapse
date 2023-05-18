@@ -22,8 +22,8 @@ from synapse.util import Clock
 
 from tests import unittest
 
-one_hour_ms = 3600000
-one_day_ms = one_hour_ms * 24
+ONE_HOUR_MS = 3600000
+ONE_DAY_MS = ONE_HOUR_MS * 24
 
 
 class ReadMarkerTestCase(unittest.HomeserverTestCase):
@@ -43,8 +43,8 @@ class ReadMarkerTestCase(unittest.HomeserverTestCase):
         # @override_config
         retention_config = {
             "enabled": True,
-            "allowed_lifetime_min": one_day_ms,
-            "allowed_lifetime_max": one_day_ms * 3,
+            "allowed_lifetime_min": ONE_DAY_MS,
+            "allowed_lifetime_max": ONE_DAY_MS * 3,
         }
         retention_config.update(config.get("retention", {}))
         config["retention"] = retention_config
@@ -103,7 +103,7 @@ class ReadMarkerTestCase(unittest.HomeserverTestCase):
         self.helper.send_state(
             room_id=room_id,
             event_type=EventTypes.Retention,
-            body={"max_lifetime": one_day_ms},
+            body={"max_lifetime": ONE_DAY_MS},
             tok=self.owner_tok,
         )
 
@@ -126,7 +126,7 @@ class ReadMarkerTestCase(unittest.HomeserverTestCase):
         # Send a second message (retention will not remove the latest event ever)
         send_message()
         # And then advance so retention rules remove the first event (where the marker is)
-        self.reactor.advance(one_day_ms * 2 / 1000)
+        self.reactor.advance(ONE_DAY_MS * 2 / 1000)
 
         event = self.get_success(self.store.get_event(event_id_1, allow_none=True))
         assert event is None
