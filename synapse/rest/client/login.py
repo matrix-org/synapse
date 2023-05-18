@@ -458,7 +458,7 @@ class LoginRestServlet(RestServlet):
         Returns:
             The body of the JSON response.
         """
-        user_id = self.hs.get_jwt_handler().validate_login(login_submission)
+        user_id = await self.hs.get_jwt_handler().validate_login(login_submission)
         return await self._complete_login(
             user_id,
             login_submission,
