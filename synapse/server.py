@@ -147,6 +147,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from txredisapi import ConnectionHandler
 
+    from synapse.handlers.jwt import JwtHandler
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
 
@@ -532,6 +533,12 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_sso_handler(self) -> SsoHandler:
         return SsoHandler(self)
+
+    @cache_in_self
+    def get_jwt_handler(self) -> "JwtHandler":
+        from synapse.handlers.jwt import JwtHandler
+
+        return JwtHandler(self)
 
     @cache_in_self
     def get_sync_handler(self) -> SyncHandler:
