@@ -70,9 +70,9 @@ class UserMutualRoomsServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         if user_id == requester.user.to_string():
             raise SynapseError(
-                code=400,
-                msg="You cannot request a list of shared rooms with yourself",
-                errcode=Codes.FORBIDDEN,
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "You cannot request a list of shared rooms with yourself",
+                errcode=Codes.INVALID_PARAM,
             )
 
         rooms = await self.store.get_mutual_rooms_between_users(
