@@ -46,7 +46,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import JsonDict, StrCollection
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
@@ -1585,8 +1585,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
     @trace
     async def get_event_ids_with_failed_pull_attempts(
-        self, event_ids: StrCollection
-    ) -> StrCollection:
+        self, event_ids: List[str]
+    ) -> List[str]:
         """
         Filter the given list of `event_ids` and return events which have any failed
         pull attempts.

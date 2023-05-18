@@ -865,7 +865,7 @@ class FederationEventHandler:
             [event.event_id for event in events]
         )
 
-        new_events: Collection[EventBase] = []
+        new_events: List[EventBase] = []
         for event in events:
             event_id = event.event_id
 
