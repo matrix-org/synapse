@@ -27,7 +27,7 @@ from netaddr import AddrFormatError, IPNetwork, IPSet
 from twisted.conch.ssh.keys import Key
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrSequence
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -73,7 +73,7 @@ def _6to4(network: IPNetwork) -> IPNetwork:
 def generate_ip_set(
     ip_addresses: Optional[Iterable[str]],
     extra_addresses: Optional[Iterable[str]] = None,
-    config_path: Optional[Iterable[str]] = None,
+    config_path: Optional[StrSequence] = None,
 ) -> IPSet:
     """
     Generate an IPSet from a list of IP addresses or CIDRs.
