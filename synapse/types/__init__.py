@@ -84,9 +84,14 @@ JsonSerializable = object
 
 # Collection[str] that does not include str itself; str being a Sequence[str]
 # is very misleading and results in bugs.
+#
+# StrCollection is an unordered collection of strings. If ordering is important,
+# StrSequence can be used instead.
 StrCollection = Union[Tuple[str, ...], List[str], AbstractSet[str]]
 # Sequence[str] that does not include str itself; str being a Sequence[str]
 # is very misleading and results in bugs.
+#
+# Unlike StrCollection, StrSequence is an ordered collection of strings.
 StrSequence = Union[Tuple[str, ...], List[str]]
 
 
