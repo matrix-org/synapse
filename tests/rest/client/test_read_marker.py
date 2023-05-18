@@ -131,6 +131,7 @@ class ReadMarkerTestCase(unittest.HomeserverTestCase):
         event = self.get_success(self.store.get_event(event_id_1, allow_none=True))
         assert event is None
 
+        # TODO See https://github.com/matrix-org/synapse/issues/13476
         self.store.get_event_ordering.invalidate_all()
 
         # Test moving the read marker to a newer event
