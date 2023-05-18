@@ -72,7 +72,7 @@ def setupdb() -> None:
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
         cur.execute(
-            "CREATE DATABASE %s ENCODING 'UTF8' LC_COLLATE='C' LC_CTYPE='C' "
+            "CREATE DATABASE %s ENCODING 'UTF8' LC_COLLATE='en_US.UTF-8' LC_CTYPE='en_US.UTF-8' "
             "template=template0;" % (POSTGRES_BASE_DB,)
         )
         cur.close()

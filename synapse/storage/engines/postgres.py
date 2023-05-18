@@ -129,6 +129,8 @@ class PostgresEngine(
 
         errors = []
 
+        allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
+
         if collation != "C":
             errors.append("    - 'COLLATE' is set to %r. Should be 'C'" % (collation,))
 
@@ -136,10 +138,11 @@ class PostgresEngine(
             errors.append("    - 'CTYPE' is set to %r. Should be 'C'" % (ctype,))
 
         if errors:
-            raise IncorrectDatabaseSetup(
-                "Database is incorrectly configured:\n\n%s\n\n"
-                "See docs/postgres.md for more information." % ("\n".join(errors))
-            )
+            if not allow_unsafe_locale:
+                raise IncorrectDatabaseSetup(
+                    "Database is incorrectly configured:\n\n%s\n\n"
+                    "See docs/postgres.md for more information." % ("\n".join(errors))
+                )
 
     def convert_param_style(self, sql: str) -> str:
         return sql.replace("?", "%s")
