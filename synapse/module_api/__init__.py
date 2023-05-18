@@ -105,6 +105,7 @@ from synapse.module_api.callbacks.spamchecker_callbacks import (
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
     SpamCheckerModuleApiCallbacks,
 )
+from synapse.push.httppusher import HttpPusher
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -248,6 +249,7 @@ class ModuleApi:
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._pusherpool = hs.get_pusherpool()
         self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
@@ -1224,6 +1226,50 @@ class ModuleApi:
         """
 
         await self._clock.sleep(seconds)
+
+    async def send_http_push_notification(
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        content: JsonDict,
+        tweaks: Optional[JsonMapping] = None,
+        default_payload: Optional[JsonMapping] = None,
+    ) -> Dict[str, bool]:
+        """Send an HTTP push notification that is forwarded to the registered push gateway
+        for the specified user/device.
+
+        Added in Synapse v1.82.0.
+
+        Args:
+            user_id: The user ID to send the push notification to.
+            device_id: The device ID of the device where to send the push notification. If `None`,
+            the notification will be sent to all registered HTTP pushers of the user.
+            content: A dict of values that will be put in the `notification` field of the push
+            (cf Push Gateway spec). `devices` field will be overrided if included.
+            tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+            This will be merged (and override if some matching values already exist there)
+            with existing `default_payload`.
+
+        Returns:
+            a dict reprensenting the status of the push per device ID
+        """
+        status = {}
+        if user_id in self._pusherpool.pushers:
+            for p in self._pusherpool.pushers[user_id].values():
+                if isinstance(p, HttpPusher) and (
+                    not device_id or p.device_id == device_id
+                ):
+                    res = await p.dispatch_push(content, tweaks, default_payload)
+                    # Check if the push was successful and no pushers were rejected.
+                    sent = res is not False and not res
+
+                    # This is mainly to accomodate mypy
+                    # device_id should never be empty after the `set_device_id_for_pushers`
+                    # background job has been properly run.
+                    if p.device_id:
+                        status[p.device_id] = sent
+        return status
 
     async def send_mail(
         self,

@@ -44,6 +44,7 @@ from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .events_forward_extremities import EventForwardExtremitiesStore
+from .experimental_features import ExperimentalFeaturesStore
 from .filtering import FilteringWorkerStore
 from .keys import KeyStore
 from .lock import LockStore
@@ -83,6 +84,7 @@ logger = logging.getLogger(__name__)
 
 class DataStore(
     EventsBackgroundUpdatesStore,
+    ExperimentalFeaturesStore,
     DeviceStore,
     RoomMemberStore,
     RoomStore,

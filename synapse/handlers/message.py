@@ -561,6 +561,8 @@ class EventCreationHandler:
                 expiry_ms=30 * 60 * 1000,
             )
 
+        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
+
     async def create_event(
         self,
         requester: Requester,
@@ -701,8 +703,15 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
+        # Save the access token ID, the device ID and the transaction ID in the event
+        # internal metadata. This is useful to determine if we should echo the
+        # transaction_id in events.
+        # See `synapse.events.utils.EventClientSerializer.serialize_event`
         if requester.access_token_id is not None:
             builder.internal_metadata.token_id = requester.access_token_id
+
+        if requester.device_id is not None:
+            builder.internal_metadata.device_id = requester.device_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
@@ -897,12 +906,31 @@ class EventCreationHandler:
         Returns:
             An event if one could be found, None otherwise.
         """
+
+        if self._msc3970_enabled and requester.device_id:
+            # When MSC3970 is enabled, we lookup for events sent by the same device first,
+            # and fallback to the old behaviour if none were found.
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_device_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.device_id,
+                    txn_id,
+                )
+            )
+            if existing_event_id:
+                return await self.store.get_event(existing_event_id)
+
+        # Pre-MSC3970, we looked up for events that were sent by the same session by
+        # using the access token ID.
         if requester.access_token_id:
-            existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id,
-                requester.user.to_string(),
-                requester.access_token_id,
-                txn_id,
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_token_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.access_token_id,
+                    txn_id,
+                )
             )
             if existing_event_id:
                 return await self.store.get_event(existing_event_id)

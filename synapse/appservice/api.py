@@ -442,8 +442,10 @@ class ApplicationServiceApi(SimpleHttpClient):
         return False
 
     async def claim_client_keys(
-        self, service: "ApplicationService", query: List[Tuple[str, str, str]]
-    ) -> Tuple[Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str]]]:
+        self, service: "ApplicationService", query: List[Tuple[str, str, str, int]]
+    ) -> Tuple[
+        Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str, int]]
+    ]:
         """Claim one time keys from an application service.
 
         Note that any error (including a timeout) is treated as the application
@@ -469,8 +471,10 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         # Create the expected payload shape.
         body: Dict[str, Dict[str, List[str]]] = {}
-        for user_id, device, algorithm in query:
-            body.setdefault(user_id, {}).setdefault(device, []).append(algorithm)
+        for user_id, device, algorithm, count in query:
+            body.setdefault(user_id, {}).setdefault(device, []).extend(
+                [algorithm] * count
+            )
 
         uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3983/keys/claim"
         try:
@@ -493,11 +497,20 @@ class ApplicationServiceApi(SimpleHttpClient):
         # or if some are still missing.
         #
         # TODO This places a lot of faith in the response shape being correct.
-        missing = [
-            (user_id, device, algorithm)
-            for user_id, device, algorithm in query
-            if algorithm not in response.get(user_id, {}).get(device, [])
-        ]
+        missing = []
+        for user_id, device, algorithm, count in query:
+            # Count the number of keys in the response for this algorithm by
+            # checking which key IDs start with the algorithm. This uses that
+            # True == 1 in Python to generate a count.
+            response_count = sum(
+                key_id.startswith(f"{algorithm}:")
+                for key_id in response.get(user_id, {}).get(device, {})
+            )
+            count -= response_count
+            # If the appservice responds with fewer keys than requested, then
+            # consider the request unfulfilled.
+            if count > 0:
+                missing.append((user_id, device, algorithm, count))
 
         return response, missing
 

@@ -50,6 +50,8 @@ class HttpTransactionCache:
         # for at *LEAST* 30 mins, and at *MOST* 60 mins.
         self.cleaner = self.clock.looping_call(self._cleanup, CLEANUP_PERIOD_MS)
 
+        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
+
     def _get_transaction_key(self, request: IRequest, requester: Requester) -> Hashable:
         """A helper function which returns a transaction key that can be used
         with TransactionCache for idempotent requests.
@@ -58,6 +60,7 @@ class HttpTransactionCache:
         requests to the same endpoint. The key is formed from the HTTP request
         path and attributes from the requester: the access_token_id for regular users,
         the user ID for guest users, and the appservice ID for appservice users.
+        With MSC3970, for regular users, the key is based on the user ID and device ID.
 
         Args:
             request: The incoming request.
@@ -67,11 +70,21 @@ class HttpTransactionCache:
         """
         assert request.path is not None
         path: str = request.path.decode("utf8")
+
         if requester.is_guest:
             assert requester.user is not None, "Guest requester must have a user ID set"
             return (path, "guest", requester.user)
+
         elif requester.app_service is not None:
             return (path, "appservice", requester.app_service.id)
+
+        # With MSC3970, we use the user ID and device ID as the transaction key
+        elif self._msc3970_enabled:
+            assert requester.user, "Requester must have a user"
+            assert requester.device_id, "Requester must have a device_id"
+            return (path, "user", requester.user, requester.device_id)
+
+        # Otherwise, the pre-MSC3970 behaviour is to use the access token ID
         else:
             assert (
                 requester.access_token_id is not None

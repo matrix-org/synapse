@@ -574,7 +574,10 @@ impl FilteredPushRules {
             .filter(|rule| {
                 // Ignore disabled experimental push rules
 
-                if !self.msc1767_enabled && rule.rule_id.contains("org.matrix.msc1767") {
+                if !self.msc1767_enabled
+                    && (rule.rule_id.contains("org.matrix.msc1767")
+                        || rule.rule_id.contains("org.matrix.msc3933"))
+                {
                     return false;
                 }
 
