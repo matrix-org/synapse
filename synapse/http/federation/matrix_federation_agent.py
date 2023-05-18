@@ -25,6 +25,7 @@ from zope.interface import implementer
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.internet.interfaces import (
+    IProtocol,
     IProtocolFactory,
     IReactorCore,
     IStreamClientEndpoint,
@@ -86,7 +87,7 @@ class MatrixFederationAgent:
         reactor: ISynapseReactor,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
-        ip_whitelist: IPSet,
+        ip_whitelist: Optional[IPSet],
         ip_blacklist: IPSet,
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
@@ -154,11 +155,10 @@ class MatrixFederationAgent:
                 a file for a file upload).  Or None if the request is to have
                 no body.
         Returns:
-            Deferred[twisted.web.iweb.IResponse]:
-                fires when the header of the response has been received (regardless of the
-                response status code). Fails if there is any problem which prevents that
-                response from being received (including problems that prevent the request
-                from being sent).
+            A deferred which fires when the header of the response has been received
+            (regardless of the response status code). Fails if there is any problem
+            which prevents that response from being received (including problems that
+            prevent the request from being sent).
         """
         # We use urlparse as that will set `port` to None if there is no
         # explicit port.
@@ -238,7 +238,7 @@ class MatrixHostnameEndpointFactory:
 
         self._srv_resolver = srv_resolver
 
-    def endpointForURI(self, parsed_uri: URI):
+    def endpointForURI(self, parsed_uri: URI) -> "MatrixHostnameEndpoint":
         return MatrixHostnameEndpoint(
             self._reactor,
             self._proxy_reactor,
@@ -309,12 +309,14 @@ class MatrixHostnameEndpoint:
 
         self._srv_resolver = srv_resolver
 
-    def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
+    def connect(
+        self, protocol_factory: IProtocolFactory
+    ) -> "defer.Deferred[IProtocol]":
         """Implements IStreamClientEndpoint interface"""
 
         return run_in_background(self._do_connect, protocol_factory)
 
-    async def _do_connect(self, protocol_factory: IProtocolFactory) -> None:
+    async def _do_connect(self, protocol_factory: IProtocolFactory) -> IProtocol:
         first_exception = None
 
         server_list = await self._resolve_server()

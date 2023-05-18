@@ -14,7 +14,9 @@
 
 import functools
 import sys
-from typing import Any, Callable, List
+from typing import Any, Callable, Generator, List, TypeVar, cast
+
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
@@ -22,6 +24,10 @@ from twisted.python.failure import Failure
 
 # Tracks if we've already patched inlineCallbacks
 _already_patched = False
+
+
+T = TypeVar("T")
+P = ParamSpec("P")
 
 
 def do_patch() -> None:
@@ -37,15 +43,19 @@ def do_patch() -> None:
     if _already_patched:
         return
 
-    def new_inline_callbacks(f):
+    def new_inline_callbacks(
+        f: Callable[P, Generator["Deferred[object]", object, T]]
+    ) -> Callable[P, "Deferred[T]"]:
         @functools.wraps(f)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> "Deferred[T]":
             start_context = current_context()
             changes: List[str] = []
-            orig = orig_inline_callbacks(_check_yield_points(f, changes))
+            orig: Callable[P, "Deferred[T]"] = orig_inline_callbacks(
+                _check_yield_points(f, changes)
+            )
 
             try:
-                res = orig(*args, **kwargs)
+                res: "Deferred[T]" = orig(*args, **kwargs)
             except Exception:
                 if current_context() != start_context:
                     for err in changes:
@@ -84,7 +94,7 @@ def do_patch() -> None:
                 print(err, file=sys.stderr)
                 raise Exception(err)
 
-            def check_ctx(r):
+            def check_ctx(r: T) -> T:
                 if current_context() != start_context:
                     for err in changes:
                         print(err, file=sys.stderr)
@@ -107,7 +117,10 @@ def do_patch() -> None:
     _already_patched = True
 
 
-def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
+def _check_yield_points(
+    f: Callable[P, Generator["Deferred[object]", object, T]],
+    changes: List[str],
+) -> Callable:
     """Wraps a generator that is about to be passed to defer.inlineCallbacks
     checking that after every yield the log contexts are correct.
 
@@ -127,7 +140,9 @@ def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
     from synapse.logging.context import current_context
 
     @functools.wraps(f)
-    def check_yield_points_inner(*args, **kwargs):
+    def check_yield_points_inner(
+        *args: P.args, **kwargs: P.kwargs
+    ) -> Generator["Deferred[object]", object, T]:
         gen = f(*args, **kwargs)
 
         last_yield_line_no = gen.gi_frame.f_lineno
@@ -162,7 +177,9 @@ def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
                         )
                     )
                     changes.append(err)
-                return getattr(e, "value", None)
+                # The `StopIteration` or `_DefGen_Return` contains the return value from the
+                # generator.
+                return cast(T, e.value)
 
             frame = gen.gi_frame
 
@@ -194,7 +211,6 @@ def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
                 result = Failure()
 
             if current_context() != expected_context:
-
                 # This happens because the context is lost sometime *after* the
                 # previous yield and *after* the current yield. E.g. the
                 # deferred we waited on didn't follow the rules, or we forgot to
@@ -203,13 +219,16 @@ def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
                 # We don't raise here as its perfectly valid for contexts to
                 # change in a function, as long as it sets the correct context
                 # on resolving (which is checked separately).
-                err = "%s changed context from %s to %s, happened between lines %d and %d in %s" % (
-                    frame.f_code.co_name,
-                    expected_context,
-                    current_context(),
-                    last_yield_line_no,
-                    frame.f_lineno,
-                    frame.f_code.co_filename,
+                err = (
+                    "%s changed context from %s to %s, happened between lines %d and %d in %s"
+                    % (
+                        frame.f_code.co_name,
+                        expected_context,
+                        current_context(),
+                        last_yield_line_no,
+                        frame.f_lineno,
+                        frame.f_code.co_filename,
+                    )
                 )
                 changes.append(err)
 

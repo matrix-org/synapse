@@ -12,28 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from typing import List, Optional
+from unittest.mock import Mock, patch
 
 from synapse._scripts.register_new_matrix_user import request_registration
+from synapse.types import JsonDict
 
 from tests.unittest import TestCase
 
 
 class RegisterTestCase(TestCase):
-    def test_success(self):
+    def test_success(self) -> None:
         """
         The script will fetch a nonce, and then generate a MAC with it, and then
         post that MAC.
         """
 
-        def get(url, verify=None):
+        def get(url: str, verify: Optional[bool] = None) -> Mock:
             r = Mock()
             r.status_code = 200
             r.json = lambda: {"nonce": "a"}
             return r
 
-        def post(url, json=None, verify=None):
+        def post(
+            url: str, json: Optional[JsonDict] = None, verify: Optional[bool] = None
+        ) -> Mock:
             # Make sure we are sent the correct info
+            assert json is not None
             self.assertEqual(json["username"], "user")
             self.assertEqual(json["password"], "pass")
             self.assertEqual(json["nonce"], "a")
@@ -49,19 +54,19 @@ class RegisterTestCase(TestCase):
         requests.post = post
 
         # The fake stdout will be written here
-        out = []
-        err_code = []
+        out: List[str] = []
+        err_code: List[int] = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # We should get the success message making sure everything is OK.
         self.assertIn("Success!", out)
@@ -69,12 +74,12 @@ class RegisterTestCase(TestCase):
         # sys.exit shouldn't have been called.
         self.assertEqual(err_code, [])
 
-    def test_failure_nonce(self):
+    def test_failure_nonce(self) -> None:
         """
         If the script fails to fetch a nonce, it throws an error and quits.
         """
 
-        def get(url, verify=None):
+        def get(url: str, verify: Optional[bool] = None) -> Mock:
             r = Mock()
             r.status_code = 404
             r.reason = "Not Found"
@@ -85,19 +90,19 @@ class RegisterTestCase(TestCase):
         requests.get = get
 
         # The fake stdout will be written here
-        out = []
-        err_code = []
+        out: List[str] = []
+        err_code: List[int] = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # Exit was called
         self.assertEqual(err_code, [1])
@@ -106,20 +111,23 @@ class RegisterTestCase(TestCase):
         self.assertIn("ERROR! Received 404 Not Found", out)
         self.assertNotIn("Success!", out)
 
-    def test_failure_post(self):
+    def test_failure_post(self) -> None:
         """
         The script will fetch a nonce, and then if the final POST fails, will
         report an error and quit.
         """
 
-        def get(url, verify=None):
+        def get(url: str, verify: Optional[bool] = None) -> Mock:
             r = Mock()
             r.status_code = 200
             r.json = lambda: {"nonce": "a"}
             return r
 
-        def post(url, json=None, verify=None):
+        def post(
+            url: str, json: Optional[JsonDict] = None, verify: Optional[bool] = None
+        ) -> Mock:
             # Make sure we are sent the correct info
+            assert json is not None
             self.assertEqual(json["username"], "user")
             self.assertEqual(json["password"], "pass")
             self.assertEqual(json["nonce"], "a")
@@ -137,19 +145,19 @@ class RegisterTestCase(TestCase):
         requests.post = post
 
         # The fake stdout will be written here
-        out = []
-        err_code = []
+        out: List[str] = []
+        err_code: List[int] = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # Exit was called
         self.assertEqual(err_code, [1])

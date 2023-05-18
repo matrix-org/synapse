@@ -13,20 +13,51 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+
+from twisted.internet.interfaces import IDelayedCall
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
+from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main.user_directory import SearchResult
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import JsonDict
+from synapse.types import UserID
 from synapse.util.metrics import Measure
+from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.stringutils import non_null_str_or_none
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+# Don't refresh a stale user directory entry, using a Federation /profile request,
+# for 60 seconds. This gives time for other state events to arrive (which will
+# then be coalesced such that only one /profile request is made).
+USER_DIRECTORY_STALE_REFRESH_TIME_MS = 60 * 1000
+
+# Maximum number of remote servers that we will attempt to refresh profiles for
+# in one go.
+MAX_SERVERS_TO_REFRESH_PROFILES_FOR_IN_ONE_GO = 5
+
+# As long as we have servers to refresh (without backoff), keep adding more
+# every 15 seconds.
+INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES = 15
+
+
+def calculate_time_of_next_retry(now_ts: int, retry_count: int) -> int:
+    """
+    Calculates the time of a next retry given `now_ts` in ms and the number
+    of failures encountered thus far.
+
+    Currently the sequence goes:
+    1 min, 5 min, 25 min, 2 hour, 10 hour, 52 hour, 10 day, 7.75 week
+    """
+    return now_ts + 60_000 * (5 ** min(retry_count, 7))
 
 
 class UserDirectoryHandler(StateDeltasHandler):
@@ -55,19 +86,32 @@ class UserDirectoryHandler(StateDeltasHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.update_user_directory = hs.config.update_user_directory
-        self.search_all_users = hs.config.user_directory_search_all_users
-        self.spam_checker = hs.get_spam_checker()
+        self.update_user_directory = hs.config.worker.should_update_user_directory
+        self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
+        self._hs = hs
+
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
 
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
+
+        # Guard to ensure we only have one process for refreshing remote profiles
+        self._is_refreshing_remote_profiles = False
+        # Handle to cancel the `call_later` of `kick_off_remote_profile_refresh_process`
+        self._refresh_remote_profiles_call_later: Optional[IDelayedCall] = None
+
+        # Guard to ensure we only have one process for refreshing remote profiles
+        # for the given servers.
+        # Set of server names.
+        self._is_refreshing_remote_profiles_for_servers: Set[str] = set()
 
         if self.update_user_directory:
             self.notifier.add_replication_callback(self.notify_new_event)
@@ -76,9 +120,14 @@ class UserDirectoryHandler(StateDeltasHandler):
             # we start populating the user directory
             self.clock.call_later(0, self.notify_new_event)
 
+            # Kick off the profile refresh process on startup
+            self._refresh_remote_profiles_call_later = self.clock.call_later(
+                10, self.kick_off_remote_profile_refresh_process
+            )
+
     async def search_users(
         self, user_id: str, search_term: str, limit: int
-    ) -> JsonDict:
+    ) -> SearchResult:
         """Searches for users in directory
 
         Returns:
@@ -100,7 +149,9 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Remove any spammy users from the results.
         non_spammy_users = []
         for user in results["results"]:
-            if not await self.spam_checker.check_username_for_spam(user):
+            if not await self._spam_checker_module_callbacks.check_username_for_spam(
+                user
+            ):
                 non_spammy_users.append(user)
         results["results"] = non_spammy_users
 
@@ -132,12 +183,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
 
-        # Support users are for diagnostics and should not appear in the user directory.
-        is_support = await self.store.is_support_user(user_id)
-        # When change profile information of deactivated user it should not appear in the user directory.
-        is_deactivated = await self.store.get_user_deactivated_status(user_id)
-
-        if not (is_support or is_deactivated):
+        if await self.store.should_include_local_user_in_dir(user_id):
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
@@ -153,9 +199,21 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self.pos is None:
             self.pos = await self.store.get_user_directory_stream_pos()
 
-        # If still None then the initial background update hasn't happened yet.
-        if self.pos is None:
-            return None
+            # If still None then the initial background update hasn't happened yet.
+            if self.pos is None:
+                return None
+
+            room_max_stream_ordering = self.store.get_room_max_stream_ordering()
+            if self.pos > room_max_stream_ordering:
+                # apparently, we've processed more events than exist in the database!
+                # this can happen if events are removed with history purge or similar.
+                logger.warning(
+                    "Event stream ordering appears to have gone backwards (%i -> %i): "
+                    "rewinding user directory processor",
+                    self.pos,
+                    room_max_stream_ordering,
+                )
+                self.pos = room_max_stream_ordering
 
         # Loop round handling deltas until we're up to date
         while True:
@@ -167,7 +225,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 logger.debug(
                     "Processing user stats %s->%s", self.pos, room_max_stream_ordering
                 )
-                max_pos, deltas = await self.store.get_current_state_deltas(
+                (
+                    max_pos,
+                    deltas,
+                ) = await self._storage_controllers.state.get_current_state_deltas(
                     self.pos, room_max_stream_ordering
                 )
 
@@ -189,8 +250,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             typ = delta["type"]
             state_key = delta["state_key"]
             room_id = delta["room_id"]
-            event_id = delta["event_id"]
-            prev_event_id = delta["prev_event_id"]
+            event_id: Optional[str] = delta["event_id"]
+            prev_event_id: Optional[str] = delta["prev_event_id"]
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
@@ -201,58 +262,12 @@ class UserDirectoryHandler(StateDeltasHandler):
                     room_id, prev_event_id, event_id, typ
                 )
             elif typ == EventTypes.Member:
-                change = await self._get_key_change(
+                await self._handle_room_membership_event(
+                    room_id,
                     prev_event_id,
                     event_id,
-                    key_name="membership",
-                    public_value=Membership.JOIN,
+                    state_key,
                 )
-
-                if change is MatchChange.now_false:
-                    # Need to check if the server left the room entirely, if so
-                    # we might need to remove all the users in that room
-                    is_in_room = await self.store.is_host_joined(
-                        room_id, self.server_name
-                    )
-                    if not is_in_room:
-                        logger.debug("Server left room: %r", room_id)
-                        # Fetch all the users that we marked as being in user
-                        # directory due to being in the room and then check if
-                        # need to remove those users or not
-                        user_ids = await self.store.get_users_in_dir_due_to_room(
-                            room_id
-                        )
-
-                        for user_id in user_ids:
-                            await self._handle_remove_user(room_id, user_id)
-                        return
-                    else:
-                        logger.debug("Server is still in room: %r", room_id)
-
-                is_support = await self.store.is_support_user(state_key)
-                if not is_support:
-                    if change is MatchChange.no_change:
-                        # Handle any profile changes
-                        await self._handle_profile_change(
-                            state_key, room_id, prev_event_id, event_id
-                        )
-                        continue
-
-                    if change is MatchChange.now_true:  # The user joined
-                        event = await self.store.get_event(event_id, allow_none=True)
-                        # It isn't expected for this event to not exist, but we
-                        # don't want the entire background process to break.
-                        if event is None:
-                            continue
-
-                        profile = ProfileInfo(
-                            avatar_url=event.content.get("avatar_url"),
-                            display_name=event.content.get("displayname"),
-                        )
-
-                        await self._handle_new_user(room_id, state_key, profile)
-                    else:  # The user left
-                        await self._handle_remove_user(room_id, state_key)
             else:
                 logger.debug("Ignoring irrelevant type: %r", typ)
 
@@ -300,7 +315,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
 
-        logger.debug("Change: %r, publicness: %r", publicness, is_public)
+        logger.debug("Publicness change: %r, is_public: %r", publicness, is_public)
 
         if publicness is MatchChange.now_true and not is_public:
             # If we became world readable but room isn't currently public then
@@ -311,108 +326,186 @@ class UserDirectoryHandler(StateDeltasHandler):
             # ignore the change
             return
 
-        other_users_in_room_with_profiles = (
-            await self.store.get_users_in_room_with_profiles(room_id)
-        )
+        users_in_room = await self.store.get_users_in_room(room_id)
 
         # Remove every user from the sharing tables for that room.
-        for user_id in other_users_in_room_with_profiles.keys():
+        for user_id in users_in_room:
             await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Then, re-add them to the tables.
-        # NOTE: this is not the most efficient method, as handle_new_user sets
+        # Then, re-add all remote users and some local users to the tables.
+        # NOTE: this is not the most efficient method, as _track_user_joined_room sets
         # up local_user -> other_user and other_user_whos_local -> local_user,
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
-        for user_id, profile in other_users_in_room_with_profiles.items():
-            await self._handle_new_user(room_id, user_id, profile)
+        for user_id in users_in_room:
+            if not self.is_mine_id(
+                user_id
+            ) or await self.store.should_include_local_user_in_dir(user_id):
+                await self._track_user_joined_room(room_id, user_id)
 
-    async def _handle_new_user(
-        self, room_id: str, user_id: str, profile: ProfileInfo
+    async def _handle_room_membership_event(
+        self,
+        room_id: str,
+        prev_event_id: Optional[str],
+        event_id: Optional[str],
+        state_key: str,
     ) -> None:
-        """Called when we might need to add user to directory
+        """Process a single room membershp event.
 
-        Args:
-            room_id: The room ID that user joined or started being public
-            user_id
+        We have to do two things:
+
+        1. Update the room-sharing tables.
+           This applies to remote users and non-excluded local users.
+        2. Update the user_directory and user_directory_search tables.
+           This applies to remote users only, because we only become aware of
+           the (and any profile changes) by listening to these events.
+           The rest of the application knows exactly when local users are
+           created or their profile changed---it will directly call methods
+           on this class.
         """
-        logger.debug("Adding new user to dir, %r", user_id)
-
-        await self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url
+        joined = await self._get_key_change(
+            prev_event_id,
+            event_id,
+            key_name="membership",
+            public_value=Membership.JOIN,
         )
 
+        # Both cases ignore excluded local users, so start by discarding them.
+        is_remote = not self.is_mine_id(state_key)
+        if not is_remote and not await self.store.should_include_local_user_in_dir(
+            state_key
+        ):
+            return
+
+        if joined is MatchChange.now_false:
+            # Need to check if the server left the room entirely, if so
+            # we might need to remove all the users in that room
+            is_in_room = await self.store.is_host_joined(room_id, self.server_name)
+            if not is_in_room:
+                logger.debug("Server left room: %r", room_id)
+                # Fetch all the users that we marked as being in user
+                # directory due to being in the room and then check if
+                # need to remove those users or not
+                user_ids = await self.store.get_users_in_dir_due_to_room(room_id)
+
+                for user_id in user_ids:
+                    await self._handle_remove_user(room_id, user_id)
+            else:
+                logger.debug("Server is still in room: %r", room_id)
+                await self._handle_remove_user(room_id, state_key)
+        elif joined is MatchChange.no_change:
+            # Handle any profile changes for remote users.
+            # (For local users the rest of the application calls
+            # `handle_local_profile_change`.)
+            # Only process if there is an event_id.
+            if is_remote and event_id is not None:
+                await self._handle_possible_remote_profile_change(
+                    state_key, room_id, prev_event_id, event_id
+                )
+        elif joined is MatchChange.now_true:  # The user joined
+            # This may be the first time we've seen a remote user. If
+            # so, ensure we have a directory entry for them. (For local users,
+            # the rest of the application calls `handle_local_profile_change`.)
+            # Only process if there is an event_id.
+            if is_remote and event_id is not None:
+                await self._handle_possible_remote_profile_change(
+                    state_key, room_id, None, event_id
+                )
+            await self._track_user_joined_room(room_id, state_key)
+
+    async def _track_user_joined_room(self, room_id: str, joining_user_id: str) -> None:
+        """Someone's just joined a room. Update `users_in_public_rooms` or
+        `users_who_share_private_rooms` as appropriate.
+
+        The caller is responsible for ensuring that the given user should be
+        included in the user directory.
+        """
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        # Now we update users who share rooms with users.
-        other_users_in_room = await self.store.get_users_in_room(room_id)
-
         if is_public:
-            await self.store.add_users_in_public_rooms(room_id, (user_id,))
+            await self.store.add_users_in_public_rooms(room_id, (joining_user_id,))
         else:
-            to_insert = set()
-
-            # First, if they're our user then we need to update for every user
-            if self.is_mine_id(user_id):
-
-                is_appservice = self.store.get_if_app_services_interested_in_user(
-                    user_id
+            users_in_room = await self.store.get_users_in_room(room_id)
+            other_users_in_room = [
+                other
+                for other in users_in_room
+                if other != joining_user_id
+                and (
+                    # We can't apply any special rules to remote users so
+                    # they're always included
+                    not self.is_mine_id(other)
+                    # Check the special rules whether the local user should be
+                    # included in the user directory
+                    or await self.store.should_include_local_user_in_dir(other)
                 )
+            ]
+            updates_to_users_who_share_rooms: Set[Tuple[str, str]] = set()
 
-                # We don't care about appservice users.
-                if not is_appservice:
-                    for other_user_id in other_users_in_room:
-                        if user_id == other_user_id:
-                            continue
+            # First, if the joining user is our local user then we need an
+            # update for every other user in the room.
+            if self.is_mine_id(joining_user_id):
+                for other_user_id in other_users_in_room:
+                    updates_to_users_who_share_rooms.add(
+                        (joining_user_id, other_user_id)
+                    )
 
-                        to_insert.add((user_id, other_user_id))
-
-            # Next we need to update for every local user in the room
+            # Next, we need an update for every other local user in the room
+            # that they now share a room with the joining user.
             for other_user_id in other_users_in_room:
-                if user_id == other_user_id:
-                    continue
+                if self.is_mine_id(other_user_id):
+                    updates_to_users_who_share_rooms.add(
+                        (other_user_id, joining_user_id)
+                    )
 
-                is_appservice = self.store.get_if_app_services_interested_in_user(
-                    other_user_id
+            if updates_to_users_who_share_rooms:
+                await self.store.add_users_who_share_private_room(
+                    room_id, updates_to_users_who_share_rooms
                 )
-                if self.is_mine_id(other_user_id) and not is_appservice:
-                    to_insert.add((other_user_id, user_id))
-
-            if to_insert:
-                await self.store.add_users_who_share_private_room(room_id, to_insert)
 
     async def _handle_remove_user(self, room_id: str, user_id: str) -> None:
-        """Called when we might need to remove user from directory
+        """Called when when someone leaves a room. The user may be local or remote.
+
+        (If the person who left was the last local user in this room, the server
+        is no longer in the room. We call this function to forget that the remaining
+        remote users are in the room, even though they haven't left. So the name is
+        a little misleading!)
 
         Args:
             room_id: The room ID that user left or stopped being public that
             user_id
         """
-        logger.debug("Removing user %r", user_id)
+        logger.debug("Removing user %r from room %r", user_id, room_id)
 
         # Remove user from sharing tables
         await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Are they still in any rooms? If not, remove them entirely.
-        rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
+        # Additionally, if they're a remote user and we're no longer joined
+        # to any rooms they're in, remove them from the user directory.
+        if not self.is_mine_id(user_id):
+            rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
 
-        if len(rooms_user_is_in) == 0:
-            await self.store.remove_from_user_dir(user_id)
+            if len(rooms_user_is_in) == 0:
+                logger.debug("Removing user %r from directory", user_id)
+                await self.store.remove_from_user_dir(user_id)
 
-    async def _handle_profile_change(
+    async def _handle_possible_remote_profile_change(
         self,
         user_id: str,
         room_id: str,
         prev_event_id: Optional[str],
-        event_id: Optional[str],
+        event_id: str,
     ) -> None:
         """Check member event changes for any profile changes and update the
-        database if there are.
+        database if there are. This is intended for remote users only. The caller
+        is responsible for checking that the given user is remote.
         """
-        if not prev_event_id or not event_id:
-            return
+
+        if not prev_event_id:
+            # If we don't have an older event to fall back on, just fetch the same
+            # event itself.
+            prev_event_id = event_id
 
         prev_event = await self.store.get_event(prev_event_id, allow_none=True)
         event = await self.store.get_event(event_id, allow_none=True)
@@ -423,17 +516,236 @@ class UserDirectoryHandler(StateDeltasHandler):
         if event.membership != Membership.JOIN:
             return
 
+        is_public = await self.store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
+        if not is_public:
+            # Don't collect user profiles from private rooms as they are not guaranteed
+            # to be the same as the user's global profile.
+            now_ts = self.clock.time_msec()
+            await self.store.set_remote_user_profile_in_user_dir_stale(
+                user_id,
+                next_try_at_ms=now_ts + USER_DIRECTORY_STALE_REFRESH_TIME_MS,
+                retry_counter=0,
+            )
+            # Schedule a wake-up to refresh the user directory for this server.
+            # We intentionally wake up this server directly because we don't want
+            # other servers ahead of it in the queue to get in the way of updating
+            # the profile if the server only just sent us an event.
+            self.clock.call_later(
+                USER_DIRECTORY_STALE_REFRESH_TIME_MS // 1000 + 1,
+                self.kick_off_remote_profile_refresh_process_for_remote_server,
+                UserID.from_string(user_id).domain,
+            )
+            # Schedule a wake-up to handle any backoffs that may occur in the future.
+            self.clock.call_later(
+                2 * USER_DIRECTORY_STALE_REFRESH_TIME_MS // 1000 + 1,
+                self.kick_off_remote_profile_refresh_process,
+            )
+            return
+
         prev_name = prev_event.content.get("displayname")
         new_name = event.content.get("displayname")
-        # If the new name is an unexpected form, do not update the directory.
+        # If the new name is an unexpected form, replace with None.
         if not isinstance(new_name, str):
-            new_name = prev_name
+            new_name = None
 
         prev_avatar = prev_event.content.get("avatar_url")
         new_avatar = event.content.get("avatar_url")
-        # If the new avatar is an unexpected form, do not update the directory.
+        # If the new avatar is an unexpected form, replace with None.
         if not isinstance(new_avatar, str):
-            new_avatar = prev_avatar
+            new_avatar = None
 
-        if prev_name != new_name or prev_avatar != new_avatar:
+        if (
+            prev_name != new_name
+            or prev_avatar != new_avatar
+            or prev_event_id == event_id
+        ):
+            # Only update if something has changed, or we didn't have a previous event
+            # in the first place.
             await self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)
+
+    def kick_off_remote_profile_refresh_process(self) -> None:
+        """Called when there may be remote users with stale profiles to be refreshed"""
+        if not self.update_user_directory:
+            return
+
+        if self._is_refreshing_remote_profiles:
+            return
+
+        if self._refresh_remote_profiles_call_later:
+            if self._refresh_remote_profiles_call_later.active():
+                self._refresh_remote_profiles_call_later.cancel()
+            self._refresh_remote_profiles_call_later = None
+
+        async def process() -> None:
+            try:
+                await self._unsafe_refresh_remote_profiles()
+            finally:
+                self._is_refreshing_remote_profiles = False
+
+        self._is_refreshing_remote_profiles = True
+        run_as_background_process("user_directory.refresh_remote_profiles", process)
+
+    async def _unsafe_refresh_remote_profiles(self) -> None:
+        limit = MAX_SERVERS_TO_REFRESH_PROFILES_FOR_IN_ONE_GO - len(
+            self._is_refreshing_remote_profiles_for_servers
+        )
+        if limit <= 0:
+            # nothing to do: already refreshing the maximum number of servers
+            # at once.
+            # Come back later.
+            self._refresh_remote_profiles_call_later = self.clock.call_later(
+                INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES,
+                self.kick_off_remote_profile_refresh_process,
+            )
+            return
+
+        servers_to_refresh = (
+            await self.store.get_remote_servers_with_profiles_to_refresh(
+                now_ts=self.clock.time_msec(), limit=limit
+            )
+        )
+
+        if not servers_to_refresh:
+            # Do we have any backing-off servers that we should try again
+            # for eventually?
+            # By setting `now` is a point in the far future, we can ask for
+            # which server/user is next to be refreshed, even though it is
+            # not actually refreshable *now*.
+            end_of_time = 1 << 62
+            backing_off_servers = (
+                await self.store.get_remote_servers_with_profiles_to_refresh(
+                    now_ts=end_of_time, limit=1
+                )
+            )
+            if backing_off_servers:
+                # Find out when the next user is refreshable and schedule a
+                # refresh then.
+                backing_off_server_name = backing_off_servers[0]
+                users = await self.store.get_remote_users_to_refresh_on_server(
+                    backing_off_server_name, now_ts=end_of_time, limit=1
+                )
+                if not users:
+                    return
+                _, _, next_try_at_ts = users[0]
+                self._refresh_remote_profiles_call_later = self.clock.call_later(
+                    ((next_try_at_ts - self.clock.time_msec()) // 1000) + 2,
+                    self.kick_off_remote_profile_refresh_process,
+                )
+
+            return
+
+        for server_to_refresh in servers_to_refresh:
+            self.kick_off_remote_profile_refresh_process_for_remote_server(
+                server_to_refresh
+            )
+
+        self._refresh_remote_profiles_call_later = self.clock.call_later(
+            INTERVAL_TO_ADD_MORE_SERVERS_TO_REFRESH_PROFILES,
+            self.kick_off_remote_profile_refresh_process,
+        )
+
+    def kick_off_remote_profile_refresh_process_for_remote_server(
+        self, server_name: str
+    ) -> None:
+        """Called when there may be remote users with stale profiles to be refreshed
+        on the given server."""
+        if not self.update_user_directory:
+            return
+
+        if server_name in self._is_refreshing_remote_profiles_for_servers:
+            return
+
+        async def process() -> None:
+            try:
+                await self._unsafe_refresh_remote_profiles_for_remote_server(
+                    server_name
+                )
+            finally:
+                self._is_refreshing_remote_profiles_for_servers.remove(server_name)
+
+        self._is_refreshing_remote_profiles_for_servers.add(server_name)
+        run_as_background_process(
+            "user_directory.refresh_remote_profiles_for_remote_server", process
+        )
+
+    async def _unsafe_refresh_remote_profiles_for_remote_server(
+        self, server_name: str
+    ) -> None:
+        logger.info("Refreshing profiles in user directory for %s", server_name)
+
+        while True:
+            # Get a handful of users to process.
+            next_batch = await self.store.get_remote_users_to_refresh_on_server(
+                server_name, now_ts=self.clock.time_msec(), limit=10
+            )
+            if not next_batch:
+                # Finished for now
+                return
+
+            for user_id, retry_counter, _ in next_batch:
+                # Request the profile of the user.
+                try:
+                    profile = await self._hs.get_profile_handler().get_profile(
+                        user_id, ignore_backoff=False
+                    )
+                except NotRetryingDestination as e:
+                    logger.info(
+                        "Failed to refresh profile for %r because the destination is undergoing backoff",
+                        user_id,
+                    )
+                    # As a special-case, we back off until the destination is no longer
+                    # backed off from.
+                    await self.store.set_remote_user_profile_in_user_dir_stale(
+                        user_id,
+                        e.retry_last_ts + e.retry_interval,
+                        retry_counter=retry_counter + 1,
+                    )
+                    continue
+                except SynapseError as e:
+                    if e.code == HTTPStatus.NOT_FOUND and e.errcode == Codes.NOT_FOUND:
+                        # The profile doesn't exist.
+                        # TODO Does this mean we should clear it from our user
+                        #      directory?
+                        await self.store.clear_remote_user_profile_in_user_dir_stale(
+                            user_id
+                        )
+                        logger.warning(
+                            "Refresh of remote profile %r: not found (%r)",
+                            user_id,
+                            e.msg,
+                        )
+                        continue
+
+                    logger.warning(
+                        "Failed to refresh profile for %r because %r", user_id, e
+                    )
+                    await self.store.set_remote_user_profile_in_user_dir_stale(
+                        user_id,
+                        calculate_time_of_next_retry(
+                            self.clock.time_msec(), retry_counter + 1
+                        ),
+                        retry_counter=retry_counter + 1,
+                    )
+                    continue
+                except Exception:
+                    logger.error(
+                        "Failed to refresh profile for %r due to unhandled exception",
+                        user_id,
+                        exc_info=True,
+                    )
+                    await self.store.set_remote_user_profile_in_user_dir_stale(
+                        user_id,
+                        calculate_time_of_next_retry(
+                            self.clock.time_msec(), retry_counter + 1
+                        ),
+                        retry_counter=retry_counter + 1,
+                    )
+                    continue
+
+                await self.store.update_profile_in_user_dir(
+                    user_id,
+                    display_name=non_null_str_or_none(profile.get("displayname")),
+                    avatar_url=non_null_str_or_none(profile.get("avatar_url")),
+                )

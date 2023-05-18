@@ -14,7 +14,9 @@
 
 import logging
 import string
-from typing import TYPE_CHECKING, Iterable, List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence
+
+from typing_extensions import Literal
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
@@ -28,10 +30,9 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.appservice import ApplicationService
+from synapse.module_api import NOT_SPAM
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import JsonDict, Requester, RoomAlias, UserID, get_domain_from_id
-
-from ._base import BaseHandler
+from synapse.types import JsonDict, Requester, RoomAlias
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -39,25 +40,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class DirectoryHandler(BaseHandler):
+class DirectoryHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.auth = hs.get_auth()
+        self.hs = hs
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.config = hs.config
-        self.enable_room_list_search = hs.config.enable_room_list_search
-        self.require_membership = hs.config.require_membership_for_aliases
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
+        self.require_membership = hs.config.server.require_membership_for_aliases
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
+        self.server_name = hs.hostname
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
             "directory", self.on_directory_query
         )
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
 
     async def _create_association(
         self,
@@ -72,6 +77,9 @@ class DirectoryHandler(BaseHandler):
             if wchar in room_alias.localpart:
                 raise SynapseError(400, "Invalid characters in room alias")
 
+        if ":" in room_alias.localpart:
+            raise SynapseError(400, "Invalid character in room alias localpart: ':'.")
+
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
             # TODO(erikj): Change this.
@@ -79,8 +87,9 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            users = await self.store.get_users_in_room(room_id)
-            servers = {get_domain_from_id(u) for u in users}
+            servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+                room_id
+            )
 
         if not servers:
             raise SynapseError(400, "Failed to get server list")
@@ -120,7 +129,7 @@ class DirectoryHandler(BaseHandler):
 
         service = requester.app_service
         if service:
-            if not service.is_interested_in_alias(room_alias_str):
+            if not service.is_room_alias_in_namespace(room_alias_str):
                 raise SynapseError(
                     400,
                     "This application service has not reserved this kind of alias.",
@@ -129,7 +138,7 @@ class DirectoryHandler(BaseHandler):
         else:
             # Server admins are not subject to the same constraints as normal
             # users when creating an alias (e.g. being in the room).
-            is_admin = await self.auth.is_server_admin(requester.user)
+            is_admin = await self.auth.is_server_admin(requester)
 
             if (self.require_membership and check_membership) and not is_admin:
                 rooms_for_user = await self.store.get_rooms_for_user(user_id)
@@ -138,15 +147,23 @@ class DirectoryHandler(BaseHandler):
                         403, "You must be in the room to create an alias for it"
                     )
 
-            if not await self.spam_checker.user_may_create_room_alias(
-                user_id, room_alias
-            ):
-                raise AuthError(403, "This user is not permitted to create this alias")
+            spam_check = (
+                await self._spam_checker_module_callbacks.user_may_create_room_alias(
+                    user_id, room_alias
+                )
+            )
+            if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
+                raise AuthError(
+                    403,
+                    "This user is not permitted to create this alias",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
+                )
 
-            if not self.config.is_alias_creation_allowed(
+            if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
             ):
-                # Lets just return a generic message, as there may be all sorts of
+                # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to create alias")
@@ -187,7 +204,7 @@ class DirectoryHandler(BaseHandler):
         user_id = requester.user.to_string()
 
         try:
-            can_delete = await self._user_can_delete_alias(room_alias, user_id)
+            can_delete = await self._user_can_delete_alias(room_alias, requester)
         except StoreError as e:
             if e.code == 404:
                 raise NotFoundError("Unknown room alias")
@@ -205,6 +222,10 @@ class DirectoryHandler(BaseHandler):
             )
 
         room_id = await self._delete_association(room_alias)
+        if room_id is None:
+            # It's possible someone else deleted the association after the
+            # checks above, but before we did the deletion.
+            raise NotFoundError("Unknown room alias")
 
         try:
             await self._update_canonical_alias(requester, user_id, room_id, room_alias)
@@ -218,7 +239,7 @@ class DirectoryHandler(BaseHandler):
     async def delete_appservice_association(
         self, service: ApplicationService, room_alias: RoomAlias
     ) -> None:
-        if not service.is_interested_in_alias(room_alias.to_string()):
+        if not service.is_room_alias_in_namespace(room_alias.to_string()):
             raise SynapseError(
                 400,
                 "This application service has not reserved this kind of alias",
@@ -226,7 +247,7 @@ class DirectoryHandler(BaseHandler):
             )
         await self._delete_association(room_alias)
 
-    async def _delete_association(self, room_alias: RoomAlias) -> str:
+    async def _delete_association(self, room_alias: RoomAlias) -> Optional[str]:
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
@@ -246,7 +267,7 @@ class DirectoryHandler(BaseHandler):
                 servers = result.servers
         else:
             try:
-                fed_result = await self.federation.make_query(
+                fed_result: Optional[JsonDict] = await self.federation.make_query(
                     destination=room_alias.domain,
                     query_type="directory",
                     args={"room_alias": room_alias.to_string()},
@@ -273,15 +294,18 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND,
             )
 
-        users = await self.store.get_users_in_room(room_id)
-        extra_servers = {get_domain_from_id(u) for u in users}
-        servers = set(extra_servers) | set(servers)
+        extra_servers = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+            room_id
+        )
+        servers_set = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
-        if self.server_name in servers:
-            servers = [self.server_name] + [s for s in servers if s != self.server_name]
+        if self.server_name in servers_set:
+            servers = [self.server_name] + [
+                s for s in servers_set if s != self.server_name
+            ]
         else:
-            servers = list(servers)
+            servers = list(servers_set)
 
         return {"room_id": room_id, "servers": servers}
 
@@ -311,7 +335,7 @@ class DirectoryHandler(BaseHandler):
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        alias_event = await self.state.get_current_state(
+        alias_event = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.CanonicalAlias, ""
         )
 
@@ -371,7 +395,7 @@ class DirectoryHandler(BaseHandler):
         # non-exclusive locks on the alias (or there are no interested services)
         services = self.store.get_app_services()
         interested_services = [
-            s for s in services if s.is_interested_in_alias(alias.to_string())
+            s for s in services if s.is_room_alias_in_namespace(alias.to_string())
         ]
 
         for service in interested_services:
@@ -384,7 +408,9 @@ class DirectoryHandler(BaseHandler):
         # either no interested services, or no service with an exclusive lock
         return True
 
-    async def _user_can_delete_alias(self, alias: RoomAlias, user_id: str) -> bool:
+    async def _user_can_delete_alias(
+        self, alias: RoomAlias, requester: Requester
+    ) -> bool:
         """Determine whether a user can delete an alias.
 
         One of the following must be true:
@@ -397,7 +423,7 @@ class DirectoryHandler(BaseHandler):
         """
         creator = await self.store.get_room_alias_creator(alias.to_string())
 
-        if creator == user_id:
+        if creator == requester.user.to_string():
             return True
 
         # Resolve the alias to the corresponding room.
@@ -406,12 +432,13 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             return False
 
-        return await self.auth.check_can_change_room_list(
-            room_id, UserID.from_string(user_id)
-        )
+        return await self.auth.check_can_change_room_list(room_id, requester)
 
     async def edit_published_room_list(
-        self, requester: Requester, room_id: str, visibility: str
+        self,
+        requester: Requester,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> None:
         """Edit the entry of the room in the published room list.
 
@@ -421,16 +448,19 @@ class DirectoryHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if not await self.spam_checker.user_may_publish_room(user_id, room_id):
+        spam_check = await self._spam_checker_module_callbacks.user_may_publish_room(
+            user_id, room_id
+        )
+        if spam_check != NOT_SPAM:
             raise AuthError(
-                403, "This user is not permitted to publish rooms to the room list"
+                403,
+                "This user is not permitted to publish rooms to the room list",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
             )
 
         if requester.is_guest:
             raise AuthError(403, "Guests cannot edit the published room list")
-
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
 
         if visibility == "public" and not self.enable_room_list_search:
             # The room list has been disabled.
@@ -443,7 +473,7 @@ class DirectoryHandler(BaseHandler):
             raise SynapseError(400, "Unknown room")
 
         can_change_room_list = await self.auth.check_can_change_room_list(
-            room_id, requester.user
+            room_id, requester
         )
         if not can_change_room_list:
             raise AuthError(
@@ -455,22 +485,29 @@ class DirectoryHandler(BaseHandler):
         making_public = visibility == "public"
         if making_public:
             room_aliases = await self.store.get_aliases_for_room(room_id)
-            canonical_alias = await self.store.get_canonical_alias_for_room(room_id)
+            canonical_alias = (
+                await self._storage_controllers.state.get_canonical_alias_for_room(
+                    room_id
+                )
+            )
             if canonical_alias:
-                room_aliases.append(canonical_alias)
+                # Ensure we do not mutate room_aliases.
+                room_aliases = list(room_aliases) + [canonical_alias]
 
-            if not self.config.is_publishing_room_allowed(
+            if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
             ):
-                # Lets just return a generic message, as there may be all sorts of
+                # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to publish room")
 
             # Check if publishing is blocked by a third party module
-            allowed_by_third_party_rules = await (
-                self.third_party_event_rules.check_visibility_can_be_modified(
-                    room_id, visibility
+            allowed_by_third_party_rules = (
+                await (
+                    self._third_party_event_rules.check_visibility_can_be_modified(
+                        room_id, visibility
+                    )
                 )
             )
             if not allowed_by_third_party_rules:
@@ -479,7 +516,11 @@ class DirectoryHandler(BaseHandler):
         await self.store.set_room_is_public(room_id, making_public)
 
     async def edit_published_appservice_room_list(
-        self, appservice_id: str, network_id: str, room_id: str, visibility: str
+        self,
+        appservice_id: str,
+        network_id: str,
+        room_id: str,
+        visibility: Literal["public", "private"],
     ) -> None:
         """Add or remove a room from the appservice/network specific public
         room list.
@@ -490,24 +531,19 @@ class DirectoryHandler(BaseHandler):
             room_id
             visibility: either "public" or "private"
         """
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
-
         await self.store.set_room_is_public_appservice(
             room_id, appservice_id, network_id, visibility == "public"
         )
 
     async def get_aliases_for_room(
         self, requester: Requester, room_id: str
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """
         Get a list of the aliases that currently point to this room on this server
         """
         # allow access to server admins and current members of the room
-        is_admin = await self.auth.is_server_admin(requester.user)
+        is_admin = await self.auth.is_server_admin(requester)
         if not is_admin:
-            await self.auth.check_user_in_room_or_world_readable(
-                room_id, requester.user.to_string()
-            )
+            await self.auth.check_user_in_room_or_world_readable(room_id, requester)
 
         return await self.store.get_aliases_for_room(room_id)

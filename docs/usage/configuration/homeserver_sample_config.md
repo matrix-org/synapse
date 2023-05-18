@@ -9,6 +9,9 @@ a real homeserver.yaml. Instead, if you are starting from scratch, please genera
 a fresh config using Synapse by following the instructions in
 [Installation](../../setup/installation.md).
 
+Documentation for all configuration options can be found in the
+[Configuration Manual](./config_documentation.md).
+
 ```yaml
 {{#include ../../sample_config.yaml}}
 ```

@@ -29,20 +29,21 @@ from synapse.replication.tcp.streams._base import (
     BackfillStream,
     CachesStream,
     DeviceListsStream,
-    GroupServerStream,
     PresenceFederationStream,
     PresenceStream,
     PushersStream,
     PushRulesStream,
     ReceiptsStream,
     Stream,
-    TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
-    UserSignatureStream,
 )
 from synapse.replication.tcp.streams.events import EventsStream
 from synapse.replication.tcp.streams.federation import FederationStream
+from synapse.replication.tcp.streams.partial_state import (
+    UnPartialStatedEventStream,
+    UnPartialStatedRoomStream,
+)
 
 STREAMS_MAP = {
     stream.NAME: stream
@@ -59,10 +60,9 @@ STREAMS_MAP = {
         DeviceListsStream,
         ToDeviceStream,
         FederationStream,
-        TagAccountDataStream,
         AccountDataStream,
-        GroupServerStream,
-        UserSignatureStream,
+        UnPartialStatedRoomStream,
+        UnPartialStatedEventStream,
     )
 }
 
@@ -79,8 +79,7 @@ __all__ = [
     "CachesStream",
     "DeviceListsStream",
     "ToDeviceStream",
-    "TagAccountDataStream",
     "AccountDataStream",
-    "GroupServerStream",
-    "UserSignatureStream",
+    "UnPartialStatedRoomStream",
+    "UnPartialStatedEventStream",
 ]

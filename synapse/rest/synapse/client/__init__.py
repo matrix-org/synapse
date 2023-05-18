@@ -20,6 +20,7 @@ from synapse.rest.synapse.client.new_user_consent import NewUserConsentResource
 from synapse.rest.synapse.client.pick_idp import PickIdpResource
 from synapse.rest.synapse.client.pick_username import pick_username_resource
 from synapse.rest.synapse.client.sso_register import SsoRegisterResource
+from synapse.rest.synapse.client.unsubscribe import UnsubscribeResource
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -41,16 +42,18 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
         "/_synapse/client/pick_username": pick_username_resource(hs),
         "/_synapse/client/new_user_consent": NewUserConsentResource(hs),
         "/_synapse/client/sso_register": SsoRegisterResource(hs),
+        # Unsubscribe to notification emails link
+        "/_synapse/client/unsubscribe": UnsubscribeResource(hs),
     }
 
     # provider-specific SSO bits. Only load these if they are enabled, since they
     # rely on optional dependencies.
-    if hs.config.oidc_enabled:
+    if hs.config.oidc.oidc_enabled:
         from synapse.rest.synapse.client.oidc import OIDCResource
 
         resources["/_synapse/client/oidc"] = OIDCResource(hs)
 
-    if hs.config.saml2_enabled:
+    if hs.config.saml2.saml2_enabled:
         from synapse.rest.synapse.client.saml2 import SAML2Resource
 
         res = SAML2Resource(hs)

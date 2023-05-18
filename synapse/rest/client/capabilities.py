@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, MSC3244_CAPABILITIES
@@ -32,6 +33,7 @@ class CapabilitiesRestServlet(RestServlet):
     """End point to expose the capabilities of the server."""
 
     PATTERNS = client_patterns("/capabilities$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -44,16 +46,25 @@ class CapabilitiesRestServlet(RestServlet):
         await self.auth.get_user_by_req(request, allow_guest=True)
         change_password = self.auth_handler.can_change_password()
 
-        response = {
+        response: JsonDict = {
             "capabilities": {
                 "m.room_versions": {
-                    "default": self.config.default_room_version.identifier,
+                    "default": self.config.server.default_room_version.identifier,
                     "available": {
                         v.identifier: v.disposition
                         for v in KNOWN_ROOM_VERSIONS.values()
                     },
                 },
                 "m.change_password": {"enabled": change_password},
+                "m.set_displayname": {
+                    "enabled": self.config.registration.enable_set_displayname
+                },
+                "m.set_avatar_url": {
+                    "enabled": self.config.registration.enable_set_avatar_url
+                },
+                "m.3pid_changes": {
+                    "enabled": self.config.registration.enable_3pid_changes
+                },
             }
         }
 
@@ -62,18 +73,17 @@ class CapabilitiesRestServlet(RestServlet):
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
 
-        if self.config.experimental.msc3283_enabled:
-            response["capabilities"]["org.matrix.msc3283.set_displayname"] = {
-                "enabled": self.config.enable_set_displayname
-            }
-            response["capabilities"]["org.matrix.msc3283.set_avatar_url"] = {
-                "enabled": self.config.enable_set_avatar_url
-            }
-            response["capabilities"]["org.matrix.msc3283.3pid_changes"] = {
-                "enabled": self.config.enable_3pid_changes
+        if self.config.experimental.msc3720_enabled:
+            response["capabilities"]["org.matrix.msc3720.account_status"] = {
+                "enabled": True,
             }
 
-        return 200, response
+        if self.config.experimental.msc3664_enabled:
+            response["capabilities"]["im.nheko.msc3664.related_event_match"] = {
+                "enabled": self.config.experimental.msc3664_enabled,
+            }
+
+        return HTTPStatus.OK, response
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

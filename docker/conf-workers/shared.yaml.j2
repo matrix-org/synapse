@@ -3,7 +3,18 @@
 # configure_workers_and_start.py uses and amends to this file depending on the workers
 # that have been selected.
 
+{% if enable_redis %}
 redis:
     enabled: true
+{% endif %}
+
+{% if appservice_registrations is not none %}
+## Application Services ##
+# A list of application service config files to use.
+app_service_config_files:
+{%- for path in appservice_registrations %}
+  - "{{ path }}"
+{%- endfor %}
+{%- endif %}
 
 {{ shared_worker_config }}

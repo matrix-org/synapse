@@ -30,7 +30,7 @@ class SAML2MetadataResource(Resource):
 
     def __init__(self, hs: "HomeServer"):
         Resource.__init__(self)
-        self.sp_config = hs.config.saml2_sp_config
+        self.sp_config = hs.config.saml2.saml2_sp_config
 
     def render_GET(self, request: Request) -> bytes:
         metadata_xml = saml2.metadata.create_metadata_string(

@@ -15,11 +15,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+"""
+Script for signing and sending federation requests.
+
+Some tips on doing the join dance with this:
+
+    room_id=...
+    user_id=...
+
+    # make_join
+    federation_client.py "/_matrix/federation/v1/make_join/$room_id/$user_id?ver=5" > make_join.json
+
+    # sign
+    jq -M .event make_join.json | sign_json --sign-event-room-version=$(jq -r .room_version make_join.json) -o signed-join.json
+
+    # send_join
+    federation_client.py -X PUT "/_matrix/federation/v2/send_join/$room_id/x" --body $(<signed-join.json) > send_join.json
+"""
+
 import argparse
 import base64
 import json
 import sys
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Tuple
 from urllib import parse as urlparse
 
 import requests
@@ -27,14 +46,16 @@ import signedjson.key
 import signedjson.types
 import srvlookup
 import yaml
+from requests import PreparedRequest, Response
 from requests.adapters import HTTPAdapter
+from urllib3 import HTTPConnectionPool
 
 # uncomment the following to enable debug logging of http requests
-# from httplib import HTTPConnection
+# from http.client import HTTPConnection
 # HTTPConnection.debuglevel = 1
 
 
-def encode_base64(input_bytes):
+def encode_base64(input_bytes: bytes) -> str:
     """Encode bytes as a base64 string without any padding."""
 
     input_len = len(input_bytes)
@@ -44,7 +65,7 @@ def encode_base64(input_bytes):
     return output_string
 
 
-def encode_canonical_json(value):
+def encode_canonical_json(value: object) -> bytes:
     return json.dumps(
         value,
         # Encode code-points outside of ASCII as UTF-8 rather than \u escapes
@@ -83,6 +104,7 @@ def request(
     destination: str,
     path: str,
     content: Optional[str],
+    verify_tls: bool,
 ) -> requests.Response:
     if method is None:
         if content is None:
@@ -105,8 +127,13 @@ def request(
     authorization_headers = []
 
     for key, sig in signed_json["signatures"][origin_name].items():
-        header = 'X-Matrix origin=%s,key="%s",sig="%s"' % (origin_name, key, sig)
-        authorization_headers.append(header.encode("ascii"))
+        header = 'X-Matrix origin=%s,key="%s",sig="%s",destination="%s"' % (
+            origin_name,
+            key,
+            sig,
+            destination,
+        )
+        authorization_headers.append(header)
         print("Authorization: %s" % header, file=sys.stderr)
 
     dest = "matrix://%s%s" % (destination, path)
@@ -115,7 +142,9 @@ def request(
     s = requests.Session()
     s.mount("matrix://", MatrixConnectionAdapter())
 
-    headers = {"Host": destination, "Authorization": authorization_headers[0]}
+    headers: Dict[str, str] = {
+        "Authorization": authorization_headers[0],
+    }
 
     if method == "POST":
         headers["Content-Type"] = "application/json"
@@ -124,13 +153,13 @@ def request(
         method=method,
         url=dest,
         headers=headers,
-        verify=False,
+        verify=verify_tls,
         data=content,
         stream=True,
     )
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Signs and sends a federation request to a matrix homeserver"
     )
@@ -175,6 +204,12 @@ def main():
     parser.add_argument("--body", help="Data to send as the body of the HTTP request")
 
     parser.add_argument(
+        "--insecure",
+        action="store_true",
+        help="Disable TLS certificate verification",
+    )
+
+    parser.add_argument(
         "path", help="request path, including the '/_matrix/federation/...' prefix."
     )
 
@@ -188,6 +223,7 @@ def main():
     if not args.server_name or not args.signing_key:
         read_args_from_config(args)
 
+    assert isinstance(args.signing_key, str)
     algorithm, version, key_base64 = args.signing_key.split()
     key = signedjson.key.decode_signing_key_base64(algorithm, version, key_base64)
 
@@ -198,6 +234,7 @@ def main():
         args.destination,
         args.path,
         content=args.body,
+        verify_tls=not args.insecure,
     )
 
     sys.stderr.write("Status Code: %d\n" % (result.status_code,))
@@ -209,7 +246,7 @@ def main():
     print("")
 
 
-def read_args_from_config(args):
+def read_args_from_config(args: argparse.Namespace) -> None:
     with open(args.config, "r") as fh:
         config = yaml.safe_load(fh)
 
@@ -225,36 +262,93 @@ def read_args_from_config(args):
 
 
 class MatrixConnectionAdapter(HTTPAdapter):
-    @staticmethod
-    def lookup(s, skip_well_known=False):
-        if s[-1] == "]":
-            # ipv6 literal (with no port)
-            return s, 8448
+    def send(
+        self,
+        request: PreparedRequest,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Response:
+        # overrides the send() method in the base class.
 
-        if ":" in s:
-            out = s.rsplit(":", 1)
+        # We need to look for .well-known redirects before passing the request up to
+        # HTTPAdapter.send().
+        assert isinstance(request.url, str)
+        parsed = urlparse.urlsplit(request.url)
+        server_name = parsed.netloc
+        well_known = self._get_well_known(parsed.netloc)
+
+        if well_known:
+            server_name = well_known
+
+        # replace the scheme in the uri with https, so that cert verification is done
+        # also replace the hostname if we got a .well-known result
+        request.url = urlparse.urlunsplit(
+            ("https", server_name, parsed.path, parsed.query, parsed.fragment)
+        )
+
+        # at this point we also add the host header (otherwise urllib will add one
+        # based on the `host` from the connection returned by `get_connection`,
+        # which will be wrong if there is an SRV record).
+        request.headers["Host"] = server_name
+
+        return super().send(request, *args, **kwargs)
+
+    def get_connection(
+        self, url: str, proxies: Optional[Dict[str, str]] = None
+    ) -> HTTPConnectionPool:
+        # overrides the get_connection() method in the base class
+        parsed = urlparse.urlsplit(url)
+        (host, port, ssl_server_name) = self._lookup(parsed.netloc)
+        print(
+            f"Connecting to {host}:{port} with SNI {ssl_server_name}", file=sys.stderr
+        )
+        return self.poolmanager.connection_from_host(
+            host,
+            port=port,
+            scheme="https",
+            pool_kwargs={"server_hostname": ssl_server_name},
+        )
+
+    @staticmethod
+    def _lookup(server_name: str) -> Tuple[str, int, str]:
+        """
+        Do an SRV lookup on a server name and return the host:port to connect to
+        Given the server_name (after any .well-known lookup), return the host, port and
+        the ssl server name
+        """
+        if server_name[-1] == "]":
+            # ipv6 literal (with no port)
+            return server_name, 8448, server_name
+
+        if ":" in server_name:
+            # explicit port
+            out = server_name.rsplit(":", 1)
             try:
                 port = int(out[1])
             except ValueError:
-                raise ValueError("Invalid host:port '%s'" % s)
-            return out[0], port
-
-        # try a .well-known lookup
-        if not skip_well_known:
-            well_known = MatrixConnectionAdapter.get_well_known(s)
-            if well_known:
-                return MatrixConnectionAdapter.lookup(well_known, skip_well_known=True)
+                raise ValueError("Invalid host:port '%s'" % (server_name,))
+            return out[0], port, out[0]
 
         try:
-            srv = srvlookup.lookup("matrix", "tcp", s)[0]
-            return srv.host, srv.port
+            srv = srvlookup.lookup("matrix", "tcp", server_name)[0]
+            print(
+                f"SRV lookup on _matrix._tcp.{server_name} gave {srv}",
+                file=sys.stderr,
+            )
+            return srv.host, srv.port, server_name
         except Exception:
-            return s, 8448
+            return server_name, 8448, server_name
 
     @staticmethod
-    def get_well_known(server_name):
-        uri = "https://%s/.well-known/matrix/server" % (server_name,)
-        print("fetching %s" % (uri,), file=sys.stderr)
+    def _get_well_known(server_name: str) -> Optional[str]:
+        if ":" in server_name:
+            # explicit port, or ipv6 literal. Either way, no .well-known
+            return None
+
+        # TODO: check for ipv4 literals
+
+        uri = f"https://{server_name}/.well-known/matrix/server"
+        print(f"fetching {uri}", file=sys.stderr)
 
         try:
             resp = requests.get(uri)
@@ -274,17 +368,6 @@ class MatrixConnectionAdapter(HTTPAdapter):
         except Exception as e:
             print("Invalid response from %s: %s" % (uri, e), file=sys.stderr)
         return None
-
-    def get_connection(self, url, proxies=None):
-        parsed = urlparse.urlparse(url)
-
-        (host, port) = self.lookup(parsed.netloc)
-        netloc = "%s:%d" % (host, port)
-        print("Connecting to %s" % (netloc,), file=sys.stderr)
-        url = urlparse.urlunparse(
-            ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
-        )
-        return super().get_connection(url, proxies)
 
 
 if __name__ == "__main__":

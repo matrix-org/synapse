@@ -14,17 +14,17 @@
 # limitations under the License.
 import logging
 import urllib.parse
+from http import HTTPStatus
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
+    Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
-    Sequence,
     Tuple,
     Union,
 )
@@ -42,8 +42,12 @@ from twisted.internet import defer, error as twisted_error, protocol, ssl
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import (
     IAddress,
+    IDelayedCall,
     IHostResolution,
+    IOpenSSLContextFactory,
+    IReactorCore,
     IReactorPluggableNameResolver,
+    IReactorTime,
     IResolutionReceiver,
     ITCPTransport,
 )
@@ -70,7 +74,9 @@ from twisted.web.iweb import (
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
-from synapse.logging.context import make_deferred_yieldable
+from synapse.http.replicationagent import ReplicationAgent
+from synapse.http.types import QueryParams
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import ISynapseReactor
 from synapse.util import json_decoder
@@ -86,18 +92,29 @@ incoming_responses_counter = Counter(
     "synapse_http_client_responses", "", ["method", "code"]
 )
 
-# the type of the headers list, to be passed to the t.w.h.Headers.
-# Actually we can mix str and bytes keys, but Mapping treats 'key' as invariant so
-# we simplify.
+# the type of the headers map, to be passed to the t.w.h.Headers.
+#
+# The actual type accepted by Twisted is
+#   Mapping[Union[str, bytes], Sequence[Union[str, bytes]] ,
+# allowing us to mix and match str and bytes freely. However: any str is also a
+# Sequence[str]; passing a header string value which is a
+# standalone str is interpreted as a sequence of 1-codepoint strings. This is a disastrous footgun.
+# We use a narrower value type (RawHeaderValue) to avoid this footgun.
+#
+# We also simplify the keys to be either all str or all bytes. This helps because
+# Dict[K, V] is invariant in K (and indeed V).
 RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValue"]]
 
 # the value actually has to be a List, but List is invariant so we can't specify that
 # the entries can either be Lists or bytes.
-RawHeaderValue = Sequence[Union[str, bytes]]
-
-# the type of the query params, to be passed into `urlencode`
-QueryParamValue = Union[str, bytes, Iterable[Union[str, bytes]]]
-QueryParams = Union[Mapping[str, QueryParamValue], Mapping[bytes, QueryParamValue]]
+RawHeaderValue = Union[
+    List[str],
+    List[bytes],
+    List[Union[str, bytes]],
+    Tuple[str, ...],
+    Tuple[bytes, ...],
+    Tuple[Union[str, bytes], ...],
+]
 
 
 def check_against_blacklist(
@@ -123,13 +140,15 @@ def check_against_blacklist(
 _EPSILON = 0.00000001
 
 
-def _make_scheduler(reactor):
+def _make_scheduler(
+    reactor: IReactorTime,
+) -> Callable[[Callable[[], object]], IDelayedCall]:
     """Makes a schedular suitable for a Cooperator using the given reactor.
 
     (This is effectively just a copy from `twisted.internet.task`)
     """
 
-    def _scheduler(x):
+    def _scheduler(x: Callable[[], object]) -> IDelayedCall:
         return reactor.callLater(_EPSILON, x)
 
     return _scheduler
@@ -210,7 +229,9 @@ class _IPBlacklistingResolver:
         return recv
 
 
-@implementer(ISynapseReactor)
+# ISynapseReactor implies IReactorCore, but explicitly marking it this as an implementer
+# of IReactorCore seems to keep mypy-zope happier.
+@implementer(IReactorCore, ISynapseReactor)
 class BlacklistingReactorWrapper:
     """
     A Reactor wrapper which will prevent DNS resolution to blacklisted IP
@@ -248,8 +269,8 @@ class BlacklistingAgentWrapper(Agent):
     def __init__(
         self,
         agent: IAgent,
+        ip_blacklist: IPSet,
         ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
     ):
         """
         Args:
@@ -271,7 +292,9 @@ class BlacklistingAgentWrapper(Agent):
         h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
-            ip_address = IPAddress(h.hostname)
+            # h.hostname is Optional[str], None raises an AddrFormatError, so
+            # this is safe even though IPAddress requires a str.
+            ip_address = IPAddress(h.hostname)  # type: ignore[arg-type]
         except AddrFormatError:
             # Not an IP
             pass
@@ -280,7 +303,9 @@ class BlacklistingAgentWrapper(Agent):
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
                 logger.info("Blocking access to %s due to blacklist" % (ip_address,))
-                e = SynapseError(403, "IP address blocked by IP blacklist entry")
+                e = SynapseError(
+                    HTTPStatus.FORBIDDEN, "IP address blocked by IP blacklist entry"
+                )
                 return defer.fail(Failure(e))
 
         return self._agent.request(
@@ -288,88 +313,41 @@ class BlacklistingAgentWrapper(Agent):
         )
 
 
-class SimpleHttpClient:
+class BaseHttpClient:
     """
     A simple, no-frills HTTP client with methods that wrap up common ways of
-    using HTTP in Matrix
+    using HTTP in Matrix. Does not come with a default Agent, subclasses will need to
+    define their own.
+
+    Args:
+        hs: The HomeServer instance to pass in
+        treq_args: Extra keyword arguments to be given to treq.request.
     """
+
+    agent: IAgent
 
     def __init__(
         self,
         hs: "HomeServer",
         treq_args: Optional[Dict[str, Any]] = None,
-        ip_whitelist: Optional[IPSet] = None,
-        ip_blacklist: Optional[IPSet] = None,
-        use_proxy: bool = False,
     ):
-        """
-        Args:
-            hs
-            treq_args: Extra keyword arguments to be given to treq.request.
-            ip_blacklist: The IP addresses that are blacklisted that
-                we may not request.
-            ip_whitelist: The whitelisted IP addresses, that we can
-               request if it were otherwise caught in a blacklist.
-            use_proxy: Whether proxy settings should be discovered and used
-                from conventional environment variables.
-        """
         self.hs = hs
+        self.reactor = hs.get_reactor()
 
-        self._ip_whitelist = ip_whitelist
-        self._ip_blacklist = ip_blacklist
         self._extra_treq_args = treq_args or {}
-
-        self.user_agent = hs.version_string
         self.clock = hs.get_clock()
+
+        user_agent = hs.version_string
         if hs.config.server.user_agent_suffix:
-            self.user_agent = "%s %s" % (
-                self.user_agent,
+            user_agent = "%s %s" % (
+                user_agent,
                 hs.config.server.user_agent_suffix,
             )
+        self.user_agent = user_agent.encode("ascii")
 
         # We use this for our body producers to ensure that they use the correct
         # reactor.
         self._cooperator = Cooperator(scheduler=_make_scheduler(hs.get_reactor()))
-
-        self.user_agent = self.user_agent.encode("ascii")
-
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we need to use a DNS resolver which
-            # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
-                hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
-            )
-        else:
-            self.reactor = hs.get_reactor()
-
-        # the pusher makes lots of concurrent SSL connections to sygnal, and
-        # tends to do so in batches, so we need to allow the pool to keep
-        # lots of idle connections around.
-        pool = HTTPConnectionPool(self.reactor)
-        # XXX: The justification for using the cache factor here is that larger instances
-        # will need both more cache and more connections.
-        # Still, this should probably be a separate dial
-        pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
-        pool.cachedConnectionTimeout = 2 * 60
-
-        self.agent: IAgent = ProxyAgent(
-            self.reactor,
-            hs.get_reactor(),
-            connectTimeout=15,
-            contextFactory=self.hs.get_http_client_context_factory(),
-            pool=pool,
-            use_proxy=use_proxy,
-        )
-
-        if self._ip_blacklist:
-            # If we have an IP blacklist, we then install the blacklisting Agent
-            # which prevents direct access to IP addresses, that are not caught
-            # by the DNS resolution.
-            self.agent = BlacklistingAgentWrapper(
-                self.agent,
-                ip_whitelist=self._ip_whitelist,
-                ip_blacklist=self._ip_blacklist,
-            )
 
     async def request(
         self,
@@ -585,7 +563,7 @@ class SimpleHttpClient:
         if headers:
             actual_headers.update(headers)  # type: ignore
 
-        body = await self.get_raw(uri, args, headers=headers)
+        body = await self.get_raw(uri, args, headers=actual_headers)
         return json_decoder.decode(body.decode("utf-8"))
 
     async def put_json(
@@ -690,12 +668,18 @@ class SimpleHttpClient:
         output_stream: BinaryIO,
         max_size: Optional[int] = None,
         headers: Optional[RawHeaders] = None,
+        is_allowed_content_type: Optional[Callable[[str], bool]] = None,
     ) -> Tuple[int, Dict[bytes, List[bytes]], str, int]:
         """GETs a file from a given URL
         Args:
             url: The URL to GET
             output_stream: File to write the response body to.
             headers: A map from header name to a list of values for that header
+            is_allowed_content_type: A predicate to determine whether the
+                content type of the file we're downloading is allowed. If set and
+                it evaluates to False when called with the content type, the
+                request will be terminated before completing the download by
+                raising SynapseError.
         Returns:
             A tuple of the file length, dict of the response
             headers, absolute URI of the response and HTTP response code.
@@ -719,24 +703,48 @@ class SimpleHttpClient:
 
         if response.code > 299:
             logger.warning("Got %d when downloading %s" % (response.code, url))
-            raise SynapseError(502, "Got error %d" % (response.code,), Codes.UNKNOWN)
+            raise SynapseError(
+                HTTPStatus.BAD_GATEWAY, "Got error %d" % (response.code,), Codes.UNKNOWN
+            )
+
+        if is_allowed_content_type and b"Content-Type" in resp_headers:
+            content_type = resp_headers[b"Content-Type"][0].decode("ascii")
+            if not is_allowed_content_type(content_type):
+                raise SynapseError(
+                    HTTPStatus.BAD_GATEWAY,
+                    (
+                        "Requested file's content type not allowed for this operation: %s"
+                        % content_type
+                    ),
+                )
 
         # TODO: if our Content-Type is HTML or something, just read the first
         # N bytes into RAM rather than saving it all to disk only to read it
         # straight back in again
 
         try:
-            length = await make_deferred_yieldable(
-                read_body_with_max_size(response, output_stream, max_size)
-            )
+            d = read_body_with_max_size(response, output_stream, max_size)
+
+            # Ensure that the body is not read forever.
+            d = timeout_deferred(d, 30, self.hs.get_reactor())
+
+            length = await make_deferred_yieldable(d)
         except BodyExceededMaxSize:
             raise SynapseError(
-                502,
+                HTTPStatus.BAD_GATEWAY,
                 "Requested file is too large > %r bytes" % (max_size,),
                 Codes.TOO_LARGE,
             )
+        except defer.TimeoutError:
+            raise SynapseError(
+                HTTPStatus.BAD_GATEWAY,
+                "Requested file took too long to download",
+                Codes.TOO_LARGE,
+            )
         except Exception as e:
-            raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
+            raise SynapseError(
+                HTTPStatus.BAD_GATEWAY, ("Failed to download remote body: %s" % e)
+            ) from e
 
         return (
             length,
@@ -746,7 +754,203 @@ class SimpleHttpClient:
         )
 
 
-def _timeout_to_request_timed_out_error(f: Failure):
+class SimpleHttpClient(BaseHttpClient):
+    """
+    An HTTP client capable of crossing a proxy and respecting a block/allow list.
+
+    This also configures a larger / longer lasting HTTP connection pool.
+
+    Args:
+        hs: The HomeServer instance to pass in
+        treq_args: Extra keyword arguments to be given to treq.request.
+        ip_blacklist: The IP addresses that are blacklisted that
+            we may not request.
+        ip_whitelist: The whitelisted IP addresses, that we can
+           request if it were otherwise caught in a blacklist.
+        use_proxy: Whether proxy settings should be discovered and used
+            from conventional environment variables.
+    """
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+        treq_args: Optional[Dict[str, Any]] = None,
+        ip_whitelist: Optional[IPSet] = None,
+        ip_blacklist: Optional[IPSet] = None,
+        use_proxy: bool = False,
+    ):
+        super().__init__(hs, treq_args=treq_args)
+        self._ip_whitelist = ip_whitelist
+        self._ip_blacklist = ip_blacklist
+
+        if self._ip_blacklist:
+            # If we have an IP blacklist, we need to use a DNS resolver which
+            # filters out blacklisted IP addresses, to prevent DNS rebinding.
+            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
+                self.reactor, self._ip_whitelist, self._ip_blacklist
+            )
+
+        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
+        # do so in batches, so we need to allow the pool to keep lots of idle
+        # connections around.
+        pool = HTTPConnectionPool(self.reactor)
+        # XXX: The justification for using the cache factor here is that larger
+        # instances will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
+        pool.cachedConnectionTimeout = 2 * 60
+
+        self.agent: IAgent = ProxyAgent(
+            self.reactor,
+            hs.get_reactor(),
+            connectTimeout=15,
+            contextFactory=self.hs.get_http_client_context_factory(),
+            pool=pool,
+            use_proxy=use_proxy,
+        )
+
+        if self._ip_blacklist:
+            # If we have an IP blacklist, we then install the blacklisting Agent
+            # which prevents direct access to IP addresses, that are not caught
+            # by the DNS resolution.
+            self.agent = BlacklistingAgentWrapper(
+                self.agent,
+                ip_blacklist=self._ip_blacklist,
+                ip_whitelist=self._ip_whitelist,
+            )
+
+
+class ReplicationClient(BaseHttpClient):
+    """Client for connecting to replication endpoints via HTTP and HTTPS.
+
+    Attributes:
+        agent: The custom Twisted Agent used for constructing the connection.
+    """
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+    ):
+        """
+        Args:
+            hs: The HomeServer instance to pass in
+        """
+        super().__init__(hs)
+
+        # Use a pool, but a very small one.
+        pool = HTTPConnectionPool(self.reactor)
+        pool.maxPersistentPerHost = 5
+        pool.cachedConnectionTimeout = 2 * 60
+
+        self.agent: IAgent = ReplicationAgent(
+            hs.get_reactor(),
+            contextFactory=hs.get_http_client_context_factory(),
+            pool=pool,
+        )
+
+    async def request(
+        self,
+        method: str,
+        uri: str,
+        data: Optional[bytes] = None,
+        headers: Optional[Headers] = None,
+    ) -> IResponse:
+        """
+        Make a request, differs from BaseHttpClient.request in that it does not use treq.
+
+        Args:
+            method: HTTP method to use.
+            uri: URI to query.
+            data: Data to send in the request body, if applicable.
+            headers: Request headers.
+
+        Returns:
+            Response object, once the headers have been read.
+
+        Raises:
+            RequestTimedOutError if the request times out before the headers are read
+
+        """
+        outgoing_requests_counter.labels(method).inc()
+
+        logger.debug("Sending request %s %s", method, uri)
+
+        with start_active_span(
+            "outgoing-replication-request",
+            tags={
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
+                tags.HTTP_METHOD: method,
+                tags.HTTP_URL: uri,
+            },
+            finish_on_close=True,
+        ):
+            try:
+                body_producer = None
+                if data is not None:
+                    body_producer = QuieterFileBodyProducer(
+                        BytesIO(data),
+                        cooperator=self._cooperator,
+                    )
+
+                # Skip the fancy treq stuff, we don't need cookie handling, redirects,
+                # or buffered response bodies.
+                method_bytes = method.encode("ascii")
+                uri_bytes = uri.encode("ascii")
+
+                # To preserve the logging context, the timeout is treated
+                # in a similar way to `defer.gatherResults`:
+                # * Each logging context-preserving fork is wrapped in
+                #   `run_in_background`. In this case there is only one,
+                #   since the timeout fork is not logging-context aware.
+                # * The `Deferred` that joins the forks back together is
+                #   wrapped in `make_deferred_yieldable` to restore the
+                #   logging context regardless of the path taken.
+                # (The logic/comments for this came from MatrixFederationHttpClient)
+                request_deferred = run_in_background(
+                    self.agent.request,
+                    method_bytes,
+                    uri_bytes,
+                    headers,
+                    bodyProducer=body_producer,
+                )
+
+                # we use our own timeout mechanism rather than twisted's as a workaround
+                # for https://twistedmatrix.com/trac/ticket/9534.
+                # (Updated url https://github.com/twisted/twisted/issues/9534)
+                request_deferred = timeout_deferred(
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
+                )
+
+                # turn timeouts into RequestTimedOutErrors
+                request_deferred.addErrback(_timeout_to_request_timed_out_error)
+
+                response = await make_deferred_yieldable(request_deferred)
+
+                incoming_responses_counter.labels(method, response.code).inc()
+                logger.info(
+                    "Received response to %s %s: %s",
+                    method,
+                    uri,
+                    response.code,
+                )
+                return response
+            except Exception as e:
+                incoming_responses_counter.labels(method, "ERR").inc()
+                logger.info(
+                    "Error sending request to  %s %s: %s %s",
+                    method,
+                    uri,
+                    type(e).__name__,
+                    e.args[0],
+                )
+                set_tag(tags.ERROR, True)
+                set_tag("error_reason", e.args[0])
+                raise
+
+
+def _timeout_to_request_timed_out_error(f: Failure) -> Failure:
     if f.check(twisted_error.TimeoutError, twisted_error.ConnectingCancelledError):
         # The TCP connection has its own timeout (set by the 'connectTimeout' param
         # on the Agent), which raises twisted_error.TimeoutError exception.
@@ -780,7 +984,7 @@ class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
     def __init__(self, deferred: defer.Deferred):
         self.deferred = deferred
 
-    def _maybe_fail(self):
+    def _maybe_fail(self) -> None:
         """
         Report a max size exceed error and disconnect the first time this is called.
         """
@@ -878,7 +1082,7 @@ def read_body_with_max_size(
     return d
 
 
-def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> bytes:
+def encode_query_args(args: Optional[QueryParams]) -> bytes:
     """
     Encodes a map of query arguments to bytes which can be appended to a URL.
 
@@ -891,13 +1095,7 @@ def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> by
     if args is None:
         return b""
 
-    encoded_args = {}
-    for k, vs in args.items():
-        if isinstance(vs, str):
-            vs = [vs]
-        encoded_args[k] = [v.encode("utf8") for v in vs]
-
-    query_str = urllib.parse.urlencode(encoded_args, True)
+    query_str = urllib.parse.urlencode(args, True)
 
     return query_str.encode("utf8")
 
@@ -910,12 +1108,51 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
     Do not use this since it allows an attacker to intercept your communications.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._context = SSL.Context(SSL.SSLv23_METHOD)
-        self._context.set_verify(VERIFY_NONE, lambda *_: None)
+        self._context.set_verify(VERIFY_NONE, lambda *_: False)
 
-    def getContext(self, hostname=None, port=None):
+    def getContext(self) -> SSL.Context:
         return self._context
 
-    def creatorForNetloc(self, hostname, port):
+    def creatorForNetloc(self, hostname: bytes, port: int) -> IOpenSSLContextFactory:
         return self
+
+
+def is_unknown_endpoint(
+    e: HttpResponseException, synapse_error: Optional[SynapseError] = None
+) -> bool:
+    """
+    Returns true if the response was due to an endpoint being unimplemented.
+
+    Args:
+        e: The error response received from the remote server.
+        synapse_error: The above error converted to a SynapseError. This is
+            automatically generated if not provided.
+
+    """
+    if synapse_error is None:
+        synapse_error = e.to_synapse_error()
+
+    # Matrix v1.6 specifies that servers should return a 404 or 405 with an errcode
+    # of M_UNRECOGNIZED when they receive a request to an unknown endpoint or
+    # to an unknown method, respectively.
+    #
+    # Older versions of servers don't return proper errors, so be graceful. But,
+    # also handle that some endpoints truly do return 404 errors.
+    return (
+        # 404 is an unknown endpoint, 405 is a known endpoint, but unknown method.
+        (e.code == 404 or e.code == 405)
+        and (
+            # Consider empty body or non-JSON bodies to be unrecognised (matches
+            # older Dendrites & Conduits).
+            not e.response
+            or not e.response.startswith(b"{")
+            # The proper response JSON with M_UNRECOGNIZED errcode.
+            or synapse_error.errcode == Codes.UNRECOGNIZED
+        )
+    ) or (
+        # Older Synapses returned a 400 error.
+        e.code == 400
+        and synapse_error.errcode == Codes.UNRECOGNIZED
+    )

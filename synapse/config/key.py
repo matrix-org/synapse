@@ -16,11 +16,14 @@
 import hashlib
 import logging
 import os
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 
 import attr
 import jsonschema
 from signedjson.key import (
     NACL_ED25519,
+    SigningKey,
+    VerifyKey,
     decode_signing_key_base64,
     decode_verify_key_bytes,
     generate_signing_key,
@@ -30,9 +33,13 @@ from signedjson.key import (
 )
 from unpaddedbase64 import decode_base64
 
+from synapse.types import JsonDict
 from synapse.util.stringutils import random_string, random_string_with_symbols
 
 from ._base import Config, ConfigError
+
+if TYPE_CHECKING:
+    from signedjson.key import VerifyKeyWithExpiry
 
 INSECURE_NOTARY_ERROR = """\
 Your server is configured to accept key server responses without signature
@@ -80,24 +87,26 @@ To suppress this warning and continue using 'matrix.org', admins should set
 logger = logging.getLogger(__name__)
 
 
-@attr.s
+@attr.s(slots=True, auto_attribs=True)
 class TrustedKeyServer:
-    # string: name of the server.
-    server_name = attr.ib()
+    # name of the server.
+    server_name: str
 
-    # dict[str,VerifyKey]|None: map from key id to key object, or None to disable
-    # signature verification.
-    verify_keys = attr.ib(default=None)
+    # map from key id to key object, or None to disable signature verification.
+    verify_keys: Optional[Dict[str, VerifyKey]] = None
 
 
 class KeyConfig(Config):
     section = "key"
 
-    def read_config(self, config, config_dir_path, **kwargs):
+    def read_config(
+        self, config: JsonDict, config_dir_path: str, **kwargs: Any
+    ) -> None:
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])
         else:
+            assert config_dir_path is not None
             signing_key_path = config.get("signing_key_path")
             if signing_key_path is None:
                 signing_key_path = os.path.join(
@@ -145,155 +154,87 @@ class KeyConfig(Config):
 
         # list of TrustedKeyServer objects
         self.key_servers = list(
-            _parse_key_servers(key_servers, self.federation_verify_certificates)
+            _parse_key_servers(
+                key_servers, self.root.tls.federation_verify_certificates
+            )
         )
 
-        self.macaroon_secret_key = config.get(
-            "macaroon_secret_key", self.registration_shared_secret
+        macaroon_secret_key: Optional[str] = config.get(
+            "macaroon_secret_key", self.root.registration.registration_shared_secret
         )
 
-        if not self.macaroon_secret_key:
+        if not macaroon_secret_key:
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
             logger.warning("Config is missing macaroon_secret_key")
             seed = bytes(self.signing_key[0])
             self.macaroon_secret_key = hashlib.sha256(seed).digest()
+        else:
+            self.macaroon_secret_key = macaroon_secret_key.encode("utf-8")
 
         # a secret which is used to calculate HMACs for form values, to stop
         # falsification of values
         self.form_secret = config.get("form_secret", None)
 
     def generate_config_section(
-        self, config_dir_path, server_name, generate_secrets=False, **kwargs
-    ):
+        self,
+        config_dir_path: str,
+        server_name: str,
+        generate_secrets: bool = False,
+        **kwargs: Any,
+    ) -> str:
         base_key_name = os.path.join(config_dir_path, server_name)
+        macaroon_secret_key = ""
+        form_secret = ""
 
         if generate_secrets:
             macaroon_secret_key = 'macaroon_secret_key: "%s"' % (
                 random_string_with_symbols(50),
             )
             form_secret = 'form_secret: "%s"' % random_string_with_symbols(50)
-        else:
-            macaroon_secret_key = "#macaroon_secret_key: <PRIVATE STRING>"
-            form_secret = "#form_secret: <PRIVATE STRING>"
 
         return (
             """\
-        # a secret which is used to sign access tokens. If none is specified,
-        # the registration_shared_secret is used, if one is given; otherwise,
-        # a secret key is derived from the signing key.
-        #
         %(macaroon_secret_key)s
-
-        # a secret which is used to calculate HMACs for form values, to stop
-        # falsification of values. Must be specified for the User Consent
-        # forms to work.
-        #
         %(form_secret)s
-
-        ## Signing Keys ##
-
-        # Path to the signing key to sign messages with
-        #
         signing_key_path: "%(base_key_name)s.signing.key"
-
-        # The keys that the server used to sign messages with but won't use
-        # to sign new messages.
-        #
-        old_signing_keys:
-          # For each key, `key` should be the base64-encoded public key, and
-          # `expired_ts`should be the time (in milliseconds since the unix epoch) that
-          # it was last used.
-          #
-          # It is possible to build an entry from an old signing.key file using the
-          # `export_signing_key` script which is provided with synapse.
-          #
-          # For example:
-          #
-          #"ed25519:id": { key: "base64string", expired_ts: 123456789123 }
-
-        # How long key response published by this server is valid for.
-        # Used to set the valid_until_ts in /key/v2 APIs.
-        # Determines how quickly servers will query to check which keys
-        # are still valid.
-        #
-        #key_refresh_interval: 1d
-
-        # The trusted servers to download signing keys from.
-        #
-        # When we need to fetch a signing key, each server is tried in parallel.
-        #
-        # Normally, the connection to the key server is validated via TLS certificates.
-        # Additional security can be provided by configuring a `verify key`, which
-        # will make synapse check that the response is signed by that key.
-        #
-        # This setting supercedes an older setting named `perspectives`. The old format
-        # is still supported for backwards-compatibility, but it is deprecated.
-        #
-        # 'trusted_key_servers' defaults to matrix.org, but using it will generate a
-        # warning on start-up. To suppress this warning, set
-        # 'suppress_key_server_warning' to true.
-        #
-        # Options for each entry in the list include:
-        #
-        #    server_name: the name of the server. required.
-        #
-        #    verify_keys: an optional map from key id to base64-encoded public key.
-        #       If specified, we will check that the response is signed by at least
-        #       one of the given keys.
-        #
-        #    accept_keys_insecurely: a boolean. Normally, if `verify_keys` is unset,
-        #       and federation_verify_certificates is not `true`, synapse will refuse
-        #       to start, because this would allow anyone who can spoof DNS responses
-        #       to masquerade as the trusted key server. If you know what you are doing
-        #       and are sure that your network environment provides a secure connection
-        #       to the key server, you can set this to `true` to override this
-        #       behaviour.
-        #
-        # An example configuration might look like:
-        #
-        #trusted_key_servers:
-        #  - server_name: "my_trusted_server.example.com"
-        #    verify_keys:
-        #      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
-        #  - server_name: "my_other_trusted_server.example.com"
-        #
         trusted_key_servers:
           - server_name: "matrix.org"
-
-        # Uncomment the following to disable the warning that is emitted when the
-        # trusted_key_servers include 'matrix.org'. See above.
-        #
-        #suppress_key_server_warning: true
-
-        # The signing keys to use when acting as a trusted key server. If not specified
-        # defaults to the server signing key.
-        #
-        # Can contain multiple keys, one per line.
-        #
-        #key_server_signing_keys_path: "key_server_signing_keys.key"
         """
             % locals()
         )
 
-    def read_signing_keys(self, signing_key_path, name):
+    def read_signing_keys(self, signing_key_path: str, name: str) -> List[SigningKey]:
         """Read the signing keys in the given path.
 
         Args:
-            signing_key_path (str)
-            name (str): Associated config key name
+            signing_key_path
+            name: Associated config key name
 
         Returns:
-            list[SigningKey]
+            The signing keys read from the given path.
         """
 
         signing_keys = self.read_file(signing_key_path, name)
         try:
-            return read_signing_keys(signing_keys.splitlines(True))
+            loaded_signing_keys = read_signing_keys(
+                [
+                    signing_key_line
+                    for signing_key_line in signing_keys.splitlines(keepends=False)
+                    if signing_key_line.strip()
+                ]
+            )
+
+            if not loaded_signing_keys:
+                raise ConfigError(f"No signing keys in file {signing_key_path}")
+
+            return loaded_signing_keys
         except Exception as e:
             raise ConfigError("Error reading %s: %s" % (name, str(e)))
 
-    def read_old_signing_keys(self, old_signing_keys):
+    def read_old_signing_keys(
+        self, old_signing_keys: Optional[JsonDict]
+    ) -> Dict[str, "VerifyKeyWithExpiry"]:
         if old_signing_keys is None:
             return {}
         keys = {}
@@ -301,8 +242,8 @@ class KeyConfig(Config):
             if is_signing_algorithm_supported(key_id):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
-                verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_key.expired_ts = key_data["expired_ts"]
+                verify_key: "VerifyKeyWithExpiry" = decode_verify_key_bytes(key_id, key_bytes)  # type: ignore[assignment]
+                verify_key.expired = key_data["expired_ts"]
                 keys[key_id] = verify_key
             else:
                 raise ConfigError(
@@ -310,7 +251,7 @@ class KeyConfig(Config):
                 )
         return keys
 
-    def generate_files(self, config, config_dir_path):
+    def generate_files(self, config: Dict[str, Any], config_dir_path: str) -> None:
         if "signing_key" in config:
             return
 
@@ -337,7 +278,7 @@ class KeyConfig(Config):
                     write_signing_keys(signing_key_file, (key,))
 
 
-def _perspectives_to_key_servers(config):
+def _perspectives_to_key_servers(config: JsonDict) -> Iterator[JsonDict]:
     """Convert old-style 'perspectives' configs into new-style 'trusted_key_servers'
 
     Returns an iterable of entries to add to trusted_key_servers.
@@ -399,7 +340,9 @@ TRUSTED_KEY_SERVERS_SCHEMA = {
 }
 
 
-def _parse_key_servers(key_servers, federation_verify_certificates):
+def _parse_key_servers(
+    key_servers: List[Any], federation_verify_certificates: bool
+) -> Iterator[TrustedKeyServer]:
     try:
         jsonschema.validate(key_servers, TRUSTED_KEY_SERVERS_SCHEMA)
     except jsonschema.ValidationError as e:
@@ -413,7 +356,7 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
         server_name = server["server_name"]
         result = TrustedKeyServer(server_name=server_name)
 
-        verify_keys = server.get("verify_keys")
+        verify_keys: Optional[Dict[str, str]] = server.get("verify_keys")
         if verify_keys is not None:
             result.verify_keys = {}
             for key_id, key_base64 in verify_keys.items():
@@ -441,7 +384,7 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
         yield result
 
 
-def _assert_keyserver_has_verify_keys(trusted_key_server):
+def _assert_keyserver_has_verify_keys(trusted_key_server: TrustedKeyServer) -> None:
     if not trusted_key_server.verify_keys:
         raise ConfigError(INSECURE_NOTARY_ERROR)
 

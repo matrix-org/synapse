@@ -11,14 +11,132 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.roommember import ProfileInfo
+from synapse.storage.engines import PostgresEngine
+from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class ProfileWorkerStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+        self.server_name: str = hs.hostname
+        self.database_engine = database.engine
+        self.db_pool.updates.register_background_index_update(
+            "profiles_full_user_id_key_idx",
+            index_name="profiles_full_user_id_key",
+            table="profiles",
+            columns=["full_user_id"],
+            unique=True,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            "populate_full_user_id_profiles", self.populate_full_user_id_profiles
+        )
+
+    async def populate_full_user_id_profiles(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """
+        Background update to populate the column `full_user_id` of the table
+        profiles from entries in the column `user_local_part` of the same table
+        """
+
+        lower_bound_id = progress.get("lower_bound_id", "")
+
+        def _get_last_id(txn: LoggingTransaction) -> Optional[str]:
+            sql = """
+                    SELECT user_id FROM profiles
+                    WHERE user_id > ?
+                    ORDER BY user_id
+                    LIMIT 1 OFFSET 50
+                  """
+            txn.execute(sql, (lower_bound_id,))
+            res = txn.fetchone()
+            if res:
+                upper_bound_id = res[0]
+                return upper_bound_id
+            else:
+                return None
+
+        def _process_batch(
+            txn: LoggingTransaction, lower_bound_id: str, upper_bound_id: str
+        ) -> None:
+            sql = """
+                    UPDATE profiles
+                    SET full_user_id = '@' || user_id || ?
+                    WHERE ? < user_id AND user_id <= ? AND full_user_id IS NULL
+                   """
+            txn.execute(sql, (f":{self.server_name}", lower_bound_id, upper_bound_id))
+
+        def _final_batch(txn: LoggingTransaction, lower_bound_id: str) -> None:
+            sql = """
+                    UPDATE profiles
+                    SET full_user_id = '@' || user_id || ?
+                    WHERE ? < user_id AND full_user_id IS NULL
+                   """
+            txn.execute(
+                sql,
+                (
+                    f":{self.server_name}",
+                    lower_bound_id,
+                ),
+            )
+
+            if isinstance(self.database_engine, PostgresEngine):
+                sql = """
+                        ALTER TABLE profiles VALIDATE CONSTRAINT full_user_id_not_null
+                      """
+                txn.execute(sql)
+
+        upper_bound_id = await self.db_pool.runInteraction(
+            "populate_full_user_id_profiles", _get_last_id
+        )
+
+        if upper_bound_id is None:
+            await self.db_pool.runInteraction(
+                "populate_full_user_id_profiles", _final_batch, lower_bound_id
+            )
+
+            await self.db_pool.updates._end_background_update(
+                "populate_full_user_id_profiles"
+            )
+            return 1
+
+        await self.db_pool.runInteraction(
+            "populate_full_user_id_profiles",
+            _process_batch,
+            lower_bound_id,
+            upper_bound_id,
+        )
+
+        progress["lower_bound_id"] = upper_bound_id
+
+        await self.db_pool.runInteraction(
+            "populate_full_user_id_profiles",
+            self.db_pool.updates._background_update_progress_txn,
+            "populate_full_user_id_profiles",
+            progress,
+        )
+
+        return 50
+
     async def get_profileinfo(self, user_localpart: str) -> ProfileInfo:
         try:
             profile = await self.db_pool.simple_select_one(
@@ -54,130 +172,55 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_avatar_url",
         )
 
-    async def get_from_remote_profile_cache(
-        self, user_id: str
-    ) -> Optional[Dict[str, Any]]:
-        return await self.db_pool.simple_select_one(
-            table="remote_profile_cache",
-            keyvalues={"user_id": user_id},
-            retcols=("displayname", "avatar_url"),
-            allow_none=True,
-            desc="get_from_remote_profile_cache",
-        )
-
-    async def create_profile(self, user_localpart: str) -> None:
+    async def create_profile(self, user_id: UserID) -> None:
+        user_localpart = user_id.localpart
         await self.db_pool.simple_insert(
-            table="profiles", values={"user_id": user_localpart}, desc="create_profile"
+            table="profiles",
+            values={"user_id": user_localpart, "full_user_id": user_id.to_string()},
+            desc="create_profile",
         )
 
     async def set_profile_displayname(
-        self, user_localpart: str, new_displayname: Optional[str]
+        self, user_id: UserID, new_displayname: Optional[str]
     ) -> None:
+        """
+        Set the display name of a user.
+
+        Args:
+            user_id: The user's ID.
+            new_displayname: The new display name. If this is None, the user's display
+                name is removed.
+        """
+        user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={"displayname": new_displayname},
+            values={
+                "displayname": new_displayname,
+                "full_user_id": user_id.to_string(),
+            },
             desc="set_profile_displayname",
         )
 
     async def set_profile_avatar_url(
-        self, user_localpart: str, new_avatar_url: Optional[str]
+        self, user_id: UserID, new_avatar_url: Optional[str]
     ) -> None:
+        """
+        Set the avatar of a user.
+
+        Args:
+            user_id: The user's ID.
+            new_avatar_url: The new avatar URL. If this is None, the user's avatar is
+                removed.
+        """
+        user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={"avatar_url": new_avatar_url},
+            values={"avatar_url": new_avatar_url, "full_user_id": user_id.to_string()},
             desc="set_profile_avatar_url",
-        )
-
-    async def update_remote_profile_cache(
-        self, user_id: str, displayname: str, avatar_url: str
-    ) -> int:
-        return await self.db_pool.simple_update(
-            table="remote_profile_cache",
-            keyvalues={"user_id": user_id},
-            updatevalues={
-                "displayname": displayname,
-                "avatar_url": avatar_url,
-                "last_check": self._clock.time_msec(),
-            },
-            desc="update_remote_profile_cache",
-        )
-
-    async def maybe_delete_remote_profile_cache(self, user_id):
-        """Check if we still care about the remote user's profile, and if we
-        don't then remove their profile from the cache
-        """
-        subscribed = await self.is_subscribed_remote_profile_for_user(user_id)
-        if not subscribed:
-            await self.db_pool.simple_delete(
-                table="remote_profile_cache",
-                keyvalues={"user_id": user_id},
-                desc="delete_remote_profile_cache",
-            )
-
-    async def is_subscribed_remote_profile_for_user(self, user_id):
-        """Check whether we are interested in a remote user's profile."""
-        res = await self.db_pool.simple_select_one_onecol(
-            table="group_users",
-            keyvalues={"user_id": user_id},
-            retcol="user_id",
-            allow_none=True,
-            desc="should_update_remote_profile_cache_for_user",
-        )
-
-        if res:
-            return True
-
-        res = await self.db_pool.simple_select_one_onecol(
-            table="group_invites",
-            keyvalues={"user_id": user_id},
-            retcol="user_id",
-            allow_none=True,
-            desc="should_update_remote_profile_cache_for_user",
-        )
-
-        if res:
-            return True
-
-    async def get_remote_profile_cache_entries_that_expire(
-        self, last_checked: int
-    ) -> List[Dict[str, str]]:
-        """Get all users who haven't been checked since `last_checked`"""
-
-        def _get_remote_profile_cache_entries_that_expire_txn(txn):
-            sql = """
-                SELECT user_id, displayname, avatar_url
-                FROM remote_profile_cache
-                WHERE last_check < ?
-            """
-
-            txn.execute(sql, (last_checked,))
-
-            return self.db_pool.cursor_to_dict(txn)
-
-        return await self.db_pool.runInteraction(
-            "get_remote_profile_cache_entries_that_expire",
-            _get_remote_profile_cache_entries_that_expire_txn,
         )
 
 
 class ProfileStore(ProfileWorkerStore):
-    async def add_remote_profile_cache(
-        self, user_id: str, displayname: str, avatar_url: str
-    ) -> None:
-        """Ensure we are caching the remote user's profiles.
-
-        This should only be called when `is_subscribed_remote_profile_for_user`
-        would return true for the user.
-        """
-        await self.db_pool.simple_upsert(
-            table="remote_profile_cache",
-            keyvalues={"user_id": user_id},
-            values={
-                "displayname": displayname,
-                "avatar_url": avatar_url,
-                "last_check": self._clock.time_msec(),
-            },
-            desc="add_remote_profile_cache",
-        )
+    pass

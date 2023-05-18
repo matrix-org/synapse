@@ -14,12 +14,13 @@
 
 import json
 import logging
-import re
 import typing
-from typing import Any, Callable, Dict, Generator, Pattern
+from typing import Any, Callable, Dict, Generator, Optional, Sequence
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
+from matrix_common.versionstring import get_distribution_version_string
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer, task
 from twisted.internet.defer import Deferred
@@ -35,33 +36,35 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-_WILDCARD_RUN = re.compile(r"([\?\*]+)")
-
-
 def _reject_invalid_json(val: Any) -> None:
     """Do not allow Infinity, -Infinity, or NaN values in JSON."""
     raise ValueError("Invalid JSON value: '%s'" % val)
 
 
-def _handle_frozendict(obj: Any) -> Dict[Any, Any]:
-    """Helper for json_encoder. Makes frozendicts serializable by returning
+def _handle_immutabledict(obj: Any) -> Dict[Any, Any]:
+    """Helper for json_encoder. Makes immutabledicts serializable by returning
     the underlying dict
     """
-    if type(obj) is frozendict:
+    if type(obj) is immutabledict:
         # fishing the protected dict out of the object is a bit nasty,
         # but we don't really want the overhead of copying the dict.
-        return obj._dict
+        try:
+            # Safety: we catch the AttributeError immediately below.
+            return obj._dict
+        except AttributeError:
+            # If all else fails, resort to making a copy of the immutabledict
+            return dict(obj)
     raise TypeError(
         "Object of type %s is not JSON serializable" % obj.__class__.__name__
     )
 
 
 # A custom JSON encoder which:
-#   * handles frozendicts
+#   * handles immutabledicts
 #   * produces valid JSON (no NaNs etc)
 #   * reduces redundant whitespace
 json_encoder = json.JSONEncoder(
-    allow_nan=False, separators=(",", ":"), default=_handle_frozendict
+    allow_nan=False, separators=(",", ":"), default=_handle_immutabledict
 )
 
 # Create a custom decoder to reject Python extensions to JSON.
@@ -69,9 +72,14 @@ json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
 def unwrapFirstError(failure: Failure) -> Failure:
-    # defer.gatherResults and DeferredLists wrap failures.
+    # Deprecated: you probably just want to catch defer.FirstError and reraise
+    # the subFailure's value, which will do a better job of preserving stacktraces.
+    # (actually, you probably want to use yieldable_gather_results anyway)
     failure.trap(defer.FirstError)
     return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
+
+
+P = ParamSpec("P")
 
 
 @attr.s(slots=True)
@@ -101,7 +109,9 @@ class Clock:
         """Returns the current system time in milliseconds since epoch."""
         return int(self.time() * 1000)
 
-    def looping_call(self, f: Callable, msec: float, *args, **kwargs) -> LoopingCall:
+    def looping_call(
+        self, f: Callable[P, object], msec: float, *args: P.args, **kwargs: P.kwargs
+    ) -> LoopingCall:
         """Call a function repeatedly.
 
         Waits `msec` initially before calling `f` for the first time.
@@ -121,20 +131,22 @@ class Clock:
         d.addErrback(log_failure, "Looping call died", consumeErrors=False)
         return call
 
-    def call_later(self, delay, callback, *args, **kwargs) -> IDelayedCall:
+    def call_later(
+        self, delay: float, callback: Callable, *args: Any, **kwargs: Any
+    ) -> IDelayedCall:
         """Call something later
 
         Note that the function will be called with no logcontext, so if it is anything
         other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
-            delay(float): How long to wait in seconds.
-            callback(function): Function to call
+            delay: How long to wait in seconds.
+            callback: Function to call
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
 
-        def wrapped_callback(*args, **kwargs):
+        def wrapped_callback(*args: Any, **kwargs: Any) -> None:
             with context.PreserveLoggingContext():
                 callback(*args, **kwargs)
 
@@ -149,75 +161,43 @@ class Clock:
                 raise
 
 
-def log_failure(failure, msg, consumeErrors=True):
+def log_failure(
+    failure: Failure, msg: str, consumeErrors: bool = True
+) -> Optional[Failure]:
     """Creates a function suitable for passing to `Deferred.addErrback` that
     logs any failures that occur.
 
     Args:
-        msg (str): Message to log
-        consumeErrors (bool): If true consumes the failure, otherwise passes
-            on down the callback chain
+        failure: The Failure to log
+        msg: Message to log
+        consumeErrors: If true consumes the failure, otherwise passes on down
+            the callback chain
 
     Returns:
-        func(Failure)
+        The Failure if consumeErrors is false. None, otherwise.
     """
 
     logger.error(
-        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())
+        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())  # type: ignore[arg-type]
     )
 
     if not consumeErrors:
         return failure
+    return None
 
 
-def glob_to_regex(glob: str, word_boundary: bool = False) -> Pattern:
-    """Converts a glob to a compiled regex object.
-
-    Args:
-        glob: pattern to match
-        word_boundary: If True, the pattern will be allowed to match at word boundaries
-           anywhere in the string. Otherwise, the pattern is anchored at the start and
-           end of the string.
-
-    Returns:
-        compiled regex pattern
-    """
-
-    # Patterns with wildcards must be simplified to avoid performance cliffs
-    # - The glob `?**?**?` is equivalent to the glob `???*`
-    # - The glob `???*` is equivalent to the regex `.{3,}`
-    chunks = []
-    for chunk in _WILDCARD_RUN.split(glob):
-        # No wildcards? re.escape()
-        if not _WILDCARD_RUN.match(chunk):
-            chunks.append(re.escape(chunk))
-            continue
-
-        # Wildcards? Simplify.
-        qmarks = chunk.count("?")
-        if "*" in chunk:
-            chunks.append(".{%d,}" % qmarks)
-        else:
-            chunks.append(".{%d}" % qmarks)
-
-    res = "".join(chunks)
-
-    if word_boundary:
-        res = re_word_boundary(res)
-    else:
-        # \A anchors at start of string, \Z at end of string
-        res = r"\A" + res + r"\Z"
-
-    return re.compile(res, re.IGNORECASE)
+# Version string with git info. Computed here once so that we don't invoke git multiple
+# times.
+SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse", __file__)
 
 
-def re_word_boundary(r: str) -> str:
-    """
-    Adds word boundary characters to the start and end of an
-    expression to require that the match occur as a whole word,
-    but do so respecting the fact that strings starting or ending
-    with non-word characters will change word boundaries.
-    """
-    # we can't use \b as it chokes on unicode. however \W seems to be okay
-    # as shorthand for [^0-9A-Za-z_].
-    return r"(^|\W)%s(\W|$)" % (r,)
+class ExceptionBundle(Exception):
+    # A poor stand-in for something like Python 3.11's ExceptionGroup.
+    # (A backport called `exceptiongroup` exists but seems overkill: we just want a
+    # container type here.)
+    def __init__(self, message: str, exceptions: Sequence[Exception]):
+        parts = [message]
+        for e in exceptions:
+            parts.append(str(e))
+        super().__init__("\n  - ".join(parts))
+        self.exceptions = exceptions

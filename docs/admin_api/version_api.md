@@ -16,6 +16,6 @@ It returns a JSON body like the following:
 ```json
 {
     "server_version": "0.99.2rc1 (b=develop, abcdef123)",
-    "python_version": "3.6.8"
+    "python_version": "3.7.8"
 }
 ```

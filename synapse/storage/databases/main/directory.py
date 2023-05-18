@@ -12,18 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Sequence, Tuple
+
+import attr
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.types import RoomAlias
 from synapse.util.caches.descriptors import cached
 
-RoomAliasMapping = namedtuple("RoomAliasMapping", ("room_id", "room_alias", "servers"))
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomAliasMapping:
+    room_id: str
+    room_alias: str
+    servers: List[str]
 
 
-class DirectoryWorkerStore(SQLBaseStore):
+class DirectoryWorkerStore(CacheInvalidationWorkerStore):
     async def get_association_from_room_alias(
         self, room_alias: RoomAlias
     ) -> Optional[RoomAliasMapping]:
@@ -67,7 +74,7 @@ class DirectoryWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=5000)
-    async def get_aliases_for_room(self, room_id: str) -> List[str]:
+    async def get_aliases_for_room(self, room_id: str) -> Sequence[str]:
         return await self.db_pool.simple_select_onecol(
             "room_aliases",
             {"room_id": room_id},
@@ -91,7 +98,7 @@ class DirectoryWorkerStore(SQLBaseStore):
             creator: Optional user_id of creator.
         """
 
-        def alias_txn(txn):
+        def alias_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_insert_txn(
                 txn,
                 "room_aliases",
@@ -105,10 +112,8 @@ class DirectoryWorkerStore(SQLBaseStore):
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="room_alias_servers",
-                values=[
-                    {"room_alias": room_alias.to_string(), "server": server}
-                    for server in servers
-                ],
+                keys=("room_alias", "server"),
+                values=[(room_alias.to_string(), server) for server in servers],
             )
 
             self._invalidate_cache_and_stream(
@@ -124,16 +129,16 @@ class DirectoryWorkerStore(SQLBaseStore):
                 409, "Room alias %s already exists" % room_alias.to_string()
             )
 
-
-class DirectoryStore(DirectoryWorkerStore):
-    async def delete_room_alias(self, room_alias: RoomAlias) -> str:
+    async def delete_room_alias(self, room_alias: RoomAlias) -> Optional[str]:
         room_id = await self.db_pool.runInteraction(
             "delete_room_alias", self._delete_room_alias_txn, room_alias
         )
 
         return room_id
 
-    def _delete_room_alias_txn(self, txn, room_alias: RoomAlias) -> str:
+    def _delete_room_alias_txn(
+        self, txn: LoggingTransaction, room_alias: RoomAlias
+    ) -> Optional[str]:
         txn.execute(
             "SELECT room_id FROM room_aliases WHERE room_alias = ?",
             (room_alias.to_string(),),
@@ -173,9 +178,9 @@ class DirectoryStore(DirectoryWorkerStore):
                 If None, the creator will be left unchanged.
         """
 
-        def _update_aliases_for_room_txn(txn):
+        def _update_aliases_for_room_txn(txn: LoggingTransaction) -> None:
             update_creator_sql = ""
-            sql_params = (new_room_id, old_room_id)
+            sql_params: Tuple[str, ...] = (new_room_id, old_room_id)
             if creator:
                 update_creator_sql = ", creator = ?"
                 sql_params = (new_room_id, creator, old_room_id)
@@ -194,3 +199,7 @@ class DirectoryStore(DirectoryWorkerStore):
         await self.db_pool.runInteraction(
             "_update_aliases_for_room_txn", _update_aliases_for_room_txn
         )
+
+
+class DirectoryStore(DirectoryWorkerStore):
+    pass

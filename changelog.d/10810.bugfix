@@ -1,1 +1,0 @@
-Fix a case where logging contexts would go missing when federation requests time out.

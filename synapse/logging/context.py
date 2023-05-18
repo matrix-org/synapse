@@ -22,20 +22,32 @@ them.
 
 See doc/log_contexts.rst for details on how this works.
 """
-import inspect
 import logging
 import threading
 import typing
 import warnings
-from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
+from types import TracebackType
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 
 import attr
-from typing_extensions import Literal
+from typing_extensions import Literal, ParamSpec
 
 from twisted.internet import defer, threads
+from twisted.python.threadpool import ThreadPool
 
 if TYPE_CHECKING:
     from synapse.logging.scopecontextmanager import _LogContextScope
+    from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
@@ -52,21 +64,20 @@ try:
 
     is_thread_resource_usage_supported = True
 
-    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
+    def get_thread_resource_usage() -> "Optional[resource.struct_rusage]":
         return resource.getrusage(RUSAGE_THREAD)
-
 
 except Exception:
     # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
     # won't track resource usage.
     is_thread_resource_usage_supported = False
 
-    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
+    def get_thread_resource_usage() -> "Optional[resource.struct_rusage]":
         return None
 
 
 # a hook which can be set during testing to assert that we aren't abusing logcontexts.
-def logcontext_error(msg: str):
+def logcontext_error(msg: str) -> None:
     logger.warning(msg)
 
 
@@ -106,8 +117,7 @@ class ContextResourceUsage:
         """Create a new ContextResourceUsage
 
         Args:
-            copy_from (ContextResourceUsage|None): if not None, an object to
-                copy stats from
+            copy_from: if not None, an object to copy stats from
         """
         if copy_from is None:
             self.reset()
@@ -151,7 +161,7 @@ class ContextResourceUsage:
         """Add another ContextResourceUsage's stats to this one's.
 
         Args:
-            other (ContextResourceUsage): the other resource usage object
+            other: the other resource usage object
         """
         self.ru_utime += other.ru_utime
         self.ru_stime += other.ru_stime
@@ -181,7 +191,7 @@ class ContextResourceUsage:
         return res
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class ContextRequest:
     """
     A bundle of attributes from the SynapseRequest object.
@@ -193,15 +203,15 @@ class ContextRequest:
       their children.
     """
 
-    request_id = attr.ib(type=str)
-    ip_address = attr.ib(type=str)
-    site_tag = attr.ib(type=str)
-    requester = attr.ib(type=Optional[str])
-    authenticated_entity = attr.ib(type=Optional[str])
-    method = attr.ib(type=str)
-    url = attr.ib(type=str)
-    protocol = attr.ib(type=str)
-    user_agent = attr.ib(type=str)
+    request_id: str
+    ip_address: str
+    site_tag: str
+    requester: Optional[str]
+    authenticated_entity: Optional[str]
+    method: str
+    url: str
+    protocol: str
+    user_agent: str
 
 
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
@@ -220,28 +230,25 @@ class _Sentinel:
         self.scope = None
         self.tag = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "sentinel"
 
-    def copy_to(self, record):
+    def start(self, rusage: "Optional[resource.struct_rusage]") -> None:
         pass
 
-    def start(self, rusage: "Optional[resource._RUsage]"):
+    def stop(self, rusage: "Optional[resource.struct_rusage]") -> None:
         pass
 
-    def stop(self, rusage: "Optional[resource._RUsage]"):
+    def add_database_transaction(self, duration_sec: float) -> None:
         pass
 
-    def add_database_transaction(self, duration_sec):
+    def add_database_scheduled(self, sched_sec: float) -> None:
         pass
 
-    def add_database_scheduled(self, sched_sec):
+    def record_event_fetch(self, event_count: int) -> None:
         pass
 
-    def record_event_fetch(self, event_count):
-        pass
-
-    def __bool__(self):
+    def __bool__(self) -> Literal[False]:
         return False
 
 
@@ -289,7 +296,7 @@ class LoggingContext:
 
         # The thread resource usage when the logcontext became active. None
         # if the context is not currently active.
-        self.usage_start: Optional[resource._RUsage] = None
+        self.usage_start: Optional[resource.struct_rusage] = None
 
         self.main_thread = get_thread_id()
         self.request = None
@@ -334,7 +341,7 @@ class LoggingContext:
         called directly.
 
         Returns:
-            LoggingContext: the current logging context
+            The current logging context
         """
         warnings.warn(
             "synapse.logging.context.LoggingContext.current_context() is deprecated "
@@ -354,7 +361,8 @@ class LoggingContext:
         called directly.
 
         Args:
-            context(LoggingContext): The context to activate.
+            context: The context to activate.
+
         Returns:
             The context that was previously active
         """
@@ -379,7 +387,12 @@ class LoggingContext:
             )
         return self
 
-    def __exit__(self, type, value, traceback) -> None:
+    def __exit__(
+        self,
+        type: Optional[Type[BaseException]],
+        value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         """Restore the logging context in thread local storage to the state it
         was before this context was entered.
         Returns:
@@ -399,18 +412,7 @@ class LoggingContext:
         # recorded against the correct metrics.
         self.finished = True
 
-    def copy_to(self, record) -> None:
-        """Copy logging fields from this context to a log record or
-        another LoggingContext
-        """
-
-        # we track the current request
-        record.request = self.request
-
-        # we also track the current scope:
-        record.scope = self.scope
-
-    def start(self, rusage: "Optional[resource._RUsage]") -> None:
+    def start(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """
         Record that this logcontext is currently running.
 
@@ -435,7 +437,7 @@ class LoggingContext:
         else:
             self.usage_start = rusage
 
-    def stop(self, rusage: "Optional[resource._RUsage]") -> None:
+    def stop(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """
         Record that this logcontext is no longer running.
 
@@ -472,8 +474,7 @@ class LoggingContext:
         """Get resources used by this logcontext so far.
 
         Returns:
-            ContextResourceUsage: a *copy* of the object tracking resource
-                usage so far
+            A *copy* of the object tracking resource usage so far
         """
         # we always return a copy, for consistency
         res = self._resource_usage.copy()
@@ -490,7 +491,7 @@ class LoggingContext:
 
         return res
 
-    def _get_cputime(self, current: "resource._RUsage") -> Tuple[float, float]:
+    def _get_cputime(self, current: "resource.struct_rusage") -> Tuple[float, float]:
         """Get the cpu usage time between start() and the given rusage
 
         Args:
@@ -584,7 +585,7 @@ class LoggingContextFilter(logging.Filter):
             True to include the record in the log output.
         """
         context = current_context()
-        record.request = self._default_request  # type: ignore
+        record.request = self._default_request
 
         # context should never be None, but if it somehow ends up being, then
         # we end up in a death spiral of infinite loops, so let's check, for
@@ -592,21 +593,21 @@ class LoggingContextFilter(logging.Filter):
         if context is not None:
             # Logging is interested in the request ID. Note that for backwards
             # compatibility this is stored as the "request" on the record.
-            record.request = str(context)  # type: ignore
+            record.request = str(context)
 
             # Add some data from the HTTP request.
             request = context.request
             if request is None:
                 return True
 
-            record.ip_address = request.ip_address  # type: ignore
-            record.site_tag = request.site_tag  # type: ignore
-            record.requester = request.requester  # type: ignore
-            record.authenticated_entity = request.authenticated_entity  # type: ignore
-            record.method = request.method  # type: ignore
-            record.url = request.url  # type: ignore
-            record.protocol = request.protocol  # type: ignore
-            record.user_agent = request.user_agent  # type: ignore
+            record.ip_address = request.ip_address
+            record.site_tag = request.site_tag
+            record.requester = request.requester
+            record.authenticated_entity = request.authenticated_entity
+            record.method = request.method
+            record.url = request.url
+            record.protocol = request.protocol
+            record.user_agent = request.user_agent
 
         return True
 
@@ -626,7 +627,12 @@ class PreserveLoggingContext:
     def __enter__(self) -> None:
         self._old_context = set_current_context(self._new_context)
 
-    def __exit__(self, type, value, traceback) -> None:
+    def __exit__(
+        self,
+        type: Optional[Type[BaseException]],
+        value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         context = set_current_context(self._old_context)
 
         if context != self._new_context:
@@ -656,7 +662,8 @@ def current_context() -> LoggingContextOrSentinel:
 def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSentinel:
     """Set the current logging context in thread local storage
     Args:
-        context(LoggingContext): The context to activate.
+        context: The context to activate.
+
     Returns:
         The context that was previously active
     """
@@ -693,7 +700,7 @@ def nested_logging_context(suffix: str) -> LoggingContext:
         suffix: suffix to add to the parent context's 'name'.
 
     Returns:
-        LoggingContext: new logging context.
+        A new logging context.
     """
     curr_context = current_context()
     if not curr_context:
@@ -711,16 +718,71 @@ def nested_logging_context(suffix: str) -> LoggingContext:
     )
 
 
-def preserve_fn(f):
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+async def _unwrap_awaitable(awaitable: Awaitable[R]) -> R:
+    """Unwraps an arbitrary awaitable by awaiting it."""
+    return await awaitable
+
+
+@overload
+def preserve_fn(  # type: ignore[misc]
+    f: Callable[P, Awaitable[R]],
+) -> Callable[P, "defer.Deferred[R]"]:
+    # The `type: ignore[misc]` above suppresses
+    # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
+    ...
+
+
+@overload
+def preserve_fn(f: Callable[P, R]) -> Callable[P, "defer.Deferred[R]"]:
+    ...
+
+
+def preserve_fn(
+    f: Union[
+        Callable[P, R],
+        Callable[P, Awaitable[R]],
+    ]
+) -> Callable[P, "defer.Deferred[R]"]:
     """Function decorator which wraps the function with run_in_background"""
 
-    def g(*args, **kwargs):
+    def g(*args: P.args, **kwargs: P.kwargs) -> "defer.Deferred[R]":
         return run_in_background(f, *args, **kwargs)
 
     return g
 
 
-def run_in_background(f, *args, **kwargs) -> defer.Deferred:
+@overload
+def run_in_background(  # type: ignore[misc]
+    f: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs
+) -> "defer.Deferred[R]":
+    # The `type: ignore[misc]` above suppresses
+    # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
+    ...
+
+
+@overload
+def run_in_background(
+    f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+) -> "defer.Deferred[R]":
+    ...
+
+
+def run_in_background(  # type: ignore[misc]
+    # The `type: ignore[misc]` above suppresses
+    # "Overloaded function implementation does not accept all possible arguments of signature 1"
+    # "Overloaded function implementation does not accept all possible arguments of signature 2"
+    # which seems like a bug in mypy.
+    f: Union[
+        Callable[P, R],
+        Callable[P, Awaitable[R]],
+    ],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> "defer.Deferred[R]":
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
     deferred returned by the function completes.
@@ -745,13 +807,20 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
 
+    # `res` may be a coroutine, `Deferred`, some other kind of awaitable, or a plain
+    # value. Convert it to a `Deferred`.
     if isinstance(res, typing.Coroutine):
+        # Wrap the coroutine in a `Deferred`.
         res = defer.ensureDeferred(res)
-
-    # At this point we should have a Deferred, if not then f was a synchronous
-    # function, wrap it in a Deferred for consistency.
-    if not isinstance(res, defer.Deferred):
-        return defer.succeed(res)
+    elif isinstance(res, defer.Deferred):
+        pass
+    elif isinstance(res, Awaitable):
+        # `res` is probably some kind of completed awaitable, such as a `DoneAwaitable`
+        # or `Future` from `make_awaitable`.
+        res = defer.ensureDeferred(_unwrap_awaitable(res))
+    else:
+        # `res` is a plain value. Wrap it in a `Deferred`.
+        res = defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
@@ -778,13 +847,14 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     return res
 
 
-def make_deferred_yieldable(deferred):
-    """Given a deferred (or coroutine), make it follow the Synapse logcontext
-    rules:
+T = TypeVar("T")
 
-    If the deferred has completed (or is not actually a Deferred), essentially
-    does nothing (just returns another completed deferred with the
-    result/failure).
+
+def make_deferred_yieldable(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
+    """Given a deferred, make it follow the Synapse logcontext rules:
+
+    If the deferred has completed, essentially does nothing (just returns another
+    completed deferred with the result/failure).
 
     If the deferred has not yet completed, resets the logcontext before
     returning a deferred. Then, when the deferred completes, restores the
@@ -792,16 +862,6 @@ def make_deferred_yieldable(deferred):
 
     (This is more-or-less the opposite operation to run_in_background.)
     """
-    if inspect.isawaitable(deferred):
-        # If we're given a coroutine we convert it to a deferred so that we
-        # run it and find out if it immediately finishes, it it does then we
-        # don't need to fiddle with log contexts at all and can return
-        # immediately.
-        deferred = defer.ensureDeferred(deferred)
-
-    if not isinstance(deferred, defer.Deferred):
-        return deferred
-
     if deferred.called and not deferred.paused:
         # it looks like this deferred is ready to run any callbacks we give it
         # immediately. We may as well optimise out the logcontext faffery.
@@ -823,7 +883,9 @@ def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
     return result
 
 
-def defer_to_thread(reactor, f, *args, **kwargs):
+def defer_to_thread(
+    reactor: "ISynapseReactor", f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+) -> "defer.Deferred[R]":
     """
     Calls the function `f` using a thread from the reactor's default threadpool and
     returns the result as a Deferred.
@@ -836,26 +898,31 @@ def defer_to_thread(reactor, f, *args, **kwargs):
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked, and whose threadpool we should use for the
-            function.
+        reactor: The reactor in whose main thread the Deferred will be invoked,
+            and whose threadpool we should use for the function.
 
             Normally this will be hs.get_reactor().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     return defer_to_threadpool(reactor, reactor.getThreadPool(), f, *args, **kwargs)
 
 
-def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
+def defer_to_threadpool(
+    reactor: "ISynapseReactor",
+    threadpool: ThreadPool,
+    f: Callable[P, R],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> "defer.Deferred[R]":
     """
     A wrapper for twisted.internet.threads.deferToThreadpool, which handles
     logcontexts correctly.
@@ -871,20 +938,20 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
     on it.
 
     Args:
-        reactor (twisted.internet.base.ReactorBase): The reactor in whose main thread
-            the Deferred will be invoked. Normally this will be hs.get_reactor().
+        reactor: The reactor in whose main thread the Deferred will be invoked.
+            Normally this will be hs.get_reactor().
 
-        threadpool (twisted.python.threadpool.ThreadPool): The threadpool to use for
-            running `f`. Normally this will be hs.get_reactor().getThreadPool().
+        threadpool: The threadpool to use for running `f`. Normally this will be
+            hs.get_reactor().getThreadPool().
 
-        f (callable): The function to call.
+        f: The function to call.
 
         args: positional arguments to pass to f.
 
         kwargs: keyword arguments to pass to f.
 
     Returns:
-        Deferred: A Deferred which fires a callback with the result of `f`, or an
+        A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
     curr_context = current_context()
@@ -897,7 +964,7 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
 
-    def g():
+    def g() -> R:
         with LoggingContext(str(curr_context), parent_context=parent_context):
             return f(*args, **kwargs)
 

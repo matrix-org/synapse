@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 from zope.interface import implementer
 
@@ -23,25 +23,32 @@ from twisted.internet.defer import ensureDeferred
 from twisted.mail import interfaces, smtp
 
 from tests.server import FakeTransport
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 
 @implementer(interfaces.IMessageDelivery)
 class _DummyMessageDelivery:
-    def __init__(self):
+    def __init__(self) -> None:
         # (recipient, message) tuples
         self.messages: List[Tuple[smtp.Address, bytes]] = []
 
-    def receivedHeader(self, helo, origin, recipients):
+    def receivedHeader(
+        self,
+        helo: Tuple[bytes, bytes],
+        origin: smtp.Address,
+        recipients: List[smtp.User],
+    ) -> None:
         return None
 
-    def validateFrom(self, helo, origin):
+    def validateFrom(
+        self, helo: Tuple[bytes, bytes], origin: smtp.Address
+    ) -> smtp.Address:
         return origin
 
-    def record_message(self, recipient: smtp.Address, message: bytes):
+    def record_message(self, recipient: smtp.Address, message: bytes) -> None:
         self.messages.append((recipient, message))
 
-    def validateTo(self, user: smtp.User):
+    def validateTo(self, user: smtp.User) -> Callable[[], interfaces.IMessageSMTP]:
         return lambda: _DummyMessage(self, user)
 
 
@@ -56,20 +63,20 @@ class _DummyMessage:
         self._user = user
         self._buffer: List[bytes] = []
 
-    def lineReceived(self, line):
+    def lineReceived(self, line: bytes) -> None:
         self._buffer.append(line)
 
-    def eomReceived(self):
+    def eomReceived(self) -> "defer.Deferred[bytes]":
         message = b"\n".join(self._buffer) + b"\n"
         self._delivery.record_message(self._user.dest, message)
         return defer.succeed(b"saved")
 
-    def connectionLost(self):
+    def connectionLost(self) -> None:
         pass
 
 
 class SendEmailHandlerTestCase(HomeserverTestCase):
-    def test_send_email(self):
+    def test_send_email(self) -> None:
         """Happy-path test that we can send email to a non-TLS server."""
         h = self.hs.get_send_email_handler()
         d = ensureDeferred(
@@ -84,6 +91,61 @@ class SendEmailHandlerTestCase(HomeserverTestCase):
         ]
         self.assertEqual(host, "localhost")
         self.assertEqual(port, 25)
+
+        # wire it up to an SMTP server
+        message_delivery = _DummyMessageDelivery()
+        server_protocol = smtp.ESMTP()
+        server_protocol.delivery = message_delivery
+        # make sure that the server uses the test reactor to set timeouts
+        server_protocol.callLater = self.reactor.callLater  # type: ignore[assignment]
+
+        client_protocol = client_factory.buildProtocol(None)
+        client_protocol.makeConnection(FakeTransport(server_protocol, self.reactor))
+        server_protocol.makeConnection(
+            FakeTransport(
+                client_protocol,
+                self.reactor,
+                peer_address=IPv4Address("TCP", "127.0.0.1", 1234),
+            )
+        )
+
+        # the message should now get delivered
+        self.get_success(d, by=0.1)
+
+        # check it arrived
+        self.assertEqual(len(message_delivery.messages), 1)
+        user, msg = message_delivery.messages.pop()
+        self.assertEqual(str(user), "foo@bar.com")
+        self.assertIn(b"Subject: test subject", msg)
+
+    @override_config(
+        {
+            "email": {
+                "notif_from": "noreply@test",
+                "force_tls": True,
+            },
+        }
+    )
+    def test_send_email_force_tls(self) -> None:
+        """Happy-path test that we can send email to an Implicit TLS server."""
+        h = self.hs.get_send_email_handler()
+        d = ensureDeferred(
+            h.send_email(
+                "foo@bar.com", "test subject", "Tests", "HTML content", "Text content"
+            )
+        )
+        # there should be an attempt to connect to localhost:465
+        self.assertEqual(len(self.reactor.sslClients), 1)
+        (
+            host,
+            port,
+            client_factory,
+            contextFactory,
+            _timeout,
+            _bindAddress,
+        ) = self.reactor.sslClients[0]
+        self.assertEqual(host, "localhost")
+        self.assertEqual(port, 465)
 
         # wire it up to an SMTP server
         message_delivery = _DummyMessageDelivery()

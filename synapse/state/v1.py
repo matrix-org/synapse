@@ -17,6 +17,7 @@ import logging
 from typing import (
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -29,7 +30,7 @@ from typing import (
 from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
-from synapse.api.room_versions import RoomVersion, RoomVersions
+from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateMap
 
@@ -44,7 +45,7 @@ async def resolve_events_with_store(
     room_version: RoomVersion,
     state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
-    state_map_factory: Callable[[Iterable[str]], Awaitable[Dict[str, EventBase]]],
+    state_map_factory: Callable[[Collection[str]], Awaitable[Dict[str, EventBase]]],
 ) -> StateMap[str]:
     """
     Args:
@@ -225,7 +226,7 @@ def _resolve_with_state(
     conflicted_state_ids: StateMap[Set[str]],
     auth_event_ids: StateMap[str],
     state_map: Dict[str, EventBase],
-):
+) -> MutableStateMap[str]:
     conflicted_state = {}
     for key, event_ids in conflicted_state_ids.items():
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
@@ -329,12 +330,9 @@ def _resolve_auth_events(
         auth_events[(prev_event.type, prev_event.state_key)] = prev_event
         try:
             # The signatures have already been checked at this point
-            event_auth.check(
-                RoomVersions.V1,
+            event_auth.check_state_dependent_auth_rules(
                 event,
-                auth_events,
-                do_sig_check=False,
-                do_size_check=False,
+                auth_events.values(),
             )
             prev_event = event
         except AuthError:
@@ -349,12 +347,9 @@ def _resolve_normal_events(
     for event in _ordered_events(events):
         try:
             # The signatures have already been checked at this point
-            event_auth.check(
-                RoomVersions.V1,
+            event_auth.check_state_dependent_auth_rules(
                 event,
-                auth_events,
-                do_sig_check=False,
-                do_size_check=False,
+                auth_events.values(),
             )
             return event
         except AuthError:
@@ -366,7 +361,7 @@ def _resolve_normal_events(
 
 
 def _ordered_events(events: Iterable[EventBase]) -> List[EventBase]:
-    def key_func(e):
+    def key_func(e: EventBase) -> Tuple[int, str]:
         # we have to use utf-8 rather than ascii here because it turns out we allow
         # people to send us events with non-ascii event IDs :/
         return -int(e.depth), hashlib.sha1(e.event_id.encode("utf-8")).hexdigest()

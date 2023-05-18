@@ -17,13 +17,11 @@ follows:
 }
 ```
 
-Note that the login type of `m.login.jwt` is supported, but is deprecated. This
-will be removed in a future version of Synapse.
-
 The `token` field should include the JSON web token with the following claims:
 
-* The `sub` (subject) claim is required and should encode the local part of the
-  user ID.
+* A claim that encodes the local part of the user ID is required. By default,
+  the `sub` (subject) claim is used, or a custom claim can be set in the
+  configuration file.
 * The expiration time (`exp`), not before time (`nbf`), and issued at (`iat`)
   claims are optional, but validated if present.
 * The issuer (`iss`) claim is optional, but required and validated if configured.
@@ -39,27 +37,26 @@ As with other login types, there are additional fields (e.g. `device_id` and
 ## Preparing Synapse
 
 The JSON Web Token integration in Synapse uses the
-[`PyJWT`](https://pypi.org/project/pyjwt/) library, which must be installed
+[`Authlib`](https://docs.authlib.org/en/latest/index.html) library, which must be installed
 as follows:
 
- * The relevant libraries are included in the Docker images and Debian packages
-   provided by `matrix.org` so no further action is needed.
+* The relevant libraries are included in the Docker images and Debian packages
+  provided by `matrix.org` so no further action is needed.
 
- * If you installed Synapse into a virtualenv, run `/path/to/env/bin/pip
-   install synapse[pyjwt]` to install the necessary dependencies.
+* If you installed Synapse into a virtualenv, run `/path/to/env/bin/pip
+  install synapse[jwt]` to install the necessary dependencies.
 
- * For other installation mechanisms, see the documentation provided by the
-   maintainer.
+* For other installation mechanisms, see the documentation provided by the
+  maintainer.
 
-To enable the JSON web token integration, you should then add an `jwt_config` section
-to your configuration file (or uncomment the `enabled: true` line in the
-existing section). See [sample_config.yaml](./sample_config.yaml) for some
+To enable the JSON web token integration, you should then add a `jwt_config` option
+to your configuration file. See the [configuration manual](usage/configuration/config_documentation.md#jwt_config) for some
 sample settings.
 
 ## How to test JWT as a developer
 
 Although JSON Web Tokens are typically generated from an external server, the
-examples below use [PyJWT](https://pyjwt.readthedocs.io/en/latest/) directly.
+example below uses a locally generated JWT.
 
 1.  Configure Synapse with JWT logins, note that this example uses a pre-shared
     secret and an algorithm of HS256:
@@ -72,10 +69,21 @@ examples below use [PyJWT](https://pyjwt.readthedocs.io/en/latest/) directly.
     ```
 2.  Generate a JSON web token:
 
-    ```bash
-    $ pyjwt --key=my-secret-token --alg=HS256 encode sub=test-user
-    eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.Ag71GT8v01UO3w80aqRPTeuVPBIBZkYhNTJJ-_-zQIc
+    You can use the following short Python snippet to generate a JWT
+    protected by an HMAC.
+    Take care that the `secret` and the algorithm given in the `header` match
+    the entries from `jwt_config` above.
+
+    ```python
+    from authlib.jose import jwt
+
+    header = {"alg": "HS256"}
+    payload = {"sub": "user1", "aud": ["audience"]}
+    secret = "my-secret-token"
+    result = jwt.encode(header, payload, secret)
+    print(result.decode("ascii"))
     ```
+
 3.  Query for the login types and ensure `org.matrix.login.jwt` is there:
 
     ```bash

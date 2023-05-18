@@ -18,11 +18,13 @@ from synapse.storage._base import SQLBaseStore
 
 
 class RoomBatchStore(SQLBaseStore):
-    async def get_insertion_event_by_chunk_id(self, chunk_id: str) -> Optional[str]:
+    async def get_insertion_event_id_by_batch_id(
+        self, room_id: str, batch_id: str
+    ) -> Optional[str]:
         """Retrieve a insertion event ID.
 
         Args:
-            chunk_id: The chunk ID of the insertion event to retrieve.
+            batch_id: The batch ID of the insertion event to retrieve.
 
         Returns:
             The event_id of an insertion event, or None if there is no known
@@ -30,7 +32,16 @@ class RoomBatchStore(SQLBaseStore):
         """
         return await self.db_pool.simple_select_one_onecol(
             table="insertion_events",
-            keyvalues={"next_chunk_id": chunk_id},
+            keyvalues={"room_id": room_id, "next_batch_id": batch_id},
             retcol="event_id",
             allow_none=True,
+        )
+
+    async def store_state_group_id_for_event_id(
+        self, event_id: str, state_group_id: int
+    ) -> None:
+        await self.db_pool.simple_upsert(
+            table="event_to_state_groups",
+            keyvalues={"event_id": event_id},
+            values={"state_group": state_group_id, "event_id": event_id},
         )

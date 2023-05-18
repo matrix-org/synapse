@@ -14,6 +14,7 @@
 import logging
 from typing import (
     TYPE_CHECKING,
+    Any,
     Awaitable,
     Callable,
     Dict,
@@ -21,11 +22,16 @@ from typing import (
     List,
     Optional,
     Set,
+    TypeVar,
     Union,
 )
 
+from typing_extensions import ParamSpec
+
+from twisted.internet.defer import CancelledError
+
 from synapse.api.presence import UserPresenceState
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -33,23 +39,26 @@ if TYPE_CHECKING:
 GET_USERS_FOR_STATES_CALLBACK = Callable[
     [Iterable[UserPresenceState]], Awaitable[Dict[str, Set[UserPresenceState]]]
 ]
-GET_INTERESTED_USERS_CALLBACK = Callable[
-    [str], Awaitable[Union[Set[str], "PresenceRouter.ALL_USERS"]]
-]
+# This must either return a set of strings or the constant PresenceRouter.ALL_USERS.
+GET_INTERESTED_USERS_CALLBACK = Callable[[str], Awaitable[Union[Set[str], str]]]
 
 logger = logging.getLogger(__name__)
 
 
-def load_legacy_presence_router(hs: "HomeServer"):
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def load_legacy_presence_router(hs: "HomeServer") -> None:
     """Wrapper that loads a presence router module configured using the old
     configuration, and registers the hooks they implement.
     """
 
-    if hs.config.presence_router_module_class is None:
+    if hs.config.server.presence_router_module_class is None:
         return
 
-    module = hs.config.presence_router_module_class
-    config = hs.config.presence_router_config
+    module = hs.config.server.presence_router_module_class
+    config = hs.config.server.presence_router_config
     api = hs.get_module_api()
 
     presence_router = module(config=config, module_api=api)
@@ -63,15 +72,18 @@ def load_legacy_presence_router(hs: "HomeServer"):
 
     # All methods that the module provides should be async, but this wasn't enforced
     # in the old module system, so we wrap them if needed
-    def async_wrapper(f: Optional[Callable]) -> Optional[Callable[..., Awaitable]]:
+    def async_wrapper(
+        f: Optional[Callable[P, R]]
+    ) -> Optional[Callable[P, Awaitable[R]]]:
         # f might be None if the callback isn't implemented by the module. In this
         # case we don't want to register a callback at all so we return None.
         if f is None:
             return None
 
-        def run(*args, **kwargs):
-            # mypy doesn't do well across function boundaries so we need to tell it
-            # f is definitely not None.
+        def run(*args: P.args, **kwargs: P.kwargs) -> Awaitable[R]:
+            # Assertion required because mypy can't prove we won't change `f`
+            # back to `None`. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
             assert f is not None
 
             return maybe_awaitable(f(*args, **kwargs))
@@ -79,7 +91,7 @@ def load_legacy_presence_router(hs: "HomeServer"):
         return run
 
     # Register the hooks through the module API.
-    hooks = {
+    hooks: Dict[str, Optional[Callable[..., Any]]] = {
         hook: async_wrapper(getattr(presence_router, hook, None))
         for hook in presence_router_methods
     }
@@ -104,7 +116,7 @@ class PresenceRouter:
         self,
         get_users_for_states: Optional[GET_USERS_FOR_STATES_CALLBACK] = None,
         get_interested_users: Optional[GET_INTERESTED_USERS_CALLBACK] = None,
-    ):
+    ) -> None:
         # PresenceRouter modules are required to implement both of these methods
         # or neither of them as they are assumed to act in a complementary manner
         paired_methods = [get_users_for_states, get_interested_users]
@@ -142,11 +154,15 @@ class PresenceRouter:
             # Don't include any extra destinations for presence updates
             return {}
 
-        users_for_states = {}
+        users_for_states: Dict[str, Set[UserPresenceState]] = {}
         # run all the callbacks for get_users_for_states and combine the results
         for callback in self._get_users_for_states_callbacks:
             try:
-                result = await callback(state_updates)
+                # Note: result is an object here, because we don't trust modules to
+                # return the types they're supposed to.
+                result: object = await delay_cancellation(callback(state_updates))
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -171,7 +187,7 @@ class PresenceRouter:
 
         return users_for_states
 
-    async def get_interested_users(self, user_id: str) -> Union[Set[str], ALL_USERS]:
+    async def get_interested_users(self, user_id: str) -> Union[Set[str], str]:
         """
         Retrieve a list of users that `user_id` is interested in receiving the
         presence of. This will be in addition to those they share a room with.
@@ -198,7 +214,9 @@ class PresenceRouter:
         # run all the callbacks for get_interested_users and combine the results
         for callback in self._get_interested_users_callbacks:
             try:
-                result = await callback(user_id)
+                result = await delay_cancellation(callback(user_id))
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue

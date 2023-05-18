@@ -12,11 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import Union
+from typing import Iterable, List, Type, Union, cast
 
 import jsonschema
+from pydantic import Field, StrictBool, StrictStr
 
-from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
+from synapse.api.constants import (
+    MAX_ALIAS_LENGTH,
+    EventContentFields,
+    EventTypes,
+    Membership,
+)
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import EventFormatVersions
 from synapse.config.homeserver import HomeServerConfig
@@ -28,12 +34,18 @@ from synapse.events.utils import (
     validate_canonicaljson,
 )
 from synapse.federation.federation_server import server_matches_acl_event
-from synapse.types import EventID, RoomID, UserID
+from synapse.http.servlet import validate_json_object
+from synapse.rest.models import RequestBodyModel
+from synapse.types import EventID, JsonDict, RoomID, UserID
 
 
 class EventValidator:
-    def validate_new(self, event: EventBase, config: HomeServerConfig):
+    def validate_new(self, event: EventBase, config: HomeServerConfig) -> None:
         """Validates the event has roughly the right format
+
+        Suitable for checking a locally-created event. It has stricter checks than
+        is appropriate for an event received over federation (for which, see
+        event_auth.validate_event_for_room_version)
 
         Args:
             event: The event to validate.
@@ -41,7 +53,7 @@ class EventValidator:
         """
         self.validate_builder(event)
 
-        if event.format_version == EventFormatVersions.V1:
+        if event.format_version == EventFormatVersions.ROOM_V1_V2:
             EventID.from_string(event.event_id)
 
         required = [
@@ -55,7 +67,7 @@ class EventValidator:
         ]
 
         for k in required:
-            if not hasattr(event, k):
+            if k not in event:
                 raise SynapseError(400, "Event does not have key %s" % (k,))
 
         # Check that the following keys have string values
@@ -84,26 +96,31 @@ class EventValidator:
                             Codes.INVALID_PARAM,
                         )
 
-        if event.type == EventTypes.Retention:
+        elif event.type == EventTypes.Retention:
             self._validate_retention(event)
 
-        if event.type == EventTypes.ServerACL:
+        elif event.type == EventTypes.ServerACL:
             if not server_matches_acl_event(config.server.server_name, event):
                 raise SynapseError(
                     400, "Can't create an ACL event that denies the local server"
                 )
 
-        if event.type == EventTypes.PowerLevels:
+        elif event.type == EventTypes.PowerLevels:
             try:
                 jsonschema.validate(
                     instance=event.content,
                     schema=POWER_LEVELS_SCHEMA,
-                    cls=plValidator,
+                    cls=POWER_LEVELS_VALIDATOR,
                 )
             except jsonschema.ValidationError as e:
                 if e.path:
                     # example: "users_default": '0' is not of type 'integer'
-                    message = '"' + e.path[-1] + '": ' + e.message  # noqa: B306
+                    # cast safety: path entries can be integers, if we fail to validate
+                    # items in an array. However, the POWER_LEVELS_SCHEMA doesn't expect
+                    # to see any arrays.
+                    message = (
+                        '"' + cast(str, e.path[-1]) + '": ' + e.message  # noqa: B306
+                    )
                     # jsonschema.ValidationError.message is a valid attribute
                 else:
                     # example: '0' is not of type 'integer'
@@ -116,7 +133,16 @@ class EventValidator:
                     errcode=Codes.BAD_JSON,
                 )
 
-    def _validate_retention(self, event: EventBase):
+        # If the event contains a mentions key, validate it.
+        if (
+            EventContentFields.MSC3952_MENTIONS in event.content
+            and config.experimental.msc3952_intentional_mentions
+        ):
+            validate_json_object(
+                event.content[EventContentFields.MSC3952_MENTIONS], Mentions
+            )
+
+    def _validate_retention(self, event: EventBase) -> None:
         """Checks that an event that defines the retention policy for a room respects the
         format enforced by the spec.
 
@@ -130,7 +156,7 @@ class EventValidator:
         max_lifetime = event.content.get("max_lifetime")
 
         if min_lifetime is not None:
-            if not isinstance(min_lifetime, int):
+            if type(min_lifetime) is not int:
                 raise SynapseError(
                     code=400,
                     msg="'min_lifetime' must be an integer",
@@ -138,7 +164,7 @@ class EventValidator:
                 )
 
         if max_lifetime is not None:
-            if not isinstance(max_lifetime, int):
+            if type(max_lifetime) is not int:
                 raise SynapseError(
                     code=400,
                     msg="'max_lifetime' must be an integer",
@@ -156,7 +182,7 @@ class EventValidator:
                 errcode=Codes.BAD_JSON,
             )
 
-    def validate_builder(self, event: Union[EventBase, EventBuilder]):
+    def validate_builder(self, event: Union[EventBase, EventBuilder]) -> None:
         """Validates that the builder/event has roughly the right format. Only
         checks values that we expect a proto event to have, rather than all the
         fields an event would have
@@ -204,14 +230,14 @@ class EventValidator:
 
             self._ensure_state_event(event)
 
-    def _ensure_strings(self, d, keys):
+    def _ensure_strings(self, d: JsonDict, keys: Iterable[str]) -> None:
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))
             if not isinstance(d[s], str):
                 raise SynapseError(400, "'%s' not a string type" % (s,))
 
-    def _ensure_state_event(self, event):
+    def _ensure_state_event(self, event: Union[EventBase, EventBuilder]) -> None:
         if not event.is_state():
             raise SynapseError(400, "'%s' must be state events" % (event.type,))
 
@@ -244,10 +270,17 @@ POWER_LEVELS_SCHEMA = {
 }
 
 
-def _create_power_level_validator():
-    validator = jsonschema.validators.validator_for(POWER_LEVELS_SCHEMA)
+class Mentions(RequestBodyModel):
+    user_ids: List[StrictStr] = Field(default_factory=list)
+    room: StrictBool = False
 
-    # by default jsonschema does not consider a frozendict to be an object so
+
+# This could return something newer than Draft 7, but that's the current "latest"
+# validator.
+def _create_validator(schema: JsonDict) -> Type[jsonschema.Draft7Validator]:
+    validator = jsonschema.validators.validator_for(schema)
+
+    # by default jsonschema does not consider a immutabledict to be an object so
     # we need to use a custom type checker
     # https://python-jsonschema.readthedocs.io/en/stable/validate/?highlight=object#validating-with-additional-types
     type_checker = validator.TYPE_CHECKER.redefine(
@@ -257,4 +290,4 @@ def _create_power_level_validator():
     return jsonschema.validators.extend(validator, type_checker=type_checker)
 
 
-plValidator = _create_power_level_validator()
+POWER_LEVELS_VALIDATOR = _create_validator(POWER_LEVELS_SCHEMA)

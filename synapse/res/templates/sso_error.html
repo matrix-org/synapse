@@ -1,18 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Authentication failed</title>
-        <meta name="viewport" content="width=device-width, user-scalable=no">
-        <style type="text/css">
-            {% include "sso.css" without context %}
+{% extends "_base.html" %}
+{% block title %}Authentication failed{% endblock %}
 
-            #error_code {
-                margin-top: 56px;
-            }
-        </style>
-    </head>
-    <body class="error_page">
+{% block header %}
+{% if error == "unauthorised" %}
+<style type="text/css">
+    {% include "sso.css" without context %}
+
+    #error_code {
+        margin-top: 56px;
+    }
+</style>
+{% endif %}
+{% endblock %}
+
+{% block body %}
+<div class="error_page">
 {# If an error of unauthorised is returned it means we have actively rejected their login #}
 {% if error == "unauthorised" %}
         <header>
@@ -65,5 +67,5 @@
             }
         </script>
 {% endif %}
-</body>
-</html>
+</div>
+{% endblock %}

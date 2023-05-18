@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -32,7 +32,11 @@ class AdditionalResource(DirectServeJsonResource):
     and exception handling.
     """
 
-    def __init__(self, hs: "HomeServer", handler):
+    def __init__(
+        self,
+        hs: "HomeServer",
+        handler: Callable[[Request], Awaitable[Optional[Tuple[int, Any]]]],
+    ):
         """Initialise AdditionalResource
 
         The ``handler`` should return a deferred which completes when it has
@@ -41,13 +45,12 @@ class AdditionalResource(DirectServeJsonResource):
 
         Args:
             hs: homeserver
-            handler ((twisted.web.server.Request) -> twisted.internet.defer.Deferred):
-                function to be called to handle the request.
+            handler: function to be called to handle the request.
         """
         super().__init__()
         self._handler = handler
 
-    def _async_render(self, request: Request):
+    async def _async_render(self, request: Request) -> Optional[Tuple[int, Any]]:
         # Cheekily pass the result straight through, so we don't need to worry
         # if its an awaitable or not.
-        return self._handler(request)
+        return await self._handler(request)

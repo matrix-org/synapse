@@ -6,14 +6,18 @@
 # assume we only have one package
 PACKAGE_NAME:=`dh_listpackages`
 
-override_dh_systemd_enable:
-	dh_systemd_enable --name=matrix-synapse
-
-override_dh_installinit:
-	dh_installinit --name=matrix-synapse
+override_dh_installsystemd:
+	dh_installsystemd --name=matrix-synapse
 
 # we don't really want to strip the symbols from our object files.
 override_dh_strip:
+
+override_dh_auto_configure:
+
+# many libraries pulled from PyPI have allocatable sections after
+# non-allocatable ones on which dwz errors out. For those without the issue the
+# gains are only marginal
+override_dh_dwz:
 
 # dh_shlibdeps calls dpkg-shlibdeps, which finds all the binary files
 # (executables and shared libs) in the package, and looks for the shared
@@ -50,6 +54,12 @@ override_dh_shlibdeps:
 
 override_dh_virtualenv:
 	./debian/build_virtualenv
+
+override_dh_builddeb:
+        # force the compression to xzip, to stop dpkg-deb on impish defaulting to zstd
+        # (which requires reprepro 5.3.0-1.3, which is currently only in 'experimental' in Debian:
+        # https://metadata.ftp-master.debian.org/changelogs/main/r/reprepro/reprepro_5.3.0-1.3_changelog)
+	dh_builddeb -- -Zxz
 
 %:
 	dh $@ --with python-virtualenv

@@ -14,25 +14,31 @@
 
 from typing import Dict, List, Set, Tuple
 
+from twisted.test.proto_helpers import MemoryReactor
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.events import _LinkMap
+from synapse.storage.types import Cursor
 from synapse.types import create_requester
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class EventChainStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
         self._next_stream_ordering = 1
 
-    def test_simple(self):
+    def test_simple(self) -> None:
         """Test that the example in `docs/auth_chain_difference_algorithm.md`
         works.
         """
@@ -231,7 +237,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
                 ),
             )
 
-    def test_out_of_order_events(self):
+    def test_out_of_order_events(self) -> None:
         """Test that we handle persisting events that we don't have the full
         auth chain for yet (which should only happen for out of band memberships).
         """
@@ -377,21 +383,26 @@ class EventChainStoreTestCase(HomeserverTestCase):
     def persist(
         self,
         events: List[EventBase],
-    ):
+    ) -> None:
         """Persist the given events and check that the links generated match
         those given.
         """
 
         persist_events_store = self.hs.get_datastores().persist_events
+        assert persist_events_store is not None
 
         for e in events:
             e.internal_metadata.stream_ordering = self._next_stream_ordering
             self._next_stream_ordering += 1
 
-        def _persist(txn):
+        def _persist(txn: LoggingTransaction) -> None:
             # We need to persist the events to the events and state_events
             # tables.
-            persist_events_store._store_event_txn(txn, [(e, {}) for e in events])
+            assert persist_events_store is not None
+            persist_events_store._store_event_txn(
+                txn,
+                [(e, EventContext(self.hs.get_storage_controllers())) for e in events],
+            )
 
             # Actually call the function that calculates the auth chain stuff.
             persist_events_store._persist_event_auth_chain_txn(txn, events)
@@ -406,7 +417,6 @@ class EventChainStoreTestCase(HomeserverTestCase):
     def fetch_chains(
         self, events: List[EventBase]
     ) -> Tuple[Dict[str, Tuple[int, int]], _LinkMap]:
-
         # Fetch the map from event ID -> (chain ID, sequence number)
         rows = self.get_success(
             self.store.db_pool.simple_select_many_batch(
@@ -452,7 +462,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
 
 
 class LinkMapTestCase(unittest.TestCase):
-    def test_simple(self):
+    def test_simple(self) -> None:
         """Basic tests for the LinkMap."""
         link_map = _LinkMap()
 
@@ -481,15 +491,14 @@ class LinkMapTestCase(unittest.TestCase):
 
 
 class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
         self.token = self.login("foo", "pass")
         self.requester = create_requester(self.user_id)
@@ -513,7 +522,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         latest_event_ids = self.get_success(
             self.store.get_prev_events_for_room(room_id)
         )
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_handler.create_event(
                 self.requester,
                 {
@@ -526,12 +535,17 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
                 prev_event_ids=latest_event_ids,
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
-            event_handler.handle_new_client_event(self.requester, event, context)
+            event_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
         )
-        state1 = set(self.get_success(context.get_current_state_ids()).values())
+        state_ids1 = self.get_success(context.get_current_state_ids())
+        assert state_ids1 is not None
+        state1 = set(state_ids1.values())
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             event_handler.create_event(
                 self.requester,
                 {
@@ -544,14 +558,19 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
                 prev_event_ids=latest_event_ids,
             )
         )
+        context = self.get_success(unpersisted_context.persist(event))
         self.get_success(
-            event_handler.handle_new_client_event(self.requester, event, context)
+            event_handler.handle_new_client_event(
+                self.requester, events_and_context=[(event, context)]
+            )
         )
-        state2 = set(self.get_success(context.get_current_state_ids()).values())
+        state_ids2 = self.get_success(context.get_current_state_ids())
+        assert state_ids2 is not None
+        state2 = set(state_ids2.values())
 
         # Delete the chain cover info.
 
-        def _delete_tables(txn):
+        def _delete_tables(txn: Cursor) -> None:
             txn.execute("DELETE FROM event_auth_chains")
             txn.execute("DELETE FROM event_auth_chain_links")
 
@@ -559,7 +578,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
 
         return room_id, [state1, state2]
 
-    def test_background_update_single_room(self):
+    def test_background_update_single_room(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """
@@ -578,12 +597,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         # Ugh, have to reset this flag
         self.store.db_pool.updates._all_done = False
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # Test that the `has_auth_chain_index` has been set
         self.assertTrue(self.get_success(self.store.has_auth_chain_index(room_id)))
@@ -599,7 +613,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
 
-    def test_background_update_multiple_rooms(self):
+    def test_background_update_multiple_rooms(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """
@@ -619,12 +633,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         # Ugh, have to reset this flag
         self.store.db_pool.updates._all_done = False
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # Test that the `has_auth_chain_index` has been set
         self.assertTrue(self.get_success(self.store.has_auth_chain_index(room_id1)))
@@ -642,7 +651,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
 
-    def test_background_update_single_large_room(self):
+    def test_background_update_single_large_room(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """
@@ -674,7 +683,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         ):
             iterations += 1
             self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
         # Ensure that we did actually take multiple iterations to process the
@@ -695,7 +704,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
             )
         )
 
-    def test_background_update_multiple_large_room(self):
+    def test_background_update_multiple_large_room(self) -> None:
         """Test that the background update to calculate auth chains for historic
         rooms works correctly.
         """
@@ -733,7 +742,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         ):
             iterations += 1
             self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
         # Ensure that we did actually take multiple iterations to process the

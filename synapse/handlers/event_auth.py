@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Collection, List, Optional, Union
+from typing import TYPE_CHECKING, List, Mapping, Optional, Union
 
 from synapse import event_auth
 from synapse.api.constants import (
@@ -22,12 +22,14 @@ from synapse.api.constants import (
     RestrictedJoinRuleTypes,
 )
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.api.room_versions import RoomVersion
+from synapse.event_auth import (
+    check_state_dependent_auth_rules,
+    check_state_independent_auth_rules,
+)
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
-from synapse.events.snapshot import EventContext
-from synapse.types import StateMap, get_domain_from_id
-from synapse.util.metrics import Measure
+from synapse.types import StateMap, StrCollection
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -42,24 +44,39 @@ class EventAuthHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
+        self._state_storage_controller = hs.get_storage_controllers().state
         self._server_name = hs.hostname
+        self._is_mine_id = hs.is_mine_id
 
-    async def check_from_context(
+    async def check_auth_rules_from_context(
         self,
-        room_version: str,
         event: EventBase,
-        context: EventContext,
-        do_sig_check: bool = True,
+        batched_auth_events: Optional[Mapping[str, EventBase]] = None,
     ) -> None:
-        auth_event_ids = event.auth_event_ids()
-        auth_events_by_id = await self._store.get_events(auth_event_ids)
-        auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
-
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-        event_auth.check(
-            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
+        """Check an event passes the auth rules at its own auth events
+        Args:
+            event: event to be authed
+            batched_auth_events: if the event being authed is part of a batch, any events
+            from the same batch that may be necessary to auth the current event
+        """
+        await check_state_independent_auth_rules(
+            self._store, event, batched_auth_events
         )
+        auth_event_ids = event.auth_event_ids()
+
+        if batched_auth_events:
+            # Copy the batched auth events to avoid mutating them.
+            auth_events_by_id = dict(batched_auth_events)
+            needed_auth_event_ids = set(auth_event_ids) - set(batched_auth_events)
+            if needed_auth_event_ids:
+                auth_events_by_id.update(
+                    await self._store.get_events(needed_auth_event_ids)
+                )
+        else:
+            auth_events_by_id = await self._store.get_events(auth_event_ids)
+
+        check_state_dependent_auth_rules(event, auth_events_by_id.values())
 
     def compute_auth_events(
         self,
@@ -130,12 +147,9 @@ class EventAuthHandler:
         else:
             users = {}
 
-        # Find the user with the highest power level.
-        users_in_room = await self._store.get_users_in_room(room_id)
-        # Only interested in local users.
-        local_users_in_room = [
-            u for u in users_in_room if get_domain_from_id(u) == self._server_name
-        ]
+        # Find the user with the highest power level (only interested in local
+        # users).
+        local_users_in_room = await self._store.get_local_users_in_room(room_id)
         chosen_user = max(
             local_users_in_room,
             key=lambda user: users.get(user, users_default_level),
@@ -160,16 +174,45 @@ class EventAuthHandler:
             Codes.UNABLE_TO_GRANT_JOIN,
         )
 
-    async def check_host_in_room(self, room_id: str, host: str) -> bool:
-        with Measure(self._clock, "check_host_in_room"):
-            return await self._store.is_host_joined(room_id, host)
+    async def is_host_in_room(self, room_id: str, host: str) -> bool:
+        return await self._store.is_host_joined(room_id, host)
+
+    async def assert_host_in_room(
+        self, room_id: str, host: str, allow_partial_state_rooms: bool = False
+    ) -> None:
+        """
+        Asserts that the host is in the room, or raises an AuthError.
+
+        If the room is partial-stated, we raise an AuthError with the
+        UNABLE_DUE_TO_PARTIAL_STATE error code, unless `allow_partial_state_rooms` is true.
+
+        If allow_partial_state_rooms is True and the room is partial-stated,
+        this function may return an incorrect result as we are not able to fully
+        track server membership in a room without full state.
+        """
+        if await self._store.is_partial_state_room(room_id):
+            if allow_partial_state_rooms:
+                current_hosts = await self._state_storage_controller.get_current_hosts_in_room_or_partial_state_approximation(
+                    room_id
+                )
+                if host not in current_hosts:
+                    raise AuthError(403, "Host not in room (partial-state approx).")
+            else:
+                raise AuthError(
+                    403,
+                    "Unable to authorise you right now; room is partial-stated here.",
+                    errcode=Codes.UNABLE_DUE_TO_PARTIAL_STATE,
+                )
+        else:
+            if not await self.is_host_in_room(room_id, host):
+                raise AuthError(403, "Host not in room.")
 
     async def check_restricted_join_rules(
         self,
         state_ids: StateMap[str],
         room_version: RoomVersion,
         user_id: str,
-        prev_member_event: Optional[EventBase],
+        prev_membership: Optional[str],
     ) -> None:
         """
         Check whether a user can join a room without an invite due to restricted join rules.
@@ -181,15 +224,14 @@ class EventAuthHandler:
             state_ids: The state of the room as it currently is.
             room_version: The room version of the room being joined.
             user_id: The user joining the room.
-            prev_member_event: The current membership event for this user.
+            prev_membership: The current membership state for this user. `None` if the
+                user has never joined the room (equivalent to "leave").
 
         Raises:
             AuthError if the user cannot join the room.
         """
         # If the member is invited or currently joined, then nothing to do.
-        if prev_member_event and (
-            prev_member_event.membership in (Membership.JOIN, Membership.INVITE)
-        ):
+        if prev_membership in (Membership.JOIN, Membership.INVITE):
             return
 
         # This is not a room with a restricted join rule, so we don't need to do the
@@ -204,10 +246,9 @@ class EventAuthHandler:
         # in any of them.
         allowed_rooms = await self.get_rooms_that_allow_join(state_ids)
         if not await self.is_user_in_rooms(allowed_rooms, user_id):
-
             # If this is a remote request, the user might be in an allowed room
             # that we do not know about.
-            if get_domain_from_id(user_id) != self._server_name:
+            if not self._is_mine_id(user_id):
                 for room_id in allowed_rooms:
                     if not await self._store.is_host_joined(room_id, self._server_name):
                         raise SynapseError(
@@ -222,13 +263,14 @@ class EventAuthHandler:
             )
 
     async def has_restricted_join_rules(
-        self, state_ids: StateMap[str], room_version: RoomVersion
+        self, partial_state_ids: StateMap[str], room_version: RoomVersion
     ) -> bool:
         """
         Return if the room has the proper join rules set for access via rooms.
 
         Args:
-            state_ids: The state of the room as it currently is.
+            state_ids: The state of the room as it currently is. May be full or partial
+                state.
             room_version: The room version of the room to query.
 
         Returns:
@@ -239,17 +281,25 @@ class EventAuthHandler:
             return False
 
         # If there's no join rule, then it defaults to invite (so this doesn't apply).
-        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
+        join_rules_event_id = partial_state_ids.get((EventTypes.JoinRules, ""), None)
         if not join_rules_event_id:
             return False
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        return join_rules_event.content.get("join_rule") == JoinRules.RESTRICTED
+        content_join_rule = join_rules_event.content.get("join_rule")
+        if content_join_rule == JoinRules.RESTRICTED:
+            return True
+
+        # also check for MSC3787 behaviour
+        if room_version.msc3787_knock_restricted_join_rule:
+            return content_join_rule == JoinRules.KNOCK_RESTRICTED
+
+        return False
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]
-    ) -> Collection[str]:
+    ) -> StrCollection:
         """
         Generate a list of rooms in which membership allows access to a room.
 
@@ -290,7 +340,7 @@ class EventAuthHandler:
 
         return result
 
-    async def is_user_in_rooms(self, room_ids: Collection[str], user_id: str) -> bool:
+    async def is_user_in_rooms(self, room_ids: StrCollection, user_id: str) -> bool:
         """
         Check whether a user is a member of any of the provided rooms.
 

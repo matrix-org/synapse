@@ -23,7 +23,7 @@ from twisted.conch.manhole import ColoredManhole, ManholeInterpreter
 from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
 from twisted.internet import defer
-from twisted.internet.protocol import Factory
+from twisted.internet.protocol import ServerFactory
 
 from synapse.config.server import ManholeConfig
 
@@ -65,7 +65,7 @@ EddTrx3TNpr1D5m/f+6mnXWrc8u9y1+GNx9yz889xMjIBTBI9KqaaOs=
 -----END RSA PRIVATE KEY-----"""
 
 
-def manhole(settings: ManholeConfig, globals: Dict[str, Any]) -> Factory:
+def manhole(settings: ManholeConfig, globals: Dict[str, Any]) -> ServerFactory:
     """Starts a ssh listener with password authentication using
     the given username and password. Clients connecting to the ssh
     listener will find themselves in a colored python shell with
@@ -105,7 +105,8 @@ def manhole(settings: ManholeConfig, globals: Dict[str, Any]) -> Factory:
     factory.privateKeys[b"ssh-rsa"] = priv_key  # type: ignore[assignment]
     factory.publicKeys[b"ssh-rsa"] = pub_key  # type: ignore[assignment]
 
-    return factory
+    # ConchFactory is a Factory, not a ServerFactory, but they are identical.
+    return factory  # type: ignore[return-value]
 
 
 class SynapseManhole(ColoredManhole):

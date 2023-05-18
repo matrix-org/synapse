@@ -8,7 +8,8 @@ and allow server and room admins to configure how long messages should
 be kept in a homeserver's database before being purged from it.
 **Please note that, as this feature isn't part of the Matrix
 specification yet, this implementation is to be considered as
-experimental.** 
+experimental. There are known bugs which may cause database corruption.
+Proceed with caution.** 
 
 A message retention policy is mainly defined by its `max_lifetime`
 parameter, which defines how long a message can be kept around after
@@ -49,9 +50,9 @@ clients.
 
 ## Server configuration
 
-Support for this feature can be enabled and configured in the
-`retention` section of the Synapse configuration file (see the
-[sample file](https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518)).
+Support for this feature can be enabled and configured by adding a the
+`retention` in the Synapse configuration file (see
+[configuration manual](usage/configuration/config_documentation.md#retention)).
 
 To enable support for message retention policies, set the setting
 `enabled` in this section to `true`.
@@ -65,13 +66,13 @@ message retention policy configured in its state. This allows server
 admins to ensure that messages are never kept indefinitely in a server's
 database. 
 
-A default policy can be defined as such, in the `retention` section of
-the configuration file:
+A default policy can be defined as such, by adding the `retention` option in
+the configuration file and adding these sub-options:
 
 ```yaml
-  default_policy:
-    min_lifetime: 1d
-    max_lifetime: 1y
+default_policy:
+  min_lifetime: 1d
+  max_lifetime: 1y
 ```
 
 Here, `min_lifetime` and `max_lifetime` have the same meaning and level
@@ -86,8 +87,8 @@ Purge jobs are the jobs that Synapse runs in the background to purge
 expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
-Synapse will use a default configuration, which is described in the
-[sample configuration file](https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518).
+Synapse will use a default configuration, which is described here in the
+[configuration manual](usage/configuration/config_documentation.md#retention).
 
 Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
@@ -95,14 +96,14 @@ depending on an event's room's policy. This can be done by setting the
 file. An example of such configuration could be:
 
 ```yaml
-  purge_jobs:
-    - longest_max_lifetime: 3d
-      interval: 12h
-    - shortest_max_lifetime: 3d
-      longest_max_lifetime: 1w
-      interval: 1d
-    - shortest_max_lifetime: 1w
-      interval: 2d
+purge_jobs:
+  - longest_max_lifetime: 3d
+    interval: 12h
+  - shortest_max_lifetime: 3d
+    longest_max_lifetime: 1w
+    interval: 1d
+  - shortest_max_lifetime: 1w
+    interval: 2d
 ```
 
 In this example, we define three jobs:
@@ -117,7 +118,7 @@ In this example, we define three jobs:
 Note that this example is tailored to show different configurations and
 features slightly more jobs than it's probably necessary (in practice, a
 server admin would probably consider it better to replace the two last
-jobs with one that runs once a day and handles rooms which which
+jobs with one that runs once a day and handles rooms which
 policy's `max_lifetime` is greater than 3 days).
 
 Keep in mind, when configuring these jobs, that a purge job can become
@@ -137,12 +138,12 @@ the server's database.
 ### Lifetime limits
 
 Server admins can set limits on the values of `max_lifetime` to use when
-purging old events in a room. These limits can be defined as such in the
-`retention` section of the configuration file:
+purging old events in a room. These limits can be defined under the
+`retention` option in the configuration file:
 
 ```yaml
-  allowed_lifetime_min: 1d
-  allowed_lifetime_max: 1y
+allowed_lifetime_min: 1d
+allowed_lifetime_max: 1y
 ```
 
 The limits are considered when running purge jobs. If necessary, the

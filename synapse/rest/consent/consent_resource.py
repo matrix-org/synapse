@@ -78,20 +78,21 @@ class ConsentResource(DirectServeHtmlResource):
         super().__init__()
 
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.registration_handler = hs.get_registration_handler()
 
         # this is required by the request_handler wrapper
         self.clock = hs.get_clock()
 
-        self._default_consent_version = hs.config.user_consent_version
-        if self._default_consent_version is None:
+        # Consent must be configured to create this resource.
+        default_consent_version = hs.config.consent.user_consent_version
+        consent_template_directory = hs.config.consent.user_consent_template_dir
+        if default_consent_version is None or consent_template_directory is None:
             raise ConfigError(
                 "Consent resource is enabled but user_consent section is "
                 "missing in config file."
             )
-
-        consent_template_directory = hs.config.user_consent_template_dir
+        self._default_consent_version = default_consent_version
 
         # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(consent_template_directory)
@@ -99,13 +100,13 @@ class ConsentResource(DirectServeHtmlResource):
             loader=loader, autoescape=jinja2.select_autoescape(["html", "htm", "xml"])
         )
 
-        if hs.config.form_secret is None:
+        if hs.config.key.form_secret is None:
             raise ConfigError(
                 "Consent resource is enabled but form_secret is not set in "
                 "config file. It should be set to an arbitrary secret string."
             )
 
-        self._hmac_secret = hs.config.form_secret.encode("utf-8")
+        self._hmac_secret = hs.config.key.form_secret.encode("utf-8")
 
     async def _async_render_GET(self, request: Request) -> None:
         version = parse_string(request, "v", default=self._default_consent_version)

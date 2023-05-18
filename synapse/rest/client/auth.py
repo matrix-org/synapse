@@ -47,10 +47,12 @@ class AuthRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.recaptcha_template = hs.config.recaptcha_template
-        self.terms_template = hs.config.terms_template
-        self.registration_token_template = hs.config.registration_token_template
-        self.success_template = hs.config.fallback_success_template
+        self.recaptcha_template = hs.config.captcha.recaptcha_template
+        self.terms_template = hs.config.consent.terms_template
+        self.registration_token_template = (
+            hs.config.registration.registration_token_template
+        )
+        self.success_template = hs.config.registration.fallback_success_template
 
     async def on_GET(self, request: SynapseRequest, stagetype: str) -> None:
         session = parse_string(request, "session")
@@ -60,9 +62,9 @@ class AuthRestServlet(RestServlet):
         if stagetype == LoginType.RECAPTCHA:
             html = self.recaptcha_template.render(
                 session=session,
-                myurl="%s/r0/auth/%s/fallback/web"
+                myurl="%s/v3/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                sitekey=self.hs.config.recaptcha_public_key,
+                sitekey=self.hs.config.captcha.recaptcha_public_key,
             )
         elif stagetype == LoginType.TERMS:
             html = self.terms_template.render(
@@ -70,9 +72,9 @@ class AuthRestServlet(RestServlet):
                 terms_url="%s_matrix/consent?v=%s"
                 % (
                     self.hs.config.server.public_baseurl,
-                    self.hs.config.user_consent_version,
+                    self.hs.config.consent.user_consent_version,
                 ),
-                myurl="%s/r0/auth/%s/fallback/web"
+                myurl="%s/v3/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
             )
 
@@ -95,7 +97,6 @@ class AuthRestServlet(RestServlet):
         return None
 
     async def on_POST(self, request: Request, stagetype: str) -> None:
-
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
@@ -110,15 +111,15 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.RECAPTCHA, authdict, request.getClientIP()
+                    LoginType.RECAPTCHA, authdict, request.getClientAddress().host
                 )
             except LoginError as e:
                 # Authentication failed, let user try again
                 html = self.recaptcha_template.render(
                     session=session,
-                    myurl="%s/r0/auth/%s/fallback/web"
+                    myurl="%s/v3/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                    sitekey=self.hs.config.recaptcha_public_key,
+                    sitekey=self.hs.config.captcha.recaptcha_public_key,
                     error=e.msg,
                 )
             else:
@@ -130,7 +131,7 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.TERMS, authdict, request.getClientIP()
+                    LoginType.TERMS, authdict, request.getClientAddress().host
                 )
             except LoginError as e:
                 # Authentication failed, let user try again
@@ -139,9 +140,9 @@ class AuthRestServlet(RestServlet):
                     terms_url="%s_matrix/consent?v=%s"
                     % (
                         self.hs.config.server.public_baseurl,
-                        self.hs.config.user_consent_version,
+                        self.hs.config.consent.user_consent_version,
                     ),
-                    myurl="%s/r0/auth/%s/fallback/web"
+                    myurl="%s/v3/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
                     error=e.msg,
                 )
@@ -159,7 +160,9 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.REGISTRATION_TOKEN, authdict, request.getClientIP()
+                    LoginType.REGISTRATION_TOKEN,
+                    authdict,
+                    request.getClientAddress().host,
                 )
             except LoginError as e:
                 html = self.registration_token_template.render(

@@ -7,17 +7,30 @@
 
 1.  Enable Synapse metrics:
 
-    There are two methods of enabling metrics in Synapse.
+    In `homeserver.yaml`, make sure `enable_metrics` is
+    set to `True`.
+
+1.  Enable the `/_synapse/metrics` Synapse endpoint that Prometheus uses to
+    collect data:
+
+    There are two methods of enabling the metrics endpoint in Synapse.
 
     The first serves the metrics as a part of the usual web server and
-    can be enabled by adding the \"metrics\" resource to the existing
-    listener as such:
+    can be enabled by adding the `metrics` resource to the existing
+    listener as such as in this example:
 
     ```yaml
-      resources:
-        - names:
-          - client
-          - metrics
+    listeners:
+      - port: 8008
+        tls: false
+        type: http
+        x_forwarded: true
+        bind_addresses: ['::1', '127.0.0.1']
+
+        resources:
+          # added "metrics" in this line
+          - names: [client, federation, metrics]
+            compress: false
     ```
 
     This provides a simple way of adding metrics to your Synapse
@@ -31,18 +44,25 @@
     to just internal networks easier. The served metrics are available
     over HTTP only, and will be available at `/_synapse/metrics`.
 
-    Add a new listener to homeserver.yaml:
+    Add a new listener to homeserver.yaml as in this example:
 
     ```yaml
-      listeners:
-        - type: metrics
-          port: 9000
-          bind_addresses:
-            - '0.0.0.0'
-    ```
+    listeners:
+      - port: 8008
+        tls: false
+        type: http
+        x_forwarded: true
+        bind_addresses: ['::1', '127.0.0.1']
 
-    For both options, you will need to ensure that `enable_metrics` is
-    set to `True`.
+        resources:
+          - names: [client, federation]
+            compress: false
+
+      # beginning of the new metrics listener
+      - port: 9000
+        type: metrics
+        bind_addresses: ['::1', '127.0.0.1']
+    ```
 
 1.  Restart Synapse.
 
@@ -132,6 +152,8 @@ Synapse 1.2 updates the Prometheus metrics to match the naming
 convention of the upstream `prometheus_client`. The old names are
 considered deprecated and will be removed in a future version of
 Synapse.
+**The old names will be disabled by default in Synapse v1.71.0 and removed
+altogether in Synapse v1.73.0.**
 
 | New Name                                                                     | Old Name                                                               |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -143,6 +165,13 @@ Synapse.
 | synapse_federation_client_events_processed_total                             | synapse_federation_client_events_processed                             |
 | synapse_event_processing_loop_count_total                                    | synapse_event_processing_loop_count                                    |
 | synapse_event_processing_loop_room_count_total                               | synapse_event_processing_loop_room_count                               |
+| synapse_util_caches_cache_hits                                               | synapse_util_caches_cache:hits                                         |
+| synapse_util_caches_cache_size                                               | synapse_util_caches_cache:size                                         |
+| synapse_util_caches_cache_evicted_size                                       | synapse_util_caches_cache:evicted_size                                 |
+| synapse_util_caches_cache                                                    | synapse_util_caches_cache:total                                        |
+| synapse_util_caches_response_cache_size                                      | synapse_util_caches_response_cache:size                                |
+| synapse_util_caches_response_cache_hits                                      | synapse_util_caches_response_cache:hits                                |
+| synapse_util_caches_response_cache_evicted_size                              | synapse_util_caches_response_cache:evicted_size                        |
 | synapse_util_metrics_block_count_total                                       | synapse_util_metrics_block_count                                       |
 | synapse_util_metrics_block_time_seconds_total                                | synapse_util_metrics_block_time_seconds                                |
 | synapse_util_metrics_block_ru_utime_seconds_total                            | synapse_util_metrics_block_ru_utime_seconds                            |
@@ -180,6 +209,9 @@ Synapse.
 | synapse_http_httppusher_http_pushes_failed_total                             | synapse_http_httppusher_http_pushes_failed                             |
 | synapse_http_httppusher_badge_updates_processed_total                        | synapse_http_httppusher_badge_updates_processed                        |
 | synapse_http_httppusher_badge_updates_failed_total                           | synapse_http_httppusher_badge_updates_failed                           |
+| synapse_admin_mau_current                                                    | synapse_admin_mau:current                                              |
+| synapse_admin_mau_max                                                        | synapse_admin_mau:max                                                  |
+| synapse_admin_mau_registered_reserved_users                                  | synapse_admin_mau:registered_reserved_users                            |
 
 Removal of deprecated metrics & time based counters becoming histograms in 0.31.0
 ---------------------------------------------------------------------------------
@@ -258,7 +290,7 @@ Standard Metric Names
 
 As of synapse version 0.18.2, the format of the process-wide metrics has
 been changed to fit prometheus standard naming conventions. Additionally
-the units have been changed to seconds, from miliseconds.
+the units have been changed to seconds, from milliseconds.
 
 | New name                                 | Old name                          |
 | ---------------------------------------- | --------------------------------- |

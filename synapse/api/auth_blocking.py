@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class AuthBlocking:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._hs_disabled = hs.config.server.hs_disabled
@@ -39,7 +39,7 @@ class AuthBlocking:
         self._mau_limits_reserved_threepids = (
             hs.config.server.mau_limits_reserved_threepids
         )
-        self._server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
 
     async def check_auth_blocking(
@@ -77,11 +77,11 @@ class AuthBlocking:
         if requester:
             if requester.authenticated_entity.startswith("@"):
                 user_id = requester.authenticated_entity
-            elif requester.authenticated_entity == self._server_name:
+            elif self._is_mine_server_name(requester.authenticated_entity):
                 # We never block the server from doing actions on behalf of
                 # users.
                 return
-            elif requester.app_service and not self._track_appservice_user_ips:
+            if requester.app_service and not self._track_appservice_user_ips:
                 # If we're authenticated as an appservice then we only block
                 # auth if `track_appservice_user_ips` is set, as that option
                 # implicitly means that application services are part of MAU

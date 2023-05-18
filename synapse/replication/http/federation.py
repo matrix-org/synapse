@@ -13,13 +13,21 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, List, Tuple
 
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.events import make_event_from_dict
+from twisted.web.server import Request
+
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.server import HttpServer
 from synapse.replication.http._base import ReplicationEndpoint
+from synapse.types import JsonDict
 from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -51,28 +59,35 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         {
             "max_stream_id": 32443,
         }
+
+    Responds with a 409 when a `PartialStateConflictError` is raised due to an event
+    context that needs to be recomputed due to the un-partial stating of a room.
     """
 
     NAME = "fed_send_events"
     PATH_ARGS = ()
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
-        self.storage = hs.get_storage()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
         self.federation_event_handler = hs.get_federation_event_handler()
 
     @staticmethod
-    async def _serialize_payload(store, room_id, event_and_contexts, backfilled):
+    async def _serialize_payload(  # type: ignore[override]
+        store: "DataStore",
+        room_id: str,
+        event_and_contexts: List[Tuple[EventBase, EventContext]],
+        backfilled: bool,
+    ) -> JsonDict:
         """
         Args:
             store
-            room_id (str)
-            event_and_contexts (list[tuple[FrozenEvent, EventContext]])
-            backfilled (bool): Whether or not the events are the result of
-                backfilling
+            room_id
+            event_and_contexts
+            backfilled: Whether or not the events are the result of backfilling
         """
         event_payloads = []
         for event, context in event_and_contexts:
@@ -98,10 +113,8 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
         return payload
 
-    async def _handle_request(self, request):
+    async def _handle_request(self, request: Request, content: JsonDict) -> Tuple[int, JsonDict]:  # type: ignore[override]
         with Measure(self.clock, "repl_fed_send_events_parse"):
-            content = parse_json_object_from_request(request)
-
             room_id = content["room_id"]
             backfilled = content["backfilled"]
 
@@ -120,7 +133,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 event.internal_metadata.outlier = event_payload["outlier"]
 
                 context = EventContext.deserialize(
-                    self.storage, event_payload["context"]
+                    self._storage_controllers, event_payload["context"]
                 )
 
                 event_and_contexts.append((event, context))
@@ -151,29 +164,30 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
     NAME = "fed_send_edu"
     PATH_ARGS = ("edu_type",)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
     @staticmethod
-    async def _serialize_payload(edu_type, origin, content):
+    async def _serialize_payload(  # type: ignore[override]
+        edu_type: str, origin: str, content: JsonDict
+    ) -> JsonDict:
         return {"origin": origin, "content": content}
 
-    async def _handle_request(self, request, edu_type):
-        with Measure(self.clock, "repl_fed_send_edu_parse"):
-            content = parse_json_object_from_request(request)
-
-            origin = content["origin"]
-            edu_content = content["content"]
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, content: JsonDict, edu_type: str
+    ) -> Tuple[int, JsonDict]:
+        origin = content["origin"]
+        edu_content = content["content"]
 
         logger.info("Got %r edu from %s", edu_type, origin)
 
-        result = await self.registry.on_edu(edu_type, origin, edu_content)
+        await self.registry.on_edu(edu_type, origin, edu_content)
 
-        return 200, result
+        return 200, {}
 
 
 class ReplicationGetQueryRestServlet(ReplicationEndpoint):
@@ -194,28 +208,27 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
     # This is a query, so let's not bother caching
     CACHE = False
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
     @staticmethod
-    async def _serialize_payload(query_type, args):
+    async def _serialize_payload(query_type: str, args: JsonDict) -> JsonDict:  # type: ignore[override]
         """
         Args:
-            query_type (str)
-            args (dict): The arguments received for the given query type
+            query_type
+            args: The arguments received for the given query type
         """
         return {"args": args}
 
-    async def _handle_request(self, request, query_type):
-        with Measure(self.clock, "repl_fed_query_parse"):
-            content = parse_json_object_from_request(request)
-
-            args = content["args"]
-            args["origin"] = content["origin"]
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, content: JsonDict, query_type: str
+    ) -> Tuple[int, JsonDict]:
+        args = content["args"]
+        args["origin"] = content["origin"]
 
         logger.info("Got %r query from %s", query_type, args["origin"])
 
@@ -238,20 +251,22 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
     NAME = "fed_cleanup_room"
     PATH_ARGS = ("room_id",)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     @staticmethod
-    async def _serialize_payload(room_id, args):
+    async def _serialize_payload(room_id: str) -> JsonDict:  # type: ignore[override]
         """
         Args:
-            room_id (str)
+            room_id
         """
         return {}
 
-    async def _handle_request(self, request, room_id):
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, content: JsonDict, room_id: str
+    ) -> Tuple[int, JsonDict]:
         await self.store.clean_room_for_join(room_id)
 
         return 200, {}
@@ -273,23 +288,24 @@ class ReplicationStoreRoomOnOutlierMembershipRestServlet(ReplicationEndpoint):
     NAME = "store_room_on_outlier_membership"
     PATH_ARGS = ("room_id",)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     @staticmethod
-    async def _serialize_payload(room_id, room_version):
+    async def _serialize_payload(room_id: str, room_version: RoomVersion) -> JsonDict:  # type: ignore[override]
         return {"room_version": room_version.identifier}
 
-    async def _handle_request(self, request, room_id):
-        content = parse_json_object_from_request(request)
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, content: JsonDict, room_id: str
+    ) -> Tuple[int, JsonDict]:
         room_version = KNOWN_ROOM_VERSIONS[content["room_version"]]
         await self.store.maybe_store_room_on_outlier_membership(room_id, room_version)
         return 200, {}
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationFederationSendEventsRestServlet(hs).register(http_server)
     ReplicationFederationSendEduRestServlet(hs).register(http_server)
     ReplicationGetQueryRestServlet(hs).register(http_server)

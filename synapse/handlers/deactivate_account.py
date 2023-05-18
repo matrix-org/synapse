@@ -16,10 +16,9 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import SynapseError
+from synapse.handlers.device import DeviceHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import Requester, UserID, create_requester
-
-from ._base import BaseHandler
+from synapse.types import Codes, Requester, UserID, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -27,11 +26,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class DeactivateAccountHandler(BaseHandler):
+class DeactivateAccountHandler:
     """Handler which deals with deactivating user accounts."""
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastores().main
         self.hs = hs
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -40,9 +39,11 @@ class DeactivateAccountHandler(BaseHandler):
         self._profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self._server_name = hs.hostname
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
@@ -75,6 +76,18 @@ class DeactivateAccountHandler(BaseHandler):
         Returns:
             True if identity server supports removing threepids, otherwise False.
         """
+
+        # This can only be called on the main process.
+        assert isinstance(self._device_handler, DeviceHandler)
+
+        # Check if this user can be deactivated
+        if not await self._third_party_rules.check_can_deactivate_user(
+            user_id, by_admin
+        ):
+            raise SynapseError(
+                403, "Deactivation of this user is forbidden", Codes.FORBIDDEN
+            )
+
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
 
@@ -87,30 +100,27 @@ class DeactivateAccountHandler(BaseHandler):
         # unbinding
         identity_server_supports_unbinding = True
 
-        # Retrieve the 3PIDs this user has bound to an identity server
-        threepids = await self.store.user_get_bound_threepids(user_id)
-
-        for threepid in threepids:
+        # Attempt to unbind any known bound threepids to this account from identity
+        # server(s).
+        bound_threepids = await self.store.user_get_bound_threepids(user_id)
+        for threepid in bound_threepids:
             try:
                 result = await self._identity_handler.try_unbind_threepid(
-                    user_id,
-                    {
-                        "medium": threepid["medium"],
-                        "address": threepid["address"],
-                        "id_server": id_server,
-                    },
+                    user_id, threepid["medium"], threepid["address"], id_server
                 )
-                identity_server_supports_unbinding &= result
             except Exception:
                 # Do we want this to be a fatal error or should we carry on?
                 logger.exception("Failed to remove threepid from ID server")
                 raise SynapseError(400, "Failed to remove threepid from ID server")
-            await self.store.user_delete_threepid(
+
+            identity_server_supports_unbinding &= result
+
+        # Remove any local threepid associations for this account.
+        local_threepids = await self.store.user_get_threepids(user_id)
+        for threepid in local_threepids:
+            await self._auth_handler.delete_local_threepid(
                 user_id, threepid["medium"], threepid["address"]
             )
-
-        # Remove all 3PIDs this user has bound to the homeserver
-        await self.store.user_delete_threepids(user_id)
 
         # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
@@ -137,9 +147,13 @@ class DeactivateAccountHandler(BaseHandler):
         if erase_data:
             user = UserID.from_string(user_id)
             # Remove avatar URL from this user
-            await self._profile_handler.set_avatar_url(user, requester, "", by_admin)
+            await self._profile_handler.set_avatar_url(
+                user, requester, "", by_admin, deactivation=True
+            )
             # Remove displayname from this user
-            await self._profile_handler.set_displayname(user, requester, "", by_admin)
+            await self._profile_handler.set_displayname(
+                user, requester, "", by_admin, deactivation=True
+            )
 
             logger.info("Marking %s as erased", user_id)
             await self.store.mark_user_erased(user_id)
@@ -158,6 +172,19 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Mark the user as deactivated.
         await self.store.set_user_deactivated_status(user_id, True)
+
+        # Remove account data (including ignored users and push rules).
+        await self.store.purge_account_data_for_user(user_id)
+
+        # Delete any server-side backup keys
+        await self.store.bulk_delete_backup_keys_and_versions_for_user(user_id)
+
+        # Let modules know the user has been deactivated.
+        await self._third_party_rules.on_user_deactivation_status_changed(
+            user_id,
+            True,
+            by_admin,
+        )
 
         return identity_server_supports_unbinding
 
@@ -255,13 +282,20 @@ class DeactivateAccountHandler(BaseHandler):
         Args:
             user_id: ID of user to be re-activated
         """
-        # Add the user to the directory, if necessary.
         user = UserID.from_string(user_id)
-        profile = await self.store.get_profileinfo(user.localpart)
-        await self.user_directory_handler.handle_local_profile_change(user_id, profile)
 
         # Ensure the user is not marked as erased.
         await self.store.mark_user_not_erased(user_id)
 
         # Mark the user as active.
         await self.store.set_user_deactivated_status(user_id, False)
+
+        await self._third_party_rules.on_user_deactivation_status_changed(
+            user_id, False, True
+        )
+
+        # Add the user to the directory, if necessary. Note that
+        # this must be done after the user is re-activated, because
+        # deactivated users are excluded from the user directory.
+        profile = await self.store.get_profileinfo(user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(user_id, profile)

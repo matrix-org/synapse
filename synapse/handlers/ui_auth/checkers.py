@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, ClassVar, Sequence, Type
 
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, LoginError, SynapseError
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -28,19 +28,28 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class UserInteractiveAuthChecker:
+class UserInteractiveAuthChecker(ABC):
     """Abstract base class for an interactive auth checker"""
 
-    def __init__(self, hs: "HomeServer"):
+    # This should really be an "abstract class property", i.e. it should
+    # be an error to instantiate a subclass that doesn't specify an AUTH_TYPE.
+    # But calling this a `ClassVar` is simpler than a decorator stack of
+    # @property @abstractmethod and @classmethod (if that's even the right order).
+    AUTH_TYPE: ClassVar[str]
+
+    def __init__(self, hs: "HomeServer"):  # noqa: B027
         pass
 
+    @abstractmethod
     def is_enabled(self) -> bool:
         """Check if the configuration of the homeserver allows this checker to work
 
         Returns:
             True if this login type is enabled.
         """
+        raise NotImplementedError()
 
+    @abstractmethod
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         """Given the authentication dict from the client, attempt to check this step
 
@@ -82,10 +91,10 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self._enabled = bool(hs.config.recaptcha_private_key)
+        self._enabled = bool(hs.config.captcha.recaptcha_private_key)
         self._http_client = hs.get_proxied_http_client()
-        self._url = hs.config.recaptcha_siteverify_api
-        self._secret = hs.config.recaptcha_private_key
+        self._url = hs.config.captcha.recaptcha_siteverify_api
+        self._secret = hs.config.captcha.recaptcha_private_key
 
     def is_enabled(self) -> bool:
         return self._enabled
@@ -107,6 +116,8 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         try:
+            assert self._secret is not None
+
             resp_body = await self._http_client.post_urlencoded_get_json(
                 self._url,
                 args={
@@ -118,6 +129,9 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
+            # For mypy's benefit. A general Error.response is Optional[bytes], but
+            # a PartialDownloadError.response should be bytes AFAICS.
+            assert data is not None
             resp_body = json_decoder.decode(data.decode("utf-8"))
 
         if "success" in resp_body:
@@ -139,7 +153,7 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 class _BaseThreepidAuthChecker:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def _check_threepid(self, medium: str, authdict: dict) -> dict:
         if "threepid_creds" not in authdict:
@@ -151,22 +165,18 @@ class _BaseThreepidAuthChecker:
 
         logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
 
-        # msisdns are currently always ThreepidBehaviour.REMOTE
+        # msisdns are currently always verified via the IS
         if medium == "msisdn":
-            if not self.hs.config.account_threepid_delegate_msisdn:
+            if not self.hs.config.registration.account_threepid_delegate_msisdn:
                 raise SynapseError(
                     400, "Phone number verification is not enabled on this homeserver"
                 )
             threepid = await identity_handler.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_msisdn,
+                threepid_creds,
             )
         elif medium == "email":
-            if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-                assert self.hs.config.account_threepid_delegate_email
-                threepid = await identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_email, threepid_creds
-                )
-            elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.hs.config.email.can_verify_email:
                 threepid = None
                 row = await self.store.get_threepid_validation_session(
                     medium,
@@ -218,10 +228,7 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return self.hs.config.threepid_behaviour_email in (
-            ThreepidBehaviour.REMOTE,
-            ThreepidBehaviour.LOCAL,
-        )
+        return self.hs.config.email.can_verify_email
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("email", authdict)
@@ -235,7 +242,7 @@ class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return bool(self.hs.config.account_threepid_delegate_msisdn)
+        return bool(self.hs.config.registration.account_threepid_delegate_msisdn)
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("msisdn", authdict)
@@ -247,8 +254,10 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
-        self._enabled = bool(hs.config.registration_requires_token)
-        self.store = hs.get_datastore()
+        self._enabled = bool(
+            hs.config.registration.registration_requires_token
+        ) or bool(hs.config.registration.enable_registration_token_3pid_bypass)
+        self.store = hs.get_datastores().main
 
     def is_enabled(self) -> bool:
         return self._enabled
@@ -305,7 +314,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
             )
 
 
-INTERACTIVE_AUTH_CHECKERS = [
+INTERACTIVE_AUTH_CHECKERS: Sequence[Type[UserInteractiveAuthChecker]] = [
     DummyAuthChecker,
     TermsAuthChecker,
     RecaptchaAuthChecker,

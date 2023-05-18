@@ -22,7 +22,6 @@ from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
-from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
@@ -51,22 +50,23 @@ class Saml2SessionData:
     ui_auth_session_id: Optional[str] = None
 
 
-class SamlHandler(BaseHandler):
+class SamlHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-        self._saml_client = Saml2Client(hs.config.saml2_sp_config)
-        self._saml_idp_entityid = hs.config.saml2_idp_entityid
+        self.store = hs.get_datastores().main
+        self.clock = hs.get_clock()
+        self.server_name = hs.hostname
+        self._saml_client = Saml2Client(hs.config.saml2.saml2_sp_config)
+        self._saml_idp_entityid = hs.config.saml2.saml2_idp_entityid
 
-        self._saml2_session_lifetime = hs.config.saml2_session_lifetime
+        self._saml2_session_lifetime = hs.config.saml2.saml2_session_lifetime
         self._grandfathered_mxid_source_attribute = (
-            hs.config.saml2_grandfathered_mxid_source_attribute
+            hs.config.saml2.saml2_grandfathered_mxid_source_attribute
         )
         self._saml2_attribute_requirements = hs.config.saml2.attribute_requirements
-        self._error_template = hs.config.sso_error_template
 
         # plugin to do custom mapping from saml response to mxid
-        self._user_mapping_provider = hs.config.saml2_user_mapping_provider_class(
-            hs.config.saml2_user_mapping_provider_config,
+        self._user_mapping_provider = hs.config.saml2.saml2_user_mapping_provider_class(
+            hs.config.saml2.saml2_user_mapping_provider_config,
             ModuleApi(hs, hs.get_auth_handler()),
         )
 
@@ -411,7 +411,7 @@ class DefaultSamlMappingProvider:
         self._mxid_mapper = parsed_config.mxid_mapper
 
         self._grandfathered_mxid_source_attribute = (
-            module_api._hs.config.saml2_grandfathered_mxid_source_attribute
+            module_api._hs.config.saml2.saml2_grandfathered_mxid_source_attribute
         )
 
     def get_remote_user_id(
@@ -441,7 +441,7 @@ class DefaultSamlMappingProvider:
             client_redirect_url: where the client wants to redirect to
 
         Returns:
-            dict: A dict containing new user attributes. Possible keys:
+            A dict containing new user attributes. Possible keys:
                 * mxid_localpart (str): Required. The localpart of the user's mxid
                 * displayname (str): The displayname of the user
                 * emails (list[str]): Any emails for the user
@@ -483,7 +483,7 @@ class DefaultSamlMappingProvider:
         Args:
             config: A dictionary containing configuration options for this provider
         Returns:
-            SamlConfig: A custom config object for this module
+            A custom config object for this module
         """
         # Parse config options and use defaults where necessary
         mxid_source_attribute = config.get("mxid_source_attribute", "uid")

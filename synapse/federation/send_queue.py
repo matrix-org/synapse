@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +30,6 @@ Events are replicated via a separate events stream.
 """
 
 import logging
-from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -42,6 +42,7 @@ from typing import (
     Type,
 )
 
+import attr
 from sortedcontainers import SortedDict
 
 from synapse.api.presence import UserPresenceState
@@ -67,6 +68,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         # We may have multiple federation sender instances, so we need to track
         # their positions separately.
@@ -197,7 +199,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         key: Optional[Hashable] = None,
     ) -> None:
         """As per FederationSender"""
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.info("Not sending EDU to ourselves")
             return
 
@@ -243,7 +245,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
 
         self.notifier.on_new_replication_data()
 
-    def send_device_messages(self, destination: str) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
         """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.
@@ -313,7 +315,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # stream position.
         keyed_edus = {v: k for k, v in self.keyed_edu_changed.items()[i:j]}
 
-        for ((destination, edu_key), pos) in keyed_edus.items():
+        for (destination, edu_key), pos in keyed_edus.items():
             rows.append(
                 (
                     pos,
@@ -328,7 +330,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         j = self.edus.bisect_right(to_token) + 1
         edus = self.edus.items()[i:j]
 
-        for (pos, edu) in edus:
+        for pos, edu in edus:
             rows.append((pos, EduRow(edu)))
 
         # Sort rows based on pos
@@ -350,7 +352,7 @@ class BaseFederationRow:
     TypeId = ""  # Unique string that ids the type. Must be overridden in sub classes.
 
     @staticmethod
-    def from_data(data):
+    def from_data(data: JsonDict) -> "BaseFederationRow":
         """Parse the data from the federation stream into a row.
 
         Args:
@@ -359,7 +361,7 @@ class BaseFederationRow:
         """
         raise NotImplementedError()
 
-    def to_data(self):
+    def to_data(self) -> JsonDict:
         """Serialize this row to be sent over the federation stream.
 
         Returns:
@@ -368,7 +370,7 @@ class BaseFederationRow:
         """
         raise NotImplementedError()
 
-    def add_to_buffer(self, buff):
+    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
         """Add this row to the appropriate field in the buffer ready for this
         to be sent over federation.
 
@@ -381,65 +383,64 @@ class BaseFederationRow:
         raise NotImplementedError()
 
 
-class PresenceDestinationsRow(
-    BaseFederationRow,
-    namedtuple(
-        "PresenceDestinationsRow",
-        ("state", "destinations"),  # UserPresenceState  # list[str]
-    ),
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class PresenceDestinationsRow(BaseFederationRow):
+    state: UserPresenceState
+    destinations: List[str]
+
     TypeId = "pd"
 
     @staticmethod
-    def from_data(data):
+    def from_data(data: JsonDict) -> "PresenceDestinationsRow":
         return PresenceDestinationsRow(
             state=UserPresenceState.from_dict(data["state"]), destinations=data["dests"]
         )
 
-    def to_data(self):
+    def to_data(self) -> JsonDict:
         return {"state": self.state.as_dict(), "dests": self.destinations}
 
-    def add_to_buffer(self, buff):
+    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
         buff.presence_destinations.append((self.state, self.destinations))
 
 
-class KeyedEduRow(
-    BaseFederationRow,
-    namedtuple(
-        "KeyedEduRow",
-        ("key", "edu"),  # tuple(str) - the edu key passed to send_edu  # Edu
-    ),
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class KeyedEduRow(BaseFederationRow):
     """Streams EDUs that have an associated key that is ued to clobber. For example,
     typing EDUs clobber based on room_id.
     """
 
+    key: Tuple[str, ...]  # the edu key passed to send_edu
+    edu: Edu
+
     TypeId = "k"
 
     @staticmethod
-    def from_data(data):
+    def from_data(data: JsonDict) -> "KeyedEduRow":
         return KeyedEduRow(key=tuple(data["key"]), edu=Edu(**data["edu"]))
 
-    def to_data(self):
+    def to_data(self) -> JsonDict:
         return {"key": self.key, "edu": self.edu.get_internal_dict()}
 
-    def add_to_buffer(self, buff):
+    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
         buff.keyed_edus.setdefault(self.edu.destination, {})[self.key] = self.edu
 
 
-class EduRow(BaseFederationRow, namedtuple("EduRow", ("edu",))):  # Edu
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class EduRow(BaseFederationRow):
     """Streams EDUs that don't have keys. See KeyedEduRow"""
+
+    edu: Edu
 
     TypeId = "e"
 
     @staticmethod
-    def from_data(data):
+    def from_data(data: JsonDict) -> "EduRow":
         return EduRow(Edu(**data))
 
-    def to_data(self):
+    def to_data(self) -> JsonDict:
         return self.edu.get_internal_dict()
 
-    def add_to_buffer(self, buff):
+    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
         buff.edus.setdefault(self.edu.destination, []).append(self.edu)
 
 
@@ -452,14 +453,14 @@ _rowtypes: Tuple[Type[BaseFederationRow], ...] = (
 TypeToRow = {Row.TypeId: Row for Row in _rowtypes}
 
 
-ParsedFederationStreamData = namedtuple(
-    "ParsedFederationStreamData",
-    (
-        "presence_destinations",  # list of tuples of UserPresenceState and destinations
-        "keyed_edus",  # dict of destination -> { key -> Edu }
-        "edus",  # dict of destination -> [Edu]
-    ),
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ParsedFederationStreamData:
+    # list of tuples of UserPresenceState and destinations
+    presence_destinations: List[Tuple[UserPresenceState, List[str]]]
+    # dict of destination -> { key -> Edu }
+    keyed_edus: Dict[str, Dict[Tuple[str, ...], Edu]]
+    # dict of destination -> [Edu]
+    edus: Dict[str, List[Edu]]
 
 
 def process_rows_for_federation(

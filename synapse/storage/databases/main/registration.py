@@ -16,20 +16,31 @@
 import logging
 import random
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 import attr
 
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
+from synapse.api.errors import (
+    Codes,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+    ThreepidValidationError,
+)
+from synapse.config.homeserver import HomeServerConfig
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
-from synapse.storage.types import Connection, Cursor
+from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import IdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import UserID, UserInfo
+from synapse.types import JsonDict, UserID, UserInfo
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -40,7 +51,20 @@ THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 logger = logging.getLogger(__name__)
 
 
-@attr.s(frozen=True, slots=True)
+class ExternalIDReuseException(Exception):
+    """Exception if writing an external id for a user fails,
+    because this external id is given to an other user."""
+
+
+class LoginTokenExpired(Exception):
+    """Exception if the login token sent expired"""
+
+
+class LoginTokenReused(Exception):
+    """Exception if the login token sent was already used"""
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class TokenLookupResult:
     """Result of looking up an access token.
 
@@ -58,42 +82,65 @@ class TokenLookupResult:
             cached.
     """
 
-    user_id = attr.ib(type=str)
-    is_guest = attr.ib(type=bool, default=False)
-    shadow_banned = attr.ib(type=bool, default=False)
-    token_id = attr.ib(type=Optional[int], default=None)
-    device_id = attr.ib(type=Optional[str], default=None)
-    valid_until_ms = attr.ib(type=Optional[int], default=None)
-    token_owner = attr.ib(type=str)
-    token_used = attr.ib(type=bool, default=False)
+    user_id: str
+    token_id: int
+    is_guest: bool = False
+    shadow_banned: bool = False
+    device_id: Optional[str] = None
+    valid_until_ms: Optional[int] = None
+    token_owner: str = attr.ib()
+    token_used: bool = False
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
-    def _default_token_owner(self):
+    def _default_token_owner(self) -> str:
         return self.user_id
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(auto_attribs=True, frozen=True, slots=True)
 class RefreshTokenLookupResult:
     """Result of looking up a refresh token."""
 
-    user_id = attr.ib(type=str)
+    user_id: str
     """The user this token belongs to."""
 
-    device_id = attr.ib(type=str)
+    device_id: str
     """The device associated with this refresh token."""
 
-    token_id = attr.ib(type=int)
+    token_id: int
     """The ID of this refresh token."""
 
-    next_token_id = attr.ib(type=Optional[int])
+    next_token_id: Optional[int]
     """The ID of the refresh token which replaced this one."""
 
-    has_next_refresh_token_been_refreshed = attr.ib(type=bool)
+    has_next_refresh_token_been_refreshed: bool
     """True if the next refresh token was used for another refresh."""
 
-    has_next_access_token_been_used = attr.ib(type=bool)
+    has_next_access_token_been_used: bool
     """True if the next access token was already used at least once."""
+
+    expiry_ts: Optional[int]
+    """The time at which the refresh token expires and can not be used.
+    If None, the refresh token doesn't expire."""
+
+    ultimate_session_expiry_ts: Optional[int]
+    """The time at which the session comes to an end and can no longer be
+    refreshed.
+    If None, the session can be refreshed indefinitely."""
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class LoginTokenLookupResult:
+    """Result of looking up a login token."""
+
+    user_id: str
+    """The user this token belongs to."""
+
+    auth_provider_id: Optional[str]
+    """The SSO Identity Provider that the user authenticated with, to get this token."""
+
+    auth_provider_session_id: Optional[str]
+    """The session ID advertised by the SSO Identity Provider."""
 
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
@@ -105,7 +152,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self.config = hs.config
+        self.config: HomeServerConfig = hs.config
 
         # Note: we don't check this sequence for consistency as we'd have to
         # call `find_max_generated_user_id_localpart` each time, which is
@@ -145,27 +192,50 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             )
 
     @cached()
-    async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_id(self, user_id: str) -> Optional[Mapping[str, Any]]:
         """Deprecated: use get_userinfo_by_id instead"""
-        return await self.db_pool.simple_select_one(
-            table="users",
-            keyvalues={"name": user_id},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "consent_version",
-                "consent_server_notice_sent",
-                "appservice_id",
-                "creation_ts",
-                "user_type",
-                "deactivated",
-                "shadow_banned",
-            ],
-            allow_none=True,
+
+        def get_user_by_id_txn(txn: LoggingTransaction) -> Optional[Dict[str, Any]]:
+            # We could technically use simple_select_one here, but it would not perform
+            # the COALESCEs (unless hacked into the column names), which could yield
+            # confusing results.
+            txn.execute(
+                """
+                SELECT
+                    name, password_hash, is_guest, admin, consent_version, consent_ts,
+                    consent_server_notice_sent, appservice_id, creation_ts, user_type,
+                    deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
+                    COALESCE(approved, TRUE) AS approved
+                FROM users
+                WHERE name = ?
+                """,
+                (user_id,),
+            )
+
+            rows = self.db_pool.cursor_to_dict(txn)
+
+            if len(rows) == 0:
+                return None
+
+            return rows[0]
+
+        row = await self.db_pool.runInteraction(
             desc="get_user_by_id",
+            func=get_user_by_id_txn,
         )
+
+        if row is not None:
+            # If we're using SQLite our boolean values will be integers. Because we
+            # present some of this data as is to e.g. server admins via REST APIs, we
+            # want to make sure we're returning the right type of data.
+            # Note: when adding a column name to this list, be wary of NULLable columns,
+            # since NULL values will be turned into False.
+            boolean_columns = ["admin", "deactivated", "shadow_banned", "approved"]
+            for column in boolean_columns:
+                if not isinstance(row[column], bool):
+                    row[column] = bool(row[column])
+
+        return row
 
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get a UserInfo object for a user by user ID.
@@ -196,7 +266,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     async def is_trial_user(self, user_id: str) -> bool:
         """Checks if user is in the "trial" period, i.e. within the first
-        N days of registration defined by `mau_trial_days` config
+        N days of registration defined by `mau_trial_days` config or the
+        `mau_appservice_trial_days` config.
 
         Args:
             user_id: The user to check for trial status.
@@ -207,7 +278,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return False
 
         now = self._clock.time_msec()
-        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        days = self.config.server.mau_appservice_trial_days.get(
+            info["appservice_id"], self.config.server.mau_trial_days
+        )
+        trial_duration_ms = days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
         return is_trial
 
@@ -280,7 +354,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 the account.
         """
 
-        def set_account_validity_for_user_txn(txn):
+        def set_account_validity_for_user_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_update_txn(
                 txn=txn,
                 table="account_validity",
@@ -366,29 +440,31 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="get_renewal_token_for_user",
         )
 
-    async def get_users_expiring_soon(self) -> List[Dict[str, Any]]:
+    async def get_users_expiring_soon(self) -> List[Tuple[str, int]]:
         """Selects users whose account will expire in the [now, now + renew_at] time
         window (see configuration for account_validity for information on what renew_at
         refers to).
 
         Returns:
-            A list of dictionaries, each with a user ID and expiration time (in milliseconds).
+            A list of tuples, each with a user ID and expiration time (in milliseconds).
         """
 
-        def select_users_txn(txn, now_ms, renew_at):
+        def select_users_txn(
+            txn: LoggingTransaction, now_ms: int, renew_at: int
+        ) -> List[Tuple[str, int]]:
             sql = (
                 "SELECT user_id, expiration_ts_ms FROM account_validity"
                 " WHERE email_sent = ? AND (expiration_ts_ms - ?) <= ?"
             )
             values = [False, now_ms, renew_at]
             txn.execute(sql, values)
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(List[Tuple[str, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
             "get_users_expiring_soon",
             select_users_txn,
             self._clock.time_msec(),
-            self.config.account_validity_renew_at,
+            self.config.account_validity.account_validity_renew_at,
         )
 
     async def set_renewal_mail_status(self, user_id: str, email_sent: bool) -> None:
@@ -447,7 +523,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             admin: true iff the user is to be a server admin, false otherwise.
         """
 
-        def set_server_admin_txn(txn):
+        def set_server_admin_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_update_one_txn(
                 txn, "users", {"name": user.to_string()}, {"admin": 1 if admin else 0}
             )
@@ -465,7 +541,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             shadow_banned: true iff the user is to be shadow-banned, false otherwise.
         """
 
-        def set_shadow_banned_txn(txn):
+        def set_shadow_banned_txn(txn: LoggingTransaction) -> None:
             user_id = user.to_string()
             self.db_pool.simple_update_one_txn(
                 txn,
@@ -488,7 +564,27 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 
-    def _query_for_auth(self, txn, token: str) -> Optional[TokenLookupResult]:
+    async def set_user_type(self, user: UserID, user_type: Optional[UserTypes]) -> None:
+        """Sets the user type.
+
+        Args:
+            user: user ID of the user.
+            user_type: type of the user or None for a user without a type.
+        """
+
+        def set_user_type_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_update_one_txn(
+                txn, "users", {"name": user.to_string()}, {"user_type": user_type}
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user.to_string(),)
+            )
+
+        await self.db_pool.runInteraction("set_user_type", set_user_type_txn)
+
+    def _query_for_auth(
+        self, txn: LoggingTransaction, token: str
+    ) -> Optional[TokenLookupResult]:
         sql = """
             SELECT users.name as user_id,
                 users.is_guest,
@@ -545,7 +641,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "is_support_user", self.is_support_user_txn, user_id
         )
 
-    def is_real_user_txn(self, txn, user_id):
+    def is_real_user_txn(self, txn: LoggingTransaction, user_id: str) -> bool:
         res = self.db_pool.simple_select_one_onecol_txn(
             txn=txn,
             table="users",
@@ -555,7 +651,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
         return res is None
 
-    def is_support_user_txn(self, txn, user_id):
+    def is_support_user_txn(self, txn: LoggingTransaction, user_id: str) -> bool:
         res = self.db_pool.simple_select_one_onecol_txn(
             txn=txn,
             table="users",
@@ -572,10 +668,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
              A mapping of user_id -> password_hash.
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> Dict[str, str]:
             sql = "SELECT name, password_hash FROM users WHERE lower(name) = lower(?)"
             txn.execute(sql, (user_id,))
-            return dict(txn)
+            result = cast(List[Tuple[str, str]], txn.fetchall())
+            return dict(result)
 
         return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
@@ -584,28 +681,66 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     ) -> None:
         """Record a mapping from an external user id to a mxid
 
+        See notes in _record_user_external_id_txn about what constitutes valid data.
+
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
             user_id: complete mxid that it is mapped to
+
+        Raises:
+            ExternalIDReuseException if the new external_id could not be mapped.
         """
-        await self.db_pool.simple_insert(
+
+        try:
+            await self.db_pool.runInteraction(
+                "record_user_external_id",
+                self._record_user_external_id_txn,
+                auth_provider,
+                external_id,
+                user_id,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise ExternalIDReuseException()
+
+    def _record_user_external_id_txn(
+        self,
+        txn: LoggingTransaction,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+    ) -> None:
+        """
+        Record a mapping from an external user id to a mxid.
+
+        Note that the auth provider IDs (and the external IDs) are not validated
+        against configured IdPs as Synapse does not know its relationship to
+        external systems. For example, it might be useful to pre-configure users
+        before enabling a new IdP or an IdP might be temporarily offline, but
+        still valid.
+
+        Args:
+            txn: The database transaction.
+            auth_provider: identifier for the remote auth provider
+            external_id: id on that system
+            user_id: complete mxid that it is mapped to
+        """
+
+        self.db_pool.simple_insert_txn(
+            txn,
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
             },
-            desc="record_user_external_id",
         )
 
     async def remove_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
         """Remove a mapping from an external user id to a mxid
-
         If the mapping is not found, this method does nothing.
-
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
@@ -620,6 +755,63 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             },
             desc="remove_user_external_id",
         )
+
+    async def replace_user_external_id(
+        self,
+        record_external_ids: List[Tuple[str, str]],
+        user_id: str,
+    ) -> None:
+        """Replace mappings from external user ids to a mxid in a single transaction.
+        All mappings are deleted and the new ones are created.
+
+        See notes in _record_user_external_id_txn about what constitutes valid data.
+
+        Args:
+            record_external_ids:
+                List with tuple of auth_provider and external_id to record
+            user_id: complete mxid that it is mapped to
+
+        Raises:
+            ExternalIDReuseException if the new external_id could not be mapped.
+        """
+
+        def _remove_user_external_ids_txn(
+            txn: LoggingTransaction,
+            user_id: str,
+        ) -> None:
+            """Remove all mappings from external user ids to a mxid
+            If these mappings are not found, this method does nothing.
+
+            Args:
+                user_id: complete mxid that it is mapped to
+            """
+
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="user_external_ids",
+                keyvalues={"user_id": user_id},
+            )
+
+        def _replace_user_external_id_txn(
+            txn: LoggingTransaction,
+        ) -> None:
+            _remove_user_external_ids_txn(txn, user_id)
+
+            for auth_provider, external_id in record_external_ids:
+                self._record_user_external_id_txn(
+                    txn,
+                    auth_provider,
+                    external_id,
+                    user_id,
+                )
+
+        try:
+            await self.db_pool.runInteraction(
+                "replace_user_external_id",
+                _replace_user_external_id_txn,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise ExternalIDReuseException()
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
@@ -658,10 +850,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
         return [(r["auth_provider"], r["external_id"]) for r in res]
 
-    async def count_all_users(self):
+    async def count_all_users(self) -> int:
         """Counts all users registered on the homeserver."""
 
-        def _count_users(txn):
+        def _count_users(txn: LoggingTransaction) -> int:
             txn.execute("SELECT COUNT(*) AS users FROM users")
             rows = self.db_pool.cursor_to_dict(txn)
             if rows:
@@ -678,11 +870,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         who registered on the homeserver in the past 24 hours
         """
 
-        def _count_daily_user_type(txn):
+        def _count_daily_user_type(txn: LoggingTransaction) -> Dict[str, int]:
             yesterday = int(self._clock.time()) - (60 * 60 * 24)
 
             sql = """
-                SELECT user_type, COALESCE(count(*), 0) AS count FROM (
+                SELECT user_type, COUNT(*) AS count FROM (
                     SELECT
                     CASE
                         WHEN is_guest=0 AND appservice_id IS NULL THEN 'native'
@@ -703,23 +895,23 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "count_daily_user_type", _count_daily_user_type
         )
 
-    async def count_nonbridged_users(self):
-        def _count_users(txn):
+    async def count_nonbridged_users(self) -> int:
+        def _count_users(txn: LoggingTransaction) -> int:
             txn.execute(
                 """
-                SELECT COALESCE(COUNT(*), 0) FROM users
+                SELECT COUNT(*) FROM users
                 WHERE appservice_id IS NULL
             """
             )
-            (count,) = txn.fetchone()
+            (count,) = cast(Tuple[int], txn.fetchone())
             return count
 
         return await self.db_pool.runInteraction("count_users", _count_users)
 
-    async def count_real_users(self):
+    async def count_real_users(self) -> int:
         """Counts all users without a special user_type registered on the homeserver."""
 
-        def _count_users(txn):
+        def _count_users(txn: LoggingTransaction) -> int:
             txn.execute("SELECT COUNT(*) AS users FROM users where user_type is null")
             rows = self.db_pool.cursor_to_dict(txn)
             if rows:
@@ -744,7 +936,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         Args:
             medium: threepid medium e.g. email
-            address: threepid address e.g. me@example.com
+            address: threepid address e.g. me@example.com. This must already be
+                in canonical form.
 
         Returns:
             The user ID or None if no user id/threepid mapping exists
@@ -755,12 +948,12 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         return user_id
 
     def get_user_id_by_threepid_txn(
-        self, txn, medium: str, address: str
+        self, txn: LoggingTransaction, medium: str, address: str
     ) -> Optional[str]:
         """Returns user id from threepid
 
         Args:
-            txn (cursor):
+            txn:
             medium: threepid medium e.g. email
             address: threepid address e.g. me@example.com
 
@@ -792,7 +985,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             {"user_id": user_id, "validated_at": validated_at, "added_at": added_at},
         )
 
-    async def user_get_threepids(self, user_id) -> List[Dict[str, Any]]:
+    async def user_get_threepids(self, user_id: str) -> List[Dict[str, Any]]:
         return await self.db_pool.simple_select_list(
             "user_threepids",
             {"user_id": user_id},
@@ -809,22 +1002,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="user_delete_threepid",
         )
 
-    async def user_delete_threepids(self, user_id: str) -> None:
-        """Delete all threepid this user has bound
-
-        Args:
-             user_id: The user id to delete all threepids of
-
-        """
-        await self.db_pool.simple_delete(
-            "user_threepids",
-            keyvalues={"user_id": user_id},
-            desc="user_delete_threepids",
-        )
-
     async def add_user_bound_threepid(
         self, user_id: str, medium: str, address: str, id_server: str
-    ):
+    ) -> None:
         """The server proxied a bind request to the given identity server on
         behalf of the given user. We need to remember this in case the user
         asks us to unbind the threepid.
@@ -983,7 +1163,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         assert address or sid
 
-        def get_threepid_validation_session_txn(txn):
+        def get_threepid_validation_session_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[Dict[str, Any]]:
             sql = """
                 SELECT address, session_id, medium, client_secret,
                 last_send_attempt, validated_at
@@ -1017,7 +1199,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             session_id: The ID of the session to delete
         """
 
-        def delete_threepid_session_txn(txn):
+        def delete_threepid_session_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_delete_txn(
                 txn,
                 table="threepid_validation_token",
@@ -1037,7 +1219,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     async def cull_expired_threepid_validation_tokens(self) -> None:
         """Remove threepid validation tokens with expiry dates that have passed"""
 
-        def cull_expired_threepid_validation_tokens_txn(txn, ts):
+        def cull_expired_threepid_validation_tokens_txn(
+            txn: LoggingTransaction, ts: int
+        ) -> None:
             sql = """
             DELETE FROM threepid_validation_token WHERE
             expires < ?
@@ -1051,13 +1235,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
 
     @wrap_as_background_process("account_validity_set_expiration_dates")
-    async def _set_expiration_date_when_missing(self):
+    async def _set_expiration_date_when_missing(self) -> None:
         """
         Retrieves the list of registered users that don't have an expiration date, and
         adds an expiration date for each of them.
         """
 
-        def select_users_with_no_expiration_date_txn(txn):
+        def select_users_with_no_expiration_date_txn(txn: LoggingTransaction) -> None:
             """Retrieves the list of registered users with no expiration date from the
             database, filtering out deactivated users.
             """
@@ -1080,12 +1264,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             select_users_with_no_expiration_date_txn,
         )
 
-    def set_expiration_date_for_user_txn(self, txn, user_id, use_delta=False):
+    def set_expiration_date_for_user_txn(
+        self, txn: LoggingTransaction, user_id: str, use_delta: bool = False
+    ) -> None:
         """Sets an expiration date to the account with the given user ID.
 
         Args:
-             user_id (str): User ID to set an expiration date for.
-             use_delta (bool): If set to False, the expiration date for the user will be
+             user_id: User ID to set an expiration date for.
+             use_delta: If set to False, the expiration date for the user will be
                 now + validity period. If set to True, this expiration date will be a
                 random value in the [now + period - d ; now + period] range, d being a
                 delta equal to 10% of the validity period.
@@ -1095,8 +1281,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:
+            assert self._account_validity_startup_job_max_delta is not None
             expiration_ts = random.randrange(
-                expiration_ts - self._account_validity_startup_job_max_delta,
+                int(expiration_ts - self._account_validity_startup_job_max_delta),
                 expiration_ts,
             )
 
@@ -1210,7 +1397,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             token: The registration token pending use
         """
 
-        def _set_registration_token_pending_txn(txn):
+        def _set_registration_token_pending_txn(txn: LoggingTransaction) -> None:
             pending = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 "registration_tokens",
@@ -1224,7 +1411,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 updatevalues={"pending": pending + 1},
             )
 
-        return await self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "set_registration_token_pending", _set_registration_token_pending_txn
         )
 
@@ -1238,17 +1425,20 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             token: The registration token to be 'used'
         """
 
-        def _use_registration_token_txn(txn):
+        def _use_registration_token_txn(txn: LoggingTransaction) -> None:
             # Normally, res is Optional[Dict[str, Any]].
             # Override type because the return type is only optional if
             # allow_none is True, and we don't want mypy throwing errors
             # about None not being indexable.
-            res: Dict[str, Any] = self.db_pool.simple_select_one_txn(
-                txn,
-                "registration_tokens",
-                keyvalues={"token": token},
-                retcols=["pending", "completed"],
-            )  # type: ignore
+            res = cast(
+                Dict[str, Any],
+                self.db_pool.simple_select_one_txn(
+                    txn,
+                    "registration_tokens",
+                    keyvalues={"token": token},
+                    retcols=["pending", "completed"],
+                ),
+            )
 
             # Decrement pending and increment completed
             self.db_pool.simple_update_one_txn(
@@ -1261,7 +1451,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 },
             )
 
-        return await self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "use_registration_token", _use_registration_token_txn
         )
 
@@ -1279,7 +1469,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             A list of dicts, each containing details of a token.
         """
 
-        def select_registration_tokens_txn(txn, now: int, valid: Optional[bool]):
+        def select_registration_tokens_txn(
+            txn: LoggingTransaction, now: int, valid: Optional[bool]
+        ) -> List[Dict[str, Any]]:
             if valid is None:
                 # Return all tokens regardless of validity
                 txn.execute("SELECT * FROM registration_tokens")
@@ -1386,7 +1578,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             Whether the row was inserted or not.
         """
 
-        def _create_registration_token_txn(txn):
+        def _create_registration_token_txn(txn: LoggingTransaction) -> bool:
             row = self.db_pool.simple_select_one_txn(
                 txn,
                 "registration_tokens",
@@ -1433,7 +1625,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             A dict with all info about the token, or None if token doesn't exist.
         """
 
-        def _update_registration_token_txn(txn):
+        def _update_registration_token_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[Dict[str, Any]]:
             try:
                 self.db_pool.simple_update_one_txn(
                     txn,
@@ -1514,7 +1708,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     ) -> Optional[RefreshTokenLookupResult]:
         """Lookup a refresh token with hints about its validity."""
 
-        def _lookup_refresh_token_txn(txn) -> Optional[RefreshTokenLookupResult]:
+        def _lookup_refresh_token_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[RefreshTokenLookupResult]:
             txn.execute(
                 """
                 SELECT
@@ -1522,8 +1718,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     rt.user_id,
                     rt.device_id,
                     rt.next_token_id,
-                    (nrt.next_token_id IS NOT NULL) has_next_refresh_token_been_refreshed,
-                    at.used has_next_access_token_been_used
+                    (nrt.next_token_id IS NOT NULL) AS has_next_refresh_token_been_refreshed,
+                    at.used AS has_next_access_token_been_used,
+                    rt.expiry_ts,
+                    rt.ultimate_session_expiry_ts
                 FROM refresh_tokens rt
                 LEFT JOIN refresh_tokens nrt ON rt.next_token_id = nrt.id
                 LEFT JOIN access_tokens at ON at.refresh_token_id = nrt.id
@@ -1541,9 +1739,12 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 user_id=row[1],
                 device_id=row[2],
                 next_token_id=row[3],
-                has_next_refresh_token_been_refreshed=row[4],
+                # SQLite returns 0 or 1 for false/true, so convert to a bool.
+                has_next_refresh_token_been_refreshed=bool(row[4]),
                 # This column is nullable, ensure it's a boolean
                 has_next_access_token_been_used=(row[5] or False),
+                expiry_ts=row[6],
+                ultimate_session_expiry_ts=row[7],
             )
 
         return await self.db_pool.runInteraction(
@@ -1555,12 +1756,15 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         Set the successor of a refresh token, removing the existing successor
         if any.
 
+        This also deletes the predecessor refresh and access tokens,
+        since they cannot be valid anymore.
+
         Args:
             token_id: ID of the refresh token to update.
             next_token_id: ID of its successor.
         """
 
-        def _replace_refresh_token_txn(txn) -> None:
+        def _replace_refresh_token_txn(txn: LoggingTransaction) -> None:
             # First check if there was an existing refresh token
             old_next_token_id = self.db_pool.simple_select_one_onecol_txn(
                 txn,
@@ -1586,8 +1790,188 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     {"id": old_next_token_id},
                 )
 
+            # Delete the previous refresh token, since we only want to keep the
+            # last 2 refresh tokens in the database.
+            # (The predecessor of the latest refresh token is still useful in
+            # case the refresh was interrupted and the client re-uses the old
+            # one.)
+            # This cascades to delete the associated access token.
+            self.db_pool.simple_delete_txn(
+                txn, "refresh_tokens", {"next_token_id": token_id}
+            )
+
         await self.db_pool.runInteraction(
             "replace_refresh_token", _replace_refresh_token_txn
+        )
+
+    async def add_login_token_to_user(
+        self,
+        user_id: str,
+        token: str,
+        expiry_ts: int,
+        auth_provider_id: Optional[str],
+        auth_provider_session_id: Optional[str],
+    ) -> None:
+        """Adds a short-term login token for the given user.
+
+        Args:
+            user_id: The user ID.
+            token: The new login token to add.
+            expiry_ts (milliseconds since the epoch): Time after which the login token
+                cannot be used.
+            auth_provider_id: The SSO Identity Provider that the user authenticated with
+                to get this token, if any
+            auth_provider_session_id: The session ID advertised by the SSO Identity
+                Provider, if any.
+        """
+        await self.db_pool.simple_insert(
+            "login_tokens",
+            {
+                "token": token,
+                "user_id": user_id,
+                "expiry_ts": expiry_ts,
+                "auth_provider_id": auth_provider_id,
+                "auth_provider_session_id": auth_provider_session_id,
+            },
+            desc="add_login_token_to_user",
+        )
+
+    def _consume_login_token(
+        self,
+        txn: LoggingTransaction,
+        token: str,
+        ts: int,
+    ) -> LoginTokenLookupResult:
+        values = self.db_pool.simple_select_one_txn(
+            txn,
+            "login_tokens",
+            keyvalues={"token": token},
+            retcols=(
+                "user_id",
+                "expiry_ts",
+                "used_ts",
+                "auth_provider_id",
+                "auth_provider_session_id",
+            ),
+            allow_none=True,
+        )
+
+        if values is None:
+            raise NotFoundError()
+
+        self.db_pool.simple_update_one_txn(
+            txn,
+            "login_tokens",
+            keyvalues={"token": token},
+            updatevalues={"used_ts": ts},
+        )
+        user_id = values["user_id"]
+        expiry_ts = values["expiry_ts"]
+        used_ts = values["used_ts"]
+        auth_provider_id = values["auth_provider_id"]
+        auth_provider_session_id = values["auth_provider_session_id"]
+
+        # Token was already used
+        if used_ts is not None:
+            raise LoginTokenReused()
+
+        # Token expired
+        if ts > int(expiry_ts):
+            raise LoginTokenExpired()
+
+        return LoginTokenLookupResult(
+            user_id=user_id,
+            auth_provider_id=auth_provider_id,
+            auth_provider_session_id=auth_provider_session_id,
+        )
+
+    async def consume_login_token(self, token: str) -> LoginTokenLookupResult:
+        """Lookup a login token and consume it.
+
+        Args:
+            token: The login token.
+
+        Returns:
+            The data stored with that token, including the `user_id`. Returns `None` if
+            the token does not exist or if it expired.
+
+        Raises:
+            NotFound if the login token was not found in database
+            LoginTokenExpired if the login token expired
+            LoginTokenReused if the login token was already used
+        """
+        return await self.db_pool.runInteraction(
+            "consume_login_token",
+            self._consume_login_token,
+            token,
+            self._clock.time_msec(),
+        )
+
+    async def invalidate_login_tokens_by_session_id(
+        self, auth_provider_id: str, auth_provider_session_id: str
+    ) -> None:
+        """Invalidate login tokens with the given IdP session ID.
+
+        Args:
+            auth_provider_id: The SSO Identity Provider that the user authenticated with
+                to get this token
+            auth_provider_session_id: The session ID advertised by the SSO Identity
+                Provider
+        """
+        await self.db_pool.simple_update(
+            table="login_tokens",
+            keyvalues={
+                "auth_provider_id": auth_provider_id,
+                "auth_provider_session_id": auth_provider_session_id,
+            },
+            updatevalues={"used_ts": self._clock.time_msec()},
+            desc="invalidate_login_tokens_by_session_id",
+        )
+
+    @cached()
+    async def is_guest(self, user_id: str) -> bool:
+        res = await self.db_pool.simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="is_guest",
+            allow_none=True,
+            desc="is_guest",
+        )
+
+        return res if res else False
+
+    @cached()
+    async def is_user_approved(self, user_id: str) -> bool:
+        """Checks if a user is approved and therefore can be allowed to log in.
+
+        If the user's 'approved' column is NULL, we consider it as true given it means
+        the user was registered when support for an approval flow was either disabled
+        or nonexistent.
+
+        Args:
+            user_id: the user to check the approval status of.
+
+        Returns:
+            A boolean that is True if the user is approved, False otherwise.
+        """
+
+        def is_user_approved_txn(txn: LoggingTransaction) -> bool:
+            txn.execute(
+                """
+                SELECT COALESCE(approved, TRUE) AS approved FROM users WHERE name = ?
+                """,
+                (user_id,),
+            )
+
+            rows = self.db_pool.cursor_to_dict(txn)
+
+            # We cast to bool because the value returned by the database engine might
+            # be an integer if we're using SQLite.
+            return bool(rows[0]["approved"])
+
+        return await self.db_pool.runInteraction(
+            desc="is_user_pending_approval",
+            func=is_user_approved_txn,
         )
 
 
@@ -1617,17 +2001,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             columns=["creation_ts"],
         )
 
-        # we no longer use refresh tokens, but it's possible that some people
-        # might have a background update queued to build this index. Just
-        # clear the background update.
-        self.db_pool.updates.register_noop_background_update(
-            "refresh_tokens_device_index"
-        )
-
-        self.db_pool.updates.register_background_update_handler(
-            "user_threepids_grandfather", self._bg_user_threepids_grandfather
-        )
-
         self.db_pool.updates.register_background_update_handler(
             "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
@@ -1640,14 +2013,18 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             unique=False,
         )
 
-    async def _background_update_set_deactivated_flag(self, progress, batch_size):
+    async def _background_update_set_deactivated_flag(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         """Retrieves a list of all deactivated users and sets the 'deactivated' flag to 1
         for each of them.
         """
 
         last_user = progress.get("user_id", "")
 
-        def _background_update_set_deactivated_flag_txn(txn):
+        def _background_update_set_deactivated_flag_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[bool, int]:
             txn.execute(
                 """
                 SELECT
@@ -1702,35 +2079,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
 
         return nb_processed
 
-    async def _bg_user_threepids_grandfather(self, progress, batch_size):
-        """We now track which identity servers a user binds their 3PID to, so
-        we need to handle the case of existing bindings where we didn't track
-        this.
-
-        We do this by grandfathering in existing user threepids assuming that
-        they used one of the server configured trusted identity servers.
-        """
-        id_servers = set(self.config.trusted_third_party_id_servers)
-
-        def _bg_user_threepids_grandfather_txn(txn):
-            sql = """
-                INSERT INTO user_threepid_id_server
-                    (user_id, medium, address, id_server)
-                SELECT user_id, medium, address, ?
-                FROM user_threepids
-            """
-
-            txn.execute_batch(sql, [(id_server,) for id_server in id_servers])
-
-        if id_servers:
-            await self.db_pool.runInteraction(
-                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn
-            )
-
-        await self.db_pool.updates._end_background_update("user_threepids_grandfather")
-
-        return 1
-
     async def set_user_deactivated_status(
         self, user_id: str, deactivated: bool
     ) -> None:
@@ -1748,7 +2096,9 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             deactivated,
         )
 
-    def set_user_deactivated_status_txn(self, txn, user_id: str, deactivated: bool):
+    def set_user_deactivated_status_txn(
+        self, txn: LoggingTransaction, user_id: str, deactivated: bool
+    ) -> None:
         self.db_pool.simple_update_one_txn(
             txn=txn,
             table="users",
@@ -1761,27 +2111,58 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
-    @cached()
-    async def is_guest(self, user_id: str) -> bool:
-        res = await self.db_pool.simple_select_one_onecol(
+    def update_user_approval_status_txn(
+        self, txn: LoggingTransaction, user_id: str, approved: bool
+    ) -> None:
+        """Set the user's 'approved' flag to the given value.
+
+        The boolean is turned into an int because the column is a smallint.
+
+        Args:
+            txn: the current database transaction.
+            user_id: the user to update the flag for.
+            approved: the value to set the flag to.
+        """
+        self.db_pool.simple_update_one_txn(
+            txn=txn,
             table="users",
             keyvalues={"name": user_id},
-            retcol="is_guest",
-            allow_none=True,
-            desc="is_guest",
+            updatevalues={"approved": approved},
         )
 
-        return res if res else False
+        # Invalidate the caches of methods that read the value of the 'approved' flag.
+        self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+        self._invalidate_cache_and_stream(txn, self.is_user_approved, (user_id,))
 
 
 class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
-        self._ignore_unknown_session_error = hs.config.request_token_inhibit_3pid_errors
+        self._ignore_unknown_session_error = (
+            hs.config.server.request_token_inhibit_3pid_errors
+        )
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
+
+        # If support for MSC3866 is enabled and configured to require approval for new
+        # account, we will create new users with an 'approved' flag set to false.
+        self._require_approval = (
+            hs.config.experimental.msc3866.enabled
+            and hs.config.experimental.msc3866.require_approval_for_new_accounts
+        )
+
+        # Create a background job for removing expired login tokens
+        if hs.config.worker.run_background_tasks:
+            self._clock.looping_call(
+                self._delete_expired_login_tokens, THIRTY_MINUTES_IN_MS
+            )
 
     async def add_access_token_to_user(
         self,
@@ -1833,6 +2214,8 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         user_id: str,
         token: str,
         device_id: Optional[str],
+        expiry_ts: Optional[int],
+        ultimate_session_expiry_ts: Optional[int],
     ) -> int:
         """Adds a refresh token for the given user.
 
@@ -1840,6 +2223,13 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             user_id: The user ID.
             token: The new access token to add.
             device_id: ID of the device to associate with the refresh token.
+            expiry_ts (milliseconds since the epoch): Time after which the
+                refresh token cannot be used.
+                If None, the refresh token never expires until it has been used.
+            ultimate_session_expiry_ts (milliseconds since the epoch):
+                Time at which the session will end and can not be extended any
+                further.
+                If None, the session can be refreshed indefinitely.
         Raises:
             StoreError if there was a problem adding this.
         Returns:
@@ -1855,13 +2245,17 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "device_id": device_id,
                 "token": token,
                 "next_token_id": None,
+                "expiry_ts": expiry_ts,
+                "ultimate_session_expiry_ts": ultimate_session_expiry_ts,
             },
             desc="add_refresh_token_to_user",
         )
 
         return next_id
 
-    def _set_device_for_access_token_txn(self, txn, token: str, device_id: str) -> str:
+    def _set_device_for_access_token_txn(
+        self, txn: LoggingTransaction, token: str, device_id: str
+    ) -> str:
         old_device_id = self.db_pool.simple_select_one_onecol_txn(
             txn, "access_tokens", {"token": token}, "device_id"
         )
@@ -1902,6 +2296,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         admin: bool = False,
         user_type: Optional[str] = None,
         shadow_banned: bool = False,
+        approved: bool = False,
     ) -> None:
         """Attempts to register an account.
 
@@ -1920,6 +2315,8 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 or None for a normal user.
             shadow_banned: Whether the user is shadow-banned, i.e. they may be
                 told their requests succeeded but we ignore them.
+            approved: Whether to consider the user has already been approved by an
+                administrator.
 
         Raises:
             StoreError if the user_id could not be registered.
@@ -1936,11 +2333,12 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             admin,
             user_type,
             shadow_banned,
+            approved,
         )
 
     def _register_user(
         self,
-        txn,
+        txn: LoggingTransaction,
         user_id: str,
         password_hash: Optional[str],
         was_guest: bool,
@@ -1950,10 +2348,13 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         admin: bool,
         user_type: Optional[str],
         shadow_banned: bool,
-    ):
+        approved: bool,
+    ) -> None:
         user_id_obj = UserID.from_string(user_id)
 
         now = int(self._clock.time())
+
+        user_approved = approved or not self._require_approval
 
         try:
             if was_guest:
@@ -1980,6 +2381,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
+                        "approved": user_approved,
                     },
                 )
             else:
@@ -1995,6 +2397,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                         "shadow_banned": shadow_banned,
+                        "approved": user_approved,
                     },
                 )
 
@@ -2011,11 +2414,11 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             # *obviously* the 'profiles' table uses localpart for user_id
             # while everything else uses the full mxid.
             txn.execute(
-                "INSERT INTO profiles(user_id, displayname) VALUES (?,?)",
-                (user_id_obj.localpart, create_profile_with_displayname),
+                "INSERT INTO profiles(full_user_id, user_id, displayname) VALUES (?,?,?)",
+                (user_id, user_id_obj.localpart, create_profile_with_displayname),
             )
 
-        if self.hs.config.stats_enabled:
+        if self.hs.config.stats.stats_enabled:
             # we create a new completed user statistics row
 
             # we don't strictly need current_token since this user really can't
@@ -2037,7 +2440,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             pointless. Use flush_user separately.
         """
 
-        def user_set_password_hash_txn(txn):
+        def user_set_password_hash_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_update_one_txn(
                 txn, "users", {"name": user_id}, {"password_hash": password_hash}
             )
@@ -2060,12 +2463,15 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             StoreError(404) if user not found
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> None:
             self.db_pool.simple_update_one_txn(
                 txn,
                 table="users",
                 keyvalues={"name": user_id},
-                updatevalues={"consent_version": consent_version},
+                updatevalues={
+                    "consent_version": consent_version,
+                    "consent_ts": self._clock.time_msec(),
+                },
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
@@ -2085,7 +2491,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             StoreError(404) if user not found
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> None:
             self.db_pool.simple_update_one_txn(
                 txn,
                 table="users",
@@ -2115,7 +2521,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             A tuple of (token, token id, device id) for each of the deleted tokens
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> List[Tuple[str, int, Optional[str]]]:
             keyvalues = {"user_id": user_id}
             if device_id is not None:
                 keyvalues["device_id"] = device_id
@@ -2157,7 +2563,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         return await self.db_pool.runInteraction("user_delete_access_tokens", f)
 
     async def delete_access_token(self, access_token: str) -> None:
-        def f(txn):
+        def f(txn: LoggingTransaction) -> None:
             self.db_pool.simple_delete_one_txn(
                 txn, table="access_tokens", keyvalues={"token": access_token}
             )
@@ -2169,7 +2575,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         await self.db_pool.runInteraction("delete_access_token", f)
 
     async def delete_refresh_token(self, refresh_token: str) -> None:
-        def f(txn):
+        def f(txn: LoggingTransaction) -> None:
             self.db_pool.simple_delete_one_txn(
                 txn, table="refresh_tokens", keyvalues={"token": refresh_token}
             )
@@ -2209,7 +2615,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         """
 
         # Insert everything into a transaction in order to run atomically
-        def validate_threepid_session_txn(txn):
+        def validate_threepid_session_txn(txn: LoggingTransaction) -> Optional[str]:
             row = self.db_pool.simple_select_one_txn(
                 txn,
                 table="threepid_validation_session",
@@ -2230,7 +2636,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                     # accident.
                     row = {"client_secret": None, "validated_at": None}
                 else:
-                    raise ThreepidValidationError(400, "Unknown session_id")
+                    raise ThreepidValidationError("Unknown session_id")
 
             retrieved_client_secret = row["client_secret"]
             validated_at = row["validated_at"]
@@ -2245,14 +2651,14 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             if not row:
                 raise ThreepidValidationError(
-                    400, "Validation token not found or has expired"
+                    "Validation token not found or has expired"
                 )
             expires = row["expires"]
             next_link = row["next_link"]
 
             if retrieved_client_secret != client_secret:
                 raise ThreepidValidationError(
-                    400, "This client_secret does not match the provided session_id"
+                    "This client_secret does not match the provided session_id"
                 )
 
             # If the session is already validated, no need to revalidate
@@ -2261,7 +2667,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             if expires <= current_ts:
                 raise ThreepidValidationError(
-                    400, "This token has expired. Please request a new one"
+                    "This token has expired. Please request a new one"
                 )
 
             # Looks good. Validate the session
@@ -2306,7 +2712,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 longer be valid
         """
 
-        def start_or_continue_validation_session_txn(txn):
+        def start_or_continue_validation_session_txn(txn: LoggingTransaction) -> None:
             # Create or update a validation session
             self.db_pool.simple_upsert_txn(
                 txn,
@@ -2335,6 +2741,42 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         await self.db_pool.runInteraction(
             "start_or_continue_validation_session",
             start_or_continue_validation_session_txn,
+        )
+
+    async def update_user_approval_status(
+        self, user_id: UserID, approved: bool
+    ) -> None:
+        """Set the user's 'approved' flag to the given value.
+
+        The boolean will be turned into an int (in update_user_approval_status_txn)
+        because the column is a smallint.
+
+        Args:
+            user_id: the user to update the flag for.
+            approved: the value to set the flag to.
+        """
+        await self.db_pool.runInteraction(
+            "update_user_approval_status",
+            self.update_user_approval_status_txn,
+            user_id.to_string(),
+            approved,
+        )
+
+    @wrap_as_background_process("delete_expired_login_tokens")
+    async def _delete_expired_login_tokens(self) -> None:
+        """Remove login tokens with expiry dates that have passed."""
+
+        def _delete_expired_login_tokens_txn(txn: LoggingTransaction, ts: int) -> None:
+            sql = "DELETE FROM login_tokens WHERE expiry_ts <= ?"
+            txn.execute(sql, (ts,))
+
+        # We keep the expired tokens for an extra 5 minutes so we can measure how many
+        # times a token is being used after its expiry
+        now = self._clock.time_msec()
+        await self.db_pool.runInteraction(
+            "delete_expired_login_tokens",
+            _delete_expired_login_tokens_txn,
+            now - (5 * 60 * 1000),
         )
 
 

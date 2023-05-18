@@ -11,19 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 from synapse.rest.health import HealthResource
 
 from tests import unittest
 
 
 class HealthCheckTests(unittest.HomeserverTestCase):
-    def create_test_resource(self):
+    def create_test_resource(self) -> HealthResource:
         # replace the JsonResource with a HealthResource.
         return HealthResource()
 
-    def test_health(self):
+    def test_health(self) -> None:
         channel = self.make_request("GET", "/health", shorthand=False)
 
         self.assertEqual(channel.code, 200)

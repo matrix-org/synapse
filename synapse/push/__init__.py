@@ -12,6 +12,80 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This module implements the push rules & notifications portion of the Matrix
+specification.
+
+There's a few related features:
+
+* Push notifications (i.e. email or outgoing requests to a Push Gateway).
+* Calculation of unread notifications (for /sync and /notifications).
+
+When Synapse receives a new event (locally, via the Client-Server API, or via
+federation), the following occurs:
+
+1. The push rules get evaluated to generate a set of per-user actions.
+2. The event is persisted into the database.
+3. (In the background) The notifier is notified about the new event.
+
+The per-user actions are initially stored in the event_push_actions_staging table,
+before getting moved into the event_push_actions table when the event is persisted.
+The event_push_actions table is periodically summarised into the event_push_summary
+and event_push_summary_stream_ordering tables.
+
+Since push actions block an event from being persisted the generation of push
+actions is performance sensitive.
+
+The general interaction of the classes are:
+
+        +---------------------------------------------+
+        | FederationEventHandler/EventCreationHandler |
+        +---------------------------------------------+
+                |
+                v
+        +-----------------------+     +---------------------------+
+        | BulkPushRuleEvaluator |---->| PushRuleEvaluatorForEvent |
+        +-----------------------+     +---------------------------+
+                |
+                v
+        +-----------------------------+
+        | EventPushActionsWorkerStore |
+        +-----------------------------+
+
+The notifier notifies the pusher pool of the new event, which checks for affected
+users. Each user-configured pusher of the affected users then performs the
+previously calculated action.
+
+The general interaction of the classes are:
+
+        +----------+
+        | Notifier |
+        +----------+
+                |
+                v
+        +------------+     +--------------+
+        | PusherPool |---->| PusherConfig |
+        +------------+     +--------------+
+                |
+                |     +---------------+
+                +<--->| PusherFactory |
+                |     +---------------+
+                v
+        +------------------------+     +-----------------------------------------------+
+        | EmailPusher/HttpPusher |---->| EventPushActionsWorkerStore/PusherWorkerStore |
+        +------------------------+     +-----------------------------------------------+
+                |
+                v
+        +-------------------------+
+        | Mailer/SimpleHttpClient |
+        +-------------------------+
+
+The Pusher instance also calls out to various utilities for generating payloads
+(or email templates), but those interactions are not detailed in this diagram
+(and are specific to the type of pusher).
+
+"""
+
 import abc
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -23,25 +97,32 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class PusherConfig:
     """Parameters necessary to configure a pusher."""
 
-    id = attr.ib(type=Optional[str])
-    user_name = attr.ib(type=str)
-    access_token = attr.ib(type=Optional[int])
-    profile_tag = attr.ib(type=str)
-    kind = attr.ib(type=str)
-    app_id = attr.ib(type=str)
-    app_display_name = attr.ib(type=str)
-    device_display_name = attr.ib(type=str)
-    pushkey = attr.ib(type=str)
-    ts = attr.ib(type=int)
-    lang = attr.ib(type=Optional[str])
-    data = attr.ib(type=Optional[JsonDict])
-    last_stream_ordering = attr.ib(type=int)
-    last_success = attr.ib(type=Optional[int])
-    failing_since = attr.ib(type=Optional[int])
+    id: Optional[str]
+    user_name: str
+
+    profile_tag: str
+    kind: str
+    app_id: str
+    app_display_name: str
+    device_display_name: str
+    pushkey: str
+    ts: int
+    lang: Optional[str]
+    data: Optional[JsonDict]
+    last_stream_ordering: int
+    last_success: Optional[int]
+    failing_since: Optional[int]
+    enabled: bool
+    device_id: Optional[str]
+
+    # XXX(quenting): The access_token is not persisted anymore for new pushers, but we
+    # keep it when reading from the database, so that we don't get stale pushers
+    # while the "set_device_id_for_pushers" background update is running.
+    access_token: Optional[int]
 
     def as_dict(self) -> Dict[str, Any]:
         """Information that can be retrieved about a pusher after creation."""
@@ -54,21 +135,23 @@ class PusherConfig:
             "lang": self.lang,
             "profile_tag": self.profile_tag,
             "pushkey": self.pushkey,
+            "enabled": self.enabled,
+            "device_id": self.device_id,
         }
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class ThrottleParams:
     """Parameters for controlling the rate of sending pushes via email."""
 
-    last_sent_ts = attr.ib(type=int)
-    throttle_ms = attr.ib(type=int)
+    last_sent_ts: int
+    throttle_ms: int
 
 
 class Pusher(metaclass=abc.ABCMeta):
     def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
         self.hs = hs
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.clock = self.hs.get_clock()
 
         self.pusher_id = pusher_config.id
@@ -94,7 +177,7 @@ class Pusher(metaclass=abc.ABCMeta):
         self._start_processing()
 
     @abc.abstractmethod
-    def _start_processing(self):
+    def _start_processing(self) -> None:
         """Start processing push notifications."""
         raise NotImplementedError()
 

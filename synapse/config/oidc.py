@@ -14,17 +14,17 @@
 # limitations under the License.
 
 from collections import Counter
-from typing import Collection, Iterable, List, Mapping, Optional, Tuple, Type
+from typing import Any, Collection, Iterable, List, Mapping, Optional, Tuple, Type
 
 import attr
 
 from synapse.config._util import validate_config
 from synapse.config.sso import SsoAttributeRequirement
-from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
+from ..util.check_dependencies import check_requirements
 from ._base import Config, ConfigError, read_file
 
 DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc.JinjaOidcMappingProvider"
@@ -36,17 +36,12 @@ LEGACY_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingPr
 class OIDCConfig(Config):
     section = "oidc"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.oidc_providers = tuple(_parse_oidc_provider_configs(config))
         if not self.oidc_providers:
             return
 
-        try:
-            check_requirements("oidc")
-        except DependencyException as e:
-            raise ConfigError(
-                e.message  # noqa: B306, DependencyException.message is a property
-            ) from e
+        check_requirements("oidc")
 
         # check we don't have any duplicate idp_ids now. (The SSO handler will also
         # check for duplicates when the REST listeners get registered, but that happens
@@ -58,203 +53,13 @@ class OIDCConfig(Config):
                     "Multiple OIDC providers have the idp_id %r." % idp_id
                 )
 
-        public_baseurl = self.public_baseurl
-        if public_baseurl is None:
-            raise ConfigError("oidc_config requires a public_baseurl to be set")
+        public_baseurl = self.root.server.public_baseurl
         self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"
 
     @property
     def oidc_enabled(self) -> bool:
         # OIDC is enabled if we have a provider
         return bool(self.oidc_providers)
-
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """\
-        # List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
-        # and login.
-        #
-        # Options for each entry include:
-        #
-        #   idp_id: a unique identifier for this identity provider. Used internally
-        #       by Synapse; should be a single word such as 'github'.
-        #
-        #       Note that, if this is changed, users authenticating via that provider
-        #       will no longer be recognised as the same user!
-        #
-        #       (Use "oidc" here if you are migrating from an old "oidc_config"
-        #       configuration.)
-        #
-        #   idp_name: A user-facing name for this identity provider, which is used to
-        #       offer the user a choice of login mechanisms.
-        #
-        #   idp_icon: An optional icon for this identity provider, which is presented
-        #       by clients and Synapse's own IdP picker page. If given, must be an
-        #       MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
-        #       obtain such an MXC URI is to upload an image to an (unencrypted) room
-        #       and then copy the "url" from the source of the event.)
-        #
-        #   idp_brand: An optional brand for this identity provider, allowing clients
-        #       to style the login flow according to the identity provider in question.
-        #       See the spec for possible options here.
-        #
-        #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
-        #       to discover endpoints. Defaults to true.
-        #
-        #   issuer: Required. The OIDC issuer. Used to validate tokens and (if discovery
-        #       is enabled) to discover the provider's endpoints.
-        #
-        #   client_id: Required. oauth2 client id to use.
-        #
-        #   client_secret: oauth2 client secret to use. May be omitted if
-        #        client_secret_jwt_key is given, or if client_auth_method is 'none'.
-        #
-        #   client_secret_jwt_key: Alternative to client_secret: details of a key used
-        #      to create a JSON Web Token to be used as an OAuth2 client secret. If
-        #      given, must be a dictionary with the following properties:
-        #
-        #          key: a pem-encoded signing key. Must be a suitable key for the
-        #              algorithm specified. Required unless 'key_file' is given.
-        #
-        #          key_file: the path to file containing a pem-encoded signing key file.
-        #              Required unless 'key' is given.
-        #
-        #          jwt_header: a dictionary giving properties to include in the JWT
-        #              header. Must include the key 'alg', giving the algorithm used to
-        #              sign the JWT, such as "ES256", using the JWA identifiers in
-        #              RFC7518.
-        #
-        #          jwt_payload: an optional dictionary giving properties to include in
-        #              the JWT payload. Normally this should include an 'iss' key.
-        #
-        #   client_auth_method: auth method to use when exchanging the token. Valid
-        #       values are 'client_secret_basic' (default), 'client_secret_post' and
-        #       'none'.
-        #
-        #   scopes: list of scopes to request. This should normally include the "openid"
-        #       scope. Defaults to ["openid"].
-        #
-        #   authorization_endpoint: the oauth2 authorization endpoint. Required if
-        #       provider discovery is disabled.
-        #
-        #   token_endpoint: the oauth2 token endpoint. Required if provider discovery is
-        #       disabled.
-        #
-        #   userinfo_endpoint: the OIDC userinfo endpoint. Required if discovery is
-        #       disabled and the 'openid' scope is not requested.
-        #
-        #   jwks_uri: URI where to fetch the JWKS. Required if discovery is disabled and
-        #       the 'openid' scope is used.
-        #
-        #   skip_verification: set to 'true' to skip metadata verification. Use this if
-        #       you are connecting to a provider that is not OpenID Connect compliant.
-        #       Defaults to false. Avoid this in production.
-        #
-        #   user_profile_method: Whether to fetch the user profile from the userinfo
-        #       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
-        #
-        #       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
-        #       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
-        #       userinfo endpoint.
-        #
-        #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to
-        #       match a pre-existing account instead of failing. This could be used if
-        #       switching from password logins to OIDC. Defaults to false.
-        #
-        #   user_mapping_provider: Configuration for how attributes returned from a OIDC
-        #       provider are mapped onto a matrix user. This setting has the following
-        #       sub-properties:
-        #
-        #       module: The class name of a custom mapping module. Default is
-        #           {mapping_provider!r}.
-        #           See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
-        #           for information on implementing a custom mapping provider.
-        #
-        #       config: Configuration for the mapping provider module. This section will
-        #           be passed as a Python dictionary to the user mapping provider
-        #           module's `parse_config` method.
-        #
-        #           For the default provider, the following settings are available:
-        #
-        #             subject_claim: name of the claim containing a unique identifier
-        #                 for the user. Defaults to 'sub', which OpenID Connect
-        #                 compliant providers should provide.
-        #
-        #             localpart_template: Jinja2 template for the localpart of the MXID.
-        #                 If this is not set, the user will be prompted to choose their
-        #                 own username (see 'sso_auth_account_details.html' in the 'sso'
-        #                 section of this file).
-        #
-        #             display_name_template: Jinja2 template for the display name to set
-        #                 on first login. If unset, no displayname will be set.
-        #
-        #             email_template: Jinja2 template for the email address of the user.
-        #                 If unset, no email address will be added to the account.
-        #
-        #             extra_attributes: a map of Jinja2 templates for extra attributes
-        #                 to send back to the client during login.
-        #                 Note that these are non-standard and clients will ignore them
-        #                 without modifications.
-        #
-        #           When rendering, the Jinja2 templates are given a 'user' variable,
-        #           which is set to the claims returned by the UserInfo Endpoint and/or
-        #           in the ID Token.
-        #
-        #   It is possible to configure Synapse to only allow logins if certain attributes
-        #   match particular values in the OIDC userinfo. The requirements can be listed under
-        #   `attribute_requirements` as shown below. All of the listed attributes must
-        #   match for the login to be permitted. Additional attributes can be added to
-        #   userinfo by expanding the `scopes` section of the OIDC config to retrieve
-        #   additional information from the OIDC provider.
-        #
-        #   If the OIDC claim is a list, then the attribute must match any value in the list.
-        #   Otherwise, it must exactly match the value of the claim. Using the example
-        #   below, the `family_name` claim MUST be "Stephensson", but the `groups`
-        #   claim MUST contain "admin".
-        #
-        #   attribute_requirements:
-        #     - attribute: family_name
-        #       value: "Stephensson"
-        #     - attribute: groups
-        #       value: "admin"
-        #
-        # See https://matrix-org.github.io/synapse/latest/openid.html
-        # for information on how to configure these options.
-        #
-        # For backwards compatibility, it is also possible to configure a single OIDC
-        # provider via an 'oidc_config' setting. This is now deprecated and admins are
-        # advised to migrate to the 'oidc_providers' format. (When doing that migration,
-        # use 'oidc' for the idp_id to ensure that existing users continue to be
-        # recognised.)
-        #
-        oidc_providers:
-          # Generic example
-          #
-          #- idp_id: my_idp
-          #  idp_name: "My OpenID provider"
-          #  idp_icon: "mxc://example.com/mediaid"
-          #  discover: false
-          #  issuer: "https://accounts.example.com/"
-          #  client_id: "provided-by-your-issuer"
-          #  client_secret: "provided-by-your-issuer"
-          #  client_auth_method: client_secret_post
-          #  scopes: ["openid", "profile"]
-          #  authorization_endpoint: "https://accounts.example.com/oauth2/auth"
-          #  token_endpoint: "https://accounts.example.com/oauth2/token"
-          #  userinfo_endpoint: "https://accounts.example.com/userinfo"
-          #  jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
-          #  skip_verification: true
-          #  user_mapping_provider:
-          #    config:
-          #      subject_claim: "id"
-          #      localpart_template: "{{{{ user.login }}}}"
-          #      display_name_template: "{{{{ user.name }}}}"
-          #      email_template: "{{{{ user.email }}}}"
-          #  attribute_requirements:
-          #    - attribute: userGroup
-          #      value: "synapseUsers"
-        """.format(
-            mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
-        )
 
 
 # jsonschema definition of the configuration settings for an oidc identity provider
@@ -312,12 +117,15 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             # to avoid importing authlib here.
             "enum": ["client_secret_basic", "client_secret_post", "none"],
         },
+        "pkce_method": {"type": "string", "enum": ["auto", "always", "never"]},
         "scopes": {"type": "array", "items": {"type": "string"}},
         "authorization_endpoint": {"type": "string"},
         "token_endpoint": {"type": "string"},
         "userinfo_endpoint": {"type": "string"},
         "jwks_uri": {"type": "string"},
         "skip_verification": {"type": "boolean"},
+        "backchannel_logout_enabled": {"type": "boolean"},
+        "backchannel_logout_ignore_sub": {"type": "boolean"},
         "user_profile_method": {
             "type": "string",
             "enum": ["auto", "userinfo_endpoint"],
@@ -328,6 +136,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "type": "array",
             "items": SsoAttributeRequirement.JSON_SCHEMA,
         },
+        "enable_registration": {"type": "boolean"},
     },
 }
 
@@ -335,7 +144,6 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
 OIDC_PROVIDER_CONFIG_WITH_ID_SCHEMA = {
     "allOf": [OIDC_PROVIDER_CONFIG_SCHEMA, {"required": ["idp_id", "idp_name"]}]
 }
-
 
 # the `oidc_providers` list can either be None (as it is in the default config), or
 # a list of provider configs, each of which requires an explicit ID and name.
@@ -483,103 +291,122 @@ def _parse_oidc_config_dict(
         client_secret=oidc_config.get("client_secret"),
         client_secret_jwt_key=client_secret_jwt_key,
         client_auth_method=oidc_config.get("client_auth_method", "client_secret_basic"),
+        pkce_method=oidc_config.get("pkce_method", "auto"),
         scopes=oidc_config.get("scopes", ["openid"]),
         authorization_endpoint=oidc_config.get("authorization_endpoint"),
         token_endpoint=oidc_config.get("token_endpoint"),
         userinfo_endpoint=oidc_config.get("userinfo_endpoint"),
         jwks_uri=oidc_config.get("jwks_uri"),
+        backchannel_logout_enabled=oidc_config.get("backchannel_logout_enabled", False),
+        backchannel_logout_ignore_sub=oidc_config.get(
+            "backchannel_logout_ignore_sub", False
+        ),
         skip_verification=oidc_config.get("skip_verification", False),
         user_profile_method=oidc_config.get("user_profile_method", "auto"),
         allow_existing_users=oidc_config.get("allow_existing_users", False),
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
         attribute_requirements=attribute_requirements,
+        enable_registration=oidc_config.get("enable_registration", True),
     )
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class OidcProviderClientSecretJwtKey:
     # a pem-encoded signing key
-    key = attr.ib(type=str)
+    key: str
 
     # properties to include in the JWT header
-    jwt_header = attr.ib(type=Mapping[str, str])
+    jwt_header: Mapping[str, str]
 
     # properties to include in the JWT payload.
-    jwt_payload = attr.ib(type=Mapping[str, str])
+    jwt_payload: Mapping[str, str]
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class OidcProviderConfig:
     # a unique identifier for this identity provider. Used in the 'user_external_ids'
     # table, as well as the query/path parameter used in the login protocol.
-    idp_id = attr.ib(type=str)
+    idp_id: str
 
     # user-facing name for this identity provider.
-    idp_name = attr.ib(type=str)
+    idp_name: str
 
     # Optional MXC URI for icon for this IdP.
-    idp_icon = attr.ib(type=Optional[str])
+    idp_icon: Optional[str]
 
     # Optional brand identifier for this IdP.
-    idp_brand = attr.ib(type=Optional[str])
+    idp_brand: Optional[str]
 
     # whether the OIDC discovery mechanism is used to discover endpoints
-    discover = attr.ib(type=bool)
+    discover: bool
 
     # the OIDC issuer. Used to validate tokens and (if discovery is enabled) to
     # discover the provider's endpoints.
-    issuer = attr.ib(type=str)
+    issuer: str
 
     # oauth2 client id to use
-    client_id = attr.ib(type=str)
+    client_id: str
 
     # oauth2 client secret to use. if `None`, use client_secret_jwt_key to generate
     # a secret.
-    client_secret = attr.ib(type=Optional[str])
+    client_secret: Optional[str]
 
     # key to use to construct a JWT to use as a client secret. May be `None` if
     # `client_secret` is set.
-    client_secret_jwt_key = attr.ib(type=Optional[OidcProviderClientSecretJwtKey])
+    client_secret_jwt_key: Optional[OidcProviderClientSecretJwtKey]
 
     # auth method to use when exchanging the token.
     # Valid values are 'client_secret_basic', 'client_secret_post' and
     # 'none'.
-    client_auth_method = attr.ib(type=str)
+    client_auth_method: str
+
+    # Whether to enable PKCE when exchanging the authorization & token.
+    # Valid values are 'auto', 'always', and 'never'.
+    pkce_method: str
 
     # list of scopes to request
-    scopes = attr.ib(type=Collection[str])
+    scopes: Collection[str]
 
     # the oauth2 authorization endpoint. Required if discovery is disabled.
-    authorization_endpoint = attr.ib(type=Optional[str])
+    authorization_endpoint: Optional[str]
 
     # the oauth2 token endpoint. Required if discovery is disabled.
-    token_endpoint = attr.ib(type=Optional[str])
+    token_endpoint: Optional[str]
 
     # the OIDC userinfo endpoint. Required if discovery is disabled and the
     # "openid" scope is not requested.
-    userinfo_endpoint = attr.ib(type=Optional[str])
+    userinfo_endpoint: Optional[str]
 
     # URI where to fetch the JWKS. Required if discovery is disabled and the
     # "openid" scope is used.
-    jwks_uri = attr.ib(type=Optional[str])
+    jwks_uri: Optional[str]
+
+    # Whether Synapse should react to backchannel logouts
+    backchannel_logout_enabled: bool
+
+    # Whether Synapse should ignore the `sub` claim in backchannel logouts or not.
+    backchannel_logout_ignore_sub: bool
 
     # Whether to skip metadata verification
-    skip_verification = attr.ib(type=bool)
+    skip_verification: bool
 
     # Whether to fetch the user profile from the userinfo endpoint. Valid
     # values are: "auto" or "userinfo_endpoint".
-    user_profile_method = attr.ib(type=str)
+    user_profile_method: str
 
     # whether to allow a user logging in via OIDC to match a pre-existing account
     # instead of failing
-    allow_existing_users = attr.ib(type=bool)
+    allow_existing_users: bool
 
     # the class of the user mapping provider
-    user_mapping_provider_class = attr.ib(type=Type)
+    user_mapping_provider_class: Type
 
     # the config of the user mapping provider
-    user_mapping_provider_config = attr.ib()
+    user_mapping_provider_config: Any
 
     # required attributes to require in userinfo to allow login/registration
-    attribute_requirements = attr.ib(type=List[SsoAttributeRequirement])
+    attribute_requirements: List[SsoAttributeRequirement]
+
+    # Whether automatic registrations are enabled in the ODIC flow. Defaults to True
+    enable_registration: bool

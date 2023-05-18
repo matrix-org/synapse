@@ -34,12 +34,15 @@ class TagListServlet(RestServlet):
     GET /user/{user_id}/rooms/{room_id}/tags HTTP/1.1
     """
 
-    PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags")
+    PATTERNS = client_patterns(
+        "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags$"
+    )
+    CATEGORY = "Account data requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str, room_id: str
@@ -62,6 +65,7 @@ class TagServlet(RestServlet):
     PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)/rooms/(?P<room_id>[^/]*)/tags/(?P<tag>[^/]*)"
     )
+    CATEGORY = "Account data requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

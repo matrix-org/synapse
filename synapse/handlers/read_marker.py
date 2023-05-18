@@ -15,9 +15,8 @@
 import logging
 from typing import TYPE_CHECKING
 
+from synapse.api.constants import ReceiptTypes
 from synapse.util.async_helpers import Linearizer
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -25,11 +24,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ReadMarkerHandler(BaseHandler):
+class ReadMarkerHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
         self.server_name = hs.config.server.server_name
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.account_data_handler = hs.get_account_data_handler()
         self.read_marker_linearizer = Linearizer(name="read_marker")
 
@@ -43,9 +41,9 @@ class ReadMarkerHandler(BaseHandler):
         the read marker has changed.
         """
 
-        with await self.read_marker_linearizer.queue((room_id, user_id)):
+        async with self.read_marker_linearizer.queue((room_id, user_id)):
             existing_read_marker = await self.store.get_account_data_for_room_and_type(
-                user_id, room_id, "m.fully_read"
+                user_id, room_id, ReceiptTypes.FULLY_READ
             )
 
             should_update = True
@@ -59,5 +57,5 @@ class ReadMarkerHandler(BaseHandler):
             if should_update:
                 content = {"event_id": event_id}
                 await self.account_data_handler.add_account_data_to_room(
-                    user_id, room_id, "m.fully_read", content
+                    user_id, room_id, ReceiptTypes.FULLY_READ, content
                 )

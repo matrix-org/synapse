@@ -1,1 +1,0 @@
-Factor out PNG image data to a constant to be used in several tests.

@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# Prefixes all lines on stdout and stderr with the process name (as determined by
+# the SUPERVISOR_PROCESS_NAME env var, which is automatically set by Supervisor).
+#
+# Usage:
+#   prefix-log command [args...]
+#
+
+exec 1> >(awk '{print "'"${SUPERVISOR_PROCESS_NAME}"' | "$0}' >&1)
+exec 2> >(awk '{print "'"${SUPERVISOR_PROCESS_NAME}"' | "$0}' >&2)
+exec "$@"

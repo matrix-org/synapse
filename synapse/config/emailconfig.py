@@ -18,10 +18,11 @@
 import email.utils
 import logging
 import os
-from enum import Enum
-from typing import Optional
+from typing import Any
 
 import attr
+
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
@@ -51,30 +52,30 @@ LEGACY_TEMPLATE_DIR_WARNING = """
 This server's configuration file is using the deprecated 'template_dir' setting in the
 'email' section. Support for this setting has been deprecated and will be removed in a
 future version of Synapse. Server admins should instead use the new
-'custom_templates_directory' setting documented here:
+'custom_template_directory' setting documented here:
 https://matrix-org.github.io/synapse/latest/templates.html
 ---------------------------------------------------------------------------------------"""
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EmailSubjectConfig:
-    message_from_person_in_room = attr.ib(type=str)
-    message_from_person = attr.ib(type=str)
-    messages_from_person = attr.ib(type=str)
-    messages_in_room = attr.ib(type=str)
-    messages_in_room_and_others = attr.ib(type=str)
-    messages_from_person_and_others = attr.ib(type=str)
-    invite_from_person = attr.ib(type=str)
-    invite_from_person_to_room = attr.ib(type=str)
-    invite_from_person_to_space = attr.ib(type=str)
-    password_reset = attr.ib(type=str)
-    email_validation = attr.ib(type=str)
+    message_from_person_in_room: str
+    message_from_person: str
+    messages_from_person: str
+    messages_in_room: str
+    messages_in_room_and_others: str
+    messages_from_person_and_others: str
+    invite_from_person: str
+    invite_from_person_to_room: str
+    invite_from_person_to_space: str
+    password_reset: str
+    email_validation: str
 
 
 class EmailConfig(Config):
     section = "email"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         # TODO: We should separate better the email configuration from the notification
         # and account validity config.
 
@@ -84,14 +85,19 @@ class EmailConfig(Config):
         if email_config is None:
             email_config = {}
 
+        self.force_tls = email_config.get("force_tls", False)
         self.email_smtp_host = email_config.get("smtp_host", "localhost")
-        self.email_smtp_port = email_config.get("smtp_port", 25)
+        self.email_smtp_port = email_config.get(
+            "smtp_port", 465 if self.force_tls else 25
+        )
         self.email_smtp_user = email_config.get("smtp_user", None)
         self.email_smtp_pass = email_config.get("smtp_pass", None)
         self.require_transport_security = email_config.get(
             "require_transport_security", False
         )
         self.enable_smtp_tls = email_config.get("enable_tls", True)
+        if self.force_tls and not self.enable_smtp_tls:
+            raise ConfigError("email.force_tls requires email.enable_tls to be true")
         if self.require_transport_security and not self.enable_smtp_tls:
             raise ConfigError(
                 "email.require_transport_security requires email.enable_tls to be true"
@@ -129,68 +135,25 @@ class EmailConfig(Config):
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
-        self.threepid_behaviour_email = (
-            # Have Synapse handle the email sending if account_threepid_delegates.email
-            # is not defined
-            # msisdn is currently always remote while Synapse does not support any method of
-            # sending SMS messages
-            ThreepidBehaviour.REMOTE
-            if self.account_threepid_delegate_email
-            else ThreepidBehaviour.LOCAL
-        )
-        # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
-        # use an identity server to password reset tokens on its behalf. We now warn the user
-        # if they have this set and tell them to use the updated option, while using a default
-        # identity server in the process.
-        self.using_identity_server_from_trusted_list = False
-        if (
-            not self.account_threepid_delegate_email
-            and config.get("trust_identity_server_for_password_resets", False) is True
-        ):
-            # Use the first entry in self.trusted_third_party_id_servers instead
-            if self.trusted_third_party_id_servers:
-                # XXX: It's a little confusing that account_threepid_delegate_email is modified
-                # both in RegistrationConfig and here. We should factor this bit out
+        if config.get("trust_identity_server_for_password_resets"):
+            raise ConfigError(
+                'The config option "trust_identity_server_for_password_resets" '
+                "is no longer supported. Please remove it from the config file."
+            )
 
-                first_trusted_identity_server = self.trusted_third_party_id_servers[0]
-
-                # trusted_third_party_id_servers does not contain a scheme whereas
-                # account_threepid_delegate_email is expected to. Presume https
-                self.account_threepid_delegate_email: Optional[str] = (
-                    "https://" + first_trusted_identity_server
-                )
-                self.using_identity_server_from_trusted_list = True
-            else:
-                raise ConfigError(
-                    "Attempted to use an identity server from"
-                    '"trusted_third_party_id_servers" but it is empty.'
-                )
-
-        self.local_threepid_handling_disabled_due_to_email_config = False
-        if (
-            self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-            and email_config == {}
-        ):
-            # We cannot warn the user this has happened here
-            # Instead do so when a user attempts to reset their password
-            self.local_threepid_handling_disabled_due_to_email_config = True
-
-            self.threepid_behaviour_email = ThreepidBehaviour.OFF
+        # If we have email config settings, assume that we can verify ownership of
+        # email addresses.
+        self.can_verify_email = email_config != {}
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
             email_config.get("validation_token_lifetime", "1h")
         )
 
-        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.can_verify_email:
             missing = []
             if not self.email_notif_from:
                 missing.append("email.notif_from")
-
-            # public_baseurl is required to build password reset and validation links that
-            # will be emailed to users
-            if config.get("public_baseurl") is None:
-                missing.append("public_baseurl")
 
             if missing:
                 raise ConfigError(
@@ -297,9 +260,6 @@ class EmailConfig(Config):
             if not self.email_notif_from:
                 missing.append("email.notif_from")
 
-            if config.get("public_baseurl") is None:
-                missing.append("public_baseurl")
-
             if missing:
                 raise ConfigError(
                     "email.enable_notifs is True but required keys are missing: %s"
@@ -335,7 +295,7 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if self.account_validity_renew_by_email_enabled:
+        if self.root.account_validity.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
@@ -381,172 +341,3 @@ class EmailConfig(Config):
                     "Config option email.invite_client_location must be a http or https URL",
                     path=("email", "invite_client_location"),
                 )
-
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return (
-            """\
-        # Configuration for sending emails from Synapse.
-        #
-        # Server admins can configure custom templates for email content. See
-        # https://matrix-org.github.io/synapse/latest/templates.html for more information.
-        #
-        email:
-          # The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
-          #
-          #smtp_host: mail.server
-
-          # The port on the mail server for outgoing SMTP. Defaults to 25.
-          #
-          #smtp_port: 587
-
-          # Username/password for authentication to the SMTP server. By default, no
-          # authentication is attempted.
-          #
-          #smtp_user: "exampleusername"
-          #smtp_pass: "examplepassword"
-
-          # Uncomment the following to require TLS transport security for SMTP.
-          # By default, Synapse will connect over plain text, and will then switch to
-          # TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
-          # Synapse will refuse to connect unless the server supports STARTTLS.
-          #
-          #require_transport_security: true
-
-          # Uncomment the following to disable TLS for SMTP.
-          #
-          # By default, if the server supports TLS, it will be used, and the server
-          # must present a certificate that is valid for 'smtp_host'. If this option
-          # is set to false, TLS will not be used.
-          #
-          #enable_tls: false
-
-          # notif_from defines the "From" address to use when sending emails.
-          # It must be set if email sending is enabled.
-          #
-          # The placeholder '%%(app)s' will be replaced by the application name,
-          # which is normally 'app_name' (below), but may be overridden by the
-          # Matrix client application.
-          #
-          # Note that the placeholder must be written '%%(app)s', including the
-          # trailing 's'.
-          #
-          #notif_from: "Your Friendly %%(app)s homeserver <noreply@example.com>"
-
-          # app_name defines the default value for '%%(app)s' in notif_from and email
-          # subjects. It defaults to 'Matrix'.
-          #
-          #app_name: my_branded_matrix_server
-
-          # Uncomment the following to enable sending emails for messages that the user
-          # has missed. Disabled by default.
-          #
-          #enable_notifs: true
-
-          # Uncomment the following to disable automatic subscription to email
-          # notifications for new users. Enabled by default.
-          #
-          #notif_for_new_users: false
-
-          # Custom URL for client links within the email notifications. By default
-          # links will be based on "https://matrix.to".
-          #
-          # (This setting used to be called riot_base_url; the old name is still
-          # supported for backwards-compatibility but is now deprecated.)
-          #
-          #client_base_url: "http://localhost/riot"
-
-          # Configure the time that a validation email will expire after sending.
-          # Defaults to 1h.
-          #
-          #validation_token_lifetime: 15m
-
-          # The web client location to direct users to during an invite. This is passed
-          # to the identity server as the org.matrix.web_client_location key. Defaults
-          # to unset, giving no guidance to the identity server.
-          #
-          #invite_client_location: https://app.element.io
-
-          # Subjects to use when sending emails from Synapse.
-          #
-          # The placeholder '%%(app)s' will be replaced with the value of the 'app_name'
-          # setting above, or by a value dictated by the Matrix client application.
-          #
-          # If a subject isn't overridden in this configuration file, the value used as
-          # its example will be used.
-          #
-          #subjects:
-
-            # Subjects for notification emails.
-            #
-            # On top of the '%%(app)s' placeholder, these can use the following
-            # placeholders:
-            #
-            #   * '%%(person)s', which will be replaced by the display name of the user(s)
-            #      that sent the message(s), e.g. "Alice and Bob".
-            #   * '%%(room)s', which will be replaced by the name of the room the
-            #      message(s) have been sent to, e.g. "My super room".
-            #
-            # See the example provided for each setting to see which placeholder can be
-            # used and how to use them.
-            #
-            # Subject to use to notify about one message from one or more user(s) in a
-            # room which has a name.
-            #message_from_person_in_room: "%(message_from_person_in_room)s"
-            #
-            # Subject to use to notify about one message from one or more user(s) in a
-            # room which doesn't have a name.
-            #message_from_person: "%(message_from_person)s"
-            #
-            # Subject to use to notify about multiple messages from one or more users in
-            # a room which doesn't have a name.
-            #messages_from_person: "%(messages_from_person)s"
-            #
-            # Subject to use to notify about multiple messages in a room which has a
-            # name.
-            #messages_in_room: "%(messages_in_room)s"
-            #
-            # Subject to use to notify about multiple messages in multiple rooms.
-            #messages_in_room_and_others: "%(messages_in_room_and_others)s"
-            #
-            # Subject to use to notify about multiple messages from multiple persons in
-            # multiple rooms. This is similar to the setting above except it's used when
-            # the room in which the notification was triggered has no name.
-            #messages_from_person_and_others: "%(messages_from_person_and_others)s"
-            #
-            # Subject to use to notify about an invite to a room which has a name.
-            #invite_from_person_to_room: "%(invite_from_person_to_room)s"
-            #
-            # Subject to use to notify about an invite to a room which doesn't have a
-            # name.
-            #invite_from_person: "%(invite_from_person)s"
-
-            # Subject for emails related to account administration.
-            #
-            # On top of the '%%(app)s' placeholder, these one can use the
-            # '%%(server_name)s' placeholder, which will be replaced by the value of the
-            # 'server_name' setting in your Synapse configuration.
-            #
-            # Subject to use when sending a password reset email.
-            #password_reset: "%(password_reset)s"
-            #
-            # Subject to use when sending a verification email to assert an address's
-            # ownership.
-            #email_validation: "%(email_validation)s"
-        """
-            % DEFAULT_SUBJECTS
-        )
-
-
-class ThreepidBehaviour(Enum):
-    """
-    Enum to define the behaviour of Synapse with regards to when it contacts an identity
-    server for 3pid registration and password resets
-
-    REMOTE = use an external server to send tokens
-    LOCAL = send tokens ourselves
-    OFF = disable registration via 3pid and password resets
-    """
-
-    REMOTE = "remote"
-    LOCAL = "local"
-    OFF = "off"

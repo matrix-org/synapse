@@ -1,4 +1,4 @@
-# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2022 The Matrix.org Foundation C.I.C.
 # Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,12 +15,25 @@
 
 import logging
 import urllib
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 import ijson
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Direction, Membership
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.api.urls import (
@@ -30,36 +43,34 @@ from synapse.api.urls import (
 )
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
-from synapse.http.matrixfederationclient import ByteParser
-from synapse.logging.utils import log_function
+from synapse.http.matrixfederationclient import ByteParser, LegacyJsonSendParser
+from synapse.http.types import QueryParams
 from synapse.types import JsonDict
+from synapse.util import ExceptionBundle
+
+if TYPE_CHECKING:
+    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
-
-# Send join responses can be huge, so we set a separate limit here. The response
-# is parsed in a streaming manner, which helps alleviate the issue of memory
-# usage a bit.
-MAX_RESPONSE_SIZE_SEND_JOIN = 500 * 1024 * 1024
 
 
 class TransportLayerClient:
     """Sends federation HTTP requests to other servers"""
 
-    def __init__(self, hs):
-        self.server_name = hs.hostname
+    def __init__(self, hs: "HomeServer"):
         self.client = hs.get_federation_http_client()
+        self._faster_joins_enabled = hs.config.experimental.faster_joins_enabled
+        self._is_mine_server_name = hs.is_mine_server_name
 
-    @log_function
     async def get_room_state_ids(
         self, destination: str, room_id: str, event_id: str
     ) -> JsonDict:
-        """Requests all state for a given room from the given server at the
-        given event. Returns the state's event_id's
+        """Requests the IDs of all state for a given room at the given event.
 
         Args:
             destination: The host name of the remote homeserver we want
                 to get the state from.
-            context: The name of the context we want the state of
+            room_id: the room we want the state of
             event_id: The event we want the context at.
 
         Returns:
@@ -75,7 +86,33 @@ class TransportLayerClient:
             try_trailing_slash_on_400=True,
         )
 
-    @log_function
+    async def get_room_state(
+        self, room_version: RoomVersion, destination: str, room_id: str, event_id: str
+    ) -> "StateRequestResponse":
+        """Requests the full state for a given room at the given event.
+
+        Args:
+            room_version: the version of the room (required to build the event objects)
+            destination: The host name of the remote homeserver we want
+                to get the state from.
+            room_id: the room we want the state of
+            event_id: The event we want the context at.
+
+        Returns:
+            Results in a dict received from the remote homeserver.
+        """
+        path = _create_v1_path("/state/%s", room_id)
+        return await self.client.get_json(
+            destination,
+            path=path,
+            args={"event_id": event_id},
+            # This can take a looooooong time for large rooms. Give this a generous
+            # timeout of 10 minutes to avoid the partial state resync timing out early
+            # and trying a bunch of servers who haven't seen our join yet.
+            timeout=600_000,
+            parser=_StateParser(room_version),
+        )
+
     async def get_event(
         self, destination: str, event_id: str, timeout: Optional[int] = None
     ) -> JsonDict:
@@ -98,17 +135,18 @@ class TransportLayerClient:
             destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
         )
 
-    @log_function
     async def backfill(
-        self, destination: str, room_id: str, event_tuples: Iterable[str], limit: int
-    ) -> Optional[JsonDict]:
+        self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
+    ) -> Optional[Union[JsonDict, list]]:
         """Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
         Args:
             destination
             room_id
-            event_tuples
+            event_tuples:
+                Must be a Collection that is falsy when empty.
+                (Iterable is not enough here!)
             limit
 
         Returns:
@@ -134,7 +172,40 @@ class TransportLayerClient:
             destination, path=path, args=args, try_trailing_slash_on_400=True
         )
 
-    @log_function
+    async def timestamp_to_event(
+        self, destination: str, room_id: str, timestamp: int, direction: Direction
+    ) -> Union[JsonDict, List]:
+        """
+        Calls a remote federating server at `destination` asking for their
+        closest event to the given timestamp in the given direction.
+
+        Args:
+            destination: Domain name of the remote homeserver
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: indicates whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            Response dict received from the remote homeserver.
+
+        Raises:
+            Various exceptions when the request fails
+        """
+        path = _create_v1_path(
+            "/timestamp_to_event/%s",
+            room_id,
+        )
+
+        args = {"ts": [str(timestamp)], "dir": [direction.value]}
+
+        remote_response = await self.client.get_json(
+            destination, path=path, args=args, try_trailing_slash_on_400=True
+        )
+
+        return remote_response
+
     async def send_transaction(
         self,
         transaction: Transaction,
@@ -160,21 +231,21 @@ class TransportLayerClient:
         """
         logger.debug(
             "send_data dest=%s, txid=%s",
-            transaction.destination,  # type: ignore
-            transaction.transaction_id,  # type: ignore
+            transaction.destination,
+            transaction.transaction_id,
         )
 
-        if transaction.destination == self.server_name:  # type: ignore
+        if self._is_mine_server_name(transaction.destination):
             raise RuntimeError("Transport layer cannot send to itself!")
 
         # FIXME: This is only used by the tests. The actual json sent is
         # generated by the json_data_callback.
         json_data = transaction.get_dict()
 
-        path = _create_v1_path("/send/%s", transaction.transaction_id)  # type: ignore
+        path = _create_v1_path("/send/%s", transaction.transaction_id)
 
         return await self.client.put_json(
-            transaction.destination,  # type: ignore
+            transaction.destination,
             path=path,
             data=json_data,
             json_data_callback=json_data_callback,
@@ -183,13 +254,18 @@ class TransportLayerClient:
             try_trailing_slash_on_400=True,
         )
 
-    @log_function
     async def make_query(
-        self, destination, query_type, args, retry_on_dns_fail, ignore_backoff=False
-    ):
-        path = _create_v1_path("/query/%s", query_type)
+        self,
+        destination: str,
+        query_type: str,
+        args: QueryParams,
+        retry_on_dns_fail: bool,
+        ignore_backoff: bool = False,
+        prefix: str = FEDERATION_V1_PREFIX,
+    ) -> JsonDict:
+        path = _create_path(prefix, "/query/%s", query_type)
 
-        content = await self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args=args,
@@ -198,9 +274,6 @@ class TransportLayerClient:
             ignore_backoff=ignore_backoff,
         )
 
-        return content
-
-    @log_function
     async def make_membership_event(
         self,
         destination: str,
@@ -214,12 +287,11 @@ class TransportLayerClient:
         Note that this does not append any events to any graphs.
 
         Args:
-            destination (str): address of remote homeserver
-            room_id (str): room to join/leave
-            user_id (str): user to be joined/left
-            membership (str): one of join/leave
-            params (dict[str, str|Iterable[str]]): Query parameters to include in the
-                request.
+            destination: address of remote homeserver
+            room_id: room to join/leave
+            user_id: user to be joined/left
+            membership: one of join/leave
+            params: Query parameters to include in the request.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The result
@@ -263,7 +335,6 @@ class TransportLayerClient:
             ignore_backoff=ignore_backoff,
         )
 
-    @log_function
     async def send_join_v1(
         self,
         room_version: RoomVersion,
@@ -279,10 +350,8 @@ class TransportLayerClient:
             path=path,
             data=content,
             parser=SendJoinParser(room_version, v1_api=True),
-            max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
-    @log_function
     async def send_join_v2(
         self,
         room_version: RoomVersion,
@@ -290,18 +359,25 @@ class TransportLayerClient:
         room_id: str,
         event_id: str,
         content: JsonDict,
+        omit_members: bool,
     ) -> "SendJoinResponse":
         path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
+        query_params: Dict[str, str] = {}
+        if self._faster_joins_enabled:
+            # lazy-load state on join
+            query_params["org.matrix.msc3706.partial_state"] = (
+                "true" if omit_members else "false"
+            )
+            query_params["omit_members"] = "true" if omit_members else "false"
 
         return await self.client.put_json(
             destination=destination,
             path=path,
+            args=query_params,
             data=content,
             parser=SendJoinParser(room_version, v1_api=False),
-            max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
-    @log_function
     async def send_leave_v1(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> Tuple[int, JsonDict]:
@@ -316,9 +392,9 @@ class TransportLayerClient:
             # server was just having a momentary blip, the room will be out of
             # sync.
             ignore_backoff=True,
+            parser=LegacyJsonSendParser(),
         )
 
-    @log_function
     async def send_leave_v2(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> JsonDict:
@@ -335,7 +411,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def send_knock_v1(
         self,
         destination: str,
@@ -369,17 +444,19 @@ class TransportLayerClient:
             destination=destination, path=path, data=content
         )
 
-    @log_function
     async def send_invite_v1(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> Tuple[int, JsonDict]:
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+            parser=LegacyJsonSendParser(),
         )
 
-    @log_function
     async def send_invite_v2(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> JsonDict:
@@ -389,7 +466,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     async def get_public_rooms(
         self,
         remote_server: str,
@@ -414,7 +490,7 @@ class TransportLayerClient:
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
-                data["limit"] = str(limit)
+                data["limit"] = limit
             if since_token:
                 data["since"] = since_token
 
@@ -436,7 +512,7 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/publicRooms")
 
-            args: Dict[str, Any] = {
+            args: Dict[str, Union[str, Iterable[str]]] = {
                 "include_all_networks": "true" if include_all_networks else "false"
             }
             if third_party_instance_id:
@@ -462,7 +538,6 @@ class TransportLayerClient:
 
         return response
 
-    @log_function
     async def exchange_third_party_invite(
         self, destination: str, room_id: str, event_dict: JsonDict
     ) -> JsonDict:
@@ -472,7 +547,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=event_dict
         )
 
-    @log_function
     async def get_event_auth(
         self, destination: str, room_id: str, event_id: str
     ) -> JsonDict:
@@ -480,7 +554,6 @@ class TransportLayerClient:
 
         return await self.client.get_json(destination=destination, path=path)
 
-    @log_function
     async def query_client_keys(
         self, destination: str, query_content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -522,7 +595,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=query_content, timeout=timeout
         )
 
-    @log_function
     async def query_user_devices(
         self, destination: str, user_id: str, timeout: int
     ) -> JsonDict:
@@ -562,9 +634,8 @@ class TransportLayerClient:
             destination=destination, path=path, timeout=timeout
         )
 
-    @log_function
     async def claim_client_keys(
-        self, destination: str, query_content: JsonDict, timeout: int
+        self, destination: str, query_content: JsonDict, timeout: Optional[int]
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
 
@@ -579,10 +650,10 @@ class TransportLayerClient:
 
         Response:
             {
-              "device_keys": {
+              "one_time_keys": {
                 "<user_id>": {
                   "<device_id>": {
-                    "<algorithm>:<key_id>": "<key_base64>"
+                    "<algorithm>:<key_id>": <OTK JSON>
                   }
                 }
               }
@@ -598,10 +669,52 @@ class TransportLayerClient:
         path = _create_v1_path("/user/keys/claim")
 
         return await self.client.post_json(
-            destination=destination, path=path, data=query_content, timeout=timeout
+            destination=destination,
+            path=path,
+            data={"one_time_keys": query_content},
+            timeout=timeout,
         )
 
-    @log_function
+    async def claim_client_keys_unstable(
+        self, destination: str, query_content: JsonDict, timeout: Optional[int]
+    ) -> JsonDict:
+        """Claim one-time keys for a list of devices hosted on a remote server.
+
+        Request:
+            {
+              "one_time_keys": {
+                "<user_id>": {
+                  "<device_id>": {"<algorithm>": <count>}
+                }
+              }
+            }
+
+        Response:
+            {
+              "one_time_keys": {
+                "<user_id>": {
+                  "<device_id>": {
+                    "<algorithm>:<key_id>": <OTK JSON>
+                  }
+                }
+              }
+            }
+
+        Args:
+            destination: The server to query.
+            query_content: The user ids to query.
+        Returns:
+            A dict containing the one-time keys.
+        """
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/user/keys/claim")
+
+        return await self.client.post_json(
+            destination=destination,
+            path=path,
+            data={"one_time_keys": query_content},
+            timeout=timeout,
+        )
+
     async def get_missing_events(
         self,
         destination: str,
@@ -626,514 +739,6 @@ class TransportLayerClient:
             timeout=timeout,
         )
 
-    @log_function
-    async def get_group_profile(
-        self, destination: str, group_id: str, requester_user_id: str
-    ) -> JsonDict:
-        """Get a group profile"""
-        path = _create_v1_path("/groups/%s/profile", group_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def update_group_profile(
-        self, destination: str, group_id: str, requester_user_id: str, content: JsonDict
-    ) -> JsonDict:
-        """Update a remote group profile
-
-        Args:
-            destination
-            group_id
-            requester_user_id
-            content: The new profile of the group
-        """
-        path = _create_v1_path("/groups/%s/profile", group_id)
-
-        return self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_group_summary(
-        self, destination: str, group_id: str, requester_user_id: str
-    ) -> JsonDict:
-        """Get a group summary"""
-        path = _create_v1_path("/groups/%s/summary", group_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_rooms_in_group(
-        self, destination: str, group_id: str, requester_user_id: str
-    ) -> JsonDict:
-        """Get all rooms in a group"""
-        path = _create_v1_path("/groups/%s/rooms", group_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    async def add_room_to_group(
-        self,
-        destination: str,
-        group_id: str,
-        requester_user_id: str,
-        room_id: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Add a room to a group"""
-        path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    async def update_room_in_group(
-        self,
-        destination: str,
-        group_id: str,
-        requester_user_id: str,
-        room_id: str,
-        config_key: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Update room in group"""
-        path = _create_v1_path(
-            "/groups/%s/room/%s/config/%s", group_id, room_id, config_key
-        )
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    async def remove_room_from_group(
-        self, destination: str, group_id: str, requester_user_id: str, room_id: str
-    ) -> JsonDict:
-        """Remove a room from a group"""
-        path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
-
-        return await self.client.delete_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_users_in_group(
-        self, destination: str, group_id: str, requester_user_id: str
-    ) -> JsonDict:
-        """Get users in a group"""
-        path = _create_v1_path("/groups/%s/users", group_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_invited_users_in_group(
-        self, destination: str, group_id: str, requester_user_id: str
-    ) -> JsonDict:
-        """Get users that have been invited to a group"""
-        path = _create_v1_path("/groups/%s/invited_users", group_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def accept_group_invite(
-        self, destination: str, group_id: str, user_id: str, content: JsonDict
-    ) -> JsonDict:
-        """Accept a group invite"""
-        path = _create_v1_path("/groups/%s/users/%s/accept_invite", group_id, user_id)
-
-        return await self.client.post_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
-        )
-
-    @log_function
-    def join_group(
-        self, destination: str, group_id: str, user_id: str, content: JsonDict
-    ) -> JsonDict:
-        """Attempts to join a group"""
-        path = _create_v1_path("/groups/%s/users/%s/join", group_id, user_id)
-
-        return self.client.post_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
-        )
-
-    @log_function
-    async def invite_to_group(
-        self,
-        destination: str,
-        group_id: str,
-        user_id: str,
-        requester_user_id: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Invite a user to a group"""
-        path = _create_v1_path("/groups/%s/users/%s/invite", group_id, user_id)
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def invite_to_group_notification(
-        self, destination: str, group_id: str, user_id: str, content: JsonDict
-    ) -> JsonDict:
-        """Sent by group server to inform a user's server that they have been
-        invited.
-        """
-
-        path = _create_v1_path("/groups/local/%s/users/%s/invite", group_id, user_id)
-
-        return await self.client.post_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
-        )
-
-    @log_function
-    async def remove_user_from_group(
-        self,
-        destination: str,
-        group_id: str,
-        requester_user_id: str,
-        user_id: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Remove a user from a group"""
-        path = _create_v1_path("/groups/%s/users/%s/remove", group_id, user_id)
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def remove_user_from_group_notification(
-        self, destination: str, group_id: str, user_id: str, content: JsonDict
-    ) -> JsonDict:
-        """Sent by group server to inform a user's server that they have been
-        kicked from the group.
-        """
-
-        path = _create_v1_path("/groups/local/%s/users/%s/remove", group_id, user_id)
-
-        return await self.client.post_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
-        )
-
-    @log_function
-    async def renew_group_attestation(
-        self, destination: str, group_id: str, user_id: str, content: JsonDict
-    ) -> JsonDict:
-        """Sent by either a group server or a user's server to periodically update
-        the attestations
-        """
-
-        path = _create_v1_path("/groups/%s/renew_attestation/%s", group_id, user_id)
-
-        return await self.client.post_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
-        )
-
-    @log_function
-    async def update_group_summary_room(
-        self,
-        destination: str,
-        group_id: str,
-        user_id: str,
-        room_id: str,
-        category_id: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Update a room entry in a group summary"""
-        if category_id:
-            path = _create_v1_path(
-                "/groups/%s/summary/categories/%s/rooms/%s",
-                group_id,
-                category_id,
-                room_id,
-            )
-        else:
-            path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def delete_group_summary_room(
-        self,
-        destination: str,
-        group_id: str,
-        user_id: str,
-        room_id: str,
-        category_id: str,
-    ) -> JsonDict:
-        """Delete a room entry in a group summary"""
-        if category_id:
-            path = _create_v1_path(
-                "/groups/%s/summary/categories/%s/rooms/%s",
-                group_id,
-                category_id,
-                room_id,
-            )
-        else:
-            path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
-
-        return await self.client.delete_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_group_categories(
-        self, destination: str, group_id: str, requester_user_id: str
-    ) -> JsonDict:
-        """Get all categories in a group"""
-        path = _create_v1_path("/groups/%s/categories", group_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_group_category(
-        self, destination: str, group_id: str, requester_user_id: str, category_id: str
-    ) -> JsonDict:
-        """Get category info in a group"""
-        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def update_group_category(
-        self,
-        destination: str,
-        group_id: str,
-        requester_user_id: str,
-        category_id: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Update a category in a group"""
-        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def delete_group_category(
-        self, destination: str, group_id: str, requester_user_id: str, category_id: str
-    ) -> JsonDict:
-        """Delete a category in a group"""
-        path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
-
-        return await self.client.delete_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_group_roles(
-        self, destination: str, group_id: str, requester_user_id: str
-    ) -> JsonDict:
-        """Get all roles in a group"""
-        path = _create_v1_path("/groups/%s/roles", group_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def get_group_role(
-        self, destination: str, group_id: str, requester_user_id: str, role_id: str
-    ) -> JsonDict:
-        """Get a roles info"""
-        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
-
-        return await self.client.get_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def update_group_role(
-        self,
-        destination: str,
-        group_id: str,
-        requester_user_id: str,
-        role_id: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Update a role in a group"""
-        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def delete_group_role(
-        self, destination: str, group_id: str, requester_user_id: str, role_id: str
-    ) -> JsonDict:
-        """Delete a role in a group"""
-        path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
-
-        return await self.client.delete_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def update_group_summary_user(
-        self,
-        destination: str,
-        group_id: str,
-        requester_user_id: str,
-        user_id: str,
-        role_id: str,
-        content: JsonDict,
-    ) -> JsonDict:
-        """Update a users entry in a group"""
-        if role_id:
-            path = _create_v1_path(
-                "/groups/%s/summary/roles/%s/users/%s", group_id, role_id, user_id
-            )
-        else:
-            path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
-
-        return await self.client.post_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def set_group_join_policy(
-        self, destination: str, group_id: str, requester_user_id: str, content: JsonDict
-    ) -> JsonDict:
-        """Sets the join policy for a group"""
-        path = _create_v1_path("/groups/%s/settings/m.join_policy", group_id)
-
-        return await self.client.put_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            data=content,
-            ignore_backoff=True,
-        )
-
-    @log_function
-    async def delete_group_summary_user(
-        self,
-        destination: str,
-        group_id: str,
-        requester_user_id: str,
-        user_id: str,
-        role_id: str,
-    ) -> JsonDict:
-        """Delete a users entry in a group"""
-        if role_id:
-            path = _create_v1_path(
-                "/groups/%s/summary/roles/%s/users/%s", group_id, role_id, user_id
-            )
-        else:
-            path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
-
-        return await self.client.delete_json(
-            destination=destination,
-            path=path,
-            args={"requester_user_id": requester_user_id},
-            ignore_backoff=True,
-        )
-
-    async def bulk_get_publicised_groups(
-        self, destination: str, user_ids: Iterable[str]
-    ) -> JsonDict:
-        """Get the groups a list of users are publicising"""
-
-        path = _create_v1_path("/get_groups_publicised")
-
-        content = {"user_ids": user_ids}
-
-        return await self.client.post_json(
-            destination=destination, path=path, data=content, ignore_backoff=True
-        )
-
     async def get_room_complexity(self, destination: str, room_id: str) -> JsonDict:
         """
         Args:
@@ -1144,44 +749,25 @@ class TransportLayerClient:
 
         return await self.client.get_json(destination=destination, path=path)
 
-    async def get_space_summary(
-        self,
-        destination: str,
-        room_id: str,
-        suggested_only: bool,
-        max_rooms_per_space: Optional[int],
-        exclude_rooms: List[str],
+    async def get_room_hierarchy(
+        self, destination: str, room_id: str, suggested_only: bool
     ) -> JsonDict:
         """
         Args:
             destination: The remote server
             room_id: The room ID to ask about.
             suggested_only: if True, only suggested rooms will be returned
-            max_rooms_per_space: an optional limit to the number of children to be
-               returned per space
-            exclude_rooms: a list of any rooms we can skip
         """
-        # TODO When switching to the stable endpoint, use GET instead of POST.
-        path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc2946/spaces/%s", room_id
+        path = _create_v1_path("/hierarchy/%s", room_id)
+
+        return await self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"suggested_only": "true" if suggested_only else "false"},
         )
 
-        params = {
-            "suggested_only": suggested_only,
-            "exclude_rooms": exclude_rooms,
-        }
-        if max_rooms_per_space is not None:
-            params["max_rooms_per_space"] = max_rooms_per_space
-
-        return await self.client.post_json(
-            destination=destination, path=path, data=params
-        )
-
-    async def get_room_hierarchy(
-        self,
-        destination: str,
-        room_id: str,
-        suggested_only: bool,
+    async def get_room_hierarchy_unstable(
+        self, destination: str, room_id: str, suggested_only: bool
     ) -> JsonDict:
         """
         Args:
@@ -1197,6 +783,22 @@ class TransportLayerClient:
             destination=destination,
             path=path,
             args={"suggested_only": "true" if suggested_only else "false"},
+        )
+
+    async def get_account_status(
+        self, destination: str, user_ids: List[str]
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server.
+            user_ids: The user ID(s) for which to request account status(es).
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc3720/account_status"
+        )
+
+        return await self.client.post_json(
+            destination=destination, path=path, data={"user_ids": user_ids}
         )
 
 
@@ -1251,9 +853,23 @@ class SendJoinResponse:
     # "event" is not included in the response.
     event: Optional[EventBase] = None
 
+    # The room state is incomplete
+    members_omitted: bool = False
+
+    # List of servers in the room
+    servers_in_room: Optional[List[str]] = None
+
+
+@attr.s(slots=True, auto_attribs=True)
+class StateRequestResponse:
+    """The parsed response of a `/state` request."""
+
+    auth_events: List[EventBase]
+    state: List[EventBase]
+
 
 @ijson.coroutine
-def _event_parser(event_dict: JsonDict):
+def _event_parser(event_dict: JsonDict) -> Generator[None, Tuple[str, Any], None]:
     """Helper function for use with `ijson.kvitems_coro` to parse key-value pairs
     to add them to a given dictionary.
     """
@@ -1264,7 +880,9 @@ def _event_parser(event_dict: JsonDict):
 
 
 @ijson.coroutine
-def _event_list_parser(room_version: RoomVersion, events: List[EventBase]):
+def _event_list_parser(
+    room_version: RoomVersion, events: List[EventBase]
+) -> Generator[None, JsonDict, None]:
     """Helper function for use with `ijson.items_coro` to parse an array of
     events and add them to the given list.
     """
@@ -1273,6 +891,34 @@ def _event_list_parser(room_version: RoomVersion, events: List[EventBase]):
         obj = yield
         event = make_event_from_dict(obj, room_version)
         events.append(event)
+
+
+@ijson.coroutine
+def _members_omitted_parser(response: SendJoinResponse) -> Generator[None, Any, None]:
+    """Helper function for use with `ijson.items_coro`
+
+    Parses the members_omitted field in send_join responses
+    """
+    while True:
+        val = yield
+        if not isinstance(val, bool):
+            raise TypeError(
+                "members_omitted (formerly org.matrix.msc370c.partial_state) must be a boolean"
+            )
+        response.members_omitted = val
+
+
+@ijson.coroutine
+def _servers_in_room_parser(response: SendJoinResponse) -> Generator[None, Any, None]:
+    """Helper function for use with `ijson.items_coro`
+
+    Parses the servers_in_room field in send_join responses
+    """
+    while True:
+        val = yield
+        if not isinstance(val, list) or any(not isinstance(x, str) for x in val):
+            raise TypeError("servers_in_room must be a list of strings")
+        response.servers_in_room = val
 
 
 class SendJoinParser(ByteParser[SendJoinResponse]):
@@ -1285,37 +931,143 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
 
     CONTENT_TYPE = "application/json"
 
+    # /send_join responses can be huge, so we override the size limit here. The response
+    # is parsed in a streaming manner, which helps alleviate the issue of memory
+    # usage a bit.
+    MAX_RESPONSE_SIZE = 500 * 1024 * 1024
+
     def __init__(self, room_version: RoomVersion, v1_api: bool):
-        self._response = SendJoinResponse([], [], {})
+        self._response = SendJoinResponse([], [], event_dict={})
         self._room_version = room_version
+        self._coros: List[Generator[None, bytes, None]] = []
 
         # The V1 API has the shape of `[200, {...}]`, which we handle by
         # prefixing with `item.*`.
         prefix = "item." if v1_api else ""
 
-        self._coro_state = ijson.items_coro(
-            _event_list_parser(room_version, self._response.state),
-            prefix + "state.item",
-        )
-        self._coro_auth = ijson.items_coro(
-            _event_list_parser(room_version, self._response.auth_events),
-            prefix + "auth_chain.item",
-        )
-        self._coro_event = ijson.kvitems_coro(
-            _event_parser(self._response.event_dict),
-            prefix + "org.matrix.msc3083.v2.event",
-        )
+        self._coros = [
+            ijson.items_coro(
+                _event_list_parser(room_version, self._response.state),
+                prefix + "state.item",
+                use_float=True,
+            ),
+            ijson.items_coro(
+                _event_list_parser(room_version, self._response.auth_events),
+                prefix + "auth_chain.item",
+                use_float=True,
+            ),
+            ijson.kvitems_coro(
+                _event_parser(self._response.event_dict),
+                prefix + "event",
+                use_float=True,
+            ),
+        ]
+
+        if not v1_api:
+            self._coros.append(
+                ijson.items_coro(
+                    _members_omitted_parser(self._response),
+                    "org.matrix.msc3706.partial_state",
+                    use_float="True",
+                )
+            )
+            # The stable field name comes last, so it "wins" if the fields disagree
+            self._coros.append(
+                ijson.items_coro(
+                    _members_omitted_parser(self._response),
+                    "members_omitted",
+                    use_float="True",
+                )
+            )
+
+            self._coros.append(
+                ijson.items_coro(
+                    _servers_in_room_parser(self._response),
+                    "org.matrix.msc3706.servers_in_room",
+                    use_float="True",
+                )
+            )
+
+            # Again, stable field name comes last
+            self._coros.append(
+                ijson.items_coro(
+                    _servers_in_room_parser(self._response),
+                    "servers_in_room",
+                    use_float="True",
+                )
+            )
 
     def write(self, data: bytes) -> int:
-        self._coro_state.send(data)
-        self._coro_auth.send(data)
-        self._coro_event.send(data)
+        for c in self._coros:
+            c.send(data)
 
         return len(data)
 
     def finish(self) -> SendJoinResponse:
+        _close_coros(self._coros)
+
         if self._response.event_dict:
             self._response.event = make_event_from_dict(
                 self._response.event_dict, self._room_version
             )
         return self._response
+
+
+class _StateParser(ByteParser[StateRequestResponse]):
+    """A parser for the response to `/state` requests.
+
+    Args:
+        room_version: The version of the room.
+    """
+
+    CONTENT_TYPE = "application/json"
+
+    # As with /send_join, /state responses can be huge.
+    MAX_RESPONSE_SIZE = 500 * 1024 * 1024
+
+    def __init__(self, room_version: RoomVersion):
+        self._response = StateRequestResponse([], [])
+        self._room_version = room_version
+        self._coros: List[Generator[None, bytes, None]] = [
+            ijson.items_coro(
+                _event_list_parser(room_version, self._response.state),
+                "pdus.item",
+                use_float=True,
+            ),
+            ijson.items_coro(
+                _event_list_parser(room_version, self._response.auth_events),
+                "auth_chain.item",
+                use_float=True,
+            ),
+        ]
+
+    def write(self, data: bytes) -> int:
+        for c in self._coros:
+            c.send(data)
+        return len(data)
+
+    def finish(self) -> StateRequestResponse:
+        _close_coros(self._coros)
+        return self._response
+
+
+def _close_coros(coros: Iterable[Generator[None, bytes, None]]) -> None:
+    """Close each of the given coroutines.
+
+    Always calls .close() on each coroutine, even if doing so raises an exception.
+    Any exceptions raised are aggregated into an ExceptionBundle.
+
+    :raises ExceptionBundle: if at least one coroutine fails to close.
+    """
+    exceptions = []
+    for c in coros:
+        try:
+            c.close()
+        except Exception as e:
+            exceptions.append(e)
+
+    if exceptions:
+        # raise from the first exception so that the traceback has slightly more context
+        raise ExceptionBundle(
+            f"There were {len(exceptions)} errors closing coroutines", exceptions
+        ) from exceptions[0]

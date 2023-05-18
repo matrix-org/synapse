@@ -12,24 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Tuple, Union
 
 import attr
-from nacl.signing import SigningKey
+from signedjson.types import SigningKey
 
 from synapse.api.constants import MAX_DEPTH
-from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
     KNOWN_EVENT_FORMAT_VERSIONS,
-    KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
     RoomVersion,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
+from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
 from synapse.state import StateHandler
 from synapse.storage.databases.main import DataStore
 from synapse.types import EventID, JsonDict
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -92,18 +92,18 @@ class EventBuilder:
     )
 
     @property
-    def state_key(self):
+    def state_key(self) -> str:
         if self._state_key is not None:
             return self._state_key
 
         raise AttributeError("state_key")
 
-    def is_state(self):
+    def is_state(self) -> bool:
         return self._state_key is not None
 
     async def build(
         self,
-        prev_event_ids: List[str],
+        prev_event_ids: Collection[str],
         auth_event_ids: Optional[List[str]],
         depth: Optional[int] = None,
     ) -> EventBase:
@@ -122,22 +122,25 @@ class EventBuilder:
             The signed and hashed event.
         """
         if auth_event_ids is None:
-            state_ids = await self._state.get_current_state_ids(
-                self.room_id, prev_event_ids
+            state_ids = await self._state.compute_state_after_events(
+                self.room_id,
+                prev_event_ids,
+                state_filter=StateFilter.from_types(
+                    auth_types_for_event(self.room_version, self)
+                ),
+                await_full_state=False,
             )
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 self, state_ids
             )
 
         format_version = self.room_version.event_format
-        if format_version == EventFormatVersions.V1:
-            # The types of auth/prev events changes between event versions.
-            auth_events: Union[
-                List[str], List[Tuple[str, Dict[str, str]]]
-            ] = await self._store.add_event_hashes(auth_event_ids)
-            prev_events: Union[
-                List[str], List[Tuple[str, Dict[str, str]]]
-            ] = await self._store.add_event_hashes(prev_event_ids)
+        # The types of auth/prev events changes between event versions.
+        prev_events: Union[Collection[str], List[Tuple[str, Dict[str, str]]]]
+        auth_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
+        if format_version == EventFormatVersions.ROOM_V1_V2:
+            auth_events = await self._store.add_event_hashes(auth_event_ids)
+            prev_events = await self._store.add_event_hashes(prev_event_ids)
         else:
             auth_events = auth_event_ids
             prev_events = prev_event_ids
@@ -165,13 +168,14 @@ class EventBuilder:
             "content": self.content,
             "unsigned": self.unsigned,
             "depth": depth,
-            "prev_state": [],
         }
 
         if self.is_state():
             event_dict["state_key"] = self._state_key
 
-        if self._redacts is not None:
+        # MSC2174 moves the redacts property to the content, it is invalid to
+        # provide it as a top-level property.
+        if self._redacts is not None and not self.room_version.msc2176_redaction_rules:
             event_dict["redacts"] = self._redacts
 
         if self._origin_server_ts is not None:
@@ -193,27 +197,9 @@ class EventBuilderFactory:
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
-
-    def new(self, room_version: str, key_values: dict) -> EventBuilder:
-        """Generate an event builder appropriate for the given room version
-
-        Deprecated: use for_room_version with a RoomVersion object instead
-
-        Args:
-            room_version: Version of the room that we're creating an event builder for
-            key_values: Fields used as the basis of the new event
-
-        Returns:
-            EventBuilder
-        """
-        v = KNOWN_ROOM_VERSIONS.get(room_version)
-        if not v:
-            # this can happen if support is withdrawn for a room version
-            raise UnsupportedRoomVersionError()
-        return self.for_room_version(v, key_values)
 
     def for_room_version(
         self, room_version: RoomVersion, key_values: dict
@@ -269,7 +255,7 @@ def create_local_event_from_event_dict(
 
     time_now = int(clock.time_msec())
 
-    if format_version == EventFormatVersions.V1:
+    if format_version == EventFormatVersions.ROOM_V1_V2:
         event_dict["event_id"] = _create_event_id(clock, hostname)
 
     event_dict["origin"] = hostname

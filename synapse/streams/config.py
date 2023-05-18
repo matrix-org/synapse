@@ -16,8 +16,9 @@ from typing import Optional
 
 import attr
 
+from synapse.api.constants import Direction
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.servlet import parse_enum, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.storage.databases.main import DataStore
 from synapse.types import StreamToken
@@ -28,24 +29,24 @@ logger = logging.getLogger(__name__)
 MAX_LIMIT = 1000
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class PaginationConfig:
     """A configuration object which stores pagination parameters."""
 
-    from_token = attr.ib(type=Optional[StreamToken])
-    to_token = attr.ib(type=Optional[StreamToken])
-    direction = attr.ib(type=str)
-    limit = attr.ib(type=Optional[int])
+    from_token: Optional[StreamToken]
+    to_token: Optional[StreamToken]
+    direction: Direction
+    limit: int
 
     @classmethod
     async def from_request(
         cls,
         store: "DataStore",
         request: SynapseRequest,
-        raise_invalid_params: bool = True,
-        default_limit: Optional[int] = None,
+        default_limit: int,
+        default_dir: Direction = Direction.FORWARDS,
     ) -> "PaginationConfig":
-        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
+        direction = parse_enum(request, "dir", Direction, default=default_dir)
 
         from_tok_str = parse_string(request, "from")
         to_tok_str = parse_string(request, "to")
@@ -67,12 +68,10 @@ class PaginationConfig:
             raise SynapseError(400, "'to' parameter is invalid")
 
         limit = parse_integer(request, "limit", default=default_limit)
+        if limit < 0:
+            raise SynapseError(400, "Limit must be 0 or above")
 
-        if limit:
-            if limit < 0:
-                raise SynapseError(400, "Limit must be 0 or above")
-
-            limit = min(int(limit), MAX_LIMIT)
+        limit = min(limit, MAX_LIMIT)
 
         try:
             return PaginationConfig(from_tok, to_tok, direction, limit)
@@ -81,7 +80,7 @@ class PaginationConfig:
             raise SynapseError(400, "Invalid request.")
 
     def __repr__(self) -> str:
-        return ("PaginationConfig(from_tok=%r, to_tok=%r, direction=%r, limit=%r)") % (
+        return "PaginationConfig(from_tok=%r, to_tok=%r, direction=%r, limit=%r)" % (
             self.from_token,
             self.to_token,
             self.direction,

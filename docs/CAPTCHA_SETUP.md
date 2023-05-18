@@ -15,12 +15,12 @@ in `homeserver.yaml`, to the list of authorized domains. If you have not set
 1. Agree to the terms of service and submit.
 1. Copy your site key and secret key and add them to your `homeserver.yaml`
 configuration file
-    ```
+    ```yaml
     recaptcha_public_key: YOUR_SITE_KEY
     recaptcha_private_key: YOUR_SECRET_KEY
     ```
 1. Enable the CAPTCHA for new registrations
-    ```
+    ```yaml
     enable_registration_captcha: true
     ```
 1. Go to the settings page for the CAPTCHA you just created

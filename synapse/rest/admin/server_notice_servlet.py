@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Awaitable, Optional, Tuple
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError, SynapseError
@@ -22,10 +23,10 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
 )
 from synapse.http.site import SynapseRequest
-from synapse.rest.admin import assert_requester_is_admin
-from synapse.rest.admin._base import admin_patterns
+from synapse.logging.opentracing import set_tag
+from synapse.rest.admin._base import admin_patterns, assert_user_is_admin
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, Requester, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -51,11 +52,11 @@ class SendServerNoticeServlet(RestServlet):
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.server_notices_manager = hs.get_server_notices_manager()
         self.admin_handler = hs.get_admin_handler()
         self.txns = HttpTransactionCache(hs)
+        self.is_mine = hs.is_mine
 
     def register(self, json_resource: HttpServer) -> None:
         PATTERN = "/send_server_notice"
@@ -69,10 +70,13 @@ class SendServerNoticeServlet(RestServlet):
             self.__class__.__name__,
         )
 
-    async def on_POST(
-        self, request: SynapseRequest, txn_id: Optional[str] = None
+    async def _do(
+        self,
+        request: SynapseRequest,
+        requester: Requester,
+        txn_id: Optional[str],
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self.auth, request)
+        await assert_user_is_admin(self.auth, requester)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("user_id", "content"))
         event_type = body.get("type", EventTypes.Message)
@@ -82,11 +86,15 @@ class SendServerNoticeServlet(RestServlet):
         # but worker processes still need to initialise SendServerNoticeServlet (as it is part of the
         # admin api).
         if not self.server_notices_manager.is_enabled():
-            raise SynapseError(400, "Server notices are not enabled on this server")
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Server notices are not enabled on this server"
+            )
 
         target_user = UserID.from_string(body["user_id"])
-        if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Server notices can only be sent to local users")
+        if not self.is_mine(target_user):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Server notices can only be sent to local users"
+            )
 
         if not await self.admin_handler.get_user(target_user):
             raise NotFoundError("User not found")
@@ -99,11 +107,20 @@ class SendServerNoticeServlet(RestServlet):
             txn_id=txn_id,
         )
 
-        return 200, {"event_id": event.event_id}
+        return HTTPStatus.OK, {"event_id": event.event_id}
 
-    def on_PUT(
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        return await self._do(request, requester, None)
+
+    async def on_PUT(
         self, request: SynapseRequest, txn_id: str
-    ) -> Awaitable[Tuple[int, JsonDict]]:
-        return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, txn_id
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        set_tag("txn_id", txn_id)
+        return await self.txns.fetch_or_execute_request(
+            request, requester, self._do, request, requester, txn_id
         )

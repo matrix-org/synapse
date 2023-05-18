@@ -2,11 +2,11 @@
 # https://github.com/grantjenks/python-sortedcontainers/blob/d0a225d7fd0fb4c54532b8798af3cbeebf97e2d5/sortedcontainers/sortedset.pyi
 # (from https://github.com/grantjenks/python-sortedcontainers/pull/107)
 
+from __future__ import annotations
+
 from typing import (
-    AbstractSet,
     Any,
     Callable,
-    Generic,
     Hashable,
     Iterable,
     Iterator,
@@ -103,7 +103,7 @@ class SortedSet(MutableSet[_T], Sequence[_T]):
         self,
         start: Optional[int] = ...,
         stop: Optional[int] = ...,
-        reverse=bool,
+        reverse: bool = ...,
     ) -> Iterator[_T]: ...
     def irange(
         self,

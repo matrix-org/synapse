@@ -15,39 +15,30 @@
 import email.mime.multipart
 import email.utils
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
-
-from twisted.web.http import Request
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
+from synapse.util.async_helpers import delay_cancellation
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
-# Types for callbacks to be registered via the module api
-IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[Optional[bool]]]
-ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
-# Temporary hooks to allow for a transition from `/_matrix/client` endpoints
-# to `/_synapse/client/account_validity`. See `register_account_validity_callbacks`.
-ON_LEGACY_SEND_MAIL_CALLBACK = Callable[[str], Awaitable]
-ON_LEGACY_RENEW_CALLBACK = Callable[[str], Awaitable[Tuple[bool, bool, int]]]
-ON_LEGACY_ADMIN_REQUEST = Callable[[Request], Awaitable]
-
 
 class AccountValidityHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.config = hs.config
-        self.store = self.hs.get_datastore()
-        self.send_email_handler = self.hs.get_send_email_handler()
-        self.clock = self.hs.get_clock()
+        self.store = hs.get_datastores().main
+        self.send_email_handler = hs.get_send_email_handler()
+        self.clock = hs.get_clock()
 
-        self._app_name = self.hs.config.email_app_name
+        self._app_name = hs.config.email.email_app_name
+        self._module_api_callbacks = hs.get_module_api_callbacks().account_validity
 
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
@@ -67,12 +58,8 @@ class AccountValidityHandler:
             and self._account_validity_renew_by_email_enabled
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
-            self._template_html = (
-                hs.config.account_validity.account_validity_template_html
-            )
-            self._template_text = (
-                hs.config.account_validity.account_validity_template_text
-            )
+            self._template_html = hs.config.email.account_validity_template_html
+            self._template_text = hs.config.email.account_validity_template_text
             self._renew_email_subject = (
                 hs.config.account_validity.account_validity_renew_email_subject
             )
@@ -80,69 +67,6 @@ class AccountValidityHandler:
             # Check the renewal emails to send and send them every 30min.
             if hs.config.worker.run_background_tasks:
                 self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
-
-        self._is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []
-        self._on_user_registration_callbacks: List[ON_USER_REGISTRATION_CALLBACK] = []
-        self._on_legacy_send_mail_callback: Optional[
-            ON_LEGACY_SEND_MAIL_CALLBACK
-        ] = None
-        self._on_legacy_renew_callback: Optional[ON_LEGACY_RENEW_CALLBACK] = None
-
-        # The legacy admin requests callback isn't a protected attribute because we need
-        # to access it from the admin servlet, which is outside of this handler.
-        self.on_legacy_admin_request_callback: Optional[ON_LEGACY_ADMIN_REQUEST] = None
-
-    def register_account_validity_callbacks(
-        self,
-        is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
-        on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
-        on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
-        on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
-        on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
-    ) -> None:
-        """Register callbacks from module for each hook."""
-        if is_user_expired is not None:
-            self._is_user_expired_callbacks.append(is_user_expired)
-
-        if on_user_registration is not None:
-            self._on_user_registration_callbacks.append(on_user_registration)
-
-        # The builtin account validity feature exposes 3 endpoints (send_mail, renew, and
-        # an admin one). As part of moving the feature into a module, we need to change
-        # the path from /_matrix/client/unstable/account_validity/... to
-        # /_synapse/client/account_validity, because:
-        #
-        #   * the feature isn't part of the Matrix spec thus shouldn't live under /_matrix
-        #   * the way we register servlets means that modules can't register resources
-        #     under /_matrix/client
-        #
-        # We need to allow for a transition period between the old and new endpoints
-        # in order to allow for clients to update (and for emails to be processed).
-        #
-        # Once the email-account-validity module is loaded, it will take control of account
-        # validity by moving the rows from our `account_validity` table into its own table.
-        #
-        # Therefore, we need to allow modules (in practice just the one implementing the
-        # email-based account validity) to temporarily hook into the legacy endpoints so we
-        # can route the traffic coming into the old endpoints into the module, which is
-        # why we have the following three temporary hooks.
-        if on_legacy_send_mail is not None:
-            if self._on_legacy_send_mail_callback is not None:
-                raise RuntimeError("Tried to register on_legacy_send_mail twice")
-
-            self._on_legacy_send_mail_callback = on_legacy_send_mail
-
-        if on_legacy_renew is not None:
-            if self._on_legacy_renew_callback is not None:
-                raise RuntimeError("Tried to register on_legacy_renew twice")
-
-            self._on_legacy_renew_callback = on_legacy_renew
-
-        if on_legacy_admin_request is not None:
-            if self.on_legacy_admin_request_callback is not None:
-                raise RuntimeError("Tried to register on_legacy_admin_request twice")
-
-            self.on_legacy_admin_request_callback = on_legacy_admin_request
 
     async def is_user_expired(self, user_id: str) -> bool:
         """Checks if a user has expired against third-party modules.
@@ -153,8 +77,8 @@ class AccountValidityHandler:
         Returns:
             Whether the user has expired.
         """
-        for callback in self._is_user_expired_callbacks:
-            expired = await callback(user_id)
+        for callback in self._module_api_callbacks.is_user_expired_callbacks:
+            expired = await delay_cancellation(callback(user_id))
             if expired is not None:
                 return expired
 
@@ -171,7 +95,7 @@ class AccountValidityHandler:
         Args:
             user_id: The ID of the newly registered user.
         """
-        for callback in self._on_user_registration_callbacks:
+        for callback in self._module_api_callbacks.on_user_registration_callbacks:
             await callback(user_id)
 
     @wrap_as_background_process("send_renewals")
@@ -184,9 +108,9 @@ class AccountValidityHandler:
         expiring_users = await self.store.get_users_expiring_soon()
 
         if expiring_users:
-            for user in expiring_users:
+            for user_id, expiration_ts_ms in expiring_users:
                 await self._send_renewal_email(
-                    user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
+                    user_id=user_id, expiration_ts=expiration_ts_ms
                 )
 
     async def send_renewal_email_to_user(self, user_id: str) -> None:
@@ -201,8 +125,8 @@ class AccountValidityHandler:
         """
         # If a module supports sending a renewal email from here, do that, otherwise do
         # the legacy dance.
-        if self._on_legacy_send_mail_callback is not None:
-            await self._on_legacy_send_mail_callback(user_id)
+        if self._module_api_callbacks.on_legacy_send_mail_callback is not None:
+            await self._module_api_callbacks.on_legacy_send_mail_callback(user_id)
             return
 
         if not self._account_validity_renew_by_email_enabled:
@@ -339,8 +263,10 @@ class AccountValidityHandler:
         """
         # If a module supports triggering a renew from here, do that, otherwise do the
         # legacy dance.
-        if self._on_legacy_renew_callback is not None:
-            return await self._on_legacy_renew_callback(renewal_token)
+        if self._module_api_callbacks.on_legacy_renew_callback is not None:
+            return await self._module_api_callbacks.on_legacy_renew_callback(
+                renewal_token
+            )
 
         try:
             (

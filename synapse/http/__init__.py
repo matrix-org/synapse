@@ -25,7 +25,7 @@ from synapse.api.errors import SynapseError
 class RequestTimedOutError(SynapseError):
     """Exception representing timeout of an outbound request"""
 
-    def __init__(self, msg):
+    def __init__(self, msg: str):
         super().__init__(504, msg)
 
 
@@ -33,7 +33,7 @@ ACCESS_TOKEN_RE = re.compile(r"(\?.*access(_|%5[Ff])token=)[^&]*(.*)$")
 CLIENT_SECRET_RE = re.compile(r"(\?.*client(_|%5[Ff])secret=)[^&]*(.*)$")
 
 
-def redact_uri(uri):
+def redact_uri(uri: str) -> str:
     """Strips sensitive information from the uri replaces with <redacted>"""
     uri = ACCESS_TOKEN_RE.sub(r"\1<redacted>\3", uri)
     return CLIENT_SECRET_RE.sub(r"\1<redacted>\3", uri)
@@ -46,7 +46,7 @@ class QuieterFileBodyProducer(FileBodyProducer):
     https://twistedmatrix.com/trac/ticket/6528
     """
 
-    def stopProducing(self):
+    def stopProducing(self) -> None:
         try:
             FileBodyProducer.stopProducing(self)
         except task.TaskStopped:

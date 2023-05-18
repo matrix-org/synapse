@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.server import HomeServer
+from synapse.storage.databases.main.e2e_room_keys import RoomKey
+from synapse.util import Clock
+
 from tests import unittest
 
 # sample room_key data for use in the tests
-room_key = {
+room_key: RoomKey = {
     "first_message_index": 1,
     "forwarded_count": 1,
     "is_verified": False,
@@ -24,12 +30,12 @@ room_key = {
 
 
 class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         return hs
 
-    def test_room_keys_version_delete(self):
+    def test_room_keys_version_delete(self) -> None:
         # test that deleting a room key backup deletes the keys
         version1 = self.get_success(
             self.store.create_e2e_room_keys_version(

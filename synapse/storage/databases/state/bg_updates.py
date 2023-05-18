@@ -22,8 +22,9 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.state import StateFilter
 from synapse.types import MutableStateMap, StateMap
+from synapse.types.state import StateFilter
+from synapse.util.caches import intern_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -92,13 +93,6 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
         results: Dict[int, MutableStateMap[str]] = {group: {} for group in groups}
 
-        where_clause, where_args = state_filter.make_sql_filter_clause()
-
-        # Unless the filter clause is empty, we're going to append it after an
-        # existing where clause
-        if where_clause:
-            where_clause = " AND (%s)" % (where_clause,)
-
         if isinstance(self.database_engine, PostgresEngine):
             # Temporarily disable sequential scans in this transaction. This is
             # a temporary hack until we can add the right indices in
@@ -109,37 +103,103 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             # against `state_groups_state` to fetch the latest state.
             # It assumes that previous state groups are always numerically
             # lesser.
-            # The PARTITION is used to get the event_id in the greatest state
-            # group for the given type, state_key.
             # This may return multiple rows per (type, state_key), but last_value
             # should be the same.
             sql = """
-                WITH RECURSIVE state(state_group) AS (
+                WITH RECURSIVE sgs(state_group) AS (
                     VALUES(?::bigint)
                     UNION ALL
-                    SELECT prev_state_group FROM state_group_edges e, state s
+                    SELECT prev_state_group FROM state_group_edges e, sgs s
                     WHERE s.state_group = e.state_group
                 )
-                SELECT DISTINCT ON (type, state_key)
-                    type, state_key, event_id
-                FROM state_groups_state
-                WHERE state_group IN (
-                    SELECT state_group FROM state
-                ) %s
-                ORDER BY type, state_key, state_group DESC
+                %s
             """
+
+            overall_select_query_args: List[Union[int, str]] = []
+
+            # This is an optimization to create a select clause per-condition. This
+            # makes the query planner a lot smarter on what rows should pull out in the
+            # first place and we end up with something that takes 10x less time to get a
+            # result.
+            use_condition_optimization = (
+                not state_filter.include_others and not state_filter.is_full()
+            )
+            state_filter_condition_combos: List[Tuple[str, Optional[str]]] = []
+            # We don't need to caclculate this list if we're not using the condition
+            # optimization
+            if use_condition_optimization:
+                for etype, state_keys in state_filter.types.items():
+                    if state_keys is None:
+                        state_filter_condition_combos.append((etype, None))
+                    else:
+                        for state_key in state_keys:
+                            state_filter_condition_combos.append((etype, state_key))
+            # And here is the optimization itself. We don't want to do the optimization
+            # if there are too many individual conditions. 10 is an arbitrary number
+            # with no testing behind it but we do know that we specifically made this
+            # optimization for when we grab the necessary state out for
+            # `filter_events_for_client` which just uses 2 conditions
+            # (`EventTypes.RoomHistoryVisibility` and `EventTypes.Member`).
+            if use_condition_optimization and len(state_filter_condition_combos) < 10:
+                select_clause_list: List[str] = []
+                for etype, skey in state_filter_condition_combos:
+                    if skey is None:
+                        where_clause = "(type = ?)"
+                        overall_select_query_args.extend([etype])
+                    else:
+                        where_clause = "(type = ? AND state_key = ?)"
+                        overall_select_query_args.extend([etype, skey])
+
+                    select_clause_list.append(
+                        f"""
+                        (
+                            SELECT DISTINCT ON (type, state_key)
+                                type, state_key, event_id
+                            FROM state_groups_state
+                            INNER JOIN sgs USING (state_group)
+                            WHERE {where_clause}
+                            ORDER BY type, state_key, state_group DESC
+                        )
+                        """
+                    )
+
+                overall_select_clause = " UNION ".join(select_clause_list)
+            else:
+                where_clause, where_args = state_filter.make_sql_filter_clause()
+                # Unless the filter clause is empty, we're going to append it after an
+                # existing where clause
+                if where_clause:
+                    where_clause = " AND (%s)" % (where_clause,)
+
+                overall_select_query_args.extend(where_args)
+
+                overall_select_clause = f"""
+                    SELECT DISTINCT ON (type, state_key)
+                        type, state_key, event_id
+                    FROM state_groups_state
+                    WHERE state_group IN (
+                        SELECT state_group FROM sgs
+                    ) {where_clause}
+                    ORDER BY type, state_key, state_group DESC
+                """
 
             for group in groups:
                 args: List[Union[int, str]] = [group]
-                args.extend(where_args)
+                args.extend(overall_select_query_args)
 
-                txn.execute(sql % (where_clause,), args)
+                txn.execute(sql % (overall_select_clause,), args)
                 for row in txn:
                     typ, state_key, event_id = row
-                    key = (typ, state_key)
+                    key = (intern_string(typ), intern_string(state_key))
                     results[group][key] = event_id
         else:
             max_entries_returned = state_filter.max_entries_returned()
+
+            where_clause, where_args = state_filter.make_sql_filter_clause()
+            # Unless the filter clause is empty, we're going to append it after an
+            # existing where clause
+            if where_clause:
+                where_clause = " AND (%s)" % (where_clause,)
 
             # We don't use WITH RECURSIVE on sqlite3 as there are distributions
             # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
@@ -191,10 +251,10 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
 
 class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
-
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
     STATE_GROUPS_ROOM_INDEX_UPDATE_NAME = "state_groups_room_id_idx"
+    STATE_GROUP_EDGES_UNIQUE_INDEX_UPDATE_NAME = "state_group_edges_unique_idx"
 
     def __init__(
         self,
@@ -215,6 +275,21 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             index_name="state_groups_room_id_idx",
             table="state_groups",
             columns=["room_id"],
+        )
+
+        # `state_group_edges` can cause severe performance issues if duplicate
+        # rows are introduced, which can accidentally be done by well-meaning
+        # server admins when trying to restore a database dump, etc.
+        # See https://github.com/matrix-org/synapse/issues/11779.
+        # Introduce a unique index to guard against that.
+        self.db_pool.updates.register_background_index_update(
+            self.STATE_GROUP_EDGES_UNIQUE_INDEX_UPDATE_NAME,
+            index_name="state_group_edges_unique_idx",
+            table="state_group_edges",
+            columns=["state_group", "prev_state_group"],
+            unique=True,
+            # The old index was on (state_group) and was not unique.
+            replaces_index="state_group_edges_idx",
         )
 
     async def _background_deduplicate_state(
@@ -327,14 +402,15 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                         self.db_pool.simple_insert_many_txn(
                             txn,
                             table="state_groups_state",
+                            keys=(
+                                "state_group",
+                                "room_id",
+                                "type",
+                                "state_key",
+                                "event_id",
+                            ),
                             values=[
-                                {
-                                    "state_group": state_group,
-                                    "room_id": room_id,
-                                    "type": key[0],
-                                    "state_key": key[1],
-                                    "event_id": state_id,
-                                }
+                                (state_group, room_id, key[0], key[1], state_id)
                                 for key, state_id in delta_state.items()
                             ],
                         )

@@ -14,14 +14,17 @@
 import contextlib
 import logging
 import time
-from typing import Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Generator, Optional, Tuple, Union
 
 import attr
 from zope.interface import implementer
 
+from twisted.internet.address import UNIXAddress
+from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IAddress, IReactorTime
 from twisted.python.failure import Failure
-from twisted.web.resource import IResource
+from twisted.web.http import HTTPChannel
+from twisted.web.resource import IResource, Resource
 from twisted.web.server import Request, Site
 
 from synapse.config.server import ListenerConfig
@@ -33,6 +36,9 @@ from synapse.logging.context import (
     PreserveLoggingContext,
 )
 from synapse.types import Requester
+
+if TYPE_CHECKING:
+    import opentracing
 
 logger = logging.getLogger(__name__)
 
@@ -61,19 +67,42 @@ class SynapseRequest(Request):
         logcontext: the log context for this request
     """
 
-    def __init__(self, channel, *args, max_request_body_size=1024, **kw):
-        Request.__init__(self, channel, *args, **kw)
+    def __init__(
+        self,
+        channel: HTTPChannel,
+        site: "SynapseSite",
+        *args: Any,
+        max_request_body_size: int = 1024,
+        request_id_header: Optional[str] = None,
+        **kw: Any,
+    ):
+        super().__init__(channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
-        self.site: SynapseSite = channel.site
+        self.request_id_header = request_id_header
+        self.synapse_site = site
+        self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
+        self.experimental_cors_msc3886 = site.experimental_cors_msc3886
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
         self._requester: Optional[Union[Requester, str]] = None
 
+        # An opentracing span for this request. Will be closed when the request is
+        # completely processed.
+        self._opentracing_span: "Optional[opentracing.Span]" = None
+
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext: Optional[LoggingContext] = None
+
+        # The `Deferred` to cancel if the client disconnects early and
+        # `is_render_cancellable` is set. Expected to be set by `Resource.render`.
+        self.render_deferred: Optional["Deferred[None]"] = None
+        # A boolean indicating whether `render_deferred` should be cancelled if the
+        # client disconnects early. Expected to be set by the coroutine started by
+        # `Resource.render`, if rendering is asynchronous.
+        self.is_render_cancellable = False
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -83,13 +112,13 @@ class SynapseRequest(Request):
         self._is_processing = False
 
         # the time when the asynchronous request handler completed its processing
-        self._processing_finished_time = None
+        self._processing_finished_time: Optional[float] = None
 
         # what time we finished sending the response to the client (or the connection
         # dropped)
-        self.finish_time = None
+        self.finish_time: Optional[float] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         # We overwrite this so that we don't log ``access_token``
         return "<%s at 0x%x method=%r uri=%r clientproto=%r site=%r>" % (
             self.__class__.__name__,
@@ -97,10 +126,10 @@ class SynapseRequest(Request):
             self.get_method(),
             self.get_redacted_uri(),
             self.clientproto.decode("ascii", errors="replace"),
-            self.site.site_tag,
+            self.synapse_site.site_tag,
         )
 
-    def handleContentChunk(self, data):
+    def handleContentChunk(self, data: bytes) -> None:
         # we should have a `content` by now.
         assert self.content, "handleContentChunk() called before gotLength()"
         if self.content.tell() + len(data) > self._max_request_body_size:
@@ -139,8 +168,22 @@ class SynapseRequest(Request):
         # If there's no authenticated entity, it was the requester.
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
 
-    def get_request_id(self):
-        return "%s-%i" % (self.get_method(), self.request_seq)
+    def set_opentracing_span(self, span: "opentracing.Span") -> None:
+        """attach an opentracing span to this request
+
+        Doing so will cause the span to be closed when we finish processing the request
+        """
+        self._opentracing_span = span
+
+    def get_request_id(self) -> str:
+        request_id_value = None
+        if self.request_id_header:
+            request_id_value = self.getHeader(self.request_id_header)
+
+        if request_id_value is None:
+            request_id_value = str(self.request_seq)
+
+        return "%s-%s" % (self.get_method(), request_id_value)
 
     def get_redacted_uri(self) -> str:
         """Gets the redacted URI associated with the request (or placeholder if the URI
@@ -194,7 +237,7 @@ class SynapseRequest(Request):
 
             # If this is a request where the target user doesn't match the user who
             # authenticated (e.g. and admin is puppetting a user) then we return both.
-            if self._requester.user.to_string() != authenticated_entity:
+            if requester != authenticated_entity:
                 return requester, authenticated_entity
 
             return requester, None
@@ -205,7 +248,7 @@ class SynapseRequest(Request):
 
         return None, None
 
-    def render(self, resrc):
+    def render(self, resrc: Resource) -> None:
         # this is called once a Resource has been found to serve the request; in our
         # case the Resource in question will normally be a JsonResource.
 
@@ -215,8 +258,8 @@ class SynapseRequest(Request):
             request_id,
             request=ContextRequest(
                 request_id=request_id,
-                ip_address=self.getClientIP(),
-                site_tag=self.site.site_tag,
+                ip_address=self.get_client_ip_if_available(),
+                site_tag=self.synapse_site.site_tag,
                 # The requester is going to be unknown at this point.
                 requester=None,
                 authenticated_entity=None,
@@ -228,7 +271,7 @@ class SynapseRequest(Request):
         )
 
         # override the Server header which is set by twisted
-        self.setHeader("Server", self.site.server_version_string)
+        self.setHeader("Server", self.synapse_site.server_version_string)
 
         with PreserveLoggingContext(self.logcontext):
             # we start the request metrics timer here with an initial stab
@@ -247,7 +290,7 @@ class SynapseRequest(Request):
             requests_counter.labels(self.get_method(), self.request_metrics.name).inc()
 
     @contextlib.contextmanager
-    def processing(self):
+    def processing(self) -> Generator[None, None, None]:
         """Record the fact that we are processing this request.
 
         Returns a context manager; the correct way to use this is:
@@ -277,12 +320,15 @@ class SynapseRequest(Request):
             self._processing_finished_time = time.time()
             self._is_processing = False
 
+            if self._opentracing_span:
+                self._opentracing_span.log_kv({"event": "finished processing"})
+
             # if we've already sent the response, log it now; otherwise, we wait for the
             # response to be sent.
             if self.finish_time is not None:
                 self._finished_processing()
 
-    def finish(self):
+    def finish(self) -> None:
         """Called when all response data has been written to this Request.
 
         Overrides twisted.web.server.Request.finish to record the finish time and do
@@ -290,12 +336,14 @@ class SynapseRequest(Request):
         """
         self.finish_time = time.time()
         Request.finish(self)
+        if self._opentracing_span:
+            self._opentracing_span.log_kv({"event": "response sent"})
         if not self._is_processing:
             assert self.logcontext is not None
             with PreserveLoggingContext(self.logcontext):
                 self._finished_processing()
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason: Union[Failure, Exception]) -> None:
         """Called when the client connection is closed before the response is written.
 
         Overrides twisted.web.server.Request.connectionLost to record the finish time and
@@ -324,17 +372,36 @@ class SynapseRequest(Request):
         with PreserveLoggingContext(self.logcontext):
             logger.info("Connection from client lost before response was sent")
 
-            if not self._is_processing:
+            if self._opentracing_span:
+                self._opentracing_span.log_kv(
+                    {"event": "client connection lost", "reason": str(reason.value)}
+                )
+
+            if self._is_processing:
+                if self.is_render_cancellable:
+                    if self.render_deferred is not None:
+                        # Throw a cancellation into the request processing, in the hope
+                        # that it will finish up sooner than it normally would.
+                        # The `self.processing()` context manager will call
+                        # `_finished_processing()` when done.
+                        with PreserveLoggingContext():
+                            self.render_deferred.cancel()
+                    else:
+                        logger.error(
+                            "Connection from client lost, but have no Deferred to "
+                            "cancel even though the request is marked as cancellable."
+                        )
+            else:
                 self._finished_processing()
 
-    def _started_processing(self, servlet_name):
+    def _started_processing(self, servlet_name: str) -> None:
         """Record the fact that we are processing this request.
 
         This will log the request's arrival. Once the request completes,
         be sure to call finished_processing.
 
         Args:
-            servlet_name (str): the name of the servlet which will be
+            servlet_name: the name of the servlet which will be
                 processing this request. This is used in the metrics.
 
                 It is possible to update this afterwards by updating
@@ -346,17 +413,19 @@ class SynapseRequest(Request):
             self.start_time, name=servlet_name, method=self.get_method()
         )
 
-        self.site.access_logger.debug(
+        self.synapse_site.access_logger.debug(
             "%s - %s - Received request: %s %s",
-            self.getClientIP(),
-            self.site.site_tag,
+            self.get_client_ip_if_available(),
+            self.synapse_site.site_tag,
             self.get_method(),
             self.get_redacted_uri(),
         )
 
-    def _finished_processing(self):
+    def _finished_processing(self) -> None:
         """Log the completion of this request and update the metrics"""
         assert self.logcontext is not None
+        assert self.finish_time is not None
+
         usage = self.logcontext.get_resource_usage()
 
         if self._processing_finished_time is None:
@@ -372,7 +441,10 @@ class SynapseRequest(Request):
 
         user_agent = get_request_user_agent(self, "-")
 
-        code = str(self.code)
+        # int(self.code) looks redundant, because self.code is already an int.
+        # But self.code might be an HTTPStatus (which inherits from int)---which has
+        # a different string representation. So ensure we really have an integer.
+        code = str(int(self.code))
         if not self.finished:
             # we didn't send the full response before we gave up (presumably because
             # the connection dropped)
@@ -386,13 +458,13 @@ class SynapseRequest(Request):
         if authenticated_entity:
             requester = f"{authenticated_entity}|{requester}"
 
-        self.site.access_logger.log(
+        self.synapse_site.access_logger.log(
             log_level,
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
-            self.getClientIP(),
-            self.site.site_tag,
+            self.get_client_ip_if_available(),
+            self.synapse_site.site_tag,
             requester,
             processing_time,
             response_send_time,
@@ -410,6 +482,10 @@ class SynapseRequest(Request):
             usage.evt_db_fetch_count,
         )
 
+        # complete the opentracing span, if any.
+        if self._opentracing_span:
+            self._opentracing_span.finish()
+
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
@@ -425,6 +501,26 @@ class SynapseRequest(Request):
 
         return True
 
+    def get_client_ip_if_available(self) -> str:
+        """Logging helper. Return something useful when a client IP is not retrievable
+        from a unix socket.
+
+        In practice, this returns the socket file path on a SynapseRequest if using a
+        unix socket and the normal IP address for TCP sockets.
+
+        """
+        # getClientAddress().host returns a proper IP address for a TCP socket. But
+        # unix sockets have no concept of IP addresses or ports and return a
+        # UNIXAddress containing a 'None' value. In order to get something usable for
+        # logs(where this is used) get the unix socket file. getHost() returns a
+        # UNIXAddress containing a value of the socket file and has an instance
+        # variable of 'name' encoded as a byte string containing the path we want.
+        # Decode to utf-8 so it looks nice.
+        if isinstance(self.getClientAddress(), UNIXAddress):
+            return self.getHost().name.decode("utf-8")
+        else:
+            return self.getClientAddress().host
+
 
 class XForwardedForRequest(SynapseRequest):
     """Request object which honours proxy headers
@@ -437,7 +533,7 @@ class XForwardedForRequest(SynapseRequest):
     _forwarded_for: "Optional[_XForwardedForAddress]" = None
     _forwarded_https: bool = False
 
-    def requestReceived(self, command, path, version):
+    def requestReceived(self, command: bytes, path: bytes, version: bytes) -> None:
         # this method is called by the Channel once the full request has been
         # received, to dispatch the request to a resource.
         # We can use it to set the IP address and protocol according to the
@@ -445,7 +541,7 @@ class XForwardedForRequest(SynapseRequest):
         self._process_forwarded_headers()
         return super().requestReceived(command, path, version)
 
-    def _process_forwarded_headers(self):
+    def _process_forwarded_headers(self) -> None:
         headers = self.requestHeaders.getRawHeaders(b"x-forwarded-for")
         if not headers:
             return
@@ -470,7 +566,7 @@ class XForwardedForRequest(SynapseRequest):
             )
             self._forwarded_https = True
 
-    def isSecure(self):
+    def isSecure(self) -> bool:
         if self._forwarded_https:
             return True
         return super().isSecure()
@@ -495,9 +591,9 @@ class XForwardedForRequest(SynapseRequest):
 
 
 @implementer(IAddress)
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class _XForwardedForAddress:
-    host = attr.ib(type=str)
+    host: str
 
 
 class SynapseSite(Site):
@@ -520,7 +616,7 @@ class SynapseSite(Site):
         site_tag: str,
         config: ListenerConfig,
         resource: IResource,
-        server_version_string,
+        server_version_string: str,
         max_request_body_size: int,
         reactor: IReactorTime,
     ):
@@ -540,19 +636,28 @@ class SynapseSite(Site):
         Site.__init__(self, resource, reactor=reactor)
 
         self.site_tag = site_tag
+        self.reactor = reactor
 
         assert config.http_options is not None
         proxied = config.http_options.x_forwarded
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
-        def request_factory(channel, queued) -> Request:
+        request_id_header = config.http_options.request_id_header
+
+        self.experimental_cors_msc3886 = config.http_options.experimental_cors_msc3886
+
+        def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(
-                channel, max_request_body_size=max_request_body_size, queued=queued
+                channel,
+                self,
+                max_request_body_size=max_request_body_size,
+                queued=queued,
+                request_id_header=request_id_header,
             )
 
         self.requestFactory = request_factory  # type: ignore
         self.access_logger = logging.getLogger(logger_name)
         self.server_version_string = server_version_string.encode("ascii")
 
-    def log(self, request):
+    def log(self, request: SynapseRequest) -> None:
         pass

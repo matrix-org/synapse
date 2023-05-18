@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +13,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import urllib
-from typing import TYPE_CHECKING, List, Optional, Tuple
+import urllib.parse
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+)
 
 from prometheus_client import Counter
+from typing_extensions import Concatenate, ParamSpec, TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
-from synapse.api.errors import CodeMessageException
+from synapse.api.errors import CodeMessageException, HttpResponseException
+from synapse.appservice import (
+    ApplicationService,
+    TransactionOneTimeKeysCount,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.events import EventBase
-from synapse.events.utils import serialize_event
-from synapse.http.client import SimpleHttpClient
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.events.utils import SerializeEventConfig, serialize_event
+from synapse.http.client import SimpleHttpClient, is_unknown_endpoint
+from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
-    from synapse.appservice import ApplicationService
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +66,29 @@ sent_events_counter = Counter(
     "synapse_appservice_api_sent_events", "Number of events sent to the AS", ["service"]
 )
 
+sent_ephemeral_counter = Counter(
+    "synapse_appservice_api_sent_ephemeral",
+    "Number of ephemeral events sent to the AS",
+    ["service"],
+)
+
+sent_todevice_counter = Counter(
+    "synapse_appservice_api_sent_todevice",
+    "Number of todevice messages sent to the AS",
+    ["service"],
+)
+
 HOUR_IN_MS = 60 * 60 * 1000
 
 
-APP_SERVICE_PREFIX = "/_matrix/app/unstable"
+APP_SERVICE_PREFIX = "/_matrix/app/v1"
+APP_SERVICE_UNSTABLE_PREFIX = "/_matrix/app/unstable"
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
-def _is_valid_3pe_metadata(info):
+def _is_valid_3pe_metadata(info: JsonDict) -> bool:
     if "instances" not in info:
         return False
     if not isinstance(info["instances"], list):
@@ -60,7 +96,7 @@ def _is_valid_3pe_metadata(info):
     return True
 
 
-def _is_valid_3pe_result(r, field):
+def _is_valid_3pe_result(r: object, field: str) -> TypeGuard[JsonDict]:
     if not isinstance(r, dict):
         return False
 
@@ -84,7 +120,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     pushing.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.clock = hs.get_clock()
 
@@ -92,39 +128,106 @@ class ApplicationServiceApi(SimpleHttpClient):
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )
 
-    async def query_user(self, service, user_id):
+    async def _send_with_fallbacks(
+        self,
+        service: "ApplicationService",
+        prefixes: List[str],
+        path: str,
+        func: Callable[Concatenate[str, P], Awaitable[R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        """
+        Attempt to call an application service with multiple paths, falling back
+        until one succeeds.
+
+        Args:
+            service: The appliacation service, this provides the base URL.
+            prefixes: A last of paths to try in order for the requests.
+            path: A suffix to append to each prefix.
+            func: The function to call, the first argument will be the full
+                endpoint to fetch. Other arguments are provided by args/kwargs.
+
+        Returns:
+            The return value of func.
+        """
+        for i, prefix in enumerate(prefixes, start=1):
+            uri = f"{service.url}{prefix}{path}"
+            try:
+                return await func(uri, *args, **kwargs)
+            except HttpResponseException as e:
+                # If an error is received that is due to an unrecognised path,
+                # fallback to next path (if one exists). Otherwise, consider it
+                # a legitimate error and raise.
+                if i < len(prefixes) and is_unknown_endpoint(e):
+                    continue
+                raise
+            except Exception:
+                # Unexpected exceptions get sent to the caller.
+                raise
+
+        # The function should always exit via the return or raise above this.
+        raise RuntimeError("Unexpected fallback behaviour. This should never be seen.")
+
+    async def query_user(self, service: "ApplicationService", user_id: str) -> bool:
         if service.url is None:
             return False
-        uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self._send_with_fallbacks(
+                service,
+                [APP_SERVICE_PREFIX, ""],
+                f"/users/{urllib.parse.quote(user_id)}",
+                self.get_json,
+                {"access_token": service.hs_token},
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
             if e.code == 404:
                 return False
-            logger.warning("query_user to %s received %s", uri, e.code)
+            logger.warning("query_user to %s received %s", service.url, e.code)
         except Exception as ex:
-            logger.warning("query_user to %s threw exception %s", uri, ex)
+            logger.warning("query_user to %s threw exception %s", service.url, ex)
         return False
 
-    async def query_alias(self, service, alias):
+    async def query_alias(self, service: "ApplicationService", alias: str) -> bool:
         if service.url is None:
             return False
-        uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         try:
-            response = await self.get_json(uri, {"access_token": service.hs_token})
+            response = await self._send_with_fallbacks(
+                service,
+                [APP_SERVICE_PREFIX, ""],
+                f"/rooms/{urllib.parse.quote(alias)}",
+                self.get_json,
+                {"access_token": service.hs_token},
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
-            logger.warning("query_alias to %s received %s", uri, e.code)
+            logger.warning("query_alias to %s received %s", service.url, e.code)
             if e.code == 404:
                 return False
         except Exception as ex:
-            logger.warning("query_alias to %s threw exception %s", uri, ex)
+            logger.warning("query_alias to %s threw exception %s", service.url, ex)
         return False
 
-    async def query_3pe(self, service, kind, protocol, fields):
+    async def query_3pe(
+        self,
+        service: "ApplicationService",
+        kind: str,
+        protocol: str,
+        fields: Dict[bytes, List[bytes]],
+    ) -> List[JsonDict]:
         if kind == ThirdPartyEntityKind.USER:
             required_field = "userid"
         elif kind == ThirdPartyEntityKind.LOCATION:
@@ -134,17 +237,27 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
-        uri = "%s%s/thirdparty/%s/%s" % (
-            service.url,
-            APP_SERVICE_PREFIX,
-            kind,
-            urllib.parse.quote(protocol),
-        )
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         try:
-            response = await self.get_json(uri, fields)
+            args: Mapping[Any, Any] = {
+                **fields,
+                b"access_token": service.hs_token,
+            }
+            response = await self._send_with_fallbacks(
+                service,
+                [APP_SERVICE_PREFIX, APP_SERVICE_UNSTABLE_PREFIX],
+                f"/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
+                self.get_json,
+                args=args,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if not isinstance(response, list):
                 logger.warning(
-                    "query_3pe to %s returned an invalid response %r", uri, response
+                    "query_3pe to %s returned an invalid response %r",
+                    service.url,
+                    response,
                 )
                 return []
 
@@ -154,12 +267,12 @@ class ApplicationServiceApi(SimpleHttpClient):
                     ret.append(r)
                 else:
                     logger.warning(
-                        "query_3pe to %s returned an invalid result %r", uri, r
+                        "query_3pe to %s returned an invalid result %r", service.url, r
                     )
 
             return ret
         except Exception as ex:
-            logger.warning("query_3pe to %s threw exception %s", uri, ex)
+            logger.warning("query_3pe to %s threw exception %s", service.url, ex)
             return []
 
     async def get_3pe_protocol(
@@ -169,17 +282,22 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
-            uri = "%s%s/thirdparty/protocol/%s" % (
-                service.url,
-                APP_SERVICE_PREFIX,
-                urllib.parse.quote(protocol),
-            )
+            # This is required by the configuration.
+            assert service.hs_token is not None
             try:
-                info = await self.get_json(uri)
+                info = await self._send_with_fallbacks(
+                    service,
+                    [APP_SERVICE_PREFIX, APP_SERVICE_UNSTABLE_PREFIX],
+                    f"/thirdparty/protocol/{urllib.parse.quote(protocol)}",
+                    self.get_json,
+                    {"access_token": service.hs_token},
+                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                )
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
-                        "query_3pe_protocol to %s did not return a valid result", uri
+                        "query_3pe_protocol to %s did not return a valid result",
+                        service.url,
                     )
                     return None
 
@@ -192,23 +310,59 @@ class ApplicationServiceApi(SimpleHttpClient):
 
                 return info
             except Exception as ex:
-                logger.warning("query_3pe_protocol to %s threw exception %s", uri, ex)
+                logger.warning(
+                    "query_3pe_protocol to %s threw exception %s", service.url, ex
+                )
                 return None
 
         key = (service.id, protocol)
         return await self.protocol_meta_cache.wrap(key, _get)
 
+    async def ping(self, service: "ApplicationService", txn_id: Optional[str]) -> None:
+        # The caller should check that url is set
+        assert service.url is not None, "ping called without URL being set"
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        await self.post_json_get_json(
+            uri=f"{service.url}{APP_SERVICE_PREFIX}/ping",
+            post_json={"transaction_id": txn_id},
+            headers={"Authorization": [f"Bearer {service.hs_token}"]},
+        )
+
     async def push_bulk(
         self,
         service: "ApplicationService",
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: List[JsonDict],
+        to_device_messages: List[JsonDict],
+        one_time_keys_count: TransactionOneTimeKeysCount,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
         txn_id: Optional[int] = None,
-    ):
+    ) -> bool:
+        """
+        Push data to an application service.
+
+        Args:
+            service: The application service to send to.
+            events: The persistent events to send.
+            ephemeral: The ephemeral events to send.
+            to_device_messages: The to-device messages to send.
+            txn_id: An unique ID to assign to this transaction. Application services should
+                deduplicate transactions received with identitical IDs.
+
+        Returns:
+            True if the task succeeded, False if it failed.
+        """
         if service.url is None:
             return True
 
-        events = self._serialize(service, events)
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        serialized_events = self._serialize(service, events)
 
         if txn_id is None:
             logger.warning(
@@ -216,46 +370,212 @@ class ApplicationServiceApi(SimpleHttpClient):
             )
             txn_id = 0
 
-        uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
-
         # Never send ephemeral events to appservices that do not support it
+        body: JsonDict = {"events": serialized_events}
         if service.supports_ephemeral:
-            body = {"events": events, "de.sorunome.msc2409.ephemeral": ephemeral}
-        else:
-            body = {"events": events}
+            body.update(
+                {
+                    # TODO: Update to stable prefixes once MSC2409 completes FCP merge.
+                    "de.sorunome.msc2409.ephemeral": ephemeral,
+                    "de.sorunome.msc2409.to_device": to_device_messages,
+                }
+            )
+
+        # TODO: Update to stable prefixes once MSC3202 completes FCP merge
+        if service.msc3202_transaction_extensions:
+            if one_time_keys_count:
+                body[
+                    "org.matrix.msc3202.device_one_time_key_counts"
+                ] = one_time_keys_count
+                body[
+                    "org.matrix.msc3202.device_one_time_keys_count"
+                ] = one_time_keys_count
+            if unused_fallback_keys:
+                body[
+                    "org.matrix.msc3202.device_unused_fallback_key_types"
+                ] = unused_fallback_keys
+            if device_list_summary:
+                body["org.matrix.msc3202.device_lists"] = {
+                    "changed": list(device_list_summary.changed),
+                    "left": list(device_list_summary.left),
+                }
 
         try:
-            await self.put_json(
-                uri=uri,
+            await self._send_with_fallbacks(
+                service,
+                [APP_SERVICE_PREFIX, ""],
+                f"/transactions/{urllib.parse.quote(str(txn_id))}",
+                self.put_json,
                 json_body=body,
                 args={"access_token": service.hs_token},
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "push_bulk to %s succeeded! events=%s",
+                    service.url,
+                    [event.get("event_id") for event in events],
+                )
             sent_transactions_counter.labels(service.id).inc()
-            sent_events_counter.labels(service.id).inc(len(events))
+            sent_events_counter.labels(service.id).inc(len(serialized_events))
+            sent_ephemeral_counter.labels(service.id).inc(len(ephemeral))
+            sent_todevice_counter.labels(service.id).inc(len(to_device_messages))
             return True
         except CodeMessageException as e:
-            logger.warning("push_bulk to %s received %s", uri, e.code)
+            logger.warning(
+                "push_bulk to %s received code=%s msg=%s",
+                service.url,
+                e.code,
+                e.msg,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
         except Exception as ex:
-            logger.warning("push_bulk to %s threw exception %s", uri, ex)
+            logger.warning(
+                "push_bulk to %s threw exception(%s) %s args=%s",
+                service.url,
+                type(ex).__name__,
+                ex,
+                ex.args,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
         failed_transactions_counter.labels(service.id).inc()
         return False
 
-    def _serialize(self, service, events):
+    async def claim_client_keys(
+        self, service: "ApplicationService", query: List[Tuple[str, str, str, int]]
+    ) -> Tuple[
+        Dict[str, Dict[str, Dict[str, JsonDict]]], List[Tuple[str, str, str, int]]
+    ]:
+        """Claim one time keys from an application service.
+
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
+        Args:
+            service: The application service to query.
+            query: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A tuple of:
+                A map of user ID -> a map device ID -> a map of key ID -> JSON dict.
+
+                A copy of the input which has not been fulfilled because the
+                appservice doesn't support this endpoint or has not returned
+                data for that tuple.
+        """
+        if service.url is None:
+            return {}, query
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        # Create the expected payload shape.
+        body: Dict[str, Dict[str, List[str]]] = {}
+        for user_id, device, algorithm, count in query:
+            body.setdefault(user_id, {}).setdefault(device, []).extend(
+                [algorithm] * count
+            )
+
+        uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3983/keys/claim"
+        try:
+            response = await self.post_json_get_json(
+                uri,
+                body,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
+        except HttpResponseException as e:
+            # The appservice doesn't support this endpoint.
+            if is_unknown_endpoint(e):
+                return {}, query
+            logger.warning("claim_keys to %s received %s", uri, e.code)
+            return {}, query
+        except Exception as ex:
+            logger.warning("claim_keys to %s threw exception %s", uri, ex)
+            return {}, query
+
+        # Check if the appservice fulfilled all of the queried user/device/algorithms
+        # or if some are still missing.
+        #
+        # TODO This places a lot of faith in the response shape being correct.
+        missing = []
+        for user_id, device, algorithm, count in query:
+            # Count the number of keys in the response for this algorithm by
+            # checking which key IDs start with the algorithm. This uses that
+            # True == 1 in Python to generate a count.
+            response_count = sum(
+                key_id.startswith(f"{algorithm}:")
+                for key_id in response.get(user_id, {}).get(device, {})
+            )
+            count -= response_count
+            # If the appservice responds with fewer keys than requested, then
+            # consider the request unfulfilled.
+            if count > 0:
+                missing.append((user_id, device, algorithm, count))
+
+        return response, missing
+
+    async def query_keys(
+        self, service: "ApplicationService", query: Dict[str, List[str]]
+    ) -> Dict[str, Dict[str, Dict[str, JsonDict]]]:
+        """Query the application service for keys.
+
+        Note that any error (including a timeout) is treated as the application
+        service having no information.
+
+        Args:
+            service: The application service to query.
+            query: An iterable of tuples of (user ID, device ID, algorithm).
+
+        Returns:
+            A map of device_keys/master_keys/self_signing_keys/user_signing_keys:
+
+            device_keys is a map of user ID -> a map device ID -> device info.
+        """
+        if service.url is None:
+            return {}
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3984/keys/query"
+        try:
+            response = await self.post_json_get_json(
+                uri,
+                query,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
+        except HttpResponseException as e:
+            # The appservice doesn't support this endpoint.
+            if is_unknown_endpoint(e):
+                return {}
+            logger.warning("query_keys to %s received %s", uri, e.code)
+            return {}
+        except Exception as ex:
+            logger.warning("query_keys to %s threw exception %s", uri, ex)
+            return {}
+
+        return response
+
+    def _serialize(
+        self, service: "ApplicationService", events: Iterable[EventBase]
+    ) -> List[JsonDict]:
         time_now = self.clock.time_msec()
         return [
             serialize_event(
                 e,
                 time_now,
-                as_client_event=True,
-                # If this is an invite or a knock membership event, and we're interested
-                # in this user, then include any stripped state alongside the event.
-                include_stripped_room_state=(
-                    e.type == EventTypes.Member
-                    and (
-                        e.membership == Membership.INVITE
-                        or e.membership == Membership.KNOCK
-                    )
-                    and service.is_interested_in_user(e.state_key)
+                config=SerializeEventConfig(
+                    as_client_event=True,
+                    # If this is an invite or a knock membership event, and we're interested
+                    # in this user, then include any stripped state alongside the event.
+                    include_stripped_room_state=(
+                        e.type == EventTypes.Member
+                        and (
+                            e.membership == Membership.INVITE
+                            or e.membership == Membership.KNOCK
+                        )
+                        and service.is_interested_in_user(e.state_key)
+                    ),
                 ),
             )
             for e in events

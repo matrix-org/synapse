@@ -6,7 +6,7 @@
 # Synapse also supports structured logging for machine readable logs which can
 # be ingested by ELK stacks. See [2] for details.
 #
-# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [1]: https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema
 # [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
@@ -61,13 +61,6 @@ loggers:
         # beware: increasing this to DEBUG will make synapse log sensitive
         # information such as access tokens.
         level: INFO
-
-    twisted:
-        # We send the twisted logging directly to the file handler,
-        # to work around https://github.com/matrix-org/synapse/issues/3471
-        # when using "buffer" logger. Use "console" to log to stderr instead.
-        handlers: [file]
-        propagate: false
 
 root:
     level: INFO

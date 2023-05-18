@@ -14,6 +14,7 @@
 
 from typing import Any, List, Tuple, Type
 
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 
 from ._base import Config
@@ -24,7 +25,30 @@ LDAP_PROVIDER = "ldap_auth_provider.LdapAuthProvider"
 class PasswordAuthProviderConfig(Config):
     section = "authproviders"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
+        """Parses the old password auth providers config. The config format looks like this:
+
+        password_providers:
+           # Example config for an LDAP auth provider
+           - module: "ldap_auth_provider.LdapAuthProvider"
+             config:
+               enabled: true
+               uri: "ldap://ldap.example.com:389"
+               start_tls: true
+               base: "ou=users,dc=example,dc=com"
+               attributes:
+                  uid: "cn"
+                  mail: "email"
+                  name: "givenName"
+               #bind_dn:
+               #bind_password:
+               #filter: "(objectClass=posixAccount)"
+
+        We expect admins to use modules for this feature (which is why it doesn't appear
+        in the sample config file), but we want to keep support for it around for a bit
+        for backwards compatibility.
+        """
+
         self.password_providers: List[Tuple[Type, Any]] = []
         providers = []
 
@@ -49,33 +73,3 @@ class PasswordAuthProviderConfig(Config):
             )
 
             self.password_providers.append((provider_class, provider_config))
-
-    def generate_config_section(self, **kwargs):
-        return """\
-        # Password providers allow homeserver administrators to integrate
-        # their Synapse installation with existing authentication methods
-        # ex. LDAP, external tokens, etc.
-        #
-        # For more information and known implementations, please see
-        # https://matrix-org.github.io/synapse/latest/password_auth_providers.html
-        #
-        # Note: instances wishing to use SAML or CAS authentication should
-        # instead use the `saml2_config` or `cas_config` options,
-        # respectively.
-        #
-        password_providers:
-        #    # Example config for an LDAP auth provider
-        #    - module: "ldap_auth_provider.LdapAuthProvider"
-        #      config:
-        #        enabled: true
-        #        uri: "ldap://ldap.example.com:389"
-        #        start_tls: true
-        #        base: "ou=users,dc=example,dc=com"
-        #        attributes:
-        #           uid: "cn"
-        #           mail: "email"
-        #           name: "givenName"
-        #        #bind_dn:
-        #        #bind_password:
-        #        #filter: "(objectClass=posixAccount)"
-        """

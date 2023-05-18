@@ -81,7 +81,7 @@ class SequenceGenerator(metaclass=abc.ABCMeta):
         id_column: str,
         stream_name: Optional[str] = None,
         positive: bool = True,
-    ):
+    ) -> None:
         """Should be called during start up to test that the current value of
         the sequence is greater than or equal to the maximum ID in the table.
 
@@ -122,7 +122,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
         id_column: str,
         stream_name: Optional[str] = None,
         positive: bool = True,
-    ):
+    ) -> None:
         """See SequenceGenerator.check_consistency for docstring."""
 
         txn = db_conn.cursor(txn_name="sequence.check_consistency")
@@ -205,7 +205,7 @@ class LocalSequenceGenerator(SequenceGenerator):
         """
         Args:
             get_first_callback: a callback which is called on the first call to
-                 get_next_id_txn; should return the curreent maximum id
+                 get_next_id_txn; should return the current maximum id
         """
         # the callback. this is cleared after it is called, so that it can be GCed.
         self._callback: Optional[GetFirstCallbackType] = get_first_callback
@@ -244,7 +244,7 @@ class LocalSequenceGenerator(SequenceGenerator):
         id_column: str,
         stream_name: Optional[str] = None,
         positive: bool = True,
-    ):
+    ) -> None:
         # There is nothing to do for in memory sequences
         pass
 

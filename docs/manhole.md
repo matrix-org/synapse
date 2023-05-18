@@ -13,8 +13,10 @@ environments where untrusted users have shell access.
 
 ## Configuring the manhole
 
-To enable it, first uncomment the `manhole` listener configuration in
-`homeserver.yaml`. The configuration is slightly different if you're using docker.
+To enable it, first add the `manhole` listener configuration in your
+`homeserver.yaml`. You can find information on how to do that 
+in the [configuration manual](usage/configuration/config_documentation.md#manhole_settings).
+The configuration is slightly different if you're using docker.
 
 #### Docker config
 
@@ -94,6 +96,6 @@ As a simple example, retrieving an event from the database:
 
 ```pycon
 >>> from twisted.internet import defer
->>> defer.ensureDeferred(hs.get_datastore().get_event('$1416420717069yeQaw:matrix.org'))
+>>> defer.ensureDeferred(hs.get_datastores().main.get_event('$1416420717069yeQaw:matrix.org'))
 <Deferred at 0x7ff253fc6998 current result: <FrozenEvent event_id='$1416420717069yeQaw:matrix.org', type='m.room.create', state_key=''>>
 ```

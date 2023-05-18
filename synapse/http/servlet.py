@@ -13,7 +13,9 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
+import enum
 import logging
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Iterable,
@@ -22,14 +24,20 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
+    TypeVar,
     overload,
 )
 
+from pydantic import BaseModel, MissingError, PydanticValueError, ValidationError
+from pydantic.error_wrappers import ErrorWrapper
 from typing_extensions import Literal
 
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.http import redact_uri
+from synapse.http.server import HttpServer
 from synapse.types import JsonDict, RoomAlias, RoomID
 from synapse.util import json_decoder
 
@@ -79,6 +87,35 @@ def parse_integer(
     return parse_integer_from_args(args, name, default, required)
 
 
+@overload
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[int] = None,
+) -> Optional[int]:
+    ...
+
+
+@overload
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    *,
+    required: Literal[True],
+) -> int:
+    ...
+
+
+@overload
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[int] = None,
+    required: bool = False,
+) -> Optional[int]:
+    ...
+
+
 def parse_integer_from_args(
     args: Mapping[bytes, Sequence[bytes]],
     name: str,
@@ -108,11 +145,15 @@ def parse_integer_from_args(
             return int(args[name_bytes][0])
         except Exception:
             message = "Query parameter %r must be an integer" % (name,)
-            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM
+            )
     else:
         if required:
             message = "Missing integer query parameter %r" % (name,)
-            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM
+            )
         else:
             return default
 
@@ -217,11 +258,15 @@ def parse_boolean_from_args(
             message = (
                 "Boolean query parameter %r must be one of ['true', 'false']"
             ) % (name,)
-            raise SynapseError(400, message)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM
+            )
     else:
         if required:
             message = "Missing boolean query parameter %r" % (name,)
-            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM
+            )
         else:
             return default
 
@@ -284,7 +329,7 @@ def parse_bytes_from_args(
         return args[name_bytes][0]
     elif required:
         message = "Missing string query parameter %s" % (name,)
-        raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+        raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM)
 
     return default
 
@@ -318,6 +363,7 @@ def parse_string(
     request: Request,
     name: str,
     *,
+    default: Optional[str] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
@@ -369,6 +415,74 @@ def parse_string(
     )
 
 
+EnumT = TypeVar("EnumT", bound=enum.Enum)
+
+
+@overload
+def parse_enum(
+    request: Request,
+    name: str,
+    E: Type[EnumT],
+    default: EnumT,
+) -> EnumT:
+    ...
+
+
+@overload
+def parse_enum(
+    request: Request,
+    name: str,
+    E: Type[EnumT],
+    *,
+    required: Literal[True],
+) -> EnumT:
+    ...
+
+
+def parse_enum(
+    request: Request,
+    name: str,
+    E: Type[EnumT],
+    default: Optional[EnumT] = None,
+    required: bool = False,
+) -> Optional[EnumT]:
+    """
+    Parse an enum parameter from the request query string.
+
+    Note that the enum *must only have string values*.
+
+    Args:
+        request: the twisted HTTP request.
+        name: the name of the query parameter.
+        E: the enum which represents valid values
+        default: enum value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+
+    Returns:
+        An enum value.
+
+    Raises:
+        SynapseError if the parameter is absent and required, or if the
+            parameter is present, must be one of a list of allowed values and
+            is not one of those allowed values.
+    """
+    # Assert the enum values are strings.
+    assert all(
+        isinstance(e.value, str) for e in E
+    ), "parse_enum only works with string values"
+    str_value = parse_string(
+        request,
+        name,
+        default=default.value if default is not None else None,
+        required=required,
+        allowed_values=[e.value for e in E],
+    )
+    if str_value is None:
+        return None
+    return E(str_value)
+
+
 def _parse_string_value(
     value: bytes,
     allowed_values: Optional[Iterable[str]],
@@ -378,14 +492,16 @@ def _parse_string_value(
     try:
         value_str = value.decode(encoding)
     except ValueError:
-        raise SynapseError(400, "Query parameter %r must be %s" % (name, encoding))
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST, "Query parameter %r must be %s" % (name, encoding)
+        )
 
     if allowed_values is not None and value_str not in allowed_values:
         message = "Query parameter %r must be one of [%s]" % (
             name,
             ", ".join(repr(v) for v in allowed_values),
         )
-        raise SynapseError(400, message)
+        raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM)
     else:
         return value_str
 
@@ -481,7 +597,9 @@ def parse_strings_from_args(
     else:
         if required:
             message = "Missing string query parameter %r" % (name,)
-            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM
+            )
 
         return default
 
@@ -609,7 +727,7 @@ def parse_json_value_from_request(
     try:
         content_bytes = request.content.read()  # type: ignore
     except Exception:
-        raise SynapseError(400, "Error reading JSON content.")
+        raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading JSON content.")
 
     if not content_bytes and allow_empty_body:
         return None
@@ -617,8 +735,16 @@ def parse_json_value_from_request(
     try:
         content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
-        logger.warning("Unable to parse JSON: %s (%s)", e, content_bytes)
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+        logger.warning(
+            "Unable to parse JSON from %s %s response: %s (%s)",
+            request.method.decode("ascii", errors="replace"),
+            redact_uri(request.uri.decode("ascii", errors="replace")),
+            e,
+            content_bytes,
+        )
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST, "Content not JSON.", errcode=Codes.NOT_JSON
+        )
 
     return content
 
@@ -644,9 +770,55 @@ def parse_json_object_from_request(
 
     if not isinstance(content, dict):
         message = "Content must be a JSON object."
-        raise SynapseError(400, message, errcode=Codes.BAD_JSON)
+        raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.BAD_JSON)
 
     return content
+
+
+Model = TypeVar("Model", bound=BaseModel)
+
+
+def validate_json_object(content: JsonDict, model_type: Type[Model]) -> Model:
+    """Validate a deserialized JSON object using the given pydantic model.
+
+    Raises:
+        SynapseError if the request body couldn't be decoded as JSON or
+            if it wasn't a JSON object.
+    """
+    try:
+        instance = model_type.parse_obj(content)
+    except ValidationError as e:
+        # Choose a matrix error code. The catch-all is BAD_JSON, but we try to find a
+        # more specific error if possible (which occasionally helps us to be spec-
+        # compliant) This is a bit awkward because the spec's error codes aren't very
+        # clear-cut: BAD_JSON arguably overlaps with MISSING_PARAM and INVALID_PARAM.
+        errcode = Codes.BAD_JSON
+
+        raw_errors = e.raw_errors
+        if len(raw_errors) == 1 and isinstance(raw_errors[0], ErrorWrapper):
+            raw_error = raw_errors[0].exc
+            if isinstance(raw_error, MissingError):
+                errcode = Codes.MISSING_PARAM
+            elif isinstance(raw_error, PydanticValueError):
+                errcode = Codes.INVALID_PARAM
+
+        raise SynapseError(HTTPStatus.BAD_REQUEST, str(e), errcode=errcode)
+
+    return instance
+
+
+def parse_and_validate_json_object_from_request(
+    request: Request, model_type: Type[Model]
+) -> Model:
+    """Parse a JSON object from the body of a twisted HTTP request, then deserialise and
+    validate using the given pydantic model.
+
+    Raises:
+        SynapseError if the request body couldn't be decoded as JSON or
+            if it wasn't a JSON object.
+    """
+    content = parse_json_object_from_request(request, allow_empty_body=False)
+    return validate_json_object(content, model_type)
 
 
 def assert_params_in_dict(body: JsonDict, required: Iterable[str]) -> None:
@@ -656,7 +828,9 @@ def assert_params_in_dict(body: JsonDict, required: Iterable[str]) -> None:
             absent.append(k)
 
     if len(absent) > 0:
-        raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST, "Missing params: %r" % absent, Codes.MISSING_PARAM
+        )
 
 
 class RestServlet:
@@ -680,7 +854,7 @@ class RestServlet:
     into the appropriate HTTP response.
     """
 
-    def register(self, http_server):
+    def register(self, http_server: HttpServer) -> None:
         """Register this servlet with the given HTTP server."""
         patterns = getattr(self, "PATTERNS", None)
         if patterns:
@@ -729,10 +903,12 @@ class ResolveRoomIdMixin:
             resolved_room_id = room_id.to_string()
         else:
             raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
+                HTTPStatus.BAD_REQUEST,
+                "%s was not legal room ID or room alias" % (room_identifier,),
             )
         if not resolved_room_id:
             raise SynapseError(
-                400, "Unknown room ID or room alias %s" % room_identifier
+                HTTPStatus.BAD_REQUEST,
+                "Unknown room ID or room alias %s" % room_identifier,
             )
         return resolved_room_id, remote_room_hosts

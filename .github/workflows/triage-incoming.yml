@@ -1,0 +1,15 @@
+name: Move new issues into the issue triage board
+
+on:
+  issues:
+    types: [ opened ]
+
+jobs:
+  triage:
+    uses: matrix-org/backend-meta/.github/workflows/triage-incoming.yml@v2
+    with: 
+      project_id: 'PVT_kwDOAIB0Bs4AFDdZ'
+      content_id: ${{ github.event.issue.node_id }}
+    secrets: 
+      github_access_token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+          

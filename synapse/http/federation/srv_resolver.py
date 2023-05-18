@@ -16,13 +16,13 @@
 import logging
 import random
 import time
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 import attr
 
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
-from twisted.names.error import DNSNameError, DomainError
+from twisted.names.error import DNSNameError, DNSNotImplementedError, DomainError
 
 from synapse.logging.context import make_deferred_yieldable
 
@@ -109,7 +109,7 @@ class SrvResolver:
 
     def __init__(
         self,
-        dns_client=client,
+        dns_client: Any = client,
         cache: Dict[bytes, List[Server]] = SERVER_CACHE,
         get_time: Callable[[], float] = time.time,
     ):
@@ -144,6 +144,9 @@ class SrvResolver:
         except DNSNameError:
             # TODO: cache this. We can get the SOA out of the exception, and use
             # the negative-TTL value.
+            return []
+        except DNSNotImplementedError:
+            # For .onion homeservers this is unavailable, just fallback to host:8448
             return []
         except DomainError as e:
             # We failed to resolve the name (other than a NameError)

@@ -30,7 +30,7 @@ class MatchChange(Enum):
 
 class StateDeltasHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def _get_key_change(
         self,

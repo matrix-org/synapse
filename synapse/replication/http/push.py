@@ -13,10 +13,13 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
-from synapse.http.servlet import parse_json_object_from_request
+from twisted.web.server import Request
+
+from synapse.http.server import HttpServer
 from synapse.replication.http._base import ReplicationEndpoint
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -48,7 +51,7 @@ class ReplicationRemovePusherRestServlet(ReplicationEndpoint):
         self.pusher_pool = hs.get_pusherpool()
 
     @staticmethod
-    async def _serialize_payload(app_id, pushkey, user_id):
+    async def _serialize_payload(app_id: str, pushkey: str, user_id: str) -> JsonDict:  # type: ignore[override]
         payload = {
             "app_id": app_id,
             "pushkey": pushkey,
@@ -56,9 +59,9 @@ class ReplicationRemovePusherRestServlet(ReplicationEndpoint):
 
         return payload
 
-    async def _handle_request(self, request, user_id):
-        content = parse_json_object_from_request(request)
-
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, content: JsonDict, user_id: str
+    ) -> Tuple[int, JsonDict]:
         app_id = content["app_id"]
         pushkey = content["pushkey"]
 
@@ -67,5 +70,5 @@ class ReplicationRemovePusherRestServlet(ReplicationEndpoint):
         return 200, {}
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationRemovePusherRestServlet(hs).register(http_server)

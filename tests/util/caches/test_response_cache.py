@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from unittest.mock import Mock
+
 from parameterized import parameterized
 
 from twisted.internet import defer
@@ -32,7 +35,7 @@ class ResponseCacheTestCase(TestCase):
                 (These have cache with a short timeout_ms=, shorter than will be tested through advancing the clock)
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor, self.clock = get_clock()
 
     def with_cache(self, name: str, ms: int = 0) -> ResponseCache:
@@ -46,7 +49,7 @@ class ResponseCacheTestCase(TestCase):
         await self.clock.sleep(1)
         return o
 
-    def test_cache_hit(self):
+    def test_cache_hit(self) -> None:
         cache = self.with_cache("keeping_cache", ms=9001)
 
         expected_result = "howdy"
@@ -60,13 +63,18 @@ class ResponseCacheTestCase(TestCase):
             self.successResultOf(wrap_d),
             "initial wrap result should be the same",
         )
+
+        # a second call should return the result without a call to the wrapped function
+        unexpected = Mock(spec=())
+        wrap2_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+        unexpected.assert_not_called()
         self.assertEqual(
             expected_result,
-            self.successResultOf(cache.get(0)),
-            "cache should have the result",
+            self.successResultOf(wrap2_d),
+            "cache should still have the result",
         )
 
-    def test_cache_miss(self):
+    def test_cache_miss(self) -> None:
         cache = self.with_cache("trashing_cache", ms=0)
 
         expected_result = "howdy"
@@ -80,9 +88,9 @@ class ResponseCacheTestCase(TestCase):
             self.successResultOf(wrap_d),
             "initial wrap result should be the same",
         )
-        self.assertIsNone(cache.get(0), "cache should not have the result now")
+        self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
-    def test_cache_expire(self):
+    def test_cache_expire(self) -> None:
         cache = self.with_cache("short_cache", ms=1000)
 
         expected_result = "howdy"
@@ -92,18 +100,22 @@ class ResponseCacheTestCase(TestCase):
         )
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
+
+        # a second call should return the result without a call to the wrapped function
+        unexpected = Mock(spec=())
+        wrap2_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+        unexpected.assert_not_called()
         self.assertEqual(
             expected_result,
-            self.successResultOf(cache.get(0)),
+            self.successResultOf(wrap2_d),
             "cache should still have the result",
         )
 
         # cache eviction timer is handled
         self.reactor.pump((2,))
+        self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
-        self.assertIsNone(cache.get(0), "cache should not have the result now")
-
-    def test_cache_wait_hit(self):
+    def test_cache_wait_hit(self) -> None:
         cache = self.with_cache("neutral_cache")
 
         expected_result = "howdy"
@@ -119,7 +131,7 @@ class ResponseCacheTestCase(TestCase):
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
 
-    def test_cache_wait_expire(self):
+    def test_cache_wait_expire(self) -> None:
         cache = self.with_cache("medium_cache", ms=3000)
 
         expected_result = "howdy"
@@ -133,19 +145,24 @@ class ResponseCacheTestCase(TestCase):
         self.reactor.pump((1, 1))
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
+
+        # a second call should immediately return the result without a call to the
+        # wrapped function
+        unexpected = Mock(spec=())
+        wrap2_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+        unexpected.assert_not_called()
         self.assertEqual(
             expected_result,
-            self.successResultOf(cache.get(0)),
+            self.successResultOf(wrap2_d),
             "cache should still have the result",
         )
 
         # (1 + 1 + 2) > 3.0, cache eviction timer is handled
         self.reactor.pump((2,))
-
-        self.assertIsNone(cache.get(0), "cache should not have the result now")
+        self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
     @parameterized.expand([(True,), (False,)])
-    def test_cache_context_nocache(self, should_cache: bool):
+    def test_cache_context_nocache(self, should_cache: bool) -> None:
         """If the callback clears the should_cache bit, the result should not be cached"""
         cache = self.with_cache("medium_cache", ms=3000)
 
@@ -153,7 +170,7 @@ class ResponseCacheTestCase(TestCase):
 
         call_count = 0
 
-        async def non_caching(o: str, cache_context: ResponseCacheContext[int]):
+        async def non_caching(o: str, cache_context: ResponseCacheContext[int]) -> str:
             nonlocal call_count
             call_count += 1
             await self.clock.sleep(1)
@@ -183,10 +200,16 @@ class ResponseCacheTestCase(TestCase):
         self.assertEqual(expected_result, self.successResultOf(wrap2_d))
 
         if should_cache:
+            unexpected = Mock(spec=())
+            wrap3_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+            unexpected.assert_not_called()
             self.assertEqual(
                 expected_result,
-                self.successResultOf(cache.get(0)),
+                self.successResultOf(wrap3_d),
                 "cache should still have the result",
             )
+
         else:
-            self.assertIsNone(cache.get(0), "cache should not have the result")
+            self.assertCountEqual(
+                [], cache.keys(), "cache should not have the result now"
+            )
