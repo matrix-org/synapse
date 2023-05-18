@@ -155,8 +155,11 @@
                 # Redis is needed in order to run Synapse in worker mode.
                 services.redis.enable = true;
 
-                # We are now ready to start Synapse.
-                
+                # Configure and start Synapse. Before starting Synapse, this shell code:
+                #  * generates a default homeserver.yaml config file if one does not exist, and
+                #  * ensures a directory containing two additional homeserver config files exists;
+                #    one to configure using the development environment's PostgreSQL as the
+                #    database backend and another for enabling Redis support.
                 process.before = ''
                   python -m synapse.app.homeserver -c homeserver.yaml --generate-config --server-name=synapse.dev --report-stats=no
                   mkdir -p homeserver-config-overrides.d
