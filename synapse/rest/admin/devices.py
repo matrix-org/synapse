@@ -137,6 +137,35 @@ class DevicesRestServlet(RestServlet):
         devices = await self.device_handler.get_devices_by_user(target_user.to_string())
         return HTTPStatus.OK, {"devices": devices, "total": len(devices)}
 
+    async def on_POST(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        """Creates a new device for the user."""
+        await assert_requester_is_admin(self.auth, request)
+
+        target_user = UserID.from_string(user_id)
+        if not self.is_mine(target_user):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Can only create devices for local users"
+            )
+
+        u = await self.store.get_user_by_id(target_user.to_string())
+        if u is None:
+            raise NotFoundError("Unknown user")
+
+        body = parse_json_object_from_request(request)
+        device_id = body.get("device_id")
+        if not device_id:
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Missing device_id")
+        if not isinstance(device_id, str):
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "device_id must be a string")
+
+        await self.device_handler.check_device_registered(
+            user_id=user_id, device_id=device_id
+        )
+
+        return HTTPStatus.CREATED, {}
+
 
 class DeleteDevicesRestServlet(RestServlet):
     """
