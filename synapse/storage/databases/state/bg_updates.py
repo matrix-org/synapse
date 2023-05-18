@@ -207,10 +207,12 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 args: List[Union[int, str]] = [group]
                 args.extend(overall_select_query_args)
 
-                state_groups_we_have_already_fetched_string = [
-                    f"{state_group}::bigint"
-                    for state_group in state_groups_we_have_already_fetched
-                ].join(", ")
+                state_groups_we_have_already_fetched_string = ", ".join(
+                    [
+                        f"{state_group}::bigint"
+                        for state_group in state_groups_we_have_already_fetched
+                    ]
+                )
 
                 txn.execute(
                     sql
@@ -234,12 +236,14 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 # If we see a state group edge link to a previous state_group that we
                 # already fetched from the database, link up the base state to the
                 # partial state we retrieved from the database to build on top of.
-                if results[min_state_group] is not None:
-                    base_state_map = results[min_state_group].copy()
+                if (
+                    min_state_group is not None
+                    and results.get(min_state_group) is not None
+                ):
+                    resultant_state_map = dict(results[min_state_group])
+                    resultant_state_map.update(partial_state_map_for_state_group)
 
-                    results[group] = base_state_map.update(
-                        partial_state_map_for_state_group
-                    )
+                    results[group] = resultant_state_map
                 else:
                     # It's also completely normal for us not to have a previous
                     # state_group to build on top of if this is the first group being
@@ -258,8 +262,9 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             if where_clause:
                 where_clause = " AND (%s)" % (where_clause,)
 
-            # We don't use WITH RECURSIVE on sqlite3 as there are distributions
-            # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
+            # XXX: We could `WITH RECURSIVE` here since it's supported on SQLite 3.8.3
+            # or higher and our minimum supported version is greater than that. We just
+            # haven't put in the time to refactor this.
             for group in groups:
                 next_group: Optional[int] = group
 
