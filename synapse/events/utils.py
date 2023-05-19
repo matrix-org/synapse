@@ -247,7 +247,7 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
 
 def _split_field(field: str) -> List[str]:
     """
-    Split strings unescaped dots and removes escaping.
+    Splits strings on unescaped dots and removes escaping.
 
     Args:
         field: A string representing a path to a field.
