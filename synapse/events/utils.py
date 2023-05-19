@@ -274,30 +274,26 @@ def _split_field(field: str) -> List[str]:
     # 2. ["content", "body", "thing\.with\.dots"]
     # 3. ["content", "body", "thing.with.dots"]
 
-    # Find all dots (and their preceding backslashes). Check if they're escaped
-    # and if not, then note them as a spot to split on.
-    splits = []
+    # Find all dots (and their preceding backslashes). If the dot is unescaped
+    # then emit a new field part.
+    result = []
+    prev_start = 0
     for match in re.finditer(r"\\*\.", field):
         # If the match is an *even* number of characters than the dot was escaped.
         if len(match.group()) % 2 == 0:
             continue
 
-        # The character after the one to keep.
-        splits.append(match.end())
+        # Add a new part (up to the dot, exclusive) after escaping.
+        result.append(
+            re.sub(r"\\(.)", _escape_slash, field[prev_start : match.end() - 1])
+        )
+        prev_start = match.end()
 
-    # Iterate through the splits in reverse order to avoid modifying the positions
-    # as we go.
-    result = []
-    previous_split = len(field)
-    for split in reversed(splits):
-        result.append(field[split:previous_split])
-        previous_split = split - 1
+    # Add any part of the field after the last unescaped dot. (Note that if the
+    # character is a dot this correctly adds a blank string.)
+    result.append(re.sub(r"\\(.)", _escape_slash, field[prev_start:]))
 
-    # Add the first bit.
-    result.append(field[:previous_split])
-
-    # Unescape each part.
-    return [re.sub(r"\\(.)", _escape_slash, part) for part in reversed(result)]
+    return result
 
 
 def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
