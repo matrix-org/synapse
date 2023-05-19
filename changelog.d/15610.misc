@@ -1,1 +1,1 @@
-Instrument `state` and `state_group` storage related things to better picture what's happening when tracing.
+Instrument `state` and `state_group` storage-related operations to better picture what's happening when tracing.
