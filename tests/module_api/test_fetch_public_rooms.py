@@ -76,7 +76,7 @@ class FetchPublicRoomsTestCase(HomeserverTestCase):
 
                 (last_joined_members, last_room_id) = bounds
                 if last_joined_members < 3 or last_room_id == room3_2["room_id"]:
-                    return [room1]
+                    return [room3, room1]
 
             return [room3_2, room3, room1]
 
