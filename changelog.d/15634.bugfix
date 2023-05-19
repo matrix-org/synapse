@@ -1,0 +1,1 @@
+Fix a long-standing bug where deactivated user were able to login in uncommon situations.
