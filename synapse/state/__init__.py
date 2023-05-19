@@ -514,9 +514,12 @@ class StateHandler:
 
         room_version = await self.store.get_room_version_id(room_id)
 
+        # TODO: Use a state_filter here to only grab auth events (and maybe history visibility)?
+        asdf = StateFilter.from_types(
+            event_auth.auth_types_for_event(event.room_version, event)
+        )
         state_to_resolve = await self._state_storage_controller.get_state_for_groups(
-            state_group_ids_set
-            # TODO: Can we use a state_filter here to only grab auth events (and maybe history visibility)?
+            state_group_ids_set, state_filter=asdf
         )
 
         result = await self._state_resolution_handler.resolve_state_groups(
