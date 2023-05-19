@@ -185,7 +185,9 @@ class RoomListHandler:
             module_public_rooms = await fetch_public_rooms(
                 forwards,
                 probing_limit,
-                batch_token.last_joined_members if batch_token else None,
+                (batch_token.last_joined_members, batch_token.last_room_id)
+                if batch_token
+                else None,
             )
 
             # Insert the module's reported public rooms into the list
@@ -212,7 +214,7 @@ class RoomListHandler:
         response: JsonDict = {}
         num_results = len(results)
         if limit is not None:
-            more_to_come = num_results == probing_limit
+            more_to_come = num_results >= probing_limit
 
             # Depending on direction we trim either the front or back.
             if forwards:

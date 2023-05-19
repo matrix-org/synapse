@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Types for callbacks to be registered via the module api
 FETCH_PUBLIC_ROOMS_CALLBACK = Callable[
-    [bool, Optional[int], Optional[int]],
+    [bool, Optional[int], Optional[Tuple[int, str]]],
     Awaitable[Iterable[PublicRoom]],
 ]
 
