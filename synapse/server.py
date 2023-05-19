@@ -454,15 +454,15 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
-    def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
+    def get_proxied_blocklisted_http_client(self) -> SimpleHttpClient:
         """
-        An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
-        based on the IP range blacklist/whitelist.
+        An HTTP client that uses configured HTTP(S) proxies and blocks IPs
+        based on the configured IP ranges.
         """
         return SimpleHttpClient(
             self,
-            ip_whitelist=self.config.server.ip_range_whitelist,
-            ip_blacklist=self.config.server.ip_range_blacklist,
+            ip_allowlist=self.config.server.ip_range_allowlist,
+            ip_blocklist=self.config.server.ip_range_blocklist,
             use_proxy=True,
         )
 
