@@ -269,8 +269,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
                 # Use the instance_map data to retrieve the correct scheme and use the
                 # instance_name to abstract the connection details into the Agent
-                uri = "%s://%s/_synapse/replication/%s/%s" % (
-                    instance_map[instance_name].scheme(),
+                uri = "synapse-replication://%s/_synapse/replication/%s/%s" % (
                     instance_name,
                     cls.NAME,
                     "/".join(url_args),

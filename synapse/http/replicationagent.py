@@ -64,11 +64,14 @@ class ReplicationEndpointFactory:
         # The place to connect to now comes in as the name of the worker, similar to
         # a hostname in placement. Use the instance_map data to get the actual
         # connection information.
-        netloc = self.instance_map[uri.netloc.decode("utf-8")].netloc()
-        if uri.scheme in (b"http", b"https"):
+        worker_name = uri.netloc.decode("utf-8")
+        netloc = self.instance_map[worker_name].netloc()
+        scheme = self.instance_map[worker_name].scheme()
+
+        if scheme in ("http", "https"):
             host, port = netloc.split(":", maxsplit=1)
             endpoint = HostnameEndpoint(self.reactor, host, int(port))
-            if uri.scheme == b"https":
+            if scheme == "https":
                 endpoint = wrapClientTLS(
                     # The 'port' argument below isn't actually used by the function
                     self.context_factory.creatorForNetloc(host, port),
@@ -76,7 +79,7 @@ class ReplicationEndpointFactory:
                 )
             return endpoint
         else:
-            raise SchemeNotSupported(f"Unsupported scheme: {uri.scheme!r}")
+            raise SchemeNotSupported(f"Unsupported scheme: {scheme}")
 
 
 @implementer(IAgent)
