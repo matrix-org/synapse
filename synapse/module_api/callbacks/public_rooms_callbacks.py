@@ -15,7 +15,6 @@
 import logging
 from typing import Awaitable, Callable, Iterable, List, Optional, Tuple
 
-
 from synapse.types import PublicRoom
 
 logger = logging.getLogger(__name__)

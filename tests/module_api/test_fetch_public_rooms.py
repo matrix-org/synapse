@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from http import HTTPStatus
-from typing import (
-    Iterable,
-    Optional,
-    Tuple,
-)
+from typing import Iterable, Optional, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
