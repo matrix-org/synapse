@@ -67,6 +67,8 @@ class StateStorageController:
         """
         self._partial_state_room_tracker.notify_un_partial_stated(room_id)
 
+    @trace
+    @tag_args
     async def get_state_group_delta(
         self, state_group: int
     ) -> Tuple[Optional[int], Optional[StateMap[str]]]:
@@ -84,6 +86,8 @@ class StateStorageController:
         state_group_delta = await self.stores.state.get_state_group_delta(state_group)
         return state_group_delta.prev_group, state_group_delta.delta_ids
 
+    @trace
+    @tag_args
     async def get_state_groups_ids(
         self, _room_id: str, event_ids: Collection[str], await_full_state: bool = True
     ) -> Dict[int, MutableStateMap[str]]:
@@ -114,6 +118,8 @@ class StateStorageController:
 
         return group_to_state
 
+    @trace
+    @tag_args
     async def get_state_ids_for_group(
         self, state_group: int, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
@@ -130,6 +136,8 @@ class StateStorageController:
 
         return group_to_state[state_group]
 
+    @trace
+    @tag_args
     async def get_state_groups(
         self, room_id: str, event_ids: Collection[str]
     ) -> Dict[int, List[EventBase]]:
@@ -165,6 +173,8 @@ class StateStorageController:
             for group, event_id_map in group_to_ids.items()
         }
 
+    @trace
+    @tag_args
     def _get_state_groups_from_groups(
         self, groups: List[int], state_filter: StateFilter
     ) -> Awaitable[Dict[int, StateMap[str]]]:
@@ -183,6 +193,7 @@ class StateStorageController:
         return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
     @trace
+    @tag_args
     async def get_state_for_events(
         self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
@@ -280,6 +291,8 @@ class StateStorageController:
 
         return {event: event_to_state[event] for event in event_ids}
 
+    @trace
+    @tag_args
     async def get_state_for_event(
         self, event_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[EventBase]:
@@ -303,6 +316,7 @@ class StateStorageController:
         return state_map[event_id]
 
     @trace
+    @tag_args
     async def get_state_ids_for_event(
         self,
         event_id: str,
@@ -333,6 +347,8 @@ class StateStorageController:
         )
         return state_map[event_id]
 
+    @trace
+    @tag_args
     def get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
     ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
@@ -402,6 +418,8 @@ class StateStorageController:
             event_id, room_id, prev_group, delta_ids, current_state_ids
         )
 
+    @trace
+    @tag_args
     @cancellable
     async def get_current_state_ids(
         self,
@@ -442,6 +460,8 @@ class StateStorageController:
                 room_id, on_invalidate=on_invalidate
             )
 
+    @trace
+    @tag_args
     async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
         """Get canonical alias for room, if any
 
@@ -466,6 +486,8 @@ class StateStorageController:
 
         return event.content.get("canonical_alias")
 
+    @trace
+    @tag_args
     async def get_current_state_deltas(
         self, prev_stream_id: int, max_stream_id: int
     ) -> Tuple[int, List[Dict[str, Any]]]:
@@ -500,6 +522,7 @@ class StateStorageController:
         )
 
     @trace
+    @tag_args
     async def get_current_state(
         self, room_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[EventBase]:
@@ -516,6 +539,8 @@ class StateStorageController:
 
         return state_map
 
+    @trace
+    @tag_args
     async def get_current_state_event(
         self, room_id: str, event_type: str, state_key: str
     ) -> Optional[EventBase]:
@@ -527,6 +552,8 @@ class StateStorageController:
         )
         return state_map.get(key)
 
+    @trace
+    @tag_args
     async def get_current_hosts_in_room(self, room_id: str) -> AbstractSet[str]:
         """Get current hosts in room based on current state.
 
@@ -538,6 +565,8 @@ class StateStorageController:
 
         return await self.stores.main.get_current_hosts_in_room(room_id)
 
+    @trace
+    @tag_args
     async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
         """Get current hosts in room based on current state.
 
@@ -553,6 +582,8 @@ class StateStorageController:
 
         return await self.stores.main.get_current_hosts_in_room_ordered(room_id)
 
+    @trace
+    @tag_args
     async def get_current_hosts_in_room_or_partial_state_approximation(
         self, room_id: str
     ) -> Collection[str]:
@@ -582,6 +613,8 @@ class StateStorageController:
 
         return hosts
 
+    @trace
+    @tag_args
     async def get_users_in_room_with_profiles(
         self, room_id: str
     ) -> Mapping[str, ProfileInfo]:
