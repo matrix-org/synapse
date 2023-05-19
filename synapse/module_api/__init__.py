@@ -137,7 +137,7 @@ from synapse.util.caches.descriptors import CachedFunction, cached as _cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
-    from synapse.app.generic_worker import GenericWorkerSlavedStore
+    from synapse.app.generic_worker import GenericWorkerStore
     from synapse.server import HomeServer
 
 
@@ -241,9 +241,7 @@ class ModuleApi:
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
         #       out.
-        self._store: Union[
-            DataStore, "GenericWorkerSlavedStore"
-        ] = hs.get_datastores().main
+        self._store: Union[DataStore, "GenericWorkerStore"] = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler

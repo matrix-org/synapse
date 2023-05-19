@@ -264,7 +264,7 @@ class StateTestCase(unittest.TestCase):
 
         self.dummy_store.register_events(graph.walk())
 
-        context_store: dict[str, EventContext] = {}
+        context_store: Dict[str, EventContext] = {}
 
         for event in graph.walk():
             context = yield defer.ensureDeferred(

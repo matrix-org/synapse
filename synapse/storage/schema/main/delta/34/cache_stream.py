@@ -21,7 +21,7 @@ from synapse.storage.prepare_database import get_statements
 logger = logging.getLogger(__name__)
 
 
-# This stream is used to notify replication slaves that some caches have
+# This stream is used to notify workers over replication that some caches have
 # been invalidated that they cannot infer from the other streams.
 CREATE_TABLE = """
 CREATE TABLE cache_invalidation_stream (
