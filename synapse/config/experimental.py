@@ -84,18 +84,6 @@ class ExperimentalConfig(Config):
             "msc3984_appservice_key_query", False
         )
 
-        # MSC3706 (server-side support for partial state in /send_join responses)
-        # Synapse will always serve partial state responses to requests using the stable
-        # query parameter `omit_members`. If this flag is set, Synapse will also serve
-        # partial state responses to requests using the unstable query parameter
-        # `org.matrix.msc3706.partial_state`.
-        self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
-
-        # experimental support for faster joins over federation
-        # (MSC2775, MSC3706, MSC3895)
-        # requires a target server that can provide a partial join response (MSC3706)
-        self.faster_joins_enabled: bool = experimental.get("faster_joins", True)
-
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
 
