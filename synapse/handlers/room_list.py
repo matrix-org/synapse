@@ -201,6 +201,7 @@ class RoomListHandler:
                         and new_room["num_joined_members"] <= r["num_joined_members"]
                     ):
                         results.insert(i, new_room)
+                        inserted = True
                         break
                 if not inserted:
                     if forwards:

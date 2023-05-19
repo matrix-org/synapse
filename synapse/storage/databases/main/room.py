@@ -527,7 +527,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         )
 
         def build_room_entry(room: JsonDict) -> PublicRoom:
-            return PublicRoom(
+            entry = PublicRoom(
                 room_id=room["room_id"],
                 name=room["name"],
                 topic=room["topic"],
@@ -542,7 +542,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             )
 
             # Filter out Nones – rather omit the field altogether
-            # return {k: v for k, v in entry.items() if v is not None}
+            for key in list(entry):
+                if entry[key] == None:
+                    del entry[key]
+
+            return entry
 
         return [build_room_entry(r) for r in ret_val]
 
