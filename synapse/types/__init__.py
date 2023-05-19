@@ -953,17 +953,17 @@ class UserInfo:
     is_shadow_banned: bool
 
 
-class PublicRoomsChunk:
+class PublicRoom(TypedDict):
     room_id: str
-    name: str
-    topic: str
+    name: Optional[str]
+    topic: Optional[str]
     num_joined_members: int
-    canonical_alias: str
-    avatar_url: str
+    canonical_alias: Optional[str]
+    avatar_url: Optional[str]
     world_readable: bool
     guest_can_join: bool
-    join_rule: str
-    room_type: str
+    join_rule: Optional[str]
+    room_type: Optional[str]
 
 
 class UserProfile(TypedDict):

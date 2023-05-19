@@ -149,7 +149,10 @@ class PublicRoomList(BaseFederationServlet):
             limit = None
 
         data = await self.handler.get_local_public_room_list(
-            limit, since_token, network_tuple=network_tuple, from_federation=True
+            limit,
+            since_token,
+            network_tuple=network_tuple,
+            from_remote_server_name=origin,
         )
         return 200, data
 
@@ -190,7 +193,7 @@ class PublicRoomList(BaseFederationServlet):
             since_token=since_token,
             search_filter=search_filter,
             network_tuple=network_tuple,
-            from_federation=True,
+            from_remote_server_name=origin,
         )
 
         return 200, data

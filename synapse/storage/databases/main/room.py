@@ -62,7 +62,13 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, RetentionPolicy, StrCollection, ThirdPartyInstanceID
+from synapse.types import (
+    JsonDict,
+    PublicRoom,
+    RetentionPolicy,
+    StrCollection,
+    ThirdPartyInstanceID,
+)
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.stringutils import MXC_REGEX
@@ -369,7 +375,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         bounds: Optional[Tuple[int, str]],
         forwards: bool,
         ignore_non_federatable: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[PublicRoom]:
         """Gets the largest public rooms (where largest is in terms of joined
         members, as tracked in the statistics table).
 
@@ -520,23 +526,23 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
 
-        def build_room_entry(room: JsonDict) -> JsonDict:
-            entry = {
-                "room_id": room["room_id"],
-                "name": room["name"],
-                "topic": room["topic"],
-                "canonical_alias": room["canonical_alias"],
-                "num_joined_members": room["joined_members"],
-                "avatar_url": room["avatar"],
-                "world_readable": room["history_visibility"]
-                                  == HistoryVisibility.WORLD_READABLE,
-                "guest_can_join": room["guest_access"] == "can_join",
-                "join_rule": room["join_rules"],
-                "room_type": room["room_type"],
-            }
+        def build_room_entry(room: JsonDict) -> PublicRoom:
+            return PublicRoom(
+                room_id=room["room_id"],
+                name=room["name"],
+                topic=room["topic"],
+                canonical_alias=room["canonical_alias"],
+                num_joined_members=room["joined_members"],
+                avatar_url=room["avatar"],
+                world_readable=room["history_visibility"]
+                == HistoryVisibility.WORLD_READABLE,
+                guest_can_join=room["guest_access"] == "can_join",
+                join_rule=room["join_rules"],
+                room_type=room["room_type"],
+            )
 
             # Filter out Nones – rather omit the field altogether
-            return {k: v for k, v in entry.items() if v is not None}
+            # return {k: v for k, v in entry.items() if v is not None}
 
         return [build_room_entry(r) for r in ret_val]
 

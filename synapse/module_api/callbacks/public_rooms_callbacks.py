@@ -14,30 +14,17 @@
 
 import logging
 from typing import Awaitable, Callable, Iterable, List, Optional, Tuple
+from synapse.types import PublicRoom
 
 import attr
 
 logger = logging.getLogger(__name__)
 
 
-@attr.s(auto_attribs=True)
-class PublicRoom:
-    room_id: str
-    name: str
-    topic: str
-    num_joined_members: int
-    canonical_alias: str
-    avatar_url: str
-    world_readable: bool
-    guest_can_join: bool
-    join_rule: str
-    room_type: str
-
-
 # Types for callbacks to be registered via the module api
 FETCH_PUBLIC_ROOMS_CALLBACK = Callable[
-    [int, Optional[Tuple[int, bool]], Optional[dict], Optional[str], Optional[str]],
-    Awaitable[Tuple[Iterable[PublicRoom], bool]],
+    [bool, Optional[int], Optional[int]],
+    Awaitable[Iterable[PublicRoom]],
 ]
 
 

@@ -79,7 +79,6 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
 )
 from synapse.module_api.callbacks.public_rooms_callbacks import (
     FETCH_PUBLIC_ROOMS_CALLBACK,
-    PublicRoomChunk,
 )
 from synapse.module_api.callbacks.spamchecker_callbacks import (
     CHECK_EVENT_FOR_SPAM_CALLBACK,
@@ -123,6 +122,7 @@ from synapse.types import (
     DomainSpecificString,
     JsonDict,
     JsonMapping,
+    PublicRoom,
     Requester,
     RoomAlias,
     StateMap,

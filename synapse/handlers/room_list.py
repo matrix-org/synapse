@@ -34,7 +34,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import JsonDict, PublicRoom, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -166,30 +166,47 @@ class RoomListHandler:
         # we request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
-        public_rooms = await self.store.get_largest_public_rooms(
+        results = await self.store.get_largest_public_rooms(
             network_tuple,
             search_filter,
             probing_limit,
-            bounds=(
-                [batch_token.last_joined_members, batch_token.last_room_id]
-                if batch_token else None
-            ),
+            bounds=(batch_token.last_joined_members, batch_token.last_room_id)
+            if batch_token
+            else None,
             forwards=forwards,
             ignore_non_federatable=bool(from_remote_server_name),
         )
 
-        for fetch_public_rooms in self._module_api_callbacks.fetch_public_rooms_callbacks:
+        for (
+            fetch_public_rooms
+        ) in self._module_api_callbacks.fetch_public_rooms_callbacks:
             # Ask each module for a list of public rooms given the last_joined_members
             # value from the since token and the probing limit.
             module_public_rooms = await fetch_public_rooms(
-                limit=probing_limit,
-                max_member_count=(
-                    batch_token.last_joined_members
-                    if batch_token else None
-                ),
+                forwards,
+                probing_limit,
+                batch_token.last_joined_members if batch_token else None,
             )
 
             # Insert the module's reported public rooms into the list
+            for new_room in module_public_rooms:
+                inserted = False
+                for i in range(len(results)):
+                    r = results[i]
+                    if (
+                        forwards
+                        and new_room["num_joined_members"] >= r["num_joined_members"]
+                    ) or (
+                        not forwards
+                        and new_room["num_joined_members"] <= r["num_joined_members"]
+                    ):
+                        results.insert(i, new_room)
+                        break
+                if not inserted:
+                    if forwards:
+                        results.append(new_room)
+                    else:
+                        results.insert(0, new_room)
 
         response: JsonDict = {}
         num_results = len(results)
