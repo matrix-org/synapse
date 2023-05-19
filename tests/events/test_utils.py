@@ -807,20 +807,20 @@ class SplitFieldTestCase(stdlib_unittest.TestCase):
             ["m.foo", ["m", "foo"]],
             ["m.foo.bar", ["m", "foo", "bar"]],
             # Backslash is used as an escape character.
-            ["m\\.foo", ["m.foo"]],
-            ["m\\\\.foo", ["m\\", "foo"]],
-            ["m\\\\\\.foo", ["m\\.foo"]],
-            ["m\\\\\\\\.foo", ["m\\\\", "foo"]],
-            ["m\\foo", ["m\\foo"]],
-            ["m\\\\foo", ["m\\foo"]],
-            ["m\\\\\\foo", ["m\\\\foo"]],
-            ["m\\\\\\\\foo", ["m\\\\foo"]],
+            [r"m\.foo", ["m.foo"]],
+            [r"m\\.foo", ["m\\", "foo"]],
+            [r"m\\\.foo", [r"m\.foo"]],
+            [r"m\\\\.foo", ["m\\\\", "foo"]],
+            [r"m\foo", [r"m\foo"]],
+            [r"m\\foo", [r"m\foo"]],
+            [r"m\\\foo", [r"m\\foo"]],
+            [r"m\\\\foo", [r"m\\foo"]],
             # Ensure that escapes at the end don't cause issues.
             ["m.foo\\", ["m", "foo\\"]],
-            ["m.foo\\\\", ["m", "foo\\"]],
-            ["m.foo\\.", ["m", "foo."]],
-            ["m.foo\\\\.", ["m", "foo\\", ""]],
-            ["m.foo\\\\\\.", ["m", "foo\\."]],
+            ["m.foo\\", ["m", "foo\\"]],
+            [r"m.foo\.", ["m", "foo."]],
+            [r"m.foo\\.", ["m", "foo\\", ""]],
+            [r"m.foo\\\.", ["m", r"foo\."]],
             # Empty parts (corresponding to properties which are an empty string) are allowed.
             [".m", ["", "m"]],
             ["..m", ["", "", "m"]],
@@ -828,7 +828,7 @@ class SplitFieldTestCase(stdlib_unittest.TestCase):
             ["m..", ["m", "", ""]],
             ["m..foo", ["m", "", "foo"]],
             # Invalid escape sequences.
-            ["\\m", ["\\m"]],
+            [r"\m", [r"\m"]],
         ]
     )
     def test_split_field(self, input: str, expected: str) -> None:
