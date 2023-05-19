@@ -117,7 +117,7 @@ RawHeaderValue = Union[
 ]
 
 
-def _is_ip_allowed(
+def _is_ip_blocked(
     ip_address: IPAddress, allowlist: Optional[IPSet], blocklist: IPSet
 ) -> bool:
     """
@@ -191,7 +191,7 @@ class _IPBlockingResolver:
 
                 ip_address = IPAddress(address.host)
 
-                if _is_ip_allowed(ip_address, self._ip_allowlist, self._ip_blocklist):
+                if _is_ip_blocked(ip_address, self._ip_allowlist, self._ip_blocklist):
                     logger.info(
                         "Blocked %s from DNS resolution to %s" % (ip_address, hostname)
                     )
@@ -296,7 +296,7 @@ class BlocklistingAgentWrapper(Agent):
             # Not an IP
             pass
         else:
-            if _is_ip_allowed(ip_address, self._ip_allowlist, self._ip_blocklist):
+            if _is_ip_blocked(ip_address, self._ip_allowlist, self._ip_blocklist):
                 logger.info("Blocking access to %s" % (ip_address,))
                 e = SynapseError(HTTPStatus.FORBIDDEN, "IP address blocked")
                 return defer.fail(Failure(e))
