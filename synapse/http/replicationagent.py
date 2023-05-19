@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from zope.interface import implementer
 
@@ -32,6 +32,7 @@ from twisted.web.iweb import (
     IResponse,
 )
 
+from synapse.config.workers import InstanceLocationConfig
 from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ class ReplicationAgent(_AgentBase):
     def __init__(
         self,
         reactor: ISynapseReactor,
-        instance_map: Dict[str, Any],
+        instance_map: Dict[str, InstanceLocationConfig],
         contextFactory: IPolicyForHTTPS,
         connectTimeout: Optional[float] = None,
         bindAddress: Optional[bytes] = None,
