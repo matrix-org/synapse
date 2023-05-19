@@ -27,14 +27,13 @@ from synapse.api.constants import (
     JoinRules,
     PublicRoomsFilterFields,
 )
-from synapse.types import Requester
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
     RequestSendFailed,
     SynapseError,
 )
-from synapse.types import JsonDict, PublicRoom, ThirdPartyInstanceID
+from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -213,7 +212,7 @@ class RoomListHandler:
 
         response: JsonDict = {}
         num_results = len(results)
-        if limit is not None:
+        if limit is not None and probing_limit is not None:
             more_to_come = num_results >= probing_limit
 
             # Depending on direction we trim either the front or back.

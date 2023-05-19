@@ -122,7 +122,6 @@ from synapse.types import (
     DomainSpecificString,
     JsonDict,
     JsonMapping,
-    PublicRoom,
     Requester,
     RoomAlias,
     StateMap,

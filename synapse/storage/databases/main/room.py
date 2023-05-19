@@ -16,7 +16,6 @@
 import logging
 from abc import abstractmethod
 from enum import Enum
-from synapse.api.constants import HistoryVisibility
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -39,6 +38,7 @@ from synapse.api.constants import (
     Direction,
     EventContentFields,
     EventTypes,
+    HistoryVisibility,
     JoinRules,
     PublicRoomsFilterFields,
 )
@@ -543,7 +543,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             # Filter out Nones – rather omit the field altogether
             for key in list(entry):
-                if entry[key] == None:
+                if entry[key] is None:
                     del entry[key]
 
             return entry

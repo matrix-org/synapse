@@ -27,6 +27,7 @@ from typing import (
     MutableMapping,
     NoReturn,
     Optional,
+    Required,
     Set,
     Tuple,
     Type,
@@ -953,15 +954,15 @@ class UserInfo:
     is_shadow_banned: bool
 
 
-class PublicRoom(TypedDict):
-    room_id: str
+class PublicRoom(TypedDict, total=False):
+    room_id: Required[str]
     name: Optional[str]
     topic: Optional[str]
-    num_joined_members: int
+    num_joined_members: Required[int]
     canonical_alias: Optional[str]
     avatar_url: Optional[str]
-    world_readable: bool
-    guest_can_join: bool
+    world_readable: Required[bool]
+    guest_can_join: Required[bool]
     join_rule: Optional[str]
     room_type: Optional[str]
 

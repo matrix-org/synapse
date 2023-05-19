@@ -11,22 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.test.proto_helpers import MemoryReactor
-
 from http import HTTPStatus
 from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    TypeVar,
-    Tuple,
-    cast,
     Iterable,
+    Optional,
+    Tuple,
 )
 
-from synapse.api.errors import SynapseError
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.rest import admin, login, room
 from synapse.server import HomeServer
 from synapse.types import PublicRoom
