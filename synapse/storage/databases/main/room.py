@@ -543,8 +543,8 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             # Filter out Nones – rather omit the field altogether
             for key in list(entry):
-                if entry[key] is None:
-                    del entry[key]
+                if entry[key] is None:  # type: ignore[literal-required]
+                    del entry[key]  # type: ignore[misc]
 
             return entry
 

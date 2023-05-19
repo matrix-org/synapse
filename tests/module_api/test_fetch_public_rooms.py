@@ -64,12 +64,25 @@ class FetchPublicRoomsTestCase(HomeserverTestCase):
                 world_readable=True,
                 guest_can_join=False,
             )
-            if limit is not None and limit < 3 and bounds is not None:
+            room3_2 = PublicRoom(
+                room_id="!test3_2:test",
+                num_joined_members=3,
+                world_readable=True,
+                guest_can_join=False,
+            )
+            rooms = [room3_2, room3, room1]
+            if not forwards:
+                rooms.reverse()
+
+            if limit is not None:
+                if bounds is None:
+                    return rooms[:limit]
+
                 (last_joined_members, last_room_id) = bounds
-                if last_joined_members < 3 or last_room_id == room3["room_id"]:
+                if last_joined_members < 3 or last_room_id == room3_2["room_id"]:
                     return [room1]
 
-            return [room3, room1]
+            return [room3_2, room3, room1]
 
         self._module_api.register_public_rooms_callbacks(fetch_public_rooms=cb)
 
@@ -92,15 +105,26 @@ class FetchPublicRoomsTestCase(HomeserverTestCase):
         channel = self.make_request("GET", self.url)
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
-        self.assertEquals(len(channel.json_body["chunk"]), 3)
+        self.assertEquals(len(channel.json_body["chunk"]), 4)
         self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
-        self.assertEquals(channel.json_body["chunk"][1]["num_joined_members"], 2)
-        self.assertEquals(channel.json_body["chunk"][2]["num_joined_members"], 1)
+        self.assertEquals(channel.json_body["chunk"][1]["num_joined_members"], 3)
+        self.assertEquals(channel.json_body["chunk"][2]["num_joined_members"], 2)
+        self.assertEquals(channel.json_body["chunk"][3]["num_joined_members"], 1)
 
     def test_pagination(self) -> None:
         channel = self.make_request("GET", self.url + "?limit=1")
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
+        returned_room3_id = channel.json_body["chunk"][0]["room_id"]
+
+        channel = self.make_request(
+            "GET", self.url + "?limit=1&since=" + channel.json_body["next_batch"]
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
+        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
+        self.assertNotEquals(
+            returned_room3_id, channel.json_body["chunk"][0]["room_id"]
+        )
 
         channel = self.make_request(
             "GET", self.url + "?limit=1&since=" + channel.json_body["next_batch"]
