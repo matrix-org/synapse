@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,6 +22,7 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    Match,
     MutableMapping,
     Optional,
     Union,
@@ -245,6 +247,16 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
     sub_out_dict[key_to_move] = sub_dict[key_to_move]
 
 
+def _escape_slash(m: Match[str]) -> str:
+    """
+    Replacement function; replace a backslash-backslash or backslash-dot with the
+    second character. Leaves any other string alone.
+    """
+    if m.group(1) in ("\\", "."):
+        return m.group(1)
+    return m.group(0)
+
+
 def _split_field(field: str) -> List[str]:
     """
     Splits strings on unescaped dots and removes escaping.
@@ -262,49 +274,30 @@ def _split_field(field: str) -> List[str]:
     # 2. ["content", "body", "thing\.with\.dots"]
     # 3. ["content", "body", "thing.with.dots"]
 
+    # Find all dots (and their preceding backslashes). Check if they're escaped
+    # and if not, then note them as a spot to split on.
+    splits = []
+    for match in re.finditer(r"\\*\.", field):
+        # If the match is an *even* number of characters than the dot was escaped.
+        if len(match.group()) % 2 == 0:
+            continue
+
+        # The character after the one to keep.
+        splits.append(match.end())
+
+    # Iterate through the splits in reverse order to avoid modifying the positions
+    # as we go.
     result = []
+    previous_split = len(field)
+    for split in reversed(splits):
+        result.append(field[split:previous_split])
+        previous_split = split - 1
 
-    # The current field and whether the previous character was the escape
-    # character (a backslash).
-    part = ""
-    escaped = False
+    # Add the first bit.
+    result.append(field[:previous_split])
 
-    # Iterate over each character, and decide whether to append to the current
-    # part (following the escape rules) or to start a new part (based on the
-    # field separator).
-    for c in field:
-        # If the previous character was the escape character (a backslash)
-        # then decide what to append to the current part.
-        if escaped:
-            if c in ("\\", "."):
-                # An escaped backslash or dot just gets added.
-                part += c
-            else:
-                # A character that shouldn't be escaped gets the backslash prepended.
-                part += "\\" + c
-            # This always resets being escaped.
-            escaped = False
-
-        # Otherwise, the previous character was not the escape character.
-        else:
-            if c == ".":
-                # The field separator creates a new part.
-                result.append(part)
-                part = ""
-            elif c == "\\":
-                # A backslash adds no characters, but starts an escape sequence.
-                escaped = True
-            else:
-                # Otherwise, just add the current character.
-                part += c
-
-    # Ensure the final part is included. If there's an open escape sequence
-    # it should be included.
-    if escaped:
-        part += "\\"
-    result.append(part)
-
-    return result
+    # Unescape each part.
+    return [re.sub(r"\\(.)", _escape_slash, part) for part in reversed(result)]
 
 
 def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
