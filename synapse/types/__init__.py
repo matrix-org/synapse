@@ -963,14 +963,14 @@ class UserInfo:
 
 
 class PublicRoom(TypedDict, total=False):
-    room_id: Required[str]
+    room_id: str
     name: Optional[str]
     topic: Optional[str]
-    num_joined_members: Required[int]
+    num_joined_members: int
     canonical_alias: Optional[str]
     avatar_url: Optional[str]
-    world_readable: Required[bool]
-    guest_can_join: Required[bool]
+    world_readable: bool
+    guest_can_join: bool
     join_rule: Optional[str]
     room_type: Optional[str]
 
