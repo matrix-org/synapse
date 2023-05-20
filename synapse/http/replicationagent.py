@@ -64,15 +64,21 @@ class ReplicationEndpointFactory:
         # The given URI has a special scheme and includes the worker name. The
         # actual connection details are pulled from the instance map.
         worker_name = uri.netloc.decode("utf-8")
-        netloc = self.instance_map[worker_name].netloc()
         scheme = self.instance_map[worker_name].scheme()
 
         if scheme in ("http", "https"):
-            endpoint = HostnameEndpoint(self.reactor, self.instance_map[worker_name].host, self.instance_map[worker_name].port)
+            endpoint = HostnameEndpoint(
+                self.reactor,
+                self.instance_map[worker_name].host,
+                self.instance_map[worker_name].port,
+            )
             if scheme == "https":
                 endpoint = wrapClientTLS(
                     # The 'port' argument below isn't actually used by the function
-                    self.context_factory.creatorForNetloc(host, port),
+                    self.context_factory.creatorForNetloc(
+                        self.instance_map[worker_name].host,
+                        self.instance_map[worker_name].port,
+                    ),
                     endpoint,
                 )
             return endpoint
