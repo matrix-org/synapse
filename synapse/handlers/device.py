@@ -17,7 +17,6 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Any,
-    Collection,
     Dict,
     Iterable,
     List,
@@ -33,6 +32,7 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     HttpResponseException,
+    InvalidAPICallError,
     RequestSendFailed,
     SynapseError,
 )
@@ -43,8 +43,10 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.types import (
     JsonDict,
+    StrCollection,
     StreamKeyType,
     StreamToken,
+    UserID,
     get_domain_from_id,
     get_verify_key_from_cross_signing_key,
 )
@@ -65,16 +67,24 @@ DELETE_STALE_DEVICES_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 
 class DeviceWorkerHandler:
+    device_list_updater: "DeviceListWorkerUpdater"
+
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.hs = hs
         self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
+        self._appservice_handler = hs.get_application_service_handler()
         self._state_storage = hs.get_storage_controllers().state
         self._auth_handler = hs.get_auth_handler()
         self.server_name = hs.hostname
         self._msc3852_enabled = hs.config.experimental.msc3852_enabled
+        self._query_appservices_for_keys = (
+            hs.config.experimental.msc3984_appservice_key_query
+        )
+
+        self.device_list_updater = DeviceListWorkerUpdater(hs)
 
     @trace
     async def get_devices_by_user(self, user_id: str) -> List[JsonDict]:
@@ -98,6 +108,19 @@ class DeviceWorkerHandler:
 
         log_kv(device_map)
         return devices
+
+    async def get_dehydrated_device(
+        self, user_id: str
+    ) -> Optional[Tuple[str, JsonDict]]:
+        """Retrieve the information for a dehydrated device.
+
+        Args:
+            user_id: the user whose dehydrated device we are looking for
+        Returns:
+            a tuple whose first item is the device ID, and the second item is
+            the dehydrated device information
+        """
+        return await self.store.get_dehydrated_device(user_id)
 
     @trace
     async def get_device(self, user_id: str, device_id: str) -> JsonDict:
@@ -126,8 +149,8 @@ class DeviceWorkerHandler:
 
     @cancellable
     async def get_device_changes_in_shared_rooms(
-        self, user_id: str, room_ids: Collection[str], from_token: StreamToken
-    ) -> Collection[str]:
+        self, user_id: str, room_ids: StrCollection, from_token: StreamToken
+    ) -> Set[str]:
         """Get the set of users whose devices have changed who share a room with
         the given user.
         """
@@ -195,6 +218,16 @@ class DeviceWorkerHandler:
         possibly_changed = set(changed)
         possibly_left = set()
         for room_id in rooms_changed:
+            # Check if the forward extremities have changed. If not then we know
+            # the current state won't have changed, and so we can skip this room.
+            try:
+                if not await self.store.have_room_forward_extremities_changed_since(
+                    room_id, stream_ordering
+                ):
+                    continue
+            except errors.StoreError:
+                pass
+
             current_state_ids = await self._state_storage.get_current_state_ids(
                 room_id, await_full_state=False
             )
@@ -299,6 +332,30 @@ class DeviceWorkerHandler:
             user_id, "self_signing"
         )
 
+        # Check if the application services have any results.
+        if self._query_appservices_for_keys:
+            # Query the appservice for all devices for this user.
+            query: Dict[str, Optional[List[str]]] = {user_id: None}
+
+            # Query the appservices for any keys.
+            appservice_results = await self._appservice_handler.query_keys(query)
+
+            # Merge results, overriding anything from the database.
+            appservice_devices = appservice_results.get("device_keys", {}).get(
+                user_id, {}
+            )
+
+            # Filter the database results to only those devices that the appservice has
+            # *not* responded with.
+            devices = [d for d in devices if d["device_id"] not in appservice_devices]
+            # Append the appservice response by wrapping each result in another dictionary.
+            devices.extend(
+                {"device_id": device_id, "keys": device}
+                for device_id, device in appservice_devices.items()
+            )
+
+            # TODO Handle cross-signing keys.
+
         return {
             "user_id": user_id,
             "stream_id": stream_id,
@@ -320,10 +377,13 @@ class DeviceWorkerHandler:
 
 
 class DeviceHandler(DeviceWorkerHandler):
+    device_list_updater: "DeviceListUpdater"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.federation_sender = hs.get_federation_sender()
+        self._account_data_handler = hs.get_account_data_handler()
         self._storage_controllers = hs.get_storage_controllers()
 
         self.device_list_updater = DeviceListUpdater(hs, self)
@@ -480,7 +540,7 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
-        # Delete access tokens and e2e keys for each device. Not optimised as it is not
+        # Delete data specific to each device. Not optimised as it is not
         # considered as part of a critical path.
         for device_id in device_ids:
             await self._auth_handler.delete_access_tokens_for_user(
@@ -489,6 +549,18 @@ class DeviceHandler(DeviceWorkerHandler):
             await self.store.delete_e2e_keys_by_device(
                 user_id=user_id, device_id=device_id
             )
+
+            if self.hs.config.experimental.msc3890_enabled:
+                # Remove any local notification settings for this device in accordance
+                # with MSC3890.
+                await self._account_data_handler.remove_account_data_for_user(
+                    user_id,
+                    f"org.matrix.msc3890.local_notification_settings.{device_id}",
+                )
+
+        # Pushers are deleted after `delete_access_tokens_for_user` is called so that
+        # modules using `on_logged_out` hook can use them if needed.
+        await self.hs.get_pusherpool().remove_pushers_by_devices(user_id, device_ids)
 
         await self.notify_device_update(user_id, device_ids)
 
@@ -520,7 +592,7 @@ class DeviceHandler(DeviceWorkerHandler):
     @trace
     @measure_func("notify_device_update")
     async def notify_device_update(
-        self, user_id: str, device_ids: Collection[str]
+        self, user_id: str, device_ids: StrCollection
     ) -> None:
         """Notify that a user's device(s) has changed. Pokes the notifier, and
         remote servers if the user is local.
@@ -606,19 +678,6 @@ class DeviceHandler(DeviceWorkerHandler):
             await self.delete_devices(user_id, [old_device_id])
         return device_id
 
-    async def get_dehydrated_device(
-        self, user_id: str
-    ) -> Optional[Tuple[str, JsonDict]]:
-        """Retrieve the information for a dehydrated device.
-
-        Args:
-            user_id: the user whose dehydrated device we are looking for
-        Returns:
-            a tuple whose first item is the device ID, and the second item is
-            the dehydrated device information
-        """
-        return await self.store.get_dehydrated_device(user_id)
-
     async def rehydrate_device(
         self, user_id: str, access_token: str, device_id: str
     ) -> dict:
@@ -682,13 +741,33 @@ class DeviceHandler(DeviceWorkerHandler):
         hosts_already_sent_to: Set[str] = set()
 
         try:
+            stream_id, room_id = await self.store.get_device_change_last_converted_pos()
+
             while True:
                 self._handle_new_device_update_new_data = False
-                rows = await self.store.get_uncoverted_outbound_room_pokes()
+                max_stream_id = self.store.get_device_stream_token()
+                rows = await self.store.get_uncoverted_outbound_room_pokes(
+                    stream_id, room_id
+                )
                 if not rows:
                     # If the DB returned nothing then there is nothing left to
                     # do, *unless* a new device list update happened during the
                     # DB query.
+
+                    # Advance `(stream_id, room_id)`.
+                    # `max_stream_id` comes from *before* the query for unconverted
+                    # rows, which means that any unconverted rows must have a larger
+                    # stream ID.
+                    if max_stream_id > stream_id:
+                        stream_id, room_id = max_stream_id, ""
+                        await self.store.set_device_change_last_converted_pos(
+                            stream_id, room_id
+                        )
+                    else:
+                        assert max_stream_id == stream_id
+                        # Avoid moving `room_id` backwards.
+                        pass
+
                     if self._handle_new_device_update_new_data:
                         continue
                     else:
@@ -718,7 +797,6 @@ class DeviceHandler(DeviceWorkerHandler):
                         user_id=user_id,
                         device_id=device_id,
                         room_id=room_id,
-                        stream_id=stream_id,
                         hosts=hosts,
                         context=opentracing_context,
                     )
@@ -751,6 +829,12 @@ class DeviceHandler(DeviceWorkerHandler):
 
                     hosts_already_sent_to.update(hosts)
                     current_stream_id = stream_id
+
+                # Advance `(stream_id, room_id)`.
+                _, _, room_id, stream_id, _ = rows[-1]
+                await self.store.set_device_change_last_converted_pos(
+                    stream_id, room_id
+                )
 
         finally:
             self._handle_new_device_update_is_processing = False
@@ -816,6 +900,7 @@ class DeviceHandler(DeviceWorkerHandler):
         known_hosts_at_join = await self.store.get_partial_state_servers_at_join(
             room_id
         )
+        assert known_hosts_at_join is not None
         potentially_changed_hosts.difference_update(known_hosts_at_join)
 
         potentially_changed_hosts.discard(self.server_name)
@@ -834,7 +919,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 user_id=user_id,
                 device_id=device_id,
                 room_id=room_id,
-                stream_id=None,
                 hosts=potentially_changed_hosts,
                 context=None,
             )
@@ -858,7 +942,39 @@ def _update_device_from_client_ips(
     )
 
 
-class DeviceListUpdater:
+class DeviceListWorkerUpdater:
+    "Handles incoming device list updates from federation and contacts the main process over replication"
+
+    def __init__(self, hs: "HomeServer"):
+        from synapse.replication.http.devices import (
+            ReplicationMultiUserDevicesResyncRestServlet,
+        )
+
+        self._multi_user_device_resync_client = (
+            ReplicationMultiUserDevicesResyncRestServlet.make_client(hs)
+        )
+
+    async def multi_user_device_resync(
+        self, user_ids: List[str], mark_failed_as_stale: bool = True
+    ) -> Dict[str, Optional[JsonDict]]:
+        """
+        Like `user_device_resync` but operates on multiple users **from the same origin**
+        at once.
+
+        Returns:
+            Dict from User ID to the same Dict as `user_device_resync`.
+        """
+        # mark_failed_as_stale is not sent. Ensure this doesn't break expectations.
+        assert mark_failed_as_stale
+
+        if not user_ids:
+            # Shortcut empty requests
+            return {}
+
+        return await self._multi_user_device_resync_client(user_ids=user_ids)
+
+
+class DeviceListUpdater(DeviceListWorkerUpdater):
     "Handles incoming device list updates from federation and updates the DB"
 
     def __init__(self, hs: "HomeServer", device_handler: DeviceHandler):
@@ -866,6 +982,7 @@ class DeviceListUpdater:
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.device_handler = device_handler
+        self._notifier = hs.get_notifier()
 
         self._remote_edu_linearizer = Linearizer(name="remote_device_list")
 
@@ -937,12 +1054,16 @@ class DeviceListUpdater:
         # Check if we are partially joining any rooms. If so we need to store
         # all device list updates so that we can handle them correctly once we
         # know who is in the room.
-        partial_rooms = await self.store.get_partial_state_rooms_and_servers()
+        # TODO(faster_joins): this fetches and processes a bunch of data that we don't
+        # use. Could be replaced by a tighter query e.g.
+        #   SELECT EXISTS(SELECT 1 FROM partial_state_rooms)
+        partial_rooms = await self.store.get_partial_state_room_resync_info()
         if partial_rooms:
             await self.store.add_remote_device_list_to_pending(
                 user_id,
                 device_id,
             )
+            self._notifier.notify_replication()
 
         room_ids = await self.store.get_rooms_for_user(user_id)
         if not room_ids:
@@ -1003,7 +1124,7 @@ class DeviceListUpdater:
                 )
 
             if resync:
-                await self.user_device_resync(user_id)
+                await self.multi_user_device_resync([user_id])
             else:
                 # Simply update the single device, since we know that is the only
                 # change (because of the single prev_id matching the current cache)
@@ -1070,10 +1191,9 @@ class DeviceListUpdater:
             for user_id in need_resync:
                 try:
                     # Try to resync the current user's devices list.
-                    result = await self.user_device_resync(
-                        user_id=user_id,
-                        mark_failed_as_stale=False,
-                    )
+                    result = (await self.multi_user_device_resync([user_id], False))[
+                        user_id
+                    ]
 
                     # user_device_resync only returns a result if it managed to
                     # successfully resync and update the database. Updating the table
@@ -1098,19 +1218,54 @@ class DeviceListUpdater:
             # Allow future calls to retry resyncinc out of sync device lists.
             self._resync_retry_in_progress = False
 
-    async def user_device_resync(
-        self, user_id: str, mark_failed_as_stale: bool = True
-    ) -> Optional[JsonDict]:
+    async def multi_user_device_resync(
+        self, user_ids: List[str], mark_failed_as_stale: bool = True
+    ) -> Dict[str, Optional[JsonDict]]:
+        """
+        Like `user_device_resync` but operates on multiple users **from the same origin**
+        at once.
+
+        Returns:
+            Dict from User ID to the same Dict as `user_device_resync`.
+        """
+        if not user_ids:
+            return {}
+
+        origins = {UserID.from_string(user_id).domain for user_id in user_ids}
+
+        if len(origins) != 1:
+            raise InvalidAPICallError(f"Only one origin permitted, got {origins!r}")
+
+        result = {}
+        failed = set()
+        # TODO(Perf): Actually batch these up
+        for user_id in user_ids:
+            user_result, user_failed = await self._user_device_resync_returning_failed(
+                user_id
+            )
+            result[user_id] = user_result
+            if user_failed:
+                failed.add(user_id)
+
+        if mark_failed_as_stale:
+            await self.store.mark_remote_users_device_caches_as_stale(failed)
+
+        return result
+
+    async def _user_device_resync_returning_failed(
+        self, user_id: str
+    ) -> Tuple[Optional[JsonDict], bool]:
         """Fetches all devices for a user and updates the device cache with them.
 
         Args:
             user_id: The user's id whose device_list will be updated.
-            mark_failed_as_stale: Whether to mark the user's device list as stale
-                if the attempt to resync failed.
         Returns:
-            A dict with device info as under the "devices" in the result of this
-            request:
-            https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
+            - A dict with device info as under the "devices" in the result of this
+              request:
+              https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
+              None when we weren't able to fetch the device info for some reason,
+              e.g. due to a connection problem.
+            - True iff the resync failed and the device list should be marked as stale.
         """
         logger.debug("Attempting to resync the device list for %s", user_id)
         log_kv({"message": "Doing resync to update device list."})
@@ -1119,12 +1274,7 @@ class DeviceListUpdater:
         try:
             result = await self.federation.query_user_devices(origin, user_id)
         except NotRetryingDestination:
-            if mark_failed_as_stale:
-                # Mark the remote user's device list as stale so we know we need to retry
-                # it later.
-                await self.store.mark_remote_user_device_cache_as_stale(user_id)
-
-            return None
+            return None, True
         except (RequestSendFailed, HttpResponseException) as e:
             logger.warning(
                 "Failed to handle device list update for %s: %s",
@@ -1132,23 +1282,18 @@ class DeviceListUpdater:
                 e,
             )
 
-            if mark_failed_as_stale:
-                # Mark the remote user's device list as stale so we know we need to retry
-                # it later.
-                await self.store.mark_remote_user_device_cache_as_stale(user_id)
-
             # We abort on exceptions rather than accepting the update
             # as otherwise synapse will 'forget' that its device list
             # is out of date. If we bail then we will retry the resync
             # next time we get a device list update for this user_id.
             # This makes it more likely that the device lists will
             # eventually become consistent.
-            return None
+            return None, True
         except FederationDeniedError as e:
             set_tag("error", True)
             log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
-            return None
+            return None, False
         except Exception as e:
             set_tag("error", True)
             log_kv(
@@ -1156,12 +1301,7 @@ class DeviceListUpdater:
             )
             logger.exception("Failed to handle device list update for %s", user_id)
 
-            if mark_failed_as_stale:
-                # Mark the remote user's device list as stale so we know we need to retry
-                # it later.
-                await self.store.mark_remote_user_device_cache_as_stale(user_id)
-
-            return None
+            return None, True
         log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]
@@ -1243,7 +1383,7 @@ class DeviceListUpdater:
         # point.
         self._seen_updates[user_id] = {stream_id}
 
-        return result
+        return result, False
 
     async def process_cross_signing_key_update(
         self,

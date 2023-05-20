@@ -20,7 +20,9 @@ from typing import (
     FrozenSet,
     Iterable,
     List,
+    Mapping,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Union,
@@ -29,7 +31,7 @@ from typing import (
 
 import attr
 
-from synapse.api.constants import MAIN_TIMELINE, RelationTypes
+from synapse.api.constants import MAIN_TIMELINE, Direction, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
@@ -39,9 +41,13 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_in_list_sql_clause,
 )
-from synapse.storage.databases.main.stream import generate_pagination_where_clause
+from synapse.storage.databases.main.stream import (
+    generate_next_token,
+    generate_pagination_bounds,
+    generate_pagination_where_clause,
+)
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
+from synapse.types import JsonDict, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
@@ -81,8 +87,6 @@ class _RelatedEvent:
     event_id: str
     # The sender of the related event.
     sender: str
-    topological_ordering: Optional[int]
-    stream_ordering: int
 
 
 class RelationsWorkerStore(SQLBaseStore):
@@ -165,10 +169,11 @@ class RelationsWorkerStore(SQLBaseStore):
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
         limit: int = 5,
-        direction: str = "b",
+        direction: Direction = Direction.BACKWARDS,
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
-    ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
+        recurse: bool = False,
+    ) -> Tuple[Sequence[_RelatedEvent], Optional[StreamToken]]:
         """Get a list of relations for an event, ordered by topological ordering.
 
         Args:
@@ -178,10 +183,11 @@ class RelationsWorkerStore(SQLBaseStore):
             relation_type: Only fetch events with this relation type, if given.
             event_type: Only fetch events with this event type, if given.
             limit: Only fetch the most recent `limit` events.
-            direction: Whether to fetch the most recent first (`"b"`) or the
-                oldest first (`"f"`).
+            direction: Whether to fetch the most recent first (backwards) or the
+                oldest first (forwards).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
+            recurse: Whether to recursively find relations.
 
         Returns:
             A tuple of:
@@ -196,8 +202,8 @@ class RelationsWorkerStore(SQLBaseStore):
         # Ensure bad limits aren't being passed in.
         assert limit >= 0
 
-        where_clause = ["relates_to_id = ?", "room_id = ?"]
-        where_args: List[Union[str, int]] = [event.event_id, room_id]
+        where_clause = ["room_id = ?"]
+        where_args: List[Union[str, int]] = [room_id]
         is_redacted = event.internal_metadata.is_redacted()
 
         if relation_type is not None:
@@ -208,50 +214,82 @@ class RelationsWorkerStore(SQLBaseStore):
             where_clause.append("type = ?")
             where_args.append(event_type)
 
+        order, from_bound, to_bound = generate_pagination_bounds(
+            direction,
+            from_token.room_key if from_token else None,
+            to_token.room_key if to_token else None,
+        )
+
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=from_token.room_key.as_historical_tuple()
-            if from_token
-            else None,
-            to_token=to_token.room_key.as_historical_tuple() if to_token else None,
+            from_token=from_bound,
+            to_token=to_bound,
             engine=self.database_engine,
         )
 
         if pagination_clause:
             where_clause.append(pagination_clause)
 
-        if direction == "b":
-            order = "DESC"
+        # If a recursive query is requested then the filters are applied after
+        # recursively following relationships from the requested event to children
+        # up to 3-relations deep.
+        #
+        # If no recursion is needed then the event_relations table is queried
+        # for direct children of the requested event.
+        if recurse:
+            sql = """
+                WITH RECURSIVE related_events AS (
+                    SELECT event_id, relation_type, relates_to_id, 0 AS depth
+                    FROM event_relations
+                    WHERE relates_to_id = ?
+                    UNION SELECT e.event_id, e.relation_type, e.relates_to_id, depth + 1
+                    FROM event_relations e
+                    INNER JOIN related_events r ON r.event_id = e.relates_to_id
+                    WHERE depth <= 3
+                )
+                SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
+                FROM related_events
+                INNER JOIN events USING (event_id)
+                WHERE %s
+                ORDER BY topological_ordering %s, stream_ordering %s
+                LIMIT ?;
+            """ % (
+                " AND ".join(where_clause),
+                order,
+                order,
+            )
         else:
-            order = "ASC"
-
-        sql = """
-            SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
-            FROM event_relations
-            INNER JOIN events USING (event_id)
-            WHERE %s
-            ORDER BY topological_ordering %s, stream_ordering %s
-            LIMIT ?
-        """ % (
-            " AND ".join(where_clause),
-            order,
-            order,
-        )
+            sql = """
+                SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
+                FROM event_relations
+                INNER JOIN events USING (event_id)
+                WHERE relates_to_id = ? AND %s
+                ORDER BY topological_ordering %s, stream_ordering %s
+                LIMIT ?
+            """ % (
+                " AND ".join(where_clause),
+                order,
+                order,
+            )
 
         def _get_recent_references_for_event_txn(
             txn: LoggingTransaction,
         ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
-            txn.execute(sql, where_args + [limit + 1])
+            txn.execute(sql, [event.event_id] + where_args + [limit + 1])
 
             events = []
-            for event_id, relation_type, sender, topo_ordering, stream_ordering in txn:
+            topo_orderings: List[int] = []
+            stream_orderings: List[int] = []
+            for event_id, relation_type, sender, topo_ordering, stream_ordering in cast(
+                List[Tuple[str, str, str, int, int]], txn
+            ):
                 # Do not include edits for redacted events as they leak event
                 # content.
                 if not is_redacted or relation_type != RelationTypes.REPLACE:
-                    events.append(
-                        _RelatedEvent(event_id, sender, topo_ordering, stream_ordering)
-                    )
+                    events.append(_RelatedEvent(event_id, sender))
+                    topo_orderings.append(topo_ordering)
+                    stream_orderings.append(stream_ordering)
 
             # If there are more events, generate the next pagination key from the
             # last event returned.
@@ -260,17 +298,12 @@ class RelationsWorkerStore(SQLBaseStore):
                 # Instead of using the last row (which tells us there is more
                 # data), use the last row to be returned.
                 events = events[:limit]
+                topo_orderings = topo_orderings[:limit]
+                stream_orderings = stream_orderings[:limit]
 
-                topo = events[-1].topological_ordering
-                token = events[-1].stream_ordering
-                if direction == "b":
-                    # Tokens are positions between events.
-                    # This token points *after* the last event in the chunk.
-                    # We need it to point to the event before it in the chunk
-                    # when we are going backwards so we subtract one from the
-                    # stream part.
-                    token -= 1
-                next_key = RoomStreamToken(topo, token)
+                next_key = generate_next_token(
+                    direction, topo_orderings[-1], stream_orderings[-1]
+                )
 
                 if from_token:
                     next_token = from_token.copy_and_replace(
@@ -287,12 +320,49 @@ class RelationsWorkerStore(SQLBaseStore):
                         to_device_key=0,
                         device_list_key=0,
                         groups_key=0,
+                        un_partial_stated_rooms_key=0,
                     )
 
             return events[:limit], next_token
 
         return await self.db_pool.runInteraction(
             "get_recent_references_for_event", _get_recent_references_for_event_txn
+        )
+
+    async def get_all_relations_for_event_with_types(
+        self,
+        event_id: str,
+        relation_types: List[str],
+    ) -> List[str]:
+        """Get the event IDs of all events that have a relation to the given event with
+        one of the given relation types.
+
+        Args:
+            event_id: The event for which to look for related events.
+            relation_types: The types of relations to look for.
+
+        Returns:
+            A list of the IDs of the events that relate to the given event with one of
+            the given relation types.
+        """
+
+        def get_all_relation_ids_for_event_with_types_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
+            rows = self.db_pool.simple_select_many_txn(
+                txn=txn,
+                table="event_relations",
+                column="relation_type",
+                iterable=relation_types,
+                keyvalues={"relates_to_id": event_id},
+                retcols=["event_id"],
+            )
+
+            return [row["event_id"] for row in rows]
+
+        return await self.db_pool.runInteraction(
+            desc="get_all_relation_ids_for_event_with_types",
+            func=get_all_relation_ids_for_event_with_types_txn,
         )
 
     async def event_includes_relation(self, event_id: str) -> bool:
@@ -358,109 +428,58 @@ class RelationsWorkerStore(SQLBaseStore):
         )
         return result is not None
 
-    @cached(tree=True)
-    async def get_aggregation_groups_for_event(
-        self, event_id: str, room_id: str, limit: int = 5
-    ) -> List[JsonDict]:
-        """Get a list of annotations on the event, grouped by event type and
-        aggregation key, sorted by count.
+    @cached()
+    async def get_references_for_event(self, event_id: str) -> List[JsonDict]:
+        raise NotImplementedError()
 
-        This is used e.g. to get the what and how many reactions have happend
-        on an event.
-
-        Args:
-            event_id: Fetch events that relate to this event ID.
-            room_id: The room the event belongs to.
-            limit: Only fetch the `limit` groups.
-
-        Returns:
-            List of groups of annotations that match. Each row is a dict with
-            `type`, `key` and `count` fields.
-        """
-
-        args = [
-            event_id,
-            room_id,
-            RelationTypes.ANNOTATION,
-            limit,
-        ]
-
-        sql = """
-            SELECT type, aggregation_key, COUNT(DISTINCT sender)
-            FROM event_relations
-            INNER JOIN events USING (event_id)
-            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ?
-            GROUP BY relation_type, type, aggregation_key
-            ORDER BY COUNT(*) DESC
-            LIMIT ?
-        """
-
-        def _get_aggregation_groups_for_event_txn(
-            txn: LoggingTransaction,
-        ) -> List[JsonDict]:
-            txn.execute(sql, args)
-
-            return [{"type": row[0], "key": row[1], "count": row[2]} for row in txn]
-
-        return await self.db_pool.runInteraction(
-            "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
-        )
-
-    async def get_aggregation_groups_for_users(
-        self,
-        event_id: str,
-        room_id: str,
-        limit: int,
-        users: FrozenSet[str] = frozenset(),
-    ) -> Dict[Tuple[str, str], int]:
-        """Fetch the partial aggregations for an event for specific users.
-
-        This is used, in conjunction with get_aggregation_groups_for_event, to
-        remove information from the results for ignored users.
+    @cachedList(cached_method_name="get_references_for_event", list_name="event_ids")
+    async def get_references_for_events(
+        self, event_ids: Collection[str]
+    ) -> Mapping[str, Optional[List[_RelatedEvent]]]:
+        """Get a list of references to the given events.
 
         Args:
-            event_id: Fetch events that relate to this event ID.
-            room_id: The room the event belongs to.
-            limit: Only fetch the `limit` groups.
-            users: The users to fetch information for.
+            event_ids: Fetch events that relate to these event IDs.
 
         Returns:
-            A map of (event type, aggregation key) to a count of users.
+            A map of event IDs to a list of related event IDs (and their senders).
         """
 
-        if not users:
-            return {}
-
-        args: List[Union[str, int]] = [
-            event_id,
-            room_id,
-            RelationTypes.ANNOTATION,
-        ]
-
-        users_sql, users_args = make_in_list_sql_clause(
-            self.database_engine, "sender", users
+        clause, args = make_in_list_sql_clause(
+            self.database_engine, "relates_to_id", event_ids
         )
-        args.extend(users_args)
+        args.append(RelationTypes.REFERENCE)
 
         sql = f"""
-            SELECT type, aggregation_key, COUNT(DISTINCT sender)
-            FROM event_relations
-            INNER JOIN events USING (event_id)
-            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ? AND {users_sql}
-            GROUP BY relation_type, type, aggregation_key
-            ORDER BY COUNT(*) DESC
-            LIMIT ?
+            SELECT relates_to_id, ref.event_id, ref.sender
+            FROM events AS ref
+            INNER JOIN event_relations USING (event_id)
+            INNER JOIN events AS parent ON
+                parent.event_id = relates_to_id
+                AND parent.room_id = ref.room_id
+            WHERE
+                {clause}
+                AND relation_type = ?
+            ORDER BY ref.topological_ordering, ref.stream_ordering
         """
 
-        def _get_aggregation_groups_for_users_txn(
+        def _get_references_for_events_txn(
             txn: LoggingTransaction,
-        ) -> Dict[Tuple[str, str], int]:
-            txn.execute(sql, args + [limit])
+        ) -> Mapping[str, List[_RelatedEvent]]:
+            txn.execute(sql, args)
 
-            return {(row[0], row[1]): row[2] for row in txn}
+            result: Dict[str, List[_RelatedEvent]] = {}
+            for relates_to_id, event_id, sender in cast(
+                List[Tuple[str, str, str]], txn
+            ):
+                result.setdefault(relates_to_id, []).append(
+                    _RelatedEvent(event_id, sender)
+                )
+
+            return result
 
         return await self.db_pool.runInteraction(
-            "get_aggregation_groups_for_users", _get_aggregation_groups_for_users_txn
+            "_get_references_for_events_txn", _get_references_for_events_txn
         )
 
     @cached()
@@ -977,7 +996,7 @@ class RelationsWorkerStore(SQLBaseStore):
         # relation.
         sql = """
             WITH RECURSIVE related_events AS (
-                SELECT event_id, relates_to_id, relation_type, 0 depth
+                SELECT event_id, relates_to_id, relation_type, 0 AS depth
                 FROM event_relations
                 WHERE event_id = ?
                 UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1
@@ -1037,7 +1056,7 @@ class RelationsWorkerStore(SQLBaseStore):
         sql = """
         SELECT relates_to_id FROM event_relations WHERE relates_to_id = COALESCE((
             WITH RECURSIVE related_events AS (
-                SELECT event_id, relates_to_id, relation_type, 0 depth
+                SELECT event_id, relates_to_id, relation_type, 0 AS depth
                 FROM event_relations
                 WHERE event_id = ?
                 UNION SELECT e.event_id, e.relates_to_id, e.relation_type, depth + 1

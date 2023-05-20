@@ -1,1 +1,0 @@
-Set LD_PRELOAD to use jemalloc memory allocator in Dockerfile-workers.

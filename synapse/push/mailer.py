@@ -37,8 +37,8 @@ from synapse.push.push_types import (
     TemplateVars,
 )
 from synapse.storage.databases.main.event_push_actions import EmailPushAction
-from synapse.storage.state import StateFilter
 from synapse.types import StateMap, UserID
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
@@ -149,7 +149,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.password_reset
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 

@@ -46,6 +46,7 @@ from synapse.replication.tcp.commands import (
     UserIpCommand,
     UserSyncCommand,
 )
+from synapse.replication.tcp.context import ClientContextFactory
 from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams import (
     STREAMS_MAP,
@@ -58,7 +59,6 @@ from synapse.replication.tcp.streams import (
     PresenceStream,
     ReceiptsStream,
     Stream,
-    TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
 )
@@ -145,7 +145,7 @@ class ReplicationCommandHandler:
 
                 continue
 
-            if isinstance(stream, (AccountDataStream, TagAccountDataStream)):
+            if isinstance(stream, AccountDataStream):
                 # Only add AccountDataStream and TagAccountDataStream as a source on the
                 # instance in charge of account_data persistence.
                 if hs.get_instance_name() in hs.config.worker.writers.account_data:
@@ -349,13 +349,27 @@ class ReplicationCommandHandler:
             outbound_redis_connection,
             channel_names=self._channels_to_subscribe_to,
         )
-        hs.get_reactor().connectTCP(
-            hs.config.redis.redis_host,
-            hs.config.redis.redis_port,
-            self._factory,
-            timeout=30,
-            bindAddress=None,
-        )
+
+        reactor = hs.get_reactor()
+        redis_config = hs.config.redis
+        if hs.config.redis.redis_use_tls:
+            ssl_context_factory = ClientContextFactory(hs.config.redis)
+            reactor.connectSSL(
+                redis_config.redis_host,
+                redis_config.redis_port,
+                self._factory,
+                ssl_context_factory,
+                timeout=30,
+                bindAddress=None,
+            )
+        else:
+            reactor.connectTCP(
+                redis_config.redis_host,
+                redis_config.redis_port,
+                self._factory,
+                timeout=30,
+                bindAddress=None,
+            )
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a map from stream name to all streams."""
@@ -626,23 +640,6 @@ class ReplicationCommandHandler:
 
         self._notifier.notify_remote_server_up(cmd.data)
 
-        # We relay to all other connections to ensure every instance gets the
-        # notification.
-        #
-        # When configured to use redis we'll always only have one connection and
-        # so this is a no-op (all instances will have already received the same
-        # REMOTE_SERVER_UP command).
-        #
-        # For direct TCP connections this will relay to all other connections
-        # connected to us. When on master this will correctly fan out to all
-        # other direct TCP clients and on workers there'll only be the one
-        # connection to master.
-        #
-        # (The logic here should also be sound if we have a mix of Redis and
-        # direct TCP connections so long as there is only one traffic route
-        # between two instances, but that is not currently supported).
-        self.send_command(cmd, ignore_conn=conn)
-
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""
         self._connections.append(connection)
@@ -690,21 +687,14 @@ class ReplicationCommandHandler:
         """
         return bool(self._connections)
 
-    def send_command(
-        self, cmd: Command, ignore_conn: Optional[IReplicationConnection] = None
-    ) -> None:
+    def send_command(self, cmd: Command) -> None:
         """Send a command to all connected connections.
 
         Args:
             cmd
-            ignore_conn: If set don't send command to the given connection.
-                Used when relaying commands from one connection to all others.
         """
         if self._connections:
             for connection in self._connections:
-                if connection == ignore_conn:
-                    continue
-
                 try:
                     connection.send_command(cmd)
                 except Exception:

@@ -84,7 +84,7 @@ class RoomTestCase(_ShadowBannedBase):
     def test_invite_3pid(self) -> None:
         """Ensure that a 3PID invite does not attempt to contact the identity server."""
         identity_handler = self.hs.get_identity_handler()
-        identity_handler.lookup_3pid = Mock(
+        identity_handler.lookup_3pid = Mock(  # type: ignore[assignment]
             side_effect=AssertionError("This should not get called")
         )
 
@@ -222,7 +222,7 @@ class RoomTestCase(_ShadowBannedBase):
             event_source.get_new_events(
                 user=UserID.from_string(self.other_user_id),
                 from_key=0,
-                limit=None,
+                limit=10,
                 room_ids=[room_id],
                 is_guest=False,
             )
@@ -286,6 +286,7 @@ class ProfileTestCase(_ShadowBannedBase):
                 self.banned_user_id,
             )
         )
+        assert event is not None
         self.assertEqual(
             event.content, {"membership": "join", "displayname": original_display_name}
         )
@@ -321,6 +322,7 @@ class ProfileTestCase(_ShadowBannedBase):
                 self.banned_user_id,
             )
         )
+        assert event is not None
         self.assertEqual(
             event.content, {"membership": "join", "displayname": original_display_name}
         )

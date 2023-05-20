@@ -154,9 +154,9 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         # Create a user to receive notifications and send receipts.
         user_id, token, _, other_token, room_id = self._create_users_and_room()
 
-        last_event_id: str
+        last_event_id = ""
 
-        def _assert_counts(noitf_count: int, highlight_count: int) -> None:
+        def _assert_counts(notif_count: int, highlight_count: int) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "get-unread-counts",
@@ -168,12 +168,21 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count,
+                    notify_count=notif_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
             )
             self.assertEqual(counts.threads, {})
+
+            aggregate_counts = self.get_success(
+                self.store.db_pool.runInteraction(
+                    "get-aggregate-unread-counts",
+                    self.store._get_unread_counts_by_room_for_user_txn,
+                    user_id,
+                )
+            )
+            self.assertEqual(aggregate_counts[room_id], notif_count)
 
         def _create_event(highlight: bool = False) -> str:
             result = self.helper.send_event(
@@ -280,10 +289,10 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         user_id, token, _, other_token, room_id = self._create_users_and_room()
         thread_id: str
 
-        last_event_id: str
+        last_event_id = ""
 
         def _assert_counts(
-            noitf_count: int,
+            notif_count: int,
             highlight_count: int,
             thread_notif_count: int,
             thread_highlight_count: int,
@@ -299,7 +308,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count,
+                    notify_count=notif_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
@@ -317,6 +326,17 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             else:
                 self.assertEqual(counts.threads, {})
+
+            aggregate_counts = self.get_success(
+                self.store.db_pool.runInteraction(
+                    "get-aggregate-unread-counts",
+                    self.store._get_unread_counts_by_room_for_user_txn,
+                    user_id,
+                )
+            )
+            self.assertEqual(
+                aggregate_counts[room_id], notif_count + thread_notif_count
+            )
 
         def _create_event(
             highlight: bool = False, thread_id: Optional[str] = None
@@ -451,10 +471,10 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         user_id, token, _, other_token, room_id = self._create_users_and_room()
         thread_id: str
 
-        last_event_id: str
+        last_event_id = ""
 
         def _assert_counts(
-            noitf_count: int,
+            notif_count: int,
             highlight_count: int,
             thread_notif_count: int,
             thread_highlight_count: int,
@@ -470,7 +490,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count,
+                    notify_count=notif_count,
                     unread_count=0,
                     highlight_count=highlight_count,
                 ),
@@ -488,6 +508,17 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             else:
                 self.assertEqual(counts.threads, {})
+
+            aggregate_counts = self.get_success(
+                self.store.db_pool.runInteraction(
+                    "get-aggregate-unread-counts",
+                    self.store._get_unread_counts_by_room_for_user_txn,
+                    user_id,
+                )
+            )
+            self.assertEqual(
+                aggregate_counts[room_id], notif_count + thread_notif_count
+            )
 
         def _create_event(
             highlight: bool = False, thread_id: Optional[str] = None
@@ -646,7 +677,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
             return result["event_id"]
 
-        def _assert_counts(noitf_count: int, thread_notif_count: int) -> None:
+        def _assert_counts(notif_count: int, thread_notif_count: int) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "get-unread-counts",
@@ -658,7 +689,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             self.assertEqual(
                 counts.main_timeline,
                 NotifCounts(
-                    notify_count=noitf_count, unread_count=0, highlight_count=0
+                    notify_count=notif_count, unread_count=0, highlight_count=0
                 ),
             )
             if thread_notif_count:
@@ -743,7 +774,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         self.assertEqual(r, 3)
 
         # add a bunch of dummy events to the events table
-        for (stream_ordering, ts) in (
+        for stream_ordering, ts in (
             (3, 110),
             (4, 120),
             (5, 120),

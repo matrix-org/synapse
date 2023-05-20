@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Generator, Optional, Tuple, Union
 import attr
 from zope.interface import implementer
 
+from twisted.internet.address import UNIXAddress
 from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IAddress, IReactorTime
 from twisted.python.failure import Failure
@@ -82,6 +83,7 @@ class SynapseRequest(Request):
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
+        self.experimental_cors_msc3886 = site.experimental_cors_msc3886
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
@@ -256,7 +258,7 @@ class SynapseRequest(Request):
             request_id,
             request=ContextRequest(
                 request_id=request_id,
-                ip_address=self.getClientAddress().host,
+                ip_address=self.get_client_ip_if_available(),
                 site_tag=self.synapse_site.site_tag,
                 # The requester is going to be unknown at this point.
                 requester=None,
@@ -399,7 +401,7 @@ class SynapseRequest(Request):
         be sure to call finished_processing.
 
         Args:
-            servlet_name (str): the name of the servlet which will be
+            servlet_name: the name of the servlet which will be
                 processing this request. This is used in the metrics.
 
                 It is possible to update this afterwards by updating
@@ -413,7 +415,7 @@ class SynapseRequest(Request):
 
         self.synapse_site.access_logger.debug(
             "%s - %s - Received request: %s %s",
-            self.getClientAddress().host,
+            self.get_client_ip_if_available(),
             self.synapse_site.site_tag,
             self.get_method(),
             self.get_redacted_uri(),
@@ -461,7 +463,7 @@ class SynapseRequest(Request):
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
-            self.getClientAddress().host,
+            self.get_client_ip_if_available(),
             self.synapse_site.site_tag,
             requester,
             processing_time,
@@ -498,6 +500,26 @@ class SynapseRequest(Request):
             return False
 
         return True
+
+    def get_client_ip_if_available(self) -> str:
+        """Logging helper. Return something useful when a client IP is not retrievable
+        from a unix socket.
+
+        In practice, this returns the socket file path on a SynapseRequest if using a
+        unix socket and the normal IP address for TCP sockets.
+
+        """
+        # getClientAddress().host returns a proper IP address for a TCP socket. But
+        # unix sockets have no concept of IP addresses or ports and return a
+        # UNIXAddress containing a 'None' value. In order to get something usable for
+        # logs(where this is used) get the unix socket file. getHost() returns a
+        # UNIXAddress containing a value of the socket file and has an instance
+        # variable of 'name' encoded as a byte string containing the path we want.
+        # Decode to utf-8 so it looks nice.
+        if isinstance(self.getClientAddress(), UNIXAddress):
+            return self.getHost().name.decode("utf-8")
+        else:
+            return self.getClientAddress().host
 
 
 class XForwardedForRequest(SynapseRequest):
@@ -621,6 +643,8 @@ class SynapseSite(Site):
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
         request_id_header = config.http_options.request_id_header
+
+        self.experimental_cors_msc3886 = config.http_options.experimental_cors_msc3886
 
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(

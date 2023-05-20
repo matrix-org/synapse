@@ -22,14 +22,11 @@ from synapse.types import UserID
 
 def format_push_rules_for_user(
     user: UserID, ruleslist: FilteredPushRules
-) -> Dict[str, Dict[str, list]]:
+) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
-    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
-        "global": {},
-        "device": {},
-    }
+    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {"global": {}}
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 
@@ -43,6 +40,13 @@ def format_push_rules_for_user(
             continue
 
         rulearray.append(template_rule)
+
+        for type_key in ("pattern", "value"):
+            type_value = template_rule.pop(f"{type_key}_type", None)
+            if type_value == "user_id":
+                template_rule[type_key] = user.to_string()
+            elif type_value == "user_localpart":
+                template_rule[type_key] = user.localpart
 
         template_rule["enabled"] = enabled
 
@@ -93,10 +97,14 @@ def _rule_to_template(rule: PushRule) -> Optional[Dict[str, Any]]:
         if len(rule.conditions) != 1:
             return None
         thecond = rule.conditions[0]
-        if "pattern" not in thecond:
-            return None
+
         templaterule = {"actions": rule.actions}
-        templaterule["pattern"] = thecond["pattern"]
+        if "pattern" in thecond:
+            templaterule["pattern"] = thecond["pattern"]
+        elif "pattern_type" in thecond:
+            templaterule["pattern_type"] = thecond["pattern_type"]
+        else:
+            return None
     else:
         # This should not be reached unless this function is not kept in sync
         # with PRIORITY_CLASS_INVERSE_MAP.

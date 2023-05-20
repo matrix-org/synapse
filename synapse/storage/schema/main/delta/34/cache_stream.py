@@ -14,13 +14,14 @@
 
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
 
 
-# This stream is used to notify replication slaves that some caches have
+# This stream is used to notify workers over replication that some caches have
 # been invalidated that they cannot infer from the other streams.
 CREATE_TABLE = """
 CREATE TABLE cache_invalidation_stream (
@@ -34,13 +35,9 @@ CREATE INDEX cache_invalidation_stream_id ON cache_invalidation_stream(stream_id
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if not isinstance(database_engine, PostgresEngine):
         return
 
     for statement in get_statements(CREATE_TABLE.splitlines()):
         cur.execute(statement)
-
-
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass

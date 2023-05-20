@@ -16,8 +16,9 @@ from typing import Optional
 
 import attr
 
+from synapse.api.constants import Direction
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.servlet import parse_enum, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.storage.databases.main import DataStore
 from synapse.types import StreamToken
@@ -34,7 +35,7 @@ class PaginationConfig:
 
     from_token: Optional[StreamToken]
     to_token: Optional[StreamToken]
-    direction: str
+    direction: Direction
     limit: int
 
     @classmethod
@@ -43,11 +44,9 @@ class PaginationConfig:
         store: "DataStore",
         request: SynapseRequest,
         default_limit: int,
-        default_dir: str = "f",
+        default_dir: Direction = Direction.FORWARDS,
     ) -> "PaginationConfig":
-        direction = parse_string(
-            request, "dir", default=default_dir, allowed_values=["f", "b"]
-        )
+        direction = parse_enum(request, "dir", Direction, default=default_dir)
 
         from_tok_str = parse_string(request, "from")
         to_tok_str = parse_string(request, "to")

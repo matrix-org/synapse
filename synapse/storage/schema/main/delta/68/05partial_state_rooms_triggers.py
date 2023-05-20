@@ -18,11 +18,11 @@ This migration adds triggers to the partial_state_events tables to enforce uniqu
 
 Triggers cannot be expressed in .sql files, so we have to use a separate file.
 """
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     # complain if the room_id in partial_state_events doesn't match
     # that in `events`. We already have a fk constraint which ensures that the event
     # exists in `events`, so all we have to do is raise if there is a row with a

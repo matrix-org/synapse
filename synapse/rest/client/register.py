@@ -367,6 +367,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         f"/register/{LoginType.REGISTRATION_TOKEN}/validity",
         releases=("v1",),
     )
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -395,6 +396,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
 
 class RegisterRestServlet(RestServlet):
     PATTERNS = client_patterns("/register$")
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -628,10 +630,12 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            desired_username = await (
-                self.password_auth_provider.get_username_for_registration(
-                    auth_result,
-                    params,
+            desired_username = (
+                await (
+                    self.password_auth_provider.get_username_for_registration(
+                        auth_result,
+                        params,
+                    )
                 )
             )
 
@@ -682,9 +686,11 @@ class RegisterRestServlet(RestServlet):
                 session_id
             )
 
-            display_name = await (
-                self.password_auth_provider.get_displayname_for_registration(
-                    auth_result, params
+            display_name = (
+                await (
+                    self.password_auth_provider.get_displayname_for_registration(
+                        auth_result, params
+                    )
                 )
             )
 
@@ -949,9 +955,10 @@ def _calculate_registration_flows(
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    EmailRegisterRequestTokenRestServlet(hs).register(http_server)
-    MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        EmailRegisterRequestTokenRestServlet(hs).register(http_server)
+        MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
+        RegistrationSubmitTokenServlet(hs).register(http_server)
     UsernameAvailabilityRestServlet(hs).register(http_server)
-    RegistrationSubmitTokenServlet(hs).register(http_server)
     RegistrationTokenValidityRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

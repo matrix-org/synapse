@@ -43,9 +43,11 @@ from synapse.api.constants import (
 from synapse.api.errors import (
     AuthError,
     Codes,
+    EventSizeError,
     FederationError,
     FederationPullAttemptBackoffError,
     HttpResponseException,
+    PartialStateConflictError,
     RequestSendFailed,
     SynapseError,
 )
@@ -57,8 +59,8 @@ from synapse.event_auth import (
     validate_event_for_room_version,
 )
 from synapse.events import EventBase
-from synapse.events.snapshot import EventContext
-from synapse.federation.federation_client import InvalidResponseError
+from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
+from synapse.federation.federation_client import InvalidResponseError, PulledPduInfo
 from synapse.logging.context import nested_logging_context
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -68,21 +70,23 @@ from synapse.logging.opentracing import (
     trace,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
+from synapse.replication.http.devices import (
+    ReplicationMultiUserDevicesResyncRestServlet,
+)
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.state import StateResolutionStore
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
+    StrCollection,
     UserID,
     get_domain_from_id,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.iterutils import batch_iter
 from synapse.util.retryutils import NotRetryingDestination
@@ -138,6 +142,7 @@ class FederationEventHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        self._clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
@@ -152,10 +157,13 @@ class FederationEventHandler:
         self._get_room_member_handler = hs.get_room_member_handler
 
         self._federation_client = hs.get_federation_client()
-        self._third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
         self._notifier = hs.get_notifier()
 
         self._is_mine_id = hs.is_mine_id
+        self._is_mine_server_name = hs.is_mine_server_name
         self._server_name = hs.hostname
         self._instance_name = hs.get_instance_name()
 
@@ -164,8 +172,8 @@ class FederationEventHandler:
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
         if hs.config.worker.worker_app:
-            self._user_device_resync = (
-                ReplicationUserDevicesResyncRestServlet.make_client(hs)
+            self._multi_user_device_resync = (
+                ReplicationMultiUserDevicesResyncRestServlet.make_client(hs)
             )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
@@ -424,7 +432,9 @@ class FederationEventHandler:
         return event, context
 
     async def check_join_restrictions(
-        self, context: EventContext, event: EventBase
+        self,
+        context: UnpersistedEventContextBase,
+        event: EventBase,
     ) -> None:
         """Check that restrictions in restricted join rules are matched
 
@@ -437,16 +447,17 @@ class FederationEventHandler:
         # Check if the user is already in the room or invited to the room.
         user_id = event.state_key
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
-        prev_member_event = None
+        prev_membership = None
         if prev_member_event_id:
             prev_member_event = await self._store.get_event(prev_member_event_id)
+            prev_membership = prev_member_event.membership
 
         # Check if the member should be allowed access via membership in a space.
         await self._event_auth_handler.check_restricted_join_rules(
             prev_state_ids,
             event.room_version,
             user_id,
-            prev_member_event,
+            prev_membership,
         )
 
     @trace
@@ -522,17 +533,63 @@ class FederationEventHandler:
             "Peristing join-via-remote %s (partial_state: %s)", event, partial_state
         )
         with nested_logging_context(suffix=event.event_id):
+            if partial_state:
+                # When handling a second partial state join into a partial state room,
+                # the returned state will exclude the membership from the first join. To
+                # preserve prior memberships, we try to compute the partial state before
+                # the event ourselves if we know about any of the prev events.
+                #
+                # When we don't know about any of the prev events, it's fine to just use
+                # the returned state, since the new join will create a new forward
+                # extremity, and leave the forward extremity containing our prior
+                # memberships alone.
+                prev_event_ids = set(event.prev_event_ids())
+                seen_event_ids = await self._store.have_events_in_timeline(
+                    prev_event_ids
+                )
+                missing_event_ids = prev_event_ids - seen_event_ids
+
+                state_maps_to_resolve: List[StateMap[str]] = []
+
+                # Fetch the state after the prev events that we know about.
+                state_maps_to_resolve.extend(
+                    (
+                        await self._state_storage_controller.get_state_groups_ids(
+                            room_id, seen_event_ids, await_full_state=False
+                        )
+                    ).values()
+                )
+
+                # When there are prev events we do not have the state for, we state
+                # resolve with the state returned by the remote homeserver.
+                if missing_event_ids or len(state_maps_to_resolve) == 0:
+                    state_maps_to_resolve.append(
+                        {(e.type, e.state_key): e.event_id for e in state}
+                    )
+
+                state_ids_before_event = (
+                    await self._state_resolution_handler.resolve_events_with_store(
+                        event.room_id,
+                        room_version.identifier,
+                        state_maps_to_resolve,
+                        event_map=None,
+                        state_res_store=StateResolutionStore(self._store),
+                    )
+                )
+            else:
+                state_ids_before_event = {
+                    (e.type, e.state_key): e.event_id for e in state
+                }
+
             context = await self._state_handler.compute_event_context(
                 event,
-                state_ids_before_event={
-                    (e.type, e.state_key): e.event_id for e in state
-                },
+                state_ids_before_event=state_ids_before_event,
                 partial_state=partial_state,
             )
 
             await self._check_event_auth(origin, event, context)
             if context.rejected:
-                raise SynapseError(400, "Join event was rejected")
+                raise SynapseError(403, "Join event was rejected")
 
             # the remote server is responsible for sending our join event to the rest
             # of the federation. Indeed, attempting to do so will result in problems
@@ -609,10 +666,12 @@ class FederationEventHandler:
             self._state_storage_controller.notify_event_un_partial_stated(
                 event.event_id
             )
+            # Notify that there's a new row in the un_partial_stated_events stream.
+            self._notifier.notify_replication()
 
     @trace
     async def backfill(
-        self, dest: str, room_id: str, limit: int, extremities: Collection[str]
+        self, dest: str, room_id: str, limit: int, extremities: StrCollection
     ) -> None:
         """Trigger a backfill request to `dest` for the given `room_id`
 
@@ -630,7 +689,7 @@ class FederationEventHandler:
         server from invalid events (there is probably no point in trying to
         re-fetch invalid events from every other HS in the room.)
         """
-        if dest == self._server_name:
+        if self._is_mine_server_name(dest):
             raise SynapseError(400, "Can't backfill from self.")
 
         events = await self._federation_client.backfill(
@@ -798,9 +857,42 @@ class FederationEventHandler:
             ],
         )
 
+        # Check if we already any of these have these events.
+        # Note: we currently make a lookup in the database directly here rather than
+        # checking the event cache, due to:
+        # https://github.com/matrix-org/synapse/issues/13476
+        existing_events_map = await self._store._get_events_from_db(
+            [event.event_id for event in events]
+        )
+
+        new_events = []
+        for event in events:
+            event_id = event.event_id
+
+            # If we've already seen this event ID...
+            if event_id in existing_events_map:
+                existing_event = existing_events_map[event_id]
+
+                # ...and the event itself was not previously stored as an outlier...
+                if not existing_event.event.internal_metadata.is_outlier():
+                    # ...then there's no need to persist it. We have it already.
+                    logger.info(
+                        "_process_pulled_event: Ignoring received event %s which we "
+                        "have already seen",
+                        event.event_id,
+                    )
+                    continue
+
+                # While we have seen this event before, it was stored as an outlier.
+                # We'll now persist it as a non-outlier.
+                logger.info("De-outliering event %s", event_id)
+
+            # Continue on with the events that are new to us.
+            new_events.append(event)
+
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
-        sorted_events = sorted(events, key=lambda x: x.depth)
+        sorted_events = sorted(new_events, key=lambda x: x.depth)
         for ev in sorted_events:
             with nested_logging_context(ev.event_id):
                 await self._process_pulled_event(origin, ev, backfilled=backfilled)
@@ -851,18 +943,6 @@ class FederationEventHandler:
         )
 
         event_id = event.event_id
-
-        existing = await self._store.get_event(
-            event_id, allow_none=True, allow_rejected=True
-        )
-        if existing:
-            if not existing.internal_metadata.is_outlier():
-                logger.info(
-                    "_process_pulled_event: Ignoring received event %s which we have already seen",
-                    event_id,
-                )
-                return
-            logger.info("De-outliering event %s", event_id)
 
         try:
             self._sanity_check_event(event)
@@ -964,8 +1044,8 @@ class FederationEventHandler:
 
         Raises:
             FederationPullAttemptBackoffError if we are are deliberately not attempting
-                to pull the given event over federation because we've already done so
-                recently and are backing off.
+                to pull one of the given event's `prev_event`s over federation because
+                we've already done so recently and are backing off.
             FederationError if we fail to get the state from the remote server after any
                 missing `prev_event`s.
         """
@@ -979,13 +1059,22 @@ class FederationEventHandler:
         # If we've already recently attempted to pull this missing event, don't
         # try it again so soon. Since we have to fetch all of the prev_events, we can
         # bail early here if we find any to ignore.
-        prevs_to_ignore = await self._store.get_event_ids_to_not_pull_from_backoff(
-            room_id, missing_prevs
+        prevs_with_pull_backoff = (
+            await self._store.get_event_ids_to_not_pull_from_backoff(
+                room_id, missing_prevs
+            )
         )
-        if len(prevs_to_ignore) > 0:
+        if len(prevs_with_pull_backoff) > 0:
             raise FederationPullAttemptBackoffError(
-                event_ids=prevs_to_ignore,
-                message=f"While computing context for event={event_id}, not attempting to pull missing prev_event={prevs_to_ignore[0]} because we already tried to pull recently (backing off).",
+                event_ids=prevs_with_pull_backoff.keys(),
+                message=(
+                    f"While computing context for event={event_id}, not attempting to "
+                    f"pull missing prev_events={list(prevs_with_pull_backoff.keys())} "
+                    "because we already tried to pull recently (backing off)."
+                ),
+                retry_after_ms=(
+                    max(prevs_with_pull_backoff.values()) - self._clock.time_msec()
+                ),
             )
 
         if not missing_prevs:
@@ -1044,10 +1133,9 @@ class FederationEventHandler:
                 state_res_store=StateResolutionStore(self._store),
             )
 
-        except Exception:
+        except Exception as e:
             logger.warning(
-                "Error attempting to resolve state at missing prev_events",
-                exc_info=True,
+                "Error attempting to resolve state at missing prev_events: %s", e
             )
             raise FederationError(
                 "ERROR",
@@ -1400,13 +1488,15 @@ class FederationEventHandler:
         """
 
         try:
-            await self._store.mark_remote_user_device_cache_as_stale(sender)
+            await self._store.mark_remote_users_device_caches_as_stale((sender,))
 
             # Immediately attempt a resync in the background
             if self._config.worker.worker_app:
-                await self._user_device_resync(user_id=sender)
+                await self._multi_user_device_resync(user_ids=[sender])
             else:
-                await self._device_list_updater.user_device_resync(sender)
+                await self._device_list_updater.multi_user_device_resync(
+                    user_ids=[sender]
+                )
         except Exception:
             logger.exception("Failed to resync device for %s", sender)
 
@@ -1432,7 +1522,10 @@ class FederationEventHandler:
         # support it or the event is not from the room creator.
         room_version = await self._store.get_room_version(marker_event.room_id)
         create_event = await self._store.get_create_event_for_room(marker_event.room_id)
-        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        if not room_version.msc2175_implicit_room_creator:
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        else:
+            room_creator = create_event.sender
         if not room_version.msc2716_historical and (
             not self._config.experimental.msc2716_enabled
             or marker_event.sender != room_creator
@@ -1496,8 +1589,8 @@ class FederationEventHandler:
         )
 
     async def backfill_event_id(
-        self, destination: str, room_id: str, event_id: str
-    ) -> EventBase:
+        self, destinations: List[str], room_id: str, event_id: str
+    ) -> PulledPduInfo:
         """Backfill a single event and persist it as a non-outlier which means
         we also pull in all of the state and auth events necessary for it.
 
@@ -1509,24 +1602,21 @@ class FederationEventHandler:
         Raises:
             FederationError if we are unable to find the event from the destination
         """
-        logger.info(
-            "backfill_event_id: event_id=%s from destination=%s", event_id, destination
-        )
+        logger.info("backfill_event_id: event_id=%s", event_id)
 
         room_version = await self._store.get_room_version(room_id)
 
-        event_from_response = await self._federation_client.get_pdu(
-            [destination],
+        pulled_pdu_info = await self._federation_client.get_pdu(
+            destinations,
             event_id,
             room_version,
         )
 
-        if not event_from_response:
+        if not pulled_pdu_info:
             raise FederationError(
                 "ERROR",
                 404,
-                "Unable to find event_id=%s from destination=%s to backfill."
-                % (event_id, destination),
+                f"Unable to find event_id={event_id} from remote servers to backfill.",
                 affected=event_id,
             )
 
@@ -1534,18 +1624,18 @@ class FederationEventHandler:
         # and auth events to de-outlier it. This also sets up the necessary
         # `state_groups` for the event.
         await self._process_pulled_events(
-            destination,
-            [event_from_response],
+            pulled_pdu_info.pull_origin,
+            [pulled_pdu_info.pdu],
             # Prevent notifications going to clients
             backfilled=True,
         )
 
-        return event_from_response
+        return pulled_pdu_info
 
     @trace
     @tag_args
     async def _get_events_and_persist(
-        self, destination: str, room_id: str, event_ids: Collection[str]
+        self, destination: str, room_id: str, event_ids: StrCollection
     ) -> None:
         """Fetch the given events from a server, and persist them as outliers.
 
@@ -1563,19 +1653,19 @@ class FederationEventHandler:
         async def get_event(event_id: str) -> None:
             with nested_logging_context(event_id):
                 try:
-                    event = await self._federation_client.get_pdu(
+                    pulled_pdu_info = await self._federation_client.get_pdu(
                         [destination],
                         event_id,
                         room_version,
                     )
-                    if event is None:
+                    if pulled_pdu_info is None:
                         logger.warning(
                             "Server %s didn't return event %s",
                             destination,
                             event_id,
                         )
                         return
-                    events.append(event)
+                    events.append(pulled_pdu_info.pdu)
 
                 except Exception as e:
                     logger.warning(
@@ -1719,6 +1809,15 @@ class FederationEventHandler:
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
+                except EventSizeError as e:
+                    if e.unpersistable:
+                        # This event is completely unpersistable.
+                        raise e
+                    # Otherwise, we are somewhat lenient and just persist the event
+                    # as rejected, for moderate compatibility with older Synapse
+                    # versions.
+                    logger.warning("While validating received event %r: %s", event, e)
+                    context.rejected = RejectedReason.OVERSIZED_EVENT
 
             events_and_contexts_to_persist.append((event, context))
 
@@ -1763,6 +1862,16 @@ class FederationEventHandler:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
             context.rejected = RejectedReason.AUTH_ERROR
+            return
+        except EventSizeError as e:
+            if e.unpersistable:
+                # This event is completely unpersistable.
+                raise e
+            # Otherwise, we are somewhat lenient and just persist the event
+            # as rejected, for moderate compatibility with older Synapse
+            # versions.
+            logger.warning("While validating received event %r: %s", event, e)
+            context.rejected = RejectedReason.OVERSIZED_EVENT
             return
 
         # next, check that we have all of the event's auth events.
@@ -2150,8 +2259,8 @@ class FederationEventHandler:
                     min_depth,
                 )
             else:
-                await self._bulk_push_rule_evaluator.action_for_event_by_user(
-                    event, context
+                await self._bulk_push_rule_evaluator.action_for_events_by_user(
+                    [(event, context)]
                 )
 
         try:
@@ -2219,6 +2328,10 @@ class FederationEventHandler:
             ) = await self._storage_controllers.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
+
+            # After persistence we always need to notify replication there may
+            # be new data.
+            self._notifier.notify_replication()
 
             if self._ephemeral_messages_enabled:
                 for event in events:

@@ -16,7 +16,6 @@
 import itertools
 import logging
 from collections import OrderedDict
-from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,9 +25,9 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
+    cast,
 )
 
 import attr
@@ -36,7 +35,7 @@ from prometheus_client import Counter
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import PartialStateConflictError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -52,7 +51,7 @@ from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
-from synapse.types import JsonDict, StateMap, get_domain_from_id
+from synapse.types import JsonDict, StateMap, StrCollection, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter, sorted_topologically
 from synapse.util.stringutils import non_null_str_or_none
@@ -70,24 +69,6 @@ event_counter = Counter(
     "",
     ["type", "origin_type", "origin_entity"],
 )
-
-
-class PartialStateConflictError(SynapseError):
-    """An internal error raised when attempting to persist an event with partial state
-    after the room containing the event has been un-partial stated.
-
-    This error should be handled by recomputing the event context and trying again.
-
-    This error has an HTTP status code so that it can be transported over replication.
-    It should not be exposed to clients.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(
-            HTTPStatus.CONFLICT,
-            msg="Cannot persist partial state event in un-partial stated room",
-            errcode=Codes.UNKNOWN,
-        )
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -145,6 +126,8 @@ class PersistEventsStore:
         # generators are chained off them so doing so is a bit of a PITA.
         self._backfill_id_gen: AbstractStreamIdGenerator = self.store._backfill_id_gen
         self._stream_id_gen: AbstractStreamIdGenerator = self.store._stream_id_gen
+
+        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
 
     @trace
     async def _persist_events_and_state_updates(
@@ -306,7 +289,7 @@ class PersistEventsStore:
 
         # The set of event_ids to return. This includes all soft-failed events
         # and their prev events.
-        existing_prevs = set()
+        existing_prevs: Set[str] = set()
 
         def _get_prevs_before_rejected_txn(
             txn: LoggingTransaction, batch: Collection[str]
@@ -355,9 +338,9 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         *,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
-        inhibit_local_membership_updates: bool = False,
-        state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
-        new_forward_extremities: Optional[Dict[str, Set[str]]] = None,
+        inhibit_local_membership_updates: bool,
+        state_delta_for_room: Dict[str, DeltaState],
+        new_forward_extremities: Dict[str, Set[str]],
     ) -> None:
         """Insert some number of room events into the necessary database tables.
 
@@ -384,9 +367,6 @@ class PersistEventsStore:
             PartialStateConflictError: if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
-        state_delta_for_room = state_delta_for_room or {}
-        new_forward_extremities = new_forward_extremities or {}
-
         all_events_and_contexts = events_and_contexts
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
@@ -492,7 +472,6 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events: List[EventBase],
     ) -> None:
-
         # We only care about state events, so this if there are no state events.
         if not any(e.is_state() for e in events):
             return
@@ -574,7 +553,7 @@ class PersistEventsStore:
         event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
-        event_to_auth_chain: Dict[str, Sequence[str]],
+        event_to_auth_chain: Dict[str, StrCollection],
     ) -> None:
         """Calculate the chain cover index for the given events.
 
@@ -868,7 +847,7 @@ class PersistEventsStore:
         event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
-        event_to_auth_chain: Dict[str, Sequence[str]],
+        event_to_auth_chain: Dict[str, StrCollection],
         events_to_calc_chain_id_for: Set[str],
         chain_map: Dict[str, Tuple[int, int]],
     ) -> Dict[str, Tuple[int, int]]:
@@ -1000,23 +979,43 @@ class PersistEventsStore:
     ) -> None:
         """Persist the mapping from transaction IDs to event IDs (if defined)."""
 
-        to_insert = []
+        inserted_ts = self._clock.time_msec()
+        to_insert_token_id: List[Tuple[str, str, str, int, str, int]] = []
+        to_insert_device_id: List[Tuple[str, str, str, str, str, int]] = []
         for event, _ in events_and_contexts:
-            token_id = getattr(event.internal_metadata, "token_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
-            if token_id and txn_id:
-                to_insert.append(
-                    (
-                        event.event_id,
-                        event.room_id,
-                        event.sender,
-                        token_id,
-                        txn_id,
-                        self._clock.time_msec(),
-                    )
-                )
+            token_id = getattr(event.internal_metadata, "token_id", None)
+            device_id = getattr(event.internal_metadata, "device_id", None)
 
-        if to_insert:
+            if txn_id is not None:
+                if token_id is not None:
+                    to_insert_token_id.append(
+                        (
+                            event.event_id,
+                            event.room_id,
+                            event.sender,
+                            token_id,
+                            txn_id,
+                            inserted_ts,
+                        )
+                    )
+
+                if device_id is not None:
+                    to_insert_device_id.append(
+                        (
+                            event.event_id,
+                            event.room_id,
+                            event.sender,
+                            device_id,
+                            txn_id,
+                            inserted_ts,
+                        )
+                    )
+
+        # Pre-MSC3970, we rely on the access_token_id to scope the txn_id for events.
+        # Since this is an experimental flag, we still store the mapping even if the
+        # flag is disabled.
+        if to_insert_token_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="event_txn_id",
@@ -1028,7 +1027,25 @@ class PersistEventsStore:
                     "txn_id",
                     "inserted_ts",
                 ),
-                values=to_insert,
+                values=to_insert_token_id,
+            )
+
+        # With MSC3970, we rely on the device_id instead to scope the txn_id for events.
+        # We're only inserting if MSC3970 is *enabled*, because else the pre-MSC3970
+        # behaviour would allow for a UNIQUE constraint violation on this table
+        if to_insert_device_id and self._msc3970_enabled:
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="event_txn_id_device_id",
+                keys=(
+                    "event_id",
+                    "room_id",
+                    "user_id",
+                    "device_id",
+                    "txn_id",
+                    "inserted_ts",
+                ),
+                values=to_insert_device_id,
             )
 
     async def update_current_state(
@@ -1150,11 +1167,15 @@ class PersistEventsStore:
                 # been inserted into room_memberships.
                 txn.execute_batch(
                     """INSERT INTO current_state_events
-                        (room_id, type, state_key, event_id, membership)
-                    VALUES (?, ?, ?, ?, (SELECT membership FROM room_memberships WHERE event_id = ?))
+                        (room_id, type, state_key, event_id, membership, event_stream_ordering)
+                    VALUES (
+                        ?, ?, ?, ?,
+                        (SELECT membership FROM room_memberships WHERE event_id = ?),
+                        (SELECT stream_ordering FROM events WHERE event_id = ?)
+                    )
                     """,
                     [
-                        (room_id, key[0], key[1], ev_id, ev_id)
+                        (room_id, key[0], key[1], ev_id, ev_id, ev_id)
                         for key, ev_id in to_insert.items()
                     ],
                 )
@@ -1181,11 +1202,15 @@ class PersistEventsStore:
             if to_insert:
                 txn.execute_batch(
                     """INSERT INTO local_current_membership
-                        (room_id, user_id, event_id, membership)
-                    VALUES (?, ?, ?, (SELECT membership FROM room_memberships WHERE event_id = ?))
+                        (room_id, user_id, event_id, membership, event_stream_ordering)
+                    VALUES (
+                        ?, ?, ?,
+                        (SELECT membership FROM room_memberships WHERE event_id = ?),
+                        (SELECT stream_ordering FROM events WHERE event_id = ?)
+                    )
                     """,
                     [
-                        (room_id, key[1], ev_id, ev_id)
+                        (room_id, key[1], ev_id, ev_id, ev_id)
                         for key, ev_id in to_insert.items()
                         if key[0] == EventTypes.Member and self.is_mine_id(key[1])
                     ],
@@ -1282,9 +1307,10 @@ class PersistEventsStore:
         Pick the earliest non-outlier if there is one, else the earliest one.
 
         Args:
-            events_and_contexts (list[(EventBase, EventContext)]):
+            events_and_contexts:
+
         Returns:
-            list[(EventBase, EventContext)]: filtered list
+            filtered list
         """
         new_events_and_contexts: OrderedDict[
             str, Tuple[EventBase, EventContext]
@@ -1310,9 +1336,8 @@ class PersistEventsStore:
         """Update min_depth for each room
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
-                we are persisting
+            txn: db connection
+            events_and_contexts: events we are persisting
         """
         depth_updates: Dict[str, int] = {}
         for event, context in events_and_contexts:
@@ -1364,9 +1389,7 @@ class PersistEventsStore:
             [event.event_id for event, _ in events_and_contexts],
         )
 
-        have_persisted: Dict[str, bool] = {
-            event_id: outlier for event_id, outlier in txn
-        }
+        have_persisted = dict(cast(Iterable[Tuple[str, bool]], txn))
 
         logger.debug(
             "_update_outliers_txn: events=%s have_persisted=%s",
@@ -1583,13 +1606,11 @@ class PersistEventsStore:
         """Update all the miscellaneous tables for new events
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
-                we are persisting
-            all_events_and_contexts (list[(EventBase, EventContext)]): all
-                events that we were going to persist. This includes events
-                we've already persisted, etc, that wouldn't appear in
-                events_and_context.
+            txn: db connection
+            events_and_contexts: events we are persisting
+            all_events_and_contexts: all events that we were going to persist.
+                This includes events we've already persisted, etc, that wouldn't
+                appear in events_and_context.
             inhibit_local_membership_updates: Stop the local_current_membership
                 from being updated by these events. This should be set to True
                 for backfilled events because backfilled events in the past do
@@ -1656,7 +1677,7 @@ class PersistEventsStore:
             if self._ephemeral_messages_enabled:
                 # If there's an expiry timestamp on the event, store it.
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-                if isinstance(expiry_ts, int) and not event.is_state():
+                if type(expiry_ts) is int and not event.is_state():
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
@@ -1795,6 +1816,7 @@ class PersistEventsStore:
             table="room_memberships",
             keys=(
                 "event_id",
+                "event_stream_ordering",
                 "user_id",
                 "sender",
                 "room_id",
@@ -1805,6 +1827,7 @@ class PersistEventsStore:
             values=[
                 (
                     event.event_id,
+                    event.internal_metadata.stream_ordering,
                     event.state_key,
                     event.user_id,
                     event.room_id,
@@ -1837,6 +1860,7 @@ class PersistEventsStore:
                     keyvalues={"room_id": event.room_id, "user_id": event.state_key},
                     values={
                         "event_id": event.event_id,
+                        "event_stream_ordering": event.internal_metadata.stream_ordering,
                         "membership": event.membership,
                     },
                 )
@@ -2028,25 +2052,37 @@ class PersistEventsStore:
             redacted_event_id: The event that was redacted.
         """
 
-        # Fetch the current relation of the event being redacted.
-        redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
+        # Fetch the relation of the event being redacted.
+        row = self.db_pool.simple_select_one_txn(
             txn,
             table="event_relations",
             keyvalues={"event_id": redacted_event_id},
-            retcol="relates_to_id",
+            retcols=("relates_to_id", "relation_type"),
             allow_none=True,
         )
+        # Nothing to do if no relation is found.
+        if row is None:
+            return
+
+        redacted_relates_to = row["relates_to_id"]
+        rel_type = row["relation_type"]
+        self.db_pool.simple_delete_txn(
+            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
+        )
+
         # Any relation information for the related event must be cleared.
-        if redacted_relates_to is not None:
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_relations_for_event, (redacted_relates_to,)
+        )
+        if rel_type == RelationTypes.REFERENCE:
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_relations_for_event, (redacted_relates_to,)
+                txn, self.store.get_references_for_event, (redacted_relates_to,)
             )
-            self.store._invalidate_cache_and_stream(
-                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
-            )
+        if rel_type == RelationTypes.REPLACE:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_applicable_edit, (redacted_relates_to,)
             )
+        if rel_type == RelationTypes.THREAD:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_summary, (redacted_relates_to,)
             )
@@ -2057,9 +2093,38 @@ class PersistEventsStore:
                 txn, self.store.get_threads, (room_id,)
             )
 
-        self.db_pool.simple_delete_txn(
-            txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
-        )
+            # Find the new latest event in the thread.
+            sql = """
+            SELECT event_id, topological_ordering, stream_ordering
+            FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND relation_type = ?
+            ORDER BY topological_ordering DESC, stream_ordering DESC
+            LIMIT 1
+            """
+            txn.execute(sql, (redacted_relates_to, RelationTypes.THREAD))
+
+            # If a latest event is found, update the threads table, this might
+            # be the same current latest event (if an earlier event in the thread
+            # was redacted).
+            latest_event_row = txn.fetchone()
+            if latest_event_row:
+                self.db_pool.simple_upsert_txn(
+                    txn,
+                    table="threads",
+                    keyvalues={"room_id": room_id, "thread_id": redacted_relates_to},
+                    values={
+                        "latest_event_id": latest_event_row[0],
+                        "topological_ordering": latest_event_row[1],
+                        "stream_ordering": latest_event_row[2],
+                    },
+                )
+
+            # Otherwise, delete the thread: it no longer exists.
+            else:
+                self.db_pool.simple_delete_one_txn(
+                    txn, table="threads", keyvalues={"thread_id": redacted_relates_to}
+                )
 
     def _store_room_topic_txn(self, txn: LoggingTransaction, event: EventBase) -> None:
         if isinstance(event.content.get("topic"), str):
@@ -2093,10 +2158,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), int)
+                and type(event.content["min_lifetime"]) is not int
             ) or (
                 "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), int)
+                and type(event.content["max_lifetime"]) is not int
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return

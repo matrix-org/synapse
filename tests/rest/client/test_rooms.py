@@ -39,6 +39,8 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.appservice import ApplicationService
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, register, room, sync
@@ -51,6 +53,8 @@ from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
 from tests.storage.test_stream import PaginationTestCase
 from tests.test_utils import make_awaitable
+from tests.test_utils.event_injection import create_event
+from tests.unittest import override_config
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -61,7 +65,6 @@ class RoomBase(unittest.HomeserverTestCase):
     servlets = [room.register_servlets, room.register_deprecated_servlets]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         self.hs = self.setup_test_homeserver(
             "red",
             federation_http_client=None,
@@ -88,7 +91,6 @@ class RoomPermissionsTestCase(RoomBase):
     rmcreator_id = "@notme:red"
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
         self.helper.auth_user_id = self.rmcreator_id
         # create some rooms under the name rmcreator_id
         self.uncreated_rmid = "!aa:test"
@@ -711,7 +713,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(34, channel.resource_usage.db_txn_count)
+        self.assertEqual(30, channel.resource_usage.db_txn_count)
 
     def test_post_room_initial_state(self) -> None:
         # POST with initial_state config key, expect new room id
@@ -724,7 +726,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(37, channel.resource_usage.db_txn_count)
+        self.assertEqual(32, channel.resource_usage.db_txn_count)
 
     def test_post_room_visibility_key(self) -> None:
         # POST with visibility config key, expect new room id
@@ -812,7 +814,9 @@ class RoomsCreateTestCase(RoomBase):
             return False
 
         join_mock = Mock(side_effect=user_may_join_room)
-        self.hs.get_spam_checker()._user_may_join_room_callbacks.append(join_mock)
+        self.hs.get_module_api_callbacks().spam_checker._user_may_join_room_callbacks.append(
+            join_mock
+        )
 
         channel = self.make_request(
             "POST",
@@ -838,7 +842,9 @@ class RoomsCreateTestCase(RoomBase):
             return Codes.CONSENT_NOT_GIVEN
 
         join_mock = Mock(side_effect=user_may_join_room_codes)
-        self.hs.get_spam_checker()._user_may_join_room_callbacks.append(join_mock)
+        self.hs.get_module_api_callbacks().spam_checker._user_may_join_room_callbacks.append(
+            join_mock
+        )
 
         channel = self.make_request(
             "POST",
@@ -867,6 +873,41 @@ class RoomsCreateTestCase(RoomBase):
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         self.assertEqual(join_mock.call_count, 0)
+
+    def _create_basic_room(self) -> Tuple[int, object]:
+        """
+        Tries to create a basic room and returns the response code.
+        """
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {},
+        )
+        return channel.code, channel.json_body
+
+    @override_config(
+        {
+            "rc_message": {"per_second": 0.2, "burst_count": 10},
+        }
+    )
+    def test_room_creation_ratelimiting(self) -> None:
+        """
+        Regression test for #14312, where ratelimiting was made too strict.
+        Clients should be able to create 10 rooms in a row
+        without hitting rate limits, using default rate limit config.
+        (We override rate limiting config back to its default value.)
+
+        To ensure we don't make ratelimiting too generous accidentally,
+        also check that we can't create an 11th room.
+        """
+
+        for _ in range(10):
+            code, json_body = self._create_basic_room()
+            self.assertEqual(code, HTTPStatus.OK, json_body)
+
+        # The 6th room hits the rate limit.
+        code, json_body = self._create_basic_room()
+        self.assertEqual(code, HTTPStatus.TOO_MANY_REQUESTS, json_body)
 
 
 class RoomTopicTestCase(RoomBase):
@@ -1088,7 +1129,6 @@ class RoomInviteRatelimitTestCase(RoomBase):
 
 
 class RoomJoinTestCase(RoomBase):
-
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -1126,7 +1166,9 @@ class RoomJoinTestCase(RoomBase):
         # `spec` argument is needed for this function mock to have `__qualname__`, which
         # is needed for `Measure` metrics buried in SpamChecker.
         callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
-        self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
+        self.hs.get_module_api_callbacks().spam_checker._user_may_join_room_callbacks.append(
+            callback_mock
+        )
 
         # Join a first room, without being invited to it.
         self.helper.join(self.room1, self.user2, tok=self.tok2)
@@ -1191,7 +1233,9 @@ class RoomJoinTestCase(RoomBase):
         # `spec` argument is needed for this function mock to have `__qualname__`, which
         # is needed for `Measure` metrics buried in SpamChecker.
         callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
-        self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
+        self.hs.get_module_api_callbacks().spam_checker._user_may_join_room_callbacks.append(
+            callback_mock
+        )
 
         # Join a first room, without being invited to it.
         self.helper.join(self.room1, self.user2, tok=self.tok2)
@@ -1387,10 +1431,22 @@ class RoomJoinRatelimitTestCase(RoomBase):
     )
     def test_join_local_ratelimit(self) -> None:
         """Tests that local joins are actually rate-limited."""
-        for _ in range(3):
-            self.helper.create_room_as(self.user_id)
+        # Create 4 rooms
+        room_ids = [
+            self.helper.create_room_as(self.user_id, is_public=True) for _ in range(4)
+        ]
 
-        self.helper.create_room_as(self.user_id, expect_code=429)
+        joiner_user_id = self.register_user("joiner", "secret")
+        # Now make a new user try to join some of them.
+
+        # The user can join 3 rooms
+        for room_id in room_ids[0:3]:
+            self.helper.join(room_id, joiner_user_id)
+
+        # But the user cannot join a 4th room
+        self.helper.join(
+            room_ids[3], joiner_user_id, expect_code=HTTPStatus.TOO_MANY_REQUESTS
+        )
 
     @unittest.override_config(
         {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
@@ -1595,7 +1651,7 @@ class RoomMessagesTestCase(RoomBase):
 
         spam_checker = SpamCheck()
 
-        self.hs.get_spam_checker()._check_event_for_spam_callbacks.append(
+        self.hs.get_module_api_callbacks().spam_checker._check_event_for_spam_callbacks.append(
             spam_checker.check_event_for_spam
         )
 
@@ -1936,7 +1992,7 @@ class RoomMessageListTestCase(RoomBase):
         self.room_id = self.helper.create_room_as(self.user_id)
 
     def test_topo_token_is_accepted(self) -> None:
-        token = "t1-0_0_0_0_0_0_0_0_0"
+        token = "t1-0_0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET", "/rooms/%s/messages?access_token=x&from=%s" % (self.room_id, token)
         )
@@ -1947,7 +2003,7 @@ class RoomMessageListTestCase(RoomBase):
         self.assertTrue("end" in channel.json_body)
 
     def test_stream_token_is_accepted_for_fwd_pagianation(self) -> None:
-        token = "s0_0_0_0_0_0_0_0_0"
+        token = "s0_0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET", "/rooms/%s/messages?access_token=x&from=%s" % (self.room_id, token)
         )
@@ -2051,7 +2107,6 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
     hijack_auth = False
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
         # Register the user who does the searching
         self.user_id2 = self.register_user("user", "pass")
         self.access_token = self.login("user", "pass")
@@ -2144,7 +2199,6 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
 
 
 class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -2152,7 +2206,6 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         self.url = b"/_matrix/client/r0/publicRooms"
 
         config = self.default_config()
@@ -2174,7 +2227,6 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
 
 
 class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -2182,7 +2234,6 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["allow_public_rooms_without_auth"] = True
         self.hs = self.setup_test_homeserver(config=config)
@@ -2363,7 +2414,6 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
 
 
 class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -2677,7 +2727,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by a label on a /messages request."""
         self._send_labelled_messages_in_room()
 
-        token = "s0_0_0_0_0_0_0_0_0"
+        token = "s0_0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
@@ -2694,7 +2744,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by the absence of a label on a /messages request."""
         self._send_labelled_messages_in_room()
 
-        token = "s0_0_0_0_0_0_0_0_0"
+        token = "s0_0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
@@ -2717,7 +2767,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """
         self._send_labelled_messages_in_room()
 
-        token = "s0_0_0_0_0_0_0_0_0"
+        token = "s0_0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
@@ -2932,7 +2982,6 @@ class RelationsTestCase(PaginationTestCase):
 
 
 class ContextTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -3308,7 +3357,6 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
 
 
 class ThreepidInviteTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -3331,8 +3379,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = Mock(return_value=make_awaitable((Mock(event_id="abc"), 0)))
-        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
-        self.hs.get_identity_handler().lookup_3pid = Mock(
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[assignment]
+        self.hs.get_identity_handler().lookup_3pid = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(None),
         )
 
@@ -3341,7 +3389,9 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # `spec` argument is needed for this function mock to have `__qualname__`, which
         # is needed for `Measure` metrics buried in SpamChecker.
         mock = Mock(return_value=make_awaitable(True), spec=lambda *x: None)
-        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
+        self.hs.get_module_api_callbacks().spam_checker._user_may_send_3pid_invite_callbacks.append(
+            mock
+        )
 
         # Send a 3PID invite into the room and check that it succeeded.
         email_to_invite = "teresa@example.com"
@@ -3387,13 +3437,14 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         """
         Test allowing/blocking threepid invites with a spam-check module.
 
-        In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`."""
+        In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`.
+        """
         # Mock a few functions to prevent the test from failing due to failing to talk to
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = Mock(return_value=make_awaitable((Mock(event_id="abc"), 0)))
-        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
-        self.hs.get_identity_handler().lookup_3pid = Mock(
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[assignment]
+        self.hs.get_identity_handler().lookup_3pid = Mock(  # type: ignore[assignment]
             return_value=make_awaitable(None),
         )
 
@@ -3405,7 +3456,9 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             return_value=make_awaitable(synapse.module_api.NOT_SPAM),
             spec=lambda *x: None,
         )
-        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
+        self.hs.get_module_api_callbacks().spam_checker._user_may_send_3pid_invite_callbacks.append(
+            mock
+        )
 
         # Send a 3PID invite into the room and check that it succeeded.
         email_to_invite = "teresa@example.com"
@@ -3486,3 +3539,62 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 400)
         self.assertEqual(channel.json_body["errcode"], "M_MISSING_PARAM")
+
+
+class TimestampLookupTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self._storage_controllers = self.hs.get_storage_controllers()
+
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+    def _inject_outlier(self, room_id: str) -> EventBase:
+        event, _context = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                type="m.test",
+                sender="@test_remote_user:remote",
+            )
+        )
+
+        event.internal_metadata.outlier = True
+        persistence = self._storage_controllers.persistence
+        assert persistence is not None
+        self.get_success(
+            persistence.persist_event(
+                event, EventContext.for_outlier(self._storage_controllers)
+            )
+        )
+        return event
+
+    def test_no_outliers(self) -> None:
+        """
+        Test to make sure `/timestamp_to_event` does not return `outlier` events.
+        We're unable to determine whether an `outlier` is next to a gap so we
+        don't know whether it's actually the closest event. Instead, let's just
+        ignore `outliers` with this endpoint.
+
+        This test is really seeing that we choose the non-`outlier` event behind the
+        `outlier`. Since the gap checking logic considers the latest message in the room
+        as *not* next to a gap, asking over federation does not come into play here.
+        """
+        room_id = self.helper.create_room_as(self.room_owner, tok=self.room_owner_tok)
+
+        outlier_event = self._inject_outlier(room_id)
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{room_id}/timestamp_to_event?dir=b&ts={outlier_event.origin_server_ts}",
+            access_token=self.room_owner_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+
+        # Make sure the outlier event is not returned
+        self.assertNotEqual(channel.json_body["event_id"], outlier_event.event_id)

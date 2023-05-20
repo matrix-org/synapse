@@ -17,19 +17,20 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
+from typing import List
 
 from synapse.config.homeserver import HomeServerConfig
 
 
 class ConfigFileTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.dir = tempfile.mkdtemp()
         self.config_file = os.path.join(self.dir, "homeserver.yaml")
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self.dir)
 
-    def generate_config(self):
+    def generate_config(self) -> None:
         with redirect_stdout(StringIO()):
             HomeServerConfig.load_or_generate_config(
                 "",
@@ -43,7 +44,7 @@ class ConfigFileTestCase(unittest.TestCase):
                 ],
             )
 
-    def generate_config_and_remove_lines_containing(self, needle):
+    def generate_config_and_remove_lines_containing(self, needle: str) -> None:
         self.generate_config()
 
         with open(self.config_file) as f:
@@ -52,7 +53,7 @@ class ConfigFileTestCase(unittest.TestCase):
         with open(self.config_file, "w") as f:
             f.write("".join(contents))
 
-    def add_lines_to_config(self, lines):
+    def add_lines_to_config(self, lines: List[str]) -> None:
         with open(self.config_file, "a") as f:
             for line in lines:
                 f.write(line + "\n")

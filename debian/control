@@ -8,6 +8,8 @@ Build-Depends:
  dh-virtualenv (>= 1.1),
  libsystemd-dev,
  libpq-dev,
+ libicu-dev,
+ pkg-config,
  lsb-release,
  python3-dev,
  python3,
@@ -35,6 +37,7 @@ Depends:
 # so we put perl:Depends in Suggests rather than Depends.
 Recommends:
  ${shlibs1:Recommends},
+ matrix-org-archive-keyring,
 Suggests:
  sqlite3,
  ${perl:Depends},

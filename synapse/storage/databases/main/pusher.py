@@ -27,13 +27,17 @@ from typing import (
 )
 
 from synapse.push import PusherConfig, ThrottleParams
+from synapse.replication.tcp.streams import PushersStream
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
-from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
+    StreamIdGenerator,
+)
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -52,8 +56,16 @@ class PusherWorkerStore(SQLBaseStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
+
+        # In the worker store this is an ID tracker which we overwrite in the non-worker
+        # class below that is used on the main process.
         self._pushers_id_gen = StreamIdGenerator(
-            db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
+            db_conn,
+            hs.get_replication_notifier(),
+            "pushers",
+            "id",
+            extra_tables=[("deleted_pushers", "stream_id")],
+            is_writer=hs.config.worker.worker_app is None,
         )
 
         self.db_pool.updates.register_background_update_handler(
@@ -95,6 +107,16 @@ class PusherWorkerStore(SQLBaseStore):
             r["enabled"] = bool(r["enabled"])
 
             yield PusherConfig(**r)
+
+    def get_pushers_stream_token(self) -> int:
+        return self._pushers_id_gen.get_current_token()
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == PushersStream.NAME:
+            self._pushers_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     async def get_pushers_by_app_id_and_pushkey(
         self, app_id: str, pushkey: str
@@ -303,14 +325,11 @@ class PusherWorkerStore(SQLBaseStore):
     async def set_throttle_params(
         self, pusher_id: str, room_id: str, params: ThrottleParams
     ) -> None:
-        # no need to lock because `pusher_throttle` has a primary key on
-        # (pusher, room_id) so simple_upsert will retry
         await self.db_pool.simple_upsert(
             "pusher_throttle",
             {"pusher": pusher_id, "room_id": room_id},
             {"last_sent_ts": params.last_sent_ts, "throttle_ms": params.throttle_ms},
             desc="set_throttle_params",
-            lock=False,
         )
 
     async def _remove_deactivated_pushers(self, progress: dict, batch_size: int) -> int:
@@ -324,7 +343,6 @@ class PusherWorkerStore(SQLBaseStore):
         last_user = progress.get("last_user", "")
 
         def _delete_pushers(txn: LoggingTransaction) -> int:
-
             sql = """
                 SELECT name FROM users
                 WHERE deactivated = ? and name > ?
@@ -372,7 +390,6 @@ class PusherWorkerStore(SQLBaseStore):
         last_pusher = progress.get("last_pusher", 0)
 
         def _delete_pushers(txn: LoggingTransaction) -> int:
-
             sql = """
                 SELECT p.id, access_token FROM pushers AS p
                 LEFT JOIN access_tokens AS a ON (p.access_token = a.id)
@@ -429,7 +446,6 @@ class PusherWorkerStore(SQLBaseStore):
         last_pusher = progress.get("last_pusher", 0)
 
         def _delete_pushers(txn: LoggingTransaction) -> int:
-
             sql = """
                 SELECT p.id, p.user_name, p.app_id, p.pushkey
                 FROM pushers AS p
@@ -493,19 +509,24 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
     async def _set_device_id_for_pushers(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        """Background update to populate the device_id column of the pushers table."""
+        """
+        Background update to populate the device_id column and clear the access_token
+        column for the pushers table.
+        """
         last_pusher_id = progress.get("pusher_id", 0)
 
         def set_device_id_for_pushers_txn(txn: LoggingTransaction) -> int:
             txn.execute(
                 """
-                    SELECT p.id, at.device_id
+                    SELECT
+                        p.id AS pusher_id,
+                        p.device_id AS pusher_device_id,
+                        at.device_id AS token_device_id
                     FROM pushers AS p
-                    INNER JOIN access_tokens AS at
+                    LEFT JOIN access_tokens AS at
                         ON p.access_token = at.id
                     WHERE
                         p.access_token IS NOT NULL
-                        AND at.device_id IS NOT NULL
                         AND p.id > ?
                     ORDER BY p.id
                     LIMIT ?
@@ -517,17 +538,31 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
             if len(rows) == 0:
                 return 0
 
+            # The reason we're clearing the access_token column here is a bit subtle.
+            # When a user logs out, we:
+            #  (1) delete the access token
+            #  (2) delete the device
+            #
+            # Ideally, we would delete the pushers only via its link to the device
+            # during (2), but since this background update might not have fully run yet,
+            # we're still deleting the pushers via the access token during (1).
             self.db_pool.simple_update_many_txn(
                 txn=txn,
                 table="pushers",
                 key_names=("id",),
-                key_values=[(row["id"],) for row in rows],
-                value_names=("device_id",),
-                value_values=[(row["device_id"],) for row in rows],
+                key_values=[(row["pusher_id"],) for row in rows],
+                value_names=("device_id", "access_token"),
+                # If there was already a device_id on the pusher, we only want to clear
+                # the access_token column, so we keep the existing device_id. Otherwise,
+                # we set the device_id we got from joining the access_tokens table.
+                value_values=[
+                    (row["pusher_device_id"] or row["token_device_id"], None)
+                    for row in rows
+                ],
             )
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, "set_device_id_for_pushers", {"pusher_id": rows[-1]["id"]}
+                txn, "set_device_id_for_pushers", {"pusher_id": rows[-1]["pusher_id"]}
             )
 
             return len(rows)
@@ -545,13 +580,13 @@ class PusherBackgroundUpdatesStore(SQLBaseStore):
 
 
 class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
-    def get_pushers_stream_token(self) -> int:
-        return self._pushers_id_gen.get_current_token()
+    # Because we have write access, this will be a StreamIdGenerator
+    # (see PusherWorkerStore.__init__)
+    _pushers_id_gen: AbstractStreamIdGenerator
 
     async def add_pusher(
         self,
         user_id: str,
-        access_token: Optional[int],
         kind: str,
         app_id: str,
         app_display_name: str,
@@ -564,15 +599,13 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
         profile_tag: str = "",
         enabled: bool = True,
         device_id: Optional[str] = None,
+        access_token_id: Optional[int] = None,
     ) -> None:
         async with self._pushers_id_gen.get_next() as stream_id:
-            # no need to lock because `pushers` has a unique key on
-            # (app_id, pushkey, user_name) so simple_upsert will retry
             await self.db_pool.simple_upsert(
                 table="pushers",
                 keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
                 values={
-                    "access_token": access_token,
                     "kind": kind,
                     "app_display_name": app_display_name,
                     "device_display_name": device_display_name,
@@ -584,9 +617,12 @@ class PusherStore(PusherWorkerStore, PusherBackgroundUpdatesStore):
                     "id": stream_id,
                     "enabled": enabled,
                     "device_id": device_id,
+                    # XXX(quenting): We're only really persisting the access token ID
+                    # when updating an existing pusher. This is in case the
+                    # 'set_device_id_for_pushers' background update hasn't finished yet.
+                    "access_token": access_token_id,
                 },
                 desc="add_pusher",
-                lock=False,
             )
 
             user_has_pusher = self.get_if_user_has_pusher.cache.get_immediate(

@@ -68,6 +68,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         # We may have multiple federation sender instances, so we need to track
         # their positions separately.
@@ -198,7 +199,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         key: Optional[Hashable] = None,
     ) -> None:
         """As per FederationSender"""
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.info("Not sending EDU to ourselves")
             return
 
@@ -244,7 +245,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
 
         self.notifier.on_new_replication_data()
 
-    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
         """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.
@@ -314,7 +315,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # stream position.
         keyed_edus = {v: k for k, v in self.keyed_edu_changed.items()[i:j]}
 
-        for ((destination, edu_key), pos) in keyed_edus.items():
+        for (destination, edu_key), pos in keyed_edus.items():
             rows.append(
                 (
                     pos,
@@ -329,7 +330,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         j = self.edus.bisect_right(to_token) + 1
         edus = self.edus.items()[i:j]
 
-        for (pos, edu) in edus:
+        for pos, edu in edus:
             rows.append((pos, EduRow(edu)))
 
         # Sort rows based on pos

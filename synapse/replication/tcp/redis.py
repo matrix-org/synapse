@@ -35,6 +35,7 @@ from synapse.replication.tcp.commands import (
     ReplicateCommand,
     parse_command_from_line,
 )
+from synapse.replication.tcp.context import ClientContextFactory
 from synapse.replication.tcp.protocol import (
     IReplicationConnection,
     tcp_inbound_commands_counter,
@@ -328,7 +329,6 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
         outbound_redis_connection: txredisapi.ConnectionHandler,
         channel_names: List[str],
     ):
-
         super().__init__(
             hs,
             uuid="subscriber",
@@ -387,12 +387,24 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(
-        host,
-        port,
-        factory,
-        timeout=30,
-        bindAddress=None,
-    )
+
+    if hs.config.redis.redis_use_tls:
+        ssl_context_factory = ClientContextFactory(hs.config.redis)
+        reactor.connectSSL(
+            host,
+            port,
+            factory,
+            ssl_context_factory,
+            timeout=30,
+            bindAddress=None,
+        )
+    else:
+        reactor.connectTCP(
+            host,
+            port,
+            factory,
+            timeout=30,
+            bindAddress=None,
+        )
 
     return factory.handler
