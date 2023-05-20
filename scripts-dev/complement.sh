@@ -267,11 +267,11 @@ if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
   # Since this is just a test suite, this is fine and won't reveal anyone's
   # personal information
   export PASS_SYNAPSE_LOG_SENSITIVE=1
-
-  # Log a few more useful things for a developer attempting to debug something
-  # particularly tricky.
-  export PASS_SYNAPSE_TEST_LOG_LEVEL=1
 fi
+
+# Log a few more useful things for a developer attempting to debug something
+# particularly tricky.
+export PASS_SYNAPSE_LOG_TESTING=1
 
 # Run the tests!
 echo "Images built; running complement"
