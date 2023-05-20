@@ -68,8 +68,7 @@ class ReplicationEndpointFactory:
         scheme = self.instance_map[worker_name].scheme()
 
         if scheme in ("http", "https"):
-            host, port = netloc.split(":", maxsplit=1)
-            endpoint = HostnameEndpoint(self.reactor, host, int(port))
+            endpoint = HostnameEndpoint(self.reactor, self.instance_map[worker_name].host, self.instance_map[worker_name].port)
             if scheme == "https":
                 endpoint = wrapClientTLS(
                     # The 'port' argument below isn't actually used by the function
