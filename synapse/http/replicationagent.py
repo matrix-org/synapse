@@ -61,9 +61,8 @@ class ReplicationEndpointFactory:
 
         Returns: The correct client endpoint object
         """
-        # The place to connect to now comes in as the name of the worker, similar to
-        # a hostname in placement. Use the instance_map data to get the actual
-        # connection information.
+        # The given URI has a special scheme and includes the worker name. The
+        # actual connection details are pulled from the instance map.
         worker_name = uri.netloc.decode("utf-8")
         netloc = self.instance_map[worker_name].netloc()
         scheme = self.instance_map[worker_name].scheme()
