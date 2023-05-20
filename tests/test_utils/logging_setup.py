@@ -54,4 +54,10 @@ def setup_logging() -> None:
     log_level = os.environ.get("SYNAPSE_TEST_LOG_LEVEL", "ERROR")
     root_logger.setLevel(log_level)
 
+    # Log when events are (maybe unexpectedly) filtered out of responses in tests. It's
+    # just nice to be able to look at the CI log and figure out why an event isn't being
+    # returned.
+    logging.getLogger("synapse.visibility.filtered_event_debug").setLevel(logging.DEBUG)
+
+    # Blow away the pyo3-log cache so that it reloads the configuration.
     reset_logging_config()
