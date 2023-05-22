@@ -105,7 +105,7 @@ class UrlPreviewer:
 
     When Synapse is asked to preview a URL it does the following:
 
-    1. Checks against a URL blacklist (defined as `url_preview_url_blacklist` in the
+    1. Checks against a URL blocklist (defined as `url_preview_url_blacklist` in the
        config).
     2. Checks the URL against an in-memory cache and returns the result if it exists. (This
        is also used to de-duplicate processing of multiple in-flight requests at once.)
@@ -113,7 +113,7 @@ class UrlPreviewer:
        1. Checks URL and timestamp against the database cache and returns the result if it
           has not expired and was successful (a 2xx return code).
        2. Checks if the URL matches an oEmbed (https://oembed.com/) pattern. If it
-          does, update the URL to download.
+          does and the new URL is not blocked, update the URL to download.
        3. Downloads the URL and stores it into a file via the media storage provider
           and saves the local media metadata.
        4. If the media is an image:
@@ -127,14 +127,14 @@ class UrlPreviewer:
                 and saves the local media metadata.
              2. Convert the oEmbed response to an Open Graph response.
              3. Override any Open Graph data from the HTML with data from oEmbed.
-          4. If an image exists in the Open Graph response:
+          4. If an image URL exists in the Open Graph response:
              1. Downloads the URL and stores it into a file via the media storage
                 provider and saves the local media metadata.
              2. Generates thumbnails.
              3. Updates the Open Graph response based on image properties.
-       6. If the media is JSON and an oEmbed URL was found:
+       6. If an oEmbed URL was found and the media is JSON:
           1. Convert the oEmbed response to an Open Graph response.
-          2. If a thumbnail or image is in the oEmbed response:
+          2. If an image URL is in the oEmbed response:
              1. Downloads the URL and stores it into a file via the media storage
                 provider and saves the local media metadata.
              2. Generates thumbnails.
@@ -144,7 +144,8 @@ class UrlPreviewer:
 
     If any additional requests (e.g. from oEmbed autodiscovery, step 5.3 or
     image thumbnailing, step 5.4 or 6.4) fails then the URL preview as a whole
-    does not fail. As much information as possible is returned.
+    does not fail. If any of them are blocked, then those additional requests
+    are skipped. As much information as possible is returned.
 
     The in-memory cache expires after 1 hour.
 
@@ -166,8 +167,8 @@ class UrlPreviewer:
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
-            ip_whitelist=hs.config.media.url_preview_ip_range_whitelist,
-            ip_blacklist=hs.config.media.url_preview_ip_range_blacklist,
+            ip_allowlist=hs.config.media.url_preview_ip_range_allowlist,
+            ip_blocklist=hs.config.media.url_preview_ip_range_blocklist,
             use_proxy=True,
         )
         self.media_repo = media_repo
@@ -185,7 +186,7 @@ class UrlPreviewer:
             or instance_running_jobs == hs.get_instance_name()
         )
 
-        self.url_preview_url_blacklist = hs.config.media.url_preview_url_blacklist
+        self.url_preview_url_blocklist = hs.config.media.url_preview_url_blocklist
         self.url_preview_accept_language = hs.config.media.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning
@@ -203,48 +204,14 @@ class UrlPreviewer:
             )
 
     async def preview(self, url: str, user: UserID, ts: int) -> bytes:
-        # XXX: we could move this into _do_preview if we wanted.
-        url_tuple = urlsplit(url)
-        for entry in self.url_preview_url_blacklist:
-            match = True
-            for attrib in entry:
-                pattern = entry[attrib]
-                value = getattr(url_tuple, attrib)
-                logger.debug(
-                    "Matching attrib '%s' with value '%s' against pattern '%s'",
-                    attrib,
-                    value,
-                    pattern,
-                )
-
-                if value is None:
-                    match = False
-                    continue
-
-                # Some attributes might not be parsed as strings by urlsplit (such as the
-                # port, which is parsed as an int). Because we use match functions that
-                # expect strings, we want to make sure that's what we give them.
-                value_str = str(value)
-
-                if pattern.startswith("^"):
-                    if not re.match(pattern, value_str):
-                        match = False
-                        continue
-                else:
-                    if not fnmatch.fnmatch(value_str, pattern):
-                        match = False
-                        continue
-            if match:
-                logger.warning("URL %s blocked by url_blacklist entry %s", url, entry)
-                raise SynapseError(
-                    403, "URL blocked by url pattern blacklist entry", Codes.UNKNOWN
-                )
-
         # the in-memory cache:
-        # * ensures that only one request is active at a time
+        # * ensures that only one request to a URL is active at a time
         # * takes load off the DB for the thundering herds
         # * also caches any failures (unlike the DB) so we don't keep
-        #    requesting the same endpoint
+        #   requesting the same endpoint
+        #
+        # Note that autodiscovered oEmbed URLs and pre-caching of images
+        # are not captured in the in-memory cache.
 
         observable = self._cache.get(url)
 
@@ -283,7 +250,7 @@ class UrlPreviewer:
                 og = og.encode("utf8")
             return og
 
-        # If this URL can be accessed via oEmbed, use that instead.
+        # If this URL can be accessed via an allowed oEmbed, use that instead.
         url_to_download = url
         oembed_url = self._oembed.get_oembed_url(url)
         if oembed_url:
@@ -329,6 +296,7 @@ class UrlPreviewer:
                 # defer to that.
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
+                # Only download to the oEmbed URL if it is allowed.
                 if oembed_url:
                     try:
                         oembed_info = await self._handle_url(
@@ -411,6 +379,59 @@ class UrlPreviewer:
 
         return jsonog.encode("utf8")
 
+    def _is_url_blocked(self, url: str) -> bool:
+        """
+        Check whether the URL is allowed to be previewed (according to the homeserver
+        configuration).
+
+        Args:
+            url: The requested URL.
+
+        Return:
+            True if the URL is blocked, False if it is allowed.
+        """
+        url_tuple = urlsplit(url)
+        for entry in self.url_preview_url_blocklist:
+            match = True
+            # Iterate over each entry. If *all* attributes of that entry match
+            # the current URL, then reject it.
+            for attrib, pattern in entry.items():
+                value = getattr(url_tuple, attrib)
+                logger.debug(
+                    "Matching attrib '%s' with value '%s' against pattern '%s'",
+                    attrib,
+                    value,
+                    pattern,
+                )
+
+                if value is None:
+                    match = False
+                    break
+
+                # Some attributes might not be parsed as strings by urlsplit (such as the
+                # port, which is parsed as an int). Because we use match functions that
+                # expect strings, we want to make sure that's what we give them.
+                value_str = str(value)
+
+                # Check the value against the pattern as either a regular expression or
+                # a glob. If it doesn't match, the entry doesn't match.
+                if pattern.startswith("^"):
+                    if not re.match(pattern, value_str):
+                        match = False
+                        break
+                else:
+                    if not fnmatch.fnmatch(value_str, pattern):
+                        match = False
+                        break
+
+            # All fields matched, return true (the URL is blocked).
+            if match:
+                logger.warning("URL %s blocked by entry %s", url, entry)
+                return match
+
+        # No matches were found, the URL is allowed.
+        return False
+
     async def _download_url(self, url: str, output_stream: BinaryIO) -> DownloadResult:
         """
         Fetches a remote URL and parses the headers.
@@ -451,7 +472,7 @@ class UrlPreviewer:
         except DNSLookupError:
             # DNS lookup returned no results
             # Note: This will also be the case if one of the resolved IP
-            # addresses is blacklisted
+            # addresses is blocked.
             raise SynapseError(
                 502,
                 "DNS resolution failure during URL preview generation",
@@ -547,7 +568,15 @@ class UrlPreviewer:
 
         Returns:
             A MediaInfo object describing the fetched content.
+
+        Raises:
+            SynapseError if the URL is blocked.
         """
+
+        if self._is_url_blocked(url):
+            raise SynapseError(
+                403, "URL blocked by url pattern blocklist entry", Codes.UNKNOWN
+            )
 
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
@@ -624,7 +653,7 @@ class UrlPreviewer:
             return
 
         # The image URL from the HTML might be relative to the previewed page,
-        # convert it to an URL which can be requested directly.
+        # convert it to a URL which can be requested directly.
         url_parts = urlparse(image_url)
         if url_parts.scheme != "data":
             image_url = urljoin(media_info.uri, image_url)

@@ -52,7 +52,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         m.post_json_get_json = post_json_get_json
 
-        hs = self.setup_test_homeserver(proxied_blacklisted_http_client=m)
+        hs = self.setup_test_homeserver(proxied_blocklisted_http_client=m)
 
         return hs
 

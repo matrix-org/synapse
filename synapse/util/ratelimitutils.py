@@ -25,10 +25,12 @@ from typing import (
     Iterator,
     List,
     Mapping,
+    MutableSet,
     Optional,
     Set,
     Tuple,
 )
+from weakref import WeakSet
 
 from prometheus_client.core import Counter
 from typing_extensions import ContextManager
@@ -86,7 +88,9 @@ queue_wait_timer = Histogram(
 )
 
 
-_rate_limiter_instances: Set["FederationRateLimiter"] = set()
+# This must be a `WeakSet`, otherwise we indirectly hold on to entire `HomeServer`s
+# during trial test runs and leak a lot of memory.
+_rate_limiter_instances: MutableSet["FederationRateLimiter"] = WeakSet()
 # Protects the _rate_limiter_instances set from concurrent access
 _rate_limiter_instances_lock = threading.Lock()
 

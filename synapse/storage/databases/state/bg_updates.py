@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Union
 
+from synapse.logging.opentracing import tag_args, trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -40,6 +41,8 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
     updates.
     """
 
+    @trace
+    @tag_args
     def _count_state_group_hops_txn(
         self, txn: LoggingTransaction, state_group: int
     ) -> int:
@@ -83,6 +86,8 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
             return count
 
+    @trace
+    @tag_args
     def _get_state_groups_from_groups_txn(
         self,
         txn: LoggingTransaction,
