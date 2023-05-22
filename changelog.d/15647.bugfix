@@ -1,0 +1,1 @@
+Fix `@trace` not wrapping some state related operations that return coroutines correctly.
