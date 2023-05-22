@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Awaitable, Callable, Iterable, List, Optional, Tuple
+from typing import Awaitable, Callable, List, Optional, Tuple
 
 from synapse.types import PublicRoom
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Types for callbacks to be registered via the module api
 FETCH_PUBLIC_ROOMS_CALLBACK = Callable[
     [bool, Optional[int], Optional[Tuple[int, str]]],
-    Awaitable[Iterable[PublicRoom]],
+    Awaitable[List[PublicRoom]],
 ]
 
 

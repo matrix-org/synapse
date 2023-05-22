@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from http import HTTPStatus
-from typing import Iterable, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -47,38 +47,46 @@ class FetchPublicRoomsTestCase(HomeserverTestCase):
 
         async def cb(
             forwards: bool, limit: Optional[int], bounds: Optional[Tuple[int, str]]
-        ) -> Iterable[PublicRoom]:
-            room1 = PublicRoom(
-                room_id="!test1:test",
-                num_joined_members=1,
-                world_readable=True,
-                guest_can_join=False,
-            )
-            room3 = PublicRoom(
-                room_id="!test3:test",
-                num_joined_members=3,
-                world_readable=True,
-                guest_can_join=False,
-            )
-            room3_2 = PublicRoom(
-                room_id="!test3_2:test",
-                num_joined_members=3,
-                world_readable=True,
-                guest_can_join=False,
-            )
-            rooms = [room3_2, room3, room1]
-            if not forwards:
-                rooms.reverse()
+        ) -> List[PublicRoom]:
+            rooms_db = [
+                PublicRoom(
+                    room_id="!test1:test",
+                    num_joined_members=1,
+                    world_readable=True,
+                    guest_can_join=False,
+                ),
+                PublicRoom(
+                    room_id="!test3:test",
+                    num_joined_members=3,
+                    world_readable=True,
+                    guest_can_join=False,
+                ),
+                PublicRoom(
+                    room_id="!test3_2:test",
+                    num_joined_members=3,
+                    world_readable=True,
+                    guest_can_join=False,
+                ),
+            ]
+
+            result = []
+            if limit is not None and bounds is not None:
+                (last_joined_members, last_room_id) = bounds
+                for r in rooms_db:
+                    if r.num_joined_members <= last_joined_members:
+                        if r.room_id == last_room_id:
+                            break
+                        result.append(r)
+            else:
+                result = rooms_db
+
+            if forwards:
+                result.reverse()
 
             if limit is not None:
-                if bounds is None:
-                    return rooms[:limit]
+                result = result[:limit]
 
-                (last_joined_members, last_room_id) = bounds
-                if last_joined_members < 3 or last_room_id == room3_2.room_id:
-                    return [room3, room1]
-
-            return [room3_2, room3, room1]
+            return result
 
         self._module_api.register_public_rooms_callbacks(fetch_public_rooms=cb)
 

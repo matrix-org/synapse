@@ -189,6 +189,7 @@ class RoomListHandler:
                 if batch_token
                 else None,
             )
+            module_public_rooms.reverse()
 
             # Insert the module's reported public rooms into the list
             for new_room in module_public_rooms:
