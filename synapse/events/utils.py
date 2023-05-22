@@ -47,6 +47,11 @@ if TYPE_CHECKING:
     from synapse.handlers.relations import BundledAggregations
 
 
+# Split strings on "." but not "\." (or "\\\.").
+SPLIT_FIELD_REGEX = re.compile(r"\\*\.")
+# Find escaped characters, e.g. those with a \ in front of them.
+ESCAPE_SEQUENCE_PATTERN = re.compile(r"\\(.)")
+
 CANONICALJSON_MAX_INT = (2**53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
 
@@ -278,14 +283,14 @@ def _split_field(field: str) -> List[str]:
     # then emit a new field part.
     result = []
     prev_start = 0
-    for match in re.finditer(r"\\*\.", field):
+    for match in SPLIT_FIELD_REGEX.finditer(field):
         # If the match is an *even* number of characters than the dot was escaped.
         if len(match.group()) % 2 == 0:
             continue
 
         # Add a new part (up to the dot, exclusive) after escaping.
         result.append(
-            re.sub(r"\\(.)", _escape_slash, field[prev_start : match.end() - 1])
+            ESCAPE_SEQUENCE_PATTERN.sub(_escape_slash, field[prev_start: match.end() - 1])
         )
         prev_start = match.end()
 
