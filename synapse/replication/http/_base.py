@@ -267,8 +267,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         "Unknown METHOD on %s replication endpoint" % (cls.NAME,)
                     )
 
-                # Use the instance_map data to retrieve the correct scheme and use the
-                # instance_name to abstract the connection details into the Agent
+                # Hard code a special scheme to show this only used for replication. The
+                # instance_name will be passed into the ReplicationEndpointFactory to
+                # determine connection details from the instance_map.
                 uri = "synapse-replication://%s/_synapse/replication/%s/%s" % (
                     instance_name,
                     cls.NAME,
