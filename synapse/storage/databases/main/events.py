@@ -1010,9 +1010,10 @@ class PersistEventsStore:
                         )
                     )
 
-        # Pre-MSC3970, we rely on the access_token_id to scope the txn_id for events.
-        # Since this is an experimental flag, we still store the mapping even if the
-        # flag is disabled.
+        # Previously Synapsed used the access_token_id to scope the txn_id for events.
+        #
+        # TODO Remove this once Synapse cannot be rolled back to a version without
+        #      device IDs being stored.
         if to_insert_token_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
@@ -1028,9 +1029,7 @@ class PersistEventsStore:
                 values=to_insert_token_id,
             )
 
-        # With MSC3970, we rely on the device_id instead to scope the txn_id for events.
-        # We're only inserting if MSC3970 is *enabled*, because else the pre-MSC3970
-        # behaviour would allow for a UNIQUE constraint violation on this table
+        # Synapse now relies on the device_id to scope the txn_id for events.
         if to_insert_device_id:
             self.db_pool.simple_insert_many_txn(
                 txn,

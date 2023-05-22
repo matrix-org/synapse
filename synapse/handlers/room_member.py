@@ -422,9 +422,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # do it up front for efficiency.)
         if txn_id:
             existing_event_id = None
+            # Look for an event sent by the same device. If none is found, fallback
+            # to an event sent by the same access token.
             if requester.device_id:
-                # When MSC3970 is enabled, we lookup for events sent by the same device
-                # first, and fallback to the old behaviour if none were found.
                 existing_event_id = (
                     await self.store.get_event_id_from_transaction_id_and_device_id(
                         room_id,
