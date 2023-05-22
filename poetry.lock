@@ -1940,14 +1940,14 @@ email = ["email-validator (>=1.0.3)"]
 
 [[package]]
 name = "pygithub"
-version = "1.58.1"
+version = "1.58.2"
 description = "Use the full Github API v3"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "PyGithub-1.58.1-py3-none-any.whl", hash = "sha256:4e7fe9c3ec30d5fde5b4fbb97f18821c9dbf372bf6df337fe66f6689a65e0a83"},
-    {file = "PyGithub-1.58.1.tar.gz", hash = "sha256:7d528b4ad92bc13122129fafd444ce3d04c47d2d801f6446b6e6ee2d410235b3"},
+    {file = "PyGithub-1.58.2-py3-none-any.whl", hash = "sha256:f435884af617c6debaa76cbc355372d1027445a56fbc39972a3b9ed4968badc8"},
+    {file = "PyGithub-1.58.2.tar.gz", hash = "sha256:1e6b1b7afe31f75151fb81f7ab6b984a7188a852bdb123dbb9ae90023c3ce60f"},
 ]
 
 [package.dependencies]
