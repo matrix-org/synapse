@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib.util
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.server import HomeServer
@@ -69,6 +71,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         Test background job that copies entries from column user_id to full_user_id, adding
         the hostname in the process.
         """
+
         updater = self.hs.get_datastores().main.db_pool.updates
 
         # drop the constraint so we can insert nulls in full_user_id to populate the test
@@ -116,6 +119,66 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         expected_values = []
         for i in range(0, 70):
             expected_values.append((f"@hello{i:02}:{self.hs.hostname}",))
+
+        res = self.get_success(
+            self.store.db_pool.execute(
+                "", None, "SELECT full_user_id from profiles ORDER BY full_user_id"
+            )
+        )
+        self.assertEqual(len(res), len(expected_values))
+        self.assertEqual(res, expected_values)
+
+    def test_upgrade_function(self) -> None:
+        # drop the constraint so we can insert nulls in full_user_id to populate the test
+        if isinstance(self.store.database_engine, PostgresEngine):
+
+            def f(txn: LoggingTransaction) -> None:
+                txn.execute(
+                    "ALTER TABLE profiles DROP CONSTRAINT full_user_id_not_null"
+                )
+
+            self.get_success(self.store.db_pool.runInteraction("", f))
+
+        for i in range(0, 10):
+            self.get_success(
+                self.store.db_pool.simple_insert(
+                    "profiles",
+                    {"user_id": f"hello{i:02}"},
+                )
+            )
+
+        # re-add the constraint so that when it's validated it actually exists
+        if isinstance(self.store.database_engine, PostgresEngine):
+
+            def f(txn: LoggingTransaction) -> None:
+                txn.execute(
+                    "ALTER TABLE profiles ADD CONSTRAINT full_user_id_not_null CHECK (full_user_id IS NOT NULL) NOT VALID"
+                )
+
+            self.get_success(self.store.db_pool.runInteraction("", f))
+
+        expected_values = []
+        for i in range(0, 10):
+            expected_values.append((f"@hello{i:02}:{self.hs.hostname}",))
+
+        # get the upgrade function and run it on the db we just prepared
+        module_name = "synapse.storage.v78_0_1_validate_and_update_profiles"
+        absolute_path = "../../synapse/storage/schema/main/delta/78/01_validate_and_update_profiles.py"
+
+        spec = importlib.util.spec_from_file_location(module_name, absolute_path)
+        assert spec is not None
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "",
+                module.run_upgrade,
+                self.store.database_engine,
+                self.hs.config,
+            )
+        )
 
         res = self.get_success(
             self.store.db_pool.execute(
