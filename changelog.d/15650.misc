@@ -1,0 +1,1 @@
+Add support to trace a function which returns an `Awaitable`.
