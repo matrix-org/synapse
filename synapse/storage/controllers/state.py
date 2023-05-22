@@ -16,7 +16,6 @@ from typing import (
     TYPE_CHECKING,
     AbstractSet,
     Any,
-    Awaitable,
     Callable,
     Collection,
     Dict,
