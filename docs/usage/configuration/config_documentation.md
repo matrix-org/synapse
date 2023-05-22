@@ -3981,8 +3981,15 @@ This setting has the following sub-options:
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+* `use_tls`: Whether to use tls connection. Defaults to false.
+* `certificate_file`: Optional path to the certificate file
+* `private_key_file`: Optional path to the private key file
+* `ca_file`: Optional path to the CA certificate file. Use this one or:
+* `ca_path`: Optional path to the folder containing the CA certificate file
 
   _Added in Synapse 1.78.0._
+
+  _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
 
 Example configuration:
 ```yaml
@@ -3992,6 +3999,10 @@ redis:
   port: 6379
   password: <secret_password>
   dbid: <dbid>
+  #use_tls: True
+  #certificate_file: <path_to_the_certificate_file>
+  #private_key_file: <path_to_the_private_key_file>
+  #ca_file: <path_to_the_ca_certificate_file>
 ```
 ---
 ## Individual worker configuration

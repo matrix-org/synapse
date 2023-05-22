@@ -565,9 +565,8 @@ class DatabasePool:
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = set(UNIQUE_INDEX_BACKGROUND_UPDATES.keys())
 
-        # We add the user_directory_search table to the blacklist on SQLite
-        # because the existing search table does not have an index, making it
-        # unsafe to use native upserts.
+        # The user_directory_search table is unsafe to use native upserts
+        # on SQLite because the existing search table does not have an index.
         if isinstance(self.engine, Sqlite3Engine):
             self._unsafe_to_upsert_tables.add("user_directory_search")
 

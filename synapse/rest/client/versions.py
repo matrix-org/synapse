@@ -79,6 +79,7 @@ class VersionsRestServlet(RestServlet):
                     "v1.3",
                     "v1.4",
                     "v1.5",
+                    "v1.6",
                 ],
                 # as per MSC1497:
                 "unstable_features": {
@@ -90,7 +91,7 @@ class VersionsRestServlet(RestServlet):
                     # Implements additional endpoints as described in MSC2432
                     "org.matrix.msc2432": True,
                     # Implements additional endpoints as described in MSC2666
-                    "uk.half-shot.msc2666.mutual_rooms": True,
+                    "uk.half-shot.msc2666.query_mutual_rooms": True,
                     # Whether new rooms will be set to encrypted or not (based on presets).
                     "io.element.e2ee_forced.public": self.e2ee_forced_public,
                     "io.element.e2ee_forced.private": self.e2ee_forced_private,
@@ -125,6 +126,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3912": self.config.experimental.msc3912_enabled,
                     # Adds support for unstable "intentional mentions" behaviour.
                     "org.matrix.msc3952_intentional_mentions": self.config.experimental.msc3952_intentional_mentions,
+                    # Whether recursively provide relations is supported.
+                    "org.matrix.msc3981": self.config.experimental.msc3981_recurse_relations,
                     # Adds support for deleting account data.
                     "org.matrix.msc3391": self.config.experimental.msc3391_enabled,
                 },
