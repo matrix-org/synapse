@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import cast
+from typing import Awaitable, cast
 
 from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactorClock
@@ -276,4 +276,35 @@ class LogContextScopeManagerTestCase(TestCase):
         self.assertEqual(
             [span.operation_name for span in self._reporter.get_spans()],
             ["fixture_async_func"],
+        )
+
+    def test_trace_decorator_awaitable_return(self) -> None:
+        """
+        Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
+        with functions that return an awaitable (e.g. a coroutine)
+        """
+        reactor = MemoryReactorClock()
+
+        with LoggingContext("root context"):
+            # Something we can return without `await` to get a coroutine
+            async def fixture_async_func() -> str:
+                return "foo"
+
+            # The actual kind of function we want to test that returns an awaitable
+            @trace_with_opname("fixture_awaitable_return_func", tracer=self._tracer)
+            @tag_args
+            def fixture_awaitable_return_func() -> Awaitable[str]:
+                return fixture_async_func()
+
+            d1 = defer.ensureDeferred(fixture_awaitable_return_func())
+
+            # let the tasks complete
+            reactor.pump((2,) * 8)
+
+            self.assertEqual(self.successResultOf(d1), "foo")
+
+        # the span should have been reported
+        self.assertEqual(
+            [span.operation_name for span in self._reporter.get_spans()],
+            ["fixture_awaitable_return_func"],
         )

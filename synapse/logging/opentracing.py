@@ -937,14 +937,19 @@ def _custom_sync_async_decorator(
 
                 else:
                     if inspect.isawaitable(result):
-                        logger.error(
-                            "@trace may not have wrapped %s correctly! "
-                            "The function is not async but returned a %s.",
-                            func.__qualname__,
-                            type(result).__name__,
-                        )
 
-                    scope.__exit__(None, None, None)
+                        async def await_coroutine():
+                            try:
+                                return await result
+                            finally:
+                                scope.__exit__(None, None, None)
+
+                        # The original method returned a coroutine, so we create another
+                        # coroutine wrapping it, that calls __exit__.
+                        return await_coroutine()
+                    else:
+                        # Just a simple sync function
+                        scope.__exit__(None, None, None)
 
                 return result
 
