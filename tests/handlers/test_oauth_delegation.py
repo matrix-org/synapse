@@ -30,6 +30,7 @@ from synapse.api.errors import (
     Codes,
     InvalidClientTokenError,
     OAuthInsufficientScopeError,
+    SynapseError,
 )
 from synapse.rest import admin
 from synapse.rest.client import account, devices, keys, login, logout, register
@@ -404,6 +405,40 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             get_awaitable_result(self.auth.is_server_admin(requester)), False
         )
         self.assertEqual(requester.device_id, DEVICE)
+
+    def test_unavailable_introspection_endpoint(self) -> None:
+        """The handler should return an internal server error."""
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"mockAccessToken"]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+
+        # The introspection endpoint is returning an error.
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(code=500, body=b"Internal Server Error")
+        )
+        error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
+        self.assertEqual(error.value.code, 503)
+
+        # The introspection endpoint request fails.
+        self.http_client.request = simple_async_mock(raises=Exception())
+        error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
+        self.assertEqual(error.value.code, 503)
+
+        # The introspection endpoint does not return a JSON object.
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(
+                code=200, payload=["this is an array", "not an object"]
+            )
+        )
+        error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
+        self.assertEqual(error.value.code, 503)
+
+        # The introspection endpoint does not return valid JSON.
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(code=200, body=b"this is not valid JSON")
+        )
+        error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
+        self.assertEqual(error.value.code, 503)
 
     def make_device_keys(self, user_id: str, device_id: str) -> JsonDict:
         # We only generate a master key to simplify the test.

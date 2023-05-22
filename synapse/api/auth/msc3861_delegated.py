@@ -27,9 +27,11 @@ from twisted.web.http_headers import Headers
 from synapse.api.auth.base import BaseAuth
 from synapse.api.errors import (
     AuthError,
+    HttpResponseException,
     InvalidClientTokenError,
     OAuthInsufficientScopeError,
     StoreError,
+    SynapseError,
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
@@ -117,6 +119,21 @@ class MSC3861DelegatedAuth(BaseAuth):
         return metadata
 
     async def _introspect_token(self, token: str) -> IntrospectionToken:
+        """
+        Send a token to the introspection endpoint and returns the introspection response
+
+        Parameters:
+            token: The token to introspect
+
+        Raises:
+            HttpResponseException: If the introspection endpoint returns a non-2xx response
+            ValueError: If the introspection endpoint returns an invalid JSON response
+            JSONDecodeError: If the introspection endpoint returns a non-JSON response
+            Exception: If the HTTP request fails
+
+        Returns:
+            The introspection response
+        """
         metadata = await self._issuer_metadata.get()
         introspection_endpoint = metadata.get("introspection_endpoint")
         raw_headers: Dict[str, str] = {
@@ -136,7 +153,7 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         # Do the actual request
         # We're not using the SimpleHttpClient util methods as we don't want to
-        # check the HTTP status code and we do the body encoding ourself.
+        # check the HTTP status code, and we do the body encoding ourselves.
         response = await self._http_client.request(
             method="POST",
             uri=uri,
@@ -145,10 +162,21 @@ class MSC3861DelegatedAuth(BaseAuth):
         )
 
         resp_body = await make_deferred_yieldable(readBody(response))
-        # TODO: Let's not worry about 5xx errors & co. for now and just try
-        # decoding that as JSON. We should also do some validation of the
-        # response
+
+        if response.code < 200 or response.code >= 300:
+            raise HttpResponseException(
+                response.code,
+                response.phrase.decode("ascii", errors="replace"),
+                resp_body,
+            )
+
         resp = json_decoder.decode(resp_body.decode("utf-8"))
+
+        if not isinstance(resp, dict):
+            raise ValueError(
+                "The introspection endpoint returned an invalid JSON response."
+            )
+
         return IntrospectionToken(**resp)
 
     async def is_server_admin(self, requester: Requester) -> bool:
@@ -196,7 +224,11 @@ class MSC3861DelegatedAuth(BaseAuth):
                 scope=["urn:synapse:admin:*"],
             )
 
-        introspection_result = await self._introspect_token(token)
+        try:
+            introspection_result = await self._introspect_token(token)
+        except Exception:
+            logger.exception("Failed to introspect token")
+            raise SynapseError(503, "Unable to introspect the access token")
 
         logger.info(f"Introspection result: {introspection_result!r}")
 
