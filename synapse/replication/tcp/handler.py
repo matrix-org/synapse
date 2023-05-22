@@ -352,24 +352,33 @@ class ReplicationCommandHandler:
 
         reactor = hs.get_reactor()
         redis_config = hs.config.redis
-        if hs.config.redis.redis_use_tls:
-            ssl_context_factory = ClientContextFactory(hs.config.redis)
-            reactor.connectSSL(
-                redis_config.redis_host,
-                redis_config.redis_port,
+        if redis_config.redis_path is not None:
+            reactor.connectUNIX(
+                redis_config.redis_path,
                 self._factory,
-                ssl_context_factory,
                 timeout=30,
-                bindAddress=None,
+                checkPID=False,
             )
+
         else:
-            reactor.connectTCP(
-                redis_config.redis_host,
-                redis_config.redis_port,
-                self._factory,
-                timeout=30,
-                bindAddress=None,
-            )
+            if hs.config.redis.redis_use_tls:
+                ssl_context_factory = ClientContextFactory(hs.config.redis)
+                reactor.connectSSL(
+                    redis_config.redis_host,
+                    redis_config.redis_port,
+                    self._factory,
+                    ssl_context_factory,
+                    timeout=30,
+                    bindAddress=None,
+                )
+            else:
+                reactor.connectTCP(
+                    redis_config.redis_host,
+                    redis_config.redis_port,
+                    self._factory,
+                    timeout=30,
+                    bindAddress=None,
+                )
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a map from stream name to all streams."""

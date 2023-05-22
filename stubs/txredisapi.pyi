@@ -62,6 +62,9 @@ def lazyConnection(
 class ConnectionHandler(RedisProtocol):
     def disconnect(self) -> "Deferred[None]": ...
 
+class UnixConnectionHandler(ConnectionHandler):
+    def __repr__(self) -> str: ...
+
 class RedisFactory(protocol.ReconnectingClientFactory):
     continueTrying: bool
     handler: ConnectionHandler
