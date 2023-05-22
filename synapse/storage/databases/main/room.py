@@ -541,11 +541,6 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 room_type=room["room_type"],
             )
 
-            # Filter out Nones – rather omit the field altogether
-            for key in list(entry):
-                if entry[key] is None:  # type: ignore[literal-required]
-                    del entry[key]  # type: ignore[misc]
-
             return entry
 
         return [build_room_entry(r) for r in ret_val]

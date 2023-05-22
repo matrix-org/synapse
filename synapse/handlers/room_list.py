@@ -34,6 +34,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.util import filter_none
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -195,11 +196,10 @@ class RoomListHandler:
                 for i in range(len(results)):
                     r = results[i]
                     if (
-                        forwards
-                        and new_room["num_joined_members"] >= r["num_joined_members"]
+                        forwards and new_room.num_joined_members >= r.num_joined_members
                     ) or (
                         not forwards
-                        and new_room["num_joined_members"] <= r["num_joined_members"]
+                        and new_room.num_joined_members <= r.num_joined_members
                     ):
                         results.insert(i, new_room)
                         inserted = True
@@ -232,33 +232,33 @@ class RoomListHandler:
                     # If there was a token given then we assume that there
                     # must be previous results.
                     response["prev_batch"] = RoomListNextBatch(
-                        last_joined_members=initial_entry["num_joined_members"],
-                        last_room_id=initial_entry["room_id"],
+                        last_joined_members=initial_entry.num_joined_members,
+                        last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
                     ).to_token()
 
                 if more_to_come:
                     response["next_batch"] = RoomListNextBatch(
-                        last_joined_members=final_entry["num_joined_members"],
-                        last_room_id=final_entry["room_id"],
+                        last_joined_members=final_entry.num_joined_members,
+                        last_room_id=final_entry.room_id,
                         direction_is_forward=True,
                     ).to_token()
             else:
                 if batch_token is not None:
                     response["next_batch"] = RoomListNextBatch(
-                        last_joined_members=final_entry["num_joined_members"],
-                        last_room_id=final_entry["room_id"],
+                        last_joined_members=final_entry.num_joined_members,
+                        last_room_id=final_entry.room_id,
                         direction_is_forward=True,
                     ).to_token()
 
                 if more_to_come:
                     response["prev_batch"] = RoomListNextBatch(
-                        last_joined_members=initial_entry["num_joined_members"],
-                        last_room_id=initial_entry["room_id"],
+                        last_joined_members=initial_entry.num_joined_members,
+                        last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
                     ).to_token()
 
-        response["chunk"] = results
+        response["chunk"] = [attr.asdict(r, filter=filter_none) for r in results]
 
         response["total_room_count_estimate"] = await self.store.count_public_rooms(
             network_tuple,

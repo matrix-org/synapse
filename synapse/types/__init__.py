@@ -961,17 +961,18 @@ class UserInfo:
     is_shadow_banned: bool
 
 
-class PublicRoom(TypedDict, total=False):
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class PublicRoom:
     room_id: str
-    name: Optional[str]
-    topic: Optional[str]
     num_joined_members: int
-    canonical_alias: Optional[str]
-    avatar_url: Optional[str]
     world_readable: bool
     guest_can_join: bool
-    join_rule: Optional[str]
-    room_type: Optional[str]
+    name: Optional[str] = None
+    topic: Optional[str] = None
+    canonical_alias: Optional[str] = None
+    avatar_url: Optional[str] = None
+    join_rule: Optional[str] = None
+    room_type: Optional[str] = None
 
 
 class UserProfile(TypedDict):
