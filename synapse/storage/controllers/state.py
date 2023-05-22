@@ -175,9 +175,9 @@ class StateStorageController:
 
     @trace
     @tag_args
-    def _get_state_groups_from_groups(
+    async def _get_state_groups_from_groups(
         self, groups: List[int], state_filter: StateFilter
-    ) -> Awaitable[Dict[int, StateMap[str]]]:
+    ) -> Dict[int, StateMap[str]]:
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
@@ -190,7 +190,9 @@ class StateStorageController:
             Dict of state group to state map.
         """
 
-        return self.stores.state._get_state_groups_from_groups(groups, state_filter)
+        return await self.stores.state._get_state_groups_from_groups(
+            groups, state_filter
+        )
 
     @trace
     @tag_args
@@ -349,9 +351,9 @@ class StateStorageController:
 
     @trace
     @tag_args
-    def get_state_for_groups(
+    async def get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
-    ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
+    ) -> Dict[int, MutableStateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -363,7 +365,7 @@ class StateStorageController:
         Returns:
             Dict of state group to state map.
         """
-        return self.stores.state._get_state_for_groups(
+        return await self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
 
