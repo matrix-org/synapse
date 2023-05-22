@@ -1455,8 +1455,8 @@ class PersistEventsStore:
                     },
                 )
 
-                sql = "UPDATE events SET outlier = ? WHERE event_id = ?"
-                txn.execute(sql, (False, event.event_id))
+                sql = "UPDATE events SET outlier = False WHERE event_id = ?"
+                txn.execute(sql, (event.event_id))
 
                 # Update the event_backward_extremities table now that this
                 # event isn't an outlier any more.
