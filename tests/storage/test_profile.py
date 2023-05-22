@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib.util
-
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.server import HomeServer
@@ -73,7 +72,6 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         """
 
         updater = self.hs.get_datastores().main.db_pool.updates
-
         # drop the constraint so we can insert nulls in full_user_id to populate the test
         if isinstance(self.store.database_engine, PostgresEngine):
 
