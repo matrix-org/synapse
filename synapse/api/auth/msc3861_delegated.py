@@ -44,6 +44,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Scope as defined by MSC2967
+# https://github.com/matrix-org/matrix-spec-proposals/pull/2967
+SCOPE_MATRIX_API = "urn:matrix:org.matrix.msc2967.client:api:*"
+SCOPE_MATRIX_GUEST = "urn:matrix:org.matrix.msc2967.client:api:guest"
+SCOPE_MATRIX_DEVICE_PREFIX = "urn:matrix:org.matrix.msc2967.client:device:"
+
+# Scope which allows access to the Synapse admin API
+SCOPE_SYNAPSE_ADMIN = "urn:synapse:admin:*"
+
 
 def scope_to_list(scope: str) -> List[str]:
     """Convert a scope string to a list of scope tokens"""
@@ -197,9 +206,7 @@ class MSC3861DelegatedAuth(BaseAuth):
             requester = await self.get_user_by_access_token(access_token, allow_expired)
 
         if not allow_guest and requester.is_guest:
-            raise OAuthInsufficientScopeError(
-                ["urn:matrix:org.matrix.msc2967.client:api:*"]
-            )
+            raise OAuthInsufficientScopeError([SCOPE_MATRIX_API])
 
         request.requester = requester
 
@@ -241,9 +248,9 @@ class MSC3861DelegatedAuth(BaseAuth):
         scope: List[str] = scope_to_list(introspection_result.get("scope", ""))
 
         # Determine type of user based on presence of particular scopes
-        has_admin_scope = "urn:synapse:admin:*" in scope
-        has_user_scope = "urn:matrix:org.matrix.msc2967.client:api:*" in scope
-        has_guest_scope = "urn:matrix:org.matrix.msc2967.client:api:guest" in scope
+        has_admin_scope = SCOPE_SYNAPSE_ADMIN in scope
+        has_user_scope = SCOPE_MATRIX_API in scope
+        has_guest_scope = SCOPE_MATRIX_GUEST in scope
         is_user = has_user_scope or has_admin_scope
         is_guest = has_guest_scope and not is_user
 
@@ -299,10 +306,8 @@ class MSC3861DelegatedAuth(BaseAuth):
         # Find device_id in scope
         device_id = None
         for tok in scope:
-            if tok.startswith("urn:matrix:org.matrix.msc2967.client:device:"):
-                parts = tok.split(":")
-                if len(parts) == 5:
-                    device_id = parts[4]
+            if tok.startswith(SCOPE_MATRIX_DEVICE_PREFIX):
+                device_id = tok[len(SCOPE_MATRIX_DEVICE_PREFIX) :]
 
         if device_id:
             # Create the device on the fly if it does not exist
