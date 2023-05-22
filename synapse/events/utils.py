@@ -400,20 +400,22 @@ def serialize_event(
     # requesting the event.
     txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
     if txn_id is not None and config.requester is not None:
-        # For the MSC3970 rules to be applied, we *need* to have the device ID in the
-        # event internal metadata. Since we were not recording them before, if it hasn't
-        # been recorded, we fallback to the old behaviour.
+        # Old events do not have the device ID stored in the internal metadata,
+        # if it hasn't been recorded, fallback to using the access token instead.
         event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
         if event_device_id is not None:
             if event_device_id == config.requester.device_id:
                 d["unsigned"]["transaction_id"] = txn_id
 
         else:
-            # The pre-MSC3970 behaviour is to only include the transaction ID if the
-            # event was sent from the same access token. For regular users, we can use
-            # the access token ID to determine this. For guests, we can't, but since
-            # each guest only has one access token, we can just check that the event was
-            # sent by the same user as the one requesting the event.
+            # Fallback behaviour: only include the transaction ID if the event
+            # was sent from the same access token.
+            #
+            # For regular users, the access token ID can be used to determine this.
+            #
+            # For guests, we can't check the access token ID, but since each guest
+            # only has one access token, just check the event was sent by the same
+            # user as the one requesting the event.
             event_token_id: Optional[int] = getattr(
                 e.internal_metadata, "token_id", None
             )
