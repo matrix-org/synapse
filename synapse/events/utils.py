@@ -290,7 +290,9 @@ def _split_field(field: str) -> List[str]:
 
         # Add a new part (up to the dot, exclusive) after escaping.
         result.append(
-            ESCAPE_SEQUENCE_PATTERN.sub(_escape_slash, field[prev_start: match.end() - 1])
+            ESCAPE_SEQUENCE_PATTERN.sub(
+                _escape_slash, field[prev_start : match.end() - 1]
+            )
         )
         prev_start = match.end()
 
