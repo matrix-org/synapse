@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib.util
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.server import HomeServer
