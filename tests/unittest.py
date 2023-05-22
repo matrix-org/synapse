@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
 import gc
 import hashlib
 import hmac
@@ -150,7 +151,11 @@ def deepcopy_config(config: _TConfig) -> _TConfig:
     return new_config
 
 
-_make_homeserver_config_obj_cache: Dict[str, Union[RootConfig, Config]] = {}
+@functools.lru_cache(maxsize=8)
+def _parse_config_dict(config: str) -> RootConfig:
+    config_obj = HomeServerConfig()
+    config_obj.parse_config_dict(json.loads(config), "", "")
+    return config_obj
 
 
 def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
@@ -164,21 +169,7 @@ def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
     but it keeps a cache of `HomeServerConfig` instances and deepcopies them as needed,
     to avoid validating the whole configuration every time.
     """
-    cache_key = json.dumps(config)
-
-    if cache_key in _make_homeserver_config_obj_cache:
-        # Cache hit: reuse the existing instance
-        config_obj = _make_homeserver_config_obj_cache[cache_key]
-    else:
-        # Cache miss; create the actual instance
-        config_obj = HomeServerConfig()
-        config_obj.parse_config_dict(config, "", "")
-
-        # Add to the cache
-        _make_homeserver_config_obj_cache[cache_key] = config_obj
-
-    assert isinstance(config_obj, RootConfig)
-
+    config_obj = _parse_config_dict(json.dumps(config, sort_keys=True))
     return deepcopy_config(config_obj)
 
 
