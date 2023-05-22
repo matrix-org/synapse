@@ -58,9 +58,8 @@ class TransportLayerClient:
     """Sends federation HTTP requests to other servers"""
 
     def __init__(self, hs: "HomeServer"):
-        self.server_name = hs.hostname
         self.client = hs.get_federation_http_client()
-        self._faster_joins_enabled = hs.config.experimental.faster_joins_enabled
+        self._is_mine_server_name = hs.is_mine_server_name
 
     async def get_room_state_ids(
         self, destination: str, room_id: str, event_id: str
@@ -235,7 +234,7 @@ class TransportLayerClient:
             transaction.transaction_id,
         )
 
-        if transaction.destination == self.server_name:
+        if self._is_mine_server_name(transaction.destination):
             raise RuntimeError("Transport layer cannot send to itself!")
 
         # FIXME: This is only used by the tests. The actual json sent is
@@ -363,12 +362,8 @@ class TransportLayerClient:
     ) -> "SendJoinResponse":
         path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
         query_params: Dict[str, str] = {}
-        if self._faster_joins_enabled:
-            # lazy-load state on join
-            query_params["org.matrix.msc3706.partial_state"] = (
-                "true" if omit_members else "false"
-            )
-            query_params["omit_members"] = "true" if omit_members else "false"
+        # lazy-load state on join
+        query_params["omit_members"] = "true" if omit_members else "false"
 
         return await self.client.put_json(
             destination=destination,
@@ -902,9 +897,7 @@ def _members_omitted_parser(response: SendJoinResponse) -> Generator[None, Any, 
     while True:
         val = yield
         if not isinstance(val, bool):
-            raise TypeError(
-                "members_omitted (formerly org.matrix.msc370c.partial_state) must be a boolean"
-            )
+            raise TypeError("members_omitted must be a boolean")
         response.members_omitted = val
 
 
@@ -967,23 +960,7 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
             self._coros.append(
                 ijson.items_coro(
                     _members_omitted_parser(self._response),
-                    "org.matrix.msc3706.partial_state",
-                    use_float="True",
-                )
-            )
-            # The stable field name comes last, so it "wins" if the fields disagree
-            self._coros.append(
-                ijson.items_coro(
-                    _members_omitted_parser(self._response),
                     "members_omitted",
-                    use_float="True",
-                )
-            )
-
-            self._coros.append(
-                ijson.items_coro(
-                    _servers_in_room_parser(self._response),
-                    "org.matrix.msc3706.servers_in_room",
                     use_float="True",
                 )
             )

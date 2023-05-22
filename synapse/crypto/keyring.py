@@ -173,7 +173,7 @@ class Keyring:
             process_batch_callback=self._inner_fetch_key_requests,
         )
 
-        self._hostname = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
 
         # build a FetchKeyResult for each of our own keys, to shortcircuit the
         # fetcher.
@@ -277,7 +277,7 @@ class Keyring:
 
         # If we are the originating server, short-circuit the key-fetch for any keys
         # we already have
-        if verify_request.server_name == self._hostname:
+        if self._is_mine_server_name(verify_request.server_name):
             for key_id in verify_request.key_ids:
                 if key_id in self._local_verify_keys:
                     found_keys[key_id] = self._local_verify_keys[key_id]

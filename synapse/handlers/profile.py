@@ -59,9 +59,9 @@ class ProfileHandler:
         self.max_avatar_size = hs.config.server.max_avatar_size
         self.allowed_avatar_mimetypes = hs.config.server.allowed_avatar_mimetypes
 
-        self.server_name = hs.config.server.server_name
+        self._is_mine_server_name = hs.is_mine_server_name
 
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
     async def get_profile(self, user_id: str, ignore_backoff: bool = True) -> JsonDict:
         target_user = UserID.from_string(user_id)
@@ -170,8 +170,8 @@ class ProfileHandler:
             displayname_to_set = None
 
         # If the admin changes the display name of a user, the requesting user cannot send
-        # the join event to update the displayname in the rooms.
-        # This must be done by the target user himself.
+        # the join event to update the display name in the rooms.
+        # This must be done by the target user themselves.
         if by_admin:
             requester = create_requester(
                 target_user,
@@ -309,7 +309,7 @@ class ProfileHandler:
         else:
             server_name = host
 
-        if server_name == self.server_name:
+        if self._is_mine_server_name(server_name):
             media_info = await self.store.get_local_media(media_id)
         else:
             media_info = await self.store.get_cached_remote_media(server_name, media_id)

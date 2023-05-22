@@ -25,6 +25,7 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
+from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict, UserID
 from synapse.util.caches.descriptors import cached
 
@@ -40,6 +41,8 @@ class FilteringWorkerStore(SQLBaseStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
+        self.server_name: str = hs.hostname
+        self.database_engine = database.engine
         self.db_pool.updates.register_background_index_update(
             "full_users_filters_unique_idx",
             index_name="full_users_unique_idx",
@@ -47,6 +50,98 @@ class FilteringWorkerStore(SQLBaseStore):
             columns=["full_user_id, filter_id"],
             unique=True,
         )
+
+        self.db_pool.updates.register_background_update_handler(
+            "populate_full_user_id_user_filters",
+            self.populate_full_user_id_user_filters,
+        )
+
+    async def populate_full_user_id_user_filters(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """
+        Background update to populate the column `full_user_id` of the table
+        user_filters from entries in the column `user_local_part` of the same table
+        """
+
+        lower_bound_id = progress.get("lower_bound_id", "")
+
+        def _get_last_id(txn: LoggingTransaction) -> Optional[str]:
+            sql = """
+                    SELECT user_id FROM user_filters
+                    WHERE user_id > ?
+                    ORDER BY user_id
+                    LIMIT 1 OFFSET 50
+                  """
+            txn.execute(sql, (lower_bound_id,))
+            res = txn.fetchone()
+            if res:
+                upper_bound_id = res[0]
+                return upper_bound_id
+            else:
+                return None
+
+        def _process_batch(
+            txn: LoggingTransaction, lower_bound_id: str, upper_bound_id: str
+        ) -> None:
+            sql = """
+                    UPDATE user_filters
+                    SET full_user_id = '@' || user_id || ?
+                    WHERE ? < user_id AND user_id <= ? AND full_user_id IS NULL
+                   """
+            txn.execute(sql, (f":{self.server_name}", lower_bound_id, upper_bound_id))
+
+        def _final_batch(txn: LoggingTransaction, lower_bound_id: str) -> None:
+            sql = """
+                    UPDATE user_filters
+                    SET full_user_id = '@' || user_id || ?
+                    WHERE ? < user_id AND full_user_id IS NULL
+                   """
+            txn.execute(
+                sql,
+                (
+                    f":{self.server_name}",
+                    lower_bound_id,
+                ),
+            )
+
+            if isinstance(self.database_engine, PostgresEngine):
+                sql = """
+                        ALTER TABLE user_filters VALIDATE CONSTRAINT full_user_id_not_null
+                      """
+                txn.execute(sql)
+
+        upper_bound_id = await self.db_pool.runInteraction(
+            "populate_full_user_id_user_filters", _get_last_id
+        )
+
+        if upper_bound_id is None:
+            await self.db_pool.runInteraction(
+                "populate_full_user_id_user_filters", _final_batch, lower_bound_id
+            )
+
+            await self.db_pool.updates._end_background_update(
+                "populate_full_user_id_user_filters"
+            )
+            return 1
+
+        await self.db_pool.runInteraction(
+            "populate_full_user_id_user_filters",
+            _process_batch,
+            lower_bound_id,
+            upper_bound_id,
+        )
+
+        progress["lower_bound_id"] = upper_bound_id
+
+        await self.db_pool.runInteraction(
+            "populate_full_user_id_user_filters",
+            self.db_pool.updates._background_update_progress_txn,
+            "populate_full_user_id_user_filters",
+            progress,
+        )
+
+        return 50
 
     @cached(num_args=2)
     async def get_user_filter(
