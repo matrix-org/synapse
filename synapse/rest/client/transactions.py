@@ -76,11 +76,20 @@ class HttpTransactionCache:
         elif requester.app_service is not None:
             return (path, "appservice", requester.app_service.id)
 
-        # With MSC3970, we use the user ID and device ID as the transaction key
-        else:
+        # We use the user ID and device ID as the transaction key.
+        elif requester.device_id:
             assert requester.user, "Requester must have a user"
             assert requester.device_id, "Requester must have a device_id"
             return (path, "user", requester.user, requester.device_id)
+
+        # Some requsters don't have device IDs, these are mostly handled above
+        # (appservice and guest users), but does not cover access tokens minted
+        # by the admin API. Use the access token ID instead.
+        else:
+            assert (
+                requester.access_token_id is not None
+            ), "Requester must have an access_token_id"
+            return (path, "user_admin", requester.access_token_id)
 
     def fetch_or_execute_request(
         self,
