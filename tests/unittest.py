@@ -227,13 +227,80 @@ class TestCase(unittest.TestCase):
 
         @around(self)
         def tearDown(orig: Callable[[], R]) -> R:
+            import sys
+            import time
+            import tracemalloc
+
             ret = orig()
             gc.collect(0)
             # Run a full GC every 50 gen-0 GCs.
             gen0_stats = gc.get_stats()[0]
             gen0_collections = gen0_stats["collections"]
             if gen0_collections % 50 == 0:
+                if not getattr(tracemalloc, "aaa", None):
+                    tracemalloc.aaa = True
+                    tracemalloc.start()
+                    tracemalloc.s0 = tracemalloc.take_snapshot()
+                t0 = time.time()
                 gc.collect()
+                dt = time.time() - t0
+                s1 = tracemalloc.take_snapshot()
+                for line in s1.statistics("lineno")[:20]:
+                    sys.stdout.write(f"    {line}\n")
+                sys.stdout.write(f"full collection took {dt} s\n")
+                dt = time.time() - t0
+                sys.stdout.write(f"snapshot took {dt} s\n")
+                if dt > 1.5:
+
+                    def dump_paths(o: object, max_distance: int) -> None:
+                        import pdb
+                        from collections import deque
+
+                        queue: deque[object] = deque()
+                        seen: set[int] = set()
+                        prevs: Dict[int, object] = {}
+                        roots: List[object] = []
+                        distances: Dict[int, int] = {}
+                        whitelist = {id(queue), id(seen), id(prevs), id(roots)}
+                        i = 0
+                        seen.add(id(o))
+                        queue.append(o)
+                        distances[id(o)] = 0
+                        while len(queue) > 0:
+                            o = queue.popleft()
+                            has_referrers = False
+                            if (
+                                not isinstance(o, pdb.Pdb)
+                                and distances[id(o)] < max_distance
+                            ):
+                                referrers = gc.get_referrers(o)
+                                for referrer in referrers:
+                                    if id(referrer) in whitelist:
+                                        continue
+                                    has_referrers = True
+                                    if id(referrer) in seen:
+                                        continue
+                                    prevs[id(referrer)] = o
+                                    distances[id(referrer)] = distances[id(o)] + 1
+                                    seen.add(id(referrer))
+                                    queue.append(referrer)
+
+                            if not has_referrers:
+                                roots.append(o)
+
+                            i += 1
+                        print(f"{len(roots)} roots")
+                        for root in roots:
+                            o = root
+                            while o is not None:
+                                print(str(o)[:200])
+                                o = prevs.get(id(o))
+                            print("")
+                        print(f"{len(roots)} roots")
+
+                    import pdb
+
+                    pdb.set_trace()
             gc.enable()
             set_current_context(SENTINEL_CONTEXT)
 
