@@ -27,6 +27,7 @@ from signedjson.sign import sign_json
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import (
+    AuthError,
     Codes,
     InvalidClientTokenError,
     OAuthInsufficientScopeError,
@@ -68,8 +69,9 @@ INTROSPECTION_ENDPOINT = ISSUER + "introspect"
 SYNAPSE_ADMIN_SCOPE = "urn:synapse:admin:*"
 MATRIX_USER_SCOPE = "urn:matrix:org.matrix.msc2967.client:api:*"
 MATRIX_GUEST_SCOPE = "urn:matrix:org.matrix.msc2967.client:api:guest"
+MATRIX_DEVICE_SCOPE_PREFIX = "urn:matrix:org.matrix.msc2967.client:device:"
 DEVICE = "AABBCCDD"
-MATRIX_DEVICE_SCOPE = "urn:matrix:org.matrix.msc2967.client:device:" + DEVICE
+MATRIX_DEVICE_SCOPE = MATRIX_DEVICE_SCOPE_PREFIX + DEVICE
 SUBJECT = "abc-def-ghi"
 USERNAME = "test-user"
 USER_ID = "@" + USERNAME + ":" + SERVER_NAME
@@ -343,6 +345,31 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             get_awaitable_result(self.auth.is_server_admin(requester)), False
         )
         self.assertEqual(requester.device_id, DEVICE)
+
+    def test_multiple_devices(self) -> None:
+        """The handler should raise an error if multiple devices are found in the scope."""
+
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(
+                code=200,
+                payload={
+                    "active": True,
+                    "sub": SUBJECT,
+                    "scope": " ".join(
+                        [
+                            MATRIX_USER_SCOPE,
+                            f"{MATRIX_DEVICE_SCOPE_PREFIX}AABBCC",
+                            f"{MATRIX_DEVICE_SCOPE_PREFIX}DDEEFF",
+                        ]
+                    ),
+                    "username": USERNAME,
+                },
+            )
+        )
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"mockAccessToken"]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        self.get_failure(self.auth.get_user_by_req(request), AuthError)
 
     def test_active_guest_not_allowed(self) -> None:
         """The handler should return an insufficient scope error."""

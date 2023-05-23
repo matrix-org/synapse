@@ -303,13 +303,31 @@ class MSC3861DelegatedAuth(BaseAuth):
         else:
             user_id = UserID.from_string(user_id_str)
 
-        # Find device_id in scope
-        device_id = None
-        for tok in scope:
-            if tok.startswith(SCOPE_MATRIX_DEVICE_PREFIX):
-                device_id = tok[len(SCOPE_MATRIX_DEVICE_PREFIX) :]
+        # Find device_ids in scope
+        # We only allow a single device_id in the scope, so we find them all in the
+        # scope list, and raise if there are more than one. The OIDC server should be
+        # the one enforcing valid scopes, so we raise a 500 if we find an invalid scope.
+        device_ids = [
+            tok[len(SCOPE_MATRIX_DEVICE_PREFIX) :]
+            for tok in scope
+            if tok.startswith(SCOPE_MATRIX_DEVICE_PREFIX)
+        ]
 
-        if device_id:
+        if len(device_ids) > 1:
+            raise AuthError(
+                500,
+                "Multiple device IDs in scope",
+            )
+
+        device_id = device_ids[0] if device_ids else None
+        if device_id is not None:
+            # Sanity check the device_id
+            if len(device_id) > 255 or len(device_id) < 1:
+                raise AuthError(
+                    500,
+                    "Invalid device ID in scope",
+                )
+
             # Create the device on the fly if it does not exist
             try:
                 await self.store.get_device(
