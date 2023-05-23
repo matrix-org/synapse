@@ -25,7 +25,6 @@ from mypy.typeops import bind_self
 from mypy.types import CallableType, Instance, NoneType, UnionType
 
 
-
 class SynapsePlugin(Plugin):
     def get_method_signature_hook(
         self, fullname: str
