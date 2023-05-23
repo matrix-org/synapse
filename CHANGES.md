@@ -4,7 +4,7 @@ Synapse 1.84.0 (2023-05-23)
 Bugfixes
 --------
 
-- Print full error and stack-trace of any exception that occurs during startup/initialization. ([\#15599](https://github.com/matrix-org/synapse/issues/15599))
+- Fix a bug introduced in Synapse 1.84.0rc1 where errors during startup were not reported correctly on Python < 3.10. ([\#15599](https://github.com/matrix-org/synapse/issues/15599))
 
 
 Synapse 1.84.0rc1 (2023-05-16)
