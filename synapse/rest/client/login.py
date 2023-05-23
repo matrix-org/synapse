@@ -355,7 +355,7 @@ class LoginRestServlet(RestServlet):
                 deactivation status before logging in.
 
                 This exists purely for appservice's configured sender_localpart
-                which deosn't have an associated user in the database.
+                which doesn't have an associated user in the database.
 
         Returns:
             Dictionary of account information after successful login.
