@@ -148,11 +148,15 @@
 
                         <h1 id="experimental-features-api"><a class="header" href="#experimental-features-api">Experimental Features API</a></h1>
 <p>This API allows a server administrator to enable or disable some experimental features on a per-user
-basis. Currently supported features are <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3026">msc3026</a>: busy 
-presence state enabled, <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/2654">msc2654</a>: enable unread counts,
-<a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3881">msc3881</a>: enable remotely toggling push notifications 
-for another client, and <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3967">msc3967</a>: do not require
-UIA when first uploading cross-signing keys. </p>
+basis. The currently supported features are: </p>
+<ul>
+<li><a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3026">MSC3026</a>: busy 
+presence state enabled</li>
+<li><a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3881">MSC3881</a>: enable remotely toggling push notifications 
+for another client </li>
+<li><a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3967">MSC3967</a>: do not require
+UIA when first uploading cross-signing keys. </li>
+</ul>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
 for a server admin: see <a href="../usage/administration/admin_api/">Admin API</a>.</p>
 <h2 id="enablingdisabling-features"><a class="header" href="#enablingdisabling-features">Enabling/Disabling Features</a></h2>
@@ -161,7 +165,7 @@ provide a body containing the user id and listing the features to enable/disable
 <pre><code class="language-json">{
    &quot;features&quot;: {
       &quot;msc3026&quot;:true,
-      &quot;msc2654&quot;:true
+      &quot;msc3881&quot;:true
    }
 }
 </code></pre>
@@ -178,7 +182,6 @@ user like so:</p>
 <pre><code class="language-json">{
    &quot;features&quot;: {
       &quot;msc3026&quot;: true,
-      &quot;msc2654&quot;: true,
       &quot;msc3881&quot;: false,
       &quot;msc3967&quot;: false
    }

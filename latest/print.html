@@ -1779,6 +1779,79 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1840"><a class="header" href="#upgrading-to-v1840">Upgrading to v1.84.0</a></h1>
+<h2 id="deprecation-of-worker_replication_-configuration-settings"><a class="header" href="#deprecation-of-worker_replication_-configuration-settings">Deprecation of <code>worker_replication_*</code> configuration settings</a></h2>
+<p>When using workers,</p>
+<ul>
+<li><code>worker_replication_host</code></li>
+<li><code>worker_replication_http_port</code></li>
+<li><code>worker_replication_http_tls</code></li>
+</ul>
+<p>should now be removed from individual worker YAML configurations and the main process should instead be added to the <code>instance_map</code>
+in the shared YAML configuration, using the name <code>main</code>.</p>
+<p>The old <code>worker_replication_*</code> settings are now considered deprecated and are expected to be removed in Synapse v1.88.0.</p>
+<h3 id="example-change"><a class="header" href="#example-change">Example change</a></h3>
+<h4 id="before"><a class="header" href="#before">Before:</a></h4>
+<p>Shared YAML</p>
+<pre><code class="language-yaml">instance_map:
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+</code></pre>
+<p>Worker YAML</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_replication_host: localhost
+worker_replication_http_port: 3456
+worker_replication_http_tls: false
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+</code></pre>
+<h4 id="after"><a class="header" href="#after">After:</a></h4>
+<p>Shared YAML</p>
+<pre><code class="language-yaml">instance_map:
+  main:
+    host: localhost
+    port: 3456
+    tls: false
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+</code></pre>
+<p>Worker YAML</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+
+</code></pre>
+<p>Notes: </p>
+<ul>
+<li><code>tls</code> is optional but mirrors the functionality of <code>worker_replication_http_tls</code></li>
+</ul>
 <h1 id="upgrading-to-v1810"><a class="header" href="#upgrading-to-v1810">Upgrading to v1.81.0</a></h1>
 <h2 id="application-service-path--authentication-deprecations"><a class="header" href="#application-service-path--authentication-deprecations">Application service path &amp; authentication deprecations</a></h2>
 <p>Synapse now attempts the versioned appservice paths before falling back to the
@@ -5086,6 +5159,24 @@ See <a href="usage/configuration/../../reverse_proxy.html">here</a> for more on 
 <pre><code class="language-yaml">max_image_pixels: 35M
 </code></pre>
 <hr />
+<h3 id="prevent_media_downloads_from"><a class="header" href="#prevent_media_downloads_from"><code>prevent_media_downloads_from</code></a></h3>
+<p>A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.</p>
+<p>This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.</p>
+<p>This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see <a href="usage/configuration/config_documentation.html#url_preview_url_blacklist"><code>url_preview_url_blacklist</code></a>.</p>
+<p>Defaults to an empty list (nothing blocked).</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">prevent_media_downloads_from:
+  - evil.example.org
+  - evil2.example.org
+</code></pre>
+<hr />
 <h3 id="dynamic_thumbnails"><a class="header" href="#dynamic_thumbnails"><code>dynamic_thumbnails</code></a></h3>
 <p>Whether to generate new thumbnails on the fly to precisely match
 the resolution requested by the client. If true then whenever
@@ -6515,12 +6606,16 @@ This number can either be calculated as the number of unread messages  for the u
 user has unread messages in. Defaults to true, meaning push clients will see the number of
 rooms with unread messages in them. Set to false to instead send the number
 of unread messages.</li>
+<li><code>jitter_delay</code>: Delays push notifications by a random amount up to the given
+duration. Useful for mitigating timing attacks. Optional, defaults to no
+delay. <em>Added in Synapse 1.84.0.</em></li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">push:
   enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: &quot;10s&quot;
 </code></pre>
 <hr />
 <h2 id="rooms"><a class="header" href="#rooms">Rooms</a></h2>
@@ -6744,6 +6839,13 @@ except <code>com.example.foo</code>.</p>
    public_chat: null
 </code></pre>
 <hr />
+<h3 id="forget_rooms_on_leave"><a class="header" href="#forget_rooms_on_leave"><code>forget_rooms_on_leave</code></a></h3>
+<p>Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">forget_rooms_on_leave: false
+</code></pre>
+<hr />
 <h2 id="opentracing"><a class="header" href="#opentracing">Opentracing</a></h2>
 <p>Configuration options related to Opentracing support.</p>
 <hr />
@@ -6865,13 +6967,17 @@ events may be dropped).</p>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
 <p>When using workers this should be a map from <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a> to the
-HTTP replication listener of the worker, if configured.
+HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under <a href="usage/configuration/../../workers.html#stream-writers"><code>stream_writers</code></a> needs
 a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the <code>instance_map</code>.)</p>
+The main process also needs an entry on the <code>instance_map</code>, and it should be listed under
+<code>main</code> <strong>if even one other worker exists</strong>. Ensure the port matches with what is declared 
+inside the <code>listener</code> block for a <code>replication</code> listener.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
@@ -6940,7 +7046,23 @@ localhost and 6379</p>
 </li>
 <li>
 <p><code>dbid</code>: Optional redis dbid if needs to connect to specific redis logical db.</p>
+</li>
+<li>
+<p><code>use_tls</code>: Whether to use tls connection. Defaults to false.</p>
+</li>
+<li>
+<p><code>certificate_file</code>: Optional path to the certificate file</p>
+</li>
+<li>
+<p><code>private_key_file</code>: Optional path to the private key file</p>
+</li>
+<li>
+<p><code>ca_file</code>: Optional path to the CA certificate file. Use this one or:</p>
+</li>
+<li>
+<p><code>ca_path</code>: Optional path to the folder containing the CA certificate file</p>
 <p><em>Added in Synapse 1.78.0.</em></p>
+<p><em>Changed in Synapse 1.84.0: Added use_tls, certificate_file, private_key_file, ca_file and ca_path attributes</em></p>
 </li>
 </ul>
 <p>Example configuration:</p>
@@ -6950,6 +7072,10 @@ localhost and 6379</p>
   port: 6379
   password: &lt;secret_password&gt;
   dbid: &lt;dbid&gt;
+  #use_tls: True
+  #certificate_file: &lt;path_to_the_certificate_file&gt;
+  #private_key_file: &lt;path_to_the_private_key_file&gt;
+  #ca_file: &lt;path_to_the_ca_certificate_file&gt;
 </code></pre>
 <hr />
 <h2 id="individual-worker-configuration"><a class="header" href="#individual-worker-configuration">Individual worker configuration</a></h2>
@@ -6977,6 +7103,7 @@ giving each worker a unique <code>worker_name</code>.</p>
 </code></pre>
 <hr />
 <h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>host</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
@@ -6985,6 +7112,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>port</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a <code>replication</code> resource in
 <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
@@ -6993,6 +7121,7 @@ The main Synapse process defines this with a <code>replication</code> resource i
 </code></pre>
 <hr />
 <h3 id="worker_replication_http_tls"><a class="header" href="#worker_replication_http_tls"><code>worker_replication_http_tls</code></a></h3>
+<p><em>Deprecated as of version 1.84.0. Place <code>tls</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
 <p>Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
 The main Synapse process defines this with the <code>tls</code> option on its <a href="usage/configuration/config_documentation.html#listeners">listener</a> that
@@ -7010,9 +7139,9 @@ See <a href="usage/configuration/config_documentation.html#worker_replication_se
 <p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option
 must be declared, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>
 in the shared config.</p>
-<p>Workers declared in <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a> will need to include a
-<code>replication</code> listener here, in order to accept internal HTTP requests from
-other workers.</p>
+<p>Workers declared in <a href="usage/configuration/config_documentation.html#stream_writers"><code>stream_writers</code></a> and <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a>
+will need to include a <code>replication</code> listener here, in order to accept internal HTTP 
+requests from other workers.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">worker_listeners:
   - type: http
@@ -8108,7 +8237,7 @@ This can be optionally enabled by setting <code>backchannel_logout_enabled</code
 <p>You should receive a response similar to the following. Make sure to save it.</p>
 <pre><code class="language-json">{&quot;client_id&quot;:&quot;someclientid_123&quot;,&quot;client_secret&quot;:&quot;someclientsecret_123&quot;,&quot;id&quot;:&quot;12345&quot;,&quot;name&quot;:&quot;my_synapse_app&quot;,&quot;redirect_uri&quot;:&quot;https://[synapse_public_baseurl]/_synapse/client/oidc/callback&quot;,&quot;website&quot;:null,&quot;vapid_key&quot;:&quot;somerandomvapidkey_123&quot;}
 </code></pre>
-<p>As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set. Your Synapse configuration should include the following:</p>
+<p>As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a <code>sub</code> property, an alternative <code>subject_template</code> has to be set. Your Synapse configuration should include the following:</p>
 <pre><code class="language-yaml">oidc_providers:
   - idp_id: my_mastodon
     idp_name: &quot;Mastodon Instance Example&quot;
@@ -8122,7 +8251,9 @@ This can be optionally enabled by setting <code>backchannel_logout_enabled</code
     scopes: [&quot;read&quot;]
     user_mapping_provider:
       config:
-        subject_claim: &quot;id&quot;
+        subject_template: &quot;{{ user.id }}&quot;
+        localpart_template: &quot;{{ user.username }}&quot;
+        display_name_template: &quot;{{ user.display_name }}&quot;
 </code></pre>
 <p>Note that the fields <code>client_id</code> and <code>client_secret</code> are taken from the CURL response above.</p>
 <h3 id="shibboleth-with-oidc-plugin"><a class="header" href="#shibboleth-with-oidc-plugin">Shibboleth with OIDC Plugin</a></h3>
@@ -10624,13 +10755,21 @@ the processes.</p>
 need its own configuration file and can take all of its configuration from the
 shared configuration file.</p>
 <h3 id="shared-configuration"><a class="header" href="#shared-configuration">Shared configuration</a></h3>
-<p>Normally, only a couple of changes are needed to make an existing configuration
-file suitable for use with workers. First, you need to enable an
+<p>Normally, only a few changes are needed to make an existing configuration
+file suitable for use with workers:</p>
+<ul>
+<li>First, you need to enable an
 <a href="usage/configuration/config_documentation.html#listeners">&quot;HTTP replication listener&quot;</a>
-for the main process; and secondly, you need to enable
-<a href="usage/configuration/config_documentation.html#redis">redis-based replication</a>.
-Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
-can be used to authenticate HTTP traffic between workers. For example:</p>
+for the main process</li>
+<li>Secondly, you need to enable
+<a href="usage/configuration/config_documentation.html#redis">redis-based replication</a></li>
+<li>You will need to add an <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> 
+with the <code>main</code> process defined, as well as the relevant connection information from 
+it's HTTP <code>replication</code> listener (defined in step 1 above). Note that the <code>host</code> defined 
+is the address the worker needs to look for the <code>main</code> process at, not necessarily the same address that is bound to.</li>
+<li>Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
+can be used to authenticate HTTP traffic between workers. For example:</li>
+</ul>
 <pre><code class="language-yaml"># extend the existing `listeners` section. This defines the ports that the
 # main process will listen on.
 listeners:
@@ -10646,6 +10785,11 @@ worker_replication_secret: &quot;&quot;
 
 redis:
     enabled: true
+
+instance_map:
+    main:
+        host: 'localhost'
+        port: 9093
 </code></pre>
 <p>See the <a href="usage/configuration/config_documentation.html">configuration manual</a>
 for the full documentation of each option.</p>
@@ -10662,21 +10806,17 @@ is configured</li>
 <li>The type of worker (<a href="usage/configuration/config_documentation.html#worker_app"><code>worker_app</code></a>).
 The currently available worker applications are listed <a href="workers.html#available-worker-applications">below</a>.</li>
 <li>A unique name for the worker (<a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>).</li>
-<li>The HTTP replication endpoint that it should talk to on the main synapse process
-(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
-<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>).</li>
 <li>If handling HTTP requests, a <a href="usage/configuration/config_documentation.html#worker_listeners"><code>worker_listeners</code></a> option
 with an <code>http</code> listener.</li>
 <li><strong>Synapse 1.72 and older:</strong> if handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>). This config option is no longer required and is ignored when running Synapse 1.73 and newer.</li>
+<li><strong>Synapse 1.83 and older:</strong> The HTTP replication endpoint that the worker should talk to on the main synapse process
+(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
+<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>). If using Synapse 1.84 and newer, these are not needed if <code>main</code> is defined on the <a href="workers.html#shared-configuration">shared configuration</a> <code>instance_map</code></li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: generic_worker1
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http
@@ -10931,15 +11071,22 @@ effects of bursts of events from that bridge on events sent by normal users.</p>
 <h4 id="stream-writers"><a class="header" href="#stream-writers">Stream writers</a></h4>
 <p>Additionally, the writing of specific streams (such as events) can be moved off
 of the main process to a particular worker.</p>
-<p>To enable this, the worker must have a
-<a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,
-have a <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
+<p>To enable this, the worker must have:</p>
+<ul>
+<li>An <a href="usage/configuration/config_documentation.html#listeners">HTTP <code>replication</code> listener</a> configured,</li>
+<li>Have a <a href="usage/configuration/config_documentation.html#worker_name"><code>worker_name</code></a>
 and be listed in the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a>
-config. The same worker can handle multiple streams, but unless otherwise documented,
+config. </li>
+<li>Have the main process declared on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> as well.</li>
+</ul>
+<p>Note: The same worker can handle multiple streams, but unless otherwise documented,
 each stream can only have a single writer.</p>
 <p>For example, to move event persistence off to a dedicated worker, the shared
 configuration would include:</p>
 <pre><code class="language-yaml">instance_map:
+    main:
+        host: localhost
+        port: 8030
     event_persister1:
         host: localhost
         port: 8034
@@ -11311,10 +11458,6 @@ configuration files and reverse-proxy correctly.
 Below is a sample <code>generic_worker</code> worker configuration file.</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: generic_worker1
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http
@@ -11692,11 +11835,15 @@ will be an empty JSON object.</p>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="experimental-features-api"><a class="header" href="#experimental-features-api">Experimental Features API</a></h1>
 <p>This API allows a server administrator to enable or disable some experimental features on a per-user
-basis. Currently supported features are <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3026">msc3026</a>: busy 
-presence state enabled, <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/2654">msc2654</a>: enable unread counts,
-<a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3881">msc3881</a>: enable remotely toggling push notifications 
-for another client, and <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3967">msc3967</a>: do not require
-UIA when first uploading cross-signing keys. </p>
+basis. The currently supported features are: </p>
+<ul>
+<li><a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3026">MSC3026</a>: busy 
+presence state enabled</li>
+<li><a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3881">MSC3881</a>: enable remotely toggling push notifications 
+for another client </li>
+<li><a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3967">MSC3967</a>: do not require
+UIA when first uploading cross-signing keys. </li>
+</ul>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
 for a server admin: see <a href="admin_api/../usage/administration/admin_api/">Admin API</a>.</p>
 <h2 id="enablingdisabling-features"><a class="header" href="#enablingdisabling-features">Enabling/Disabling Features</a></h2>
@@ -11705,7 +11852,7 @@ provide a body containing the user id and listing the features to enable/disable
 <pre><code class="language-json">{
    &quot;features&quot;: {
       &quot;msc3026&quot;:true,
-      &quot;msc2654&quot;:true
+      &quot;msc3881&quot;:true
    }
 }
 </code></pre>
@@ -11722,7 +11869,6 @@ user like so:</p>
 <pre><code class="language-json">{
    &quot;features&quot;: {
       &quot;msc3026&quot;: true,
-      &quot;msc2654&quot;: true,
       &quot;msc3881&quot;: false,
       &quot;msc3967&quot;: false
    }
@@ -13402,7 +13548,7 @@ they are taking.</p>
 which means that the returned information can vary widely from reality. However,
 it should be enough to get a rough idea of where database disk space is going.</p>
 <p>The API is:</p>
-<pre><code>GET /_synapse/admin/v1/statistics/statistics/database/rooms
+<pre><code>GET /_synapse/admin/v1/statistics/database/rooms
 </code></pre>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
@@ -13481,7 +13627,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api/">A
 <ul>
 <li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
 </ul>
-<h2 id="create-or-modify-account"><a class="header" href="#create-or-modify-account">Create or modify Account</a></h2>
+<h2 id="create-or-modify-account"><a class="header" href="#create-or-modify-account">Create or modify account</a></h2>
 <p>This API allows an administrator to create or modify a user account with a
 specific <code>user_id</code>.</p>
 <p>This api is:</p>
@@ -13490,28 +13636,29 @@ specific <code>user_id</code>.</p>
 <p>with a body of:</p>
 <pre><code class="language-json">{
     &quot;password&quot;: &quot;user_password&quot;,
-    &quot;displayname&quot;: &quot;User&quot;,
+    &quot;logout_devices&quot;: false,
+    &quot;displayname&quot;: &quot;Alice Marigold&quot;,
+    &quot;avatar_url&quot;: &quot;mxc://example.com/abcde12345&quot;,
     &quot;threepids&quot;: [
         {
             &quot;medium&quot;: &quot;email&quot;,
-            &quot;address&quot;: &quot;&lt;user_mail_1&gt;&quot;
+            &quot;address&quot;: &quot;alice@example.com&quot;
         },
         {
             &quot;medium&quot;: &quot;email&quot;,
-            &quot;address&quot;: &quot;&lt;user_mail_2&gt;&quot;
+            &quot;address&quot;: &quot;alice@domain.org&quot;
         }
     ],
     &quot;external_ids&quot;: [
         {
-            &quot;auth_provider&quot;: &quot;&lt;provider1&gt;&quot;,
-            &quot;external_id&quot;: &quot;&lt;user_id_provider_1&gt;&quot;
+            &quot;auth_provider&quot;: &quot;example&quot;,
+            &quot;external_id&quot;: &quot;12345&quot;
         },
         {
-            &quot;auth_provider&quot;: &quot;&lt;provider2&gt;&quot;,
-            &quot;external_id&quot;: &quot;&lt;user_id_provider_2&gt;&quot;
+            &quot;auth_provider&quot;: &quot;example2&quot;,
+            &quot;external_id&quot;: &quot;abc54321&quot;
         }
     ],
-    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
     &quot;admin&quot;: false,
     &quot;deactivated&quot;: false,
     &quot;user_type&quot;: null
@@ -13524,46 +13671,74 @@ specific <code>user_id</code>.</p>
 </ul>
 <p>URL parameters:</p>
 <ul>
-<li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
+<li><code>user_id</code> - A fully-qualified user id. For example, <code>@user:server.com</code>.</li>
 </ul>
 <p>Body parameters:</p>
 <ul>
-<li><code>password</code> - string, optional. If provided, the user's password is updated and all
-devices are logged out, unless <code>logout_devices</code> is set to <code>false</code>.</li>
-<li><code>logout_devices</code> - bool, optional, defaults to <code>true</code>. If set to false, devices aren't
-logged out even when <code>password</code> is provided.</li>
-<li><code>displayname</code> - string, optional, defaults to the value of <code>user_id</code>.</li>
-<li><code>threepids</code> - array, optional, allows setting the third-party IDs (email, msisdn)
+<li>
+<p><code>password</code> - <strong>string</strong>, optional. If provided, the user's password is updated and all
+devices are logged out, unless <code>logout_devices</code> is set to <code>false</code>.</p>
+</li>
+<li>
+<p><code>logout_devices</code> - <strong>bool</strong>, optional, defaults to <code>true</code>. If set to <code>false</code>, devices aren't
+logged out even when <code>password</code> is provided.</p>
+</li>
+<li>
+<p><code>displayname</code> - <strong>string</strong>, optional. If set to an empty string (<code>&quot;&quot;</code>), the user's display name
+will be removed.</p>
+</li>
+<li>
+<p><code>avatar_url</code> - <strong>string</strong>, optional. Must be a
+<a href="https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris">MXC URI</a>.
+If set to an empty string (<code>&quot;&quot;</code>), the user's avatar is removed.</p>
+</li>
+<li>
+<p><code>threepids</code> - <strong>array</strong>, optional. If provided, the user's third-party IDs (email, msisdn) are
+entirely replaced with the given list. Each item in the array is an object with the following
+fields:</p>
 <ul>
-<li><code>medium</code> - string. Kind of third-party ID, either <code>email</code> or <code>msisdn</code>.</li>
-<li><code>address</code> - string. Value of third-party ID.
-belonging to a user.</li>
+<li><code>medium</code> - <strong>string</strong>, required. The type of third-party ID, either <code>email</code> or <code>msisdn</code> (phone number).</li>
+<li><code>address</code> - <strong>string</strong>, required. The third-party ID itself, e.g. <code>alice@example.com</code> for <code>email</code> or
+<code>447470274584</code> (for a phone number with country code &quot;44&quot;) and <code>19254857364</code> (for a phone number
+with country code &quot;1&quot;) for <code>msisdn</code>.
+Note: If a threepid is removed from a user via this option, Synapse will also attempt to remove
+that threepid from any identity servers it is aware has a binding for it.</li>
 </ul>
 </li>
-<li><code>external_ids</code> - array, optional. Allow setting the identifier of the external identity
-provider for SSO (Single sign-on). Details in the configuration manual under the
-sections <a href="admin_api/../usage/configuration/config_documentation.html#sso">sso</a> and <a href="admin_api/../usage/configuration/config_documentation.html#oidc_providers">oidc_providers</a>.
+<li>
+<p><code>external_ids</code> - <strong>array</strong>, optional. Allow setting the identifier of the external identity
+provider for SSO (Single sign-on). More details are in the configuration manual under the
+sections <a href="admin_api/../usage/configuration/config_documentation.html#sso">sso</a> and <a href="admin_api/../usage/configuration/config_documentation.html#oidc_providers">oidc_providers</a>.</p>
 <ul>
-<li><code>auth_provider</code> - string. ID of the external identity provider. Value of <code>idp_id</code>
-in the homeserver configuration. Note that no error is raised if the provided
-value is not in the homeserver configuration.</li>
-<li><code>external_id</code> - string, user ID in the external identity provider.</li>
+<li><code>auth_provider</code> - <strong>string</strong>, required. The unique, internal ID of the external identity provider.
+The same as <code>idp_id</code> from the homeserver configuration. Note that no error is raised if the
+provided value is not in the homeserver configuration.</li>
+<li><code>external_id</code> - <strong>string</strong>, required. An identifier for the user in the external identity provider.
+When the user logs in to the identity provider, this must be the unique ID that they map to.</li>
 </ul>
 </li>
-<li><code>avatar_url</code> - string, optional, must be a
-<a href="https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris">MXC URI</a>.</li>
-<li><code>admin</code> - bool, optional, defaults to <code>false</code>.</li>
-<li><code>deactivated</code> - bool, optional. If unspecified, deactivation state will be left
-unchanged on existing accounts and set to <code>false</code> for new accounts.
-A user cannot be erased by deactivating with this API. For details on
-deactivating users see <a href="admin_api/user_admin_api.html#deactivate-account">Deactivate Account</a>.</li>
-<li><code>user_type</code> - string or null, optional. If provided, the user type will be
-adjusted. If <code>null</code> given, the user type will be cleared. Other 
-allowed options are: <code>bot</code> and <code>support</code>.</li>
+<li>
+<p><code>admin</code> - <strong>bool</strong>, optional, defaults to <code>false</code>. Whether the user is a homeserver administrator,
+granting them access to the Admin API, among other things.</p>
+</li>
+<li>
+<p><code>deactivated</code> - <strong>bool</strong>, optional. If unspecified, deactivation state will be left unchanged.</p>
+<p>Note: the <code>password</code> field must also be set if both of the following are true:</p>
+<ul>
+<li><code>deactivated</code> is set to <code>false</code> and the user was previously deactivated (you are reactivating this user)</li>
+<li>Users are allowed to set their password on this homeserver (both <code>password_config.enabled</code> and
+<code>password_config.localdb_enabled</code> config options are set to <code>true</code>).
+Users' passwords are wiped upon account deactivation, hence the need to set a new one here.</li>
 </ul>
-<p>If the user already exists then optional parameters default to the current value.</p>
-<p>In order to re-activate an account <code>deactivated</code> must be set to <code>false</code>. If
-users do not login via single-sign-on, a new <code>password</code> must be provided.</p>
+<p>Note: a user cannot be erased with this API. For more details on
+deactivating and erasing users see <a href="admin_api/user_admin_api.html#deactivate-account">Deactivate Account</a>.</p>
+</li>
+<li>
+<p><code>user_type</code> - <strong>string</strong> or null, optional. If not provided, the user type will be
+not be changed. If <code>null</code> is given, the user type will be cleared.
+Other allowed options are: <code>bot</code> and <code>support</code>.</p>
+</li>
+</ul>
 <h2 id="list-accounts"><a class="header" href="#list-accounts">List Accounts</a></h2>
 <p>This API returns all local user accounts.
 By default, the response is ordered by ascending user ID.</p>
@@ -15855,6 +16030,7 @@ See the <a href="development/../workers.html">worker documentation</a> for addit
 </ul>
 </li>
 <li>Passing <code>ASYNCIO_REACTOR=1</code> as an environment variable to use the Twisted asyncio reactor instead of the default one.</li>
+<li>Passing <code>PODMAN=1</code> will use the <a href="https://podman.io/">podman</a> container runtime, instead of docker.</li>
 </ul>
 <p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>, e.g:</p>
 <pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
