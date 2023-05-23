@@ -930,26 +930,30 @@ def _custom_sync_async_decorator(
                         return result
 
                     def err_back(result: R) -> R:
+                        # XXX: Feels like we could put the error details into the
+                        # `scope.__exit__(...)`
                         scope.__exit__(None, None, None)
                         return result
 
                     result.addCallbacks(call_back, err_back)
 
+                elif inspect.isawaitable(result):
+                    # TODO: I don't know how to type this
+                    async def await_coroutine():
+                        try:
+                            awaited_result = await result
+                            scope.__exit__(None, None, None)
+                            return awaited_result
+                        except Exception as e:
+                            scope.__exit__(type(e), None, e.__traceback__)
+                            raise
+
+                    # The original method returned a coroutine, so we create another
+                    # coroutine wrapping it, that calls `scope.__exit__(...)`.
+                    return await_coroutine()
                 else:
-                    if inspect.isawaitable(result):
-
-                        async def await_coroutine():
-                            try:
-                                return await result
-                            finally:
-                                scope.__exit__(None, None, None)
-
-                        # The original method returned a coroutine, so we create another
-                        # coroutine wrapping it, that calls __exit__.
-                        return await_coroutine()
-                    else:
-                        # Just a simple sync function
-                        scope.__exit__(None, None, None)
+                    # Just a simple sync function
+                    scope.__exit__(None, None, None)
 
                 return result
 
