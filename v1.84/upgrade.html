@@ -233,15 +233,17 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </ul>
 <h1 id="upgrading-to-v1840"><a class="header" href="#upgrading-to-v1840">Upgrading to v1.84.0</a></h1>
 <h2 id="deprecation-of-worker_replication_-configuration-settings"><a class="header" href="#deprecation-of-worker_replication_-configuration-settings">Deprecation of <code>worker_replication_*</code> configuration settings</a></h2>
-<p>When using workers, </p>
+<p>When using workers,</p>
 <ul>
 <li><code>worker_replication_host</code></li>
 <li><code>worker_replication_http_port</code></li>
 <li><code>worker_replication_http_tls</code></li>
 </ul>
-<p>can now be removed from individual worker YAML configuration <em><strong>if</strong></em> you add the main process to the <code>instance_map</code> in the shared YAML configuration,
-using the name <code>main</code>.</p>
-<h3 id="before"><a class="header" href="#before">Before:</a></h3>
+<p>should now be removed from individual worker YAML configurations and the main process should instead be added to the <code>instance_map</code>
+in the shared YAML configuration, using the name <code>main</code>.</p>
+<p>The old <code>worker_replication_*</code> settings are now considered deprecated and are expected to be removed in Synapse v1.88.0.</p>
+<h3 id="example-change"><a class="header" href="#example-change">Example change</a></h3>
+<h4 id="before"><a class="header" href="#before">Before:</a></h4>
 <p>Shared YAML</p>
 <pre><code class="language-yaml">instance_map:
   generic_worker1:
@@ -269,7 +271,7 @@ worker_listeners:
 
 worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 </code></pre>
-<h3 id="after"><a class="header" href="#after">After:</a></h3>
+<h4 id="after"><a class="header" href="#after">After:</a></h4>
 <p>Shared YAML</p>
 <pre><code class="language-yaml">instance_map:
   main:
