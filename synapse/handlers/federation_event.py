@@ -920,6 +920,14 @@ class FederationEventHandler:
             for event in new_events
             if event.event_id in event_ids_with_failed_pull_attempts
         ]
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "events_with_failed_pull_attempts",
+            str(event_ids_with_failed_pull_attempts),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "events_with_failed_pull_attempts.length",
+            str(len(events_with_failed_pull_attempts)),
+        )
         if len(events_with_failed_pull_attempts) > 0:
             run_as_background_process(
                 "_process_new_pulled_events_with_failed_pull_attempts",
@@ -934,6 +942,14 @@ class FederationEventHandler:
             for event in new_events
             if event.event_id not in event_ids_with_failed_pull_attempts
         ]
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "fresh_events",
+            str([event.event_id for event in fresh_events]),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "fresh_events.length",
+            str(len(fresh_events)),
+        )
         if len(fresh_events) > 0:
             await _process_new_pulled_events(fresh_events)
 
