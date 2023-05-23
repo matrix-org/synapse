@@ -238,6 +238,7 @@ class FederationClient(FederationBase):
         self,
         destination: str,
         query: Dict[str, Dict[str, Dict[str, int]]],
+        requester: UserID,
         timeout: Optional[int],
     ) -> JsonDict:
         """Claims one-time keys for a device hosted on a remote server.
@@ -245,6 +246,7 @@ class FederationClient(FederationBase):
         Args:
             destination: Domain name of the remote homeserver
             content: The query content.
+            requester: The user id of the requesting user
 
         Returns:
             The JSON object from the response
@@ -279,7 +281,7 @@ class FederationClient(FederationBase):
         if use_unstable:
             try:
                 return await self.transport_layer.claim_client_keys_unstable(
-                    destination, unstable_content, timeout
+                    destination, unstable_content, requester, timeout
                 )
             except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised endpoint,
@@ -295,7 +297,7 @@ class FederationClient(FederationBase):
             logger.debug("Skipping unstable claim client keys API")
 
         return await self.transport_layer.claim_client_keys(
-            destination, content, timeout
+            destination, content, requester, timeout
         )
 
     @trace

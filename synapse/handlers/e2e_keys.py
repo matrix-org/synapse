@@ -661,6 +661,7 @@ class E2eKeysHandler:
     async def claim_one_time_keys(
         self,
         query: Dict[str, Dict[str, Dict[str, int]]],
+        requester: UserID,
         timeout: Optional[int],
         always_include_fallback_keys: bool,
     ) -> JsonDict:
@@ -698,12 +699,12 @@ class E2eKeysHandler:
         failures: Dict[str, JsonDict] = {}
 
         @trace
-        async def claim_client_keys(destination: str) -> None:
+        async def claim_client_keys(destination: str, requester: UserID) -> None:
             set_tag("destination", destination)
             device_keys = remote_queries[destination]
             try:
                 remote_result = await self.federation.claim_client_keys(
-                    destination, device_keys, timeout=timeout
+                    destination, device_keys, requester, timeout=timeout
                 )
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:
@@ -718,7 +719,7 @@ class E2eKeysHandler:
         await make_deferred_yieldable(
             defer.gatherResults(
                 [
-                    run_in_background(claim_client_keys, destination)
+                    run_in_background(claim_client_keys, destination, requester)
                     for destination in remote_queries
                 ],
                 consumeErrors=True,

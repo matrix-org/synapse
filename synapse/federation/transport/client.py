@@ -45,7 +45,7 @@ from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
 from synapse.http.matrixfederationclient import ByteParser, LegacyJsonSendParser
 from synapse.http.types import QueryParams
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import ExceptionBundle
 
 if TYPE_CHECKING:
@@ -630,7 +630,11 @@ class TransportLayerClient:
         )
 
     async def claim_client_keys(
-        self, destination: str, query_content: JsonDict, timeout: Optional[int]
+        self,
+        destination: str,
+        query_content: JsonDict,
+        requester: UserID,
+        timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
 
@@ -657,6 +661,7 @@ class TransportLayerClient:
         Args:
             destination: The server to query.
             query_content: The user ids to query.
+            requester: the user_id of the requesting user
         Returns:
             A dict containing the one-time keys.
         """
@@ -671,7 +676,11 @@ class TransportLayerClient:
         )
 
     async def claim_client_keys_unstable(
-        self, destination: str, query_content: JsonDict, timeout: Optional[int]
+        self,
+        destination: str,
+        query_content: JsonDict,
+        requester: UserID,
+        timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
 
@@ -698,6 +707,7 @@ class TransportLayerClient:
         Args:
             destination: The server to query.
             query_content: The user ids to query.
+            requester: the requesting user
         Returns:
             A dict containing the one-time keys.
         """
