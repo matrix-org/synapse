@@ -186,6 +186,8 @@ def log_failure(
     return None
 
 
+# TODO: Export as metric
+#
 # Version string with git info. Computed here once so that we don't invoke git multiple
 # times.
 SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse", __file__)
