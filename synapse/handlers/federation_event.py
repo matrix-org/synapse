@@ -890,6 +890,11 @@ class FederationEventHandler:
             # Continue on with the events that are new to us.
             new_events.append(event)
 
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "new_events.length",
+            str(len(new_events)),
+        )
+
         @trace
         async def _process_new_pulled_events(new_events: Collection[EventBase]) -> None:
             # We want to sort these by depth so we process them and

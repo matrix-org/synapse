@@ -48,8 +48,6 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         invalid_filters: List[JsonDict] = [
             # `account_data` must be a dictionary
             {"account_data": "Hello World"},
-            # `event_fields` entries must not contain backslashes
-            {"event_fields": [r"\\foo"]},
             # `event_format` must be "client" or "federation"
             {"event_format": "other"},
             # `not_rooms` must contain valid room IDs
@@ -114,10 +112,6 @@ class FilteringTestCase(unittest.HomeserverTestCase):
                 "event_format": "client",
                 "event_fields": ["type", "content", "sender"],
             },
-            # a single backslash should be permitted (though it is debatable whether
-            # it should be permitted before anything other than `.`, and what that
-            # actually means)
-            #
             # (note that event_fields is implemented in
             # synapse.events.utils.serialize_event, and so whether this actually works
             # is tested elsewhere. We just want to check that it is allowed through the

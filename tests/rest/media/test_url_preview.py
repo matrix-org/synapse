@@ -418,9 +418,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
 
-    def test_blacklisted_ip_specific(self) -> None:
+    def test_blocked_ip_specific(self) -> None:
         """
-        Blacklisted IP addresses, found via DNS, are not spidered.
+        Blocked IP addresses, found via DNS, are not spidered.
         """
         self.lookups["example.com"] = [(IPv4Address, "192.168.1.1")]
 
@@ -439,9 +439,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ip_range(self) -> None:
+    def test_blocked_ip_range(self) -> None:
         """
-        Blacklisted IP ranges, IPs found over DNS, are not spidered.
+        Blocked IP ranges, IPs found over DNS, are not spidered.
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.2")]
 
@@ -458,9 +458,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ip_specific_direct(self) -> None:
+    def test_blocked_ip_specific_direct(self) -> None:
         """
-        Blacklisted IP addresses, accessed directly, are not spidered.
+        Blocked IP addresses, accessed directly, are not spidered.
         """
         channel = self.make_request(
             "GET", "preview_url?url=http://192.168.1.1", shorthand=False
@@ -470,16 +470,13 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(len(self.reactor.tcpClients), 0)
         self.assertEqual(
             channel.json_body,
-            {
-                "errcode": "M_UNKNOWN",
-                "error": "IP address blocked by IP blacklist entry",
-            },
+            {"errcode": "M_UNKNOWN", "error": "IP address blocked"},
         )
         self.assertEqual(channel.code, 403)
 
-    def test_blacklisted_ip_range_direct(self) -> None:
+    def test_blocked_ip_range_direct(self) -> None:
         """
-        Blacklisted IP ranges, accessed directly, are not spidered.
+        Blocked IP ranges, accessed directly, are not spidered.
         """
         channel = self.make_request(
             "GET", "preview_url?url=http://1.1.1.2", shorthand=False
@@ -488,15 +485,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
-            {
-                "errcode": "M_UNKNOWN",
-                "error": "IP address blocked by IP blacklist entry",
-            },
+            {"errcode": "M_UNKNOWN", "error": "IP address blocked"},
         )
 
-    def test_blacklisted_ip_range_whitelisted_ip(self) -> None:
+    def test_blocked_ip_range_whitelisted_ip(self) -> None:
         """
-        Blacklisted but then subsequently whitelisted IP addresses can be
+        Blocked but then subsequently whitelisted IP addresses can be
         spidered.
         """
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.1")]
@@ -527,10 +521,10 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
 
-    def test_blacklisted_ip_with_external_ip(self) -> None:
+    def test_blocked_ip_with_external_ip(self) -> None:
         """
-        If a hostname resolves a blacklisted IP, even if there's a
-        non-blacklisted one, it will be rejected.
+        If a hostname resolves a blocked IP, even if there's a non-blocked one,
+        it will be rejected.
         """
         # Hardcode the URL resolving to the IP we want.
         self.lookups["example.com"] = [
@@ -550,9 +544,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ipv6_specific(self) -> None:
+    def test_blocked_ipv6_specific(self) -> None:
         """
-        Blacklisted IP addresses, found via DNS, are not spidered.
+        Blocked IP addresses, found via DNS, are not spidered.
         """
         self.lookups["example.com"] = [
             (IPv6Address, "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
@@ -573,9 +567,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_blacklisted_ipv6_range(self) -> None:
+    def test_blocked_ipv6_range(self) -> None:
         """
-        Blacklisted IP ranges, IPs found over DNS, are not spidered.
+        Blocked IP ranges, IPs found over DNS, are not spidered.
         """
         self.lookups["example.com"] = [(IPv6Address, "2001:800::1")]
 
@@ -1359,7 +1353,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     @unittest.override_config({"url_preview_url_blacklist": [{"port": "*"}]})
     def test_blocked_port(self) -> None:
-        """Tests that blacklisting URLs with a port makes previewing such URLs
+        """Tests that blocking URLs with a port makes previewing such URLs
         fail with a 403 error and doesn't impact other previews.
         """
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
@@ -1401,7 +1395,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         {"url_preview_url_blacklist": [{"netloc": "example.com"}]}
     )
     def test_blocked_url(self) -> None:
-        """Tests that blacklisting URLs with a host makes previewing such URLs
+        """Tests that blocking URLs with a host makes previewing such URLs
         fail with a 403 error.
         """
         self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
