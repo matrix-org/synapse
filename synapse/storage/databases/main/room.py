@@ -382,7 +382,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         Args:
             network_tuple
             search_filter
-            limit: Maxmimum number of rows to return, unlimited otherwise.
+            limit: Maximum number of rows to return, unlimited otherwise.
             bounds: An uppoer or lower bound to apply to result set if given,
                 consists of a joined member count and room_id (these are
                 excluded from result set).

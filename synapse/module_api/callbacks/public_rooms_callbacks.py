@@ -15,14 +15,20 @@
 import logging
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from synapse.types import PublicRoom
+from synapse.types import PublicRoom, ThirdPartyInstanceID
 
 logger = logging.getLogger(__name__)
 
 
 # Types for callbacks to be registered via the module api
 FETCH_PUBLIC_ROOMS_CALLBACK = Callable[
-    [bool, Optional[int], Optional[Tuple[int, str]]],
+    [
+        Optional[ThirdPartyInstanceID],  # network_tuple
+        Optional[dict],  # search_filter
+        Optional[int],  # limit
+        Optional[Tuple[int, str]],  # bounds
+        bool,  # forwards
+    ],
     Awaitable[List[PublicRoom]],
 ]
 

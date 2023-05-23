@@ -183,11 +183,13 @@ class RoomListHandler:
             # Ask each module for a list of public rooms given the last_joined_members
             # value from the since token and the probing limit.
             module_public_rooms = await fetch_public_rooms(
-                forwards,
+                network_tuple,
+                search_filter,
                 probing_limit,
                 (batch_token.last_joined_members, batch_token.last_room_id)
                 if batch_token
                 else None,
+                forwards,
             )
             module_public_rooms.reverse()
 
