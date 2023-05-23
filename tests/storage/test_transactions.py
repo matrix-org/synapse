@@ -33,15 +33,14 @@ class TransactionStoreTestCase(HomeserverTestCase):
         destination retries, as well as testing tht we can set and get
         correctly.
         """
-        d = self.store.get_destination_retry_timings("example.com")
-        r = self.get_success(d)
+        r = self.get_success(self.store.get_destination_retry_timings("example.com"))
         self.assertIsNone(r)
 
-        d = self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
-        self.get_success(d)
+        self.get_success(
+            self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
+        )
 
-        d = self.store.get_destination_retry_timings("example.com")
-        r = self.get_success(d)
+        r = self.get_success(self.store.get_destination_retry_timings("example.com"))
 
         self.assertEqual(
             DestinationRetryTimings(
