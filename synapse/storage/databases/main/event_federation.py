@@ -46,7 +46,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrCollection
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
@@ -1585,8 +1585,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
     @trace
     async def get_event_ids_with_failed_pull_attempts(
-        self, event_ids: List[str]
-    ) -> List[str]:
+        self, event_ids: StrCollection
+    ) -> Set[str]:
         """
         Filter the given list of `event_ids` and return events which have any failed
         pull attempts.
@@ -1595,8 +1595,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             event_ids: A list of events to filter down.
 
         Returns:
-            A filtered down list of `event_ids` that have previous failed pull attempts
-            (order is maintained).
+            A filtered down list of `event_ids` that have previous failed pull attempts.
         """
 
         rows = await self.db_pool.simple_select_many_batch(
@@ -1607,16 +1606,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             retcols=("event_id",),
             desc="get_event_ids_with_failed_pull_attempts",
         )
-        event_ids_with_failed_pull_attempts_from_database = [
-            str(row["event_id"]) for row in rows
-        ]
-        # We want to maintain the order of the given `event_ids` so we re-construct the
-        # list since there is no gurantees from the database implementation/query.
-        event_ids_with_failed_pull_attempts = [
-            event_id
-            for event_id in event_ids
-            if event_id in event_ids_with_failed_pull_attempts_from_database
-        ]
+        event_ids_with_failed_pull_attempts = {str(row["event_id"]) for row in rows}
 
         return event_ids_with_failed_pull_attempts
 

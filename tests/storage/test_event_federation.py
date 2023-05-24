@@ -1144,43 +1144,31 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         tok = self.login("alice", "test")
         room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
 
-        # We purposely record the failed pull attempt for `$c_failed_event_id3` first to
-        # make sure we return results in the order of the `event_ids` passed in instead
-        # of the order in which we find things in the database or the unordered
-        # collections we might accidentally use. They also purposely have reverse
-        # prefixed a-c in front to better test dubious sorting happening somewhere.
         self.get_success(
             self.store.record_event_failed_pull_attempt(
-                room_id, "$a_failed_event_id3", "fake cause"
+                room_id, "$failed_event_id1", "fake cause"
             )
         )
         self.get_success(
             self.store.record_event_failed_pull_attempt(
-                room_id, "$c_failed_event_id1", "fake cause"
-            )
-        )
-        self.get_success(
-            self.store.record_event_failed_pull_attempt(
-                room_id, "$b_failed_event_id2", "fake cause"
+                room_id, "$failed_event_id2", "fake cause"
             )
         )
 
         event_ids_with_failed_pull_attempts = self.get_success(
             self.store.get_event_ids_with_failed_pull_attempts(
                 event_ids=[
-                    "$c_failed_event_id1",
-                    "$c_fresh_event_id1",
-                    "$b_failed_event_id2",
-                    "$b_fresh_event_id2",
-                    "$a_failed_event_id3",
-                    "$a_fresh_event_id3",
+                    "$failed_event_id1",
+                    "$fresh_event_id1",
+                    "$failed_event_id2",
+                    "$fresh_event_id2",
                 ]
             )
         )
 
         self.assertEqual(
             event_ids_with_failed_pull_attempts,
-            ["$c_failed_event_id1", "$b_failed_event_id2", "$a_failed_event_id3"],
+            {"$failed_event_id1", "$failed_event_id2"},
         )
 
     def test_get_event_ids_to_not_pull_from_backoff(self) -> None:
