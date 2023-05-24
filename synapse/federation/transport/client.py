@@ -631,9 +631,9 @@ class TransportLayerClient:
 
     async def claim_client_keys(
         self,
+        user: UserID,
         destination: str,
         query_content: JsonDict,
-        user: UserID,
         timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
@@ -659,9 +659,9 @@ class TransportLayerClient:
             }
 
         Args:
+            user: the user_id of the requesting user
             destination: The server to query.
             query_content: The user ids to query.
-            user: the user_id of the requesting user
         Returns:
             A dict containing the one-time keys.
         """
@@ -677,9 +677,9 @@ class TransportLayerClient:
 
     async def claim_client_keys_unstable(
         self,
+        user: UserID,
         destination: str,
         query_content: JsonDict,
-        user: UserID,
         timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
@@ -705,9 +705,9 @@ class TransportLayerClient:
             }
 
         Args:
+            user: the user_id of the requesting user
             destination: The server to query.
             query_content: The user ids to query.
-            user: the user_id of the requesting user
         Returns:
             A dict containing the one-time keys.
         """
