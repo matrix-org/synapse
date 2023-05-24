@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -54,12 +55,18 @@ class LoginTokenRequestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastores().main
-        self.clock = hs.get_clock()
-        self.server_name = hs.config.server.server_name
+        self._main_store = hs.get_datastores().main
         self.auth_handler = hs.get_auth_handler()
         self.token_timeout = hs.config.auth.login_via_existing_token_timeout
         self._require_ui_auth = hs.config.auth.login_via_existing_require_ui_auth
+
+        # An aggressive ratelimiter.
+        self._ratelimiter = Ratelimiter(
+            store=self._main_store,
+            clock=hs.get_clock(),
+            rate_hz=1 / 60,
+            burst_count=1,
+        )
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -74,6 +81,10 @@ class LoginTokenRequestServlet(RestServlet):
                 "issue a new access token for your account",
                 can_skip_ui_auth=False,  # Don't allow skipping of UI auth
             )
+
+        # Ensure that this endpoint isn't being used too often. (Ensure this is
+        # done *after* UI auth.)
+        await self._ratelimiter.ratelimit(None, requester.user.to_string().lower())
 
         login_token = await self.auth_handler.create_login_token_for_user_id(
             user_id=requester.user.to_string(),
