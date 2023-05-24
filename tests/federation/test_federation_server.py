@@ -63,7 +63,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
 
 
 class ServerACLsTestCase(unittest.TestCase):
-    def test_blacklisted_server(self) -> None:
+    def test_blocked_server(self) -> None:
         e = _create_acl_event({"allow": ["*"], "deny": ["evil.com"]})
         logging.info("ACL event: %s", e.content)
 

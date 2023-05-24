@@ -148,7 +148,7 @@ class HttpPusher(Pusher):
         )
 
         self.url = url
-        self.http_client = hs.get_proxied_blacklisted_http_client()
+        self.http_client = hs.get_proxied_blocklisted_http_client()
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
         del self.data_minus_url["url"]

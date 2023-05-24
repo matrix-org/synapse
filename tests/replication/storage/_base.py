@@ -24,7 +24,7 @@ from synapse.util import Clock
 from tests.replication._base import BaseStreamTestCase
 
 
-class BaseSlavedStoreTestCase(BaseStreamTestCase):
+class BaseWorkerStoreTestCase(BaseStreamTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         return self.setup_test_homeserver(federation_client=Mock())
 
@@ -34,7 +34,7 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
         self.reconnect()
 
         self.master_store = hs.get_datastores().main
-        self.slaved_store = self.worker_hs.get_datastores().main
+        self.worker_store = self.worker_hs.get_datastores().main
         persistence = hs.get_storage_controllers().persistence
         assert persistence is not None
         self.persistance = persistence
@@ -50,7 +50,7 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
         self, method: str, args: Iterable[Any], expected_result: Optional[Any] = None
     ) -> None:
         master_result = self.get_success(getattr(self.master_store, method)(*args))
-        slaved_result = self.get_success(getattr(self.slaved_store, method)(*args))
+        worker_result = self.get_success(getattr(self.worker_store, method)(*args))
         if expected_result is not None:
             self.assertEqual(
                 master_result,
@@ -59,14 +59,14 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
                 % (expected_result, master_result),
             )
             self.assertEqual(
-                slaved_result,
+                worker_result,
                 expected_result,
-                "Expected slave result to be %r but was %r"
-                % (expected_result, slaved_result),
+                "Expected worker result to be %r but was %r"
+                % (expected_result, worker_result),
             )
         self.assertEqual(
             master_result,
-            slaved_result,
-            "Slave result %r does not match master result %r"
-            % (slaved_result, master_result),
+            worker_result,
+            "Worker result %r does not match master result %r"
+            % (worker_result, master_result),
         )

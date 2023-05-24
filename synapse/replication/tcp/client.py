@@ -60,7 +60,7 @@ _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 5
 class ReplicationDataHandler:
     """Handles incoming stream updates from replication.
 
-    This instance notifies the slave data store about updates. Can be subclassed
+    This instance notifies the data store about updates. Can be subclassed
     to handle updates in additional ways.
     """
 
@@ -91,7 +91,7 @@ class ReplicationDataHandler:
     ) -> None:
         """Called to handle a batch of replication data with a given stream token.
 
-        By default this just pokes the slave store. Can be overridden in subclasses to
+        By default, this just pokes the data store. Can be overridden in subclasses to
         handle more.
 
         Args:
