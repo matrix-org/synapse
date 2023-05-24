@@ -95,8 +95,8 @@ CREATE UNIQUE INDEX event_push_summary_unique_index2 ON event_push_summary (user
 -- Recreate some indexes in the background, by re-running the background updates
 -- from 72/02event_push_actions_index.sql and 72/06thread_notifications.sql.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7403, 'event_push_summary_unique_index2', '{}')
+  (7706, 'event_push_summary_unique_index2', '{}')
   ON CONFLICT (update_name) DO UPDATE SET progress_json = '{}';
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7403, 'event_push_actions_stream_highlight_index', '{}')
+  (7706, 'event_push_actions_stream_highlight_index', '{}')
   ON CONFLICT (update_name) DO UPDATE SET progress_json = '{}';
