@@ -357,7 +357,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         Add all local users to the user directory.
         """
 
-        def _get_next_batch(txn: LoggingTransaction) -> Optional[List[str]]:
+        def _populate_user_directory_process_users_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[int]:
             sql = "SELECT user_id FROM %s ORDER BY user_id LIMIT %s" % (
                 TEMP_TABLE + "_users",
                 str(batch_size),
@@ -379,85 +381,79 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 assert count_result is not None
                 progress["remaining"] = count_result[0]
 
-            return users_to_work_on
+            if not users_to_work_on:
+                return None
 
-        users_to_work_on = await self.db_pool.runInteraction(
-            "populate_user_directory_temp_read", _get_next_batch
+            logger.debug(
+                "Processing the next %d users of %d remaining",
+                len(users_to_work_on),
+                progress["remaining"],
+            )
+
+            # First filter down to users we want to insert into the user directory.
+            users_to_insert = self._filter_local_users_for_dir_txn(
+                txn, users_to_work_on
+            )
+
+            # Next fetch their profiles. Note that the `user_id` here is the
+            # *localpart*, and that not all users have profiles.
+            profile_rows = self.db_pool.simple_select_many_txn(
+                txn,
+                table="profiles",
+                column="user_id",
+                iterable=[get_localpart_from_id(u) for u in users_to_insert],
+                retcols=(
+                    "user_id",
+                    "displayname",
+                    "avatar_url",
+                ),
+                keyvalues={},
+            )
+            profiles = {
+                f"@{row['user_id']}:{self.server_name}": _UserDirProfile(
+                    f"@{row['user_id']}:{self.server_name}",
+                    row["displayname"],
+                    row["avatar_url"],
+                )
+                for row in profile_rows
+            }
+
+            profiles_to_insert = [
+                profiles.get(user_id) or _UserDirProfile(user_id)
+                for user_id in users_to_insert
+            ]
+
+            # Actually insert the users with their profiles into the directory.
+            self._update_profiles_in_user_dir_txn(txn, profiles_to_insert)
+
+            # We've finished processing the users. Delete it from the table.
+            self.db_pool.simple_delete_many_txn(
+                txn,
+                table=TEMP_TABLE + "_users",
+                column="user_id",
+                values=users_to_work_on,
+                keyvalues={},
+            )
+
+            # Update the remaining counter.
+            progress["remaining"] -= len(users_to_work_on)
+            self.db_pool.updates._background_update_progress_txn(
+                txn, "populate_user_directory_process_users", progress
+            )
+            return len(users_to_work_on)
+
+        processed_count = await self.db_pool.runInteraction(
+            "populate_user_directory_temp", _populate_user_directory_process_users_txn
         )
 
         # No more users -- complete the transaction.
-        if not users_to_work_on:
+        if not processed_count:
             await self.db_pool.updates._end_background_update(
                 "populate_user_directory_process_users"
             )
             return 1
 
-        logger.debug(
-            "Processing the next %d users of %d remaining"
-            % (len(users_to_work_on), progress["remaining"])
-        )
-
-        # First filter down to users we want to insert into the user directory.
-        users_to_insert = await self.db_pool.runInteraction(
-            "populate_user_directory_process_users_filter",
-            self._filter_local_users_for_dir_txn,
-            users_to_work_on,
-        )
-
-        # Next fetch their profiles. Note that the `user_id` here is the
-        # *localpart*, and that not all users have profiles.
-        profile_rows = await self.db_pool.simple_select_many_batch(
-            table="profiles",
-            column="user_id",
-            iterable=[get_localpart_from_id(u) for u in users_to_insert],
-            retcols=(
-                "user_id",
-                "displayname",
-                "avatar_url",
-            ),
-            keyvalues={},
-            desc="populate_user_directory_process_users_get_profiles",
-        )
-        profiles = {
-            f"@{row['user_id']}:{self.server_name}": _UserDirProfile(
-                f"@{row['user_id']}:{self.server_name}",
-                row["displayname"],
-                row["avatar_url"],
-            )
-            for row in profile_rows
-        }
-
-        profiles_to_insert = [
-            profiles.get(user_id) or _UserDirProfile(user_id)
-            for user_id in users_to_insert
-        ]
-
-        # Actually insert the users with their profiles into the directory.
-        await self.db_pool.runInteraction(
-            "populate_user_directory_process_users_insertion",
-            self._update_profiles_in_user_dir_txn,
-            profiles_to_insert,
-        )
-
-        # We've finished processing the users. Delete it from the table.
-        await self.db_pool.simple_delete_many(
-            table=TEMP_TABLE + "_users",
-            column="user_id",
-            iterable=users_to_work_on,
-            keyvalues={},
-            desc="populate_user_directory_process_users_delete",
-        )
-
-        # Update the remaining counter.
-        progress["remaining"] -= len(users_to_work_on)
-        await self.db_pool.runInteraction(
-            "populate_user_directory",
-            self.db_pool.updates._background_update_progress_txn,
-            "populate_user_directory_process_users",
-            progress,
-        )
-
-        return len(users_to_work_on)
+        return processed_count
 
     async def should_include_local_user_in_dir(self, user: str) -> bool:
         """Certain classes of local user are omitted from the user directory.
