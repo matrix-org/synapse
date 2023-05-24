@@ -915,6 +915,13 @@ class FederationEventHandler:
             )
         )
 
+        # We construct the event lists in source order from `/backfill` response because
+        # it's a) easiest, but also b) the order in which we process things matters for
+        # MSC2716 historical batches because many historical events are all at the same
+        # `depth` and we rely on the tenuous sort that the other server gave us and hope
+        # they're doing their best. The brittle nature of this ordering for historical
+        # messages over federation is one of the reasons why we don't want to continue
+        # on MSC2716 until we have online topological ordering.
         events_with_failed_pull_attempts, fresh_events = partition(
             new_events, lambda e: e.event_id in event_ids_with_failed_pull_attempts
         )
