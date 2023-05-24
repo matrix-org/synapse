@@ -360,12 +360,23 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         def _populate_user_directory_process_users_txn(
             txn: LoggingTransaction,
         ) -> Optional[int]:
-            sql = "SELECT user_id FROM %s ORDER BY user_id LIMIT %s" % (
-                TEMP_TABLE + "_users",
-                str(batch_size),
-            )
-            txn.execute(sql)
-            user_result = cast(List[Tuple[str]], txn.fetchall())
+            if self.database_engine.supports_returning:
+                sql = f"""
+                    DELETE FROM {TEMP_TABLE + "_users"}
+                    WHERE user_id IN (
+                        SELECT user_id FROM {TEMP_TABLE + "_users"} ORDER BY user_id LIMIT ?
+                    )
+                    RETURNING user_id
+                """
+                txn.execute(sql, (batch_size,))
+                user_result = cast(List[Tuple[str]], txn.fetchall())
+            else:
+                sql = "SELECT user_id FROM %s ORDER BY user_id LIMIT %s" % (
+                    TEMP_TABLE + "_users",
+                    str(batch_size),
+                )
+                txn.execute(sql)
+                user_result = cast(List[Tuple[str]], txn.fetchall())
 
             if not user_result:
                 return None
@@ -426,14 +437,16 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             # Actually insert the users with their profiles into the directory.
             self._update_profiles_in_user_dir_txn(txn, profiles_to_insert)
 
-            # We've finished processing the users. Delete it from the table.
-            self.db_pool.simple_delete_many_txn(
-                txn,
-                table=TEMP_TABLE + "_users",
-                column="user_id",
-                values=users_to_work_on,
-                keyvalues={},
-            )
+            # We've finished processing the users. Delete it from the table, if
+            # we haven't already.
+            if not self.database_engine.supports_returning:
+                self.db_pool.simple_delete_many_txn(
+                    txn,
+                    table=TEMP_TABLE + "_users",
+                    column="user_id",
+                    values=users_to_work_on,
+                    keyvalues={},
+                )
 
             # Update the remaining counter.
             progress["remaining"] -= len(users_to_work_on)
