@@ -115,8 +115,11 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         if ret_arg is None:
             ret_arg = signature.ret_type
 
-        # This should be able to use ctx.api.lookup_typeinfo, but that doesn't seem
-        # to find the correct symbol.
+        # This should be able to use ctx.api.named_generic_type, but that doesn't seem
+        # to find the correct symbol for anything more than 1 module deep.
+        #
+        # modules is not part of CheckerPluginInterface. The following is a combination
+        # of TypeChecker.named_generic_type and TypeChecker.lookup_typeinfo.
         sym = ctx.api.modules["twisted.internet.defer"].names.get("Deferred")  # type: ignore[attr-defined]
         ret_type = Instance(sym.node, [remove_instance_last_known_values(ret_arg)])
 
