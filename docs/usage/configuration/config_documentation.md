@@ -2582,8 +2582,8 @@ the user-interactive authentication process, by allowing for multiple
 (and potentially different) operations to use the same validation session.
 
 This is ignored for potentially "dangerous" operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).
 
 Use the `session_timeout` sub-option here to change the time allowed for credential validation.
 
@@ -2591,6 +2591,27 @@ Example configuration:
 ```yaml
 ui_auth:
     session_timeout: "15s"
+```
+---
+### `login_via_existing_session`
+
+Matrix supports the ability of an existing session to mint a login token for
+another client.
+
+Synapse disables this by default as it has security ramifications.
+
+The duration of time the generated token is valid for can be configured with the
+`token_timeout` sub-option.
+
+User-interactive authentication is required when this is enabled unless the
+`require_ui_auth` sub-option is set to `False`.
+
+Example configuration:
+```yaml
+login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: "5m"
 ```
 ---
 ## Metrics
