@@ -914,7 +914,7 @@ class FederationEventHandler:
         )
 
         # Process previously failed backfill events in the background to not waste
-        # time on something that is bound to fail again.
+        # time on something that is likely to fail again.
         events_with_failed_pull_attempts = [
             event
             for event in new_events
