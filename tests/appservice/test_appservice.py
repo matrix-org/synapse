@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
-from typing import Generator
+from typing import Any, Generator
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -49,15 +49,13 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_regex_user_id_prefix_match(
         self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    ) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@irc_foobar:matrix.org"
         self.assertTrue(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
@@ -65,15 +63,13 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_regex_user_id_prefix_no_match(
         self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    ) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@someone_else:matrix.org"
         self.assertFalse(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
@@ -81,17 +77,15 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_regex_room_member_is_checked(
         self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    ) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@someone_else:matrix.org"
         self.event.type = "m.room.member"
         self.event.state_key = "@irc_foobar:matrix.org"
         self.assertTrue(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
@@ -99,17 +93,15 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_regex_room_id_match(
         self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    ) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_ROOMS].append(
             _regex("!some_prefix.*some_suffix:matrix.org")
         )
         self.event.room_id = "!some_prefixs0m3th1nGsome_suffix:matrix.org"
         self.assertTrue(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
@@ -117,25 +109,21 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_regex_room_id_no_match(
         self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    ) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_ROOMS].append(
             _regex("!some_prefix.*some_suffix:matrix.org")
         )
         self.event.room_id = "!XqBunHwQIXUiqCaoxq:matrix.org"
         self.assertFalse(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
 
     @defer.inlineCallbacks
-    def test_regex_alias_match(
-        self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    def test_regex_alias_match(self) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org")
         )
@@ -145,10 +133,8 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.store.get_local_users_in_room = simple_async_mock([])
         self.assertTrue(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
@@ -192,7 +178,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_regex_alias_no_match(
         self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    ) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org")
         )
@@ -213,7 +199,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_regex_multiple_matches(
         self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    ) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org")
         )
@@ -223,18 +209,14 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.store.get_local_users_in_room = simple_async_mock([])
         self.assertTrue(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
 
     @defer.inlineCallbacks
-    def test_interested_in_self(
-        self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    def test_interested_in_self(self) -> Generator["defer.Deferred[Any]", object, None]:
         # make sure invites get through
         self.service.sender = "@appservice:name"
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
@@ -243,18 +225,14 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.event.state_key = self.service.sender
         self.assertTrue(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )
 
     @defer.inlineCallbacks
-    def test_member_list_match(
-        self,
-    ) -> Generator["defer.Deferred[object]", object, None]:
+    def test_member_list_match(self) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         # Note that @irc_fo:here is the AS user.
         self.store.get_local_users_in_room = simple_async_mock(
@@ -265,10 +243,8 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.event.sender = "@xmpp_foobar:matrix.org"
         self.assertTrue(
             (
-                yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(
-                        self.event.event_id, self.event, self.store
-                    )
+                yield self.service.is_interested_in_event(
+                    self.event.event_id, self.event, self.store
                 )
             )
         )

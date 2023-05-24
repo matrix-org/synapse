@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from authlib.jose import JsonWebToken, JWTClaims
 from authlib.jose.errors import BadSignatureError, InvalidClaimError, JoseError
 
-from synapse.api.errors import Codes, LoginError, StoreError, UserDeactivatedError
+from synapse.api.errors import Codes, LoginError
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -26,7 +26,6 @@ if TYPE_CHECKING:
 class JwtHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self._main_store = hs.get_datastores().main
 
         self.jwt_secret = hs.config.jwt.jwt_secret
         self.jwt_subject_claim = hs.config.jwt.jwt_subject_claim
@@ -34,7 +33,7 @@ class JwtHandler:
         self.jwt_issuer = hs.config.jwt.jwt_issuer
         self.jwt_audiences = hs.config.jwt.jwt_audiences
 
-    async def validate_login(self, login_submission: JsonDict) -> str:
+    def validate_login(self, login_submission: JsonDict) -> str:
         """
         Authenticates the user for the /login API
 
@@ -103,16 +102,4 @@ class JwtHandler:
         if user is None:
             raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 
-        user_id = UserID(user, self.hs.hostname).to_string()
-
-        # If the account has been deactivated, do not proceed with the login
-        # flow.
-        try:
-            deactivated = await self._main_store.get_user_deactivated_status(user_id)
-        except StoreError:
-            # JWT lazily creates users, so they may not exist in the database yet.
-            deactivated = False
-        if deactivated:
-            raise UserDeactivatedError("This account has been deactivated")
-
-        return user_id
+        return UserID(user, self.hs.hostname).to_string()
