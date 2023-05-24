@@ -897,8 +897,10 @@ class FederationEventHandler:
 
         @trace
         async def _process_new_pulled_events(new_events: Collection[EventBase]) -> None:
-            # We want to sort these by depth so we process them and
-            # tell clients about them in order.
+            # We want to sort these by depth so we process them and tell clients about
+            # them in order. It's also more efficient to backfill this way (`depth`
+            # ascending) because one backfill event is likely to be the `prev_event` of
+            # the next event we're going to process.
             sorted_events = sorted(new_events, key=lambda x: x.depth)
             for ev in sorted_events:
                 with nested_logging_context(ev.event_id):
