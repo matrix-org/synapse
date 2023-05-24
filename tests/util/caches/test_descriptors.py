@@ -644,7 +644,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         class A:
             @cached()
-            def func(self, key: str) -> Deferred[int]:
+            def func(self, key: str) -> "Deferred[int]":
                 callcount[0] += 1
                 return d
 
