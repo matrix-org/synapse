@@ -784,6 +784,13 @@ class SimpleHttpClient(BaseHttpClient):
                 self.reactor, self._ip_allowlist, self._ip_blocklist
             )
 
+        # If no connection pool was given, create a default one.
+        #
+        # This differs from _AgentBase.__init__ by creating a HTTPConnectionPool
+        # which uses persistent connections.
+        if connection_pool is None:
+            connection_pool = HTTPConnectionPool(self.reactor)
+
         self.agent: IAgent = ProxyAgent(
             self.reactor,
             hs.get_reactor(),
