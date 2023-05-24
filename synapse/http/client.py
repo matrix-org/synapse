@@ -761,6 +761,7 @@ class SimpleHttpClient(BaseHttpClient):
            request if it were otherwise caught in a blocklist.
         use_proxy: Whether proxy settings should be discovered and used
             from conventional environment variables.
+        connection_pool: The connection pool to use for this client's agent.
     """
 
     def __init__(
@@ -770,6 +771,7 @@ class SimpleHttpClient(BaseHttpClient):
         ip_allowlist: Optional[IPSet] = None,
         ip_blocklist: Optional[IPSet] = None,
         use_proxy: bool = False,
+        connection_pool: Optional[HTTPConnectionPool] = None,
     ):
         super().__init__(hs, treq_args=treq_args)
         self._ip_allowlist = ip_allowlist
@@ -782,22 +784,12 @@ class SimpleHttpClient(BaseHttpClient):
                 self.reactor, self._ip_allowlist, self._ip_blocklist
             )
 
-        # the pusher makes lots of concurrent SSL connections to Sygnal, and tends to
-        # do so in batches, so we need to allow the pool to keep lots of idle
-        # connections around.
-        pool = HTTPConnectionPool(self.reactor)
-        # XXX: The justification for using the cache factor here is that larger
-        # instances will need both more cache and more connections.
-        # Still, this should probably be a separate dial
-        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
-        pool.cachedConnectionTimeout = 2 * 60
-
         self.agent: IAgent = ProxyAgent(
             self.reactor,
             hs.get_reactor(),
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
-            pool=pool,
+            pool=connection_pool,
             use_proxy=use_proxy,
         )
 
