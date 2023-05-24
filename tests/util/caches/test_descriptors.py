@@ -30,7 +30,6 @@ from unittest import mock
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.internet.interfaces import IReactorTime
-from twisted.python.failure import Failure
 
 from synapse.api.errors import SynapseError
 from synapse.logging.context import (
