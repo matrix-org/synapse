@@ -1,0 +1,1 @@
+Add a new `send_federation_http_request` method to the Module API to allow Synapse modules to make matrix federation requests over HTTP.

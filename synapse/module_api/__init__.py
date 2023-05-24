@@ -37,7 +37,12 @@ from twisted.internet import defer
 from twisted.web.resource import Resource
 
 from synapse.api import errors
-from synapse.api.errors import SynapseError
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.events import EventBase
 from synapse.events.presence_router import (
     GET_INTERESTED_USERS_CALLBACK,
@@ -132,6 +137,14 @@ from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import CachedFunction, cached as _cached
 from synapse.util.frozenutils import freeze
+from synapse.util.retryutils import NotRetryingDestination
+
+from .errors import (
+    FederationHttpDeniedException,
+    FederationHttpNotRetryingDestinationException,
+    FederationHttpRequestSendFailedException,
+    FederationHttpResponseException,
+)
 
 if TYPE_CHECKING:
     from synapse.app.generic_worker import GenericWorkerStore
@@ -1664,6 +1677,123 @@ class ModuleApi:
             by_admin=True,
             deactivation=deactivation,
         )
+
+    async def _try_federation_http_request(
+        self,
+        method: str,
+        remote_server_name: str,
+        path: str,
+        query_parameters: Optional[Dict[str, Any]],
+        body: Optional[JsonDict] = None,
+        timeout: Optional[int] = None,
+    ) -> Union[JsonDict, List]:
+        """
+        Send a federation request to a remote homeserver and return the response.
+
+        This method assumes the `method` argument is fully capitalised.
+
+        A helper method for self.send_federation_http_request, see that method for
+        more details.
+        """
+        assert method in ["GET", "PUT", "POST", "DELETE"]
+
+        fed_client = self._hs.get_federation_http_client()
+
+        if method == "GET":
+            return await fed_client.get_json(
+                destination=remote_server_name,
+                path=path,
+                args=query_parameters,
+                timeout=timeout,
+            )
+        elif method == "PUT":
+            return await fed_client.put_json(
+                destination=remote_server_name,
+                path=path,
+                args=query_parameters,
+                data=body,
+                timeout=timeout,
+            )
+        elif method == "POST":
+            return await fed_client.post_json(
+                destination=remote_server_name,
+                path=path,
+                args=query_parameters,
+                data=body,
+                timeout=timeout,
+            )
+        elif method == "DELETE":
+            return await fed_client.delete_json(
+                destination=remote_server_name,
+                path=path,
+                args=query_parameters,
+                timeout=timeout,
+            )
+
+        return {}
+
+    async def send_federation_http_request(
+        self,
+        method: str,
+        remote_server_name: str,
+        path: str,
+        query_parameters: Optional[Dict[str, Any]],
+        body: Optional[JsonDict] = None,
+        timeout: Optional[int] = None,
+    ) -> Union[JsonDict, List]:
+        """
+        Send an HTTP federation request to a remote homeserver.
+
+        Added in Synapse v1.79.0.
+
+        If the request is successful, the parsed response body will be returned. If
+        unsuccessful, an exception will be raised. Callers are expected to handle the
+        possible exception cases. See exception class docstrings for a more detailed
+        explanation of each.
+
+        Args:
+            method: The HTTP method to use. Must be one of: "GET", "PUT", "POST",
+                "DELETE".
+            remote_server_name: The remote server to send the request to. This method
+                 will resolve delegated homeserver URLs automatically (well-known etc).
+            path: The HTTP path for the request.
+            query_parameters: Any query parameters for the request.
+            body: The body of the request.
+            timeout: The timeout in seconds to wait before giving up on a request.
+
+        Returns:
+            The response to the request as a Python object.
+
+        Raises:
+            FederationHttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+            FederationHttpNotRetryingDestinationException: If the homeserver believes the
+                remote homeserver is down and is not yet ready to attempt to contact it.
+            FederationHttpDeniedException: If this destination is not on the local
+                homeserver's configured federation whitelist.
+            FederationHttpRequestSendFailedException: If there were problems connecting
+                to the remote, due to e.g. DNS failures, connection timeouts etc.
+        """
+        try:
+            return await self._try_federation_http_request(
+                method.upper(), remote_server_name, path, query_parameters, body, timeout
+            )
+        except HttpResponseException as e:
+            raise FederationHttpResponseException(
+                remote_server_name,
+                status_code=e.code,
+                msg=e.msg,
+                response_body=e.response,
+            )
+        except NotRetryingDestination:
+            raise FederationHttpNotRetryingDestinationException(remote_server_name)
+        except FederationDeniedError:
+            raise FederationHttpDeniedException(remote_server_name)
+        except RequestSendFailed as e:
+            raise FederationHttpRequestSendFailedException(
+                remote_server_name,
+                can_retry=e.can_retry,
+            )
 
 
 class PublicRoomListManager:

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Exception types which are exposed as part of the stable module API"""
+import attr
 
 from synapse.api.errors import (
     Codes,
@@ -24,6 +25,57 @@ from synapse.config._base import ConfigError
 from synapse.handlers.push_rules import InvalidRuleException
 from synapse.storage.push_rule import RuleNotFoundException
 
+
+@attr.s(auto_attribs=True)
+class FederationHttpResponseException(Exception):
+    """
+    Raised when an HTTP request over federation returns a status code > 300 (and not 429).
+    """
+
+    remote_server_name: str
+    # The HTTP status code of the response.
+    status_code: int
+    # A human-readable explanation for the error.
+    msg: str
+    # The non-parsed HTTP response body.
+    response_body: bytes
+
+
+@attr.s(auto_attribs=True)
+class FederationHttpNotRetryingDestinationException(Exception):
+    """
+    Raised when the local homeserver refuses to send traffic to a remote homeserver that
+    it believes is experiencing an outage.
+    """
+
+    remote_server_name: str
+
+
+@attr.s(auto_attribs=True)
+class FederationHttpDeniedException(Exception):
+    """
+    Raised when the local homeserver refuses to send federation traffic to a remote
+    homeserver. This is due to the remote homeserver not being on the configured
+    federation whitelist.
+    """
+
+    remote_server_name: str
+
+
+@attr.s(auto_attribs=True)
+class FederationHttpRequestSendFailedException(Exception):
+    """
+    Raised when there are problems connecting to the remote homeserver due to e.g.
+    DNS failures, connection timeouts, etc.
+    """
+
+    remote_server_name: str
+    # Whether the request can be retried with a chance of success. This will be True
+    # if the failure occurred due to e.g. timeouts, a disruption in the connection etc.
+    # Will be false in the case of e.g. a malformed response from the remote homeserver.
+    can_retry: bool
+
+
 __all__ = [
     "Codes",
     "InvalidClientCredentialsError",
@@ -32,4 +84,8 @@ __all__ = [
     "ConfigError",
     "InvalidRuleException",
     "RuleNotFoundException",
+    "FederationHttpResponseException",
+    "FederationHttpNotRetryingDestinationException",
+    "FederationHttpDeniedException",
+    "FederationHttpRequestSendFailedException",
 ]
