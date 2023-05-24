@@ -357,7 +357,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """
 
         def _get_next_batch(txn: LoggingTransaction) -> Optional[List[str]]:
-            sql = "SELECT user_id FROM %s LIMIT %s" % (
+            sql = "SELECT user_id FROM %s ORDER BY user_id LIMIT %s" % (
                 TEMP_TABLE + "_users",
                 str(batch_size),
             )
