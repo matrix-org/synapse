@@ -17,6 +17,7 @@ import re
 import unicodedata
 from typing import (
     TYPE_CHECKING,
+    Collection,
     Iterable,
     List,
     Mapping,
@@ -45,7 +46,7 @@ from synapse.util.stringutils import non_null_str_or_none
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, UserTypes
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -397,11 +398,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
         # First filter down to users we want to insert into the user directory.
-        users_to_insert = [
-            user_id
-            for user_id in users_to_work_on
-            if await self.should_include_local_user_in_dir(user_id)
-        ]
+        users_to_insert = await self.db_pool.runInteraction(
+            "populate_user_directory_process_users_filter",
+            self._filter_local_users_for_dir_txn,
+            users_to_work_on,
+        )
 
         # Next fetch their profiles. Note that the `user_id` here is the
         # *localpart*, and that not all users have profiles.
@@ -493,6 +494,30 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             return False
 
         return True
+
+    def _filter_local_users_for_dir_txn(
+        self, txn: LoggingTransaction, users: Collection[str]
+    ) -> Collection[str]:
+        """A batched version of `should_include_local_user_in_dir`"""
+        users = [
+            user
+            for user in users
+            if self.get_app_service_by_user_id(user) is None  # type: ignore[attr-defined]
+            and not self.get_if_app_services_interested_in_user(user)  # type: ignore[attr-defined]
+        ]
+
+        rows = self.db_pool.simple_select_many_txn(
+            txn,
+            table="users",
+            column="name",
+            iterable=users,
+            keyvalues={
+                "deactivated": 0,
+            },
+            retcols=("name", "user_type"),
+        )
+
+        return [row["name"] for row in rows if row["user_type"] != UserTypes.SUPPORT]
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
         """Check if the room is either world_readable or publically joinable"""
