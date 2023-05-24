@@ -90,7 +90,6 @@ from synapse.handlers.room import (
     RoomShutdownHandler,
     TimestampLookupHandler,
 )
-from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import (
     RoomForgetterHandler,
@@ -486,10 +485,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
         return RoomCreationHandler(self)
-
-    @cache_in_self
-    def get_room_batch_handler(self) -> RoomBatchHandler:
-        return RoomBatchHandler(self)
 
     @cache_in_self
     def get_room_shutdown_handler(self) -> RoomShutdownHandler:
