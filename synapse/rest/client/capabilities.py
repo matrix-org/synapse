@@ -65,6 +65,9 @@ class CapabilitiesRestServlet(RestServlet):
                 "m.3pid_changes": {
                     "enabled": self.config.registration.enable_3pid_changes
                 },
+                "m.get_login_token": {
+                    "enabled": self.config.auth.login_via_existing_enabled,
+                },
             }
         }
 
@@ -81,11 +84,6 @@ class CapabilitiesRestServlet(RestServlet):
         if self.config.experimental.msc3664_enabled:
             response["capabilities"]["im.nheko.msc3664.related_event_match"] = {
                 "enabled": self.config.experimental.msc3664_enabled,
-            }
-
-        if self.config.experimental.msc3882_enabled:
-            response["capabilities"]["org.matrix.msc3882.get_login_token"] = {
-                "enabled": True,
             }
 
         return HTTPStatus.OK, response

@@ -55,12 +55,12 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", endpoint, {}, access_token=token)
         self.assertEqual(channel.code, 404)
 
-    @override_config({"experimental_features": {"msc3882_enabled": True}})
+    @override_config({"login_via_existing_session": {"enabled": True}})
     def test_require_auth(self) -> None:
         channel = self.make_request("POST", endpoint, {}, access_token=None)
         self.assertEqual(channel.code, 401)
 
-    @override_config({"experimental_features": {"msc3882_enabled": True}})
+    @override_config({"login_via_existing_session": {"enabled": True}})
     def test_uia_on(self) -> None:
         user_id = self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
@@ -95,7 +95,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["user_id"], user_id)
 
     @override_config(
-        {"experimental_features": {"msc3882_enabled": True, "msc3882_ui_auth": False}}
+        {"login_via_existing_session": {"enabled": True, "require_ui_auth": False}}
     )
     def test_uia_off(self) -> None:
         user_id = self.register_user(self.user, self.password)
@@ -117,10 +117,10 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config(
         {
-            "experimental_features": {
-                "msc3882_enabled": True,
-                "msc3882_ui_auth": False,
-                "msc3882_token_timeout": "15s",
+            "login_via_existing_session": {
+                "enabled": True,
+                "require_ui_auth": False,
+                "token_timeout": "15s",
             }
         }
     )

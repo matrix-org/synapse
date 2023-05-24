@@ -187,7 +187,8 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             for room_version in details["support"]:
                 self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, str(room_version))
 
-    def test_get_does_not_include_msc3882_fields_when_disabled(self) -> None:
+    def test_get_get_token_login_fields_when_disabled(self) -> None:
+        """By default login via an existing session is disabled."""
         access_token = self.get_success(
             self.auth_handler.create_access_token_for_user_id(
                 self.user, device_id=None, valid_until_ms=None
@@ -198,13 +199,10 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, HTTPStatus.OK)
-        self.assertTrue(
-            "org.matrix.msc3882.get_login_token" not in capabilities
-            or not capabilities["org.matrix.msc3882.get_login_token"]["enabled"]
-        )
+        self.assertFalse(capabilities["m.get_login_token"]["enabled"])
 
-    @override_config({"experimental_features": {"msc3882_enabled": True}})
-    def test_get_does_include_msc3882_fields_when_enabled(self) -> None:
+    @override_config({"login_via_existing_session": {"enabled": True}})
+    def test_get_get_token_login_fields_when_enabled(self) -> None:
         access_token = self.get_success(
             self.auth_handler.create_access_token_for_user_id(
                 self.user, device_id=None, valid_until_ms=None
@@ -215,4 +213,4 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, HTTPStatus.OK)
-        self.assertTrue(capabilities["org.matrix.msc3882.get_login_token"]["enabled"])
+        self.assertTrue(capabilities["m.get_login_token"]["enabled"])

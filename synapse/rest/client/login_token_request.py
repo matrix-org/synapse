@@ -58,15 +58,15 @@ class LoginTokenRequestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.server_name = hs.config.server.server_name
         self.auth_handler = hs.get_auth_handler()
-        self.token_timeout = hs.config.experimental.msc3882_token_timeout
-        self.ui_auth = hs.config.experimental.msc3882_ui_auth
+        self.token_timeout = hs.config.auth.login_via_existing_token_timeout
+        self._require_ui_auth = hs.config.auth.login_via_existing_require_ui_auth
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
 
-        if self.ui_auth:
+        if self._require_ui_auth:
             await self.auth_handler.validate_user_via_ui_auth(
                 requester,
                 request,
@@ -91,5 +91,5 @@ class LoginTokenRequestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    if hs.config.experimental.msc3882_enabled:
+    if hs.config.auth.login_via_existing_enabled:
         LoginTokenRequestServlet(hs).register(http_server)

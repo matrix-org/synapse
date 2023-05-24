@@ -446,20 +446,16 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             ApprovalNoticeMedium.NONE, channel.json_body["approval_notice_medium"]
         )
 
-    def test_get_login_flows_with_msc3882_disabled(self) -> None:
+    def test_get_login_flows_with_login_via_existing_disabled(self) -> None:
         """GET /login should return m.login.token without get_login_token true"""
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
 
         flows = {flow["type"]: flow for flow in channel.json_body["flows"]}
-        self.assertTrue(
-            "m.login.token" not in flows
-            or "org.matrix.msc3882.get_login_token" not in flows["m.login.token"]
-            or not flows["m.login.token"]["org.matrix.msc3882.get_login_token"]
-        )
+        self.assertNotIn("m.login.token", flows)
 
-    @override_config({"experimental_features": {"msc3882_enabled": True}})
-    def test_get_login_flows_with_msc3882_enabled(self) -> None:
+    @override_config({"login_via_existing_session": {"enabled": True}})
+    def test_get_login_flows_with_login_via_existing_enabled(self) -> None:
         """GET /login should return m.login.token without get_login_token true"""
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
@@ -467,7 +463,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertCountEqual(
             channel.json_body["flows"],
             [
-                {"type": "m.login.token", "org.matrix.msc3882.get_login_token": True},
+                {"type": "m.login.token", "m.get_login_token": True},
                 {"type": "m.login.password"},
                 {"type": "m.login.application_service"},
             ],

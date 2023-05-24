@@ -104,8 +104,8 @@ class LoginRestServlet(RestServlet):
             and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
 
-        # Whether MSC3882 get login token is enabled.
-        self._get_login_token_enabled = hs.config.experimental.msc3882_enabled
+        # Whether get login token is enabled.
+        self._get_login_token_enabled = hs.config.auth.login_via_existing_enabled
 
         self.auth = hs.get_auth()
 
@@ -145,8 +145,8 @@ class LoginRestServlet(RestServlet):
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
-        # MSC3882 requires m.login.token to be advertised
-        supportLoginTokenFlow = self._get_login_token_enabled
+        # The login token flow requires m.login.token to be advertised.
+        support_login_token_flow = self._get_login_token_enabled
 
         if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
             flows.append(
@@ -160,13 +160,13 @@ class LoginRestServlet(RestServlet):
             )
 
             # SSO requires a login token to be generated, so we need to advertise that flow
-            supportLoginTokenFlow = True
+            support_login_token_flow = True
 
-        if supportLoginTokenFlow:
+        if support_login_token_flow:
             tokenTypeFlow: Dict[str, Any] = {"type": LoginRestServlet.TOKEN_TYPE}
-            # If MSC3882 is enabled we advertise the get_login_token flag.
+            # If the login token flow is enabled advertise the get_login_token flag.
             if self._get_login_token_enabled:
-                tokenTypeFlow["org.matrix.msc3882.get_login_token"] = True
+                tokenTypeFlow["m.get_login_token"] = True
             flows.append(tokenTypeFlow)
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
