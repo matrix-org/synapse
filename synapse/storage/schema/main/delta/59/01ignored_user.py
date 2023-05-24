@@ -20,18 +20,14 @@ import logging
 from io import StringIO
 
 from synapse.storage._base import db_to_json
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import execute_statements_from_stream
-from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
 
-def run_upgrade(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
-    pass
-
-
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     logger.info("Creating ignored_users table")
     execute_statements_from_stream(cur, StringIO(_create_commands))
 

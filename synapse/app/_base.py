@@ -21,6 +21,7 @@ import socket
 import sys
 import traceback
 import warnings
+from textwrap import indent
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -64,8 +65,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ListenerConfig, ManholeConfig, TCPListenerConfig
 from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
-from synapse.events.spamcheck import load_legacy_spam_checkers
-from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.http.site import SynapseSite
 from synapse.logging.context import PreserveLoggingContext
@@ -73,6 +72,10 @@ from synapse.logging.opentracing import init_tracer
 from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
+from synapse.module_api.callbacks.spamchecker_callbacks import load_legacy_spam_checkers
+from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
+    load_legacy_third_party_event_rules,
+)
 from synapse.types import ISynapseReactor
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
@@ -210,8 +213,12 @@ def handle_startup_exception(e: Exception) -> NoReturn:
     # Exceptions that occur between setting up the logging and forking or starting
     # the reactor are written to the logs, followed by a summary to stderr.
     logger.exception("Exception during startup")
+
+    error_string = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    indented_error_string = indent(error_string, "    ")
+
     quit_with_error(
-        f"Error during initialisation:\n   {e}\nThere may be more information in the logs."
+        f"Error during initialisation:\n{indented_error_string}\nThere may be more information in the logs."
     )
 
 

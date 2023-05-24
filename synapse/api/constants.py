@@ -215,6 +215,8 @@ class EventContentFields:
     FEDERATE: Final = "m.federate"
 
     # The creator of the room, as used in `m.room.create` events.
+    #
+    # This is deprecated in MSC2175.
     ROOM_CREATOR: Final = "creator"
 
     # Used in m.room.guest_access events.
@@ -255,6 +257,7 @@ class AccountDataTypes:
     DIRECT: Final = "m.direct"
     IGNORED_USER_LIST: Final = "m.ignored_user_list"
     TAG: Final = "m.tag"
+    PUSH_RULES: Final = "m.push_rules"
 
 
 class HistoryVisibility:

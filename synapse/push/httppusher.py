@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 from prometheus_client import Counter
 
@@ -27,6 +28,7 @@ from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.storage.databases.main.event_push_actions import HttpPushAction
+from synapse.types import JsonDict, JsonMapping
 
 from . import push_tools
 
@@ -56,7 +58,7 @@ http_badges_failed_counter = Counter(
 )
 
 
-def tweaks_for_actions(actions: List[Union[str, Dict]]) -> Dict[str, Any]:
+def tweaks_for_actions(actions: List[Union[str, Dict]]) -> JsonMapping:
     """
     Converts a list of actions into a `tweaks` dict (which can then be passed to
         the push gateway).
@@ -101,6 +103,7 @@ class HttpPusher(Pusher):
         self._storage_controllers = self.hs.get_storage_controllers()
         self.app_display_name = pusher_config.app_display_name
         self.device_display_name = pusher_config.device_display_name
+        self.device_id = pusher_config.device_id
         self.pushkey_ts = pusher_config.ts
         self.data = pusher_config.data
         self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
@@ -111,6 +114,8 @@ class HttpPusher(Pusher):
             hs.config.push.push_group_unread_count_by_room
         )
         self._pusherpool = hs.get_pusherpool()
+
+        self.push_jitter_delay_ms = hs.config.push.push_jitter_delay_ms
 
         self.data = pusher_config.data
         if self.data is None:
@@ -138,7 +143,7 @@ class HttpPusher(Pusher):
             )
 
         self.url = url
-        self.http_client = hs.get_proxied_blacklisted_http_client()
+        self.http_client = hs.get_proxied_blocklisted_http_client()
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
         del self.data_minus_url["url"]
@@ -324,7 +329,22 @@ class HttpPusher(Pusher):
         event = await self.store.get_event(push_action.event_id, allow_none=True)
         if event is None:
             return True  # It's been redacted
-        rejected = await self.dispatch_push(event, tweaks, badge)
+
+        # Check if we should delay sending out the notification by a random
+        # amount.
+        #
+        # Note: we base the delay off of when the event was sent, rather than
+        # now, to handle the case where we need to send out many notifications
+        # at once. If we just slept the random amount each loop then the last
+        # push notification in the set could be delayed by many times the max
+        # delay.
+        if self.push_jitter_delay_ms:
+            delay_ms = random.randint(1, self.push_jitter_delay_ms)
+            diff_ms = event.origin_server_ts + delay_ms - self.clock.time_msec()
+            if diff_ms > 0:
+                await self.clock.sleep(diff_ms / 1000)
+
+        rejected = await self.dispatch_push_event(event, tweaks, badge)
         if rejected is False:
             return False
 
@@ -342,9 +362,83 @@ class HttpPusher(Pusher):
                     await self._pusherpool.remove_pusher(self.app_id, pk, self.user_id)
         return True
 
-    async def _build_notification_dict(
-        self, event: EventBase, tweaks: Dict[str, bool], badge: int
-    ) -> Dict[str, Any]:
+    async def dispatch_push(
+        self,
+        content: JsonDict,
+        tweaks: Optional[JsonMapping] = None,
+        default_payload: Optional[JsonMapping] = None,
+    ) -> Union[bool, List[str]]:
+        """Send a notification to the registered push gateway, with `content` being
+        the content of the `notification` top property specified in the spec.
+        Note that the `devices` property will be added with device-specific
+        information for this pusher.
+
+        Args:
+            content: the content
+            tweaks: tweaks to add into the `devices` section
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+                This will be merged (and override if some matching values already exist there)
+                with existing `default_payload`.
+
+        Returns:
+            False if an error occured when calling the push gateway, or an array of
+            rejected push keys otherwise. If this array is empty, the push fully
+            succeeded.
+        """
+        content = content.copy()
+
+        data = self.data_minus_url.copy()
+        if default_payload:
+            data.setdefault("default_payload", {}).update(default_payload)
+
+        device = {
+            "app_id": self.app_id,
+            "pushkey": self.pushkey,
+            "pushkey_ts": int(self.pushkey_ts / 1000),
+            "data": data,
+        }
+        if tweaks:
+            device["tweaks"] = tweaks
+
+        content["devices"] = [device]
+
+        try:
+            resp = await self.http_client.post_json_get_json(
+                self.url, {"notification": content}
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to push data to %s: %s %s",
+                self.name,
+                type(e),
+                e,
+            )
+            return False
+        rejected = []
+        if "rejected" in resp:
+            rejected = resp["rejected"]
+        return rejected
+
+    async def dispatch_push_event(
+        self,
+        event: EventBase,
+        tweaks: JsonMapping,
+        badge: int,
+    ) -> Union[bool, List[str]]:
+        """Send a notification to the registered push gateway by building it
+        from an event.
+
+        Args:
+            event: the event
+            tweaks: tweaks to add into the `devices` section, used to decide the
+                push priority
+            badge: unread count to send with the push notification
+
+        Returns:
+            False if an error occured when calling the push gateway, or an array of
+            rejected push keys otherwise. If this array is empty, the push fully
+            succeeded.
+        """
         priority = "low"
         if (
             event.type == EventTypes.Encrypted
@@ -358,30 +452,20 @@ class HttpPusher(Pusher):
         # This was checked in the __init__, but mypy doesn't seem to know that.
         assert self.data is not None
         if self.data.get("format") == "event_id_only":
-            d: Dict[str, Any] = {
-                "notification": {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "counts": {"unread": badge},
-                    "prio": priority,
-                    "devices": [
-                        {
-                            "app_id": self.app_id,
-                            "pushkey": self.pushkey,
-                            "pushkey_ts": int(self.pushkey_ts / 1000),
-                            "data": self.data_minus_url,
-                        }
-                    ],
-                }
+            content: JsonDict = {
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "counts": {"unread": badge},
+                "prio": priority,
             }
-            return d
+            # event_id_only doesn't include the tweaks, so override them.
+            tweaks = {}
+        else:
+            ctx = await push_tools.get_context_for_event(
+                self._storage_controllers, event, self.user_id
+            )
 
-        ctx = await push_tools.get_context_for_event(
-            self._storage_controllers, event, self.user_id
-        )
-
-        d = {
-            "notification": {
+            content = {
                 "id": event.event_id,  # deprecated: remove soon
                 "event_id": event.event_id,
                 "room_id": event.room_id,
@@ -392,57 +476,27 @@ class HttpPusher(Pusher):
                     "unread": badge,
                     # 'missed_calls': 2
                 },
-                "devices": [
-                    {
-                        "app_id": self.app_id,
-                        "pushkey": self.pushkey,
-                        "pushkey_ts": int(self.pushkey_ts / 1000),
-                        "data": self.data_minus_url,
-                        "tweaks": tweaks,
-                    }
-                ],
             }
-        }
-        if event.type == "m.room.member" and event.is_state():
-            d["notification"]["membership"] = event.content["membership"]
-            d["notification"]["user_is_target"] = event.state_key == self.user_id
-        if self.hs.config.push.push_include_content and event.content:
-            d["notification"]["content"] = event.content
+            if event.type == "m.room.member" and event.is_state():
+                content["membership"] = event.content["membership"]
+                content["user_is_target"] = event.state_key == self.user_id
+            if self.hs.config.push.push_include_content and event.content:
+                content["content"] = event.content
 
-        # We no longer send aliases separately, instead, we send the human
-        # readable name of the room, which may be an alias.
-        if "sender_display_name" in ctx and len(ctx["sender_display_name"]) > 0:
-            d["notification"]["sender_display_name"] = ctx["sender_display_name"]
-        if "name" in ctx and len(ctx["name"]) > 0:
-            d["notification"]["room_name"] = ctx["name"]
+            # We no longer send aliases separately, instead, we send the human
+            # readable name of the room, which may be an alias.
+            if "sender_display_name" in ctx and len(ctx["sender_display_name"]) > 0:
+                content["sender_display_name"] = ctx["sender_display_name"]
+            if "name" in ctx and len(ctx["name"]) > 0:
+                content["room_name"] = ctx["name"]
 
-        return d
+        res = await self.dispatch_push(content, tweaks)
 
-    async def dispatch_push(
-        self, event: EventBase, tweaks: Dict[str, bool], badge: int
-    ) -> Union[bool, Iterable[str]]:
-        notification_dict = await self._build_notification_dict(event, tweaks, badge)
-        if not notification_dict:
-            return []
-        try:
-            resp = await self.http_client.post_json_get_json(
-                self.url, notification_dict
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to push event %s to %s: %s %s",
-                event.event_id,
-                self.name,
-                type(e),
-                e,
-            )
-            return False
-        rejected = []
-        if "rejected" in resp:
-            rejected = resp["rejected"]
-        if not rejected:
+        # If the push is successful and none are rejected, update the badge count.
+        if res is not False and not res:
             self.badge_count_last_call = badge
-        return rejected
+
+        return res
 
     async def _send_badge(self, badge: int) -> None:
         """

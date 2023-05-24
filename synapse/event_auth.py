@@ -455,8 +455,11 @@ def _check_create(event: "EventBase") -> None:
             "room appears to have unsupported version %s" % (room_version_prop,),
         )
 
-    # 1.4 If content has no creator field, reject.
-    if EventContentFields.ROOM_CREATOR not in event.content:
+    # 1.4 If content has no creator field, reject if the room version requires it.
+    if (
+        not event.room_version.msc2175_implicit_room_creator
+        and EventContentFields.ROOM_CREATOR not in event.content
+    ):
         raise AuthError(403, "Create event lacks a 'creator' property")
 
 
@@ -491,7 +494,11 @@ def _is_membership_change_allowed(
         key = (EventTypes.Create, "")
         create = auth_events.get(key)
         if create and event.prev_event_ids()[0] == create.event_id:
-            if create.content["creator"] == event.state_key:
+            if room_version.msc2175_implicit_room_creator:
+                creator = create.sender
+            else:
+                creator = create.content[EventContentFields.ROOM_CREATOR]
+            if creator == event.state_key:
                 return
 
     target_user_id = event.state_key
@@ -786,7 +793,7 @@ def check_redaction(
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
-        True if the the sender is allowed to redact the target event if the
+        True if the sender is allowed to redact the target event if the
         target event was created by them.
         False if the sender is allowed to redact the target event with no
         further checks.
@@ -1004,10 +1011,14 @@ def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> in
         # that.
         key = (EventTypes.Create, "")
         create_event = auth_events.get(key)
-        if create_event is not None and create_event.content["creator"] == user_id:
-            return 100
-        else:
-            return 0
+        if create_event is not None:
+            if create_event.room_version.msc2175_implicit_room_creator:
+                creator = create_event.sender
+            else:
+                creator = create_event.content[EventContentFields.ROOM_CREATOR]
+            if creator == user_id:
+                return 100
+        return 0
 
 
 def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int) -> int:
@@ -1043,10 +1054,15 @@ def _verify_third_party_invite(
     """
     if "third_party_invite" not in event.content:
         return False
-    if "signed" not in event.content["third_party_invite"]:
+    third_party_invite = event.content["third_party_invite"]
+    if not isinstance(third_party_invite, collections.abc.Mapping):
         return False
-    signed = event.content["third_party_invite"]["signed"]
-    for key in {"mxid", "token"}:
+    if "signed" not in third_party_invite:
+        return False
+    signed = third_party_invite["signed"]
+    if not isinstance(signed, collections.abc.Mapping):
+        return False
+    for key in {"mxid", "token", "signatures"}:
         if key not in signed:
             return False
 
@@ -1064,8 +1080,6 @@ def _verify_third_party_invite(
 
     if signed["mxid"] != event.state_key:
         return False
-    if signed["token"] != token:
-        return False
 
     for public_key_object in get_public_keys(invite_event):
         public_key = public_key_object["public_key"]
@@ -1077,7 +1091,9 @@ def _verify_third_party_invite(
                     verify_key = decode_verify_key_bytes(
                         key_name, decode_base64(public_key)
                     )
-                    verify_signed_json(signed, server, verify_key)
+                    # verify_signed_json incorrectly states it wants a dict, it
+                    # just needs a mapping.
+                    verify_signed_json(signed, server, verify_key)  # type: ignore[arg-type]
 
                     # We got the public key from the invite, so we know that the
                     # correct server signed the signed bundle.

@@ -58,7 +58,7 @@ from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Connection, Cursor
+from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter
 
@@ -371,33 +371,56 @@ class LoggingTransaction:
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
 
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_batch
+            # suggests each arg in args should be a sequence or mapping
             self._do_execute(
                 lambda the_sql: execute_batch(self.txn, the_sql, args), sql
             )
         else:
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#sqlite3.Cursor.executemany
+            # suggests that the outer collection may be iterable, but
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#how-to-use-placeholders-to-bind-values-in-sql-queries
+            # suggests that the inner collection should be a sequence or dict.
             self.executemany(sql, args)
 
     def execute_values(
-        self, sql: str, values: Iterable[Iterable[Any]], fetch: bool = True
+        self,
+        sql: str,
+        values: Iterable[Iterable[Any]],
+        template: Optional[str] = None,
+        fetch: bool = True,
     ) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
         The `fetch` parameter must be set to False if the query does not return
         rows (e.g. INSERTs).
+
+        The `template` is the snippet to merge to every item in argslist to
+        compose the query.
         """
         assert isinstance(self.database_engine, PostgresEngine)
         from psycopg2.extras import execute_values
 
         return self._do_execute(
-            lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
+            lambda the_sql: execute_values(
+                self.txn, the_sql, values, template=template, fetch=fetch
+            ),
             sql,
         )
 
-    def execute(self, sql: str, *args: Any) -> None:
-        self._do_execute(self.txn.execute, sql, *args)
+    def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
+        self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
+        # TODO: we should add a type for *args here. Looking at Cursor.executemany
+        # and DBAPI2 it ought to be Sequence[_Parameter], but we pass in
+        # Iterable[Iterable[Any]] in execute_batch and execute_values above, which mypy
+        # complains about.
         self._do_execute(self.txn.executemany, sql, *args)
 
     def executescript(self, sql: str) -> None:
@@ -542,9 +565,8 @@ class DatabasePool:
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = set(UNIQUE_INDEX_BACKGROUND_UPDATES.keys())
 
-        # We add the user_directory_search table to the blacklist on SQLite
-        # because the existing search table does not have an index, making it
-        # unsafe to use native upserts.
+        # The user_directory_search table is unsafe to use native upserts
+        # on SQLite because the existing search table does not have an index.
         if isinstance(self.engine, Sqlite3Engine):
             self._unsafe_to_upsert_tables.add("user_directory_search")
 

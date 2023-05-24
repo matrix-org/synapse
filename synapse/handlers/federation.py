@@ -141,13 +141,14 @@ class FederationHandler:
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
-        self.spam_checker = hs.get_spam_checker()
+        self.is_mine_server_name = hs.is_mine_server_name
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.event_builder_factory = hs.get_event_builder_factory()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
-        self.http_client = hs.get_proxied_blacklisted_http_client()
+        self.http_client = hs.get_proxied_blocklisted_http_client()
         self._replication = hs.get_replication_data_handler()
         self._federation_event_handler = hs.get_federation_event_handler()
         self._device_handler = hs.get_device_handler()
@@ -169,7 +170,9 @@ class FederationHandler:
 
         self._room_backfill = Linearizer("room_backfill")
 
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
 
         # Tracks running partial state syncs by room ID.
         # Partial state syncs currently only run on the main process, so it's okay to
@@ -451,7 +454,7 @@ class FederationHandler:
 
             for dom in domains:
                 # We don't want to ask our own server for information we don't have
-                if dom == self.server_name:
+                if self.is_mine_server_name(dom):
                     continue
 
                 try:
@@ -1042,7 +1045,7 @@ class FederationHandler:
         if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        spam_check = await self.spam_checker.user_may_invite(
+        spam_check = await self._spam_checker_module_callbacks.user_may_invite(
             event.sender, event.state_key, event.room_id
         )
         if spam_check != NOT_SPAM:
@@ -1253,7 +1256,7 @@ class FederationHandler:
             unpersisted_context,
         ) = await self.event_creation_handler.create_new_client_event(builder=builder)
 
-        event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
+        event_allowed, _ = await self._third_party_event_rules.check_event_allowed(
             event, unpersisted_context
         )
         if not event_allowed:

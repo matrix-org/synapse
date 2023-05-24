@@ -46,7 +46,7 @@ from synapse.replication.http.register import (
     ReplicationRegisterServlet,
 )
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types import GUEST_USER_ID_PATTERN, RoomAlias, UserID, create_requester
 from synapse.types.state import StateFilter
 
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ class RegistrationHandler:
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
 
         if hs.config.worker.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
@@ -143,10 +143,15 @@ class RegistrationHandler:
         assigned_user_id: Optional[str] = None,
         inhibit_user_in_use_error: bool = False,
     ) -> None:
-        if types.contains_invalid_mxid_characters(localpart):
+        if types.contains_invalid_mxid_characters(
+            localpart, self.hs.config.experimental.msc4009_e164_mxids
+        ):
+            extra_chars = (
+                "=_-./+" if self.hs.config.experimental.msc4009_e164_mxids else "=_-./"
+            )
             raise SynapseError(
                 400,
-                "User ID can only contain characters a-z, 0-9, or '=_-./'",
+                f"User ID can only contain characters a-z, 0-9, or '{extra_chars}'",
                 Codes.INVALID_USERNAME,
             )
 
@@ -195,16 +200,12 @@ class RegistrationHandler:
                         errcode=Codes.FORBIDDEN,
                     )
 
-        if guest_access_token is None:
-            try:
-                int(localpart)
-                raise SynapseError(
-                    400,
-                    "Numeric user IDs are reserved for guest users.",
-                    errcode=Codes.INVALID_USERNAME,
-                )
-            except ValueError:
-                pass
+        if guest_access_token is None and GUEST_USER_ID_PATTERN.fullmatch(localpart):
+            raise SynapseError(
+                400,
+                "Numeric user IDs are reserved for guest users.",
+                errcode=Codes.INVALID_USERNAME,
+            )
 
     async def register_user(
         self,
@@ -259,7 +260,7 @@ class RegistrationHandler:
 
         await self.check_registration_ratelimit(address)
 
-        result = await self.spam_checker.check_registration_for_spam(
+        result = await self._spam_checker_module_callbacks.check_registration_for_spam(
             threepid,
             localpart,
             user_agent_ips or [],
