@@ -101,15 +101,18 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         # If it is already a Deferred, nothing to do.
         ret_type = signature.ret_type
     else:
-        # If a coroutine, wrap the coroutine's return type in a Deferred.
-        if (
-            isinstance(signature.ret_type, Instance)
-            and signature.ret_type.type.fullname == "typing.Coroutine"
-        ):
-            ret_arg = signature.ret_type.args[2]
+        ret_arg = None
+        if isinstance(signature.ret_type, Instance):
+            # If a coroutine, wrap the coroutine's return type in a Deferred.
+            if signature.ret_type.type.fullname == "typing.Coroutine":
+                ret_arg = signature.ret_type.args[2]
 
-        # Otherwise, wrap the return type in a Deferred.
-        else:
+            # If an awaitable, wrap the awaitable's final value in a Deferred.
+            elif signature.ret_type.type.fullname == "typing.Awaitable":
+                ret_arg = signature.ret_type.args[0]
+
+        # Otherwise, wrap the return value in a Deferred.
+        if ret_arg is None:
             ret_arg = signature.ret_type
 
         # This should be able to use ctx.api.lookup_typeinfo, but that doesn't seem
