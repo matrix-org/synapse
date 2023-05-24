@@ -23,5 +23,5 @@ ALTER TABLE event_push_actions
 
 -- We then validate the constraint which doesn't need to worry about new data. It
 -- only needs a SHARE UPDATE EXCLUSIVE lock but can still take a while to complete.
-INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7706, 'event_push_actions_thread_id', '{}');
+INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
+  (7706, 'event_push_actions_thread_id', '{}', 'event_push_actions_staging_thread_id');
