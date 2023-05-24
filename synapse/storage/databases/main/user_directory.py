@@ -361,6 +361,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             txn: LoggingTransaction,
         ) -> Optional[int]:
             if self.database_engine.supports_returning:
+                # Note: we use an ORDER BY in the SELECT to force usage of an
+                # index. Otherwise, postgres does a sequential scan that is
+                # surprisingly slow (I think due to the fact it will read/skip
+                # over lots of already deleted rows).
                 sql = f"""
                     DELETE FROM {TEMP_TABLE + "_users"}
                     WHERE user_id IN (
