@@ -22,7 +22,7 @@ from synapse.util import Clock
 from tests import unittest
 from tests.unittest import override_config
 
-endpoint = "/_matrix/client/unstable/org.matrix.msc3882/login/get_token"
+GET_TOKEN_ENDPOINT = "/_matrix/client/v1/login/get_token"
 
 
 class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
@@ -46,18 +46,18 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         self.password = "password"
 
     def test_disabled(self) -> None:
-        channel = self.make_request("POST", endpoint, {}, access_token=None)
+        channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=None)
         self.assertEqual(channel.code, 404)
 
         self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
-        channel = self.make_request("POST", endpoint, {}, access_token=token)
+        channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=token)
         self.assertEqual(channel.code, 404)
 
     @override_config({"login_via_existing_session": {"enabled": True}})
     def test_require_auth(self) -> None:
-        channel = self.make_request("POST", endpoint, {}, access_token=None)
+        channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=None)
         self.assertEqual(channel.code, 401)
 
     @override_config({"login_via_existing_session": {"enabled": True}})
@@ -65,7 +65,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
-        channel = self.make_request("POST", endpoint, {}, access_token=token)
+        channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=token)
         self.assertEqual(channel.code, 401)
         self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
 
@@ -80,7 +80,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
             },
         }
 
-        channel = self.make_request("POST", endpoint, uia, access_token=token)
+        channel = self.make_request("POST", GET_TOKEN_ENDPOINT, uia, access_token=token)
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["expires_in_ms"], 300000)
 
@@ -101,7 +101,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
-        channel = self.make_request("POST", endpoint, {}, access_token=token)
+        channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=token)
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["expires_in_ms"], 300000)
 
@@ -128,6 +128,6 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         self.register_user(self.user, self.password)
         token = self.login(self.user, self.password)
 
-        channel = self.make_request("POST", endpoint, {}, access_token=token)
+        channel = self.make_request("POST", GET_TOKEN_ENDPOINT, {}, access_token=token)
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["expires_in_ms"], 15000)

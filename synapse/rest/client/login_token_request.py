@@ -48,7 +48,7 @@ class LoginTokenRequestServlet(RestServlet):
     """
 
     PATTERNS = client_patterns(
-        "/org.matrix.msc3882/login/get_token$", releases=[], v1=False, unstable=True
+        "/login/get_token$", releases=["v1"], v1=False, unstable=False
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -77,7 +77,6 @@ class LoginTokenRequestServlet(RestServlet):
 
         login_token = await self.auth_handler.create_login_token_for_user_id(
             user_id=requester.user.to_string(),
-            auth_provider_id="org.matrix.msc3882.get_login_token",
             duration_ms=self.token_timeout,
         )
 
