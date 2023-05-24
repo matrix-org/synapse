@@ -88,7 +88,7 @@ from synapse.types import (
 )
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer, concurrently_execute
-from synapse.util.iterutils import batch_iter
+from synapse.util.iterutils import batch_iter, partition
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
 
@@ -915,13 +915,9 @@ class FederationEventHandler:
             )
         )
 
-        # Process previously failed backfill events in the background to not waste
-        # time on something that is likely to fail again.
-        events_with_failed_pull_attempts = [
-            event
-            for event in new_events
-            if event.event_id in event_ids_with_failed_pull_attempts
-        ]
+        events_with_failed_pull_attempts, fresh_events = partition(
+            new_events, lambda e: e.event_id in event_ids_with_failed_pull_attempts
+        )
         set_tag(
             SynapseTags.FUNC_ARG_PREFIX + "events_with_failed_pull_attempts",
             str(event_ids_with_failed_pull_attempts),
@@ -930,6 +926,17 @@ class FederationEventHandler:
             SynapseTags.RESULT_PREFIX + "events_with_failed_pull_attempts.length",
             str(len(events_with_failed_pull_attempts)),
         )
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "fresh_events",
+            str([event.event_id for event in fresh_events]),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "fresh_events.length",
+            str(len(fresh_events)),
+        )
+
+        # Process previously failed backfill events in the background to not waste
+        # time on something that is likely to fail again.
         if len(events_with_failed_pull_attempts) > 0:
             run_as_background_process(
                 "_process_new_pulled_events_with_failed_pull_attempts",
@@ -939,19 +946,6 @@ class FederationEventHandler:
 
         # We can optimistically try to process and wait for the event to be fully
         # persisted if we've never tried before.
-        fresh_events = [
-            event
-            for event in new_events
-            if event.event_id not in event_ids_with_failed_pull_attempts
-        ]
-        set_tag(
-            SynapseTags.FUNC_ARG_PREFIX + "fresh_events",
-            str([event.event_id for event in fresh_events]),
-        )
-        set_tag(
-            SynapseTags.RESULT_PREFIX + "fresh_events.length",
-            str(len(fresh_events)),
-        )
         if len(fresh_events) > 0:
             await _process_new_pulled_events(fresh_events)
 
