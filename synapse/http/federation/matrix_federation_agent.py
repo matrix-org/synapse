@@ -36,7 +36,7 @@ from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer, IResp
 
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http import proxyagent
-from synapse.http.client import BlacklistingAgentWrapper, BlacklistingReactorWrapper
+from synapse.http.client import BlocklistingAgentWrapper, BlocklistingReactorWrapper
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
@@ -65,12 +65,12 @@ class MatrixFederationAgent:
         user_agent:
             The user agent header to use for federation requests.
 
-        ip_whitelist: Allowed IP addresses.
+        ip_allowlist: Allowed IP addresses.
 
-        ip_blacklist: Disallowed IP addresses.
+        ip_blocklist: Disallowed IP addresses.
 
         proxy_reactor: twisted reactor to use for connections to the proxy server
-           reactor might have some blacklisting applied (i.e. for DNS queries),
+           reactor might have some blocking applied (i.e. for DNS queries),
            but we need unblocked access to the proxy.
 
         _srv_resolver:
@@ -87,17 +87,17 @@ class MatrixFederationAgent:
         reactor: ISynapseReactor,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
-        ip_whitelist: Optional[IPSet],
-        ip_blacklist: IPSet,
+        ip_allowlist: Optional[IPSet],
+        ip_blocklist: IPSet,
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
     ):
-        # proxy_reactor is not blacklisted
+        # proxy_reactor is not blocklisting reactor
         proxy_reactor = reactor
 
-        # We need to use a DNS resolver which filters out blacklisted IP
+        # We need to use a DNS resolver which filters out blocked IP
         # addresses, to prevent DNS rebinding.
-        reactor = BlacklistingReactorWrapper(reactor, ip_whitelist, ip_blacklist)
+        reactor = BlocklistingReactorWrapper(reactor, ip_allowlist, ip_blocklist)
 
         self._clock = Clock(reactor)
         self._pool = HTTPConnectionPool(reactor)
@@ -120,7 +120,7 @@ class MatrixFederationAgent:
         if _well_known_resolver is None:
             _well_known_resolver = WellKnownResolver(
                 reactor,
-                agent=BlacklistingAgentWrapper(
+                agent=BlocklistingAgentWrapper(
                     ProxyAgent(
                         reactor,
                         proxy_reactor,
@@ -128,7 +128,7 @@ class MatrixFederationAgent:
                         contextFactory=tls_client_options_factory,
                         use_proxy=True,
                     ),
-                    ip_blacklist=ip_blacklist,
+                    ip_blocklist=ip_blocklist,
                 ),
                 user_agent=self.user_agent,
             )
@@ -256,7 +256,7 @@ class MatrixHostnameEndpoint:
     Args:
         reactor: twisted reactor to use for underlying requests
         proxy_reactor: twisted reactor to use for connections to the proxy server.
-           'reactor' might have some blacklisting applied (i.e. for DNS queries),
+           'reactor' might have some blocking applied (i.e. for DNS queries),
            but we need unblocked access to the proxy.
         tls_client_options_factory:
             factory to use for fetching client tls options, or none to disable TLS.

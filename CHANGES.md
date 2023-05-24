@@ -1,3 +1,96 @@
+Synapse 1.84.0 (2023-05-23)
+===========================
+
+The `worker_replication_*` configuration settings have been deprecated in favour of configuring the main process consistently with other instances in the `instance_map`. The deprecated settings will be removed in Synapse v1.88.0, but changing your configuration in advance is recommended. See the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.84/docs/upgrade.md#upgrading-to-v1840) for more information.
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.84.0rc1 where errors during startup were not reported correctly on Python < 3.10. ([\#15599](https://github.com/matrix-org/synapse/issues/15599))
+
+
+Synapse 1.84.0rc1 (2023-05-16)
+==============================
+
+Features
+--------
+
+- Add an option to prevent media downloads from configured domains. ([\#15197](https://github.com/matrix-org/synapse/issues/15197))
+- Add `forget_rooms_on_leave` config option to automatically forget rooms when users leave them or are removed from them. ([\#15224](https://github.com/matrix-org/synapse/issues/15224))
+- Add redis TLS configuration options. ([\#15312](https://github.com/matrix-org/synapse/issues/15312))
+- Add a config option to delay push notifications by a random amount, to discourage time-based profiling. ([\#15516](https://github.com/matrix-org/synapse/issues/15516))
+- Stabilize support for [MSC2659](https://github.com/matrix-org/matrix-spec-proposals/pull/2659): application service ping endpoint. Contributed by Tulir @ Beeper. ([\#15528](https://github.com/matrix-org/synapse/issues/15528))
+- Implement [MSC4009](https://github.com/matrix-org/matrix-spec-proposals/pull/4009) to expand the supported characters in Matrix IDs. ([\#15536](https://github.com/matrix-org/synapse/issues/15536))
+- Advertise support for Matrix 1.6 on `/_matrix/client/versions`. ([\#15559](https://github.com/matrix-org/synapse/issues/15559))
+- Print full error and stack-trace of any exception that occurs during startup/initialization. ([\#15569](https://github.com/matrix-org/synapse/issues/15569))
+
+
+Bugfixes
+--------
+
+- Don't fail on federation over TOR where SRV queries are not supported. Contributed by Zdzichu. ([\#15523](https://github.com/matrix-org/synapse/issues/15523))
+- Experimental support for [MSC4010](https://github.com/matrix-org/matrix-spec-proposals/pull/4010) which rejects setting the `"m.push_rules"` via account data. ([\#15554](https://github.com/matrix-org/synapse/issues/15554), [\#15555](https://github.com/matrix-org/synapse/issues/15555))
+- Fix a long-standing bug where an invalid membership event could cause an internal server error. ([\#15564](https://github.com/matrix-org/synapse/issues/15564))
+- Require at least poetry-core v1.1.0. ([\#15566](https://github.com/matrix-org/synapse/issues/15566), [\#15571](https://github.com/matrix-org/synapse/issues/15571))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove need for `worker_replication_*` based settings in worker configuration yaml by placing this data directly on the `instance_map` instead. ([\#15491](https://github.com/matrix-org/synapse/issues/15491))
+
+
+Updates to the Docker image
+---------------------------
+
+- Add pkg-config package to Stage 0 to be able to build Dockerfile on ppc64le architecture. ([\#15567](https://github.com/matrix-org/synapse/issues/15567))
+
+
+Improved Documentation
+----------------------
+
+- Clarify documentation of the "Create or modify account" Admin API. ([\#15544](https://github.com/matrix-org/synapse/issues/15544))
+- Fix path to the `statistics/database/rooms` admin API in documentation. ([\#15560](https://github.com/matrix-org/synapse/issues/15560))
+- Update and improve Mastodon Single Sign-On documentation. ([\#15587](https://github.com/matrix-org/synapse/issues/15587))
+
+
+Internal Changes
+----------------
+
+- Use oEmbed to generate URL previews for YouTube Shorts. ([\#15025](https://github.com/matrix-org/synapse/issues/15025))
+- Create new `Client` for use with HTTP Replication between workers. Contributed by Jason Little. ([\#15470](https://github.com/matrix-org/synapse/issues/15470))
+- Bump pyicu from 2.10.2 to 2.11. ([\#15509](https://github.com/matrix-org/synapse/issues/15509))
+- Remove references to supporting per-user flag for [MSC2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654). ([\#15522](https://github.com/matrix-org/synapse/issues/15522))
+- Don't use a trusted key server when running the demo scripts. ([\#15527](https://github.com/matrix-org/synapse/issues/15527))
+- Speed up rebuilding of the user directory for local users. ([\#15529](https://github.com/matrix-org/synapse/issues/15529))
+- Speed up deleting of old rows in `event_push_actions`. ([\#15531](https://github.com/matrix-org/synapse/issues/15531))
+- Install the `xmlsec` and `mdbook` packages and switch back to the upstream [cachix/devenv](https://github.com/cachix/devenv) repo in the nix development environment. ([\#15532](https://github.com/matrix-org/synapse/issues/15532), [\#15533](https://github.com/matrix-org/synapse/issues/15533), [\#15545](https://github.com/matrix-org/synapse/issues/15545))
+- Implement [MSC3987](https://github.com/matrix-org/matrix-spec-proposals/pull/3987) by removing `"dont_notify"` from the list of actions in default push rules. ([\#15534](https://github.com/matrix-org/synapse/issues/15534))
+- Move various module API callback registration methods to a dedicated class. ([\#15535](https://github.com/matrix-org/synapse/issues/15535))
+- Proxy `/user/devices` federation queries to application services for [MSC3984](https://github.com/matrix-org/matrix-spec-proposals/pull/3984). ([\#15539](https://github.com/matrix-org/synapse/issues/15539))
+- Factor out an `is_mine_server_name` method. ([\#15542](https://github.com/matrix-org/synapse/issues/15542))
+- Allow running Complement tests using [podman](https://podman.io/) by adding a `PODMAN` environment variable to `scripts-dev/complement.sh`. ([\#15543](https://github.com/matrix-org/synapse/issues/15543))
+- Bump serde from 1.0.160 to 1.0.162. ([\#15548](https://github.com/matrix-org/synapse/issues/15548))
+- Bump types-setuptools from 67.6.0.5 to 67.7.0.1. ([\#15549](https://github.com/matrix-org/synapse/issues/15549))
+- Bump sentry-sdk from 1.19.1 to 1.22.1. ([\#15550](https://github.com/matrix-org/synapse/issues/15550))
+- Bump ruff from 0.0.259 to 0.0.265. ([\#15551](https://github.com/matrix-org/synapse/issues/15551))
+- Bump hiredis from 2.2.2 to 2.2.3. ([\#15552](https://github.com/matrix-org/synapse/issues/15552))
+- Bump types-requests from 2.29.0.0 to 2.30.0.0. ([\#15553](https://github.com/matrix-org/synapse/issues/15553))
+- Add `org.matrix.msc3981` info to `/_matrix/client/versions`. ([\#15558](https://github.com/matrix-org/synapse/issues/15558))
+- Declare unstable support for [MSC3391](https://github.com/matrix-org/matrix-spec-proposals/pull/3391) under `/_matrix/client/versions` if the experimental implementation is enabled. ([\#15562](https://github.com/matrix-org/synapse/issues/15562))
+- Implement [MSC3821](https://github.com/matrix-org/matrix-spec-proposals/pull/3821) to update the redaction rules. ([\#15563](https://github.com/matrix-org/synapse/issues/15563))
+- Implement updated redaction rules from [MSC3389](https://github.com/matrix-org/matrix-spec-proposals/pull/3389). ([\#15565](https://github.com/matrix-org/synapse/issues/15565))
+- Allow `pip install` to use setuptools_rust 1.6.0 when building Synapse. ([\#15570](https://github.com/matrix-org/synapse/issues/15570))
+- Deal with upcoming Github Actions deprecations. ([\#15576](https://github.com/matrix-org/synapse/issues/15576))
+- Export `run_as_background_process` from the module API. ([\#15577](https://github.com/matrix-org/synapse/issues/15577))
+- Update build system requirements to allow building with poetry-core==1.6.0. ([\#15588](https://github.com/matrix-org/synapse/issues/15588))
+- Bump serde from 1.0.162 to 1.0.163. ([\#15589](https://github.com/matrix-org/synapse/issues/15589))
+- Bump phonenumbers from 8.13.7 to 8.13.11. ([\#15590](https://github.com/matrix-org/synapse/issues/15590))
+- Bump types-psycopg2 from 2.9.21.9 to 2.9.21.10. ([\#15591](https://github.com/matrix-org/synapse/issues/15591))
+- Bump types-commonmark from 0.9.2.2 to 0.9.2.3. ([\#15592](https://github.com/matrix-org/synapse/issues/15592))
+- Bump types-setuptools from 67.7.0.1 to 67.7.0.2. ([\#15594](https://github.com/matrix-org/synapse/issues/15594))
+
+
 Synapse 1.83.0 (2023-05-09)
 ===========================
 
