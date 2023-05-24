@@ -633,7 +633,7 @@ class TransportLayerClient:
         self,
         destination: str,
         query_content: JsonDict,
-        requester: UserID,
+        user: UserID,
         timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
@@ -661,7 +661,7 @@ class TransportLayerClient:
         Args:
             destination: The server to query.
             query_content: The user ids to query.
-            requester: the user_id of the requesting user
+            user: the user_id of the requesting user
         Returns:
             A dict containing the one-time keys.
         """
@@ -679,7 +679,7 @@ class TransportLayerClient:
         self,
         destination: str,
         query_content: JsonDict,
-        requester: UserID,
+        user: UserID,
         timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
@@ -707,7 +707,7 @@ class TransportLayerClient:
         Args:
             destination: The server to query.
             query_content: The user ids to query.
-            requester: the requesting user
+            user: the user_id of the requesting user
         Returns:
             A dict containing the one-time keys.
         """

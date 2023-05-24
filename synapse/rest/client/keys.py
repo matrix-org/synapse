@@ -288,7 +288,7 @@ class OneTimeKeyServlet(RestServlet):
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        requesting_user = requester.user
+        user = requester.user
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
 
@@ -299,7 +299,7 @@ class OneTimeKeyServlet(RestServlet):
                 query.setdefault(user_id, {})[device_id] = {algorithm: 1}
 
         result = await self.e2e_keys_handler.claim_one_time_keys(
-            query, requesting_user, timeout, always_include_fallback_keys=False
+            query, user, timeout, always_include_fallback_keys=False
         )
         return 200, result
 
@@ -337,7 +337,7 @@ class UnstableOneTimeKeyServlet(RestServlet):
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-        requesting_user = requester.user
+        user = requester.user
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
 
@@ -348,7 +348,7 @@ class UnstableOneTimeKeyServlet(RestServlet):
                 query.setdefault(user_id, {})[device_id] = Counter(algorithms)
 
         result = await self.e2e_keys_handler.claim_one_time_keys(
-            query, requesting_user, timeout, always_include_fallback_keys=True
+            query, user, timeout, always_include_fallback_keys=True
         )
         return 200, result
 
