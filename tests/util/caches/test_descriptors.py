@@ -30,6 +30,7 @@ from unittest import mock
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.internet.interfaces import IReactorTime
+from twisted.python.failure import Failure
 
 from synapse.api.errors import SynapseError
 from synapse.logging.context import (
@@ -315,7 +316,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         return defer.gatherResults([d1, d2])
 
-    def test_cache_logcontexts_with_exception(self) -> Deferred:
+    def test_cache_logcontexts_with_exception(self) -> "Deferred[None]":
         """Check that the cache sets and restores logcontexts correctly when
         the lookup function throws an exception"""
 
