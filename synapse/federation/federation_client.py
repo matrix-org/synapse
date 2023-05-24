@@ -248,7 +248,6 @@ class FederationClient(FederationBase):
             destination: Domain name of the remote homeserver
             content: The query content.
 
-
         Returns:
             The JSON object from the response
         """
