@@ -102,8 +102,6 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc2285.stable": True,  # TODO: Remove when MSC2285 becomes a part of the spec
                     # Supports filtering of /publicRooms by room type as per MSC3827
                     "org.matrix.msc3827.stable": True,
-                    # Adds support for importing historical messages as per MSC2716
-                    "org.matrix.msc2716": self.config.experimental.msc2716_enabled,
                     # Adds support for thread relations, per MSC3440.
                     "org.matrix.msc3440.stable": True,  # TODO: remove when "v1.3" is added above
                     # Support for thread read receipts & notification counts.

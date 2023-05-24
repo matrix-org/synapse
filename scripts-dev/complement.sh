@@ -246,10 +246,6 @@ else
   else
     export PASS_SYNAPSE_COMPLEMENT_DATABASE=sqlite
   fi
-
-  # The tests for importing historical messages (MSC2716)
-  # only pass with monoliths, currently.
-  test_tags="$test_tags,msc2716"
 fi
 
 if [[ -n "$ASYNCIO_REACTOR" ]]; then
