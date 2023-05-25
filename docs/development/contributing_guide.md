@@ -102,9 +102,6 @@ Now edit `homeserver.yaml`, things you might want to change include:
 - Using a [PostgreSQL database instead of SQLite](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#database)
 - Adding a [`registration_shared_secret`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration_shared_secret) so you can use [`register_new_matrix_user` command](https://matrix-org.github.io/synapse/latest/setup/installation.html#registering-a-user).
 
-edit `log_config.yaml` if necessary:
-- you may wish to set the root handler for logging in your dev environment to `console`
-
 And then run Synapse with the following command:
 
 ```sh
