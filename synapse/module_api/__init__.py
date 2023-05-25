@@ -1521,9 +1521,13 @@ class ModuleApi:
             start_timestamp, end_timestamp
         )
 
-    async def get_room_alias(self, room_id: RoomID) -> Optional[RoomAlias]:
+    async def get_canonical_room_alias(self, room_id: RoomID) -> Optional[RoomAlias]:
         """
-        Get the room alias associated with a room ID.
+        Retrieve the given room's current canonical alias.
+
+        A room may declare an alias as "canonical", meaning that it is the
+        preferred alias to use when referring to the room. This function
+        retrieves that alias from the room's state.
 
         Added in Synapse v1.82.0.
 
@@ -1531,7 +1535,8 @@ class ModuleApi:
             room_id: The Room ID to find the alias of.
 
         Returns:
-            The optional room alias
+        None if the room ID does not exist, or if the room exists but has no canonical alias.
+        Otherwise, the parsed room alias.
         """
         from synapse.api.constants import EventTypes
 
