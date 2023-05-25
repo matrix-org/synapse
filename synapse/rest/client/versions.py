@@ -115,6 +115,8 @@ class VersionsRestServlet(RestServlet):
                     "fi.mau.msc2659.stable": True,  # TODO: remove when "v1.7" is added above
                     # Adds support for remotely enabling/disabling pushers, as per MSC3881
                     "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
+                    # TODO: this is no longer needed once unstable MSC3882 does not need to be supported:
+                    "org.matrix.msc3882": self.config.auth.login_via_existing_enabled,
                     # Adds support for filtering /messages by event relation.
                     "org.matrix.msc3874": self.config.experimental.msc3874_enabled,
                     # Adds support for simple HTTP rendezvous as per MSC3886
