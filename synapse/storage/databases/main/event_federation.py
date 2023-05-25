@@ -1606,7 +1606,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             retcols=("event_id",),
             desc="get_event_ids_with_failed_pull_attempts",
         )
-        event_ids_with_failed_pull_attempts = {str(row["event_id"]) for row in rows}
+        event_ids_with_failed_pull_attempts: Set[str] = {
+            row["event_id"] for row in rows
+        }
 
         return event_ids_with_failed_pull_attempts
 
