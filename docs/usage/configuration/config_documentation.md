@@ -577,6 +577,10 @@ delete any device that hasn't been accessed for more than the specified amount o
 
 Defaults to no duration, which means devices are never pruned.
 
+**Note:** This task will always run on the main process, regardless of the value of
+`run_background_tasks_on`. This is due to workers currently not having the ability to
+delete devices.
+
 Example configuration:
 ```yaml
 delete_stale_devices_after: 1y
@@ -1762,6 +1766,30 @@ Maximum number of pixels that will be thumbnailed. Defaults to 32M.
 Example configuration:
 ```yaml
 max_image_pixels: 35M
+```
+---
+### `prevent_media_downloads_from`
+
+A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.
+
+This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.
+
+This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see [`url_preview_url_blacklist`](#url_preview_url_blacklist).
+
+Defaults to an empty list (nothing blocked).
+
+Example configuration:
+```yaml
+prevent_media_downloads_from:
+  - evil.example.org
+  - evil2.example.org
 ```
 ---
 ### `dynamic_thumbnails`
@@ -3438,6 +3466,9 @@ This option has a number of sub-options. They are as follows:
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
+* `jitter_delay`: Delays push notifications by a random amount up to the given
+  duration. Useful for mitigating timing attacks. Optional, defaults to no
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
@@ -3445,6 +3476,7 @@ push:
   enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: "10s"
 ```
 ---
 ## Rooms
@@ -3691,6 +3723,16 @@ default_power_level_content_override:
    trusted_private_chat: null
    public_chat: null
 ```
+---
+### `forget_rooms_on_leave`
+
+Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.
+
+Example configuration:
+```yaml
+forget_rooms_on_leave: false
+```
 
 ---
 ## Opentracing
@@ -3842,15 +3884,20 @@ federation_sender_instances:
 ### `instance_map`
 
 When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured.
+HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
 a HTTP replication listener, and that listener should be included in the `instance_map`.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the `instance_map`.)
+The main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is declared 
+inside the `listener` block for a `replication` listener.
+
 
 Example configuration:
 ```yaml
 instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
@@ -3934,8 +3981,15 @@ This setting has the following sub-options:
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+* `use_tls`: Whether to use tls connection. Defaults to false.
+* `certificate_file`: Optional path to the certificate file
+* `private_key_file`: Optional path to the private key file
+* `ca_file`: Optional path to the CA certificate file. Use this one or:
+* `ca_path`: Optional path to the folder containing the CA certificate file
 
   _Added in Synapse 1.78.0._
+
+  _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
 
 Example configuration:
 ```yaml
@@ -3945,6 +3999,10 @@ redis:
   port: 6379
   password: <secret_password>
   dbid: <dbid>
+  #use_tls: True
+  #certificate_file: <path_to_the_certificate_file>
+  #private_key_file: <path_to_the_private_key_file>
+  #ca_file: <path_to_the_ca_certificate_file>
 ```
 ---
 ## Individual worker configuration
@@ -3982,6 +4040,7 @@ worker_name: generic_worker1
 ```
 ---
 ### `worker_replication_host`
+*Deprecated as of version 1.84.0. Place `host` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -3993,6 +4052,7 @@ worker_replication_host: 127.0.0.1
 ```
 ---
 ### `worker_replication_http_port`
+*Deprecated as of version 1.84.0. Place `port` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -4004,6 +4064,7 @@ worker_replication_http_port: 9093
 ```
 ---
 ### `worker_replication_http_tls`
+*Deprecated as of version 1.84.0. Place `tls` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
@@ -4029,9 +4090,9 @@ A worker can handle HTTP requests. To do so, a `worker_listeners` option
 must be declared, in the same way as the [`listeners` option](#listeners)
 in the shared config.
 
-Workers declared in [`stream_writers`](#stream_writers) will need to include a
-`replication` listener here, in order to accept internal HTTP requests from
-other workers.
+Workers declared in [`stream_writers`](#stream_writers) and [`instance_map`](#instance_map)
+ will need to include a `replication` listener here, in order to accept internal HTTP 
+requests from other workers.
 
 Example configuration:
 ```yaml

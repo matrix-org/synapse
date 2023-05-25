@@ -106,7 +106,7 @@ class RoomCreationHandler:
         self.auth_blocking = hs.get_auth_blocking()
         self.clock = hs.get_clock()
         self.hs = hs
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -160,7 +160,9 @@ class RoomCreationHandler:
         )
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
 
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._third_party_event_rules = (
+            hs.get_module_api_callbacks().third_party_event_rules
+        )
 
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
@@ -449,7 +451,9 @@ class RoomCreationHandler:
         """
         user_id = requester.user.to_string()
 
-        spam_check = await self.spam_checker.user_may_create_room(user_id)
+        spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+            user_id
+        )
         if spam_check != NOT_SPAM:
             raise SynapseError(
                 403,
@@ -740,7 +744,7 @@ class RoomCreationHandler:
 
         # Let the third party rules modify the room creation config if needed, or abort
         # the room creation entirely with an exception.
-        await self.third_party_event_rules.on_create_room(
+        await self._third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
 
@@ -761,7 +765,9 @@ class RoomCreationHandler:
                 )
 
         if not is_requester_admin:
-            spam_check = await self.spam_checker.user_may_create_room(user_id)
+            spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
+                user_id
+            )
             if spam_check != NOT_SPAM:
                 raise SynapseError(
                     403,
@@ -875,7 +881,7 @@ class RoomCreationHandler:
         # Check whether this visibility value is blocked by a third party module
         allowed_by_third_party_rules = (
             await (
-                self.third_party_event_rules.check_visibility_can_be_modified(
+                self._third_party_event_rules.check_visibility_can_be_modified(
                     room_id, visibility
                 )
             )
@@ -1727,7 +1733,7 @@ class RoomShutdownHandler:
         self.room_member_handler = hs.get_room_member_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastores().main
 

@@ -44,34 +44,6 @@ from synapse.events.presence_router import (
     GET_USERS_FOR_STATES_CALLBACK,
     PresenceRouter,
 )
-from synapse.events.spamcheck import (
-    CHECK_EVENT_FOR_SPAM_CALLBACK,
-    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
-    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
-    CHECK_USERNAME_FOR_SPAM_CALLBACK,
-    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
-    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
-    USER_MAY_CREATE_ROOM_CALLBACK,
-    USER_MAY_INVITE_CALLBACK,
-    USER_MAY_JOIN_ROOM_CALLBACK,
-    USER_MAY_PUBLISH_ROOM_CALLBACK,
-    USER_MAY_SEND_3PID_INVITE_CALLBACK,
-    SpamChecker,
-)
-from synapse.events.third_party_rules import (
-    CHECK_CAN_DEACTIVATE_USER_CALLBACK,
-    CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
-    CHECK_EVENT_ALLOWED_CALLBACK,
-    CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
-    CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
-    ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
-    ON_CREATE_ROOM_CALLBACK,
-    ON_NEW_EVENT_CALLBACK,
-    ON_PROFILE_UPDATE_CALLBACK,
-    ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
-    ON_THREEPID_BIND_CALLBACK,
-    ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
-)
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
@@ -105,6 +77,35 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
     ON_LEGACY_SEND_MAIL_CALLBACK,
     ON_USER_REGISTRATION_CALLBACK,
 )
+from synapse.module_api.callbacks.spamchecker_callbacks import (
+    CHECK_EVENT_FOR_SPAM_CALLBACK,
+    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
+    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+    CHECK_USERNAME_FOR_SPAM_CALLBACK,
+    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
+    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
+    USER_MAY_CREATE_ROOM_CALLBACK,
+    USER_MAY_INVITE_CALLBACK,
+    USER_MAY_JOIN_ROOM_CALLBACK,
+    USER_MAY_PUBLISH_ROOM_CALLBACK,
+    USER_MAY_SEND_3PID_INVITE_CALLBACK,
+    SpamCheckerModuleApiCallbacks,
+)
+from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
+    CHECK_CAN_DEACTIVATE_USER_CALLBACK,
+    CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
+    CHECK_EVENT_ALLOWED_CALLBACK,
+    CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
+    CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
+    ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
+    ON_CREATE_ROOM_CALLBACK,
+    ON_NEW_EVENT_CALLBACK,
+    ON_PROFILE_UPDATE_CALLBACK,
+    ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
+    ON_THREEPID_BIND_CALLBACK,
+    ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
+)
+from synapse.push.httppusher import HttpPusher
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -134,7 +135,7 @@ from synapse.util.caches.descriptors import CachedFunction, cached as _cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
-    from synapse.app.generic_worker import GenericWorkerSlavedStore
+    from synapse.app.generic_worker import GenericWorkerStore
     from synapse.server import HomeServer
 
 
@@ -148,7 +149,7 @@ are loaded into Synapse.
 """
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
-NOT_SPAM = SpamChecker.NOT_SPAM
+NOT_SPAM = SpamCheckerModuleApiCallbacks.NOT_SPAM
 
 __all__ = [
     "errors",
@@ -156,6 +157,7 @@ __all__ = [
     "parse_json_object_from_request",
     "respond_with_html",
     "run_in_background",
+    "run_as_background_process",
     "cached",
     "NOT_SPAM",
     "UserID",
@@ -236,9 +238,7 @@ class ModuleApi:
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
         #       out.
-        self._store: Union[
-            DataStore, "GenericWorkerSlavedStore"
-        ] = hs.get_datastores().main
+        self._store: Union[DataStore, "GenericWorkerStore"] = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
@@ -249,6 +249,7 @@ class ModuleApi:
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._pusherpool = hs.get_pusherpool()
         self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
@@ -272,8 +273,6 @@ class ModuleApi:
         self._public_room_list_manager = PublicRoomListManager(hs)
         self._account_data_manager = AccountDataManager(hs)
 
-        self._spam_checker = hs.get_spam_checker()
-        self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
         self._account_data_handler = hs.get_account_data_handler()
@@ -306,7 +305,7 @@ class ModuleApi:
 
         Added in Synapse v1.37.0.
         """
-        return self._spam_checker.register_callbacks(
+        return self._callbacks.spam_checker.register_callbacks(
             check_event_for_spam=check_event_for_spam,
             should_drop_federated_event=should_drop_federated_event,
             user_may_join_room=user_may_join_room,
@@ -371,7 +370,7 @@ class ModuleApi:
 
         Added in Synapse v1.39.0.
         """
-        return self._third_party_event_rules.register_third_party_rules_callbacks(
+        return self._callbacks.third_party_event_rules.register_third_party_rules_callbacks(
             check_event_allowed=check_event_allowed,
             on_create_room=on_create_room,
             check_threepid_can_be_invited=check_threepid_can_be_invited,
@@ -1226,6 +1225,50 @@ class ModuleApi:
         """
 
         await self._clock.sleep(seconds)
+
+    async def send_http_push_notification(
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        content: JsonDict,
+        tweaks: Optional[JsonMapping] = None,
+        default_payload: Optional[JsonMapping] = None,
+    ) -> Dict[str, bool]:
+        """Send an HTTP push notification that is forwarded to the registered push gateway
+        for the specified user/device.
+
+        Added in Synapse v1.82.0.
+
+        Args:
+            user_id: The user ID to send the push notification to.
+            device_id: The device ID of the device where to send the push notification. If `None`,
+            the notification will be sent to all registered HTTP pushers of the user.
+            content: A dict of values that will be put in the `notification` field of the push
+            (cf Push Gateway spec). `devices` field will be overrided if included.
+            tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+            This will be merged (and override if some matching values already exist there)
+            with existing `default_payload`.
+
+        Returns:
+            a dict reprensenting the status of the push per device ID
+        """
+        status = {}
+        if user_id in self._pusherpool.pushers:
+            for p in self._pusherpool.pushers[user_id].values():
+                if isinstance(p, HttpPusher) and (
+                    not device_id or p.device_id == device_id
+                ):
+                    res = await p.dispatch_push(content, tweaks, default_payload)
+                    # Check if the push was successful and no pushers were rejected.
+                    sent = res is not False and not res
+
+                    # This is mainly to accomodate mypy
+                    # device_id should never be empty after the `set_device_id_for_pushers`
+                    # background job has been properly run.
+                    if p.device_id:
+                        status[p.device_id] = sent
+        return status
 
     async def send_mail(
         self,

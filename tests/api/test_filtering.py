@@ -26,13 +26,15 @@ from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.api.presence import UserPresenceState
 from synapse.server import HomeServer
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 from synapse.util.frozenutils import freeze
 
 from tests import unittest
 from tests.events.test_utils import MockEvent
 
+user_id = UserID.from_string("@test_user:test")
+user2_id = UserID.from_string("@test_user2:test")
 user_localpart = "test_user"
 
 
@@ -46,8 +48,6 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         invalid_filters: List[JsonDict] = [
             # `account_data` must be a dictionary
             {"account_data": "Hello World"},
-            # `event_fields` entries must not contain backslashes
-            {"event_fields": [r"\\foo"]},
             # `event_format` must be "client" or "federation"
             {"event_format": "other"},
             # `not_rooms` must contain valid room IDs
@@ -112,10 +112,6 @@ class FilteringTestCase(unittest.HomeserverTestCase):
                 "event_format": "client",
                 "event_fields": ["type", "content", "sender"],
             },
-            # a single backslash should be permitted (though it is debatable whether
-            # it should be permitted before anything other than `.`, and what that
-            # actually means)
-            #
             # (note that event_fields is implemented in
             # synapse.events.utils.serialize_event, and so whether this actually works
             # is tested elsewhere. We just want to check that it is allowed through the
@@ -437,7 +433,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         user_filter_json = {"presence": {"senders": ["@foo:bar"]}}
         filter_id = self.get_success(
             self.datastore.add_user_filter(
-                user_localpart=user_localpart, user_filter=user_filter_json
+                user_id=user_id, user_filter=user_filter_json
             )
         )
         presence_states = [
@@ -467,7 +463,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         filter_id = self.get_success(
             self.datastore.add_user_filter(
-                user_localpart=user_localpart + "2", user_filter=user_filter_json
+                user_id=user2_id, user_filter=user_filter_json
             )
         )
         presence_states = [
@@ -495,7 +491,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
         filter_id = self.get_success(
             self.datastore.add_user_filter(
-                user_localpart=user_localpart, user_filter=user_filter_json
+                user_id=user_id, user_filter=user_filter_json
             )
         )
         event = MockEvent(sender="@foo:bar", type="m.room.topic", room_id="!foo:bar")
@@ -514,7 +510,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
         filter_id = self.get_success(
             self.datastore.add_user_filter(
-                user_localpart=user_localpart, user_filter=user_filter_json
+                user_id=user_id, user_filter=user_filter_json
             )
         )
         event = MockEvent(
@@ -598,7 +594,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         filter_id = self.get_success(
             self.filtering.add_user_filter(
-                user_localpart=user_localpart, user_filter=user_filter_json
+                user_id=user_id, user_filter=user_filter_json
             )
         )
 
@@ -619,7 +615,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         filter_id = self.get_success(
             self.datastore.add_user_filter(
-                user_localpart=user_localpart, user_filter=user_filter_json
+                user_id=user_id, user_filter=user_filter_json
             )
         )
 

@@ -258,7 +258,7 @@ class DeleteMediaByID(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
-        self.server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self.media_repository = hs.get_media_repository()
 
     async def on_DELETE(
@@ -266,7 +266,7 @@ class DeleteMediaByID(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        if self.server_name != server_name:
+        if not self._is_mine_server_name(server_name):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local media")
 
         if await self.store.get_local_media(media_id) is None:

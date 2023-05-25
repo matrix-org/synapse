@@ -150,18 +150,19 @@ class Keyring:
     def __init__(
         self, hs: "HomeServer", key_fetchers: "Optional[Iterable[KeyFetcher]]" = None
     ):
-        self.clock = hs.get_clock()
-
         if key_fetchers is None:
-            key_fetchers = (
-                # Fetch keys from the database.
-                StoreKeyFetcher(hs),
-                # Fetch keys from a configured Perspectives server.
-                PerspectivesKeyFetcher(hs),
-                # Fetch keys from the origin server directly.
-                ServerKeyFetcher(hs),
-            )
-        self._key_fetchers = key_fetchers
+            # Always fetch keys from the database.
+            mutable_key_fetchers: List[KeyFetcher] = [StoreKeyFetcher(hs)]
+            # Fetch keys from configured trusted key servers, if any exist.
+            key_servers = hs.config.key.key_servers
+            if key_servers:
+                mutable_key_fetchers.append(PerspectivesKeyFetcher(hs))
+            # Finally, fetch keys from the origin server directly.
+            mutable_key_fetchers.append(ServerKeyFetcher(hs))
+
+            self._key_fetchers: Iterable[KeyFetcher] = tuple(mutable_key_fetchers)
+        else:
+            self._key_fetchers = key_fetchers
 
         self._fetch_keys_queue: BatchingQueue[
             _FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]
@@ -172,7 +173,7 @@ class Keyring:
             process_batch_callback=self._inner_fetch_key_requests,
         )
 
-        self._hostname = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
 
         # build a FetchKeyResult for each of our own keys, to shortcircuit the
         # fetcher.
@@ -276,7 +277,7 @@ class Keyring:
 
         # If we are the originating server, short-circuit the key-fetch for any keys
         # we already have
-        if verify_request.server_name == self._hostname:
+        if self._is_mine_server_name(verify_request.server_name):
             for key_id in verify_request.key_ids:
                 if key_id in self._local_verify_keys:
                     found_keys[key_id] = self._local_verify_keys[key_id]
@@ -510,7 +511,7 @@ class StoreKeyFetcher(KeyFetcher):
             for key_id in queue_value.key_ids
         )
 
-        res = await self.store.get_server_verify_keys(key_ids_to_fetch)
+        res = await self.store.get_server_keys_json(key_ids_to_fetch)
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
@@ -522,7 +523,6 @@ class BaseV2KeyFetcher(KeyFetcher):
         super().__init__(hs)
 
         self.store = hs.get_datastores().main
-        self.config = hs.config
 
     async def process_v2_response(
         self, from_server: str, response_json: JsonDict, time_added_ms: int
@@ -626,7 +626,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_federation_http_client()
-        self.key_servers = self.config.key.key_servers
+        self.key_servers = hs.config.key.key_servers
 
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]
@@ -775,7 +775,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
             keys.setdefault(server_name, {}).update(processed_response)
 
-        await self.store.store_server_verify_keys(
+        await self.store.store_server_signature_keys(
             perspective_name, time_now_ms, added_keys
         )
 

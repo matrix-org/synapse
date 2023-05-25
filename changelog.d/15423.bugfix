@@ -1,1 +1,0 @@
-Improve robustness when handling a perspective key response by deduplicating received server keys.

@@ -1,1 +1,0 @@
-Fix and document untold assumption that `on_logged_out` module hooks will be called before pushers deletion.

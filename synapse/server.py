@@ -42,8 +42,6 @@ from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.presence_router import PresenceRouter
-from synapse.events.spamcheck import SpamChecker
-from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
@@ -94,7 +92,11 @@ from synapse.handlers.room import (
 )
 from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
+from synapse.handlers.room_member import (
+    RoomForgetterHandler,
+    RoomMemberHandler,
+    RoomMemberMasterHandler,
+)
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
@@ -105,7 +107,11 @@ from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
-from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
+from synapse.http.client import (
+    InsecureInterceptableContextFactory,
+    ReplicationClient,
+    SimpleHttpClient,
+)
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.media.media_repository import MediaRepository
 from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
@@ -141,6 +147,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from txredisapi import ConnectionHandler
 
+    from synapse.handlers.jwt import JwtHandler
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
 
@@ -233,6 +240,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         "message",
         "pagination",
         "profile",
+        "room_forgetter",
         "stats",
     ]
 
@@ -374,6 +382,10 @@ class HomeServer(metaclass=abc.ABCMeta):
             return False
         return localpart_hostname[1] == self.hostname
 
+    def is_mine_server_name(self, server_name: str) -> bool:
+        """Determines whether a server name refers to this homeserver."""
+        return server_name == self.hostname
+
     @cache_in_self
     def get_clock(self) -> Clock:
         return Clock(self._reactor)
@@ -442,15 +454,15 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
-    def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
+    def get_proxied_blocklisted_http_client(self) -> SimpleHttpClient:
         """
-        An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
-        based on the IP range blacklist/whitelist.
+        An HTTP client that uses configured HTTP(S) proxies and blocks IPs
+        based on the configured IP ranges.
         """
         return SimpleHttpClient(
             self,
-            ip_whitelist=self.config.server.ip_range_whitelist,
-            ip_blacklist=self.config.server.ip_range_blacklist,
+            ip_allowlist=self.config.server.ip_range_allowlist,
+            ip_blocklist=self.config.server.ip_range_blocklist,
             use_proxy=True,
         )
 
@@ -463,6 +475,13 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config
         )
         return MatrixFederationHttpClient(self, tls_client_options_factory)
+
+    @cache_in_self
+    def get_replication_client(self) -> ReplicationClient:
+        """
+        An HTTP client for HTTP replication.
+        """
+        return ReplicationClient(self)
 
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
@@ -514,6 +533,12 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_sso_handler(self) -> SsoHandler:
         return SsoHandler(self)
+
+    @cache_in_self
+    def get_jwt_handler(self) -> "JwtHandler":
+        from synapse.handlers.jwt import JwtHandler
+
+        return JwtHandler(self)
 
     @cache_in_self
     def get_sync_handler(self) -> SyncHandler:
@@ -688,14 +713,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StatsHandler(self)
 
     @cache_in_self
-    def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker(self)
-
-    @cache_in_self
-    def get_third_party_event_rules(self) -> ThirdPartyEventRules:
-        return ThirdPartyEventRules(self)
-
-    @cache_in_self
     def get_password_auth_provider(self) -> PasswordAuthProvider:
         return PasswordAuthProvider()
 
@@ -767,7 +784,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(
+            msc3970_enabled=self.config.experimental.msc3970_enabled
+        )
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -803,7 +822,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_module_api_callbacks(self) -> ModuleApiCallbacks:
-        return ModuleApiCallbacks()
+        return ModuleApiCallbacks(self)
 
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:
@@ -828,6 +847,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_push_rules_handler(self) -> PushRulesHandler:
         return PushRulesHandler(self)
+
+    @cache_in_self
+    def get_room_forgetter_handler(self) -> RoomForgetterHandler:
+        return RoomForgetterHandler(self)
 
     @cache_in_self
     def get_outbound_redis_connection(self) -> "ConnectionHandler":

@@ -235,11 +235,16 @@ class FederationClient(FederationBase):
         )
 
     async def claim_client_keys(
-        self, destination: str, content: JsonDict, timeout: Optional[int]
+        self,
+        user: UserID,
+        destination: str,
+        query: Dict[str, Dict[str, Dict[str, int]]],
+        timeout: Optional[int],
     ) -> JsonDict:
         """Claims one-time keys for a device hosted on a remote server.
 
         Args:
+            user: The user id of the requesting user
             destination: Domain name of the remote homeserver
             content: The query content.
 
@@ -247,8 +252,52 @@ class FederationClient(FederationBase):
             The JSON object from the response
         """
         sent_queries_counter.labels("client_one_time_keys").inc()
+
+        # Convert the query with counts into a stable and unstable query and check
+        # if attempting to claim more than 1 OTK.
+        content: Dict[str, Dict[str, str]] = {}
+        unstable_content: Dict[str, Dict[str, List[str]]] = {}
+        use_unstable = False
+        for user_id, one_time_keys in query.items():
+            for device_id, algorithms in one_time_keys.items():
+                if any(count > 1 for count in algorithms.values()):
+                    use_unstable = True
+                if algorithms:
+                    # For the stable query, choose only the first algorithm.
+                    content.setdefault(user_id, {})[device_id] = next(iter(algorithms))
+                    # For the unstable query, repeat each algorithm by count, then
+                    # splat those into chain to get a flattened list of all algorithms.
+                    #
+                    # Converts from {"algo1": 2, "algo2": 2} to ["algo1", "algo1", "algo2"].
+                    unstable_content.setdefault(user_id, {})[device_id] = list(
+                        itertools.chain(
+                            *(
+                                itertools.repeat(algorithm, count)
+                                for algorithm, count in algorithms.items()
+                            )
+                        )
+                    )
+
+        if use_unstable:
+            try:
+                return await self.transport_layer.claim_client_keys_unstable(
+                    user, destination, unstable_content, timeout
+                )
+            except HttpResponseException as e:
+                # If an error is received that is due to an unrecognised endpoint,
+                # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
+                # and raise.
+                if not is_unknown_endpoint(e):
+                    raise
+
+            logger.debug(
+                "Couldn't claim client keys with the unstable API, falling back to the v1 API"
+            )
+        else:
+            logger.debug("Skipping unstable claim client keys API")
+
         return await self.transport_layer.claim_client_keys(
-            destination, content, timeout
+            user, destination, content, timeout
         )
 
     @trace
@@ -280,15 +329,11 @@ class FederationClient(FederationBase):
         logger.debug("backfill transaction_data=%r", transaction_data)
 
         if not isinstance(transaction_data, dict):
-            # TODO we probably want an exception type specific to federation
-            # client validation.
-            raise TypeError("Backfill transaction_data is not a dict.")
+            raise InvalidResponseError("Backfill transaction_data is not a dict.")
 
         transaction_data_pdus = transaction_data.get("pdus")
         if not isinstance(transaction_data_pdus, list):
-            # TODO we probably want an exception type specific to federation
-            # client validation.
-            raise TypeError("transaction_data.pdus is not a list.")
+            raise InvalidResponseError("transaction_data.pdus is not a list.")
 
         room_version = await self.store.get_room_version(room_id)
 
@@ -811,7 +856,7 @@ class FederationClient(FederationBase):
 
         for destination in destinations:
             # We don't want to ask our own server for information we don't have
-            if destination == self.server_name:
+            if self._is_mine_server_name(destination):
                 continue
 
             try:
@@ -1493,7 +1538,7 @@ class FederationClient(FederationBase):
         self, destinations: Iterable[str], room_id: str, event_dict: JsonDict
     ) -> None:
         for destination in destinations:
-            if destination == self.server_name:
+            if self._is_mine_server_name(destination):
                 continue
 
             try:

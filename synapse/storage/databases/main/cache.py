@@ -205,13 +205,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             )
         elif row.type == EventsStreamCurrentStateRow.TypeId:
             assert isinstance(data, EventsStreamCurrentStateRow)
-            self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)
+            self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)  # type: ignore[attr-defined]
 
             if data.type == EventTypes.Member:
-                self.get_rooms_for_user_with_stream_ordering.invalidate(
+                self.get_rooms_for_user_with_stream_ordering.invalidate(  # type: ignore[attr-defined]
                     (data.state_key,)
                 )
-                self.get_rooms_for_user.invalidate((data.state_key,))
+                self.get_rooms_for_user.invalidate((data.state_key,))  # type: ignore[attr-defined]
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
 
@@ -229,7 +229,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         # This invalidates any local in-memory cached event objects, the original
         # process triggering the invalidation is responsible for clearing any external
         # cached objects.
-        self._invalidate_local_get_event_cache(event_id)
+        self._invalidate_local_get_event_cache(event_id)  # type: ignore[attr-defined]
 
         self._attempt_to_invalidate_cache("have_seen_event", (room_id, event_id))
         self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
@@ -242,10 +242,10 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self._attempt_to_invalidate_cache("_get_membership_from_event_id", (event_id,))
 
         if not backfilled:
-            self._events_stream_cache.entity_has_changed(room_id, stream_ordering)
+            self._events_stream_cache.entity_has_changed(room_id, stream_ordering)  # type: ignore[attr-defined]
 
         if redacts:
-            self._invalidate_local_get_event_cache(redacts)
+            self._invalidate_local_get_event_cache(redacts)  # type: ignore[attr-defined]
             # Caches which might leak edits must be invalidated for the event being
             # redacted.
             self._attempt_to_invalidate_cache("get_relations_for_event", (redacts,))
@@ -254,7 +254,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_thread_id_for_receipts", (redacts,))
 
         if etype == EventTypes.Member:
-            self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
+            self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)  # type: ignore[attr-defined]
             self._attempt_to_invalidate_cache(
                 "get_invited_rooms_for_local_user", (state_key,)
             )
@@ -274,11 +274,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]
     ) -> None:
-        """Invalidates the cache and adds it to the cache stream so slaves
+        """Invalidates the cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
 
-        This should only be used to invalidate caches where slaves won't
-        otherwise know from other replication streams that the cache should
+        This should only be used to invalidate caches where other workers won't
+        otherwise have known from other replication streams that the cache should
         be invalidated.
         """
         cache_func = getattr(self, cache_name, None)
@@ -297,11 +297,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         cache_func: CachedFunction,
         keys: Tuple[Any, ...],
     ) -> None:
-        """Invalidates the cache and adds it to the cache stream so slaves
+        """Invalidates the cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
 
-        This should only be used to invalidate caches where slaves won't
-        otherwise know from other replication streams that the cache should
+        This should only be used to invalidate caches where other workers won't
+        otherwise have known from other replication streams that the cache should
         be invalidated.
         """
         txn.call_after(cache_func.invalidate, keys)
@@ -310,7 +310,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
     def _invalidate_all_cache_and_stream(
         self, txn: LoggingTransaction, cache_func: CachedFunction
     ) -> None:
-        """Invalidates the entire cache and adds it to the cache stream so slaves
+        """Invalidates the entire cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
         """
 
@@ -378,6 +378,8 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             )
 
         if isinstance(self.database_engine, PostgresEngine):
+            assert self._cache_id_gen is not None
+
             # get_next() returns a context manager which is designed to wrap
             # the transaction. However, we want to only get an ID when we want
             # to use it, here, so we need to call __enter__ manually, and have

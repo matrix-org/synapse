@@ -70,6 +70,10 @@ redis:
   port: 6379
   # dbid:  <redis_logical_db_id>
   # password: <secret_password>  
+  # use_tls: True
+  # certificate_file: <path_to_certificate>
+  # private_key_file: <path_to_private_key>
+  # ca_file: <path_to_ca_certificate>
 ```
 
 This assumes that your Redis service is called `redis` in your Docker Compose file.

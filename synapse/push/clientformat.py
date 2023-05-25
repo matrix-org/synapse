@@ -22,7 +22,7 @@ from synapse.types import UserID
 
 def format_push_rules_for_user(
     user: UserID, ruleslist: FilteredPushRules
-) -> Dict[str, Dict[str, list]]:
+) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
