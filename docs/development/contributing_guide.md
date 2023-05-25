@@ -53,6 +53,13 @@ can find many good git tutorials on the web.
 
 # 4. Install the dependencies
 
+Before installing the Python dependencies, make sure you have installed Rust (see the
+"What do I need?" section above) and have selected the default Rust toolchain:
+
+```sh
+rustup default stable
+```
+
 Synapse uses the [poetry](https://python-poetry.org/) project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
 source, you should install `poetry`.
@@ -76,7 +83,8 @@ cd path/where/you/have/cloned/the/repository
 poetry install --extras all
 ```
 
-This will install the runtime and developer dependencies for the project.
+This will install the runtime and developer dependencies for the project.  Be sure to check
+that the `poetry install` step completed cleanly.
 
 ## Running Synapse via poetry
 
@@ -84,13 +92,33 @@ To start a local instance of Synapse in the locked poetry environment, create a 
 
 ```sh
 cp docs/sample_config.yaml homeserver.yaml
+cp docs/sample_log_config.yaml log_config.yaml
 ```
 
-Now edit homeserver.yaml, and run Synapse with:
+Now edit `homeserver.yaml`, things you might want to change include:
+- setting a servername
+- fixing pathnames to be correct for your system
+- using a PostgreSQL database instead of SQLite
+- adding a [registration_shared_secret](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration_shared_secret)
+  for use with [register_new_matrix_user](https://matrix-org.github.io/synapse/latest/setup/installation.html#registering-a-user)
+
+edit `log_config.yaml` if necessary:
+- you may wish to set the root handler for logging in your dev environment to `console`
+
+and run Synapse with:
 
 ```sh
 poetry run python -m synapse.app.homeserver -c homeserver.yaml
 ```
+
+If you get an error like the following:
+
+```
+importlib.metadata.PackageNotFoundError: matrix-synapse
+```
+
+this probably indicates that the `poetry install` step did not complete cleanly - go back and
+resolve any issues and re-run until successful.
 
 # 5. Get in touch.
 
