@@ -63,6 +63,7 @@ from synapse.replication.http.streams import ReplicationGetStreamUpdates
 from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import PresenceFederationStream, PresenceStream
 from synapse.storage.databases.main import DataStore
+from synapse.storage.databases.main.experimental_features import ExperimentalFeature
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
@@ -147,8 +148,6 @@ class BasePresenceHandler(abc.ABC):
             self._federation = hs.get_federation_sender()
 
         self._federation_queue = PresenceFederationQueue(hs, self)
-
-        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
         active_presence = self.store.take_presence_startup_info()
         self.user_to_current_state = {state.user_id: state for state in active_presence}
@@ -422,8 +421,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
 
-        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
-
         hs.get_reactor().addSystemEventTrigger(
             "before",
             "shutdown",
@@ -609,8 +606,12 @@ class WorkerPresenceHandler(BasePresenceHandler):
             PresenceState.BUSY,
         )
 
+        busy_presence_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            target_user.to_string(), ExperimentalFeature.MSC3026
+        )
+
         if presence not in valid_presence or (
-            presence == PresenceState.BUSY and not self._busy_presence_enabled
+            presence == PresenceState.BUSY and not busy_presence_enabled
         ):
             raise SynapseError(400, "Invalid presence state")
 
@@ -1238,8 +1239,12 @@ class PresenceHandler(BasePresenceHandler):
             PresenceState.BUSY,
         )
 
+        busy_presence_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            target_user.to_string(), ExperimentalFeature.MSC3026
+        )
+
         if presence not in valid_presence or (
-            presence == PresenceState.BUSY and not self._busy_presence_enabled
+            presence == PresenceState.BUSY and not busy_presence_enabled
         ):
             raise SynapseError(400, "Invalid presence state")
 
@@ -1257,7 +1262,7 @@ class PresenceHandler(BasePresenceHandler):
             new_fields["status_msg"] = status_msg
 
         if presence == PresenceState.ONLINE or (
-            presence == PresenceState.BUSY and self._busy_presence_enabled
+            presence == PresenceState.BUSY and busy_presence_enabled
         ):
             new_fields["last_active_ts"] = self.clock.time_msec()
 

@@ -27,6 +27,7 @@ from synapse.http.site import SynapseRequest
 from synapse.push import PusherConfigException
 from synapse.rest.client._base import client_patterns
 from synapse.rest.synapse.client.unsubscribe import UnsubscribeResource
+from synapse.storage.databases.main.experimental_features import ExperimentalFeature
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -42,7 +43,6 @@ class PushersRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self._msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -54,8 +54,12 @@ class PushersRestServlet(RestServlet):
 
         pusher_dicts = [p.as_dict() for p in pushers]
 
+        msc3881_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            user.to_string(), ExperimentalFeature.MSC3881
+        )
+
         for pusher in pusher_dicts:
-            if self._msc3881_enabled:
+            if msc3881_enabled:
                 pusher["org.matrix.msc3881.enabled"] = pusher["enabled"]
                 pusher["org.matrix.msc3881.device_id"] = pusher["device_id"]
             del pusher["enabled"]
@@ -73,7 +77,6 @@ class PushersSetRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
         self.pusher_pool = self.hs.get_pusherpool()
-        self._msc3881_enabled = self.hs.config.experimental.msc3881_enabled
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -113,7 +116,11 @@ class PushersSetRestServlet(RestServlet):
             append = content["append"]
 
         enabled = True
-        if self._msc3881_enabled and "org.matrix.msc3881.enabled" in content:
+        msc3881_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            user.to_string(), ExperimentalFeature.MSC3881
+        )
+
+        if msc3881_enabled and "org.matrix.msc3881.enabled" in content:
             enabled = content["org.matrix.msc3881.enabled"]
 
         if not append:

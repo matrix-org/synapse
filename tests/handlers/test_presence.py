@@ -36,7 +36,7 @@ from synapse.handlers.presence import (
     handle_update,
 )
 from synapse.rest import admin
-from synapse.rest.client import room
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util import Clock
@@ -514,9 +514,13 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
 
 class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
+    servlets = [admin.register_servlets, login.register_servlets]
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
+        self.user = self.register_user("test", "pass", True)
+        self.admin_user_tok = self.login("test", "pass")
 
     def test_external_process_timeout(self) -> None:
         """Test that if an external process doesn't update the records for a while
@@ -725,6 +729,62 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.status_msg, status_msg)
 
     @parameterized.expand([(False,), (True,)])
+    def test_set_presence_from_syncing_keeps_busy_via_admin(
+        self, test_with_workers: bool
+    ) -> None:
+        """Test that presence set by syncing doesn't affect busy status, with the busy status
+        enabled via the admin api.
+
+        Args:
+            test_with_workers: If True, check the presence state of the user by calling
+                /sync against a worker, rather than the main process.
+        """
+        status_msg = "I'm busy!"
+
+        # activate busy state via admin api
+        url = f"/_synapse/admin/v1/experimental_features/{self.user}"
+        channel = self.make_request(
+            "PUT",
+            url,
+            content={
+                "features": {"msc3026": True},
+            },
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # By default, we call /sync against the main process.
+        worker_to_sync_against = self.hs
+        if test_with_workers:
+            # Create a worker and use it to handle /sync traffic instead.
+            # This is used to test that presence changes get replicated from workers
+            # to the main process correctly.
+            worker_to_sync_against = self.make_worker_hs(
+                "synapse.app.generic_worker", {"worker_name": "presence_writer"}
+            )
+
+        # Set presence to BUSY
+        self._set_presencestate_with_status_msg(
+            self.user, PresenceState.BUSY, status_msg
+        )
+
+        # Perform a sync with a presence state other than busy. This should NOT change
+        # our presence status; we only change from busy if we explicitly set it via
+        # /presence/*.
+        self.get_success(
+            worker_to_sync_against.get_presence_handler().user_syncing(
+                self.user, True, PresenceState.ONLINE
+            )
+        )
+
+        # Check against the main process that the user's presence did not change.
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(self.user))
+        )
+        # we should still be busy
+        self.assertEqual(state.state, PresenceState.BUSY)
+
+    @parameterized.expand([(False,), (True,)])
     @unittest.override_config(
         {
             "experimental_features": {
@@ -732,16 +792,16 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             },
         }
     )
-    def test_set_presence_from_syncing_keeps_busy(
+    def test_set_presence_from_syncing_keeps_busy_via_config(
         self, test_with_workers: bool
     ) -> None:
-        """Test that presence set by syncing doesn't affect busy status
+        """Test that presence set by syncing doesn't affect busy status, with the busy status
+        enabled via the config
 
         Args:
             test_with_workers: If True, check the presence state of the user by calling
                 /sync against a worker, rather than the main process.
         """
-        user_id = "@test:server"
         status_msg = "I'm busy!"
 
         # By default, we call /sync against the main process.
@@ -755,20 +815,22 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             )
 
         # Set presence to BUSY
-        self._set_presencestate_with_status_msg(user_id, PresenceState.BUSY, status_msg)
+        self._set_presencestate_with_status_msg(
+            self.user, PresenceState.BUSY, status_msg
+        )
 
         # Perform a sync with a presence state other than busy. This should NOT change
         # our presence status; we only change from busy if we explicitly set it via
         # /presence/*.
         self.get_success(
             worker_to_sync_against.get_presence_handler().user_syncing(
-                user_id, True, PresenceState.ONLINE
+                self.user, True, PresenceState.ONLINE
             )
         )
 
         # Check against the main process that the user's presence did not change.
         state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
+            self.presence_handler.get_state(UserID.from_string(self.user))
         )
         # we should still be busy
         self.assertEqual(state.state, PresenceState.BUSY)

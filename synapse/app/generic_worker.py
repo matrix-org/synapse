@@ -51,6 +51,7 @@ from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
+from synapse.storage.databases.main import ExperimentalFeaturesStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.appservice import (
     ApplicationServiceTransactionWorkerStore,
@@ -146,6 +147,7 @@ class GenericWorkerStore(
     TransactionWorkerStore,
     LockStore,
     SessionStore,
+    ExperimentalFeaturesStore,
 ):
     # Properties that multiple storage classes define. Tell mypy what the
     # expected type is.

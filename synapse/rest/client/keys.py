@@ -31,6 +31,7 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import log_kv, set_tag
 from synapse.replication.http.devices import ReplicationUploadKeysForUserRestServlet
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
+from synapse.storage.databases.main.experimental_features import ExperimentalFeature
 from synapse.types import JsonDict, StreamToken
 from synapse.util.cancellation import cancellable
 
@@ -375,7 +376,11 @@ class SigningKeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
-        if self.hs.config.experimental.msc3967_enabled:
+        msc3967_enabled = await self.hs.get_datastores().main.get_feature_enabled(
+            user_id, ExperimentalFeature.MSC3967
+        )
+
+        if msc3967_enabled:
             if await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id):
                 # If we already have a master key then cross signing is set up and we require UIA to reset
                 await self.auth_handler.validate_user_via_ui_auth(
