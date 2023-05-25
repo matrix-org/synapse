@@ -142,9 +142,10 @@ class ReplicationAgent(_AgentBase):
 
         This is copied from twisted.web.client.Agent, except:
 
-        * It uses a different pool key (combining the host & port).
-        * It does not call _ensureValidURI(...) since it breaks on some
-          UNIX paths.
+        * It uses a different pool key (combining the scheme with either host & port or
+          socket path).
+        * It does not call _ensureValidURI(...) since it breaks when using a worker's
+          name as a 'hostname'.
 
         See: twisted.web.iweb.IAgent.request
         """
@@ -154,9 +155,12 @@ class ReplicationAgent(_AgentBase):
         except SchemeNotSupported:
             return defer.fail(Failure())
 
+        worker_name = parsedURI.netloc.decode("utf-8")
+        key_scheme = self._endpointFactory.instance_map[worker_name].scheme()
+        key_netloc = self._endpointFactory.instance_map[worker_name].netloc()
         # This sets the Pool key to be:
-        #  (http(s), <host:ip>)
-        key = (parsedURI.scheme, parsedURI.netloc)
+        #  (http(s), <host:port>) or (unix, <socket_path>)
+        key = (key_scheme, key_netloc)
 
         # _requestWithEndpoint comes from _AgentBase class
         return self._requestWithEndpoint(
