@@ -105,7 +105,7 @@ Now edit `homeserver.yaml`, things you might want to change include:
 edit `log_config.yaml` if necessary:
 - you may wish to set the root handler for logging in your dev environment to `console`
 
-and run Synapse with:
+And then run Synapse with the following command:
 
 ```sh
 poetry run python -m synapse.app.homeserver -c homeserver.yaml
