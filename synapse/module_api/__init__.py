@@ -1572,7 +1572,7 @@ class ModuleApi:
         preferred alias to use when referring to the room. This function
         retrieves that alias from the room's state.
 
-        Added in Synapse v1.82.0.
+        Added in Synapse v1.84.0.
 
         Args:
             room_id: The Room ID to find the alias of.
@@ -1581,13 +1581,9 @@ class ModuleApi:
         None if the room ID does not exist, or if the room exists but has no canonical alias.
         Otherwise, the parsed room alias.
         """
-        from synapse.api.constants import EventTypes
-
-        alias_event = await self._storage_controllers.state.get_current_state_event(
-            room_id, EventTypes.CanonicalAlias, ""
-        )
-        if alias_event:
-            return alias_event.content.get("alias")
+        room_alias_str = await self._storage_controllers.state.get_canonical_alias_for_room(room_id)
+        if room_alias_str:
+            return RoomAlias.from_string(room_alias_str)
 
     async def lookup_room_alias(self, room_alias: str) -> Tuple[str, List[str]]:
         """
