@@ -1581,7 +1581,9 @@ class ModuleApi:
         None if the room ID does not exist, or if the room exists but has no canonical alias.
         Otherwise, the parsed room alias.
         """
-        room_alias_str = await self._storage_controllers.state.get_canonical_alias_for_room(room_id)
+        room_alias_str = (
+            await self._storage_controllers.state.get_canonical_alias_for_room(room_id)
+        )
         if room_alias_str:
             return RoomAlias.from_string(room_alias_str)
 
