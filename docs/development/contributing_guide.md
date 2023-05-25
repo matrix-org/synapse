@@ -22,6 +22,9 @@ on Windows is not officially supported.
 
 The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://www.python.org/downloads/). Your Python also needs support for [virtual environments](https://docs.python.org/3/library/venv.html). This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running `sudo apt install python3-venv` should be enough.
 
+A recent version of the Rust compiler is needed to build the native modules. The
+easiest way of installing the latest version is to use [rustup](https://rustup.rs/).
+
 Synapse can connect to PostgreSQL via the [psycopg2](https://pypi.org/project/psycopg2/) Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with `sudo apt install libpq-dev`.
 
 Synapse has an optional, improved user search with better Unicode support. For that you need the development package of `libicu`. On Debian or Ubuntu Linux, this can be installed with `sudo apt install libicu-dev`.
@@ -29,9 +32,6 @@ Synapse has an optional, improved user search with better Unicode support. For t
 The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
-
-A recent version of the Rust compiler is needed to build the native modules. The
-easiest way of installing the latest version is to use [rustup](https://rustup.rs/).
 
 
 # 3. Get the source.
