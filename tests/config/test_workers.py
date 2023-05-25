@@ -262,7 +262,8 @@ class WorkerDutyConfigTestCase(TestCase):
         Tests new config options. This is for the worker's config.
         """
         appservice_worker_config = self._make_worker_config(
-            worker_app="synapse.app.generic_worker", worker_name="worker1"
+            worker_app="synapse.app.generic_worker", worker_name="worker1",
+            extras={"instance_map": {"main": {"host": "127.0.0.1", "port": 0}}},
         )
 
         self.assertTrue(
