@@ -53,12 +53,10 @@ can find many good git tutorials on the web.
 
 # 4. Install the dependencies
 
-Before installing the Python dependencies, make sure you have installed Rust (see the
-"What do I need?" section above) and have selected the default Rust toolchain:
 
-```sh
-rustup default stable
-```
+Before installing the Python dependencies, make sure you have installed a recent version
+of Rust (see the "What do I need?" section above). The easiest way of installing the
+latest version is to use [rustup](https://rustup.rs/).
 
 Synapse uses the [poetry](https://python-poetry.org/) project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
