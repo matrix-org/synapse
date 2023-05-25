@@ -664,6 +664,101 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             StoreError,
         )
 
+    def test_backfill_process_previously_failed_pull_attempt_event_in_the_background(
+        self,
+    ) -> None:
+        """
+        Sanity check that events are still processed even if it is in the background
+        for events that already have failed pull attempts.
+        """
+        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
+        main_store = self.hs.get_datastores().main
+
+        # Create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(main_store.get_room_version(room_id))
+
+        # Allow the remote user to send state events
+        self.helper.send_state(
+            room_id,
+            "m.room.power_levels",
+            {"events_default": 0, "state_default": 0},
+            tok=tok,
+        )
+
+        # Add the remote user to the room
+        member_event = self.get_success(
+            event_injection.inject_member_event(self.hs, room_id, OTHER_USER, "join")
+        )
+
+        initial_state_map = self.get_success(
+            main_store.get_partial_current_state_ids(room_id)
+        )
+
+        auth_event_ids = [
+            initial_state_map[("m.room.create", "")],
+            initial_state_map[("m.room.power_levels", "")],
+            member_event.event_id,
+        ]
+
+        # Create a regular event that should process
+        pulled_event = make_event_from_dict(
+            self.add_hashes_and_signatures_from_other_server(
+                {
+                    "type": "test_regular_type",
+                    "room_id": room_id,
+                    "sender": OTHER_USER,
+                    "prev_events": [
+                        member_event.event_id,
+                    ],
+                    "auth_events": auth_event_ids,
+                    "origin_server_ts": 1,
+                    "depth": 12,
+                    "content": {"body": "pulled_event"},
+                }
+            ),
+            room_version,
+        )
+
+        # Record a failed pull attempt for this event which will cause us to backfill it
+        # in the background from here on out.
+        self.get_success(
+            main_store.record_event_failed_pull_attempt(
+                room_id, pulled_event.event_id, "fake cause"
+            )
+        )
+
+        # We expect an outbound request to /backfill, so stub that out
+        self.mock_federation_transport_client.backfill.return_value = make_awaitable(
+            {
+                "origin": self.OTHER_SERVER_NAME,
+                "origin_server_ts": 123,
+                "pdus": [
+                    pulled_event.get_pdu_json(),
+                ],
+            }
+        )
+
+        # The function under test: try to backfill and process the pulled event
+        with LoggingContext("test"):
+            self.get_success(
+                self.hs.get_federation_event_handler().backfill(
+                    self.OTHER_SERVER_NAME,
+                    room_id,
+                    limit=1,
+                    extremities=["$some_extremity"],
+                )
+            )
+
+        # Ensure `run_as_background_process(...)` has a chance to run (essentially
+        # `wait_for_background_processes()`)
+        self.reactor.pump((0.1,))
+
+        # Make sure we processed and persisted the pulled event
+        self.get_success(main_store.get_event(pulled_event.event_id, allow_none=False))
+
     def test_process_pulled_event_with_rejected_missing_state(self) -> None:
         """Ensure that we correctly handle pulled events with missing state containing a
         rejected state event
