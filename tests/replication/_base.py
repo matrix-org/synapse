@@ -22,6 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 from synapse.app.generic_worker import GenericWorkerServer
+from synapse.config.workers import InstanceTCPLocationConfig
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -339,7 +340,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # `_handle_http_replication_attempt` like we do with the master HS.
         instance_name = worker_hs.get_instance_name()
         instance_loc = worker_hs.config.worker.instance_map.get(instance_name)
-        if instance_loc:
+        if instance_loc and isinstance(instance_loc, InstanceTCPLocationConfig):
             # Ensure the host is one that has a fake DNS entry.
             if instance_loc.host not in self.reactor.lookups:
                 raise Exception(

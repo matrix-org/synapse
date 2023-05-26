@@ -88,7 +88,7 @@ class ConfigModel(BaseModel):
         allow_mutation = False
 
 
-class InstanceLocationConfig(ConfigModel):
+class InstanceTCPLocationConfig(ConfigModel):
     """The host and port to talk to an instance via HTTP replication."""
 
     host: StrictStr
@@ -102,6 +102,23 @@ class InstanceLocationConfig(ConfigModel):
     def netloc(self) -> str:
         """Nicely format the network location data"""
         return f"{self.host}:{self.port}"
+
+
+class InstanceUNIXLocationConfig(ConfigModel):
+    """The socket file to talk to an instance via HTTP replication."""
+
+    path: StrictStr
+
+    def scheme(self) -> str:
+        """Hardcode a retrievable scheme"""
+        return "unix"
+
+    def netloc(self) -> str:
+        """Nicely format the address location data"""
+        return f"{self.path}"
+
+
+InstanceLocationConfig = Union[InstanceTCPLocationConfig, InstanceUNIXLocationConfig]
 
 
 @attr.s

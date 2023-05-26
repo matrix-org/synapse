@@ -18,7 +18,11 @@ from typing import Dict, Optional
 from zope.interface import implementer
 
 from twisted.internet import defer
-from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
+from twisted.internet.endpoints import (
+    HostnameEndpoint,
+    UNIXClientEndpoint,
+    wrapClientTLS,
+)
 from twisted.internet.interfaces import IStreamClientEndpoint
 from twisted.python.failure import Failure
 from twisted.web.client import URI, HTTPConnectionPool, _AgentBase
@@ -32,7 +36,11 @@ from twisted.web.iweb import (
     IResponse,
 )
 
-from synapse.config.workers import InstanceLocationConfig
+from synapse.config.workers import (
+    InstanceLocationConfig,
+    InstanceTCPLocationConfig,
+    InstanceUNIXLocationConfig,
+)
 from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
@@ -40,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 @implementer(IAgentEndpointFactory)
 class ReplicationEndpointFactory:
-    """Connect to a given TCP socket"""
+    """Connect to a given TCP or UNIX socket"""
 
     def __init__(
         self,
@@ -64,24 +72,27 @@ class ReplicationEndpointFactory:
         # The given URI has a special scheme and includes the worker name. The
         # actual connection details are pulled from the instance map.
         worker_name = uri.netloc.decode("utf-8")
-        scheme = self.instance_map[worker_name].scheme()
+        location_config = self.instance_map[worker_name]
+        scheme = location_config.scheme()
 
-        if scheme in ("http", "https"):
+        if isinstance(location_config, InstanceTCPLocationConfig):
             endpoint = HostnameEndpoint(
                 self.reactor,
-                self.instance_map[worker_name].host,
-                self.instance_map[worker_name].port,
+                location_config.host,
+                location_config.port,
             )
             if scheme == "https":
                 endpoint = wrapClientTLS(
                     # The 'port' argument below isn't actually used by the function
                     self.context_factory.creatorForNetloc(
-                        self.instance_map[worker_name].host,
-                        self.instance_map[worker_name].port,
+                        location_config.host,
+                        location_config.port,
                     ),
                     endpoint,
                 )
             return endpoint
+        elif isinstance(location_config, InstanceUNIXLocationConfig):
+            return UNIXClientEndpoint(self.reactor, location_config.path)
         else:
             raise SchemeNotSupported(f"Unsupported scheme: {scheme}")
 
