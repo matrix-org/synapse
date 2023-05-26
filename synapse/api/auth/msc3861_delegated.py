@@ -248,13 +248,10 @@ class MSC3861DelegatedAuth(BaseAuth):
         scope: List[str] = scope_to_list(introspection_result.get("scope", ""))
 
         # Determine type of user based on presence of particular scopes
-        has_admin_scope = SCOPE_SYNAPSE_ADMIN in scope
         has_user_scope = SCOPE_MATRIX_API in scope
         has_guest_scope = SCOPE_MATRIX_GUEST in scope
-        is_user = has_user_scope or has_admin_scope
-        is_guest = has_guest_scope and not is_user
 
-        if not is_user and not is_guest:
+        if not has_user_scope and not has_guest_scope:
             raise InvalidClientTokenError("No scope in token granting user rights")
 
         # Match via the sub claim
@@ -351,5 +348,5 @@ class MSC3861DelegatedAuth(BaseAuth):
             user_id=user_id,
             device_id=device_id,
             scope=scope,
-            is_guest=is_guest,
+            is_guest=(has_guest_scope and not has_user_scope),
         )
