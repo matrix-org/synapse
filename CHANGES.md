@@ -1,7 +1,7 @@
 Synapse 1.84.1 (2023-05-26)
 ===========================
 
-This patch release fixes a major issue with homeservers that does not have an `instance_map` defined but which do use workers.
+This patch release fixes a major issue with homeservers that do not have an `instance_map` defined but which do use workers.
 If you have already upgraded to Synapse 1.84.0 and your homeserver is working normally, then there is no need to update to this patch release.
 
 
