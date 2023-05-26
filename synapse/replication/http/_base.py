@@ -220,6 +220,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 if instance_name == local_instance_name:
                     raise Exception("Trying to send HTTP request to self")
                 if instance_name not in instance_map:
+                    # TODO: remove below condition after master officially becomes main
+                    if instance_name == "master":
+                        instance_name = "main"
                     raise Exception(
                         "Instance %r not in 'instance_map' config" % (instance_name,)
                     )
