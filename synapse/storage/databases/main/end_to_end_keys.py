@@ -133,27 +133,37 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         """
         now_stream_id = self.get_device_stream_token()
 
-        results = await self._get_e2e_device_keys_for_federation_query_inner(user_id)
-
-        # Check that there have been no new devices added by another worker
-        # after the cache.
-        sql = """
-            SELECT user_id FROM device_lists_stream
-            WHERE stream_id <= ? AND user_id = ?
-        """
-        rows = await self.db_pool.execute(
-            "get_e2e_device_keys_for_federation_query_check",
-            None,
-            sql,
-            now_stream_id,
-            user_id,
-        )
-        if rows:
-            # There has, so let's invalidate the cache and run again.
-            self._get_e2e_device_keys_for_federation_query_inner.invalidate((user_id,))
-            results = await self._get_e2e_device_keys_for_federation_query_inner(
-                user_id
+        # We need to be careful with the caching here, as we need to always
+        # return *all* persisted devices, however there may be a lag between a
+        # new device being persisted and the cache being invalidated.
+        cached_results = (
+            self._get_e2e_device_keys_for_federation_query_inner.cache.get_immediate(
+                user_id, None
             )
+        )
+        if cached_results is not None:
+            # Check that there have been no new devices added by another worker
+            # after the cache. This should be quick as there should be few rows
+            # with a higher stream ordering.
+            sql = """
+                SELECT user_id FROM device_lists_stream
+                WHERE stream_id >= ? AND user_id = ?
+            """
+            rows = await self.db_pool.execute(
+                "get_e2e_device_keys_for_federation_query_check",
+                None,
+                sql,
+                now_stream_id,
+                user_id,
+            )
+            if not rows:
+                # No new rows, so cache is still valid.
+                return now_stream_id, cached_results
+
+            # There has, so let's invalidate the cache and run the query.
+            self._get_e2e_device_keys_for_federation_query_inner.invalidate((user_id,))
+
+        results = await self._get_e2e_device_keys_for_federation_query_inner(user_id)
 
         return now_stream_id, results
 
