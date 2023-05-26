@@ -224,6 +224,30 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         )
         self._assertParams()
 
+    def test_active_admin_not_user(self) -> None:
+        """The handler should raise when the scope has admin right but not user."""
+
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(
+                code=200,
+                payload={
+                    "active": True,
+                    "sub": SUBJECT,
+                    "scope": " ".join([SYNAPSE_ADMIN_SCOPE]),
+                    "username": USERNAME,
+                },
+            )
+        )
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"mockAccessToken"]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        self.get_failure(self.auth.get_user_by_req(request), InvalidClientTokenError)
+        self.http_client.get_json.assert_called_once_with(WELL_KNOWN)
+        self.http_client.request.assert_called_once_with(
+            method="POST", uri=INTROSPECTION_ENDPOINT, data=ANY, headers=ANY
+        )
+        self._assertParams()
+
     def test_active_admin(self) -> None:
         """The handler should return a requester with admin rights."""
 
@@ -233,7 +257,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
                 payload={
                     "active": True,
                     "sub": SUBJECT,
-                    "scope": " ".join([SYNAPSE_ADMIN_SCOPE]),
+                    "scope": " ".join([SYNAPSE_ADMIN_SCOPE, MATRIX_USER_SCOPE]),
                     "username": USERNAME,
                 },
             )
