@@ -296,34 +296,6 @@ impl PushRuleEvaluator {
                     Some(Cow::Borrowed(pattern)),
                 )?
             }
-            KnownCondition::InverseRelatedEventMatch(event_match) => !self.match_related_event_match(
-                &event_match.rel_type.clone(),
-                event_match.include_fallbacks,
-                event_match.key.clone(),
-                event_match.pattern.clone(),
-            )?,
-            KnownCondition::InverseRelatedEventMatchType(event_match) => {
-                // The `pattern_type` can either be "user_id" or "user_localpart",
-                // either way if we don't have a `user_id` then the condition can't
-                // match.
-                let user_id = if let Some(user_id) = user_id {
-                    user_id
-                } else {
-                    return Ok(false);
-                };
-
-                let pattern = match &*event_match.pattern_type {
-                    EventMatchPatternType::UserId => user_id,
-                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
-                };
-
-                !self.match_related_event_match(
-                    &event_match.rel_type.clone(),
-                    event_match.include_fallbacks,
-                    Some(event_match.key.clone()),
-                    Some(Cow::Borrowed(pattern)),
-                )?
-            }
             KnownCondition::EventPropertyContains(event_property_is) => self
                 .match_event_property_contains(
                     event_property_is.key.clone(),

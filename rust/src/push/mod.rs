@@ -334,15 +334,9 @@ pub enum KnownCondition {
     EventPropertyIs(EventPropertyIsCondition),
     #[serde(rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatch(RelatedEventMatchCondition),
-    // Inverse of the related event match
-    #[serde(rename = "im.nheko.msc3664.inverse_related_event_match")]
-    InverseRelatedEventMatch(RelatedEventMatchCondition),
     // Identical to related_event_match but gives predefined patterns. Cannot be added by users.
     #[serde(skip_deserializing, rename = "im.nheko.msc3664.related_event_match")]
     RelatedEventMatchType(RelatedEventMatchTypeCondition),
-    // Inverse of related event match type
-    #[serde(skip_deserializing, rename = "im.nheko.msc3664.inverse_related_event_match")]
-    InverseRelatedEventMatchType(RelatedEventMatchTypeCondition),
     EventPropertyContains(EventPropertyIsCondition),
     // Identical to exact_event_property_contains but gives predefined patterns. Cannot be added by users.
     #[serde(skip_deserializing, rename = "event_property_contains")]

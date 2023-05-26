@@ -252,29 +252,6 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default: true,
         default_enabled: true,
     },
-    // NOTE: upstream has a blanket rule that blocks all notifications for reactions,
-    // this is a modified rule that blocks reactions to *other users* events. This means
-    // any user supplied "noisy" rules don't accidentally trigger notifications for reactions
-    // to other users messages.
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.com.beeper.reaction"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[
-            Condition::Known(KnownCondition::EventMatch(EventMatchCondition {
-                key: Cow::Borrowed("type"),
-                pattern: Cow::Borrowed("m.reaction"),
-            })),
-            Condition::Known(KnownCondition::InverseRelatedEventMatchType(RelatedEventMatchTypeCondition {
-                key: Cow::Borrowed("sender"),
-                pattern_type: Cow::Borrowed(&EventMatchPatternType::UserId),
-                rel_type: Cow::Borrowed("m.annotation"),
-                include_fallbacks: None,
-            })),
-        ]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
-        default: true,
-        default_enabled: true,
-    },
     PushRule {
         rule_id: Cow::Borrowed("global/override/.m.rule.room.server_acl"),
         priority_class: 5,
