@@ -163,12 +163,12 @@ recommended for development. More information about WSL can be found at
 <a href="https://docs.microsoft.com/en-us/windows/wsl/install">https://docs.microsoft.com/en-us/windows/wsl/install</a>. Running Synapse natively
 on Windows is not officially supported.</p>
 <p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://www.python.org/downloads/">a recent version of Python 3</a>. Your Python also needs support for <a href="https://docs.python.org/3/library/venv.html">virtual environments</a>. This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running <code>sudo apt install python3-venv</code> should be enough.</p>
+<p>A recent version of the Rust compiler is needed to build the native modules. The
+easiest way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <p>Synapse can connect to PostgreSQL via the <a href="https://pypi.org/project/psycopg2/">psycopg2</a> Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with <code>sudo apt install libpq-dev</code>.</p>
 <p>Synapse has an optional, improved user search with better Unicode support. For that you need the development package of <code>libicu</code>. On Debian or Ubuntu Linux, this can be installed with <code>sudo apt install libicu-dev</code>.</p>
 <p>The source code of Synapse is hosted on GitHub. You will also need <a href="https://github.com/git-guides/install-git">a recent version of git</a>.</p>
 <p>For some tests, you will need <a href="https://docs.docker.com/get-docker/">a recent version of Docker</a>.</p>
-<p>A recent version of the Rust compiler is needed to build the native modules. The
-easiest way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <h1 id="3-get-the-source"><a class="header" href="#3-get-the-source">3. Get the source.</a></h1>
 <p>The preferred and easiest way to contribute changes is to fork the relevant
 project on GitHub, and then <a href="https://help.github.com/articles/using-pull-requests/">create a pull request</a> to ask us to pull your
@@ -180,6 +180,9 @@ git checkout develop
 <p>If you need help getting started with git, this is beyond the scope of the document, but you
 can find many good git tutorials on the web.</p>
 <h1 id="4-install-the-dependencies"><a class="header" href="#4-install-the-dependencies">4. Install the dependencies</a></h1>
+<p>Before installing the Python dependencies, make sure you have installed a recent version
+of Rust (see the &quot;What do I need?&quot; section above). The easiest way of installing the
+latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <p>Synapse uses the <a href="https://python-poetry.org/">poetry</a> project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
 source, you should install <code>poetry</code>.
@@ -195,14 +198,28 @@ for other installation methods.</p>
 <pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
 poetry install --extras all
 </code></pre>
-<p>This will install the runtime and developer dependencies for the project.</p>
+<p>This will install the runtime and developer dependencies for the project.  Be sure to check
+that the <code>poetry install</code> step completed cleanly.</p>
 <h2 id="running-synapse-via-poetry"><a class="header" href="#running-synapse-via-poetry">Running Synapse via poetry</a></h2>
 <p>To start a local instance of Synapse in the locked poetry environment, create a config file:</p>
 <pre><code class="language-sh">cp docs/sample_config.yaml homeserver.yaml
+cp docs/sample_log_config.yaml log_config.yaml
 </code></pre>
-<p>Now edit homeserver.yaml, and run Synapse with:</p>
+<p>Now edit <code>homeserver.yaml</code>, things you might want to change include:</p>
+<ul>
+<li>Set a <code>server_name</code></li>
+<li>Adjusting paths to be correct for your system like the <code>log_config</code> to point to the log config you just copied</li>
+<li>Using a <a href="https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#database">PostgreSQL database instead of SQLite</a></li>
+<li>Adding a <a href="https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a> so you can use <a href="https://matrix-org.github.io/synapse/latest/setup/installation.html#registering-a-user"><code>register_new_matrix_user</code> command</a>.</li>
+</ul>
+<p>And then run Synapse with the following command:</p>
 <pre><code class="language-sh">poetry run python -m synapse.app.homeserver -c homeserver.yaml
 </code></pre>
+<p>If you get an error like the following:</p>
+<pre><code>importlib.metadata.PackageNotFoundError: matrix-synapse
+</code></pre>
+<p>this probably indicates that the <code>poetry install</code> step did not complete cleanly - go back and
+resolve any issues and re-run until successful.</p>
 <h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
 <p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
 <h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
