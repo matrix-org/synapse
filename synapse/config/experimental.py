@@ -69,7 +69,8 @@ class MSC3861:
         if value and not HAS_AUTHLIB:
             raise ConfigError(
                 "MSC3861 is enabled but authlib is not installed. "
-                "Please install authlib to use MSC3861."
+                "Please install authlib to use MSC3861.",
+                ("experimental", "msc3861", "enabled"),
             )
 
     issuer: str = attr.ib(default="", validator=attr.validators.instance_of(str))
@@ -114,7 +115,8 @@ class MSC3861:
 
         if value == ClientAuthMethod.PRIVATE_KEY_JWT and self.jwk is None:
             raise ConfigError(
-                "A JWKS must be provided when using the private_key_jwt client auth method"
+                "A JWKS must be provided when using the private_key_jwt client auth method",
+                ("experimental", "msc3861", "client_auth_method"),
             )
 
         if (
@@ -127,7 +129,8 @@ class MSC3861:
             and self.client_secret is None
         ):
             raise ConfigError(
-                f"A client secret must be provided when using the {value} client auth method"
+                f"A client secret must be provided when using the {value} client auth method",
+                ("experimental", "msc3861", "client_auth_method"),
             )
 
     account_management_url: Optional[str] = attr.ib(
@@ -160,12 +163,14 @@ class MSC3861:
             or root.auth.password_enabled_for_login
         ):
             raise ConfigError(
-                "Password auth cannot be enabled when OAuth delegation is enabled"
+                "Password auth cannot be enabled when OAuth delegation is enabled",
+                ("password_config", "enabled"),
             )
 
         if root.registration.enable_registration:
             raise ConfigError(
-                "Registration cannot be enabled when OAuth delegation is enabled"
+                "Registration cannot be enabled when OAuth delegation is enabled",
+                ("enable_registration",),
             )
 
         if (
@@ -183,32 +188,38 @@ class MSC3861:
 
         if root.captcha.enable_registration_captcha:
             raise ConfigError(
-                "CAPTCHA cannot be enabled when OAuth delegation is enabled"
+                "CAPTCHA cannot be enabled when OAuth delegation is enabled",
+                ("captcha", "enable_registration_captcha"),
             )
 
         if root.experimental.msc3882_enabled:
             raise ConfigError(
-                "MSC3882 cannot be enabled when OAuth delegation is enabled"
+                "MSC3882 cannot be enabled when OAuth delegation is enabled",
+                ("experimental_features", "msc3882_enabled"),
             )
 
         if root.registration.refresh_token_lifetime:
             raise ConfigError(
-                "refresh_token_lifetime cannot be set when OAuth delegation is enabled"
+                "refresh_token_lifetime cannot be set when OAuth delegation is enabled",
+                ("refresh_token_lifetime",),
             )
 
         if root.registration.nonrefreshable_access_token_lifetime:
             raise ConfigError(
-                "nonrefreshable_access_token_lifetime cannot be set when OAuth delegation is enabled"
+                "nonrefreshable_access_token_lifetime cannot be set when OAuth delegation is enabled",
+                ("nonrefreshable_access_token_lifetime",),
             )
 
         if root.registration.session_lifetime:
             raise ConfigError(
-                "session_lifetime cannot be set when OAuth delegation is enabled"
+                "session_lifetime cannot be set when OAuth delegation is enabled",
+                ("session_lifetime",),
             )
 
         if not root.experimental.msc3970_enabled:
             raise ConfigError(
-                "experimental_features.msc3970_enabled must be 'true' when OAuth delegation is enabled"
+                "experimental_features.msc3970_enabled must be 'true' when OAuth delegation is enabled",
+                ("experimental_features", "msc3970_enabled"),
             )
 
 
@@ -373,7 +384,12 @@ class ExperimentalConfig(Config):
         )
 
         # MSC3861: Matrix architecture change to delegate authentication via OIDC
-        self.msc3861 = MSC3861(**experimental.get("msc3861", {}))
+        try:
+            self.msc3861 = MSC3861(**experimental.get("msc3861", {}))
+        except ValueError as exc:
+            raise ConfigError(
+                "Invalid MSC3861 configuration", ("experimental", "msc3861")
+            ) from exc
 
         # MSC3970: Scope transaction IDs to devices
         self.msc3970_enabled = experimental.get("msc3970_enabled", self.msc3861.enabled)
