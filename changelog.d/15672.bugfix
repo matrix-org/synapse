@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.84.0 where workers do not start up when no `instance_map` was provided.

@@ -1,3 +1,22 @@
+Synapse 1.84.1 (2023-05-26)
+===========================
+
+This patch release fixes a major issue with homeservers that does not have an `instance_map` defined but which do use workers.
+If you have already upgraded to Synapse 1.84.0 and your homeserver is working normally, then there is no need to update to this patch release.
+
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse v1.84.0 where workers do not start up when no `instance_map` was provided. ([\#15672](https://github.com/matrix-org/synapse/issues/15672))
+
+
+Internal Changes
+----------------
+
+- Add `dch` and `notify-send` to the development Nix flake so that the release script can be used. ([\#15673](https://github.com/matrix-org/synapse/issues/15673))
+
+
 Synapse 1.84.0 (2023-05-23)
 ===========================
 

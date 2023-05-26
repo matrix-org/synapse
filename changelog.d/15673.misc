@@ -1,1 +1,0 @@
-Add `dch` and `notify-send` to the development Nix flake so that the release script can be used.
