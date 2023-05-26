@@ -110,9 +110,15 @@ class Auth:
             # XXX this looks totally bogus. Why do we not allow users who have been banned,
             # or those who were members previously and have been re-invited?
             if allow_departed_users and membership == Membership.LEAVE:
-                forgot = await self.store.did_forget(user_id, room_id)
-                if not forgot:
-                    return membership, member_event_id
+                is_user_an_absent_knocker_for_room = (
+                    await self.store.is_user_an_absent_knocker_for_room(
+                        user_id, room_id
+                    )
+                )
+                if not is_user_an_absent_knocker_for_room:
+                    forgot = await self.store.did_forget(user_id, room_id)
+                    if not forgot:
+                        return membership, member_event_id
         raise UnstableSpecAuthError(
             403,
             "User %s not in room %s" % (user_id, room_id),
