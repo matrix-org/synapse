@@ -372,7 +372,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         network_tuple: Optional[ThirdPartyInstanceID],
         search_filter: Optional[dict],
         limit: Optional[int],
-        bounds: Optional[Tuple[int, str]],
+        bounds: Tuple[Optional[int], Optional[str]],
         forwards: bool,
         ignore_non_federatable: bool = False,
     ) -> List[PublicRoom]:
@@ -420,26 +420,20 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         # Work out the bounds if we're given them, these bounds look slightly
         # odd, but are designed to help query planner use indices by pulling
         # out a common bound.
-        if bounds:
-            last_joined_members, last_room_id = bounds
-            if forwards:
-                where_clauses.append(
-                    """
-                        joined_members <= ? AND (
-                            joined_members < ? OR room_id < ?
-                        )
-                    """
-                )
-            else:
-                where_clauses.append(
-                    """
-                        joined_members >= ? AND (
-                            joined_members > ? OR room_id > ?
-                        )
-                    """
-                )
+        last_joined_members, last_room_id = bounds
+        if last_joined_members is not None:
+            comp = "<" if forwards else ">"
 
-            query_args += [last_joined_members, last_joined_members, last_room_id]
+            clause = f"joined_members {comp}= ? AND (joined_members {comp} ?"
+            query_args += [last_joined_members, last_joined_members]
+
+            if last_room_id is None:
+                clause += ")"
+            else:
+                clause += f"OR room_id {comp} ?)"
+                query_args.append(last_room_id)
+
+            where_clauses.append(clause)
 
         if ignore_non_federatable:
             where_clauses.append("is_federatable")

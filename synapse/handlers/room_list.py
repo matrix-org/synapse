@@ -33,7 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import JsonDict, PublicRoom, ThirdPartyInstanceID
 from synapse.util import filter_none
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
@@ -156,62 +156,99 @@ class RoomListHandler:
         # plus the direction (forwards or backwards). Next batch tokens always
         # go forwards, prev batch tokens always go backwards.
 
+        forwards = True
+        last_joined_members = None
+        last_room_id = None
+        last_module_index = None
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
             forwards = batch_token.direction_is_forward
-        else:
-            batch_token = None
-            forwards = True
+            last_joined_members = batch_token.last_joined_members
+            last_room_id = batch_token.last_room_id
+            last_module_index = batch_token.last_module_index
 
         # we request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
-        results = await self.store.get_largest_public_rooms(
-            network_tuple,
-            search_filter,
-            probing_limit,
-            bounds=(batch_token.last_joined_members, batch_token.last_room_id)
-            if batch_token
-            else None,
-            forwards=forwards,
-            ignore_non_federatable=bool(from_remote_server_name),
-        )
+        results = []
 
-        for (
-            fetch_public_rooms
-        ) in self._module_api_callbacks.fetch_public_rooms_callbacks:
+        print(f"last_module_index {last_module_index}")
+        print(f"last_room_id {last_room_id}")
+
+        def insert_into_result(new_room: PublicRoom, module_index: Optional[int]):
+            # print(f"insert {new_room.room_id} {module_index}")
+            if new_room.num_joined_members == last_joined_members:
+                if last_module_index is not None and last_room_id is not None:
+                    if module_index is not None and module_index > last_module_index:
+                        return
+            inserted = False
+            for i, r in enumerate(results):
+                r = results[i]
+                if (
+                    forwards and new_room.num_joined_members >= r.num_joined_members
+                ) or (
+                    not forwards and new_room.num_joined_members <= r.num_joined_members
+                ):
+                    results.insert(i, new_room)
+                    inserted = True
+                    return
+            if not inserted:
+                if forwards:
+                    results.append(new_room)
+                else:
+                    results.insert(0, new_room)
+
+        room_ids_to_module_index = {}
+
+        for module_index, fetch_public_rooms in enumerate(
+            self._module_api_callbacks.fetch_public_rooms_callbacks
+        ):
             # Ask each module for a list of public rooms given the last_joined_members
             # value from the since token and the probing limit.
+            module_last_joined_members = None
+            if last_joined_members is not None:
+                module_last_joined_members = last_joined_members
+                if last_module_index is not None and last_module_index < module_index:
+                    module_last_joined_members = module_last_joined_members - 1
             module_public_rooms = await fetch_public_rooms(
                 network_tuple,
                 search_filter,
                 probing_limit,
-                (batch_token.last_joined_members, batch_token.last_room_id)
-                if batch_token
-                else None,
+                (
+                    module_last_joined_members,
+                    last_room_id if last_module_index == module_index else None,
+                ),
                 forwards,
             )
+
+            print([r.room_id for r in module_public_rooms])
+
+            # We reverse for iteration to keep the order in the final list
+            # since we preprend when inserting
             module_public_rooms.reverse()
 
             # Insert the module's reported public rooms into the list
             for new_room in module_public_rooms:
-                inserted = False
-                for i in range(len(results)):
-                    r = results[i]
-                    if (
-                        forwards and new_room.num_joined_members >= r.num_joined_members
-                    ) or (
-                        not forwards
-                        and new_room.num_joined_members <= r.num_joined_members
-                    ):
-                        results.insert(i, new_room)
-                        inserted = True
-                        break
-                if not inserted:
-                    if forwards:
-                        results.append(new_room)
-                    else:
-                        results.insert(0, new_room)
+                room_ids_to_module_index[new_room.room_id] = module_index
+                insert_into_result(new_room, module_index)
+
+        local_public_rooms = await self.store.get_largest_public_rooms(
+            network_tuple,
+            search_filter,
+            probing_limit,
+            bounds=(
+                last_joined_members,
+                last_room_id if last_module_index == None else None,
+            ),
+            forwards=forwards,
+            ignore_non_federatable=bool(from_remote_server_name),
+        )
+
+        for r in local_public_rooms:
+            insert_into_result(r, None)
+
+        # print("final")
+        # print([r.room_id for r in results])
 
         response: JsonDict = {}
         num_results = len(results)
@@ -231,13 +268,16 @@ class RoomListHandler:
             initial_entry = results[0]
 
             if forwards:
-                if batch_token is not None:
+                if since_token is not None:
                     # If there was a token given then we assume that there
                     # must be previous results.
                     response["prev_batch"] = RoomListNextBatch(
                         last_joined_members=initial_entry.num_joined_members,
                         last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
+                        last_module_index=room_ids_to_module_index.get(
+                            initial_entry.room_id
+                        ),
                     ).to_token()
 
                 if more_to_come:
@@ -245,13 +285,19 @@ class RoomListHandler:
                         last_joined_members=final_entry.num_joined_members,
                         last_room_id=final_entry.room_id,
                         direction_is_forward=True,
+                        last_module_index=room_ids_to_module_index.get(
+                            final_entry.room_id
+                        ),
                     ).to_token()
             else:
-                if batch_token is not None:
+                if since_token is not None:
                     response["next_batch"] = RoomListNextBatch(
                         last_joined_members=final_entry.num_joined_members,
                         last_room_id=final_entry.room_id,
                         direction_is_forward=True,
+                        last_module_index=room_ids_to_module_index.get(
+                            final_entry.room_id
+                        ),
                     ).to_token()
 
                 if more_to_come:
@@ -259,6 +305,9 @@ class RoomListHandler:
                         last_joined_members=initial_entry.num_joined_members,
                         last_room_id=initial_entry.room_id,
                         direction_is_forward=False,
+                        last_module_index=room_ids_to_module_index.get(
+                            initial_entry.room_id
+                        ),
                     ).to_token()
 
         response["chunk"] = [attr.asdict(r, filter=filter_none) for r in results]
@@ -507,11 +556,13 @@ class RoomListNextBatch:
     last_joined_members: int  # The count to get rooms after/before
     last_room_id: str  # The room_id to get rooms after/before
     direction_is_forward: bool  # True if this is a next_batch, false if prev_batch
+    last_module_index: Optional[int] = None
 
     KEY_DICT = {
         "last_joined_members": "m",
         "last_room_id": "r",
         "direction_is_forward": "d",
+        "last_module_index": "i",
     }
 
     REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
@@ -524,6 +575,7 @@ class RoomListNextBatch:
         )
 
     def to_token(self) -> str:
+        # print(self)
         return encode_base64(
             msgpack.dumps(
                 {self.KEY_DICT[key]: val for key, val in attr.asdict(self).items()}

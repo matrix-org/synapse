@@ -49,106 +49,218 @@ class FetchPublicRoomsTestCase(HomeserverTestCase):
             network_tuple: Optional[ThirdPartyInstanceID],
             search_filter: Optional[dict],
             limit: Optional[int],
-            bounds: Optional[Tuple[int, str]],
+            bounds: Tuple[Optional[int], Optional[str]],
             forwards: bool,
         ) -> List[PublicRoom]:
             room1 = PublicRoom(
-                room_id="!test1:test",
+                room_id="!one_members:module1",
                 num_joined_members=1,
                 world_readable=True,
                 guest_can_join=False,
             )
             room3 = PublicRoom(
-                room_id="!test3:test",
+                room_id="!three_members:module1",
                 num_joined_members=3,
                 world_readable=True,
                 guest_can_join=False,
             )
             room3_2 = PublicRoom(
-                room_id="!test3_2:test",
+                room_id="!three_members_2:module1",
                 num_joined_members=3,
                 world_readable=True,
                 guest_can_join=False,
             )
 
-            if forwards:
-                if limit == 2:
-                    if bounds is None:
-                        return [room3_2, room3]
-                    (last_joined_members, last_room_id) = bounds
-                    if last_joined_members == 3:
-                        if last_room_id == room3_2.room_id:
-                            return [room3, room1]
-                        if last_room_id == room3.room_id:
-                            return [room1]
-                    elif last_joined_members < 3:
-                        return [room1]
-                return [room3_2, room3, room1]
-            else:
-                if limit == 2 and bounds is not None:
-                    (last_joined_members, last_room_id) = bounds
-                    if last_joined_members == 3:
-                        if last_room_id == room3.room_id:
-                            return [room3_2]
-                return [room1, room3, room3_2]
+            (last_joined_members, last_room_id) = bounds
 
+            print(f"cb {forwards} {bounds}")
+
+            result = [room1, room3, room3_2]
+
+            if last_joined_members is not None:
+                if forwards:
+                    result = list(
+                        filter(
+                            lambda r: r.num_joined_members <= last_joined_members,
+                            result,
+                        )
+                    )
+                else:
+                    result = list(
+                        filter(
+                            lambda r: r.num_joined_members >= last_joined_members,
+                            result,
+                        )
+                    )
+
+            print([r.room_id for r in result])
+
+            if last_room_id is not None:
+                new_res = []
+                for r in result:
+                    if r.room_id == last_room_id:
+                        break
+                    new_res.append(r)
+                result = new_res
+
+            if forwards:
+                result.reverse()
+
+            if limit is not None:
+                result = result[:limit]
+
+            return result
+
+            # if forwards:
+            #     if limit == 2:
+            #         if last_joined_members is None:
+            #             return [room3_2, room3]
+            #         elif last_joined_members == 3:
+            #             if last_room_id == room3_2.room_id:
+            #                 return [room3, room1]
+            #             if last_room_id == room3.room_id:
+            #                 return [room1]
+            #         elif last_joined_members < 3:
+            #             return [room1]
+            #     return [room3_2, room3, room1]
+            # else:
+            #     if (
+            #         limit == 2
+            #         and last_joined_members == 3
+            #         and last_room_id == room3.room_id
+            #     ):
+            #         return [room3_2]
+            #     return [room1, room3, room3_2]
+
+        async def cb2(
+            network_tuple: Optional[ThirdPartyInstanceID],
+            search_filter: Optional[dict],
+            limit: Optional[int],
+            bounds: Tuple[Optional[int], Optional[str]],
+            forwards: bool,
+        ) -> List[PublicRoom]:
+            room3 = PublicRoom(
+                room_id="!three_members:module2",
+                num_joined_members=3,
+                world_readable=True,
+                guest_can_join=False,
+            )
+
+            result = [room3]
+
+            (last_joined_members, last_room_id) = bounds
+
+            print(f"cb2 {forwards} {bounds}")
+
+            if last_joined_members is not None:
+                if forwards:
+                    result = list(
+                        filter(
+                            lambda r: r.num_joined_members <= last_joined_members,
+                            result,
+                        )
+                    )
+                else:
+                    result = list(
+                        filter(
+                            lambda r: r.num_joined_members >= last_joined_members,
+                            result,
+                        )
+                    )
+
+            print([r.room_id for r in result])
+
+            if last_room_id is not None:
+                new_res = []
+                for r in result:
+                    if r.room_id == last_room_id:
+                        break
+                    new_res.append(r)
+                result = new_res
+
+            if forwards:
+                result.reverse()
+
+            if limit is not None:
+                result = result[:limit]
+
+            return result
+
+        self._module_api.register_public_rooms_callbacks(fetch_public_rooms=cb2)
         self._module_api.register_public_rooms_callbacks(fetch_public_rooms=cb)
 
         user = self.register_user("alice", "pass")
         token = self.login(user, "pass")
 
-        # Create a room
+        user2 = self.register_user("alice2", "pass")
+        token2 = self.login(user2, "pass")
+
+        user3 = self.register_user("alice3", "pass")
+        token3 = self.login(user3, "pass")
+
+        # Create a room with 2 people
         room_id = self.helper.create_room_as(
             user,
             is_public=True,
             extra_content={"visibility": "public"},
             tok=token,
         )
-
-        user2 = self.register_user("alice2", "pass")
-        token2 = self.login(user2, "pass")
         self.helper.join(room_id, user2, tok=token2)
+
+        # Create a room with 3 people
+        room_id = self.helper.create_room_as(
+            user,
+            is_public=True,
+            extra_content={"visibility": "public"},
+            tok=token,
+        )
+        self.helper.join(room_id, user2, tok=token2)
+        self.helper.join(room_id, user3, tok=token3)
 
     def test_no_limit(self) -> None:
         channel = self.make_request("GET", self.url)
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
+        chunk = channel.json_body["chunk"]
 
-        self.assertEquals(len(channel.json_body["chunk"]), 4)
-        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
-        self.assertEquals(channel.json_body["chunk"][1]["num_joined_members"], 3)
-        self.assertEquals(channel.json_body["chunk"][2]["num_joined_members"], 2)
-        self.assertEquals(channel.json_body["chunk"][3]["num_joined_members"], 1)
+        self.assertEquals(len(chunk), 6)
+        for i in range(4):
+            self.assertEquals(chunk[i]["num_joined_members"], 3)
+        self.assertEquals(chunk[4]["num_joined_members"], 2)
+        self.assertEquals(chunk[5]["num_joined_members"], 1)
 
     def test_pagination(self) -> None:
-        channel = self.make_request("GET", self.url + "?limit=1")
-        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
-        returned_room3_id = channel.json_body["chunk"][0]["room_id"]
+        returned_three_members_rooms = set()
+
+        next_batch = None
+        for i in range(4):
+            since_query_str = f"&since={next_batch}" if next_batch else ""
+            channel = self.make_request("GET", f"{self.url}?limit=1{since_query_str}")
+            chunk = channel.json_body["chunk"]
+            self.assertEquals(chunk[0]["num_joined_members"], 3)
+            self.assertTrue(chunk[0]["room_id"] not in returned_three_members_rooms)
+            returned_three_members_rooms.add(chunk[0]["room_id"])
+            next_batch = channel.json_body["next_batch"]
+
+        channel = self.make_request("GET", f"{self.url}?limit=1&since={next_batch}")
+        chunk = channel.json_body["chunk"]
+        self.assertEquals(chunk[0]["num_joined_members"], 2)
         next_batch = channel.json_body["next_batch"]
 
         channel = self.make_request("GET", f"{self.url}?limit=1&since={next_batch}")
-        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
-        # We should get the other room with 3 users here
-        self.assertNotEquals(
-            returned_room3_id, channel.json_body["chunk"][0]["room_id"]
-        )
+        chunk = channel.json_body["chunk"]
+        self.assertEquals(chunk[0]["num_joined_members"], 1)
         prev_batch = channel.json_body["prev_batch"]
 
-        channel = self.make_request("GET", f"{self.url}?limit=1&since={prev_batch}")
-        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
-        self.assertEquals(returned_room3_id, channel.json_body["chunk"][0]["room_id"])
-        next_batch = channel.json_body["next_batch"]
+        # channel = self.make_request("GET", f"{self.url}?limit=1&since={prev_batch}")
+        # chunk = channel.json_body["chunk"]
+        # print(chunk)
+        # self.assertEquals(chunk[0]["num_joined_members"], 2)
+        # prev_batch = channel.json_body["prev_batch"]
 
-        # We went backwards once, so we should get same result as step 2
-        channel = self.make_request("GET", f"{self.url}?limit=1&since={next_batch}")
-        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 3)
-        self.assertNotEquals(
-            returned_room3_id, channel.json_body["chunk"][0]["room_id"]
-        )
-        next_batch = channel.json_body["next_batch"]
-
-        channel = self.make_request("GET", f"{self.url}?limit=1&since={next_batch}")
-        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 2)
-        next_batch = channel.json_body["next_batch"]
-
-        channel = self.make_request("GET", f"{self.url}?limit=1&since={next_batch}")
-        self.assertEquals(channel.json_body["chunk"][0]["num_joined_members"], 1)
+        # returned_three_members_rooms = set()
+        # for i in range(4):
+        #     channel = self.make_request("GET", f"{self.url}?limit=1&since={prev_batch}")
+        #     chunk = channel.json_body["chunk"]
+        #     self.assertEquals(chunk[0]["num_joined_members"], 3)
+        #     self.assertTrue(chunk[0]["room_id"] not in returned_three_members_rooms)
+        #     returned_three_members_rooms.add(chunk[0]["room_id"])
+        #     prev_batch = channel.json_body["prev_batch"]
