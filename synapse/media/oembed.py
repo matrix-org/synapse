@@ -136,6 +136,7 @@ class OEmbedProvider:
         Returns:
             json-encoded Open Graph data
         """
+        breakpoint()
 
         try:
             # oEmbed responses *must* be UTF-8 according to the spec.

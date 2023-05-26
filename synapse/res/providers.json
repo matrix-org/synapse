@@ -5,6 +5,8 @@
         "endpoints": [
             {
                 "schemes": [
+                    "https://twitter.com/*/status/*",
+                    "https://*.twitter.com/*/status/*",
                     "https://twitter.com/*/moments/*",
                     "https://*.twitter.com/*/moments/*"
                 ],

@@ -218,7 +218,7 @@ class UrlPreviewer:
         if not observable:
             download = run_in_background(self._do_preview, url, user, ts)
             observable = ObservableDeferred(download, consumeErrors=True)
-            self._cache[url] = observable
+            # self._cache[url] = observable
         else:
             logger.info("Returning cached response")
 
@@ -239,7 +239,8 @@ class UrlPreviewer:
         # historical previews, if we have any)
         cache_result = await self.store.get_url_cache(url, ts)
         if (
-            cache_result
+            False
+            and cache_result
             and cache_result["expires_ts"] > ts
             and cache_result["response_code"] / 100 == 2
         ):
@@ -250,12 +251,12 @@ class UrlPreviewer:
                 og = og.encode("utf8")
             return og
 
-        # If this URL can be accessed via an allowed oEmbed, use that instead.
+        # Check if this URl has a corresponding oEmbed URL.
         url_to_download = url
         oembed_url = self._oembed.get_oembed_url(url)
-        if oembed_url:
-            url_to_download = oembed_url
 
+        # TODO If fetching the URL fails and we have an oEmbed URL, try that
+        # instead.
         media_info = await self._handle_url(url_to_download, user)
 
         logger.debug("got media_info of '%s'", media_info)
@@ -291,55 +292,48 @@ class UrlPreviewer:
                 body = file.read()
 
             tree = decode_body(body, media_info.uri, media_info.media_type)
+            og_from_html: JsonDict = {}
             if tree is not None:
-                # Check if this HTML document points to oEmbed information and
-                # defer to that.
-                oembed_url = self._oembed.autodiscover_from_html(tree)
-                og_from_oembed: JsonDict = {}
-                # Only download to the oEmbed URL if it is allowed.
-                if oembed_url:
-                    try:
-                        oembed_info = await self._handle_url(
-                            oembed_url, user, allow_data_urls=True
-                        )
-                    except Exception as e:
-                        # Fetching the oEmbed info failed, don't block the entire URL preview.
-                        logger.warning(
-                            "oEmbed fetch failed during URL preview: %s errored with %s",
-                            oembed_url,
-                            e,
-                        )
-                    else:
-                        (
-                            og_from_oembed,
-                            author_name,
-                            expiration_ms,
-                        ) = await self._handle_oembed_response(
-                            url, oembed_info, expiration_ms
-                        )
+                # Attempt to autodiscover an oEmbed URL in the document if one
+                # is not already known.
+                if not oembed_url:
+                    oembed_url = self._oembed.autodiscover_from_html(tree)
 
                 # Parse Open Graph information from the HTML in case the oEmbed
                 # response failed or is incomplete.
                 og_from_html = parse_html_to_open_graph(tree)
 
-                # Compile the Open Graph response by using the scraped
-                # information from the HTML and overlaying any information
-                # from the oEmbed response.
-                og = {**og_from_html, **og_from_oembed}
+            og_from_oembed: JsonDict = {}
+            # If an oEmbed URL exists, also fetch it.
+            if oembed_url:
+                try:
+                    oembed_info = await self._handle_url(
+                        oembed_url, user, allow_data_urls=True
+                    )
+                except Exception as e:
+                    # Fetching the oEmbed info failed, don't block the entire URL preview.
+                    logger.warning(
+                        "oEmbed fetch failed during URL preview: %s errored with %s",
+                        oembed_url,
+                        e,
+                    )
+                else:
+                    (
+                        og_from_oembed,
+                        author_name,
+                        expiration_ms,
+                    ) = await self._handle_oembed_response(
+                        url, oembed_info, expiration_ms
+                    )
 
-                await self._precache_image_url(user, media_info, og)
-            else:
-                og = {}
-
-        elif oembed_url:
-            # Handle the oEmbed information.
-            og, author_name, expiration_ms = await self._handle_oembed_response(
-                url, media_info, expiration_ms
-            )
+            # Compile the Open Graph response by using the scraped
+            # information from the HTML and overlaying any information
+            # from the oEmbed response.
+            og = {**og_from_html, **og_from_oembed}
             await self._precache_image_url(user, media_info, og)
 
         else:
-            logger.warning("Failed to find any OG data in %s", url)
+            logger.warning("Failed to find any Open Graph data in %s", url)
             og = {}
 
         # If we don't have a title but we have author_name, copy it as
