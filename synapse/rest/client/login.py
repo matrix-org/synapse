@@ -35,6 +35,7 @@ from synapse.api.errors import (
     LoginError,
     NotApprovedError,
     SynapseError,
+    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
@@ -84,14 +85,10 @@ class LoginRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
+        self._main_store = hs.get_datastores().main
 
         # JWT configuration variables.
         self.jwt_enabled = hs.config.jwt.jwt_enabled
-        self.jwt_secret = hs.config.jwt.jwt_secret
-        self.jwt_subject_claim = hs.config.jwt.jwt_subject_claim
-        self.jwt_algorithm = hs.config.jwt.jwt_algorithm
-        self.jwt_issuer = hs.config.jwt.jwt_issuer
-        self.jwt_audiences = hs.config.jwt.jwt_audiences
 
         # SSO configuration.
         self.saml2_enabled = hs.config.saml2.saml2_enabled
@@ -117,13 +114,13 @@ class LoginRestServlet(RestServlet):
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
-            store=hs.get_datastores().main,
+            store=self._main_store,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.ratelimiting.rc_login_address.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_address.burst_count,
         )
         self._account_ratelimiter = Ratelimiter(
-            store=hs.get_datastores().main,
+            store=self._main_store,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
@@ -285,6 +282,9 @@ class LoginRestServlet(RestServlet):
             login_submission,
             ratelimit=appservice.is_rate_limited(),
             should_issue_refresh_token=should_issue_refresh_token,
+            # The user represented by an appservice's configured sender_localpart
+            # is not actually created in Synapse.
+            should_check_deactivated=qualified_user_id != appservice.sender,
         )
 
     async def _do_other_login(
@@ -331,6 +331,7 @@ class LoginRestServlet(RestServlet):
         auth_provider_id: Optional[str] = None,
         should_issue_refresh_token: bool = False,
         auth_provider_session_id: Optional[str] = None,
+        should_check_deactivated: bool = True,
     ) -> LoginResponse:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -350,6 +351,11 @@ class LoginRestServlet(RestServlet):
             should_issue_refresh_token: True if this login should issue
                 a refresh token alongside the access token.
             auth_provider_session_id: The session ID got during login from the SSO IdP.
+            should_check_deactivated: True if the user should be checked for
+                deactivation status before logging in.
+
+                This exists purely for appservice's configured sender_localpart
+                which doesn't have an associated user in the database.
 
         Returns:
             Dictionary of account information after successful login.
@@ -368,6 +374,12 @@ class LoginRestServlet(RestServlet):
                     localpart=UserID.from_string(user_id).localpart
                 )
             user_id = canonical_uid
+
+        # If the account has been deactivated, do not proceed with the login.
+        if should_check_deactivated:
+            deactivated = await self._main_store.get_user_deactivated_status(user_id)
+            if deactivated:
+                raise UserDeactivatedError("This account has been deactivated")
 
         device_id = login_submission.get("device_id")
 
@@ -427,7 +439,7 @@ class LoginRestServlet(RestServlet):
         self, login_submission: JsonDict, should_issue_refresh_token: bool = False
     ) -> LoginResponse:
         """
-        Handle the final stage of SSO login.
+        Handle token login.
 
         Args:
             login_submission: The JSON request body.
@@ -452,72 +464,24 @@ class LoginRestServlet(RestServlet):
     async def _do_jwt_login(
         self, login_submission: JsonDict, should_issue_refresh_token: bool = False
     ) -> LoginResponse:
-        token = login_submission.get("token", None)
-        if token is None:
-            raise LoginError(
-                403, "Token field for JWT is missing", errcode=Codes.FORBIDDEN
-            )
+        """
+        Handle the custom JWT login.
 
-        from authlib.jose import JsonWebToken, JWTClaims
-        from authlib.jose.errors import BadSignatureError, InvalidClaimError, JoseError
+        Args:
+            login_submission: The JSON request body.
+            should_issue_refresh_token: True if this login should issue
+                a refresh token alongside the access token.
 
-        jwt = JsonWebToken([self.jwt_algorithm])
-        claim_options = {}
-        if self.jwt_issuer is not None:
-            claim_options["iss"] = {"value": self.jwt_issuer, "essential": True}
-        if self.jwt_audiences is not None:
-            claim_options["aud"] = {"values": self.jwt_audiences, "essential": True}
-
-        try:
-            claims = jwt.decode(
-                token,
-                key=self.jwt_secret,
-                claims_cls=JWTClaims,
-                claims_options=claim_options,
-            )
-        except BadSignatureError:
-            # We handle this case separately to provide a better error message
-            raise LoginError(
-                403,
-                "JWT validation failed: Signature verification failed",
-                errcode=Codes.FORBIDDEN,
-            )
-        except JoseError as e:
-            # A JWT error occurred, return some info back to the client.
-            raise LoginError(
-                403,
-                "JWT validation failed: %s" % (str(e),),
-                errcode=Codes.FORBIDDEN,
-            )
-
-        try:
-            claims.validate(leeway=120)  # allows 2 min of clock skew
-
-            # Enforce the old behavior which is rolled out in productive
-            # servers: if the JWT contains an 'aud' claim but none is
-            # configured, the login attempt will fail
-            if claims.get("aud") is not None:
-                if self.jwt_audiences is None or len(self.jwt_audiences) == 0:
-                    raise InvalidClaimError("aud")
-        except JoseError as e:
-            raise LoginError(
-                403,
-                "JWT validation failed: %s" % (str(e),),
-                errcode=Codes.FORBIDDEN,
-            )
-
-        user = claims.get(self.jwt_subject_claim, None)
-        if user is None:
-            raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
-
-        user_id = UserID(user, self.hs.hostname).to_string()
-        result = await self._complete_login(
+        Returns:
+            The body of the JSON response.
+        """
+        user_id = self.hs.get_jwt_handler().validate_login(login_submission)
+        return await self._complete_login(
             user_id,
             login_submission,
             create_non_existent_users=True,
             should_issue_refresh_token=should_issue_refresh_token,
         )
-        return result
 
 
 def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:

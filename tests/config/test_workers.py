@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from immutabledict import immutabledict
 
 from synapse.config import ConfigError
-from synapse.config.workers import WorkerConfig
+from synapse.config.workers import InstanceLocationConfig, WorkerConfig
 
 from tests.unittest import TestCase
 
@@ -94,6 +94,7 @@ class WorkerDutyConfigTestCase(TestCase):
                 # so that it doesn't raise an exception here.
                 # (This is not read by `_should_this_worker_perform_duty`.)
                 "notify_appservices": False,
+                "instance_map": {"main": {"host": "127.0.0.1", "port": 0}},
             },
         )
 
@@ -138,7 +139,9 @@ class WorkerDutyConfigTestCase(TestCase):
         """
 
         main_process_config = self._make_worker_config(
-            worker_app="synapse.app.homeserver", worker_name=None
+            worker_app="synapse.app.homeserver",
+            worker_name=None,
+            extras={"instance_map": {"main": {"host": "127.0.0.1", "port": 0}}},
         )
 
         self.assertTrue(
@@ -203,6 +206,7 @@ class WorkerDutyConfigTestCase(TestCase):
                 # so that it doesn't raise an exception here.
                 # (This is not read by `_should_this_worker_perform_duty`.)
                 "notify_appservices": False,
+                "instance_map": {"main": {"host": "127.0.0.1", "port": 0}},
             },
         )
 
@@ -236,7 +240,9 @@ class WorkerDutyConfigTestCase(TestCase):
         Tests new config options. This is for the master's config.
         """
         main_process_config = self._make_worker_config(
-            worker_app="synapse.app.homeserver", worker_name=None
+            worker_app="synapse.app.homeserver",
+            worker_name=None,
+            extras={"instance_map": {"main": {"host": "127.0.0.1", "port": 0}}},
         )
 
         self.assertTrue(
@@ -262,7 +268,9 @@ class WorkerDutyConfigTestCase(TestCase):
         Tests new config options. This is for the worker's config.
         """
         appservice_worker_config = self._make_worker_config(
-            worker_app="synapse.app.generic_worker", worker_name="worker1"
+            worker_app="synapse.app.generic_worker",
+            worker_name="worker1",
+            extras={"instance_map": {"main": {"host": "127.0.0.1", "port": 0}}},
         )
 
         self.assertTrue(
@@ -298,6 +306,7 @@ class WorkerDutyConfigTestCase(TestCase):
             extras={
                 "notify_appservices_from_worker": "worker2",
                 "update_user_directory_from_worker": "worker1",
+                "instance_map": {"main": {"host": "127.0.0.1", "port": 0}},
             },
         )
         self.assertFalse(worker1_config.should_notify_appservices)
@@ -309,7 +318,33 @@ class WorkerDutyConfigTestCase(TestCase):
             extras={
                 "notify_appservices_from_worker": "worker2",
                 "update_user_directory_from_worker": "worker1",
+                "instance_map": {"main": {"host": "127.0.0.1", "port": 0}},
             },
         )
         self.assertTrue(worker2_config.should_notify_appservices)
         self.assertFalse(worker2_config.should_update_user_directory)
+
+    def test_worker_instance_map_compat(self) -> None:
+        """
+        Test that `worker_replication_*` settings are compatibly handled by
+        adding them to the instance map as a `main` entry.
+        """
+
+        worker1_config = self._make_worker_config(
+            worker_app="synapse.app.generic_worker",
+            worker_name="worker1",
+            extras={
+                "notify_appservices_from_worker": "worker2",
+                "update_user_directory_from_worker": "worker1",
+                "worker_replication_host": "127.0.0.42",
+                "worker_replication_http_port": 1979,
+            },
+        )
+        self.assertEqual(
+            worker1_config.instance_map,
+            {
+                "master": InstanceLocationConfig(
+                    host="127.0.0.42", port=1979, tls=False
+                ),
+            },
+        )

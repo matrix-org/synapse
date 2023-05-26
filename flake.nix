@@ -95,6 +95,10 @@
 
                   # For building the Synapse documentation website.
                   mdbook
+
+                  # For releasing Synapse
+                  debian-devscripts # (`dch` for manipulating the Debian changelog)
+                  libnotify # (the release script uses `notify-send` to tell you when CI jobs are done)
                 ];
 
                 # Install Python and manage a virtualenv with Poetry.
