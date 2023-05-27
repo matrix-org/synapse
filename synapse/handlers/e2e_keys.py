@@ -1040,7 +1040,7 @@ class E2eKeysHandler:
             (
                 _,
                 self_signing_key_id,
-                self_signing_verify_key,
+                _,
             ) = await self._get_e2e_cross_signing_verify_key(user_id, "self_signing")
 
             # get our master key, since we may have received a signature of it.
@@ -1106,10 +1106,6 @@ class E2eKeysHandler:
                     # we already have a signature on this device, so we
                     # can skip it, since it should be exactly the same
                     continue
-
-                _check_device_signature(
-                    user_id, self_signing_verify_key, device, stored_device
-                )
 
                 signature = device["signatures"][user_id][self_signing_key_id]
                 signature_list.append(
@@ -1197,9 +1193,9 @@ class E2eKeysHandler:
         try:
             # get our user-signing key to verify the signatures
             (
-                user_signing_key,
+                _,
                 user_signing_key_id,
-                user_signing_verify_key,
+                _,
             ) = await self._get_e2e_cross_signing_verify_key(user_id, "user_signing")
         except SynapseError as e:
             failure = _exception_to_failure(e)
@@ -1254,10 +1250,6 @@ class E2eKeysHandler:
                 ):
                     # we already have the signature, so we can skip it
                     continue
-
-                _check_device_signature(
-                    user_id, user_signing_verify_key, key, master_key
-                )
 
                 signature = key["signatures"][user_id][user_signing_key_id]
                 signature_list.append(

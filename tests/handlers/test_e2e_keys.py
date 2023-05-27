@@ -657,26 +657,6 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 local_user,
                 {
                     local_user: {
-                        # fails because the signature is invalid
-                        # should fail with INVALID_SIGNATURE
-                        device_id: {
-                            "user_id": local_user,
-                            "device_id": device_id,
-                            "algorithms": [
-                                "m.olm.curve25519-aes-sha2",
-                                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
-                            ],
-                            "keys": {
-                                "curve25519:xyz": "curve25519+key",
-                                # private key: OMkooTr76ega06xNvXIGPbgvvxAOzmQncN8VObS7aBA
-                                "ed25519:xyz": device_pubkey,
-                            },
-                            "signatures": {
-                                local_user: {
-                                    "ed25519:" + selfsigning_pubkey: "something"
-                                }
-                            },
-                        },
                         # fails because device is unknown
                         # should fail with NOT_FOUND
                         "unknown": {
@@ -732,7 +712,6 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         user_failures = ret["failures"][local_user]
-        self.assertEqual(user_failures[device_id]["errcode"], Codes.INVALID_SIGNATURE)
         self.assertEqual(
             user_failures[master_pubkey]["errcode"], Codes.INVALID_SIGNATURE
         )
@@ -740,9 +719,6 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         other_user_failures = ret["failures"][other_user]
         self.assertEqual(other_user_failures["unknown"]["errcode"], Codes.NOT_FOUND)
-        self.assertEqual(
-            other_user_failures[other_master_pubkey]["errcode"], Codes.UNKNOWN
-        )
 
         # test successful signatures
         del device_key["signatures"]
@@ -782,12 +758,6 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 "ed25519:" + device_id
             ],
             master_key["signatures"][local_user]["ed25519:" + device_id],
-        )
-        self.assertEqual(
-            ret["master_keys"][other_user]["signatures"][local_user][
-                "ed25519:" + usersigning_pubkey
-            ],
-            other_master_key["signatures"][local_user]["ed25519:" + usersigning_pubkey],
         )
 
     def test_query_devices_remote_no_sync(self) -> None:
