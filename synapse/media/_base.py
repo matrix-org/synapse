@@ -50,6 +50,8 @@ TEXT_CONTENT_TYPES = [
     "text/xml",
 ]
 
+HOTSERVE_CONTENT_TYPES = ["audio/", "video/", "image/"]
+
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     """Parses the server name, media ID and optional file name from the request URI
@@ -151,7 +153,16 @@ def add_file_headers(
     else:
         content_type = media_type
 
+    # Only hotserve "safe" mimetypes, force download everything else
+    disposition_type = "attachment"
+    for mime in HOTSERVE_CONTENT_TYPES:
+        if media_type.lower().startswith(mime):
+            disposition_type = "inline"
+            break
+
+    disposition = disposition_type
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
+
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
@@ -173,11 +184,17 @@ def add_file_headers(
         # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
         # may as well just do the filename* version.
         if _can_encode_filename_as_token(upload_name):
-            disposition = "inline; filename=%s" % (upload_name,)
+            disposition = "%s; filename=%s" % (
+                disposition_type,
+                upload_name,
+            )
         else:
-            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
+            disposition = "%s; filename*=utf-8''%s" % (
+                disposition_type,
+                _quote(upload_name),
+            )
 
-        request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
+    request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
 
     # cache for at least a day.
     # XXX: we might want to turn this off for data we don't want to
