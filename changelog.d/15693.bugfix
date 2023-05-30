@@ -1,0 +1,1 @@
+Fix a performance issue introduced in Synapse v1.83.0 which meant that purging rooms was very slow and database-intensive.
