@@ -864,22 +864,36 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         # We only want to import redis module if we're using it, as we have
         # `txredisapi` as an optional dependency.
-        from synapse.replication.tcp.redis import lazyConnection
+        from synapse.replication.tcp.redis import lazyConnection, lazyUnixConnection
 
-        logger.info(
-            "Connecting to redis (host=%r port=%r) for external cache",
-            self.config.redis.redis_host,
-            self.config.redis.redis_port,
-        )
+        if self.config.redis.redis_path is None:
+            logger.info(
+                "Connecting to redis (host=%r port=%r) for external cache",
+                self.config.redis.redis_host,
+                self.config.redis.redis_port,
+            )
 
-        return lazyConnection(
-            hs=self,
-            host=self.config.redis.redis_host,
-            port=self.config.redis.redis_port,
-            dbid=self.config.redis.redis_dbid,
-            password=self.config.redis.redis_password,
-            reconnect=True,
-        )
+            return lazyConnection(
+                hs=self,
+                host=self.config.redis.redis_host,
+                port=self.config.redis.redis_port,
+                dbid=self.config.redis.redis_dbid,
+                password=self.config.redis.redis_password,
+                reconnect=True,
+            )
+        else:
+            logger.info(
+                "Connecting to redis (path=%r) for external cache",
+                self.config.redis.redis_path,
+            )
+
+            return lazyUnixConnection(
+                hs=self,
+                path=self.config.redis.redis_path,
+                dbid=self.config.redis.redis_dbid,
+                password=self.config.redis.redis_password,
+                reconnect=True,
+            )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"

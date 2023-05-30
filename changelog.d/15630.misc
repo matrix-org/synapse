@@ -1,1 +1,0 @@
-Fix two memory leaks in `trial` test runs.
