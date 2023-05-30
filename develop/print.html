@@ -17056,15 +17056,16 @@ poetry lock --no-update
 doesn't require poetry. (It's what we use in CI too). However, you could try
 <code>poetry build</code> too.</p>
 <h2 id="handle-a-dependabot-pull-request"><a class="header" href="#handle-a-dependabot-pull-request">...handle a Dependabot pull request?</a></h2>
-<p>Synapse uses Dependabot to keep the <code>poetry.lock</code> file up-to-date. When it
-creates a pull request a GitHub Action will run to automatically create a changelog
-file. Ensure that:</p>
+<p>Synapse uses Dependabot to keep the <code>poetry.lock</code> and <code>Cargo.lock</code> file 
+up-to-date with the latest releases of our dependencies. The changelog check is
+omitted for Dependabot PRs; the release script will include them in the 
+changelog.</p>
+<p>When reviewing a dependabot PR, ensure that:</p>
 <ul>
 <li>the lockfile changes look reasonable;</li>
 <li>the upstream changelog file (linked in the description) doesn't include any
 breaking changes;</li>
-<li>continuous integration passes (due to permissions, the GitHub Actions run on
-the changelog commit will fail, look at the initial commit of the pull request);</li>
+<li>continuous integration passes.</li>
 </ul>
 <p>In particular, any updates to the type hints (usually packages which start with <code>types-</code>)
 should be safe to merge if linting passes.</p>
