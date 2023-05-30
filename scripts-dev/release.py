@@ -874,7 +874,7 @@ def build_dependabot_changelog(repo: Repo, current_version: version.Version) -> 
 
     for i, message in enumerate(messages):
         messages[i] = re.sub(r"(.*) \(#(\d+)\)$", replacer, message)
-    messages.insert(0, "### Dependabot updates\n")
+    messages.insert(0, "### Updates to locked dependencies\n")
     return "\n".join(messages)
 
 
