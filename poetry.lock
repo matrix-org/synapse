@@ -2998,14 +2998,14 @@ files = [
 
 [[package]]
 name = "types-bleach"
-version = "6.0.0.1"
+version = "6.0.0.3"
 description = "Typing stubs for bleach"
 category = "dev"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-bleach-6.0.0.1.tar.gz", hash = "sha256:43d9129deb9e82918747437edf78f09ff440f2973f4702625b61994f3e698518"},
-    {file = "types_bleach-6.0.0.1-py3-none-any.whl", hash = "sha256:440df967254007be80bb0f4d851f026c29c709cc48359bf4935d2b2f3a6f9f90"},
+    {file = "types-bleach-6.0.0.3.tar.gz", hash = "sha256:8ce7896d4f658c562768674ffcf07492c7730e128018f03edd163ff912bfadee"},
+    {file = "types_bleach-6.0.0.3-py3-none-any.whl", hash = "sha256:d43eaf30a643ca824e16e2dcdb0c87ef9226237e2fa3ac4732a50cb3f32e145f"},
 ]
 
 [[package]]
