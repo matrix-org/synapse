@@ -1,0 +1,8 @@
+worker_app: synapse.app.generic_worker
+worker_name: background_worker
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
