@@ -192,10 +192,10 @@ class MSC3861:
                 ("captcha", "enable_registration_captcha"),
             )
 
-        if root.experimental.msc3882_enabled:
+        if root.auth.login_via_existing_enabled:
             raise ConfigError(
-                "MSC3882 cannot be enabled when OAuth delegation is enabled",
-                ("experimental_features", "msc3882_enabled"),
+                "Login via existing session cannot be enabled when OAuth delegation is enabled",
+                ("login_via_existing_session", "enabled"),
             )
 
         if root.registration.refresh_token_lifetime:
