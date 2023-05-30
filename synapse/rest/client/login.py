@@ -640,6 +640,9 @@ class CasTicketServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.experimental.msc3861.enabled:
+        return
+
     LoginRestServlet(hs).register(http_server)
     if (
         hs.config.worker.worker_app is None

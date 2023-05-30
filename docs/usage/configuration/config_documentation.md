@@ -3999,6 +3999,8 @@ This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
+* `path`: The full path to a local Unix socket file. **If this is used, `host` and
+ `port` are ignored.** Defaults to `/tmp/redis.sock'
 * `password`: Optional password if configured on the Redis instance.
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
 * `use_tls`: Whether to use tls connection. Defaults to false.
@@ -4010,6 +4012,8 @@ This setting has the following sub-options:
   _Added in Synapse 1.78.0._
 
   _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
+
+  _Changed in Synapse 1.85.0: Added path option to use a local Unix socket_
 
 Example configuration:
 ```yaml

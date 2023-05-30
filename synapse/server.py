@@ -31,6 +31,7 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
@@ -427,7 +428,11 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_auth(self) -> Auth:
-        return Auth(self)
+        if self.config.experimental.msc3861.enabled:
+            from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
+
+            return MSC3861DelegatedAuth(self)
+        return InternalAuth(self)
 
     @cache_in_self
     def get_auth_blocking(self) -> AuthBlocking:
@@ -864,22 +869,36 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         # We only want to import redis module if we're using it, as we have
         # `txredisapi` as an optional dependency.
-        from synapse.replication.tcp.redis import lazyConnection
+        from synapse.replication.tcp.redis import lazyConnection, lazyUnixConnection
 
-        logger.info(
-            "Connecting to redis (host=%r port=%r) for external cache",
-            self.config.redis.redis_host,
-            self.config.redis.redis_port,
-        )
+        if self.config.redis.redis_path is None:
+            logger.info(
+                "Connecting to redis (host=%r port=%r) for external cache",
+                self.config.redis.redis_host,
+                self.config.redis.redis_port,
+            )
 
-        return lazyConnection(
-            hs=self,
-            host=self.config.redis.redis_host,
-            port=self.config.redis.redis_port,
-            dbid=self.config.redis.redis_dbid,
-            password=self.config.redis.redis_password,
-            reconnect=True,
-        )
+            return lazyConnection(
+                hs=self,
+                host=self.config.redis.redis_host,
+                port=self.config.redis.redis_port,
+                dbid=self.config.redis.redis_dbid,
+                password=self.config.redis.redis_password,
+                reconnect=True,
+            )
+        else:
+            logger.info(
+                "Connecting to redis (path=%r) for external cache",
+                self.config.redis.redis_path,
+            )
+
+            return lazyUnixConnection(
+                hs=self,
+                path=self.config.redis.redis_path,
+                dbid=self.config.redis.redis_dbid,
+                password=self.config.redis.redis_password,
+                reconnect=True,
+            )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"

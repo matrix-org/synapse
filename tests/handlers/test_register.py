@@ -17,7 +17,7 @@ from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import (
     CodeMessageException,
@@ -683,7 +683,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         request = Mock(args={})
         request.args[b"access_token"] = [token.encode("ascii")]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        auth = Auth(self.hs)
+        auth = InternalAuth(self.hs)
         requester = self.get_success(auth.get_user_by_req(request))
 
         self.assertTrue(requester.shadow_banned)

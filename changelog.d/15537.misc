@@ -1,1 +1,0 @@
-Add not null constraint to column full_user_id of tables profiles and user_filters.
