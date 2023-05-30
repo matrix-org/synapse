@@ -166,7 +166,7 @@ class LoginRestServlet(RestServlet):
             tokenTypeFlow: Dict[str, Any] = {"type": LoginRestServlet.TOKEN_TYPE}
             # If the login token flow is enabled advertise the get_login_token flag.
             if self._get_login_token_enabled:
-                tokenTypeFlow["m.get_login_token"] = True
+                tokenTypeFlow["get_login_token"] = True
             flows.append(tokenTypeFlow)
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
