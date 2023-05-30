@@ -1291,9 +1291,6 @@ class FederationServer(FederationBase):
                 return
             lock = new_lock
 
-    def __str__(self) -> str:
-        return "<ReplicationLayer(%s)>" % self.server_name
-
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: Dict
     ) -> None:

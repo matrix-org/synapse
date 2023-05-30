@@ -31,6 +31,7 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
@@ -427,7 +428,11 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_auth(self) -> Auth:
-        return Auth(self)
+        if self.config.experimental.msc3861.enabled:
+            from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
+
+            return MSC3861DelegatedAuth(self)
+        return InternalAuth(self)
 
     @cache_in_self
     def get_auth_blocking(self) -> AuthBlocking:

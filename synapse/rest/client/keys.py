@@ -17,9 +17,10 @@
 import logging
 import re
 from collections import Counter
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
-from synapse.api.errors import InvalidAPICallError, SynapseError
+from synapse.api.errors import Codes, InvalidAPICallError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -375,9 +376,29 @@ class SigningKeyUploadServlet(RestServlet):
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
 
-        if self.hs.config.experimental.msc3967_enabled:
-            if await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id):
-                # If we already have a master key then cross signing is set up and we require UIA to reset
+        is_cross_signing_setup = (
+            await self.e2e_keys_handler.is_cross_signing_set_up_for_user(user_id)
+        )
+
+        # Before MSC3967 we required UIA both when setting up cross signing for the
+        # first time and when resetting the device signing key. With MSC3967 we only
+        # require UIA when resetting cross-signing, and not when setting up the first
+        # time. Because there is no UIA in MSC3861, for now we throw an error if the
+        # user tries to reset the device signing key when MSC3861 is enabled, but allow
+        # first-time setup.
+        if self.hs.config.experimental.msc3861.enabled:
+            # There is no way to reset the device signing key with MSC3861
+            if is_cross_signing_setup:
+                raise SynapseError(
+                    HTTPStatus.NOT_IMPLEMENTED,
+                    "Resetting cross signing keys is not yet supported with MSC3861",
+                    Codes.UNRECOGNIZED,
+                )
+            # But first-time setup is fine
+
+        elif self.hs.config.experimental.msc3967_enabled:
+            # If we already have a master key then cross signing is set up and we require UIA to reset
+            if is_cross_signing_setup:
                 await self.auth_handler.validate_user_via_ui_auth(
                     requester,
                     request,
@@ -387,6 +408,7 @@ class SigningKeyUploadServlet(RestServlet):
                     can_skip_ui_auth=False,
                 )
             # Otherwise we don't require UIA since we are setting up cross signing for first time
+
         else:
             # Previous behaviour is to always require UIA but allow it to be skipped
             await self.auth_handler.validate_user_via_ui_auth(

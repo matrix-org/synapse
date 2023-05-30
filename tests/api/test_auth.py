@@ -18,7 +18,7 @@ import pymacaroons
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.constants import UserTypes
 from synapse.api.errors import (
@@ -48,7 +48,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # have been called by the HomeserverTestCase machinery.
         hs.datastores.main = self.store  # type: ignore[union-attr]
         hs.get_auth_handler().store = self.store
-        self.auth = Auth(hs)
+        self.auth = InternalAuth(hs)
 
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
@@ -426,6 +426,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
+            scope=set(),
             shadow_banned=False,
             app_service=appservice,
             authenticated_entity="@appservice:server",
@@ -456,6 +457,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
+            scope=set(),
             shadow_banned=False,
             app_service=appservice,
             authenticated_entity="@appservice:server",
