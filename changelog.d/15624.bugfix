@@ -1,1 +1,0 @@
-Fix a long-standing bug where deactivated users were still able to login using the custom `org.matrix.login.jwt` login type (if enabled).
