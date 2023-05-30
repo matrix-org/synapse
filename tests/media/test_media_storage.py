@@ -364,8 +364,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def test_disposition_none(self) -> None:
         """
-        If there is no filename, one isn't passed on in the Content-Disposition
-        of the request.
+        If there is no filename, Content-Disposition should only
+        be a disposition type.
         """
         channel = self._req(None)
 
@@ -373,7 +373,9 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
         )
-        self.assertEqual(headers.getRawHeaders(b"Content-Disposition"), None)
+        self.assertEqual(
+            headers.getRawHeaders(b"Content-Disposition"), [b"inline"]
+        )
 
     def test_thumbnail_crop(self) -> None:
         """Test that a cropped remote thumbnail is available."""
