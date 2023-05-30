@@ -26,7 +26,7 @@ FETCH_PUBLIC_ROOMS_CALLBACK = Callable[
         Optional[ThirdPartyInstanceID],  # network_tuple
         Optional[dict],  # search_filter
         Optional[int],  # limit
-        Optional[Tuple[int, str]],  # bounds
+        Tuple[Optional[int], Optional[str]],  # bounds
         bool,  # forwards
     ],
     Awaitable[List[PublicRoom]],

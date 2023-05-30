@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 import attr
 import msgpack
@@ -170,12 +170,13 @@ class RoomListHandler:
         # we request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
-        results = []
+        results: List[PublicRoom] = []
 
-        print(f"last_module_index {last_module_index}")
-        print(f"last_room_id {last_room_id}")
+        # print(f"{forwards} {last_joined_members} {last_room_id} {last_module_index}")
 
-        def insert_into_result(new_room: PublicRoom, module_index: Optional[int]):
+        def insert_into_result(
+            new_room: PublicRoom, module_index: Optional[int]
+        ) -> None:
             # print(f"insert {new_room.room_id} {module_index}")
             if new_room.num_joined_members == last_joined_members:
                 if last_module_index is not None and last_room_id is not None:
@@ -221,8 +222,6 @@ class RoomListHandler:
                 forwards,
             )
 
-            print([r.room_id for r in module_public_rooms])
-
             # We reverse for iteration to keep the order in the final list
             # since we preprend when inserting
             module_public_rooms.reverse()
@@ -238,7 +237,7 @@ class RoomListHandler:
             probing_limit,
             bounds=(
                 last_joined_members,
-                last_room_id if last_module_index == None else None,
+                last_room_id if last_module_index is None else None,
             ),
             forwards=forwards,
             ignore_non_federatable=bool(from_remote_server_name),
@@ -247,21 +246,19 @@ class RoomListHandler:
         for r in local_public_rooms:
             insert_into_result(r, None)
 
-        # print("final")
-        # print([r.room_id for r in results])
-
         response: JsonDict = {}
         num_results = len(results)
         if limit is not None and probing_limit is not None:
             more_to_come = num_results >= probing_limit
 
-            # Depending on direction we trim either the front or back.
-            if forwards:
-                results = results[:limit]
-            else:
-                results = results[-limit:]
+            results = results[:limit]
         else:
             more_to_come = False
+
+        if not forwards:
+            results.reverse()
+
+        # print("final ", [(r.room_id, r.num_joined_members) for r in results])
 
         if num_results > 0:
             final_entry = results[-1]
