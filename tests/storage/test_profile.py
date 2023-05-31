@@ -70,7 +70,6 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         Test background job that copies entries from column user_id to full_user_id, adding
         the hostname in the process.
         """
-
         updater = self.hs.get_datastores().main.db_pool.updates
         # drop the constraint so we can insert nulls in full_user_id to populate the test
         if isinstance(self.store.database_engine, PostgresEngine):
