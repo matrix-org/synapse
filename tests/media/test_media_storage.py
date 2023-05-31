@@ -373,9 +373,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
         )
-        self.assertEqual(
-            headers.getRawHeaders(b"Content-Disposition"), [b"inline"]
-        )
+        self.assertEqual(headers.getRawHeaders(b"Content-Disposition"), [b"inline"])
 
     def test_thumbnail_crop(self) -> None:
         """Test that a cropped remote thumbnail is available."""
