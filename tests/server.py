@@ -642,7 +642,7 @@ def _make_test_homeserver_synchronous(server: HomeServer) -> None:
         pool.runWithConnection = runWithConnection  # type: ignore[assignment]
         pool.runInteraction = runInteraction  # type: ignore[assignment]
         # Replace the thread pool with a threadless 'thread' pool
-        pool.threadpool = ThreadPool(clock._reactor)  # type: ignore[assignment]
+        pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
 
     # We've just changed the Databases to run DB transactions on the same
