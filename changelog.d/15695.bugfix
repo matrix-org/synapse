@@ -1,0 +1,1 @@
+Check permissions for enabling encryption earlier during room creation to avoid creating broken rooms.
