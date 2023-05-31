@@ -7,6 +7,7 @@
 # https://github.com/matrix-org/synapse/blob/develop/docker/README-testing.md#testing-with-postgresql-and-single-or-multi-process-synapse
 
 ARG SYNAPSE_VERSION=latest
+# This is an intermediate image, to be built locally (not pulled from a registry).
 ARG FROM=matrixdotorg/synapse-workers:$SYNAPSE_VERSION
 
 FROM $FROM
@@ -19,8 +20,8 @@ FROM $FROM
     # the same debian version as Synapse's docker image (so the versions of the
     # shared libraries match).
     RUN adduser --system --uid 999 postgres --home /var/lib/postgresql
-    COPY --from=postgres:13-bullseye /usr/lib/postgresql /usr/lib/postgresql
-    COPY --from=postgres:13-bullseye /usr/share/postgresql /usr/share/postgresql
+    COPY --from=docker.io/library/postgres:13-bullseye /usr/lib/postgresql /usr/lib/postgresql
+    COPY --from=docker.io/library/postgres:13-bullseye /usr/share/postgresql /usr/share/postgresql
     RUN mkdir /var/run/postgresql && chown postgres /var/run/postgresql
     ENV PATH="${PATH}:/usr/lib/postgresql/13/bin"
     ENV PGDATA=/var/lib/postgresql/data
