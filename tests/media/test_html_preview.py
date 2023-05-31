@@ -24,7 +24,7 @@ from tests import unittest
 try:
     import lxml
 except ImportError:
-    lxml = None
+    lxml = None  # type: ignore[assignment]
 
 
 class SummarizeTestCase(unittest.TestCase):
@@ -160,6 +160,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
@@ -176,6 +177,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
@@ -195,6 +197,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(
@@ -217,6 +220,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
@@ -231,6 +235,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
@@ -246,6 +251,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": "Title", "og:description": "Title"})
@@ -261,6 +267,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": "Title", "og:description": "Some text."})
@@ -281,6 +288,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": "Title", "og:description": "Finally!"})
@@ -296,6 +304,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         """
 
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
@@ -324,6 +333,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         <head><title>Foo</title></head><body>Some text.</body></html>
         """.strip()
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -338,6 +348,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         </html>
         """
         tree = decode_body(html, "http://example.com/test.html", "invalid-encoding")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -353,6 +364,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         </html>
         """
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
 
@@ -367,6 +379,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         </html>
         """
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "ó", "og:description": "Some text."})
 
@@ -380,6 +393,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         </html>
         """
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
         self.assertEqual(
             og,
@@ -401,6 +415,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         </html>
         """
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
         self.assertEqual(
             og,
@@ -419,6 +434,7 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         with a cheeky SVG</svg></u> and <strong>some</strong> tail text</b></a>
         """
         tree = decode_body(html, "http://example.com/test.html")
+        assert tree is not None
         og = parse_html_to_open_graph(tree)
         self.assertEqual(
             og,

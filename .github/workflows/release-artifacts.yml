@@ -34,6 +34,7 @@ jobs:
       - id: set-distros
         run: |
           # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
+          # NOTE: inside the actual Dockerfile-dhvirtualenv, the image name is expanded into its full image path
           dists='["debian:sid"]'
           if [[ $GITHUB_REF == refs/tags/* ]]; then
               dists=$(scripts-dev/build_debian_packages.py --show-dists-json)

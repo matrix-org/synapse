@@ -1,1 +1,0 @@
-Re-type config paths in `ConfigError`s to be `StrSequence`s instead of `Iterable[str]`s.
