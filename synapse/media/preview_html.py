@@ -255,7 +255,7 @@ def parse_html_to_open_graph(tree: "etree._Element") -> Dict[str, Optional[str]]
     # "og:video:height" : "720",
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
-    og: Dict[str, Optional[str]] = _get_meta_tags(tree, "property", "og")
+    og = _get_meta_tags(tree, "property", "og")
 
     # TODO: Search for properties specific to the different Open Graph types,
     # such as article: meta tags, e.g.:
