@@ -1968,7 +1968,7 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
         channel = self.make_request(
             "POST",
             "/createRoom",
-            '{"creation_content": {"m.federate": false},"name": "Secret Private Room","preset": "private_chat","initial_state": [{"type": "m.room.encryption","state_key": "","content": {"algorithm": "m.megolm.v1.aes-sha2"}}]}'
+            '{"creation_content": {"m.federate": false},"name": "Secret Private Room","preset": "private_chat","initial_state": [{"type": "m.room.encryption","state_key": "","content": {"algorithm": "m.megolm.v1.aes-sha2"}}]}',
         )
 
         # Then I am not allowed because the required power level is unattainable
