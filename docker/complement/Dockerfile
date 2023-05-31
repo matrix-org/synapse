@@ -7,8 +7,7 @@
 # https://github.com/matrix-org/synapse/blob/develop/docker/README-testing.md#testing-with-postgresql-and-single-or-multi-process-synapse
 
 ARG SYNAPSE_VERSION=latest
-# This one doesn't get hardcoded, as it's an intermediate build step. The previous step
-# is built locally, not pulled from any registry.
+# This is an intermediate image, to be built locally (not pulled from a registry).
 ARG FROM=matrixdotorg/synapse-workers:$SYNAPSE_VERSION
 
 FROM $FROM
