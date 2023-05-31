@@ -167,9 +167,11 @@ class RoomListHandler:
             last_room_id = batch_token.last_room_id
             last_module_index = batch_token.last_module_index
 
-        # we request one more than wanted to see if there are more pages to come
+        # We request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
+        # We bucket results per joined members number since we want to keep order
+        # per joined members number
         num_joined_members_buckets: Dict[int, List[PublicRoom]] = {}
         room_ids_to_module_index: Dict[str, int] = {}
 
@@ -194,12 +196,14 @@ class RoomListHandler:
             self._module_api_callbacks.fetch_public_rooms_callbacks
         ):
             # Ask each module for a list of public rooms given the last_joined_members
-            # value from the since token and the probing limit.
-            module_last_joined_members = None
-            if last_joined_members is not None:
-                module_last_joined_members = last_joined_members
-                if last_module_index is not None and module_index < last_module_index:
+            # value from the since token and the probing limit
+            # last_joined_members needs to be reduce by one if this module has already
+            # given its result for last_joined_members
+            module_last_joined_members = last_joined_members
+            if module_last_joined_members is not None and last_module_index is not None:
+                if module_index < last_module_index:
                     module_last_joined_members = module_last_joined_members - 1
+
             module_public_rooms = await fetch_public_rooms(
                 network_tuple,
                 search_filter,

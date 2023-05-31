@@ -428,7 +428,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             query_args += [last_joined_members]
 
             if last_room_id is not None:
-                clause += f" AND (joined_members {comp} ? OR room_id {comp} ?)"
+                clause += f" OR (joined_members == ? AND room_id {comp} ?)"
                 query_args += [last_joined_members, last_room_id]
 
             where_clauses.append(clause)
