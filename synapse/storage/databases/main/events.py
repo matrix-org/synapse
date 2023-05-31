@@ -1010,7 +1010,7 @@ class PersistEventsStore:
                         )
                     )
 
-        # Previously Synapsed used the access_token_id to scope the txn_id for events.
+        # Previously Synapse used the access_token_id to scope the txn_id for events.
         #
         # TODO Remove this once Synapse cannot be rolled back to a version without
         #      device IDs being stored.
