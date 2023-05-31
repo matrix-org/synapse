@@ -1962,7 +1962,6 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
     )
     def test_config_override_blocks_encrypted_room(self) -> None:
         # Given the server has config for private_chats,
-        room_id = self.helper.create_room_as("@some_other_guy:red", is_public=False)
 
         # When I attempt to create an encrypted private_chat room
         channel = self.make_request(
