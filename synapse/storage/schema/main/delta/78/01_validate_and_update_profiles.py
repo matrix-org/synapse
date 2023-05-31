@@ -27,25 +27,26 @@ def run_upgrade(
     if isinstance(database_engine, PostgresEngine):
         # check if the constraint can be validated
         check_sql = """
-                    SELECT user_id from profiles WHERE full_user_id IS NULL
-                    """
+        SELECT user_id from profiles WHERE full_user_id IS NULL
+        """
         cur.execute(check_sql)
         res = cur.fetchall()
 
         if res:
             # there are rows the background job missed, finish them here before we validate the constraint
             process_rows_sql = """
-                               UPDATE profiles
-                               SET full_user_id = '@' || user_id || ?
-                               WHERE user_id IN (SELECT user_id FROM profiles WHERE
-                               full_user_id IS NULL)
-                               """
+            UPDATE profiles
+            SET full_user_id = '@' || user_id || ?
+            WHERE user_id IN (
+                SELECT user_id FROM profiles WHERE full_user_id IS NULL
+            )
+            """
             cur.execute(process_rows_sql, (f":{hostname}",))
 
         # Now we can validate
         validate_sql = """
-                       ALTER TABLE profiles VALIDATE CONSTRAINT full_user_id_not_null
-                       """
+        ALTER TABLE profiles VALIDATE CONSTRAINT full_user_id_not_null
+        """
         cur.execute(validate_sql)
 
     else:
@@ -53,33 +54,33 @@ def run_upgrade(
         cur.execute("DROP TABLE IF EXISTS temp_profiles")
 
         create_sql = """
-                      CREATE TABLE temp_profiles (
-                        full_user_id text NOT NULL,
-                        user_id text,
-                        displayname text,
-                        avatar_url text,
-                        UNIQUE (full_user_id),
-                        UNIQUE (user_id)
-                        )
-                     """
+        CREATE TABLE temp_profiles (
+            full_user_id text NOT NULL,
+            user_id text,
+            displayname text,
+            avatar_url text,
+            UNIQUE (full_user_id),
+            UNIQUE (user_id)
+        )
+        """
         cur.execute(create_sql)
 
         copy_sql = """
-                    INSERT INTO temp_profiles (
-                        user_id,
-                        displayname,
-                        avatar_url,
-                        full_user_id)
-                        SELECT user_id, displayname, avatar_url, '@' || user_id || ':' || ? FROM profiles
-                   """
+        INSERT INTO temp_profiles (
+            user_id,
+            displayname,
+            avatar_url,
+            full_user_id)
+            SELECT user_id, displayname, avatar_url, '@' || user_id || ':' || ? FROM profiles
+        """
         cur.execute(copy_sql, (f"{hostname}",))
 
         drop_sql = """
-                   DROP TABLE profiles
-                   """
+        DROP TABLE profiles
+        """
         cur.execute(drop_sql)
 
         rename_sql = """
-                     ALTER TABLE temp_profiles RENAME to profiles
-                     """
+        ALTER TABLE temp_profiles RENAME to profiles
+        """
         cur.execute(rename_sql)
