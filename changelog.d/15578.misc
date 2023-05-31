@@ -1,1 +1,0 @@
-Allow connecting to HTTP Replication Endpoints by using `worker_name` when constructing the request.
