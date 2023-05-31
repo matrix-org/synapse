@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import attr
 import msgpack
@@ -170,66 +170,8 @@ class RoomListHandler:
         # we request one more than wanted to see if there are more pages to come
         probing_limit = limit + 1 if limit is not None else None
 
-        results: List[PublicRoom] = []
-
-        # print(f"{forwards} {last_joined_members} {last_room_id} {last_module_index}")
-
-        def insert_into_result(
-            new_room: PublicRoom, module_index: Optional[int]
-        ) -> None:
-            # print(f"insert {new_room.room_id} {module_index}")
-            if new_room.num_joined_members == last_joined_members:
-                if last_module_index is not None and last_room_id is not None:
-                    if module_index is not None and module_index > last_module_index:
-                        return
-            inserted = False
-            for i, r in enumerate(results):
-                r = results[i]
-                if (
-                    forwards and new_room.num_joined_members >= r.num_joined_members
-                ) or (
-                    not forwards and new_room.num_joined_members <= r.num_joined_members
-                ):
-                    results.insert(i, new_room)
-                    inserted = True
-                    return
-            if not inserted:
-                if forwards:
-                    results.append(new_room)
-                else:
-                    results.insert(0, new_room)
-
-        room_ids_to_module_index = {}
-
-        for module_index, fetch_public_rooms in enumerate(
-            self._module_api_callbacks.fetch_public_rooms_callbacks
-        ):
-            # Ask each module for a list of public rooms given the last_joined_members
-            # value from the since token and the probing limit.
-            module_last_joined_members = None
-            if last_joined_members is not None:
-                module_last_joined_members = last_joined_members
-                if last_module_index is not None and last_module_index < module_index:
-                    module_last_joined_members = module_last_joined_members - 1
-            module_public_rooms = await fetch_public_rooms(
-                network_tuple,
-                search_filter,
-                probing_limit,
-                (
-                    module_last_joined_members,
-                    last_room_id if last_module_index == module_index else None,
-                ),
-                forwards,
-            )
-
-            # We reverse for iteration to keep the order in the final list
-            # since we preprend when inserting
-            module_public_rooms.reverse()
-
-            # Insert the module's reported public rooms into the list
-            for new_room in module_public_rooms:
-                room_ids_to_module_index[new_room.room_id] = module_index
-                insert_into_result(new_room, module_index)
+        num_joined_members_buckets: Dict[int, List[PublicRoom]] = {}
+        room_ids_to_module_index: Dict[str, int] = {}
 
         local_public_rooms = await self.store.get_largest_public_rooms(
             network_tuple,
@@ -243,8 +185,44 @@ class RoomListHandler:
             ignore_non_federatable=bool(from_remote_server_name),
         )
 
-        for r in local_public_rooms:
-            insert_into_result(r, None)
+        for room in local_public_rooms:
+            num_joined_members_buckets.setdefault(room.num_joined_members, []).append(
+                room
+            )
+
+        for module_index, fetch_public_rooms in enumerate(
+            self._module_api_callbacks.fetch_public_rooms_callbacks
+        ):
+            # Ask each module for a list of public rooms given the last_joined_members
+            # value from the since token and the probing limit.
+            module_last_joined_members = None
+            if last_joined_members is not None:
+                module_last_joined_members = last_joined_members
+                if last_module_index is not None and module_index < last_module_index:
+                    module_last_joined_members = module_last_joined_members - 1
+            module_public_rooms = await fetch_public_rooms(
+                network_tuple,
+                search_filter,
+                probing_limit,
+                (
+                    module_last_joined_members,
+                    last_room_id if last_module_index == module_index else None,
+                ),
+                forwards,
+            )
+
+            for room in module_public_rooms:
+                num_joined_members_buckets.setdefault(
+                    room.num_joined_members, []
+                ).append(room)
+                room_ids_to_module_index[room.room_id] = module_index
+
+        nums_joined_members = list(num_joined_members_buckets.keys())
+        nums_joined_members.sort(reverse=forwards)
+
+        results = []
+        for num_joined_members in nums_joined_members:
+            results += num_joined_members_buckets[num_joined_members]
 
         response: JsonDict = {}
         num_results = len(results)
@@ -257,8 +235,6 @@ class RoomListHandler:
 
         if not forwards:
             results.reverse()
-
-        # print("final ", [(r.room_id, r.num_joined_members) for r in results])
 
         if num_results > 0:
             final_entry = results[-1]

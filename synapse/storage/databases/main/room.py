@@ -386,7 +386,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             bounds: An uppoer or lower bound to apply to result set if given,
                 consists of a joined member count and room_id (these are
                 excluded from result set).
-            forwards: true iff going forwards, going backwards otherwise
+            forwards: true if going forwards, going backwards otherwise
             ignore_non_federatable: If true filters out non-federatable rooms.
 
         Returns:
@@ -424,14 +424,12 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if last_joined_members is not None:
             comp = "<" if forwards else ">"
 
-            clause = f"joined_members {comp}= ? AND (joined_members {comp} ?"
-            query_args += [last_joined_members, last_joined_members]
+            clause = f"joined_members {comp} ?"
+            query_args += [last_joined_members]
 
-            if last_room_id is None:
-                clause += ")"
-            else:
-                clause += f"OR room_id {comp} ?)"
-                query_args.append(last_room_id)
+            if last_room_id is not None:
+                clause += f" AND (joined_members {comp} ? OR room_id {comp} ?)"
+                query_args += [last_joined_members, last_room_id]
 
             where_clauses.append(clause)
 
