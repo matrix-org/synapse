@@ -122,6 +122,7 @@ from synapse.types import (
     JsonMapping,
     Requester,
     RoomAlias,
+    RoomID,
     StateMap,
     UserID,
     UserInfo,
@@ -1569,6 +1570,32 @@ class ModuleApi:
         return await self._store.get_monthly_active_users_by_service(
             start_timestamp, end_timestamp
         )
+
+    async def get_canonical_room_alias(self, room_id: RoomID) -> Optional[RoomAlias]:
+        """
+        Retrieve the given room's current canonical alias.
+
+        A room may declare an alias as "canonical", meaning that it is the
+        preferred alias to use when referring to the room. This function
+        retrieves that alias from the room's state.
+
+        Added in Synapse v1.86.0.
+
+        Args:
+            room_id: The Room ID to find the alias of.
+
+        Returns:
+            None if the room ID does not exist, or if the room exists but has no canonical alias.
+            Otherwise, the parsed room alias.
+        """
+        room_alias_str = (
+            await self._storage_controllers.state.get_canonical_alias_for_room(
+                room_id.to_string()
+            )
+        )
+        if room_alias_str:
+            return RoomAlias.from_string(room_alias_str)
+        return None
 
     async def lookup_room_alias(self, room_alias: str) -> Tuple[str, List[str]]:
         """
