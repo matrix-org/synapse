@@ -180,6 +180,7 @@ def _get_meta_tags(
     # This actually returns Dict[str, str], but the caller sets this as a variable
     # which is Dict[str, Optional[str]].
     results: Dict[str, Optional[str]] = {}
+    # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
     for tag in cast(
         List["etree._Element"],
         tree.xpath(
@@ -284,6 +285,7 @@ def parse_html_to_open_graph(tree: "etree._Element") -> Dict[str, Optional[str]]
 
     if "og:title" not in og:
         # Attempt to find a title from the title tag, or the biggest header on the page.
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
         title = cast(
             List["etree._ElementUnicodeResult"],
             tree.xpath("((//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1])/text()"),
@@ -294,6 +296,7 @@ def parse_html_to_open_graph(tree: "etree._Element") -> Dict[str, Optional[str]]
             og["og:title"] = None
 
     if "og:image" not in og:
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
         meta_image = cast(
             List["etree._ElementUnicodeResult"],
             tree.xpath(
@@ -305,6 +308,7 @@ def parse_html_to_open_graph(tree: "etree._Element") -> Dict[str, Optional[str]]
             og["og:image"] = meta_image[0]
         else:
             # Try to find images which are larger than 10px by 10px.
+            # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
             #
             # TODO: consider inlined CSS styles as well as width & height attribs
             images = cast(
@@ -319,12 +323,14 @@ def parse_html_to_open_graph(tree: "etree._Element") -> Dict[str, Optional[str]]
             )
             # If no images were found, try to find *any* images.
             if not images:
+                # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
                 images = cast(List["etree._Element"], tree.xpath("//img[@src][1]"))
             if images:
                 og["og:image"] = cast(str, images[0].attrib["src"])
 
             # Finally, fallback to the favicon if nothing else.
             else:
+                # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
                 favicons = cast(
                     List["etree._ElementUnicodeResult"],
                     tree.xpath("//link[@href][contains(@rel, 'icon')]/@href[1]"),
@@ -334,6 +340,7 @@ def parse_html_to_open_graph(tree: "etree._Element") -> Dict[str, Optional[str]]
 
     if "og:description" not in og:
         # Check the first meta description tag for content.
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
         meta_description = cast(
             List["etree._ElementUnicodeResult"],
             tree.xpath(
