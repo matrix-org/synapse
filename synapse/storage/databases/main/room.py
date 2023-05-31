@@ -383,7 +383,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             network_tuple
             search_filter
             limit: Maximum number of rows to return, unlimited otherwise.
-            bounds: An uppoer or lower bound to apply to result set if given,
+            bounds: An upper or lower bound to apply to result set if given,
                 consists of a joined member count and room_id (these are
                 excluded from result set).
             forwards: true if going forwards, going backwards otherwise
@@ -428,7 +428,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             query_args += [last_joined_members]
 
             if last_room_id is not None:
-                clause += f" OR (joined_members == ? AND room_id {comp} ?)"
+                clause += f" OR (joined_members = ? AND room_id {comp} ?)"
                 query_args += [last_joined_members, last_room_id]
 
             where_clauses.append(clause)
