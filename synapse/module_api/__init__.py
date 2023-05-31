@@ -1589,7 +1589,9 @@ class ModuleApi:
             Otherwise, the parsed room alias.
         """
         room_alias_str = (
-            await self._storage_controllers.state.get_canonical_alias_for_room(room_id.to_string())
+            await self._storage_controllers.state.get_canonical_alias_for_room(
+                room_id.to_string()
+            )
         )
         if room_alias_str:
             return RoomAlias.from_string(room_alias_str)
