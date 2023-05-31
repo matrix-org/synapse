@@ -71,6 +71,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         the hostname in the process.
         """
         updater = self.hs.get_datastores().main.db_pool.updates
+
         # drop the constraint so we can insert nulls in full_user_id to populate the test
         if isinstance(self.store.database_engine, PostgresEngine):
 
