@@ -314,7 +314,7 @@ jobs:
       # There aren't wheels for some of the older deps, so we need to install
       # their build dependencies
       - run: |
-          sudo apt update
+          sudo apt-get -qq update
           sudo apt-get -qq install build-essential libffi-dev python-dev \
             libxml2-dev libxslt-dev xmlsec1 zlib1g-dev libjpeg-dev libwebp-dev
 

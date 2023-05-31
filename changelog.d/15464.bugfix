@@ -1,1 +1,0 @@
-Fix a long-standing bug where setting the read marker could fail when using message retention. Contributed by Nick @ Beeper (@fizzadar).

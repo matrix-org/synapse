@@ -360,7 +360,7 @@ class PaginationHandler:
         except Exception:
             f = Failure()
             logger.error(
-                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())  # type: ignore
+                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())
             )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
             self._purges_by_id[purge_id].error = f.getErrorMessage()
@@ -689,7 +689,7 @@ class PaginationHandler:
             f = Failure()
             logger.error(
                 "failed",
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_FAILED
             self._delete_by_id[delete_id].error = f.getErrorMessage()

@@ -128,20 +128,7 @@ USER_FILTER_SCHEMA = {
         "account_data": {"$ref": "#/definitions/filter"},
         "room": {"$ref": "#/definitions/room_filter"},
         "event_format": {"type": "string", "enum": ["client", "federation"]},
-        "event_fields": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                # Don't allow '\\' in event field filters. This makes matching
-                # events a lot easier as we can then use a negative lookbehind
-                # assertion to split '\.' If we allowed \\ then it would
-                # incorrectly split '\\.' See synapse.events.utils.serialize_event
-                #
-                # Note that because this is a regular expression, we have to escape
-                # each backslash in the pattern.
-                "pattern": r"^((?!\\\\).)*$",
-            },
-        },
+        "event_fields": {"type": "array", "items": {"type": "string"}},
     },
     "additionalProperties": True,  # Allow new fields for forward compatibility
 }
