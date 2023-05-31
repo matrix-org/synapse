@@ -1,8 +1,6 @@
 # syntax=docker/dockerfile:1
 
 ARG SYNAPSE_VERSION=latest
-# This one doesn't get hardcoded, as it's an intermediate build step for Complement and
-# is not pulled from a registry.
 ARG FROM=matrixdotorg/synapse:$SYNAPSE_VERSION
 
 # first of all, we create a base image with an nginx which we can copy into the
