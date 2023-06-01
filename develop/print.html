@@ -1779,6 +1779,13 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1850"><a class="header" href="#upgrading-to-v1850">Upgrading to v1.85.0</a></h1>
+<h2 id="application-service-registration-with-user-property-deprecation"><a class="header" href="#application-service-registration-with-user-property-deprecation">Application service registration with &quot;user&quot; property deprecation</a></h2>
+<p>Application services should ensure they call the <code>/register</code> endpoint with a
+<code>username</code> property. The legacy <code>user</code> property is considered deprecated and
+should no longer be included.</p>
+<p>A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service login.</p>
 <h1 id="upgrading-to-v1840"><a class="header" href="#upgrading-to-v1840">Upgrading to v1.84.0</a></h1>
 <h2 id="deprecation-of-worker_replication_-configuration-settings"><a class="header" href="#deprecation-of-worker_replication_-configuration-settings">Deprecation of <code>worker_replication_*</code> configuration settings</a></h2>
 <p>When using workers,</p>
