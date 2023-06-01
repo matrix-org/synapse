@@ -4,8 +4,8 @@ Synapse 1.85.0rc1 (2023-05-30)
 Features
 --------
 
-- Process previously failed backfill events in the background to avoid blocking requests for something that is bound to fail again. ([\#15585](https://github.com/matrix-org/synapse/issues/15585))
-- Add a new [admin API](https://matrix-org.github.io/synapse/v1.75/usage/administration/admin_api/index.html) to [create a new device for a user](https://matrix-org.github.io/synapse/v1.75/admin_api/user_admin_api.html#create-a-device). ([\#15611](https://github.com/matrix-org/synapse/issues/15611))
+- Improve performance of backfill requests by performing backfill of previously failed requests in the background. ([\#15585](https://github.com/matrix-org/synapse/issues/15585))
+- Add a new [admin API](https://matrix-org.github.io/synapse/v1.85/usage/administration/admin_api/index.html) to [create a new device for a user](https://matrix-org.github.io/synapse/v1.85/admin_api/user_admin_api.html#create-a-device). ([\#15611](https://github.com/matrix-org/synapse/issues/15611))
 - Add Unix socket support for Redis connections. Contributed by Jason Little. ([\#15644](https://github.com/matrix-org/synapse/issues/15644))
 
 
