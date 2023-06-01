@@ -1,1 +1,0 @@
-Deprecate calling the `/register` endpoint with an unspecced `user` property for application services.

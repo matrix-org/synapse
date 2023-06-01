@@ -1,3 +1,24 @@
+Synapse 1.85.0rc2 (2023-06-01)
+==============================
+
+Bugfixes
+--------
+
+- Fix a performance issue introduced in Synapse v1.83.0 which meant that purging rooms was very slow and database-intensive. ([\#15693](https://github.com/matrix-org/synapse/issues/15693))
+
+
+Deprecations and Removals
+-------------------------
+
+- Deprecate calling the `/register` endpoint with an unspecced `user` property for application services. ([\#15703](https://github.com/matrix-org/synapse/issues/15703))
+
+
+Internal Changes
+----------------
+
+- Speed up background jobs `populate_full_user_id_user_filters` and `populate_full_user_id_profiles`. ([\#15700](https://github.com/matrix-org/synapse/issues/15700))
+
+
 Synapse 1.85.0rc1 (2023-05-30)
 ==============================
 
