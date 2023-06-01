@@ -352,7 +352,15 @@ class ReplicationCommandHandler:
 
         reactor = hs.get_reactor()
         redis_config = hs.config.redis
-        if hs.config.redis.redis_use_tls:
+        if redis_config.redis_path is not None:
+            reactor.connectUNIX(
+                redis_config.redis_path,
+                self._factory,
+                timeout=30,
+                checkPID=False,
+            )
+
+        elif hs.config.redis.redis_use_tls:
             ssl_context_factory = ClientContextFactory(hs.config.redis)
             reactor.connectSSL(
                 redis_config.redis_host,

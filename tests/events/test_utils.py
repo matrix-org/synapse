@@ -16,6 +16,7 @@ import unittest as stdlib_unittest
 from typing import Any, List, Mapping, Optional
 
 import attr
+from parameterized import parameterized
 
 from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
@@ -23,6 +24,7 @@ from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import (
     PowerLevelsContent,
     SerializeEventConfig,
+    _split_field,
     copy_and_fixup_power_levels_contents,
     maybe_upsert_event_field,
     prune_event,
@@ -794,3 +796,40 @@ class CopyPowerLevelsContentTestCase(stdlib_unittest.TestCase):
     def test_invalid_nesting_raises_type_error(self) -> None:
         with self.assertRaises(TypeError):
             copy_and_fixup_power_levels_contents({"a": {"b": {"c": 1}}})  # type: ignore[dict-item]
+
+
+class SplitFieldTestCase(stdlib_unittest.TestCase):
+    @parameterized.expand(
+        [
+            # A field with no dots.
+            ["m", ["m"]],
+            # Simple dotted fields.
+            ["m.foo", ["m", "foo"]],
+            ["m.foo.bar", ["m", "foo", "bar"]],
+            # Backslash is used as an escape character.
+            [r"m\.foo", ["m.foo"]],
+            [r"m\\.foo", ["m\\", "foo"]],
+            [r"m\\\.foo", [r"m\.foo"]],
+            [r"m\\\\.foo", ["m\\\\", "foo"]],
+            [r"m\foo", [r"m\foo"]],
+            [r"m\\foo", [r"m\foo"]],
+            [r"m\\\foo", [r"m\\foo"]],
+            [r"m\\\\foo", [r"m\\foo"]],
+            # Ensure that escapes at the end don't cause issues.
+            ["m.foo\\", ["m", "foo\\"]],
+            ["m.foo\\", ["m", "foo\\"]],
+            [r"m.foo\.", ["m", "foo."]],
+            [r"m.foo\\.", ["m", "foo\\", ""]],
+            [r"m.foo\\\.", ["m", r"foo\."]],
+            # Empty parts (corresponding to properties which are an empty string) are allowed.
+            [".m", ["", "m"]],
+            ["..m", ["", "", "m"]],
+            ["m.", ["m", ""]],
+            ["m..", ["m", "", ""]],
+            ["m..foo", ["m", "", "foo"]],
+            # Invalid escape sequences.
+            [r"\m", [r"\m"]],
+        ]
+    )
+    def test_split_field(self, input: str, expected: str) -> None:
+        self.assertEqual(_split_field(input), expected)

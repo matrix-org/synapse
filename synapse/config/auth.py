@@ -29,7 +29,14 @@ class AuthConfig(Config):
         if password_config is None:
             password_config = {}
 
-        passwords_enabled = password_config.get("enabled", True)
+        # The default value of password_config.enabled is True, unless msc3861 is enabled.
+        msc3861_enabled = (
+            config.get("experimental_features", {})
+            .get("msc3861", {})
+            .get("enabled", False)
+        )
+        passwords_enabled = password_config.get("enabled", not msc3861_enabled)
+
         # 'only_for_reauth' allows users who have previously set a password to use it,
         # even though passwords would otherwise be disabled.
         passwords_for_reauth_only = passwords_enabled == "only_for_reauth"

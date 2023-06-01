@@ -15,11 +15,13 @@
 import heapq
 from itertools import islice
 from typing import (
+    Callable,
     Collection,
     Dict,
     Generator,
     Iterable,
     Iterator,
+    List,
     Mapping,
     Set,
     Sized,
@@ -69,6 +71,31 @@ def chunk_seq(iseq: S, maxlen: int) -> Iterator[S]:
     If the input is empty, no chunks are returned.
     """
     return (iseq[i : i + maxlen] for i in range(0, len(iseq), maxlen))
+
+
+def partition(
+    iterable: Iterable[T], predicate: Callable[[T], bool]
+) -> Tuple[List[T], List[T]]:
+    """
+    Separate a given iterable into two lists based on the result of a predicate function.
+
+    Args:
+        iterable: the iterable to partition (separate)
+        predicate: a function that takes an item from the iterable and returns a boolean
+
+    Returns:
+        A tuple of two lists, the first containing all items for which the predicate
+        returned True, the second containing all items for which the predicate returned
+        False
+    """
+    true_results = []
+    false_results = []
+    for item in iterable:
+        if predicate(item):
+            true_results.append(item)
+        else:
+            false_results.append(item)
+    return true_results, false_results
 
 
 def sorted_topologically(

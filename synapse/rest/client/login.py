@@ -35,6 +35,7 @@ from synapse.api.errors import (
     LoginError,
     NotApprovedError,
     SynapseError,
+    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
@@ -84,6 +85,7 @@ class LoginRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
+        self._main_store = hs.get_datastores().main
 
         # JWT configuration variables.
         self.jwt_enabled = hs.config.jwt.jwt_enabled
@@ -112,13 +114,13 @@ class LoginRestServlet(RestServlet):
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
-            store=hs.get_datastores().main,
+            store=self._main_store,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.ratelimiting.rc_login_address.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_address.burst_count,
         )
         self._account_ratelimiter = Ratelimiter(
-            store=hs.get_datastores().main,
+            store=self._main_store,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
@@ -280,6 +282,9 @@ class LoginRestServlet(RestServlet):
             login_submission,
             ratelimit=appservice.is_rate_limited(),
             should_issue_refresh_token=should_issue_refresh_token,
+            # The user represented by an appservice's configured sender_localpart
+            # is not actually created in Synapse.
+            should_check_deactivated=qualified_user_id != appservice.sender,
         )
 
     async def _do_other_login(
@@ -326,6 +331,7 @@ class LoginRestServlet(RestServlet):
         auth_provider_id: Optional[str] = None,
         should_issue_refresh_token: bool = False,
         auth_provider_session_id: Optional[str] = None,
+        should_check_deactivated: bool = True,
     ) -> LoginResponse:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -345,6 +351,11 @@ class LoginRestServlet(RestServlet):
             should_issue_refresh_token: True if this login should issue
                 a refresh token alongside the access token.
             auth_provider_session_id: The session ID got during login from the SSO IdP.
+            should_check_deactivated: True if the user should be checked for
+                deactivation status before logging in.
+
+                This exists purely for appservice's configured sender_localpart
+                which doesn't have an associated user in the database.
 
         Returns:
             Dictionary of account information after successful login.
@@ -363,6 +374,12 @@ class LoginRestServlet(RestServlet):
                     localpart=UserID.from_string(user_id).localpart
                 )
             user_id = canonical_uid
+
+        # If the account has been deactivated, do not proceed with the login.
+        if should_check_deactivated:
+            deactivated = await self._main_store.get_user_deactivated_status(user_id)
+            if deactivated:
+                raise UserDeactivatedError("This account has been deactivated")
 
         device_id = login_submission.get("device_id")
 
@@ -458,7 +475,7 @@ class LoginRestServlet(RestServlet):
         Returns:
             The body of the JSON response.
         """
-        user_id = await self.hs.get_jwt_handler().validate_login(login_submission)
+        user_id = self.hs.get_jwt_handler().validate_login(login_submission)
         return await self._complete_login(
             user_id,
             login_submission,
@@ -616,6 +633,9 @@ class CasTicketServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.experimental.msc3861.enabled:
+        return
+
     LoginRestServlet(hs).register(http_server)
     if (
         hs.config.worker.worker_app is None
