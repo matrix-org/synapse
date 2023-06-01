@@ -290,18 +290,13 @@ class LogContextScopeManagerTestCase(TestCase):
             async def fixture_async_func() -> str:
                 return "foo"
 
-            # The actual kind of function we want to test that returns an awaitable
+            # The actual kind of function we want to test that returns an awaitable coroutine
             @trace_with_opname("fixture_awaitable_return_func", tracer=self._tracer)
             @tag_args
             def fixture_awaitable_return_func() -> Awaitable[str]:
                 return fixture_async_func()
 
-            # Something we can run with `defer.ensureDeferred(runner())` and pump the
-            # whole async tasks through to completion.
-            async def runner() -> str:
-                return await fixture_awaitable_return_func()
-
-            d1 = defer.ensureDeferred(runner())
+            d1 = defer.ensureDeferred(fixture_awaitable_return_func())
 
             # let the tasks complete
             reactor.pump((2,) * 8)
