@@ -171,6 +171,7 @@ from functools import wraps
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Collection,
     ContextManager,
@@ -903,6 +904,7 @@ def _custom_sync_async_decorator(
     """
 
     if inspect.iscoroutinefunction(func):
+        # For this branch, we handle async functions like `async def func() -> RInner`.
         # In this branch, R = Awaitable[RInner], for some other type RInner
         @wraps(func)
         async def _wrapper(
@@ -914,23 +916,16 @@ def _custom_sync_async_decorator(
                 return await func(*args, **kwargs)  # type: ignore[misc]
 
     else:
-        # The other case here handles both sync functions and those
-        # decorated with inlineDeferred.
+        # The other case here handles sync functions including those decorated with
+        # `@defer.inlineCallbacks` or return a `Deferred`, and those that return
+        # `Awaitable`
         @wraps(func)
-        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
             scope = wrapping_logic(func, *args, **kwargs)
             scope.__enter__()
 
             try:
                 result = func(*args, **kwargs)
-
-                # The original method returned a coroutine, so we create deferred out of
-                # it which we can handle in the code path below. The alternative would
-                # be to wrap this coroutine in our own coroutine that calls
-                # `scope.__exit__(...)` but we're not sure how to type that and this
-                # seems more straightforward in the end (less boilerplate bulk).
-                if inspect.isawaitable(result):
-                    result = defer.ensureDeferred(result)
 
                 if isinstance(result, defer.Deferred):
 
@@ -946,8 +941,24 @@ def _custom_sync_async_decorator(
 
                     result.addCallbacks(call_back, err_back)
 
+                elif inspect.isawaitable(result):
+
+                    async def await_coroutine() -> Any:
+                        try:
+                            assert isinstance(result, Awaitable)
+                            awaited_result = await result
+                            scope.__exit__(None, None, None)
+                            return awaited_result
+                        except Exception as e:
+                            scope.__exit__(type(e), None, e.__traceback__)
+                            raise
+
+                    # The original method returned a coroutine, so we create another
+                    # coroutine wrapping it, that calls `scope.__exit__(...)`.
+                    return await_coroutine()
                 else:
-                    # Just a simple sync function
+                    # Just a simple sync function so we can just exit the scope and
+                    # return the result without any fuss.
                     scope.__exit__(None, None, None)
 
                 return result
