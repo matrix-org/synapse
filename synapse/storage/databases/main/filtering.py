@@ -71,7 +71,7 @@ class FilteringWorkerStore(SQLBaseStore):
                     SELECT user_id FROM user_filters
                     WHERE user_id > ?
                     ORDER BY user_id
-                    LIMIT 1 OFFSET 50
+                    LIMIT 1 OFFSET 1000
                   """
             txn.execute(sql, (lower_bound_id,))
             res = txn.fetchone()
