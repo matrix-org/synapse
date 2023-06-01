@@ -1,1 +1,1 @@
-Fix a long-standing bug where downloading media files was served in an unsafe manner.
+Fix a long-standing bug where downloading media files was served in an unsafe manner. Contributed by @joshqou
