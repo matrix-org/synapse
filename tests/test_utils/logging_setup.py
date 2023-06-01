@@ -40,10 +40,9 @@ def setup_logging() -> None:
     """
     root_logger = logging.getLogger()
 
-    log_format = (
-        "%(asctime)s - %(name)s - %(lineno)d - "
-        "%(levelname)s - %(request)s - %(message)s"
-    )
+    # We exclude `%(asctime)s` from this format because the Twisted logger adds its own
+    # timestamp
+    log_format = "%(name)s - %(lineno)d - " "%(levelname)s - %(request)s - %(message)s"
 
     handler = ToTwistedHandler()
     formatter = logging.Formatter(log_format)

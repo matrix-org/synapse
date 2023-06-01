@@ -71,6 +71,7 @@ class UsersRestServletV2(RestServlet):
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
         self._msc3866_enabled = hs.config.experimental.msc3866.enabled
+        self._msc3861_enabled = hs.config.experimental.msc3861.enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
@@ -94,7 +95,14 @@ class UsersRestServletV2(RestServlet):
 
         user_id = parse_string(request, "user_id")
         name = parse_string(request, "name")
+
         guests = parse_boolean(request, "guests", default=True)
+        if self._msc3861_enabled and guests:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "The guests parameter is not supported when MSC3861 is enabled.",
+                errcode=Codes.INVALID_PARAM,
+            )
         deactivated = parse_boolean(request, "deactivated", default=False)
 
         # If support for MSC3866 is not enabled, apply no filtering based on the

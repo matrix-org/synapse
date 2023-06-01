@@ -92,15 +92,22 @@ process, for example:
 
 ## Deprecation of `worker_replication_*` configuration settings
 
-When using workers, 
+When using workers,
+
 * `worker_replication_host`
 * `worker_replication_http_port`
 * `worker_replication_http_tls`
  
-can now be removed from individual worker YAML configuration ***if*** you add the main process to the `instance_map` in the shared YAML configuration,
-using the name `main`.
+should now be removed from individual worker YAML configurations and the main process should instead be added to the `instance_map`
+in the shared YAML configuration, using the name `main`.
 
-### Before:
+The old `worker_replication_*` settings are now considered deprecated and are expected to be removed in Synapse v1.88.0.
+
+
+### Example change
+
+#### Before:
+
 Shared YAML
 ```yaml
 instance_map:
@@ -109,6 +116,7 @@ instance_map:
     port: 5678
     tls: false
 ```
+
 Worker YAML
 ```yaml
 worker_app: synapse.app.generic_worker
@@ -130,7 +138,10 @@ worker_listeners:
 
 worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 ```
-### After:
+
+
+#### After:
+
 Shared YAML
 ```yaml
 instance_map:
@@ -143,6 +154,7 @@ instance_map:
     port: 5678
     tls: false
 ```
+
 Worker YAML
 ```yaml
 worker_app: synapse.app.generic_worker
@@ -163,7 +175,6 @@ worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 ```
 Notes: 
 * `tls` is optional but mirrors the functionality of `worker_replication_http_tls`
-
 
 
 # Upgrading to v1.81.0
