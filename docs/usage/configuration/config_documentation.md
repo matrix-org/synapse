@@ -2598,7 +2598,8 @@ ui_auth:
 Matrix supports the ability of an existing session to mint a login token for
 another client.
 
-Synapse disables this by default as it has security ramifications.
+Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.
 
 The duration of time the generated token is valid for can be configured with the
 `token_timeout` sub-option.

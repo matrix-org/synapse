@@ -162,6 +162,14 @@ class LoginRestServlet(RestServlet):
             # SSO requires a login token to be generated, so we need to advertise that flow
             support_login_token_flow = True
 
+        # While it's valid for us to advertise this login type generally,
+        # synapse currently only gives out these tokens as part of the
+        # SSO login flow or as part of login via an existing session.
+        #
+        # Generally we don't want to advertise login flows that clients
+        # don't know how to implement, since they (currently) will always
+        # fall back to the fallback API if they don't understand one of the
+        # login flow types returned.
         if support_login_token_flow:
             tokenTypeFlow: Dict[str, Any] = {"type": LoginRestServlet.TOKEN_TYPE}
             # If the login token flow is enabled advertise the get_login_token flag.

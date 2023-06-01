@@ -447,7 +447,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         )
 
     def test_get_login_flows_with_login_via_existing_disabled(self) -> None:
-        """GET /login should return m.login.token without get_login_token true"""
+        """GET /login should return m.login.token without get_login_token"""
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
 
@@ -456,7 +456,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config({"login_via_existing_session": {"enabled": True}})
     def test_get_login_flows_with_login_via_existing_enabled(self) -> None:
-        """GET /login should return m.login.token without get_login_token true"""
+        """GET /login should return m.login.token with get_login_token true"""
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
 

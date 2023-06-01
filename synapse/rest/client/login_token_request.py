@@ -66,7 +66,10 @@ class LoginTokenRequestServlet(RestServlet):
         self.token_timeout = hs.config.auth.login_via_existing_token_timeout
         self._require_ui_auth = hs.config.auth.login_via_existing_require_ui_auth
 
-        # An aggressive ratelimiter.
+        # Ratelimit aggressively to a maxmimum of 1 request per minute.
+        #
+        # This endpoint can be used to spawn additional sessions and could be
+        # abused by a malicious client to create many sessions.
         self._ratelimiter = Ratelimiter(
             store=self._main_store,
             clock=hs.get_clock(),
