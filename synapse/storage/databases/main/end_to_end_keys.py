@@ -145,6 +145,10 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             # Check that there have been no new devices added by another worker
             # after the cache. This should be quick as there should be few rows
             # with a higher stream ordering.
+            #
+            # Note that we invalidate based on the device stream, so we only
+            # have to check for potential invalidations after the
+            # `now_stream_id`.
             sql = """
                 SELECT user_id FROM device_lists_stream
                 WHERE stream_id >= ? AND user_id = ?
