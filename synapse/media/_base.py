@@ -50,8 +50,6 @@ TEXT_CONTENT_TYPES = [
     "text/xml",
 ]
 
-HOTSERVE_CONTENT_TYPES = ["audio/", "video/", "image/"]
-
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     """Parses the server name, media ID and optional file name from the request URI
@@ -153,14 +151,7 @@ def add_file_headers(
     else:
         content_type = media_type
 
-    # Only hotserve "safe" mimetypes, force download everything else
-    disposition_type = "attachment"
-    for mime in HOTSERVE_CONTENT_TYPES:
-        if media_type.lower().startswith(mime):
-            disposition_type = "inline"
-            break
-
-    disposition = disposition_type
+    disposition = "attachment"
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
 
     if upload_name:
@@ -185,12 +176,12 @@ def add_file_headers(
         # may as well just do the filename* version.
         if _can_encode_filename_as_token(upload_name):
             disposition = "%s; filename=%s" % (
-                disposition_type,
+                disposition,
                 upload_name,
             )
         else:
             disposition = "%s; filename*=utf-8''%s" % (
-                disposition_type,
+                disposition,
                 _quote(upload_name),
             )
 
