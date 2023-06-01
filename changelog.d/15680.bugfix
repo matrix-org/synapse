@@ -1,1 +1,1 @@
-Fix unsafe hotserving behaviour for non-multimedia uploads.
+Fix a long-standing bug where downloading media files was served in an unsafe manner.
