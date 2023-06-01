@@ -421,29 +421,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # do this check just before we persist an event as well, but may as well
         # do it up front for efficiency.)
         if txn_id:
-            existing_event_id = None
-            # Look for an event sent by the same device. If none is found, fallback
-            # to an event sent by the same access token.
-            if requester.device_id:
-                existing_event_id = (
-                    await self.store.get_event_id_from_transaction_id_and_device_id(
-                        room_id,
-                        requester.user.to_string(),
-                        requester.device_id,
-                        txn_id,
-                    )
+            existing_event_id = (
+                await self.event_creation_handler.get_event_id_from_transaction(
+                    requester, txn_id, room_id
                 )
-
-            if requester.access_token_id and not existing_event_id:
-                existing_event_id = (
-                    await self.store.get_event_id_from_transaction_id_and_token_id(
-                        room_id,
-                        requester.user.to_string(),
-                        requester.access_token_id,
-                        txn_id,
-                    )
-                )
-
+            )
             if existing_event_id:
                 event_pos = await self.store.get_position_for_event(existing_event_id)
                 return existing_event_id, event_pos.stream
