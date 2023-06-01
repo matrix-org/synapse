@@ -228,8 +228,8 @@ class MSC3861OAuthDelegation(TestCase):
         with self.assertRaises(ConfigError):
             self.parse_config()
 
-    def test_msc3882_auth_cannot_be_enabled(self) -> None:
-        self.config_dict["experimental_features"]["msc3882_enabled"] = True
+    def test_login_via_existing_session_cannot_be_enabled(self) -> None:
+        self.config_dict["login_via_existing_session"] = {"enabled": True}
         with self.assertRaises(ConfigError):
             self.parse_config()
 
