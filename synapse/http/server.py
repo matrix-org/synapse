@@ -108,7 +108,7 @@ def return_json_error(
 
     if f.check(SynapseError):
         # mypy doesn't understand that f.check asserts the type.
-        exc: SynapseError = f.value  # type: ignore
+        exc: SynapseError = f.value
         error_code = exc.code
         error_dict = exc.error_dict(config)
         if exc.headers is not None:
@@ -124,7 +124,7 @@ def return_json_error(
                 "Got cancellation before client disconnection from %r: %r",
                 request.request_metrics.name,
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
         error_code = 500
@@ -134,7 +134,7 @@ def return_json_error(
             "Failed handle request via %r: %r",
             request.request_metrics.name,
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
     # Only respond with an error response if we haven't already started writing,
@@ -172,7 +172,7 @@ def return_html_error(
     """
     if f.check(CodeMessageException):
         # mypy doesn't understand that f.check asserts the type.
-        cme: CodeMessageException = f.value  # type: ignore
+        cme: CodeMessageException = f.value
         code = cme.code
         msg = cme.msg
         if cme.headers is not None:
@@ -189,7 +189,7 @@ def return_html_error(
             logger.error(
                 "Failed handle request %r",
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     elif f.check(CancelledError):
         code = HTTP_STATUS_REQUEST_CANCELLED
@@ -199,7 +199,7 @@ def return_html_error(
             logger.error(
                 "Got cancellation before client disconnection when handling request %r",
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
         code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -208,7 +208,7 @@ def return_html_error(
         logger.error(
             "Failed handle request %r",
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
     if isinstance(error_template, str):
