@@ -151,9 +151,10 @@ def add_file_headers(
     else:
         content_type = media_type
 
-    disposition = "attachment"
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
 
+    # Use a Content-Disposition of attachment to force download of media.
+    disposition = "attachment"
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
