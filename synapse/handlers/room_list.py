@@ -162,6 +162,7 @@ class RoomListHandler:
         last_module_index = None
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
+            print(batch_token)
             forwards = batch_token.direction_is_forward
             last_joined_members = batch_token.last_joined_members
             last_room_id = batch_token.last_room_id
@@ -192,17 +193,24 @@ class RoomListHandler:
                 room
             )
 
-        for module_index, fetch_public_rooms in enumerate(
-            self._module_api_callbacks.fetch_public_rooms_callbacks
-        ):
+        nb_modules = len(self._module_api_callbacks.fetch_public_rooms_callbacks)
+
+        module_range = range(0, nb_modules)
+        # if not forwards:
+        #     module_range = reversed(module_range)
+
+        for module_index in module_range:
+            fetch_public_rooms = self._module_api_callbacks.fetch_public_rooms_callbacks[module_index]
             # Ask each module for a list of public rooms given the last_joined_members
             # value from the since token and the probing limit
             # last_joined_members needs to be reduce by one if this module has already
             # given its result for last_joined_members
             module_last_joined_members = last_joined_members
             if module_last_joined_members is not None and last_module_index is not None:
-                if module_index < last_module_index:
+                if forwards and module_index < last_module_index:
                     module_last_joined_members = module_last_joined_members - 1
+                # if not forwards and module_index > last_module_index:
+                #     module_last_joined_members = module_last_joined_members - 1
 
             module_public_rooms = await fetch_public_rooms(
                 network_tuple,
@@ -226,19 +234,28 @@ class RoomListHandler:
 
         results = []
         for num_joined_members in nums_joined_members:
-            results += num_joined_members_buckets[num_joined_members]
+            rooms = num_joined_members_buckets[num_joined_members]
+            # if not forwards:
+            #     rooms.reverse()
+            results += rooms
+
+
+        print([(r.room_id, r.num_joined_members) for r in results])
 
         response: JsonDict = {}
         num_results = len(results)
         if limit is not None and probing_limit is not None:
             more_to_come = num_results >= probing_limit
 
-            results = results[:limit]
+            # Depending on direction we trim either the front or back.
+            if forwards:
+                results = results[:limit]
+            else:
+                results = results[-limit:]
         else:
             more_to_come = False
 
-        if not forwards:
-            results.reverse()
+        print([(r.room_id, r.num_joined_members) for r in results])
 
         if num_results > 0:
             final_entry = results[-1]

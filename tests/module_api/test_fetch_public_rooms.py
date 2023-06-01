@@ -150,10 +150,8 @@ class FetchPublicRoomsTestCase(HomeserverTestCase):
 
         user = self.register_user("alice", "pass")
         token = self.login(user, "pass")
-
         user2 = self.register_user("alice2", "pass")
         token2 = self.login(user2, "pass")
-
         user3 = self.register_user("alice3", "pass")
         token3 = self.login(user3, "pass")
 
