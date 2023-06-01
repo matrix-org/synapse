@@ -923,6 +923,15 @@ def _custom_sync_async_decorator(
 
             try:
                 result = func(*args, **kwargs)
+
+                # The original method returned a coroutine, so we create deferred out of
+                # it which we can handle in the code path below. The alternative would
+                # be to wrap this coroutine in our own coroutine that calls
+                # `scope.__exit__(...)` but we're not sure how to type that and this
+                # seems more straightforward in the end (less boilerplate bulk).
+                if inspect.isawaitable(result):
+                    result = defer.ensureDeferred(result)
+
                 if isinstance(result, defer.Deferred):
 
                     def call_back(result: R) -> R:
@@ -937,20 +946,6 @@ def _custom_sync_async_decorator(
 
                     result.addCallbacks(call_back, err_back)
 
-                elif inspect.isawaitable(result):
-                    # TODO: I don't know how to type this
-                    async def await_coroutine():
-                        try:
-                            awaited_result = await result
-                            scope.__exit__(None, None, None)
-                            return awaited_result
-                        except Exception as e:
-                            scope.__exit__(type(e), None, e.__traceback__)
-                            raise
-
-                    # The original method returned a coroutine, so we create another
-                    # coroutine wrapping it, that calls `scope.__exit__(...)`.
-                    return await_coroutine()
                 else:
                     # Just a simple sync function
                     scope.__exit__(None, None, None)
