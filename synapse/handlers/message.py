@@ -904,9 +904,8 @@ class EventCreationHandler:
         """
         existing_event_id = None
 
+        # According to the spec, transactions are scoped to a user's device ID.
         if requester.device_id:
-            # When MSC3970 is enabled, we lookup for events sent by the same device first,
-            # and fallback to the old behaviour if none were found.
             existing_event_id = (
                 await self.store.get_event_id_from_transaction_id_and_device_id(
                     room_id,
@@ -918,8 +917,9 @@ class EventCreationHandler:
             if existing_event_id:
                 return existing_event_id
 
-        # Pre-MSC3970, we looked up for events that were sent by the same session by
-        # using the access token ID.
+        # Some requsters don't have device IDs (appservice, guests, and access
+        # tokens minted with the admin API), fallback to checking the access token
+        # ID, which should be close enough.
         if requester.access_token_id:
             existing_event_id = (
                 await self.store.get_event_id_from_transaction_id_and_token_id(

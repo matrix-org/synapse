@@ -1010,10 +1010,9 @@ class PersistEventsStore:
                         )
                     )
 
-        # Previously Synapse used the access_token_id to scope the txn_id for events.
-        #
-        # TODO Remove this once Synapse cannot be rolled back to a version without
-        #      device IDs being stored.
+        # Synapse usually relies on the device_id to scope transactions for events,
+        # except for users without device IDs (appservice, guests, and access
+        # tokens minted with the admin API) which use the access token ID instead.
         if to_insert_token_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
@@ -1029,7 +1028,6 @@ class PersistEventsStore:
                 values=to_insert_token_id,
             )
 
-        # Synapse now relies on the device_id to scope the txn_id for events.
         if to_insert_device_id:
             self.db_pool.simple_insert_many_txn(
                 txn,

@@ -76,7 +76,7 @@ class HttpTransactionCache:
         elif requester.app_service is not None:
             return (path, "appservice", requester.app_service.id)
 
-        # We use the user ID and device ID as the transaction key.
+        # Use the user ID and device ID as the transaction key.
         elif requester.device_id:
             assert requester.user, "Requester must have a user"
             assert requester.device_id, "Requester must have a device_id"

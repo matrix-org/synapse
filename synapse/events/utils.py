@@ -444,8 +444,10 @@ def serialize_event(
     # requesting the event.
     txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
     if txn_id is not None and config.requester is not None:
-        # Old events do not have the device ID stored in the internal metadata,
-        # if it hasn't been recorded, fallback to using the access token instead.
+        # Some events do not have the device ID stored in the internal metadata,
+        # this includes old events as well as those created by appservice, guests,
+        # or with tokens minted with the admin API. For those events, fallback
+        # to using the access token instead.
         event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
         if event_device_id is not None:
             if event_device_id == config.requester.device_id:
@@ -456,10 +458,15 @@ def serialize_event(
             # was sent from the same access token.
             #
             # For regular users, the access token ID can be used to determine this.
+            # This includes access tokens minted with the admin API.
             #
             # For guests, we can't check the access token ID, but since each guest
             # only has one access token, just check the event was sent by the same
             # user as the one requesting the event.
+            #
+            # For appservice users, we can't check the access token ID, just
+            # check the event was sent by the same user as the one requesting
+            # the event.
             event_token_id: Optional[int] = getattr(
                 e.internal_metadata, "token_id", None
             )
@@ -470,6 +477,7 @@ def serialize_event(
                     and event_token_id == config.requester.access_token_id
                 )
                 or config.requester.is_guest
+                or config.requester.app_service
             ):
                 d["unsigned"]["transaction_id"] = txn_id
 
