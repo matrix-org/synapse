@@ -22,6 +22,11 @@ def run_upgrade(
     database_engine: BaseDatabaseEngine,
     config: HomeServerConfig,
 ) -> None:
+    """
+    Part 3 of a multi-step migration to drop the column `user_id` and replace it with
+    `full_user_id`. See the database schema docs for more information on the full
+    migration steps.
+    """
     hostname = config.server.server_name
 
     if isinstance(database_engine, PostgresEngine):
