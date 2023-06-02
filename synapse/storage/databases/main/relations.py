@@ -365,6 +365,36 @@ class RelationsWorkerStore(SQLBaseStore):
             func=get_all_relation_ids_for_event_with_types_txn,
         )
 
+    async def get_all_relations_for_event(
+        self,
+        event_id: str,
+    ) -> List[str]:
+        """Get the event IDs of all events that have a relation to the given event.
+
+        Args:
+            event_id: The event for which to look for related events.
+
+        Returns:
+            A list of the IDs of the events that relate to the given event.
+        """
+
+        def get_all_relation_ids_for_event_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
+            rows = self.db_pool.simple_select_list_txn(
+                txn=txn,
+                table="event_relations",
+                keyvalues={"relates_to_id": event_id},
+                retcols=["event_id"],
+            )
+
+            return [row["event_id"] for row in rows]
+
+        return await self.db_pool.runInteraction(
+            desc="get_all_relation_ids_for_event",
+            func=get_all_relation_ids_for_event_txn,
+        )
+
     async def event_includes_relation(self, event_id: str) -> bool:
         """Check if the given event relates to another event.
 
