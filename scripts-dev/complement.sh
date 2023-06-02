@@ -269,6 +269,10 @@ if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
   export PASS_SYNAPSE_LOG_SENSITIVE=1
 fi
 
+# Log a few more useful things for a developer attempting to debug something
+# particularly tricky.
+export PASS_SYNAPSE_LOG_TESTING=1
+
 # Run the tests!
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
