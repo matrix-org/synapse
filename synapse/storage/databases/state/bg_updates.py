@@ -261,6 +261,16 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
     STATE_GROUPS_ROOM_INDEX_UPDATE_NAME = "state_groups_room_id_idx"
     STATE_GROUP_EDGES_UNIQUE_INDEX_UPDATE_NAME = "state_group_edges_unique_idx"
 
+    CURRENT_STATE_EVENTS_STREAM_ORDERING_INDEX_UPDATE_NAME = (
+        "current_state_events_stream_ordering_idx"
+    )
+    ROOM_MEMBERSHIPS_STREAM_ORDERING_INDEX_UPDATE_NAME = (
+        "room_memberships_stream_ordering_idx"
+    )
+    LOCAL_CURRENT_MEMBERSHIP_STREAM_ORDERING_INDEX_UPDATE_NAME = (
+        "local_current_membership_stream_ordering_idx"
+    )
+
     def __init__(
         self,
         database: DatabasePool,
@@ -295,6 +305,27 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             unique=True,
             # The old index was on (state_group) and was not unique.
             replaces_index="state_group_edges_idx",
+        )
+
+        # These indices are needed to validate the foreign key constraint
+        # when events are deleted.
+        self.db_pool.updates.register_background_index_update(
+            self.CURRENT_STATE_EVENTS_STREAM_ORDERING_INDEX_UPDATE_NAME,
+            index_name="current_state_events_stream_ordering_idx",
+            table="current_state_events",
+            columns=["event_stream_ordering"],
+        )
+        self.db_pool.updates.register_background_index_update(
+            self.ROOM_MEMBERSHIPS_STREAM_ORDERING_INDEX_UPDATE_NAME,
+            index_name="room_memberships_stream_ordering_idx",
+            table="room_memberships",
+            columns=["event_stream_ordering"],
+        )
+        self.db_pool.updates.register_background_index_update(
+            self.LOCAL_CURRENT_MEMBERSHIP_STREAM_ORDERING_INDEX_UPDATE_NAME,
+            index_name="local_current_membership_stream_ordering_idx",
+            table="local_current_membership",
+            columns=["event_stream_ordering"],
         )
 
     async def _background_deduplicate_state(
