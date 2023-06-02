@@ -55,7 +55,8 @@ def run_upgrade(
         cur.execute(validate_sql)
 
     else:
-        # in SQLite we need to rewrite the table to add the constraint
+        # in SQLite we need to rewrite the table to add the constraint.
+        # First drop any temporary table that might be here from a previous failed migration.
         cur.execute("DROP TABLE IF EXISTS temp_profiles")
 
         create_sql = """
