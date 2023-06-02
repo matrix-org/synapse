@@ -1217,10 +1217,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 for parent_id in {r[1] for r in relations_to_insert}:
                     cache_tuple = (parent_id,)
                     self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_relations_for_event, cache_tuple  # type: ignore[attr-defined]
+                        txn, self.relations.get_relations_for_event, cache_tuple  # type: ignore[attr-defined]
                     )
                     self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_thread_summary, cache_tuple  # type: ignore[attr-defined]
+                        txn, self.relations.get_thread_summary, cache_tuple  # type: ignore[attr-defined]
                     )
 
             if results:

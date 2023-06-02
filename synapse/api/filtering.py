@@ -494,7 +494,7 @@ class Filter:
         # The event IDs to check, mypy doesn't understand the isinstance check.
         event_ids = [event.event_id for event in events if isinstance(event, EventBase)]  # type: ignore[attr-defined]
         event_ids_to_keep = set(
-            await self._store.events_have_relations(
+            await self._store.relations.events_have_relations(
                 event_ids, self.related_by_senders, self.related_by_rel_types
             )
         )

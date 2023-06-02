@@ -75,7 +75,6 @@ class AdminCmdStore(
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
     RoomMemberWorkerStore,
-    RelationsWorkerStore,
     EventFederationWorkerStore,
     EventPushActionsWorkerStore,
     StateGroupWorkerStore,
@@ -100,6 +99,9 @@ class AdminCmdStore(
         # Annoyingly `filter_events_for_client` assumes that this exists. We
         # should refactor it to take a `Clock` directly.
         self.clock = hs.get_clock()
+
+        # This is a bit repetitive, but avoids dynamically setting attributes.
+        self.relations = RelationsWorkerStore(database, db_conn, hs)
 
 
 class AdminCmdServer(HomeServer):

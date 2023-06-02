@@ -557,14 +557,14 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_applicable_edits", _get_applicable_edits_txn
         )
 
-        edits = await self.get_events(edit_ids.values())  # type: ignore[attr-defined]
+        edits = await self.hs.get_datastores().main.get_events(edit_ids.values())
 
         # Map to the original event IDs to the edit events.
         #
         # There might not be an edit event due to there being no edits or
         # due to the event not being known, either case is treated the same.
         return {
-            original_event_id: edits.get(edit_ids.get(original_event_id))
+            original_event_id: edits.get(edit_ids.get(original_event_id))  # type: ignore[arg-type]
             for original_event_id in event_ids
         }
 
@@ -671,7 +671,9 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_thread_summaries", _get_thread_summaries_txn
         )
 
-        latest_events = await self.get_events(latest_event_ids.values())  # type: ignore[attr-defined]
+        latest_events = await self.hs.get_datastores().main.get_events(
+            latest_event_ids.values()
+        )
 
         # Map to the event IDs to the thread summary.
         #

@@ -2072,25 +2072,29 @@ class PersistEventsStore:
 
         # Any relation information for the related event must be cleared.
         self.store._invalidate_cache_and_stream(
-            txn, self.store.get_relations_for_event, (redacted_relates_to,)
+            txn, self.store.relations.get_relations_for_event, (redacted_relates_to,)
         )
         if rel_type == RelationTypes.REFERENCE:
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_references_for_event, (redacted_relates_to,)
+                txn,
+                self.store.relations.get_references_for_event,
+                (redacted_relates_to,),
             )
         if rel_type == RelationTypes.REPLACE:
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_applicable_edit, (redacted_relates_to,)
+                txn, self.store.relations.get_applicable_edit, (redacted_relates_to,)
             )
         if rel_type == RelationTypes.THREAD:
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_thread_summary, (redacted_relates_to,)
+                txn, self.store.relations.get_thread_summary, (redacted_relates_to,)
             )
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_thread_participated, (redacted_relates_to,)
+                txn,
+                self.store.relations.get_thread_participated,
+                (redacted_relates_to,),
             )
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_threads, (room_id,)
+                txn, self.store.relations.get_threads, (room_id,)
             )
 
             # Find the new latest event in the thread.

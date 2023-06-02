@@ -51,6 +51,7 @@ from synapse.rest.key.v2 import KeyResource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.appservice import (
     ApplicationServiceTransactionWorkerStore,
@@ -132,7 +133,6 @@ class GenericWorkerStore(
     ServerMetricsStore,
     PusherWorkerStore,
     RoomMemberWorkerStore,
-    RelationsWorkerStore,
     EventFederationWorkerStore,
     EventPushActionsWorkerStore,
     StateGroupWorkerStore,
@@ -151,6 +151,17 @@ class GenericWorkerStore(
     # expected type is.
     server_name: str
     config: HomeServerConfig
+
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        # This is a bit repetitive, but avoids dynamically setting attributes.
+        self.relations = RelationsWorkerStore(database, db_conn, hs)
 
 
 class GenericWorkerServer(HomeServer):
