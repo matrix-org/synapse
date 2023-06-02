@@ -103,6 +103,9 @@ Changes in SCHEMA_VERSION = 76:
 
 Changes in SCHEMA_VERSION = 77
     - (Postgres) Add NOT VALID CHECK (full_user_id IS NOT NULL) to tables profiles and user_filters
+
+Changes in SCHEMA_VERSION = 78
+    - Validate check (full_user_id IS NOT NULL) on tables profiles and user_filters
 """
 
 
