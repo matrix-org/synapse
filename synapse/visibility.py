@@ -41,7 +41,7 @@ from synapse.types.state import StateFilter
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
-
+filtered_event_logger = logging.getLogger("synapse.visibility.filtered_event_debug")
 
 VISIBILITY_PRIORITY = (
     HistoryVisibility.WORLD_READABLE,
@@ -97,8 +97,8 @@ async def filter_events_for_client(
     events_before_filtering = events
     events = [e for e in events if not e.internal_metadata.is_soft_failed()]
     if len(events_before_filtering) != len(events):
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
+        if filtered_event_logger.isEnabledFor(logging.DEBUG):
+            filtered_event_logger.debug(
                 "filter_events_for_client: Filtered out soft-failed events: Before=%s, After=%s",
                 [event.event_id for event in events_before_filtering],
                 [event.event_id for event in events],
@@ -319,7 +319,7 @@ def _check_client_allowed_to_see_event(
             _check_filter_send_to_client(event, clock, retention_policy, sender_ignored)
             == _CheckFilter.DENIED
         ):
-            logger.debug(
+            filtered_event_logger.debug(
                 "_check_client_allowed_to_see_event(event=%s): Filtered out event because `_check_filter_send_to_client` returned `_CheckFilter.DENIED`",
                 event.event_id,
             )
@@ -341,7 +341,7 @@ def _check_client_allowed_to_see_event(
             )
             return event
 
-        logger.debug(
+        filtered_event_logger.debug(
             "_check_client_allowed_to_see_event(event=%s): Filtered out event because it's an outlier",
             event.event_id,
         )
@@ -367,7 +367,7 @@ def _check_client_allowed_to_see_event(
 
     membership_result = _check_membership(user_id, event, visibility, state, is_peeking)
     if not membership_result.allowed:
-        logger.debug(
+        filtered_event_logger.debug(
             "_check_client_allowed_to_see_event(event=%s): Filtered out event because the user can't see the event because of their membership, membership_result.allowed=%s membership_result.joined=%s",
             event.event_id,
             membership_result.allowed,
@@ -378,7 +378,7 @@ def _check_client_allowed_to_see_event(
     # If the sender has been erased and the user was not joined at the time, we
     # must only return the redacted form.
     if sender_erased and not membership_result.joined:
-        logger.debug(
+        filtered_event_logger.debug(
             "_check_client_allowed_to_see_event(event=%s): Returning pruned event because `sender_erased` and the user was not joined at the time",
             event.event_id,
         )

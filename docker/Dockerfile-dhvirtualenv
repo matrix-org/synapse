@@ -24,7 +24,7 @@ ARG distro=""
 # https://launchpad.net/~jyrki-pulliainen/+archive/ubuntu/dh-virtualenv, but
 # it's not obviously easier to use that than to build our own.)
 
-FROM ${distro} as builder
+FROM docker.io/library/${distro} as builder
 
 RUN apt-get update -qq -o Acquire::Languages=none
 RUN env DEBIAN_FRONTEND=noninteractive apt-get install \
@@ -55,7 +55,7 @@ RUN cd /dh-virtualenv && DEB_BUILD_OPTIONS=nodoc dpkg-buildpackage -us -uc -b
 ###
 ### Stage 1
 ###
-FROM ${distro}
+FROM docker.io/library/${distro}
 
 # Get the distro we want to pull from as a dynamic build variable
 # (We need to define it in each build stage)

@@ -113,8 +113,8 @@ class VersionsRestServlet(RestServlet):
                     "fi.mau.msc2815": self.config.experimental.msc2815_enabled,
                     # Adds a ping endpoint for appservices to check HS->AS connection
                     "fi.mau.msc2659.stable": True,  # TODO: remove when "v1.7" is added above
-                    # Adds support for login token requests as per MSC3882
-                    "org.matrix.msc3882": self.config.experimental.msc3882_enabled,
+                    # TODO: this is no longer needed once unstable MSC3882 does not need to be supported:
+                    "org.matrix.msc3882": self.config.auth.login_via_existing_enabled,
                     # Adds support for remotely enabling/disabling pushers, as per MSC3881
                     "org.matrix.msc3881": self.config.experimental.msc3881_enabled,
                     # Adds support for filtering /messages by event relation.
