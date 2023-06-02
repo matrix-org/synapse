@@ -306,36 +306,55 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
         self._attempt_to_invalidate_cache("_get_state_group_for_event", None)
 
-        # List of caches to also invalidate. Lines ending with `room_id` can be
-        # invalidated by room_id, the rest must be cleared entirely.
+        # Also invalidate room based caches
 
-        # get_account_data_for_room
-        # get_account_data_for_room_and_type
-        # get_aliases_for_room
-        # get_latest_event_ids_in_room
-        # _get_forward_extremeties_for_room
-        # get_unread_event_push_actions_by_room_for_user room_id
-        # get_event_ordering
-        # is_partial_state_event
-        # _get_linearized_receipts_for_room room_id
-        # is_room_blocked room_id
-        # get_retention_policy_for_room room_id
-        # _get_partial_state_servers_at_join room_id
-        # is_partial_state_room room_id
-        # get_invited_rooms_for_local_user
-        # _get_joined_profile_from_event_id
-        # is_host_invited
-        # get_current_hosts_in_room_ordered room_id
-        # did_forget
-        # get_forgotten_rooms_for_user
-        # _get_membership_from_event_id
-        # get_room_version_id room_id
-        # get_partial_current_state_ids room_id
-        #
+        self._attempt_to_invalidate_cache("get_account_data_for_room", None)
+        self._attempt_to_invalidate_cache("get_account_data_for_room_and_type", None)
+        self._attempt_to_invalidate_cache("get_aliases_for_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("_get_forward_extremeties_for_room", None)
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("get_event_ordering", None)
+        self._attempt_to_invalidate_cache("is_partial_state_event", None)
+        self._attempt_to_invalidate_cache(
+            "_get_linearized_receipts_for_room", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("is_room_blocked", (room_id,))
+        self._attempt_to_invalidate_cache("get_retention_policy_for_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "_get_partial_state_servers_at_join", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("is_partial_state_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_invited_rooms_for_local_user", None)
+        self._attempt_to_invalidate_cache("_get_joined_profile_from_event_id", None)
+        self._attempt_to_invalidate_cache("is_host_invited", None)
+        self._attempt_to_invalidate_cache("is_host_joined", None)
+        self._attempt_to_invalidate_cache(
+            "get_current_hosts_in_room_ordered", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("did_forget", None)
+        self._attempt_to_invalidate_cache("get_forgotten_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", None)
+        self._attempt_to_invalidate_cache("get_room_version_id", (room_id,))
 
-        # ... plus state caches for delete room? c.f. _invalidate_state_caches
-        # in `synapse.storage._base` for a list of such caches. Maybe we can
-        # just reuse that function?
+        # And delete state caches.
+
+        self._attempt_to_invalidate_cache("get_partial_current_state_ids", (room_id,))
+        self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_current_hosts_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_users_in_room_with_profiles", (room_id,))
+        self._attempt_to_invalidate_cache("get_number_joined_users_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_local_users_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("does_pair_of_users_share_a_room", None)
+        self._attempt_to_invalidate_cache("get_user_in_room_with_profile", None)
+        self._attempt_to_invalidate_cache(
+            "get_rooms_for_user_with_stream_ordering", None
+        )
+        self._attempt_to_invalidate_cache("get_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
+        self._attempt_to_invalidate_cache("get_partial_current_state_ids", (room_id,))
 
         # Plus we should clear the state cache in the state handler.
 
