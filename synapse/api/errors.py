@@ -17,6 +17,7 @@
 
 import logging
 import typing
+from enum import Enum
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Union
 
@@ -25,12 +26,17 @@ from twisted.web import http
 from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
-    from synapse.types import JsonDict
+    from synapse.config.homeserver import HomeServerConfig
+    from synapse.types import JsonDict, StrCollection
 
 logger = logging.getLogger(__name__)
 
 
-class Codes:
+class Codes(str, Enum):
+    """
+    All known error codes, as an enum of strings.
+    """
+
     UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
@@ -74,21 +80,59 @@ class Codes:
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+
+    # Part of MSC3848
+    # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
+    ALREADY_JOINED = "ORG.MATRIX.MSC3848.ALREADY_JOINED"
+    NOT_JOINED = "ORG.MATRIX.MSC3848.NOT_JOINED"
+    INSUFFICIENT_POWER = "ORG.MATRIX.MSC3848.INSUFFICIENT_POWER"
+
+    # The account has been suspended on the server.
+    # By opposition to `USER_DEACTIVATED`, this is a reversible measure
+    # that can possibly be appealed and reverted.
+    # Part of MSC3823.
+    USER_ACCOUNT_SUSPENDED = "ORG.MATRIX.MSC3823.USER_ACCOUNT_SUSPENDED"
+
     BAD_ALIAS = "M_BAD_ALIAS"
     # For restricted join rules.
     UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"
     UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
 
+    UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
+
+    # Returned for federation requests where we can't process a request as we
+    # can't ensure the sending server is in a room which is partial-stated on
+    # our side.
+    # Part of MSC3895.
+    UNABLE_DUE_TO_PARTIAL_STATE = "ORG.MATRIX.MSC3895_UNABLE_DUE_TO_PARTIAL_STATE"
+
+    USER_AWAITING_APPROVAL = "ORG.MATRIX.MSC3866_USER_AWAITING_APPROVAL"
+
+    AS_PING_URL_NOT_SET = "M_URL_NOT_SET"
+    AS_PING_BAD_STATUS = "M_BAD_STATUS"
+    AS_PING_CONNECTION_TIMEOUT = "M_CONNECTION_TIMEOUT"
+    AS_PING_CONNECTION_FAILED = "M_CONNECTION_FAILED"
+
+    # Attempt to send a second annotation with the same event type & annotation key
+    # MSC2677
+    DUPLICATE_ANNOTATION = "M_DUPLICATE_ANNOTATION"
+
 
 class CodeMessageException(RuntimeError):
-    """An exception with integer code and message string attributes.
+    """An exception with integer code, a message string attributes and optional headers.
 
     Attributes:
         code: HTTP error code
         msg: string describing the error
+        headers: optional response headers to send
     """
 
-    def __init__(self, code: Union[int, HTTPStatus], msg: str):
+    def __init__(
+        self,
+        code: Union[int, HTTPStatus],
+        msg: str,
+        headers: Optional[Dict[str, str]] = None,
+    ):
         super().__init__("%d: %s" % (code, msg))
 
         # Some calls to this method pass instances of http.HTTPStatus for `code`.
@@ -99,6 +143,7 @@ class CodeMessageException(RuntimeError):
         # To eliminate this behaviour, we convert them to their integer equivalents here.
         self.code = int(code)
         self.msg = msg
+        self.headers = headers
 
 
 class RedirectException(CodeMessageException):
@@ -126,13 +171,26 @@ class RedirectException(CodeMessageException):
 
 class SynapseError(CodeMessageException):
     """A base exception type for matrix errors which have an errcode and error
-    message (as well as an HTTP status code).
+    message (as well as an HTTP status code). These often bubble all the way up to the
+    client API response so the error code and status often reach the client directly as
+    defined here. If the error doesn't make sense to present to a client, then it
+    probably shouldn't be a `SynapseError`. For example, if we contact another
+    homeserver over federation, we shouldn't automatically ferry response errors back to
+    the client on our end (a 500 from a remote server does not make sense to a client
+    when our server did not experience a 500).
 
     Attributes:
         errcode: Matrix error code e.g 'M_FORBIDDEN'
     """
 
-    def __init__(self, code: int, msg: str, errcode: str = Codes.UNKNOWN):
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        errcode: str = Codes.UNKNOWN,
+        additional_fields: Optional[Dict] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ):
         """Constructs a synapse error.
 
         Args:
@@ -140,11 +198,15 @@ class SynapseError(CodeMessageException):
             msg: The human-readable error message.
             errcode: The matrix error code e.g 'M_FORBIDDEN'
         """
-        super().__init__(code, msg)
+        super().__init__(code, msg, headers)
         self.errcode = errcode
+        if additional_fields is None:
+            self._additional_fields: Dict = {}
+        else:
+            self._additional_fields = dict(additional_fields)
 
-    def error_dict(self) -> "JsonDict":
-        return cs_error(self.msg, self.errcode)
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
+        return cs_error(self.msg, self.errcode, **self._additional_fields)
 
 
 class InvalidAPICallError(SynapseError):
@@ -169,14 +231,7 @@ class ProxiedRequestError(SynapseError):
         errcode: str = Codes.UNKNOWN,
         additional_fields: Optional[Dict] = None,
     ):
-        super().__init__(code, msg, errcode)
-        if additional_fields is None:
-            self._additional_fields: Dict = {}
-        else:
-            self._additional_fields = dict(additional_fields)
-
-    def error_dict(self) -> "JsonDict":
-        return cs_error(self.msg, self.errcode, **self._additional_fields)
+        super().__init__(code, msg, errcode, additional_fields)
 
 
 class ConsentNotGivenError(SynapseError):
@@ -196,7 +251,7 @@ class ConsentNotGivenError(SynapseError):
         )
         self._consent_uri = consent_uri
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
 
@@ -262,10 +317,8 @@ class InteractiveAuthIncompleteError(Exception):
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
-    def __init__(
-        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
-    ):
-        super().__init__(400, msg, errcode)
+    def __init__(self, msg: str = "Unrecognized request", code: int = 400):
+        super().__init__(code, msg, Codes.UNRECOGNIZED)
 
 
 class NotFoundError(SynapseError):
@@ -280,8 +333,59 @@ class AuthError(SynapseError):
     other poorly-defined times.
     """
 
-    def __init__(self, code: int, msg: str, errcode: str = Codes.FORBIDDEN):
-        super().__init__(code, msg, errcode)
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        errcode: str = Codes.FORBIDDEN,
+        additional_fields: Optional[dict] = None,
+    ):
+        super().__init__(code, msg, errcode, additional_fields)
+
+
+class OAuthInsufficientScopeError(SynapseError):
+    """An error raised when the caller does not have sufficient scope to perform the requested action"""
+
+    def __init__(
+        self,
+        required_scopes: List[str],
+    ):
+        headers = {
+            "WWW-Authenticate": 'Bearer error="insufficient_scope", scope="%s"'
+            % (" ".join(required_scopes))
+        }
+        super().__init__(401, "Insufficient scope", Codes.FORBIDDEN, None, headers)
+
+
+class UnstableSpecAuthError(AuthError):
+    """An error raised when a new error code is being proposed to replace a previous one.
+    This error will return a "org.matrix.unstable.errcode" property with the new error code,
+    with the previous error code still being defined in the "errcode" property.
+
+    This error will include `org.matrix.msc3848.unstable.errcode` in the C-S error body.
+    """
+
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        errcode: str,
+        previous_errcode: str = Codes.FORBIDDEN,
+        additional_fields: Optional[dict] = None,
+    ):
+        self.previous_errcode = previous_errcode
+        super().__init__(code, msg, errcode, additional_fields)
+
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
+        fields = {}
+        if config is not None and config.experimental.msc3848_enabled:
+            fields["org.matrix.msc3848.unstable.errcode"] = self.errcode
+        return cs_error(
+            self.msg,
+            self.previous_errcode,
+            **fields,
+            **self._additional_fields,
+        )
 
 
 class InvalidClientCredentialsError(SynapseError):
@@ -315,8 +419,8 @@ class InvalidClientTokenError(InvalidClientCredentialsError):
         super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
         self._soft_logout = soft_logout
 
-    def error_dict(self) -> "JsonDict":
-        d = super().error_dict()
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
+        d = super().error_dict(config)
         d["soft_logout"] = self._soft_logout
         return d
 
@@ -339,7 +443,7 @@ class ResourceLimitError(SynapseError):
         self.limit_type = limit_type
         super().__init__(code, msg, errcode=errcode)
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(
             self.msg,
             self.errcode,
@@ -351,8 +455,17 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, msg: str):
+    def __init__(self, msg: str, unpersistable: bool):
+        """
+        unpersistable:
+            if True, the PDU must not be persisted, not even as a rejected PDU
+            when received over federation.
+            This is notably true when the entire PDU exceeds the size limit for a PDU,
+            (as opposed to an individual key's size limit being exceeded).
+        """
+
         super().__init__(413, msg, Codes.TOO_LARGE)
+        self.unpersistable = unpersistable
 
 
 class LoginError(SynapseError):
@@ -374,7 +487,7 @@ class InvalidCaptchaError(SynapseError):
         super().__init__(code, msg, errcode)
         self.error_url = error_url
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, error_url=self.error_url)
 
 
@@ -391,7 +504,7 @@ class LimitExceededError(SynapseError):
         super().__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
 
 
@@ -406,7 +519,7 @@ class RoomKeysVersionError(SynapseError):
         super().__init__(403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION)
         self.current_version = current_version
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, current_version=self.current_version)
 
 
@@ -446,7 +559,7 @@ class IncompatibleRoomVersionError(SynapseError):
 
         self._room_version = room_version
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, room_version=self._room_version)
 
 
@@ -483,6 +596,36 @@ class RequestSendFailed(RuntimeError):
         self.can_retry = can_retry
 
 
+class UnredactedContentDeletedError(SynapseError):
+    def __init__(self, content_keep_ms: Optional[int] = None):
+        super().__init__(
+            404,
+            "The content for that event has already been erased from the database",
+            errcode=Codes.UNREDACTED_CONTENT_DELETED,
+        )
+        self.content_keep_ms = content_keep_ms
+
+    def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
+        extra = {}
+        if self.content_keep_ms is not None:
+            extra = {"fi.mau.msc2815.content_keep_ms": self.content_keep_ms}
+        return cs_error(self.msg, self.errcode, **extra)
+
+
+class NotApprovedError(SynapseError):
+    def __init__(
+        self,
+        msg: str,
+        approval_notice_medium: str,
+    ):
+        super().__init__(
+            code=403,
+            msg=msg,
+            errcode=Codes.USER_AWAITING_APPROVAL,
+            additional_fields={"approval_notice_medium": approval_notice_medium},
+        )
+
+
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
     """Utility method for constructing an error response for client-server
     interactions.
@@ -501,8 +644,20 @@ def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
 
 
 class FederationError(RuntimeError):
-    """This class is used to inform remote homeservers about erroneous
-    PDUs they sent us.
+    """
+    Raised when we process an erroneous PDU.
+
+    There are two kinds of scenarios where this exception can be raised:
+
+    1. We may pull an invalid PDU from a remote homeserver (e.g. during backfill). We
+       raise this exception to signal an error to the rest of the application.
+    2. We may be pushed an invalid PDU as part of a `/send` transaction from a remote
+       homeserver. We raise so that we can respond to the transaction and include the
+       error string in the "PDU Processing Result". The message which will likely be
+       ignored by the remote homeserver and is not machine parse-able since it's just a
+       string.
+
+    TODO: In the future, we should split these usage scenarios into their own error types.
 
     FATAL: The remote server could not interpret the source event.
         (e.g., it was missing a required field)
@@ -541,6 +696,36 @@ class FederationError(RuntimeError):
         }
 
 
+class FederationPullAttemptBackoffError(RuntimeError):
+    """
+    Raised to indicate that we are are deliberately not attempting to pull the given
+    event over federation because we've already done so recently and are backing off.
+
+    Attributes:
+        event_id: The event_id which we are refusing to pull
+        message: A custom error message that gives more context
+        retry_after_ms: The remaining backoff interval, in milliseconds
+    """
+
+    def __init__(
+        self, event_ids: "StrCollection", message: Optional[str], retry_after_ms: int
+    ):
+        event_ids = list(event_ids)
+
+        if message:
+            error_message = message
+        else:
+            error_message = (
+                f"Not attempting to pull event_ids={event_ids} because we already "
+                "tried to pull them recently (backing off)."
+            )
+
+        super().__init__(error_message)
+
+        self.event_ids = event_ids
+        self.retry_after_ms = retry_after_ms
+
+
 class HttpResponseException(CodeMessageException):
     """
     Represents an HTTP-level failure of an outbound request
@@ -575,7 +760,7 @@ class HttpResponseException(CodeMessageException):
         set to the reason code from the HTTP response.
 
         Returns:
-            SynapseError:
+            The error converted to a SynapseError.
         """
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
@@ -606,3 +791,25 @@ class ModuleFailedException(Exception):
     Raised when a module API callback fails, for example because it raised an
     exception.
     """
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    @staticmethod
+    def message() -> str:
+        return "Cannot persist partial state event in un-partial stated room"
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg=PartialStateConflictError.message(),
+            errcode=Codes.UNKNOWN,
+        )

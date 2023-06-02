@@ -11,11 +11,134 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+The Federation Sender is responsible for sending Persistent Data Units (PDUs)
+and Ephemeral Data Units (EDUs) to other homeservers using
+the `/send` Federation API.
+
+
+## How do PDUs get sent?
+
+The Federation Sender is made aware of new PDUs due to `FederationSender.notify_new_events`.
+When the sender is notified about a newly-persisted PDU that originates from this homeserver
+and is not an out-of-band event, we pass the PDU to the `_PerDestinationQueue` for each
+remote homeserver that is in the room at that point in the DAG.
+
+
+### Per-Destination Queues
+
+There is one `PerDestinationQueue` per 'destination' homeserver.
+The `PerDestinationQueue` maintains the following information about the destination:
+
+- whether the destination is currently in [catch-up mode (see below)](#catch-up-mode);
+- a queue of PDUs to be sent to the destination; and
+- a queue of EDUs to be sent to the destination (not considered in this section).
+
+Upon a new PDU being enqueued, `attempt_new_transaction` is called to start a new
+transaction if there is not already one in progress.
+
+
+### Transactions and the Transaction Transmission Loop
+
+Each federation HTTP request to the `/send` endpoint is referred to as a 'transaction'.
+The body of the HTTP request contains a list of PDUs and EDUs to send to the destination.
+
+The *Transaction Transmission Loop* (`_transaction_transmission_loop`) is responsible
+for emptying the queued PDUs (and EDUs) from a `PerDestinationQueue` by sending
+them to the destination.
+
+There can only be one transaction in flight for a given destination at any time.
+(Other than preventing us from overloading the destination, this also makes it easier to
+reason about because we process events sequentially for each destination.
+This is useful for *Catch-Up Mode*, described later.)
+
+The loop continues so long as there is anything to send. At each iteration of the loop, we:
+
+- dequeue up to 50 PDUs (and up to 100 EDUs).
+- make the `/send` request to the destination homeserver with the dequeued PDUs and EDUs.
+- if successful, make note of the fact that we succeeded in transmitting PDUs up to
+  the given `stream_ordering` of the latest PDU by
+- if unsuccessful, back off from the remote homeserver for some time.
+  If we have been unsuccessful for too long (when the backoff interval grows to exceed 1 hour),
+  the in-memory queues are emptied and we enter [*Catch-Up Mode*, described below](#catch-up-mode).
+
+
+### Catch-Up Mode
+
+When the `PerDestinationQueue` has the catch-up flag set, the *Catch-Up Transmission Loop*
+(`_catch_up_transmission_loop`) is used in lieu of the regular `_transaction_transmission_loop`.
+(Only once the catch-up mode has been exited can the regular tranaction transmission behaviour
+be resumed.)
+
+*Catch-Up Mode*, entered upon Synapse startup or once a homeserver has fallen behind due to
+connection problems, is responsible for sending PDUs that have been missed by the destination
+homeserver. (PDUs can be missed because the `PerDestinationQueue` is volatile — i.e. resets
+on startup — and it does not hold PDUs forever if `/send` requests to the destination fail.)
+
+The catch-up mechanism makes use of the `last_successful_stream_ordering` column in the
+`destinations` table (which gives the `stream_ordering` of the most recent successfully
+sent PDU) and the `stream_ordering` column in the `destination_rooms` table (which gives,
+for each room, the `stream_ordering` of the most recent PDU that needs to be sent to this
+destination).
+
+Each iteration of the loop pulls out 50 `destination_rooms` entries with the oldest
+`stream_ordering`s that are greater than the `last_successful_stream_ordering`.
+In other words, from the set of latest PDUs in each room to be sent to the destination,
+the 50 oldest such PDUs are pulled out.
+
+These PDUs could, in principle, now be directly sent to the destination. However, as an
+optimisation intended to prevent overloading destination homeservers, we instead attempt
+to send the latest forward extremities so long as the destination homeserver is still
+eligible to receive those.
+This reduces load on the destination **in aggregate** because all Synapse homeservers
+will behave according to this principle and therefore avoid sending lots of different PDUs
+at different points in the DAG to a recovering homeserver.
+*This optimisation is not currently valid in rooms which are partial-state on this homeserver,
+since we are unable to determine whether the destination homeserver is eligible to receive
+the latest forward extremities unless this homeserver sent those PDUs — in this case, we
+just send the latest PDUs originating from this server and skip this optimisation.*
+
+Whilst PDUs are sent through this mechanism, the position of `last_successful_stream_ordering`
+is advanced as normal.
+Once there are no longer any rooms containing outstanding PDUs to be sent to the destination
+*that are not already in the `PerDestinationQueue` because they arrived since Catch-Up Mode
+was enabled*, Catch-Up Mode is exited and we return to `_transaction_transmission_loop`.
+
+
+#### A note on failures and back-offs
+
+If a remote server is unreachable over federation, we back off from that server,
+with an exponentially-increasing retry interval.
+Whilst we don't automatically retry after the interval, we prevent making new attempts
+until such time as the back-off has cleared.
+Once the back-off is cleared and a new PDU or EDU arrives for transmission, the transmission
+loop resumes and empties the queue by making federation requests.
+
+If the backoff grows too large (> 1 hour), the in-memory queue is emptied (to prevent
+unbounded growth) and Catch-Up Mode is entered.
+
+It is worth noting that the back-off for a remote server is cleared once an inbound
+request from that remote server is received (see `notify_remote_server_up`).
+At this point, the transaction transmission loop is also started up, to proactively
+send missed PDUs and EDUs to the destination (i.e. you don't need to wait for a new PDU
+or EDU, destined for that destination, to be created in order to send out missed PDUs and
+EDUs).
+"""
 
 import abc
 import logging
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import attr
 from prometheus_client import Counter
@@ -52,12 +175,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 sent_pdus_destination_dist_count = Counter(
-    "synapse_federation_client_sent_pdu_destinations:count",
+    "synapse_federation_client_sent_pdu_destinations_count",
     "Number of PDUs queued for sending to one or more destinations",
 )
 
 sent_pdus_destination_dist_total = Counter(
-    "synapse_federation_client_sent_pdu_destinations:total",
+    "synapse_federation_client_sent_pdu_destinations",
     "Total number of PDUs queued for sending across all destinations",
 )
 
@@ -235,8 +358,11 @@ class FederationSender(AbstractFederationSender):
         self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
 
+        self._storage_controllers = hs.get_storage_controllers()
+
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         self._presence_router: Optional["PresenceRouter"] = None
         self._transaction_manager = TransactionManager(hs)
@@ -339,13 +465,28 @@ class FederationSender(AbstractFederationSender):
             self._is_processing = True
             while True:
                 last_token = await self.store.get_federation_out_pos("events")
-                next_token, events = await self.store.get_all_new_events_stream(
+                (
+                    next_token,
+                    event_to_received_ts,
+                ) = await self.store.get_all_new_event_ids_stream(
                     last_token, self._last_poked_id, limit=100
                 )
 
-                logger.debug("Handling %s -> %s", last_token, next_token)
+                event_ids = event_to_received_ts.keys()
+                event_entries = await self.store.get_unredacted_events_from_cache_or_db(
+                    event_ids
+                )
 
-                if not events and next_token >= self._last_poked_id:
+                logger.debug(
+                    "Handling %i -> %i: %i events to send (current id %i)",
+                    last_token,
+                    next_token,
+                    len(event_entries),
+                    self._last_poked_id,
+                )
+
+                if not event_entries and next_token >= self._last_poked_id:
+                    logger.debug("All events processed")
                     break
 
                 async def handle_event(event: EventBase) -> None:
@@ -353,17 +494,77 @@ class FederationSender(AbstractFederationSender):
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
+                        logger.debug("Not sending remote-origin event %s", event)
                         return
 
+                    # We also want to not send out-of-band membership events.
+                    #
+                    # OOB memberships are used in three (and a half) situations:
+                    #
+                    # (1) invite events which we have received over federation. Those
+                    #     will have a `sender` on a different server, so will be
+                    #     skipped by the "is_mine" test above anyway.
+                    #
+                    # (2) rejections of invites to federated rooms - either remotely
+                    #     or locally generated. (Such rejections are normally
+                    #     created via federation, in which case the remote server is
+                    #     responsible for sending out the rejection. If that fails,
+                    #     we'll create a leave event locally, but that's only really
+                    #     for the benefit of the invited user - we don't have enough
+                    #     information to send it out over federation).
+                    #
+                    # (2a) rescinded knocks. These are identical to rejected invites.
+                    #
+                    # (3) knock events which we have sent over federation. As with
+                    #     invite rejections, the remote server should send them out to
+                    #     the federation.
+                    #
+                    # So, in all the above cases, we want to ignore such events.
+                    #
+                    # OOB memberships are always(?) outliers anyway, so if we *don't*
+                    # ignore them, we'll get an exception further down when we try to
+                    # fetch the membership list for the room.
+                    #
+                    # Arguably, we could equivalently ignore all outliers here, since
+                    # in theory the only way for an outlier with a local `sender` to
+                    # exist is by being an OOB membership (via one of (2), (2a) or (3)
+                    # above).
+                    #
+                    if event.internal_metadata.is_out_of_band_membership():
+                        logger.debug("Not sending OOB membership event %s", event)
+                        return
+
+                    # Finally, there are some other events that we should not send out
+                    # until someone asks for them. They are explicitly flagged as such
+                    # with `proactively_send: False`.
                     if not event.internal_metadata.should_proactively_send():
+                        logger.debug(
+                            "Not sending event with proactively_send=false: %s", event
+                        )
                         return
 
-                    destinations: Optional[Set[str]] = None
+                    destinations: Optional[Collection[str]] = None
                     if not event.prev_event_ids():
                         # If there are no prev event IDs then the state is empty
                         # and so no remote servers in the room
                         destinations = set()
-                    else:
+
+                    if destinations is None:
+                        # During partial join we use the set of servers that we got
+                        # when beginning the join. It's still possible that we send
+                        # events to servers that left the room in the meantime, but
+                        # we consider that an acceptable risk since it is only our own
+                        # events that we leak and not other server's ones.
+                        partial_state_destinations = (
+                            await self.store.get_partial_state_servers_at_join(
+                                event.room_id
+                            )
+                        )
+
+                        if partial_state_destinations is not None:
+                            destinations = partial_state_destinations
+
+                    if destinations is None:
                         # We check the external cache for the destinations, which is
                         # stored per state group.
 
@@ -373,6 +574,19 @@ class FederationSender(AbstractFederationSender):
                         if sg:
                             destinations = await self._external_cache.get(
                                 "get_joined_hosts", str(sg)
+                            )
+                            if destinations is None:
+                                # Add logging to help track down #13444
+                                logger.info(
+                                    "Unexpectedly did not have cached destinations for %s / %s",
+                                    sg,
+                                    event.event_id,
+                                )
+                        else:
+                            # Add logging to help track down #13444
+                            logger.info(
+                                "Unexpectedly did not have cached prev group for %s",
+                                event.event_id,
                             )
 
                     if destinations is None:
@@ -393,7 +607,7 @@ class FederationSender(AbstractFederationSender):
                             )
                             return
 
-                    destinations = {
+                    sharded_destinations = {
                         d
                         for d in destinations
                         if self._federation_shard_config.should_handle(
@@ -405,28 +619,37 @@ class FederationSender(AbstractFederationSender):
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to
                         # send the event to it.
-                        destinations.discard(send_on_behalf_of)
+                        sharded_destinations.discard(send_on_behalf_of)
 
-                    logger.debug("Sending %s to %r", event, destinations)
+                    logger.debug("Sending %s to %r", event, sharded_destinations)
 
-                    if destinations:
-                        await self._send_pdu(event, destinations)
+                    if sharded_destinations:
+                        await self._send_pdu(event, sharded_destinations)
 
                         now = self.clock.time_msec()
-                        ts = await self.store.get_received_ts(event.event_id)
+                        ts = event_to_received_ts[event.event_id]
                         assert ts is not None
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "federation_sender"
                         ).observe((now - ts) / 1000)
 
-                async def handle_room_events(events: Iterable[EventBase]) -> None:
+                async def handle_room_events(events: List[EventBase]) -> None:
+                    logger.debug(
+                        "Handling %i events in room %s", len(events), events[0].room_id
+                    )
                     with Measure(self.clock, "handle_room_events"):
                         for event in events:
                             await handle_event(event)
 
                 events_by_room: Dict[str, List[EventBase]] = {}
-                for event in events:
-                    events_by_room.setdefault(event.room_id, []).append(event)
+
+                for event_id in event_ids:
+                    # `event_entries` is unsorted, so we have to iterate over `event_ids`
+                    # to ensure the events are in the right order
+                    event_cache = event_entries.get(event_id)
+                    if event_cache:
+                        event = event_cache.event
+                        events_by_room.setdefault(event.room_id, []).append(event)
 
                 await make_deferred_yieldable(
                     defer.gatherResults(
@@ -438,11 +661,12 @@ class FederationSender(AbstractFederationSender):
                     )
                 )
 
+                logger.debug("Successfully handled up to %i", next_token)
                 await self.store.update_federation_out_pos("events", next_token)
 
-                if events:
+                if event_entries:
                     now = self.clock.time_msec()
-                    ts = await self.store.get_received_ts(events[-1].event_id)
+                    ts = max(t for t in event_to_received_ts.values() if t)
                     assert ts is not None
 
                     synapse.metrics.event_processing_lag.labels(
@@ -452,7 +676,7 @@ class FederationSender(AbstractFederationSender):
                         "federation_sender"
                     ).set(ts)
 
-                    events_processed_counter.inc(len(events))
+                    events_processed_counter.inc(len(event_entries))
 
                     event_processing_loop_room_count.labels("federation_sender").inc(
                         len(events_by_room)
@@ -537,11 +761,13 @@ class FederationSender(AbstractFederationSender):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains_set = await self.state.get_current_hosts_in_room(room_id)
+        domains_set = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+            room_id
+        )
         domains = [
             d
             for d in domains_set
-            if d != self.server_name
+            if not self.is_mine_server_name(d)
             and self._federation_shard_config.should_handle(self._instance_name, d)
         ]
         if not domains:
@@ -607,7 +833,7 @@ class FederationSender(AbstractFederationSender):
             assert self.is_mine_id(state.user_id)
 
         for destination in destinations:
-            if destination == self.server_name:
+            if self.is_mine_server_name(destination):
                 continue
             if not self._federation_shard_config.should_handle(
                 self._instance_name, destination
@@ -635,7 +861,7 @@ class FederationSender(AbstractFederationSender):
             content: content of EDU
             key: clobbering key for this edu
         """
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.info("Not sending EDU to ourselves")
             return
 
@@ -671,8 +897,8 @@ class FederationSender(AbstractFederationSender):
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
-        if destination == self.server_name:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
+        if self.is_mine_server_name(destination):
             logger.warning("Not sending device update to ourselves")
             return
 
@@ -694,7 +920,7 @@ class FederationSender(AbstractFederationSender):
         might have come back.
         """
 
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.warning("Not waking up ourselves")
             return
 

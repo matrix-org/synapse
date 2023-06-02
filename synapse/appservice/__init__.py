@@ -16,20 +16,14 @@
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern, Sequence
 
 import attr
 from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import (
-    DeviceListUpdates,
-    GroupID,
-    JsonDict,
-    UserID,
-    get_domain_from_id,
-)
+from synapse.types import DeviceListUpdates, JsonDict, UserID
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -38,11 +32,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Type for the `device_one_time_key_counts` field in an appservice transaction
+# Type for the `device_one_time_keys_count` field in an appservice transaction
 #   user ID -> {device ID -> {algorithm -> count}}
-TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
+TransactionOneTimeKeysCount = Dict[str, Dict[str, Dict[str, int]]]
 
-# Type for the `device_unused_fallback_keys` field in an appservice transaction
+# Type for the `device_unused_fallback_key_types` field in an appservice transaction
 #   user ID -> {device ID -> [algorithm]}
 TransactionUnusedFallbackKeys = Dict[str, Dict[str, List[str]]]
 
@@ -55,7 +49,6 @@ class ApplicationServiceState(Enum):
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class Namespace:
     exclusive: bool
-    group_id: Optional[str]
     regex: Pattern[str]
 
 
@@ -77,7 +70,6 @@ class ApplicationService:
     def __init__(
         self,
         token: str,
-        hostname: str,
         id: str,
         sender: str,
         url: Optional[str] = None,
@@ -94,8 +86,8 @@ class ApplicationService:
             url.rstrip("/") if isinstance(url, str) else None
         )  # url must not end with a slash
         self.hs_token = hs_token
+        # The full Matrix ID for this application service's sender.
         self.sender = sender
-        self.server_name = hostname
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
@@ -141,30 +133,13 @@ class ApplicationService:
                 exclusive = regex_obj.get("exclusive")
                 if not isinstance(exclusive, bool):
                     raise ValueError("Expected bool for 'exclusive' in ns '%s'" % ns)
-                group_id = regex_obj.get("group_id")
-                if group_id:
-                    if not isinstance(group_id, str):
-                        raise ValueError(
-                            "Expected string for 'group_id' in ns '%s'" % ns
-                        )
-                    try:
-                        GroupID.from_string(group_id)
-                    except Exception:
-                        raise ValueError(
-                            "Expected valid group ID for 'group_id' in ns '%s'" % ns
-                        )
-
-                    if get_domain_from_id(group_id) != self.server_name:
-                        raise ValueError(
-                            "Expected 'group_id' to be this host in ns '%s'" % ns
-                        )
 
                 regex = regex_obj.get("regex")
                 if not isinstance(regex, str):
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
 
                 # Pre-compile regex.
-                result[ns].append(Namespace(exclusive, group_id, re.compile(regex)))
+                result[ns].append(Namespace(exclusive, re.compile(regex)))
 
         return result
 
@@ -198,12 +173,24 @@ class ApplicationService:
         Returns:
             True if this service would like to know about this room.
         """
-        member_list = await store.get_users_in_room(
+        # We can use `get_local_users_in_room(...)` here because an application service
+        # can only be interested in local users of the server it's on (ignore any remote
+        # users that might match the user namespace regex).
+        #
+        # In the future, we can consider re-using
+        # `store.get_app_service_users_in_room` which is very similar to this
+        # function but has a slightly worse performance than this because we
+        # have an early escape-hatch if we find a single user that the
+        # appservice is interested in. The juice would be worth the squeeze if
+        # `store.get_app_service_users_in_room` was used in more places besides
+        # an experimental MSC. But for now we can avoid doing more work and
+        # barely using it later.
+        local_user_ids = await store.get_local_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
 
         # check joined member events
-        for user_id in member_list:
+        for user_id in local_user_ids:
             if self.is_interested_in_user(user_id):
                 return True
         return False
@@ -226,7 +213,7 @@ class ApplicationService:
             True if the application service is interested in the user, False if not.
         """
         return (
-            # User is the appservice's sender_localpart user
+            # User is the appservice's configured sender_localpart user
             user_id == self.sender
             # User is in the appservice's user namespace
             or self.is_user_in_namespace(user_id)
@@ -259,7 +246,9 @@ class ApplicationService:
             return True
 
         # likewise with the room's aliases (if it has any)
-        alias_list = await store.get_aliases_for_room(room_id)
+        alias_list = await store.get_aliases_for_room(
+            room_id, on_invalidate=cache_context.invalidate
+        )
         for alias in alias_list:
             if self.is_room_alias_in_namespace(alias):
                 return True
@@ -325,7 +314,9 @@ class ApplicationService:
         # Find all the rooms the sender is in
         if self.is_interested_in_user(user_id.to_string()):
             return True
-        room_ids = await store.get_rooms_for_user(user_id.to_string())
+        room_ids = await store.get_rooms_for_user(
+            user_id.to_string(), on_invalidate=cache_context.invalidate
+        )
 
         # Then find out if the appservice is interested in any of those rooms
         for room_id in room_ids:
@@ -369,21 +360,6 @@ class ApplicationService:
             if namespace.exclusive
         ]
 
-    def get_groups_for_user(self, user_id: str) -> Iterable[str]:
-        """Get the groups that this user is associated with by this AS
-
-        Args:
-            user_id: The ID of the user.
-
-        Returns:
-            An iterable that yields group_id strings.
-        """
-        return (
-            namespace.group_id
-            for namespace in self.namespaces[ApplicationService.NS_USERS]
-            if namespace.group_id and namespace.regex.match(user_id)
-        )
-
     def is_rate_limited(self) -> bool:
         return self.rate_limited
 
@@ -402,10 +378,10 @@ class AppServiceTransaction:
         self,
         service: ApplicationService,
         id: int,
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
-        one_time_key_counts: TransactionOneTimeKeyCounts,
+        one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
     ):
@@ -414,7 +390,7 @@ class AppServiceTransaction:
         self.events = events
         self.ephemeral = ephemeral
         self.to_device_messages = to_device_messages
-        self.one_time_key_counts = one_time_key_counts
+        self.one_time_keys_count = one_time_keys_count
         self.unused_fallback_keys = unused_fallback_keys
         self.device_list_summary = device_list_summary
 
@@ -431,7 +407,7 @@ class AppServiceTransaction:
             events=self.events,
             ephemeral=self.ephemeral,
             to_device_messages=self.to_device_messages,
-            one_time_key_counts=self.one_time_key_counts,
+            one_time_keys_count=self.one_time_keys_count,
             unused_fallback_keys=self.unused_fallback_keys,
             device_list_summary=self.device_list_summary,
             txn_id=self.id,

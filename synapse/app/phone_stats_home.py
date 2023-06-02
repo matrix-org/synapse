@@ -15,7 +15,7 @@ import logging
 import math
 import resource
 import sys
-from typing import TYPE_CHECKING, List, Sized, Tuple
+from typing import TYPE_CHECKING, List, Mapping, Sized, Tuple
 
 from prometheus_client import Gauge
 
@@ -32,15 +32,15 @@ logger = logging.getLogger("synapse.app.homeserver")
 _stats_process: List[Tuple[int, "resource.struct_rusage"]] = []
 
 # Gauges to expose monthly active user control metrics
-current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
+current_mau_gauge = Gauge("synapse_admin_mau_current", "Current MAU")
 current_mau_by_service_gauge = Gauge(
     "synapse_admin_mau_current_mau_by_service",
     "Current MAU by service",
     ["app_service"],
 )
-max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
+max_mau_gauge = Gauge("synapse_admin_mau_max", "MAU Limit")
 registered_reserved_users_mau_gauge = Gauge(
-    "synapse_admin_mau:registered_reserved_users",
+    "synapse_admin_mau_registered_reserved_users",
     "Registered users with reserved threepids",
 )
 
@@ -51,6 +51,16 @@ async def phone_stats_home(
     stats: JsonDict,
     stats_process: List[Tuple[int, "resource.struct_rusage"]] = _stats_process,
 ) -> None:
+    """Collect usage statistics and send them to the configured endpoint.
+
+    Args:
+        hs: the HomeServer object to use for gathering usage data.
+        stats: the dict in which to store the statistics sent to the configured
+            endpoint. Mostly used in tests to figure out the data that is supposed to
+            be sent.
+        stats_process: statistics about resource usage of the process.
+    """
+
     logger.info("Gathering stats for reporting")
     now = int(hs.get_clock().time())
     # Ensure the homeserver has started.
@@ -83,6 +93,7 @@ async def phone_stats_home(
     #
 
     store = hs.get_datastores().main
+    common_metrics = await hs.get_common_usage_metrics_manager().get_metrics()
 
     stats["homeserver"] = hs.config.server.server_name
     stats["server_context"] = hs.config.server.server_context
@@ -104,7 +115,7 @@ async def phone_stats_home(
     room_count = await store.get_room_count()
     stats["total_room_count"] = room_count
 
-    stats["daily_active_users"] = await store.count_daily_users()
+    stats["daily_active_users"] = common_metrics.daily_active_users
     stats["monthly_active_users"] = await store.count_monthly_users()
     daily_active_e2ee_rooms = await store.count_daily_active_e2ee_rooms()
     stats["daily_active_e2ee_rooms"] = daily_active_e2ee_rooms
@@ -115,10 +126,6 @@ async def phone_stats_home(
     stats["daily_messages"] = await store.count_daily_messages()
     daily_sent_messages = await store.count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
-
-    r30_results = await store.count_r30_users()
-    for name, count in r30_results.items():
-        stats["r30_users_" + name] = count
 
     r30v2_results = await store.count_r30v2_users()
     for name, count in r30v2_results.items():
@@ -183,7 +190,7 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
     @wrap_as_background_process("generate_monthly_active_users")
     async def generate_monthly_active_users() -> None:
         current_mau_count = 0
-        current_mau_count_by_service = {}
+        current_mau_count_by_service: Mapping[str, int] = {}
         reserved_users: Sized = ()
         store = hs.get_datastores().main
         if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:

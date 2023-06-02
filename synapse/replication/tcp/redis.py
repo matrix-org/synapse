@@ -14,10 +14,15 @@
 
 import logging
 from inspect import isawaitable
-from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, List, Optional, Type, TypeVar, cast
 
 import attr
-import txredisapi
+from txredisapi import (
+    ConnectionHandler,
+    RedisFactory,
+    SubscriberProtocol,
+    UnixConnectionHandler,
+)
 from zope.interface import implementer
 
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -35,6 +40,7 @@ from synapse.replication.tcp.commands import (
     ReplicateCommand,
     parse_command_from_line,
 )
+from synapse.replication.tcp.context import ClientContextFactory
 from synapse.replication.tcp.protocol import (
     IReplicationConnection,
     tcp_inbound_commands_counter,
@@ -67,7 +73,7 @@ class ConstantProperty(Generic[T, V]):
 
 
 @implementer(IReplicationConnection)
-class RedisSubscriber(txredisapi.SubscriberProtocol):
+class RedisSubscriber(SubscriberProtocol):
     """Connection to redis subscribed to replication stream.
 
     This class fulfils two functions:
@@ -85,15 +91,16 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
     Attributes:
         synapse_handler: The command handler to handle incoming commands.
-        synapse_stream_name: The *redis* stream name to subscribe to and publish
+        synapse_stream_prefix: The *redis* stream name to subscribe to and publish
             from (not anything to do with Synapse replication streams).
         synapse_outbound_redis_connection: The connection to redis to use to send
             commands.
     """
 
     synapse_handler: "ReplicationCommandHandler"
-    synapse_stream_name: str
-    synapse_outbound_redis_connection: txredisapi.ConnectionHandler
+    synapse_stream_prefix: str
+    synapse_channel_names: List[str]
+    synapse_outbound_redis_connection: ConnectionHandler
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -117,8 +124,13 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         # it's important to make sure that we only send the REPLICATE command once we
         # have successfully subscribed to the stream - otherwise we might miss the
         # POSITION response sent back by the other end.
-        logger.info("Sending redis SUBSCRIBE for %s", self.synapse_stream_name)
-        await make_deferred_yieldable(self.subscribe(self.synapse_stream_name))
+        fully_qualified_stream_names = [
+            f"{self.synapse_stream_prefix}/{stream_suffix}"
+            for stream_suffix in self.synapse_channel_names
+        ] + [self.synapse_stream_prefix]
+        logger.info("Sending redis SUBSCRIBE for %r", fully_qualified_stream_names)
+        await make_deferred_yieldable(self.subscribe(fully_qualified_stream_names))
+
         logger.info(
             "Successfully subscribed to redis stream, sending REPLICATE command"
         )
@@ -215,14 +227,14 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         # remote instances.
         tcp_outbound_commands_counter.labels(cmd.NAME, "redis").inc()
 
+        channel_name = cmd.redis_channel_name(self.synapse_stream_prefix)
+
         await make_deferred_yieldable(
-            self.synapse_outbound_redis_connection.publish(
-                self.synapse_stream_name, encoded_string
-            )
+            self.synapse_outbound_redis_connection.publish(channel_name, encoded_string)
         )
 
 
-class SynapseRedisFactory(txredisapi.RedisFactory):
+class SynapseRedisFactory(RedisFactory):
     """A subclass of RedisFactory that periodically sends pings to ensure that
     we detect dead connections.
     """
@@ -238,7 +250,7 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
         dbid: Optional[int],
         poolsize: int,
         isLazy: bool = False,
-        handler: Type = txredisapi.ConnectionHandler,
+        handler: Type = ConnectionHandler,
         charset: str = "utf-8",
         password: Optional[str] = None,
         replyTimeout: int = 30,
@@ -300,22 +312,28 @@ def format_address(address: IAddress) -> str:
 
 class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
     """This is a reconnecting factory that connects to redis and immediately
-    subscribes to a stream.
+    subscribes to some streams.
 
     Args:
         hs
         outbound_redis_connection: A connection to redis that will be used to
             send outbound commands (this is separate to the redis connection
             used to subscribe).
+        channel_names: A list of channel names to append to the base channel name
+            to additionally subscribe to.
+            e.g. if ['ABC', 'DEF'] is specified then we'll listen to:
+            example.com; example.com/ABC; and example.com/DEF.
     """
 
     maxDelay = 5
     protocol = RedisSubscriber
 
     def __init__(
-        self, hs: "HomeServer", outbound_redis_connection: txredisapi.ConnectionHandler
+        self,
+        hs: "HomeServer",
+        outbound_redis_connection: ConnectionHandler,
+        channel_names: List[str],
     ):
-
         super().__init__(
             hs,
             uuid="subscriber",
@@ -326,7 +344,8 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
         )
 
         self.synapse_handler = hs.get_replication_command_handler()
-        self.synapse_stream_name = hs.hostname
+        self.synapse_stream_prefix = hs.hostname
+        self.synapse_channel_names = channel_names
 
         self.synapse_outbound_redis_connection = outbound_redis_connection
 
@@ -340,7 +359,8 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
         # protocol.
         p.synapse_handler = self.synapse_handler
         p.synapse_outbound_redis_connection = self.synapse_outbound_redis_connection
-        p.synapse_stream_name = self.synapse_stream_name
+        p.synapse_stream_prefix = self.synapse_stream_prefix
+        p.synapse_channel_names = self.synapse_channel_names
 
         return p
 
@@ -353,7 +373,7 @@ def lazyConnection(
     reconnect: bool = True,
     password: Optional[str] = None,
     replyTimeout: int = 30,
-) -> txredisapi.ConnectionHandler:
+) -> ConnectionHandler:
     """Creates a connection to Redis that is lazily set up and reconnects if the
     connections is lost.
     """
@@ -365,19 +385,72 @@ def lazyConnection(
         dbid=dbid,
         poolsize=1,
         isLazy=True,
-        handler=txredisapi.ConnectionHandler,
+        handler=ConnectionHandler,
         password=password,
         replyTimeout=replyTimeout,
     )
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(
-        host,
-        port,
+
+    if hs.config.redis.redis_use_tls:
+        ssl_context_factory = ClientContextFactory(hs.config.redis)
+        reactor.connectSSL(
+            host,
+            port,
+            factory,
+            ssl_context_factory,
+            timeout=30,
+            bindAddress=None,
+        )
+    else:
+        reactor.connectTCP(
+            host,
+            port,
+            factory,
+            timeout=30,
+            bindAddress=None,
+        )
+
+    return factory.handler
+
+
+def lazyUnixConnection(
+    hs: "HomeServer",
+    path: str = "/tmp/redis.sock",
+    dbid: Optional[int] = None,
+    reconnect: bool = True,
+    password: Optional[str] = None,
+    replyTimeout: int = 30,
+) -> ConnectionHandler:
+    """Creates a connection to Redis that is lazily set up and reconnects if the
+    connection is lost.
+
+    Returns:
+        A subclass of ConnectionHandler, which is a UnixConnectionHandler in this case.
+    """
+
+    uuid = path
+
+    factory = SynapseRedisFactory(
+        hs,
+        uuid=uuid,
+        dbid=dbid,
+        poolsize=1,
+        isLazy=True,
+        handler=UnixConnectionHandler,
+        password=password,
+        replyTimeout=replyTimeout,
+    )
+    factory.continueTrying = reconnect
+
+    reactor = hs.get_reactor()
+
+    reactor.connectUNIX(
+        path,
         factory,
         timeout=30,
-        bindAddress=None,
+        checkPID=False,
     )
 
     return factory.handler

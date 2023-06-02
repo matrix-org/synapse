@@ -19,6 +19,7 @@ from unittest.mock import Mock
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
+from synapse.api.constants import EduTypes
 from synapse.rest.client import events, login, room
 from synapse.server import HomeServer
 from synapse.util import Clock
@@ -37,7 +38,6 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["enable_registration_captcha"] = False
         config["enable_registration"] = True
@@ -50,7 +50,6 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
         # register an account
         self.user_id = self.register_user("sid1", "pass")
         self.token = self.login(self.user_id, "pass")
@@ -103,7 +102,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
                     c
                     for c in channel.json_body["chunk"]
                     if not (
-                        c.get("type") == "m.presence"
+                        c.get("type") == EduTypes.PRESENCE
                         and c["content"].get("user_id") == self.user_id
                     )
                 ]
@@ -141,7 +140,6 @@ class GetEventsTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-
         # register an account
         self.user_id = self.register_user("sid1", "pass")
         self.token = self.login(self.user_id, "pass")

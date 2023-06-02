@@ -16,13 +16,14 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from urllib import parse as urlparse
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import Direction, EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
     assert_params_in_dict,
+    parse_enum,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -34,7 +35,9 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
+from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, RoomID, UserID, create_requester
+from synapse.types.state import StateFilter
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -67,14 +70,13 @@ class RoomRestV2Servlet(RestServlet):
         self._auth = hs.get_auth()
         self._store = hs.get_datastores().main
         self._pagination_handler = hs.get_pagination_handler()
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-
         requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_user_is_admin(self._auth, requester)
 
         content = parse_json_object_from_request(request)
 
@@ -141,7 +143,6 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-
         await assert_requester_is_admin(self._auth, request)
 
         if not RoomID.is_valid(room_id):
@@ -178,7 +179,6 @@ class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, delete_id: str
     ) -> Tuple[int, JsonDict]:
-
         await assert_requester_is_admin(self._auth, request)
 
         delete_status = self._pagination_handler.get_delete_status(delete_id)
@@ -222,15 +222,8 @@ class ListRoomRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        direction = parse_string(request, "dir", default="f")
-        if direction not in ("f", "b"):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown direction: %s" % (direction,),
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        reverse_order = True if direction == "b" else False
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
+        reverse_order = True if direction == Direction.BACKWARDS else False
 
         # Return list of rooms according to parameters
         rooms, total_rooms = await self.store.get_rooms_paginate(
@@ -302,6 +295,7 @@ class RoomRestServlet(RestServlet):
 
         members = await self.store.get_users_in_room(room_id)
         ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
+        ret["forgotten"] = await self.store.is_locally_forgotten_room(room_id)
 
         return HTTPStatus.OK, ret
 
@@ -325,7 +319,7 @@ class RoomRestServlet(RestServlet):
         pagination_handler: "PaginationHandler",
     ) -> Tuple[int, JsonDict]:
         requester = await auth.get_user_by_req(request)
-        await assert_user_is_admin(auth, requester.user)
+        await assert_user_is_admin(auth, requester)
 
         content = parse_json_object_from_request(request)
 
@@ -418,6 +412,7 @@ class RoomStateRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
 
@@ -430,7 +425,7 @@ class RoomStateRestServlet(RestServlet):
         if not ret:
             raise NotFoundError("Room not found")
 
-        event_ids = await self.store.get_current_state_ids(room_id)
+        event_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
         room_state = self._event_serializer.serialize_events(events.values(), now)
@@ -440,14 +435,14 @@ class RoomStateRestServlet(RestServlet):
 
 
 class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
-
     PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
-        self.state_handler = hs.get_state_handler()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.is_mine = hs.is_mine
 
     async def on_POST(
@@ -457,7 +452,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         assert request.args is not None
 
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         content = parse_json_object_from_request(request)
 
@@ -489,8 +484,11 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         )
 
         # send invite if room has "JoinRules.INVITE"
-        room_state = await self.state_handler.get_current_state(room_id)
-        join_rules_event = room_state.get((EventTypes.JoinRules, ""))
+        join_rules_event = (
+            await self._storage_controllers.state.get_current_state_event(
+                room_id, EventTypes.JoinRules, ""
+            )
+        )
         if join_rules_event:
             if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
                 # update_membership with an action of "invite" can raise a
@@ -535,6 +533,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         super().__init__(hs)
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
+        self._state_storage_controller = hs.get_storage_controllers().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.state_handler = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -543,7 +542,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         self, request: SynapseRequest, room_identifier: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
         content = parse_json_object_from_request(request, allow_empty_body=True)
 
         room_id, _ = await self.resolve_room_id(room_identifier)
@@ -552,12 +551,22 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         user_to_add = content.get("user_id", requester.user.to_string())
 
         # Figure out which local users currently have power in the room, if any.
-        room_state = await self.state_handler.get_current_state(room_id)
-        if not room_state:
+        filtered_room_state = await self._state_storage_controller.get_current_state(
+            room_id,
+            StateFilter.from_types(
+                [
+                    (EventTypes.Create, ""),
+                    (EventTypes.PowerLevels, ""),
+                    (EventTypes.JoinRules, ""),
+                    (EventTypes.Member, user_to_add),
+                ]
+            ),
+        )
+        if not filtered_room_state:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Server not in room")
 
-        create_event = room_state[(EventTypes.Create, "")]
-        power_levels = room_state.get((EventTypes.PowerLevels, ""))
+        create_event = filtered_room_state[(EventTypes.Create, "")]
+        power_levels = filtered_room_state.get((EventTypes.PowerLevels, ""))
 
         if power_levels is not None:
             # We pick the local user with the highest power.
@@ -633,7 +642,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
 
         # Now we check if the user we're granting admin rights to is already in
         # the room. If not and it's not a public room we invite them.
-        member_event = room_state.get((EventTypes.Member, user_to_add))
+        member_event = filtered_room_state.get((EventTypes.Member, user_to_add))
         is_joined = False
         if member_event:
             is_joined = member_event.content["membership"] in (
@@ -644,7 +653,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         if is_joined:
             return HTTPStatus.OK, {}
 
-        join_rules = room_state.get((EventTypes.JoinRules, ""))
+        join_rules = filtered_room_state.get((EventTypes.JoinRules, ""))
         is_public = False
         if join_rules:
             is_public = join_rules.content.get("join_rule") == JoinRules.PUBLIC
@@ -724,7 +733,7 @@ class RoomEventContextServlet(RestServlet):
         self, request: SynapseRequest, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_user_is_admin(self.auth, requester)
 
         limit = parse_integer(request, "limit", default=10)
 
@@ -816,7 +825,7 @@ class BlockRoomRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_user_is_admin(self._auth, requester)
 
         content = parse_json_object_from_request(request)
 
@@ -840,3 +849,106 @@ class BlockRoomRestServlet(RestServlet):
             await self._store.unblock_room(room_id)
 
         return HTTPStatus.OK, {"block": block}
+
+
+class RoomMessagesRestServlet(RestServlet):
+    """
+    Get messages list of a room.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/messages$")
+
+    def __init__(self, hs: "HomeServer"):
+        self._hs = hs
+        self._clock = hs.get_clock()
+        self._pagination_handler = hs.get_pagination_handler()
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
+        await assert_user_is_admin(self._auth, requester)
+
+        pagination_config = await PaginationConfig.from_request(
+            self._store, request, default_limit=10
+        )
+        # Twisted will have processed the args by now.
+        assert request.args is not None
+        as_client_event = b"raw" not in request.args
+        filter_str = parse_string(request, "filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
+            if (
+                event_filter
+                and event_filter.filter_json.get("event_format", "client")
+                == "federation"
+            ):
+                as_client_event = False
+        else:
+            event_filter = None
+
+        msgs = await self._pagination_handler.get_messages(
+            room_id=room_id,
+            requester=requester,
+            pagin_config=pagination_config,
+            as_client_event=as_client_event,
+            event_filter=event_filter,
+            use_admin_priviledge=True,
+        )
+
+        return HTTPStatus.OK, msgs
+
+
+class RoomTimestampToEventRestServlet(RestServlet):
+    """
+    API endpoint to fetch the `event_id` of the closest event to the given
+    timestamp (`ts` query parameter) in the given direction (`dir` query
+    parameter).
+
+    Useful for cases like jump to date so you can start paginating messages from
+    a given date in the archive.
+
+    `ts` is a timestamp in milliseconds where we will find the closest event in
+    the given direction.
+
+    `dir` can be `f` or `b` to indicate forwards and backwards in time from the
+    given timestamp.
+
+    GET /_synapse/admin/v1/rooms/<roomID>/timestamp_to_event?ts=<timestamp>&dir=<direction>
+    {
+        "event_id": ...
+    }
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/timestamp_to_event$")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+        self._timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
+        await assert_user_is_admin(self._auth, requester)
+
+        timestamp = parse_integer(request, "ts", required=True)
+        direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
+
+        (
+            event_id,
+            origin_server_ts,
+        ) = await self._timestamp_lookup_handler.get_event_for_timestamp(
+            requester, room_id, timestamp, direction
+        )
+
+        return HTTPStatus.OK, {
+            "event_id": event_id,
+            "origin_server_ts": origin_server_ts,
+        }

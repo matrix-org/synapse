@@ -1,5 +1,5 @@
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2020, 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.tcp.client import DirectTcpReplicationClientFactory
 from synapse.replication.tcp.commands import (
     ClearUserSyncsCommand,
     Command,
@@ -47,6 +46,7 @@ from synapse.replication.tcp.commands import (
     UserIpCommand,
     UserSyncCommand,
 )
+from synapse.replication.tcp.context import ClientContextFactory
 from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams import (
     STREAMS_MAP,
@@ -59,7 +59,6 @@ from synapse.replication.tcp.streams import (
     PresenceStream,
     ReceiptsStream,
     Stream,
-    TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
 )
@@ -100,6 +99,9 @@ class ReplicationCommandHandler:
         self._clock = hs.get_clock()
         self._instance_id = hs.get_instance_id()
         self._instance_name = hs.get_instance_name()
+
+        # Additional Redis channel suffixes to subscribe to.
+        self._channels_to_subscribe_to: List[str] = []
 
         self._is_presence_writer = (
             hs.get_instance_name() in hs.config.worker.writers.presence
@@ -143,7 +145,7 @@ class ReplicationCommandHandler:
 
                 continue
 
-            if isinstance(stream, (AccountDataStream, TagAccountDataStream)):
+            if isinstance(stream, AccountDataStream):
                 # Only add AccountDataStream and TagAccountDataStream as a source on the
                 # instance in charge of account_data persistence.
                 if hs.get_instance_name() in hs.config.worker.writers.account_data:
@@ -243,6 +245,31 @@ class ReplicationCommandHandler:
             # If we're NOT using Redis, this must be handled by the master
             self._should_insert_client_ips = hs.get_instance_name() == "master"
 
+        if self._is_master or self._should_insert_client_ips:
+            self.subscribe_to_channel("USER_IP")
+
+    def subscribe_to_channel(self, channel_name: str) -> None:
+        """
+        Indicates that we wish to subscribe to a Redis channel by name.
+
+        (The name will later be prefixed with the server name; i.e. subscribing
+        to the 'ABC' channel actually subscribes to 'example.com/ABC' Redis-side.)
+
+        Raises:
+          - If replication has already started, then it's too late to subscribe
+            to new channels.
+        """
+
+        if self._factory is not None:
+            # We don't allow subscribing after the fact to avoid the chance
+            # of missing an important message because we didn't subscribe in time.
+            raise RuntimeError(
+                "Cannot subscribe to more channels after replication started."
+            )
+
+        if channel_name not in self._channels_to_subscribe_to:
+            self._channels_to_subscribe_to.append(channel_name)
+
     def _add_command_to_stream_queue(
         self, conn: IReplicationConnection, cmd: Union[RdataCommand, PositionCommand]
     ) -> None:
@@ -304,40 +331,49 @@ class ReplicationCommandHandler:
 
     def start_replication(self, hs: "HomeServer") -> None:
         """Helper method to start replication."""
-        if hs.config.redis.redis_enabled:
-            from synapse.replication.tcp.redis import (
-                RedisDirectTcpReplicationClientFactory,
-            )
+        from synapse.replication.tcp.redis import RedisDirectTcpReplicationClientFactory
 
-            # First let's ensure that we have a ReplicationStreamer started.
-            hs.get_replication_streamer()
+        # First let's ensure that we have a ReplicationStreamer started.
+        hs.get_replication_streamer()
 
-            # We need two connections to redis, one for the subscription stream and
-            # one to send commands to (as you can't send further redis commands to a
-            # connection after SUBSCRIBE is called).
+        # We need two connections to redis, one for the subscription stream and
+        # one to send commands to (as you can't send further redis commands to a
+        # connection after SUBSCRIBE is called).
 
-            # First create the connection for sending commands.
-            outbound_redis_connection = hs.get_outbound_redis_connection()
+        # First create the connection for sending commands.
+        outbound_redis_connection = hs.get_outbound_redis_connection()
 
-            # Now create the factory/connection for the subscription stream.
-            self._factory = RedisDirectTcpReplicationClientFactory(
-                hs, outbound_redis_connection
-            )
-            hs.get_reactor().connectTCP(
-                hs.config.redis.redis_host,
-                hs.config.redis.redis_port,
+        # Now create the factory/connection for the subscription stream.
+        self._factory = RedisDirectTcpReplicationClientFactory(
+            hs,
+            outbound_redis_connection,
+            channel_names=self._channels_to_subscribe_to,
+        )
+
+        reactor = hs.get_reactor()
+        redis_config = hs.config.redis
+        if redis_config.redis_path is not None:
+            reactor.connectUNIX(
+                redis_config.redis_path,
                 self._factory,
+                timeout=30,
+                checkPID=False,
+            )
+
+        elif hs.config.redis.redis_use_tls:
+            ssl_context_factory = ClientContextFactory(hs.config.redis)
+            reactor.connectSSL(
+                redis_config.redis_host,
+                redis_config.redis_port,
+                self._factory,
+                ssl_context_factory,
                 timeout=30,
                 bindAddress=None,
             )
         else:
-            client_name = hs.get_instance_name()
-            self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
-            host = hs.config.worker.worker_replication_host
-            port = hs.config.worker.worker_replication_port
-            hs.get_reactor().connectTCP(
-                host,
-                port,
+            reactor.connectTCP(
+                redis_config.redis_host,
+                redis_config.redis_port,
                 self._factory,
                 timeout=30,
                 bindAddress=None,
@@ -537,7 +573,7 @@ class ReplicationCommandHandler:
             # Ignore POSITION that are just our own echoes
             return
 
-        logger.info("Handling '%s %s'", cmd.NAME, cmd.to_line())
+        logger.debug("Handling '%s %s'", cmd.NAME, cmd.to_line())
 
         self._add_command_to_stream_queue(conn, cmd)
 
@@ -567,6 +603,11 @@ class ReplicationCommandHandler:
         # between then and now.
         missing_updates = cmd.prev_token != current_token
         while missing_updates:
+            # Note: There may very well not be any new updates, but we check to
+            # make sure. This can particularly happen for the event stream where
+            # event persisters continuously send `POSITION`. See `resource.py`
+            # for why this can happen.
+
             logger.info(
                 "Fetching replication rows for '%s' between %i and %i",
                 stream_name,
@@ -590,7 +631,7 @@ class ReplicationCommandHandler:
                     [stream.parse_row(row) for row in rows],
                 )
 
-        logger.info("Caught up with stream '%s' to %i", stream_name, cmd.new_token)
+            logger.info("Caught up with stream '%s' to %i", stream_name, cmd.new_token)
 
         # We've now caught up to position sent to us, notify handler.
         await self._replication_data_handler.on_position(
@@ -606,23 +647,6 @@ class ReplicationCommandHandler:
         self._replication_data_handler.on_remote_server_up(cmd.data)
 
         self._notifier.notify_remote_server_up(cmd.data)
-
-        # We relay to all other connections to ensure every instance gets the
-        # notification.
-        #
-        # When configured to use redis we'll always only have one connection and
-        # so this is a no-op (all instances will have already received the same
-        # REMOTE_SERVER_UP command).
-        #
-        # For direct TCP connections this will relay to all other connections
-        # connected to us. When on master this will correctly fan out to all
-        # other direct TCP clients and on workers there'll only be the one
-        # connection to master.
-        #
-        # (The logic here should also be sound if we have a mix of Redis and
-        # direct TCP connections so long as there is only one traffic route
-        # between two instances, but that is not currently supported).
-        self.send_command(cmd, ignore_conn=conn)
 
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""
@@ -671,21 +695,14 @@ class ReplicationCommandHandler:
         """
         return bool(self._connections)
 
-    def send_command(
-        self, cmd: Command, ignore_conn: Optional[IReplicationConnection] = None
-    ) -> None:
+    def send_command(self, cmd: Command) -> None:
         """Send a command to all connected connections.
 
         Args:
             cmd
-            ignore_conn: If set don't send command to the given connection.
-                Used when relaying commands from one connection to all others.
         """
         if self._connections:
             for connection in self._connections:
-                if connection == ignore_conn:
-                    continue
-
                 try:
                     connection.send_command(cmd)
                 except Exception:

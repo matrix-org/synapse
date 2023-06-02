@@ -14,25 +14,22 @@
 import logging
 from unittest.mock import patch
 
-from synapse.api.room_versions import RoomVersion
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
+from synapse.server import HomeServer
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
+from synapse.util import Clock
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import make_request
-from tests.utils import USE_POSTGRES_FOR_TESTS
 
 logger = logging.getLogger(__name__)
 
 
 class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
     """Checks event persisting sharding works"""
-
-    # Event persister sharding requires postgres (due to needing
-    # `MultiWriterIdGenerator`).
-    if not USE_POSTGRES_FOR_TESTS:
-        skip = "Requires Postgres"
 
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -41,7 +38,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         sync.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # Register a user who sends a message that we'll get notified about
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
@@ -49,39 +46,28 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.room_creator = self.hs.get_room_creation_handler()
         self.store = hs.get_datastores().main
 
-    def default_config(self):
+    def default_config(self) -> dict:
         conf = super().default_config()
-        conf["redis"] = {"enabled": "true"}
         conf["stream_writers"] = {"events": ["worker1", "worker2"]}
         conf["instance_map"] = {
+            "main": {"host": "testserv", "port": 8765},
             "worker1": {"host": "testserv", "port": 1001},
             "worker2": {"host": "testserv", "port": 1002},
         }
         return conf
 
-    def _create_room(self, room_id: str, user_id: str, tok: str):
+    def _create_room(self, room_id: str, user_id: str, tok: str) -> None:
         """Create a room with given room_id"""
 
         # We control the room ID generation by patching out the
         # `_generate_room_id` method
-        async def generate_room(
-            creator_id: str, is_public: bool, room_version: RoomVersion
-        ):
-            await self.store.store_room(
-                room_id=room_id,
-                room_creator_user_id=creator_id,
-                is_public=is_public,
-                room_version=room_version,
-            )
-            return room_id
-
         with patch(
             "synapse.handlers.room.RoomCreationHandler._generate_room_id"
         ) as mock:
-            mock.side_effect = generate_room
+            mock.side_effect = lambda: room_id
             self.helper.create_room_as(user_id, tok=tok)
 
-    def test_basic(self):
+    def test_basic(self) -> None:
         """Simple test to ensure that multiple rooms can be created and joined,
         and that different rooms get handled by different instances.
         """
@@ -131,7 +117,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertTrue(persisted_on_1)
         self.assertTrue(persisted_on_2)
 
-    def test_vector_clock_token(self):
+    def test_vector_clock_token(self) -> None:
         """Tests that using a stream token with a vector clock component works
         correctly with basic /sync and /messages usage.
         """

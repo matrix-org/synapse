@@ -34,7 +34,6 @@ from typing import (
     Callable,
     Collection,
     Dict,
-    FrozenSet,
     Generator,
     Iterable,
     List,
@@ -42,14 +41,13 @@ from typing import (
     Set,
     Tuple,
     Type,
-    Union,
 )
 
 from prometheus_client import Counter
 from typing_extensions import ContextManager
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, Membership, PresenceState
+from synapse.api.constants import EduTypes, EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.appservice import ApplicationService
@@ -66,9 +64,14 @@ from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import PresenceFederationStream, PresenceStream
 from synapse.storage.databases.main import DataStore
 from synapse.streams import EventSource
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import (
+    JsonDict,
+    StrCollection,
+    StreamKeyType,
+    UserID,
+    get_domain_from_id,
+)
 from synapse.util.async_helpers import Linearizer
-from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
 
@@ -134,6 +137,7 @@ class BasePresenceHandler(abc.ABC):
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.presence_router = hs.get_presence_router()
         self.state = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -203,7 +207,7 @@ class BasePresenceHandler(abc.ABC):
         """Get the current presence state for multiple users.
 
         Returns:
-            dict: `user_id` -> `UserPresenceState`
+            A mapping of `user_id` -> `UserPresenceState`
         """
         states = {}
         missing = []
@@ -258,7 +262,7 @@ class BasePresenceHandler(abc.ABC):
         with the app.
         """
 
-    async def update_external_syncs_row(
+    async def update_external_syncs_row(  # noqa: B027 (no-op by design)
         self, process_id: str, user_id: str, is_syncing: bool, sync_time_msec: int
     ) -> None:
         """Update the syncing users for an external process as a delta.
@@ -274,7 +278,9 @@ class BasePresenceHandler(abc.ABC):
             sync_time_msec: Time in ms when the user was last syncing
         """
 
-    async def update_external_syncs_clear(self, process_id: str) -> None:
+    async def update_external_syncs_clear(  # noqa: B027 (no-op by design)
+        self, process_id: str
+    ) -> None:
         """Marks all users that had been marked as syncing by a given process
         as offline.
 
@@ -320,7 +326,7 @@ class BasePresenceHandler(abc.ABC):
         for destination, host_states in hosts_to_states.items():
             self._federation.send_presence_to_destinations(host_states, [destination])
 
-    async def send_full_presence_to_users(self, user_ids: Collection[str]) -> None:
+    async def send_full_presence_to_users(self, user_ids: StrCollection) -> None:
         """
         Adds to the list of users who should receive a full snapshot of presence
         upon their next sync. Note that this only works for local users.
@@ -394,7 +400,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         # Route presence EDUs to the right worker
         hs.get_federation_registry().register_instances_for_edu(
-            "m.presence",
+            EduTypes.PRESENCE,
             hs.config.worker.writers.presence,
         )
 
@@ -478,7 +484,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             return _NullContextManager()
 
         prev_state = await self.current_state_for_user(user_id)
-        if prev_state != PresenceState.BUSY:
+        if prev_state.state != PresenceState.BUSY:
             # We set state here but pass ignore_status_msg = True as we don't want to
             # cause the status message to be cleared.
             # Note that this causes last_active_ts to be incremented which is not
@@ -522,7 +528,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
-            "presence_key",
+            StreamKeyType.PRESENCE,
             stream_id,
             rooms=room_ids_to_states.keys(),
             users=users_to_states.keys(),
@@ -649,7 +655,9 @@ class PresenceHandler(BasePresenceHandler):
 
         federation_registry = hs.get_federation_registry()
 
-        federation_registry.register_edu_handler("m.presence", self.incoming_presence)
+        federation_registry.register_edu_handler(
+            EduTypes.PRESENCE, self.incoming_presence
+        )
 
         LaterGauge(
             "synapse_handlers_presence_user_to_current_state_size",
@@ -659,27 +667,28 @@ class PresenceHandler(BasePresenceHandler):
         )
 
         now = self.clock.time_msec()
-        for state in self.user_to_current_state.values():
-            self.wheel_timer.insert(
-                now=now, obj=state.user_id, then=state.last_active_ts + IDLE_TIMER
-            )
-            self.wheel_timer.insert(
-                now=now,
-                obj=state.user_id,
-                then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
-            )
-            if self.is_mine_id(state.user_id):
+        if self._presence_enabled:
+            for state in self.user_to_current_state.values():
+                self.wheel_timer.insert(
+                    now=now, obj=state.user_id, then=state.last_active_ts + IDLE_TIMER
+                )
                 self.wheel_timer.insert(
                     now=now,
                     obj=state.user_id,
-                    then=state.last_federation_update_ts + FEDERATION_PING_INTERVAL,
+                    then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
                 )
-            else:
-                self.wheel_timer.insert(
-                    now=now,
-                    obj=state.user_id,
-                    then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
-                )
+                if self.is_mine_id(state.user_id):
+                    self.wheel_timer.insert(
+                        now=now,
+                        obj=state.user_id,
+                        then=state.last_federation_update_ts + FEDERATION_PING_INTERVAL,
+                    )
+                else:
+                    self.wheel_timer.insert(
+                        now=now,
+                        obj=state.user_id,
+                        then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
+                    )
 
         # Set of users who have presence in the `user_to_current_state` that
         # have not yet been persisted
@@ -768,7 +777,6 @@ class PresenceHandler(BasePresenceHandler):
         )
 
         if self.unpersisted_users_changes:
-
             await self.store.update_presence(
                 [
                     self.user_to_current_state[user_id]
@@ -804,10 +812,16 @@ class PresenceHandler(BasePresenceHandler):
                 This is currently used to bump the max presence stream ID without changing any
                 user's presence (see PresenceHandler.add_users_to_send_full_presence_to).
         """
+        if not self._presence_enabled:
+            # We shouldn't get here if presence is disabled, but we check anyway
+            # to ensure that we don't a) send out presence federation and b)
+            # don't add things to the wheel timer that will never be handled.
+            logger.warning("Tried to update presence states when presence is disabled")
+            return
+
         now = self.clock.time_msec()
 
         with Measure(self.clock, "presence_update_states"):
-
             # NOTE: We purposefully don't await between now and when we've
             # calculated what we want to do with the new states, to avoid races.
 
@@ -1137,7 +1151,7 @@ class PresenceHandler(BasePresenceHandler):
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
-            "presence_key",
+            StreamKeyType.PRESENCE,
             stream_id,
             rooms=room_ids_to_states.keys(),
             users=[UserID.from_string(u) for u in users_to_states],
@@ -1228,6 +1242,10 @@ class PresenceHandler(BasePresenceHandler):
             presence == PresenceState.BUSY and not self._busy_presence_enabled
         ):
             raise SynapseError(400, "Invalid presence state")
+
+        # If presence is disabled, no-op
+        if not self.hs.config.server.use_presence:
+            return
 
         user_id = target_user.to_string()
 
@@ -1334,7 +1352,10 @@ class PresenceHandler(BasePresenceHandler):
                     self._event_pos,
                     room_max_stream_ordering,
                 )
-                max_pos, deltas = await self.store.get_current_state_deltas(
+                (
+                    max_pos,
+                    deltas,
+                ) = await self._storage_controllers.state.get_current_state_deltas(
                     self._event_pos, room_max_stream_ordering
                 )
 
@@ -1581,8 +1602,10 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         self,
         user: UserID,
         from_key: Optional[int],
-        limit: Optional[int] = None,
-        room_ids: Optional[Collection[str]] = None,
+        # Having a default limit doesn't match the EventSource API, but some
+        # callers do not provide it. It is unused in this class.
+        limit: int = 0,
+        room_ids: Optional[StrCollection] = None,
         is_guest: bool = False,
         explicit_room_id: Optional[str] = None,
         include_offline: bool = True,
@@ -1638,15 +1661,18 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
                 # doesn't return. C.f. #5503.
                 return [], max_token
 
-            # Figure out which other users this user should receive updates for
-            users_interested_in = await self._get_interested_in(user, explicit_room_id)
+            # Figure out which other users this user should explicitly receive
+            # updates for
+            additional_users_interested_in = (
+                await self.get_presence_router().get_interested_users(user.to_string())
+            )
 
             # We have a set of users that we're interested in the presence of. We want to
             # cross-reference that with the users that have actually changed their presence.
 
             # Check whether this user should see all user updates
 
-            if users_interested_in == PresenceRouter.ALL_USERS:
+            if additional_users_interested_in == PresenceRouter.ALL_USERS:
                 # Provide presence state for all users
                 presence_updates = await self._filter_all_presence_updates_for_user(
                     user_id, include_offline, from_key
@@ -1655,33 +1681,48 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
                 return presence_updates, max_token
 
             # Make mypy happy. users_interested_in should now be a set
-            assert not isinstance(users_interested_in, str)
+            assert not isinstance(additional_users_interested_in, str)
+
+            # We always care about our own presence.
+            additional_users_interested_in.add(user_id)
+
+            if explicit_room_id:
+                user_ids = await self.store.get_users_in_room(explicit_room_id)
+                additional_users_interested_in.update(user_ids)
 
             # The set of users that we're interested in and that have had a presence update.
             # We'll actually pull the presence updates for these users at the end.
-            interested_and_updated_users: Union[Set[str], FrozenSet[str]] = set()
+            interested_and_updated_users: StrCollection
 
             if from_key is not None:
                 # First get all users that have had a presence update
-                updated_users = stream_change_cache.get_all_entities_changed(from_key)
+                result = stream_change_cache.get_all_entities_changed(from_key)
 
                 # Cross-reference users we're interested in with those that have had updates.
-                # Use a slightly-optimised method for processing smaller sets of updates.
-                if updated_users is not None and len(updated_users) < 500:
-                    # For small deltas, it's quicker to get all changes and then
-                    # cross-reference with the users we're interested in
+                if result.hit:
+                    updated_users = result.entities
+
+                    # If we have the full list of changes for presence we can
+                    # simply check which ones share a room with the user.
                     get_updates_counter.labels("stream").inc()
-                    for other_user_id in updated_users:
-                        if other_user_id in users_interested_in:
-                            # mypy thinks this variable could be a FrozenSet as it's possibly set
-                            # to one in the `get_entities_changed` call below, and `add()` is not
-                            # method on a FrozenSet. That doesn't affect us here though, as
-                            # `interested_and_updated_users` is clearly a set() above.
-                            interested_and_updated_users.add(other_user_id)  # type: ignore
+
+                    sharing_users = await self.store.do_users_share_a_room(
+                        user_id, updated_users
+                    )
+
+                    interested_and_updated_users = (
+                        sharing_users.union(additional_users_interested_in)
+                    ).intersection(updated_users)
+
                 else:
                     # Too many possible updates. Find all users we can see and check
                     # if any of them have changed.
                     get_updates_counter.labels("full").inc()
+
+                    users_interested_in = (
+                        await self.store.get_users_who_share_room_with_user(user_id)
+                    )
+                    users_interested_in.update(additional_users_interested_in)
 
                     interested_and_updated_users = (
                         stream_change_cache.get_entities_changed(
@@ -1691,7 +1732,10 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
             else:
                 # No from_key has been specified. Return the presence for all users
                 # this user is interested in
-                interested_and_updated_users = users_interested_in
+                interested_and_updated_users = (
+                    await self.store.get_users_who_share_room_with_user(user_id)
+                )
+                interested_and_updated_users.update(additional_users_interested_in)
 
             # Retrieve the current presence state for each user
             users_to_state = await self.get_presence_handler().current_state_for_users(
@@ -1726,14 +1770,14 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         Returns:
             A list of presence states for the given user to receive.
         """
+        updated_users = None
         if from_key:
             # Only return updates since the last sync
-            updated_users = self.store.presence_stream_cache.get_all_entities_changed(
-                from_key
-            )
-            if not updated_users:
-                updated_users = []
+            result = self.store.presence_stream_cache.get_all_entities_changed(from_key)
+            if result.hit:
+                updated_users = result.entities
 
+        if updated_users is not None:
             # Get the actual presence update for each change
             users_to_state = await self.get_presence_handler().current_state_for_users(
                 updated_users
@@ -1785,62 +1829,6 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
 
     def get_current_key(self) -> int:
         return self.store.get_current_presence_token()
-
-    @cached(num_args=2, cache_context=True)
-    async def _get_interested_in(
-        self,
-        user: UserID,
-        explicit_room_id: Optional[str] = None,
-        cache_context: Optional[_CacheContext] = None,
-    ) -> Union[Set[str], str]:
-        """Returns the set of users that the given user should see presence
-        updates for.
-
-        Args:
-            user: The user to retrieve presence updates for.
-            explicit_room_id: The users that are in the room will be returned.
-
-        Returns:
-            A set of user IDs to return presence updates for, or "ALL" to return all
-            known updates.
-        """
-        user_id = user.to_string()
-        users_interested_in = set()
-        users_interested_in.add(user_id)  # So that we receive our own presence
-
-        # cache_context isn't likely to ever be None due to the @cached decorator,
-        # but we can't have a non-optional argument after the optional argument
-        # explicit_room_id either. Assert cache_context is not None so we can use it
-        # without mypy complaining.
-        assert cache_context
-
-        # Check with the presence router whether we should poll additional users for
-        # their presence information
-        additional_users = await self.get_presence_router().get_interested_users(
-            user.to_string()
-        )
-        if additional_users == PresenceRouter.ALL_USERS:
-            # If the module requested that this user see the presence updates of *all*
-            # users, then simply return that instead of calculating what rooms this
-            # user shares
-            return PresenceRouter.ALL_USERS
-
-        # Add the additional users from the router
-        users_interested_in.update(additional_users)
-
-        # Find the users who share a room with this user
-        users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id, on_invalidate=cache_context.invalidate
-        )
-        users_interested_in.update(users_who_share_room)
-
-        if explicit_room_id:
-            user_ids = await self.store.get_users_in_room(
-                explicit_room_id, on_invalidate=cache_context.invalidate
-            )
-            users_interested_in.update(user_ids)
-
-        return users_interested_in
 
 
 def handle_timeouts(
@@ -2073,8 +2061,7 @@ async def get_interested_remotes(
     )
 
     for room_id, states in room_ids_to_states.items():
-        user_ids = await store.get_users_in_room(room_id)
-        hosts = {get_domain_from_id(user_id) for user_id in user_ids}
+        hosts = await store.get_current_hosts_in_room(room_id)
         for host in hosts:
             hosts_and_states.setdefault(host, set()).update(states)
 
@@ -2137,7 +2124,7 @@ class PresenceFederationQueue:
         # stream_id, destinations, user_ids)`. We don't store the full states
         # for efficiency, and remote workers will already have the full states
         # cached.
-        self._queue: List[Tuple[int, int, Collection[str], Set[str]]] = []
+        self._queue: List[Tuple[int, int, StrCollection, Set[str]]] = []
 
         self._next_id = 1
 
@@ -2159,7 +2146,7 @@ class PresenceFederationQueue:
         self._queue = self._queue[index:]
 
     def send_presence_to_destinations(
-        self, states: Collection[UserPresenceState], destinations: Collection[str]
+        self, states: Collection[UserPresenceState], destinations: StrCollection
     ) -> None:
         """Send the presence states to the given destinations.
 
@@ -2171,6 +2158,11 @@ class PresenceFederationQueue:
 
         # This should only be called on a presence writer.
         assert self._presence_writer
+
+        if not states or not destinations:
+            # Ignore calls which either don't have any new states or don't need
+            # to be sent anywhere.
+            return
 
         if self._federation:
             self._federation.send_presence_to_destinations(

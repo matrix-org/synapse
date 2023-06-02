@@ -17,7 +17,7 @@ class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
-        self.state_store = hs.get_storage().state
+        self._state_storage_controller = hs.get_storage_controllers().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
@@ -53,8 +53,9 @@ class RoomBatchHandler:
         # We want to use the successor event depth so they appear after `prev_event` because
         # it has a larger `depth` but before the successor event because the `stream_ordering`
         # is negative before the successor event.
+        assert most_recent_prev_event_id is not None
         successor_event_ids = await self.store.get_successor_events(
-            [most_recent_prev_event_id]
+            most_recent_prev_event_id
         )
 
         # If we can't find any successor events, then it's a forward extremity of
@@ -139,7 +140,8 @@ class RoomBatchHandler:
             _,
         ) = await self.store.get_max_depth_of(event_ids)
         # mapping from (type, state_key) -> state_event_id
-        prev_state_map = await self.state_store.get_state_ids_for_event(
+        assert most_recent_event_id is not None
+        prev_state_map = await self._state_storage_controller.get_state_ids_for_event(
             most_recent_event_id
         )
         # List of state event ID's
@@ -325,7 +327,7 @@ class RoomBatchHandler:
             # Mark all events as historical
             event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
-            event, context = await self.event_creation_handler.create_event(
+            event, unpersisted_context = await self.event_creation_handler.create_event(
                 await self.create_requester_for_user_id_from_app_service(
                     ev["sender"], app_service_requester.app_service
                 ),
@@ -343,7 +345,7 @@ class RoomBatchHandler:
                 historical=True,
                 depth=inherited_depth,
             )
-
+            context = await unpersisted_context.persist(event)
             assert context._state_group
 
             # Normally this is done when persisting the event but we have to
@@ -372,13 +374,14 @@ class RoomBatchHandler:
         # correct stream_ordering as they are backfilled (which decrements).
         # Events are sorted by (topological_ordering, stream_ordering)
         # where topological_ordering is just depth.
-        for (event, context) in reversed(events_to_persist):
+        for event, context in reversed(events_to_persist):
+            # This call can't raise `PartialStateConflictError` since we forbid
+            # use of the historical batch API during partial state
             await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
                     event.sender, app_service_requester.app_service
                 ),
-                event=event,
-                context=context,
+                events_and_context=[(event, context)],
             )
 
         return event_ids

@@ -13,18 +13,20 @@
 # limitations under the License.
 
 from twisted.internet.address import IPv6Address
-from twisted.test.proto_helpers import StringTransport
+from twisted.test.proto_helpers import MemoryReactor, StringTransport
 
 from synapse.app.homeserver import SynapseHomeServer
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class SynapseRequestTestCase(HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         return self.setup_test_homeserver(homeserver_to_use=SynapseHomeServer)
 
-    def test_large_request(self):
+    def test_large_request(self) -> None:
         """overlarge HTTP requests should be rejected"""
         self.hs.start_listening()
 
@@ -36,7 +38,7 @@ class SynapseRequestTestCase(HomeserverTestCase):
         # as a control case, first send a regular request.
 
         # complete the connection and wire it up to a fake transport
-        client_address = IPv6Address("TCP", "::1", "2345")
+        client_address = IPv6Address("TCP", "::1", 2345)
         protocol = factory.buildProtocol(client_address)
         transport = StringTransport()
         protocol.makeConnection(transport)

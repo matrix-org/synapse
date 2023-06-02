@@ -16,19 +16,30 @@
 import logging
 from enum import Enum
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
+from synapse.storage.databases.main.events_worker import InvalidEventError
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
@@ -120,11 +131,6 @@ class StatsStore(StateDeltasStore):
         self.db_pool.updates.register_background_update_handler(
             "populate_stats_process_users", self._populate_stats_process_users
         )
-        # we no longer need to perform clean-up, but we will give ourselves
-        # the potential to reintroduce it in the future – so documentation
-        # will still encourage the use of this no-op handler.
-        self.db_pool.updates.register_noop_background_update("populate_stats_cleanup")
-        self.db_pool.updates.register_noop_background_update("populate_stats_prepare")
 
     async def _populate_stats_process_users(
         self, progress: JsonDict, batch_size: int
@@ -243,6 +249,7 @@ class StatsStore(StateDeltasStore):
         * avatar
         * canonical_alias
         * guest_access
+        * room_type
 
         A is_federatable key can also be included with a boolean value.
 
@@ -268,6 +275,7 @@ class StatsStore(StateDeltasStore):
             "avatar",
             "canonical_alias",
             "guest_access",
+            "room_type",
         ):
             field = fields.get(col, sentinel)
             if field is not sentinel and (not isinstance(field, str) or "\0" in field):
@@ -300,6 +308,7 @@ class StatsStore(StateDeltasStore):
             keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
             allow_none=True,
+            desc="get_earliest_token_for_stats",
         )
 
     async def bulk_update_stats_delta(
@@ -448,59 +457,41 @@ class StatsStore(StateDeltasStore):
             absolutes: Absolute (set) fields
             additive_relatives: Fields that will be added onto if existing row present.
         """
-        if self.database_engine.can_native_upsert:
-            absolute_updates = [
-                "%(field)s = EXCLUDED.%(field)s" % {"field": field}
-                for field in absolutes.keys()
-            ]
+        absolute_updates = [
+            "%(field)s = EXCLUDED.%(field)s" % {"field": field}
+            for field in absolutes.keys()
+        ]
 
-            relative_updates = [
-                "%(field)s = EXCLUDED.%(field)s + COALESCE(%(table)s.%(field)s, 0)"
-                % {"table": table, "field": field}
-                for field in additive_relatives.keys()
-            ]
+        relative_updates = [
+            "%(field)s = EXCLUDED.%(field)s + COALESCE(%(table)s.%(field)s, 0)"
+            % {"table": table, "field": field}
+            for field in additive_relatives.keys()
+        ]
 
-            insert_cols = []
-            qargs = []
+        insert_cols = []
+        qargs = []
 
-            for (key, val) in chain(
-                keyvalues.items(), absolutes.items(), additive_relatives.items()
-            ):
-                insert_cols.append(key)
-                qargs.append(val)
+        for key, val in chain(
+            keyvalues.items(), absolutes.items(), additive_relatives.items()
+        ):
+            insert_cols.append(key)
+            qargs.append(val)
 
-            sql = """
-                INSERT INTO %(table)s (%(insert_cols_cs)s)
-                VALUES (%(insert_vals_qs)s)
-                ON CONFLICT (%(key_columns)s) DO UPDATE SET %(updates)s
-            """ % {
-                "table": table,
-                "insert_cols_cs": ", ".join(insert_cols),
-                "insert_vals_qs": ", ".join(
-                    ["?"] * (len(keyvalues) + len(absolutes) + len(additive_relatives))
-                ),
-                "key_columns": ", ".join(keyvalues),
-                "updates": ", ".join(chain(absolute_updates, relative_updates)),
-            }
+        sql = """
+            INSERT INTO %(table)s (%(insert_cols_cs)s)
+            VALUES (%(insert_vals_qs)s)
+            ON CONFLICT (%(key_columns)s) DO UPDATE SET %(updates)s
+        """ % {
+            "table": table,
+            "insert_cols_cs": ", ".join(insert_cols),
+            "insert_vals_qs": ", ".join(
+                ["?"] * (len(keyvalues) + len(absolutes) + len(additive_relatives))
+            ),
+            "key_columns": ", ".join(keyvalues),
+            "updates": ", ".join(chain(absolute_updates, relative_updates)),
+        }
 
-            txn.execute(sql, qargs)
-        else:
-            self.database_engine.lock_table(txn, table)
-            retcols = list(chain(absolutes.keys(), additive_relatives.keys()))
-            current_row = self.db_pool.simple_select_one_txn(
-                txn, table, keyvalues, retcols, allow_none=True
-            )
-            if current_row is None:
-                merged_dict = {**keyvalues, **absolutes, **additive_relatives}
-                self.db_pool.simple_insert_txn(txn, table, merged_dict)
-            else:
-                for (key, val) in additive_relatives.items():
-                    if current_row[key] is None:
-                        current_row[key] = val
-                    else:
-                        current_row[key] += val
-                current_row.update(absolutes)
-                self.db_pool.simple_update_one_txn(txn, table, keyvalues, current_row)
+        txn.execute(sql, qargs)
 
     async def _calculate_and_set_initial_state_for_room(self, room_id: str) -> None:
         """Calculate and insert an entry into room_stats_current.
@@ -542,7 +533,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (room_id,),
             )
-            membership_counts = {membership: cnt for membership, cnt in txn}
+            membership_counts = dict(cast(Iterable[Tuple[str, int]], txn))
 
             txn.execute(
                 """
@@ -574,9 +565,19 @@ class StatsStore(StateDeltasStore):
             "get_initial_state_for_room", _fetch_current_state_stats
         )
 
-        state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
+        try:
+            state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
+        except InvalidEventError as e:
+            # If an exception occurs fetching events then the room is broken;
+            # skip process it to avoid being stuck on a room.
+            logger.warning(
+                "Failed to fetch events for room %s, skipping stats calculation: %r.",
+                room_id,
+                e,
+            )
+            return
 
-        room_state = {
+        room_state: Dict[str, Union[None, bool, str]] = {
             "join_rules": None,
             "history_visibility": None,
             "encryption": None,
@@ -585,6 +586,7 @@ class StatsStore(StateDeltasStore):
             "avatar": None,
             "canonical_alias": None,
             "is_federatable": True,
+            "room_type": None,
         }
 
         for event in state_event_map.values():
@@ -608,6 +610,9 @@ class StatsStore(StateDeltasStore):
                 room_state["is_federatable"] = (
                     event.content.get(EventContentFields.FEDERATE, True) is True
                 )
+                room_type = event.content.get(EventContentFields.ROOM_TYPE)
+                if isinstance(room_type, str):
+                    room_state["room_type"] = room_type
 
         await self.update_room_state(room_id, room_state)
 
@@ -668,7 +673,7 @@ class StatsStore(StateDeltasStore):
         from_ts: Optional[int] = None,
         until_ts: Optional[int] = None,
         order_by: Optional[str] = UserSortOrder.USER_ID.value,
-        direction: Optional[str] = "f",
+        direction: Direction = Direction.FORWARDS,
         search_term: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users and their uploaded local media
@@ -719,7 +724,7 @@ class StatsStore(StateDeltasStore):
                     500, "Incorrect value for order_by provided: %s" % order_by
                 )
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"

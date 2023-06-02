@@ -25,7 +25,6 @@ from .database import DatabaseConfig
 from .emailconfig import EmailConfig
 from .experimental import ExperimentalConfig
 from .federation import FederationConfig
-from .groups import GroupsConfig
 from .jwt import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
@@ -57,7 +56,6 @@ from .workers import WorkerConfig
 
 
 class HomeServerConfig(RootConfig):
-
     config_classes = [
         ModulesConfig,
         ServerConfig,
@@ -89,7 +87,6 @@ class HomeServerConfig(RootConfig):
         PushConfig,
         SpamCheckerConfig,
         RoomConfig,
-        GroupsConfig,
         UserDirectoryConfig,
         ConsentConfig,
         StatsConfig,

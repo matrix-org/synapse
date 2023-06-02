@@ -1,20 +1,24 @@
 import argparse
 from typing import (
     Any,
+    Collection,
     Dict,
     Iterable,
+    Iterator,
     List,
+    Literal,
     MutableMapping,
     Optional,
     Tuple,
     Type,
     TypeVar,
     Union,
+    overload,
 )
 
 import jinja2
 
-from synapse.config import (
+from synapse.config import (  # noqa: F401
     account_validity,
     api,
     appservice,
@@ -28,7 +32,6 @@ from synapse.config import (
     emailconfig,
     experimental,
     federation,
-    groups,
     jwt,
     key,
     logger,
@@ -58,11 +61,14 @@ from synapse.config import (
     voip,
     workers,
 )
+from synapse.types import StrSequence
 
 class ConfigError(Exception):
-    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+    def __init__(self, msg: str, path: Optional[StrSequence] = None):
         self.msg = msg
         self.path = path
+
+def format_config_error(e: ConfigError) -> Iterator[str]: ...
 
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
 MISSING_REPORT_STATS_SPIEL: str
@@ -101,7 +107,6 @@ class RootConfig:
     push: push.PushConfig
     spamchecker: spam_checker.SpamCheckerConfig
     room: room.RoomConfig
-    groups: groups.GroupsConfig
     userdirectory: user_directory.UserDirectoryConfig
     consent: consent.ConsentConfig
     stats: stats.StatsConfig
@@ -117,7 +122,8 @@ class RootConfig:
     background_updates: background_updates.BackgroundUpdateConfig
 
     config_classes: List[Type["Config"]] = ...
-    def __init__(self) -> None: ...
+    config_files: List[str]
+    def __init__(self, config_files: Collection[str] = ...) -> None: ...
     def invoke_all(
         self, func_name: str, *args: Any, **kwargs: Any
     ) -> MutableMapping[str, Any]: ...
@@ -157,6 +163,12 @@ class RootConfig:
     def generate_missing_files(
         self, config_dict: dict, config_dir_path: str
     ) -> None: ...
+    @overload
+    def reload_config_section(
+        self, section_name: Literal["caches"]
+    ) -> cache.CacheConfig: ...
+    @overload
+    def reload_config_section(self, section_name: str) -> "Config": ...
 
 class Config:
     root: RootConfig
@@ -189,9 +201,9 @@ def find_config_files(search_paths: List[str]) -> List[str]: ...
 class ShardedWorkerHandlingConfig:
     instances: List[str]
     def __init__(self, instances: List[str]) -> None: ...
-    def should_handle(self, instance_name: str, key: str) -> bool: ...
+    def should_handle(self, instance_name: str, key: str) -> bool: ...  # noqa: F811
 
 class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
-    def get_instance(self, key: str) -> str: ...
+    def get_instance(self, key: str) -> str: ...  # noqa: F811
 
 def read_file(file_path: Any, config_path: Iterable[str]) -> str: ...

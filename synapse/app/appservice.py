@@ -17,6 +17,11 @@ import sys
 from synapse.app.generic_worker import start
 from synapse.util.logcontext import LoggingContext
 
-if __name__ == "__main__":
+
+def main() -> None:
     with LoggingContext("main"):
         start(sys.argv[1:])
+
+
+if __name__ == "__main__":
+    main()

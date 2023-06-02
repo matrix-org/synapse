@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import abc
+import collections.abc
 import os
 from typing import (
     TYPE_CHECKING,
@@ -32,11 +33,13 @@ from typing import (
     overload,
 )
 
+import attr
 from typing_extensions import Literal
 from unpaddedbase64 import encode_base64
 
+from synapse.api.constants import RelationTypes
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StrCollection
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
@@ -195,9 +198,16 @@ class _EventInternalMetadata:
     soft_failed: DictProperty[bool] = DictProperty("soft_failed")
     proactively_send: DictProperty[bool] = DictProperty("proactively_send")
     redacted: DictProperty[bool] = DictProperty("redacted")
-    txn_id: DictProperty[str] = DictProperty("txn_id")
-    token_id: DictProperty[int] = DictProperty("token_id")
     historical: DictProperty[bool] = DictProperty("historical")
+
+    txn_id: DictProperty[str] = DictProperty("txn_id")
+    """The transaction ID, if it was set when the event was created."""
+
+    token_id: DictProperty[int] = DictProperty("token_id")
+    """The access token ID of the user who sent this event, if any."""
+
+    device_id: DictProperty[str] = DictProperty("device_id")
+    """The device ID of the user who sent this event, if any."""
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
@@ -213,10 +223,17 @@ class _EventInternalMetadata:
         return self.outlier
 
     def is_out_of_band_membership(self) -> bool:
-        """Whether this is an out of band membership, like an invite or an invite
-        rejection. This is needed as those events are marked as outliers, but
-        they still need to be processed as if they're new events (e.g. updating
-        invite state in the database, relaying to clients, etc).
+        """Whether this event is an out-of-band membership.
+
+        OOB memberships are a special case of outlier events: they are membership events
+        for federated rooms that we aren't full members of. Examples include invites
+        received over federation, and rejections for such invites.
+
+        The concept of an OOB membership is needed because these events need to be
+        processed as if they're new regular events (e.g. updating membership state in
+        the database, relaying to clients via /sync, etc) despite being outliers.
+
+        See also https://matrix-org.github.io/synapse/develop/development/room-dag-concepts.html#out-of-band-membership-events.
 
         (Added in synapse 0.99.0, so may be unreliable for events received before that)
         """
@@ -279,6 +296,10 @@ class _EventInternalMetadata:
         """
         return self._dict.get("historical", False)
 
+    def is_notifiable(self) -> bool:
+        """Whether this event can trigger a push notification"""
+        return not self.is_outlier() or self.is_out_of_band_membership()
+
 
 class EventBase(metaclass=abc.ABCMeta):
     @property
@@ -312,7 +333,6 @@ class EventBase(metaclass=abc.ABCMeta):
     hashes: DictProperty[Dict[str, str]] = DictProperty("hashes")
     origin: DictProperty[str] = DictProperty("origin")
     origin_server_ts: DictProperty[int] = DictProperty("origin_server_ts")
-    redacts: DefaultDictProperty[Optional[str]] = DefaultDictProperty("redacts", None)
     room_id: DictProperty[str] = DictProperty("room_id")
     sender: DictProperty[str] = DictProperty("sender")
     # TODO state_key should be Optional[str]. This is generally asserted in Synapse
@@ -331,6 +351,13 @@ class EventBase(metaclass=abc.ABCMeta):
     @property
     def membership(self) -> str:
         return self.content["membership"]
+
+    @property
+    def redacts(self) -> Optional[str]:
+        """MSC2176 moved the redacts field into the content."""
+        if self.room_version.msc2176_redaction_rules:
+            return self.content.get("redacts")
+        return self.get("redacts")
 
     def is_state(self) -> bool:
         return self.get_state_key() is not None
@@ -399,7 +426,7 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self._dict["prev_events"]]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -432,7 +459,7 @@ class EventBase(metaclass=abc.ABCMeta):
 
 
 class FrozenEvent(EventBase):
-    format_version = EventFormatVersions.V1  # All events of this type are V1
+    format_version = EventFormatVersions.ROOM_V1_V2  # All events of this type are V1
 
     def __init__(
         self,
@@ -448,7 +475,7 @@ class FrozenEvent(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -480,7 +507,7 @@ class FrozenEvent(EventBase):
 
 
 class FrozenEventV2(EventBase):
-    format_version = EventFormatVersions.V2  # All events of this type are V2
+    format_version = EventFormatVersions.ROOM_V3  # All events of this type are V2
 
     def __init__(
         self,
@@ -496,7 +523,7 @@ class FrozenEventV2(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -544,7 +571,7 @@ class FrozenEventV2(EventBase):
         """
         return self._dict["prev_events"]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -557,7 +584,7 @@ class FrozenEventV2(EventBase):
 class FrozenEventV3(FrozenEventV2):
     """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
 
-    format_version = EventFormatVersions.V3  # All events of this type are V3
+    format_version = EventFormatVersions.ROOM_V4_PLUS  # All events of this type are V3
 
     @property
     def event_id(self) -> str:
@@ -583,15 +610,14 @@ def _event_type_from_format_version(
         format_version: The event format version
 
     Returns:
-        type: A type that can be initialized as per the initializer of
-        `FrozenEvent`
+        A type that can be initialized as per the initializer of `FrozenEvent`
     """
 
-    if format_version == EventFormatVersions.V1:
+    if format_version == EventFormatVersions.ROOM_V1_V2:
         return FrozenEvent
-    elif format_version == EventFormatVersions.V2:
+    elif format_version == EventFormatVersions.ROOM_V3:
         return FrozenEventV2
-    elif format_version == EventFormatVersions.V3:
+    elif format_version == EventFormatVersions.ROOM_V4_PLUS:
         return FrozenEventV3
     else:
         raise Exception("No event format %r" % (format_version,))
@@ -608,3 +634,45 @@ def make_event_from_dict(
     return event_type(
         event_dict, room_version, internal_metadata_dict or {}, rejected_reason
     )
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventRelation:
+    # The target event of the relation.
+    parent_id: str
+    # The relation type.
+    rel_type: str
+    # The aggregation key. Will be None if the rel_type is not m.annotation or is
+    # not a string.
+    aggregation_key: Optional[str]
+
+
+def relation_from_event(event: EventBase) -> Optional[_EventRelation]:
+    """
+    Attempt to parse relation information an event.
+
+    Returns:
+        The event relation information, if it is valid. None, otherwise.
+    """
+    relation = event.content.get("m.relates_to")
+    if not relation or not isinstance(relation, collections.abc.Mapping):
+        # No relation information.
+        return None
+
+    # Relations must have a type and parent event ID.
+    rel_type = relation.get("rel_type")
+    if not isinstance(rel_type, str):
+        return None
+
+    parent_id = relation.get("event_id")
+    if not isinstance(parent_id, str):
+        return None
+
+    # Annotations have a key field.
+    aggregation_key = None
+    if rel_type == RelationTypes.ANNOTATION:
+        aggregation_key = relation.get("key")
+        if not isinstance(aggregation_key, str):
+            aggregation_key = None
+
+    return _EventRelation(parent_id, rel_type, aggregation_key)

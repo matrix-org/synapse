@@ -14,18 +14,22 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+from pydantic import Extra, StrictStr
 
 from synapse.api import errors
-from synapse.api.errors import NotFoundError
+from synapse.api.errors import NotFoundError, UnrecognizedRequestError
+from synapse.handlers.device import DeviceHandler
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
-    assert_params_in_dict,
-    parse_json_object_from_request,
+    parse_and_validate_json_object_from_request,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
+from synapse.rest.client.models import AuthenticationData
+from synapse.rest.models import RequestBodyModel
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -36,18 +40,33 @@ logger = logging.getLogger(__name__)
 
 class DevicesRestServlet(RestServlet):
     PATTERNS = client_patterns("/devices$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
+        self._msc3852_enabled = hs.config.experimental.msc3852_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         devices = await self.device_handler.get_devices_by_user(
             requester.user.to_string()
         )
+
+        # If MSC3852 is disabled, then the "last_seen_user_agent" field will be
+        # removed from each device. If it is enabled, then the field name will
+        # be replaced by the unstable identifier.
+        #
+        # When MSC3852 is accepted, this block of code can just be removed to
+        # expose "last_seen_user_agent" to clients.
+        for device in devices:
+            last_seen_user_agent = device["last_seen_user_agent"]
+            del device["last_seen_user_agent"]
+            if self._msc3852_enabled:
+                device["org.matrix.msc3852.last_seen_user_agent"] = last_seen_user_agent
+
         return 200, {"devices": devices}
 
 
@@ -63,30 +82,34 @@ class DeleteDevicesRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.device_handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.device_handler = handler
         self.auth_handler = hs.get_auth_handler()
+
+    class PostBody(RequestBodyModel):
+        auth: Optional[AuthenticationData]
+        devices: List[StrictStr]
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
         try:
-            body = parse_json_object_from_request(request)
+            body = parse_and_validate_json_object_from_request(request, self.PostBody)
         except errors.SynapseError as e:
             if e.errcode == errors.Codes.NOT_JSON:
-                # DELETE
+                # TODO: Can/should we remove this fallback now?
                 # deal with older clients which didn't pass a JSON dict
                 # the same as those that pass an empty dict
-                body = {}
+                body = self.PostBody.parse_obj({})
             else:
                 raise e
-
-        assert_params_in_dict(body, ["devices"])
 
         await self.auth_handler.validate_user_via_ui_auth(
             requester,
             request,
-            body,
+            body.dict(exclude_unset=True),
             "remove device(s) from your account",
             # Users might call this multiple times in a row while cleaning up
             # devices, allow a single UI auth session to be re-used.
@@ -94,20 +117,25 @@ class DeleteDevicesRestServlet(RestServlet):
         )
 
         await self.device_handler.delete_devices(
-            requester.user.to_string(), body["devices"]
+            requester.user.to_string(), body.devices
         )
         return 200, {}
 
 
 class DeviceRestServlet(RestServlet):
     PATTERNS = client_patterns("/devices/(?P<device_id>[^/]*)$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.device_handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.device_handler = handler
         self.auth_handler = hs.get_auth_handler()
+        self._msc3852_enabled = hs.config.experimental.msc3852_enabled
+        self._msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
     async def on_GET(
         self, request: SynapseRequest, device_id: str
@@ -118,48 +146,84 @@ class DeviceRestServlet(RestServlet):
         )
         if device is None:
             raise NotFoundError("No device found")
+
+        # If MSC3852 is disabled, then the "last_seen_user_agent" field will be
+        # removed from each device. If it is enabled, then the field name will
+        # be replaced by the unstable identifier.
+        #
+        # When MSC3852 is accepted, this block of code can just be removed to
+        # expose "last_seen_user_agent" to clients.
+        last_seen_user_agent = device["last_seen_user_agent"]
+        del device["last_seen_user_agent"]
+        if self._msc3852_enabled:
+            device["org.matrix.msc3852.last_seen_user_agent"] = last_seen_user_agent
+
         return 200, device
+
+    class DeleteBody(RequestBodyModel):
+        auth: Optional[AuthenticationData]
 
     @interactive_auth_handler
     async def on_DELETE(
         self, request: SynapseRequest, device_id: str
     ) -> Tuple[int, JsonDict]:
+        if self._msc3861_oauth_delegation_enabled:
+            raise UnrecognizedRequestError(code=404)
+
         requester = await self.auth.get_user_by_req(request)
 
         try:
-            body = parse_json_object_from_request(request)
+            body = parse_and_validate_json_object_from_request(request, self.DeleteBody)
 
         except errors.SynapseError as e:
             if e.errcode == errors.Codes.NOT_JSON:
+                # TODO: can/should we remove this fallback now?
                 # deal with older clients which didn't pass a JSON dict
                 # the same as those that pass an empty dict
-                body = {}
+                body = self.DeleteBody.parse_obj({})
             else:
                 raise
 
         await self.auth_handler.validate_user_via_ui_auth(
             requester,
             request,
-            body,
+            body.dict(exclude_unset=True),
             "remove a device from your account",
             # Users might call this multiple times in a row while cleaning up
             # devices, allow a single UI auth session to be re-used.
             can_skip_ui_auth=True,
         )
 
-        await self.device_handler.delete_device(requester.user.to_string(), device_id)
+        await self.device_handler.delete_devices(
+            requester.user.to_string(), [device_id]
+        )
         return 200, {}
+
+    class PutBody(RequestBodyModel):
+        display_name: Optional[StrictStr]
 
     async def on_PUT(
         self, request: SynapseRequest, device_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        body = parse_json_object_from_request(request)
+        body = parse_and_validate_json_object_from_request(request, self.PutBody)
         await self.device_handler.update_device(
-            requester.user.to_string(), device_id, body
+            requester.user.to_string(), device_id, body.dict()
         )
         return 200, {}
+
+
+class DehydratedDeviceDataModel(RequestBodyModel):
+    """JSON blob describing a dehydrated device to be stored.
+
+    Expects other freeform fields. Use .dict() to access them.
+    """
+
+    class Config:
+        extra = Extra.allow
+
+    algorithm: StrictStr
 
 
 class DehydratedDeviceServlet(RestServlet):
@@ -178,7 +242,7 @@ class DehydratedDeviceServlet(RestServlet):
       }
     }
 
-    PUT /org.matrix.msc2697/dehydrated_device
+    PUT /org.matrix.msc2697.v2/dehydrated_device
     Content-Type: application/json
 
     {
@@ -197,13 +261,15 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
-    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device", releases=())
+    PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device$", releases=())
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.device_handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.device_handler = handler
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -217,27 +283,18 @@ class DehydratedDeviceServlet(RestServlet):
         else:
             raise errors.NotFoundError("No dehydrated device available")
 
-    async def on_PUT(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        submission = parse_json_object_from_request(request)
-        requester = await self.auth.get_user_by_req(request)
+    class PutBody(RequestBodyModel):
+        device_data: DehydratedDeviceDataModel
+        initial_device_display_name: Optional[StrictStr]
 
-        if "device_data" not in submission:
-            raise errors.SynapseError(
-                400,
-                "device_data missing",
-                errcode=errors.Codes.MISSING_PARAM,
-            )
-        elif not isinstance(submission["device_data"], dict):
-            raise errors.SynapseError(
-                400,
-                "device_data must be an object",
-                errcode=errors.Codes.INVALID_PARAM,
-            )
+    async def on_PUT(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        submission = parse_and_validate_json_object_from_request(request, self.PutBody)
+        requester = await self.auth.get_user_by_req(request)
 
         device_id = await self.device_handler.store_dehydrated_device(
             requester.user.to_string(),
-            submission["device_data"],
-            submission.get("initial_device_display_name", None),
+            submission.device_data.dict(),
+            submission.initial_device_display_name,
         )
         return 200, {"device_id": device_id}
 
@@ -269,38 +326,35 @@ class ClaimDehydratedDeviceServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.device_handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.device_handler = handler
+
+    class PostBody(RequestBodyModel):
+        device_id: StrictStr
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        submission = parse_json_object_from_request(request)
-
-        if "device_id" not in submission:
-            raise errors.SynapseError(
-                400,
-                "device_id missing",
-                errcode=errors.Codes.MISSING_PARAM,
-            )
-        elif not isinstance(submission["device_id"], str):
-            raise errors.SynapseError(
-                400,
-                "device_id must be a string",
-                errcode=errors.Codes.INVALID_PARAM,
-            )
+        submission = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         result = await self.device_handler.rehydrate_device(
             requester.user.to_string(),
             self.auth.get_access_token_from_request(request),
-            submission["device_id"],
+            submission.device_id,
         )
 
         return 200, result
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    DeleteDevicesRestServlet(hs).register(http_server)
+    if (
+        hs.config.worker.worker_app is None
+        and not hs.config.experimental.msc3861.enabled
+    ):
+        DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
-    DeviceRestServlet(hs).register(http_server)
-    DehydratedDeviceServlet(hs).register(http_server)
-    ClaimDehydratedDeviceServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        DeviceRestServlet(hs).register(http_server)
+        DehydratedDeviceServlet(hs).register(http_server)
+        ClaimDehydratedDeviceServlet(hs).register(http_server)

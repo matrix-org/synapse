@@ -17,7 +17,7 @@ import logging
 import re
 import urllib.parse
 from inspect import signature
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, ClassVar, Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -25,12 +25,16 @@ from twisted.internet.error import ConnectError, DNSLookupError
 from twisted.web.server import Request
 
 from synapse.api.errors import HttpResponseException, SynapseError
+from synapse.config.workers import MAIN_PROCESS_INSTANCE_NAME
 from synapse.http import RequestTimedOutError
 from synapse.http.server import HttpServer
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing
-from synapse.logging.opentracing import trace
+from synapse.logging.opentracing import trace_with_opname
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.cancellation import is_function_cancellable
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
@@ -49,6 +53,9 @@ _outgoing_request_counter = Counter(
     "Number of outgoing replication requests, by replication method name and result",
     ["name", "code"],
 )
+
+
+_STREAM_POSITION_KEY = "_INT_STREAM_POS"
 
 
 class ReplicationEndpoint(metaclass=abc.ABCMeta):
@@ -92,6 +99,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             a connection error is received.
         RETRY_ON_CONNECT_ERROR_ATTEMPTS (int): Number of attempts to retry when
             receiving connection errors, each will backoff exponentially longer.
+        WAIT_FOR_STREAMS (bool): Whether to wait for replication streams to
+            catch up before processing the request and/or response. Defaults to
+            True.
     """
 
     NAME: str = abc.abstractproperty()  # type: ignore
@@ -101,6 +111,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     RETRY_ON_TIMEOUT = True
     RETRY_ON_CONNECT_ERROR = True
     RETRY_ON_CONNECT_ERROR_ATTEMPTS = 5  # =63s (2^6-1)
+
+    WAIT_FOR_STREAMS: ClassVar[bool] = True
 
     def __init__(self, hs: "HomeServer"):
         if self.CACHE:
@@ -123,6 +135,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         self._replication_secret = None
         if hs.config.worker.worker_replication_secret:
             self._replication_secret = hs.config.worker.worker_replication_secret
+
+        self._streams = hs.get_replication_command_handler().get_streams_to_replicate()
+        self._replication = hs.get_replication_data_handler()
+        self._instance_name = hs.get_instance_name()
 
     def _check_auth(self, request: Request) -> None:
         # Get the authorization header.
@@ -151,14 +167,14 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         argument list.
 
         Returns:
-            dict: If POST/PUT request then dictionary must be JSON serialisable,
+            If POST/PUT request then dictionary must be JSON serialisable,
             otherwise must be appropriate for adding as query args.
         """
         return {}
 
     @abc.abstractmethod
     async def _handle_request(
-        self, request: Request, **kwargs: Any
+        self, request: Request, content: JsonDict, **kwargs: Any
     ) -> Tuple[int, JsonDict]:
         """Handle incoming request.
 
@@ -179,11 +195,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         the `instance_map` config).
         """
         clock = hs.get_clock()
-        client = hs.get_simple_http_client()
+        client = hs.get_replication_client()
         local_instance_name = hs.get_instance_name()
-
-        master_host = hs.config.worker.worker_replication_host
-        master_port = hs.config.worker.worker_replication_http_port
 
         instance_map = hs.config.worker.instance_map
 
@@ -195,23 +208,41 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 "ascii"
             )
 
-        @trace(opname="outgoing_replication_request")
-        async def send_request(*, instance_name: str = "master", **kwargs: Any) -> Any:
+        @trace_with_opname("outgoing_replication_request")
+        async def send_request(
+            *, instance_name: str = MAIN_PROCESS_INSTANCE_NAME, **kwargs: Any
+        ) -> Any:
+            # We have to pull these out here to avoid circular dependencies...
+            streams = hs.get_replication_command_handler().get_streams_to_replicate()
+            replication = hs.get_replication_data_handler()
+
             with outgoing_gauge.track_inprogress():
                 if instance_name == local_instance_name:
                     raise Exception("Trying to send HTTP request to self")
-                if instance_name == "master":
-                    host = master_host
-                    port = master_port
-                elif instance_name in instance_map:
-                    host = instance_map[instance_name].host
-                    port = instance_map[instance_name].port
-                else:
+                if instance_name not in instance_map:
                     raise Exception(
                         "Instance %r not in 'instance_map' config" % (instance_name,)
                     )
 
                 data = await cls._serialize_payload(**kwargs)
+
+                if cls.METHOD != "GET" and cls.WAIT_FOR_STREAMS:
+                    # Include the current stream positions that we write to. We
+                    # don't do this for GETs as they don't have a body, and we
+                    # generally assume that a GET won't rely on data we have
+                    # written.
+                    if _STREAM_POSITION_KEY in data:
+                        raise Exception(
+                            "data to send contains %r key", _STREAM_POSITION_KEY
+                        )
+
+                    data[_STREAM_POSITION_KEY] = {
+                        "streams": {
+                            stream.NAME: stream.current_token(local_instance_name)
+                            for stream in streams
+                        },
+                        "instance_name": local_instance_name,
+                    }
 
                 url_args = [
                     urllib.parse.quote(kwargs[name], safe="") for name in cls.PATH_ARGS
@@ -236,9 +267,11 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         "Unknown METHOD on %s replication endpoint" % (cls.NAME,)
                     )
 
-                uri = "http://%s:%s/_synapse/replication/%s/%s" % (
-                    host,
-                    port,
+                # Hard code a special scheme to show this only used for replication. The
+                # instance_name will be passed into the ReplicationEndpointFactory to
+                # determine connection details from the instance_map.
+                uri = "synapse-replication://%s/_synapse/replication/%s/%s" % (
+                    instance_name,
                     cls.NAME,
                     "/".join(url_args),
                 )
@@ -298,6 +331,17 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     ) from e
 
                 _outgoing_request_counter.labels(cls.NAME, 200).inc()
+
+                # Wait on any streams that the remote may have written to.
+                for stream_name, position in result.pop(
+                    _STREAM_POSITION_KEY, {}
+                ).items():
+                    await replication.wait_for_stream_position(
+                        instance_name=instance_name,
+                        stream_name=stream_name,
+                        position=position,
+                    )
+
                 return result
 
         return send_request
@@ -309,6 +353,12 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
 
         url_args = list(self.PATH_ARGS)
         method = self.METHOD
+
+        if self.CACHE and is_function_cancellable(self._handle_request):
+            raise Exception(
+                f"{self.__class__.__name__} has been marked as cancellable, but CACHE "
+                "is set. The cancellable flag would have no effect."
+            )
 
         if self.CACHE:
             url_args.append("txn_id")
@@ -324,7 +374,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         )
 
     async def _check_auth_and_handle(
-        self, request: Request, **kwargs: Any
+        self, request: SynapseRequest, **kwargs: Any
     ) -> Tuple[int, JsonDict]:
         """Called on new incoming requests when caching is enabled. Checks
         if there is a cached response for the request and returns that,
@@ -337,11 +387,54 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self._replication_secret:
             self._check_auth(request)
 
+        if self.METHOD == "GET":
+            # GET APIs always have an empty body.
+            content = {}
+        else:
+            content = parse_json_object_from_request(request)
+
+        # Wait on any streams that the remote may have written to.
+        for stream_name, position in content.get(_STREAM_POSITION_KEY, {"streams": {}})[
+            "streams"
+        ].items():
+            await self._replication.wait_for_stream_position(
+                instance_name=content[_STREAM_POSITION_KEY]["instance_name"],
+                stream_name=stream_name,
+                position=position,
+            )
+
         if self.CACHE:
             txn_id = kwargs.pop("txn_id")
 
-            return await self.response_cache.wrap(
-                txn_id, self._handle_request, request, **kwargs
+            # We ignore the `@cancellable` flag, since cancellation wouldn't interupt
+            # `_handle_request` and `ResponseCache` does not handle cancellation
+            # correctly yet. In particular, there may be issues to do with logging
+            # context lifetimes.
+
+            code, response = await self.response_cache.wrap(
+                txn_id, self._handle_request, request, content, **kwargs
+            )
+            # Take a copy so we don't mutate things in the cache.
+            response = dict(response)
+        else:
+            # The `@cancellable` decorator may be applied to `_handle_request`. But we
+            # told `HttpServer.register_paths` that our handler is `_check_auth_and_handle`,
+            # so we have to set up the cancellable flag ourselves.
+            request.is_render_cancellable = is_function_cancellable(
+                self._handle_request
             )
 
-        return await self._handle_request(request, **kwargs)
+            code, response = await self._handle_request(request, content, **kwargs)
+
+        # Return streams we may have written to in the course of processing this
+        # request.
+        if _STREAM_POSITION_KEY in response:
+            raise Exception("data to send contains %r key", _STREAM_POSITION_KEY)
+
+        if self.WAIT_FOR_STREAMS:
+            response[_STREAM_POSITION_KEY] = {
+                stream.NAME: stream.current_token(self._instance_name)
+                for stream in self._streams
+            }
+
+        return code, response

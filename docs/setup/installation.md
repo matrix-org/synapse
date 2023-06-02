@@ -26,8 +26,8 @@ for most users.
 #### Docker images and Ansible playbooks
 
 There is an official synapse image available at
-<https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
-the docker-compose file available at
+<https://hub.docker.com/r/matrixdotorg/synapse> or at [`ghcr.io/matrix-org/synapse`](https://ghcr.io/matrix-org/synapse)
+which can be used with the docker-compose file available at
 [contrib/docker](https://github.com/matrix-org/synapse/tree/develop/contrib/docker).
 Further information on this including configuration options is available in the README
 on hub.docker.com.
@@ -84,40 +84,45 @@ file when you upgrade the Debian package to a later version.
 
 ##### Downstream Debian packages
 
-We do not recommend using the packages from the default Debian `buster`
-repository at this time, as they are old and suffer from known security
-vulnerabilities. You can install the latest version of Synapse from
-[our repository](#matrixorg-packages) or from `buster-backports`. Please
-see the [Debian documentation](https://backports.debian.org/Instructions/)
-for information on how to use backports.
-
-If you are using Debian `sid` or testing, Synapse is available in the default
-repositories and it should be possible to install it simply with:
+Andrej Shadura maintains a
+[`matrix-synapse`](https://packages.debian.org/sid/matrix-synapse) package in
+the Debian repositories.
+For `bookworm` and `sid`, it can be installed simply with:
 
 ```sh
 sudo apt install matrix-synapse
 ```
 
+Synapse is also avaliable in `bullseye-backports`.  Please
+see the [Debian documentation](https://backports.debian.org/Instructions/)
+for information on how to use backports.
+
+`matrix-synapse` is no longer maintained for `buster` and older.
+
 ##### Downstream Ubuntu packages
 
 We do not recommend using the packages in the default Ubuntu repository
-at this time, as they are old and suffer from known security vulnerabilities.
+at this time, as they are [old and suffer from known security vulnerabilities](
+    https://bugs.launchpad.net/ubuntu/+source/matrix-synapse/+bug/1848709
+).
 The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
 
 #### Fedora
 
-Synapse is in the Fedora repositories as `matrix-synapse`:
+Synapse is in the Fedora repositories as
+[`matrix-synapse`](https://src.fedoraproject.org/rpms/matrix-synapse):
 
 ```sh
 sudo dnf install matrix-synapse
 ```
 
-Oleg Girko provides Fedora RPMs at
+Additionally, Oleg Girko provides Fedora RPMs at
 <https://obs.infoserver.lv/project/monitor/matrix-synapse>
 
 #### OpenSUSE
 
-Synapse is in the OpenSUSE repositories as `matrix-synapse`:
+Synapse is in the OpenSUSE repositories as
+[`matrix-synapse`](https://software.opensuse.org/package/matrix-synapse):
 
 ```sh
 sudo zypper install matrix-synapse
@@ -131,7 +136,7 @@ Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 reposi
 #### ArchLinux
 
 The quickest way to get up and running with ArchLinux is probably with the community package
-<https://www.archlinux.org/packages/community/any/matrix-synapse/>, which should pull in most of
+<https://archlinux.org/packages/community/x86_64/matrix-synapse/>, which should pull in most of
 the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
@@ -152,7 +157,8 @@ sudo pip install py-bcrypt
 
 #### Void Linux
 
-Synapse can be found in the void repositories as 'synapse':
+Synapse can be found in the void repositories as
+['synapse'](https://github.com/void-linux/void-packages/tree/master/srcpkgs/synapse):
 
 ```sh
 xbps-install -Su
@@ -182,7 +188,7 @@ doas pkg_add synapse
 #### NixOS
 
 Robin Lambertz has packaged Synapse for NixOS at:
-<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
+<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix>
 
 
 ### Installing as a Python module from PyPI
@@ -194,8 +200,12 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.7 or later, up to Python 3.10.
+- Python 3.7 or later, up to Python 3.11.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
+
+If building on an uncommon architecture for which pre-built wheels are
+unavailable, you will need to have a recent Rust compiler installed. The easiest
+way of installing the latest version is to use [rustup](https://rustup.rs/).
 
 To install the Synapse homeserver run:
 
@@ -233,7 +243,9 @@ python -m synapse.app.homeserver \
     --report-stats=[yes|no]
 ```
 
-... substituting an appropriate value for `--server-name`.
+... substituting an appropriate value for `--server-name` and choosing whether
+or not to report usage statistics (hostname, Synapse version, uptime, total
+users, etc.) to the developers via the `--report-stats` argument.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your homeserver to
@@ -266,7 +278,7 @@ Installing prerequisites on Ubuntu or Debian:
 ```sh
 sudo apt install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev libicu-dev
 ```
 
 ##### ArchLinux
@@ -275,7 +287,7 @@ Installing prerequisites on ArchLinux:
 
 ```sh
 sudo pacman -S base-devel python python-pip \
-               python-setuptools python-virtualenv sqlite3
+               python-setuptools python-virtualenv sqlite3 icu
 ```
 
 ##### CentOS/Fedora
@@ -285,7 +297,8 @@ Installing prerequisites on CentOS or Fedora Linux:
 ```sh
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  libwebp-devel libxml2-devel libxslt-devel libpq-devel \
-                 python3-virtualenv libffi-devel openssl-devel python3-devel
+                 python3-virtualenv libffi-devel openssl-devel python3-devel \
+                 libicu-devel
 sudo dnf groupinstall "Development Tools"
 ```
 
@@ -298,9 +311,14 @@ You may need to install the latest Xcode developer tools:
 xcode-select --install
 ```
 
-On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):
+Some extra dependencies may be needed. You can use Homebrew (https://brew.sh) for them.
+
+You may need to install icu, and make the icu binaries and libraries accessible.
+Please follow [the official instructions of PyICU](https://pypi.org/project/PyICU/) to do so.
+
+On ARM-based Macs you may also need to install libjpeg and libpq:
 ```sh
- brew install jpeg
+ brew install jpeg libpq
  ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
@@ -319,7 +337,8 @@ Installing prerequisites on openSUSE:
 ```sh
 sudo zypper in -t pattern devel_basis
 sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
-               python-devel libffi-devel libopenssl-devel libjpeg62-devel
+               python-devel libffi-devel libopenssl-devel libjpeg62-devel \
+               libicu-devel
 ```
 
 ##### OpenBSD
@@ -406,11 +425,11 @@ The recommended way to do so is to set up a reverse proxy on port
 Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit `homeserver.yaml`, as follows:
 
-- First, under the `listeners` section, uncomment the configuration for the
-  TLS-enabled listener. (Remove the hash sign (`#`) at the start of
-  each line). The relevant lines are like this:
+- First, under the `listeners` option, add the configuration for the
+  TLS-enabled listener like so:
 
 ```yaml
+listeners:
   - port: 8448
     type: http
     tls: true
@@ -418,9 +437,11 @@ so, you will need to edit `homeserver.yaml`, as follows:
       - names: [client, federation]
   ```
 
-- You will also need to uncomment the `tls_certificate_path` and
-  `tls_private_key_path` lines under the `TLS` section. You will need to manage
-  provisioning of these certificates yourself.
+- You will also need to add the options `tls_certificate_path` and
+  `tls_private_key_path`. to your configuration file. You will need to manage provisioning of 
+   these certificates yourself.
+- You can find more information about these options as well as how to configure synapse in the 
+  [configuration manual](../usage/configuration/config_documentation.md).
 
   If you are using your own certificate, be sure to use a `.pem` file that
   includes the full certificate chain including any intermediate certificates
@@ -503,9 +524,13 @@ email will be disabled.
 
 ### Registering a user
 
-The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
+One way to create a new user is to do so from a client like
+[Element](https://element.io/).  This requires registration to be enabled via
+the
+[`enable_registration`](../usage/configuration/config_documentation.md#enable_registration)
+setting.
 
-Alternatively, you can do so from the command line. This can be done as follows:
+Alternatively, you can create new users from the command line. This can be done as follows:
 
  1. If synapse was installed via pip, activate the virtualenv as follows (if Synapse was
     installed via a prebuilt package, `register_new_matrix_user` should already be
@@ -517,7 +542,7 @@ Alternatively, you can do so from the command line. This can be done as follows:
     ```
  2. Run the following command:
     ```sh
-    register_new_matrix_user -c homeserver.yaml http://localhost:8008
+    register_new_matrix_user -c homeserver.yaml
     ```
 
 This will prompt you to add details for the new user, and will then connect to
@@ -530,12 +555,13 @@ Make admin [no]:
 Success!
 ```
 
-This process uses a setting `registration_shared_secret` in
-`homeserver.yaml`, which is shared between Synapse itself and the
-`register_new_matrix_user` script. It doesn't matter what it is (a random
-value is generated by `--generate-config`), but it should be kept secret, as
-anyone with knowledge of it can register users, including admin accounts,
-on your server even if `enable_registration` is `false`.
+This process uses a setting
+[`registration_shared_secret`](../usage/configuration/config_documentation.md#registration_shared_secret),
+which is shared between Synapse itself and the `register_new_matrix_user`
+script. It doesn't matter what it is (a random value is generated by
+`--generate-config`), but it should be kept secret, as anyone with knowledge of
+it can register users, including admin accounts, on your server even if
+`enable_registration` is `false`.
 
 ### Setting up a TURN server
 

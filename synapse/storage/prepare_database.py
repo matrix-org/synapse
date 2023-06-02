@@ -22,9 +22,8 @@ import attr
 from typing_extensions import Counter as CounterType
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.storage.database import LoggingDatabaseConnection
-from synapse.storage.engines import BaseDatabaseEngine
-from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.database import LoggingDatabaseConnection, LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.schema import SCHEMA_COMPAT_VERSION, SCHEMA_VERSION
 from synapse.storage.types import Cursor
 
@@ -85,7 +84,7 @@ def prepare_database(
     database_engine: BaseDatabaseEngine,
     config: Optional[HomeServerConfig],
     databases: Collection[str] = ("main", "state"),
-):
+) -> None:
     """Prepares a physical database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
 
@@ -109,9 +108,14 @@ def prepare_database(
         # so we start one before running anything. This ensures that any upgrades
         # are either applied completely, or not at all.
         #
-        # (psycopg2 automatically starts a transaction as soon as we run any statements
-        # at all, so this is redundant but harmless there.)
-        cur.execute("BEGIN TRANSACTION")
+        # psycopg2 does not automatically start transactions when in autocommit mode.
+        # While it is technically harmless to nest transactions in postgres, doing so
+        # results in a warning in Postgres' logs per query. And we'd rather like to
+        # avoid doing that.
+        if isinstance(database_engine, Sqlite3Engine) or (
+            isinstance(database_engine, PostgresEngine) and db_conn.autocommit
+        ):
+            cur.execute("BEGIN TRANSACTION")
 
         logger.info("%r: Checking existing schema version", databases)
         version_info = _get_or_create_schema_state(cur, database_engine)
@@ -164,7 +168,9 @@ def prepare_database(
 
 
 def _setup_new_database(
-    cur: Cursor, database_engine: BaseDatabaseEngine, databases: Collection[str]
+    cur: LoggingTransaction,
+    database_engine: BaseDatabaseEngine,
+    databases: Collection[str],
 ) -> None:
     """Sets up the physical database by finding a base set of "full schemas" and
     then applying any necessary deltas, including schemas from the given data
@@ -267,7 +273,7 @@ def _setup_new_database(
             ".sql." + specific
         ):
             logger.debug("Applying schema %s", entry.absolute_path)
-            executescript(cur, entry.absolute_path)
+            database_engine.execute_script_file(cur, entry.absolute_path)
 
     cur.execute(
         "INSERT INTO schema_version (version, upgraded) VALUES (?,?)",
@@ -285,7 +291,7 @@ def _setup_new_database(
 
 
 def _upgrade_existing_database(
-    cur: Cursor,
+    cur: LoggingTransaction,
     current_schema_state: _SchemaState,
     database_engine: BaseDatabaseEngine,
     config: Optional[HomeServerConfig],
@@ -501,11 +507,11 @@ def _upgrade_existing_database(
 
                 if hasattr(module, "run_create"):
                     logger.info("Running %s:run_create", relative_path)
-                    module.run_create(cur, database_engine)  # type: ignore
+                    module.run_create(cur, database_engine)
 
                 if not is_empty and hasattr(module, "run_upgrade"):
                     logger.info("Running %s:run_upgrade", relative_path)
-                    module.run_upgrade(cur, database_engine, config=config)  # type: ignore
+                    module.run_upgrade(cur, database_engine, config=config)
             elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
@@ -518,7 +524,7 @@ def _upgrade_existing_database(
                         UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying schema %s", relative_path)
-                executescript(cur, absolute_path)
+                database_engine.execute_script_file(cur, absolute_path)
             elif ext == specific_engine_extension and root_name.endswith(".sql"):
                 # A .sql file specific to our engine; just read and execute it
                 if is_worker:
@@ -526,7 +532,7 @@ def _upgrade_existing_database(
                         UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
                 logger.info("Applying engine-specific schema %s", relative_path)
-                executescript(cur, absolute_path)
+                database_engine.execute_script_file(cur, absolute_path)
             elif ext in specific_engine_extensions and root_name.endswith(".sql"):
                 # A .sql file for a different engine; skip it.
                 continue
@@ -559,7 +565,7 @@ def _apply_module_schemas(
     """
     # This is the old way for password_auth_provider modules to make changes
     # to the database. This should instead be done using the module API
-    for (mod, _config) in config.authproviders.password_providers:
+    for mod, _config in config.authproviders.password_providers:
         if not hasattr(mod, "get_db_schema_files"):
             continue
         modname = ".".join((mod.__module__, mod.__name__))
@@ -587,7 +593,7 @@ def _apply_module_schema_files(
         (modname,),
     )
     applied_deltas = {d for d, in cur}
-    for (name, stream) in names_and_streams:
+    for name, stream in names_and_streams:
         if name in applied_deltas:
             continue
 
@@ -667,7 +673,7 @@ def _get_or_create_schema_state(
 ) -> Optional[_SchemaState]:
     # Bluntly try creating the schema_version tables.
     sql_path = os.path.join(schema_path, "common", "schema_version.sql")
-    executescript(txn, sql_path)
+    database_engine.execute_script_file(txn, sql_path)
 
     txn.execute("SELECT version, upgraded FROM schema_version")
     row = txn.fetchone()

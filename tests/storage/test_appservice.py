@@ -14,7 +14,7 @@
 import json
 import os
 import tempfile
-from typing import List, Optional, cast
+from typing import List, cast
 from unittest.mock import Mock
 
 import yaml
@@ -26,7 +26,7 @@ from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.config._base import ConfigError
 from synapse.events import EventBase
 from synapse.server import HomeServer
-from synapse.storage.database import DatabasePool, make_conn
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection, make_conn
 from synapse.storage.databases.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
@@ -39,7 +39,7 @@ from tests.test_utils import make_awaitable
 
 
 class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super(ApplicationServiceStoreTestCase, self).setUp()
 
         self.as_yaml_files: List[str] = []
@@ -73,7 +73,9 @@ class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
 
         super(ApplicationServiceStoreTestCase, self).tearDown()
 
-    def _add_appservice(self, as_token, id, url, hs_token, sender) -> None:
+    def _add_appservice(
+        self, as_token: str, id: str, url: str, hs_token: str, sender: str
+    ) -> None:
         as_yaml = {
             "url": url,
             "as_token": as_token,
@@ -135,7 +137,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             database, make_conn(db_config, self.engine, "test"), self.hs
         )
 
-    def _add_service(self, url, as_token, id) -> None:
+    def _add_service(self, url: str, as_token: str, id: str) -> None:
         as_yaml = {
             "url": url,
             "as_token": as_token,
@@ -149,18 +151,17 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
-    def _set_state(
-        self, id: str, state: ApplicationServiceState, txn: Optional[int] = None
-    ):
+    def _set_state(self, id: str, state: ApplicationServiceState) -> defer.Deferred:
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
-                "INSERT INTO application_services_state(as_id, state, last_txn) "
-                "VALUES(?,?,?)"
+                "INSERT INTO application_services_state(as_id, state) VALUES(?,?)"
             ),
-            (id, state.value, txn),
+            (id, state.value),
         )
 
-    def _insert_txn(self, as_id, txn_id, events):
+    def _insert_txn(
+        self, as_id: str, txn_id: int, events: List[Mock]
+    ) -> "defer.Deferred[None]":
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
                 "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
@@ -283,17 +284,6 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         res = self.get_success(
             self.db_pool.runQuery(
                 self.engine.convert_param_style(
-                    "SELECT last_txn FROM application_services_state WHERE as_id=?"
-                ),
-                (service.id,),
-            )
-        )
-        self.assertEqual(1, len(res))
-        self.assertEqual(txn_id, res[0][0])
-
-        res = self.get_success(
-            self.db_pool.runQuery(
-                self.engine.convert_param_style(
                     "SELECT * FROM application_services_txns WHERE txn_id=?"
                 ),
                 (txn_id,),
@@ -316,14 +306,13 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         res = self.get_success(
             self.db_pool.runQuery(
                 self.engine.convert_param_style(
-                    "SELECT last_txn, state FROM application_services_state WHERE as_id=?"
+                    "SELECT state FROM application_services_state WHERE as_id=?"
                 ),
                 (service.id,),
             )
         )
         self.assertEqual(1, len(res))
-        self.assertEqual(txn_id, res[0][0])
-        self.assertEqual(ApplicationServiceState.UP.value, res[0][1])
+        self.assertEqual(ApplicationServiceState.UP.value, res[0][0])
 
         res = self.get_success(
             self.db_pool.runQuery(
@@ -463,12 +452,14 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
 
 # required for ApplicationServiceTransactionStoreTestCase tests
 class TestTransactionStore(ApplicationServiceTransactionStore, ApplicationServiceStore):
-    def __init__(self, database: DatabasePool, db_conn, hs) -> None:
+    def __init__(
+        self, database: DatabasePool, db_conn: LoggingDatabaseConnection, hs: HomeServer
+    ) -> None:
         super().__init__(database, db_conn, hs)
 
 
 class ApplicationServiceStoreConfigTestCase(unittest.HomeserverTestCase):
-    def _write_config(self, suffix, **kwargs) -> str:
+    def _write_config(self, suffix: str, **kwargs: str) -> str:
         vals = {
             "id": "id" + suffix,
             "url": "url" + suffix,

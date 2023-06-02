@@ -22,6 +22,10 @@ class FederationConfig(Config):
     section = "federation"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
+        federation_config = config.get("federation")
+        if federation_config is None:
+            federation_config = {}
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist: Optional[dict] = None
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)
@@ -46,47 +50,15 @@ class FederationConfig(Config):
         )
 
         self.allow_device_name_lookup_over_federation = config.get(
-            "allow_device_name_lookup_over_federation", True
+            "allow_device_name_lookup_over_federation", False
         )
 
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        ## Federation ##
-
-        # Restrict federation to the following whitelist of domains.
-        # N.B. we recommend also firewalling your federation listener to limit
-        # inbound federation traffic as early as possible, rather than relying
-        # purely on this application-layer restriction.  If not specified, the
-        # default is to whitelist everything.
-        #
-        #federation_domain_whitelist:
-        #  - lon.example.com
-        #  - nyc.example.com
-        #  - syd.example.com
-
-        # Report prometheus metrics on the age of PDUs being sent to and received from
-        # the following domains. This can be used to give an idea of "delay" on inbound
-        # and outbound federation, though be aware that any delay can be due to problems
-        # at either end or with the intermediate network.
-        #
-        # By default, no domains are monitored in this way.
-        #
-        #federation_metrics_domains:
-        #  - matrix.org
-        #  - example.com
-
-        # Uncomment to disable profile lookup over federation. By default, the
-        # Federation API allows other homeservers to obtain profile data of any user
-        # on this homeserver. Defaults to 'true'.
-        #
-        #allow_profile_lookup_over_federation: false
-
-        # Uncomment to disable device display name lookup over federation. By default, the
-        # Federation API allows other homeservers to obtain device display names of any user
-        # on this homeserver. Defaults to 'true'.
-        #
-        #allow_device_name_lookup_over_federation: false
-        """
+        # Allow for the configuration of max request retries and min/max retry delays
+        # in the matrix federation client
+        self.max_long_retry_delay = federation_config.get("max_long_retry_delay", 60)
+        self.max_short_retry_delay = federation_config.get("max_short_retry_delay", 2)
+        self.max_long_retries = federation_config.get("max_long_retries", 10)
+        self.max_short_retries = federation_config.get("max_short_retries", 3)
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}

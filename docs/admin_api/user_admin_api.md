@@ -1,7 +1,7 @@
 # User Admin API
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 ## Query User Account
 
@@ -37,11 +37,13 @@ It returns a JSON body like the following:
     "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
+    "erased": false,
     "shadow_banned": 0,
     "creation_ts": 1560432506,
     "appservice_id": null,
     "consent_server_notice_sent": null,
     "consent_version": null,
+    "consent_ts": null,
     "external_ids": [
         {
             "auth_provider": "<provider1>",
@@ -60,7 +62,7 @@ URL parameters:
 
 - `user_id`: fully-qualified user id: for example, `@user:server.com`.
 
-## Create or modify Account
+## Create or modify account
 
 This API allows an administrator to create or modify a user account with a
 specific `user_id`.
@@ -76,28 +78,29 @@ with a body of:
 ```json
 {
     "password": "user_password",
-    "displayname": "User",
+    "logout_devices": false,
+    "displayname": "Alice Marigold",
+    "avatar_url": "mxc://example.com/abcde12345",
     "threepids": [
         {
             "medium": "email",
-            "address": "<user_mail_1>"
+            "address": "alice@example.com"
         },
         {
             "medium": "email",
-            "address": "<user_mail_2>"
+            "address": "alice@domain.org"
         }
     ],
     "external_ids": [
         {
-            "auth_provider": "<provider1>",
-            "external_id": "<user_id_provider_1>"
+            "auth_provider": "example",
+            "external_id": "12345"
         },
         {
-            "auth_provider": "<provider2>",
-            "external_id": "<user_id_provider_2>"
+            "auth_provider": "example2",
+            "external_id": "abc54321"
         }
     ],
-    "avatar_url": "<avatar_url>",
     "admin": false,
     "deactivated": false,
     "user_type": null
@@ -110,40 +113,51 @@ Returns HTTP status code:
 
 URL parameters:
 
-- `user_id`: fully-qualified user id: for example, `@user:server.com`.
+- `user_id` - A fully-qualified user id. For example, `@user:server.com`.
 
 Body parameters:
 
-- `password` - string, optional. If provided, the user's password is updated and all
-  devices are logged out.
-- `displayname` - string, optional, defaults to the value of `user_id`.
-- `threepids` - array, optional, allows setting the third-party IDs (email, msisdn)
-  - `medium` - string. Kind of third-party ID, either `email` or `msisdn`.
-  - `address` - string. Value of third-party ID.
-  belonging to a user.
-- `external_ids` - array, optional. Allow setting the identifier of the external identity
-  provider for SSO (Single sign-on). Details in
-  [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
-  section `sso` and `oidc_providers`.
-  - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
-    in the homeserver configuration. Note that no error is raised if the provided
-    value is not in the homeserver configuration.
-  - `external_id` - string, user ID in the external identity provider.
-- `avatar_url` - string, optional, must be a
+- `password` - **string**, optional. If provided, the user's password is updated and all
+  devices are logged out, unless `logout_devices` is set to `false`.
+- `logout_devices` - **bool**, optional, defaults to `true`. If set to `false`, devices aren't
+  logged out even when `password` is provided.
+- `displayname` - **string**, optional. If set to an empty string (`""`), the user's display name
+  will be removed.
+- `avatar_url` - **string**, optional. Must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
-- `admin` - bool, optional, defaults to `false`.
-- `deactivated` - bool, optional. If unspecified, deactivation state will be left
-  unchanged on existing accounts and set to `false` for new accounts.
-  A user cannot be erased by deactivating with this API. For details on
-  deactivating users see [Deactivate Account](#deactivate-account).
-- `user_type` - string or null, optional. If provided, the user type will be
-  adjusted. If `null` given, the user type will be cleared. Other 
-  allowed options are: `bot` and `support`.
+  If set to an empty string (`""`), the user's avatar is removed.
+- `threepids` - **array**, optional. If provided, the user's third-party IDs (email, msisdn) are
+  entirely replaced with the given list. Each item in the array is an object with the following
+  fields:
+  - `medium` - **string**, required. The type of third-party ID, either `email` or `msisdn` (phone number).
+  - `address` - **string**, required. The third-party ID itself, e.g. `alice@example.com` for `email` or
+    `447470274584` (for a phone number with country code "44") and `19254857364` (for a phone number
+    with country code "1") for `msisdn`.
+  Note: If a threepid is removed from a user via this option, Synapse will also attempt to remove
+  that threepid from any identity servers it is aware has a binding for it.
+- `external_ids` - **array**, optional. Allow setting the identifier of the external identity
+  provider for SSO (Single sign-on). More details are in the configuration manual under the
+  sections [sso](../usage/configuration/config_documentation.md#sso) and [oidc_providers](../usage/configuration/config_documentation.md#oidc_providers).
+  - `auth_provider` - **string**, required. The unique, internal ID of the external identity provider.
+    The same as `idp_id` from the homeserver configuration. Note that no error is raised if the
+    provided value is not in the homeserver configuration.
+  - `external_id` - **string**, required. An identifier for the user in the external identity provider.
+    When the user logs in to the identity provider, this must be the unique ID that they map to.
+- `admin` - **bool**, optional, defaults to `false`. Whether the user is a homeserver administrator,
+  granting them access to the Admin API, among other things.
+- `deactivated` - **bool**, optional. If unspecified, deactivation state will be left unchanged.
 
-If the user already exists then optional parameters default to the current value.
+  Note: the `password` field must also be set if both of the following are true:
+  - `deactivated` is set to `false` and the user was previously deactivated (you are reactivating this user)
+  - Users are allowed to set their password on this homeserver (both `password_config.enabled` and
+    `password_config.localdb_enabled` config options are set to `true`).
+  Users' passwords are wiped upon account deactivation, hence the need to set a new one here.
 
-In order to re-activate an account `deactivated` must be set to `false`. If
-users do not login via single-sign-on, a new `password` must be provided.
+  Note: a user cannot be erased with this API. For more details on
+  deactivating and erasing users see [Deactivate Account](#deactivate-account).
+- `user_type` - **string** or null, optional. If not provided, the user type will be
+  not be changed. If `null` is given, the user type will be cleared.
+  Other allowed options are: `bot` and `support`.
 
 ## List Accounts
 
@@ -165,6 +179,7 @@ A response body like the following is returned:
             "admin": 0,
             "user_type": null,
             "deactivated": 0,
+            "erased": false,
             "shadow_banned": 0,
             "displayname": "<User One>",
             "avatar_url": null,
@@ -175,6 +190,7 @@ A response body like the following is returned:
             "admin": 1,
             "user_type": null,
             "deactivated": 0,
+            "erased": false,
             "shadow_banned": 0,
             "displayname": "<User Two>",
             "avatar_url": "<avatar_url>",
@@ -245,6 +261,7 @@ The following fields are returned in the JSON response body:
   - `user_type` - string - Type of the user. Normal users are type `None`.
     This allows user type specific behaviour. There are also types `support` and `bot`. 
   - `deactivated` - bool - Status if that user has been marked as deactivated.
+  - `erased` - bool - Status if that user has been marked as erased.
   - `shadow_banned` - bool - Status if that user has been marked as shadow banned.
   - `displayname` - string - The user's display name if they have set one.
   - `avatar_url` - string -  The user's avatar URL if they have set one.
@@ -363,6 +380,7 @@ The following actions are **NOT** performed. The list may be incomplete.
 - Remove the user's creation (registration) timestamp
 - [Remove rate limit overrides](#override-ratelimiting-for-users)
 - Remove from monthly active users
+- Remove user's consent information (consent version and timestamp)
 
 ## Reset password
 
@@ -543,7 +561,7 @@ Gets a list of all local media that a specific `user_id` has created.
 These are media that the user has uploaded themselves
 ([local media](../media_repository.md#local-media)), as well as
 [URL preview images](../media_repository.md#url-previews) requested by the user if the
-[feature is enabled](../development/url_previews.md).
+[feature is enabled](../usage/configuration/config_documentation.md#url_preview_enabled).
 
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -752,6 +770,7 @@ A response body like the following is returned:
       "device_id": "QBUAZIFURK",
       "display_name": "android",
       "last_seen_ip": "1.2.3.4",
+      "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
       "last_seen_ts": 1474491775024,
       "user_id": "<user_id>"
     },
@@ -759,6 +778,7 @@ A response body like the following is returned:
       "device_id": "AUIECTSRND",
       "display_name": "ios",
       "last_seen_ip": "1.2.3.5",
+      "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
       "last_seen_ts": 1474491775025,
       "user_id": "<user_id>"
     }
@@ -785,11 +805,40 @@ The following fields are returned in the JSON response body:
     Absent if no name has been set.
   - `last_seen_ip` - The IP address where this device was last seen.
     (May be a few minutes out of date, for efficiency reasons).
+  - `last_seen_user_agent` - The user agent of the device when it was last seen.
+    (May be a few minutes out of date, for efficiency reasons).
   - `last_seen_ts` - The timestamp (in milliseconds since the unix epoch) when this
     devices was last seen. (May be a few minutes out of date, for efficiency reasons).
   - `user_id` - Owner of  device.
 
 - `total` - Total number of user's devices.
+
+### Create a device
+
+Creates a new device for a specific `user_id` and `device_id`. Does nothing if the `device_id` 
+exists already.
+
+The API is:
+
+```
+POST /_synapse/admin/v2/users/<user_id>/devices
+
+{
+  "device_id": "QBUAZIFURK"
+}
+```
+
+An empty JSON dict is returned.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `user_id` - fully qualified: for example, `@user:server.com`.
+
+The following fields are required in the JSON request body:
+
+- `device_id` - The device ID to create.
 
 ### Delete multiple devices
 Deletes the given devices for a specific `user_id`, and invalidates
@@ -804,7 +853,7 @@ POST /_synapse/admin/v2/users/<user_id>/delete_devices
   "devices": [
     "QBUAZIFURK",
     "AUIECTSRND"
-  ],
+  ]
 }
 ```
 
@@ -836,6 +885,7 @@ A response body like the following is returned:
   "device_id": "<device_id>",
   "display_name": "android",
   "last_seen_ip": "1.2.3.4",
+  "last_seen_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
   "last_seen_ts": 1474491775024,
   "user_id": "<user_id>"
 }
@@ -856,6 +906,8 @@ The following fields are returned in the JSON response body:
 - `display_name` - Display name set by the user for this device.
   Absent if no name has been set.
 - `last_seen_ip` - The IP address where this device was last seen.
+  (May be a few minutes out of date, for efficiency reasons).
+  - `last_seen_user_agent` - The user agent of the device when it was last seen.
   (May be a few minutes out of date, for efficiency reasons).
 - `last_seen_ts` - The timestamp (in milliseconds since the unix epoch) when this
   devices was last seen. (May be a few minutes out of date, for efficiency reasons).
@@ -1145,3 +1197,80 @@ GET /_synapse/admin/v1/username_available?username=$localpart
 
 The request and response format is the same as the
 [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.
+
+### Find a user based on their ID in an auth provider
+
+The API is:
+
+```
+GET /_synapse/admin/v1/auth_providers/$provider/users/$external_id
+```
+
+When a user matched the given ID for the given provider, an HTTP code `200` with a response body like the following is returned:
+
+```json
+{
+    "user_id": "@hello:example.org"
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `provider` - The ID of the authentication provider, as advertised by the [`GET /_matrix/client/v3/login`](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login) API in the `m.login.sso` authentication method.
+- `external_id` - The user ID from the authentication provider. Usually corresponds to the `sub` claim for OIDC providers, or to the `uid` attestation for SAML2 providers.
+
+The `external_id` may have characters that are not URL-safe (typically `/`, `:` or `@`), so it is advised to URL-encode those parameters.
+
+**Errors**
+
+Returns a `404` HTTP status code if no user was found, with a response body like this:
+
+```json
+{
+    "errcode":"M_NOT_FOUND",
+    "error":"User not found"
+}
+```
+
+_Added in Synapse 1.68.0._
+
+
+### Find a user based on their Third Party ID (ThreePID or 3PID)
+
+The API is:
+
+```
+GET /_synapse/admin/v1/threepid/$medium/users/$address
+```
+
+When a user matched the given address for the given medium, an HTTP code `200` with a response body like the following is returned:
+
+```json
+{
+    "user_id": "@hello:example.org"
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `medium` - Kind of third-party ID, either `email` or `msisdn`.
+- `address` - Value of the third-party ID.
+
+The `address` may have characters that are not URL-safe, so it is advised to URL-encode those parameters.
+
+**Errors**
+
+Returns a `404` HTTP status code if no user was found, with a response body like this:
+
+```json
+{
+    "errcode":"M_NOT_FOUND",
+    "error":"User not found"
+}
+```
+
+_Added in Synapse 1.72.0._

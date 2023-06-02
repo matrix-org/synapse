@@ -98,6 +98,7 @@ class EventsStreamEventRow(BaseEventsStreamRow):
     relates_to: Optional[str]
     membership: Optional[str]
     rejected: bool
+    outlier: bool
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -138,7 +139,6 @@ class EventsStream(Stream):
         current_token: Token,
         target_row_count: int,
     ) -> StreamUpdateResult:
-
         # the events stream merges together three separate sources:
         #  * new events
         #  * current_state changes

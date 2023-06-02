@@ -11,10 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    cast,
+)
 
 import attr
 from prometheus_client import Counter, Gauge
@@ -23,6 +35,7 @@ from synapse.api.constants import MAX_DEPTH, EventTypes
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.events import EventBase, make_event_from_dict
+from synapse.logging.opentracing import tag_args, trace
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
@@ -32,11 +45,12 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
-from synapse.storage.engines import PostgresEngine
-from synapse.storage.types import Cursor
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.types import JsonDict, StrCollection
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.cancellation import cancellable
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -60,6 +74,30 @@ pdus_pruned_from_federation_queue = Counter(
 
 logger = logging.getLogger(__name__)
 
+# Parameters controlling exponential backoff between backfill failures.
+# After the first failure to backfill, we wait 2 hours before trying again. If the
+# second attempt fails, we wait 4 hours before trying again. If the third attempt fails,
+# we wait 8 hours before trying again, ... and so on.
+#
+# Each successive backoff period is twice as long as the last. However we cap this
+# period at a maximum of 2^8 = 256 hours: a little over 10 days. (This is the smallest
+# power of 2 which yields a maximum backoff period of at least 7 days---which was the
+# original maximum backoff period.) Even when we hit this cap, we will continue to
+# make backfill attempts once every 10 days.
+BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS = 8
+BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS = int(
+    datetime.timedelta(hours=1).total_seconds() * 1000
+)
+
+# We need a cap on the power of 2 or else the backoff period
+#   2^N * (milliseconds per hour)
+# will overflow when calcuated within the database. We ensure overflow does not occur
+# by checking that the largest backoff period fits in a 32-bit signed integer.
+_LONGEST_BACKOFF_PERIOD_MILLISECONDS = (
+    2**BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS
+) * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
+assert 0 < _LONGEST_BACKOFF_PERIOD_MILLISECONDS <= ((2**31) - 1)
+
 
 # All the info we need while iterating the DAG while backfilling
 @attr.s(frozen=True, slots=True, auto_attribs=True)
@@ -76,6 +114,10 @@ class _NoChainCoverIndex(Exception):
 
 
 class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBaseStore):
+    # TODO: this attribute comes from EventPushActionWorkerStore. Should we inherit from
+    # that store so that mypy can deduce this for itself?
+    stream_ordering_month_ago: Optional[int]
+
     def __init__(
         self,
         database: DatabasePool,
@@ -116,6 +158,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
         return await self.get_events_as_list(event_ids)
 
+    @trace
+    @tag_args
     async def get_auth_chain_ids(
         self,
         room_id: str,
@@ -135,7 +179,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         # Check if we have indexed the room so we can use the chain cover
         # algorithm.
-        room = await self.get_room(room_id)
+        room = await self.get_room(room_id)  # type: ignore[attr-defined]
         if room["has_auth_chain_index"]:
             try:
                 return await self.db_pool.runInteraction(
@@ -158,7 +202,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
     def _get_auth_chain_ids_using_cover_index_txn(
-        self, txn: Cursor, room_id: str, event_ids: Collection[str], include_given: bool
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        event_ids: Collection[str],
+        include_given: bool,
     ) -> Set[str]:
         """Calculates the auth chain IDs using the chain index."""
 
@@ -215,9 +263,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         chains: Dict[int, int] = {}
 
         # Add all linked chains reachable from initial set of chains.
-        for batch in batch_iter(event_chains, 1000):
+        for batch2 in batch_iter(event_chains, 1000):
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "origin_chain_id", batch
+                txn.database_engine, "origin_chain_id", batch2
             )
             txn.execute(sql % (clause,), args)
 
@@ -297,7 +345,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         front = set(event_ids)
         while front:
-            new_front = set()
+            new_front: Set[str] = set()
             for chunk in batch_iter(front, 100):
                 # Pull the auth events either from the cache or DB.
                 to_fetch: List[str] = []  # Event IDs to fetch from DB
@@ -316,7 +364,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
                     # Note we need to batch up the results by event ID before
                     # adding to the cache.
-                    to_cache = {}
+                    to_cache: Dict[str, List[Tuple[str, int]]] = {}
                     for event_id, auth_event_id, auth_event_depth in txn:
                         to_cache.setdefault(event_id, []).append(
                             (auth_event_id, auth_event_depth)
@@ -349,7 +397,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         # Check if we have indexed the room so we can use the chain cover
         # algorithm.
-        room = await self.get_room(room_id)
+        room = await self.get_room(room_id)  # type: ignore[attr-defined]
         if room["has_auth_chain_index"]:
             try:
                 return await self.db_pool.runInteraction(
@@ -370,7 +418,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
     def _get_auth_chain_difference_using_cover_index_txn(
-        self, txn: Cursor, room_id: str, state_sets: List[Set[str]]
+        self, txn: LoggingTransaction, room_id: str, state_sets: List[Set[str]]
     ) -> Set[str]:
         """Calculates the auth chain difference using the chain index.
 
@@ -444,9 +492,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         # (We need to take a copy of `seen_chains` as we want to mutate it in
         # the loop)
-        for batch in batch_iter(set(seen_chains), 1000):
+        for batch2 in batch_iter(set(seen_chains), 1000):
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "origin_chain_id", batch
+                txn.database_engine, "origin_chain_id", batch2
             )
             txn.execute(sql % (clause,), args)
 
@@ -529,7 +577,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         return result
 
     def _get_auth_chain_difference_txn(
-        self, txn, state_sets: List[Set[str]]
+        self, txn: LoggingTransaction, state_sets: List[Set[str]]
     ) -> Set[str]:
         """Calculates the auth chain difference using a breadth first search.
 
@@ -602,7 +650,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             # I think building a temporary list with fetchall is more efficient than
             # just `search.extend(txn)`, but this is unconfirmed
-            search.extend(txn.fetchall())
+            search.extend(cast(List[Tuple[int, str]], txn.fetchall()))
 
         # sort by depth
         search.sort()
@@ -645,7 +693,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 # We parse the results and add the to the `found` set and the
                 # cache (note we need to batch up the results by event ID before
                 # adding to the cache).
-                to_cache = {}
+                to_cache: Dict[str, List[Tuple[str, int]]] = {}
                 for event_id, auth_event_id, auth_event_depth in txn:
                     to_cache.setdefault(event_id, []).append(
                         (auth_event_id, auth_event_depth)
@@ -695,91 +743,265 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # Return all events where not all sets can reach them.
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
-    async def get_oldest_event_ids_with_depth_in_room(self, room_id) -> Dict[str, int]:
-        """Gets the oldest events(backwards extremities) in the room along with the
-        aproximate depth.
+    @trace
+    @tag_args
+    async def get_backfill_points_in_room(
+        self,
+        room_id: str,
+        current_depth: int,
+        limit: int,
+    ) -> List[Tuple[str, int]]:
+        """
+        Get the backward extremities to backfill from in the room along with the
+        approximate depth.
 
-        We use this function so that we can compare and see if someones current
-        depth at their current scrollback is within pagination range of the
-        event extremeties. If the current depth is close to the depth of given
-        oldest event, we can trigger a backfill.
+        Only returns events that are at a depth lower than or
+        equal to the `current_depth`. Sorted by depth, highest to lowest (descending)
+        so the closest events to the `current_depth` are first in the list.
+
+        We ignore extremities that are newer than the user's current scroll position
+        (ie, those with depth greater than `current_depth`) as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that extremity, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those extremities.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the user's current scrollback position
+            limit: The max number of backfill points to return
 
         Returns:
-            Map from event_id to depth
+            List of (event_id, depth) tuples. Sorted by depth, highest to lowest
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
-        def get_oldest_event_ids_with_depth_in_room_txn(txn, room_id):
-            # Assemble a dictionary with event_id -> depth for the oldest events
+        def get_backfill_points_in_room_txn(
+            txn: LoggingTransaction, room_id: str
+        ) -> List[Tuple[str, int]]:
+            # Assemble a tuple lookup of event_id -> depth for the oldest events
             # we know of in the room. Backwards extremeties are the oldest
             # events we know of in the room but we only know of them because
-            # some other event referenced them by prev_event and aren't peristed
-            # in our database yet (meaning we don't know their depth
-            # specifically). So we need to look for the aproximate depth from
+            # some other event referenced them by prev_event and aren't
+            # persisted in our database yet (meaning we don't know their depth
+            # specifically). So we need to look for the approximate depth from
             # the events connected to the current backwards extremeties.
-            sql = """
-                SELECT b.event_id, MAX(e.depth) FROM events as e
+
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "LEAST"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "MIN"
+            else:
+                raise RuntimeError("Unknown database engine")
+
+            sql = f"""
+                SELECT backward_extrem.event_id, event.depth FROM events AS event
                 /**
                  * Get the edge connections from the event_edges table
                  * so we can see whether this event's prev_events points
                  * to a backward extremity in the next join.
                  */
-                INNER JOIN event_edges as g
-                ON g.event_id = e.event_id
+                INNER JOIN event_edges AS edge
+                ON edge.event_id = event.event_id
                 /**
                  * We find the "oldest" events in the room by looking for
                  * events connected to backwards extremeties (oldest events
                  * in the room that we know of so far).
                  */
-                INNER JOIN event_backward_extremities as b
-                ON g.prev_event_id = b.event_id
-                WHERE b.room_id = ? AND g.is_state is ?
-                GROUP BY b.event_id
+                INNER JOIN event_backward_extremities AS backward_extrem
+                ON edge.prev_event_id = backward_extrem.event_id
+                /**
+                 * We use this info to make sure we don't retry to use a backfill point
+                 * if we've already attempted to backfill from it recently.
+                 */
+                LEFT JOIN event_failed_pull_attempts AS failed_backfill_attempt_info
+                ON
+                    failed_backfill_attempt_info.room_id = backward_extrem.room_id
+                    AND failed_backfill_attempt_info.event_id = backward_extrem.event_id
+                WHERE
+                    backward_extrem.room_id = ?
+                    /* We only care about non-state edges because we used to use
+                     * `event_edges` for two different sorts of "edges" (the current
+                     * event DAG, but also a link to the previous state, for state
+                     * events). These legacy state event edges can be distinguished by
+                     * `is_state` and are removed from the codebase and schema but
+                     * because the schema change is in a background update, it's not
+                     * necessarily safe to assume that it will have been completed.
+                     */
+                    AND edge.is_state is ? /* False */
+                    /**
+                     * We only want backwards extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
+                     */
+                    AND event.depth <= ? /* current_depth */
+                    /**
+                     * Exponential back-off (up to the upper bound) so we don't retry the
+                     * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
+                     *
+                     * We use `1 << n` as a power of 2 equivalent for compatibility
+                     * with older SQLites. The left shift equivalent only works with
+                     * powers of 2 because left shift is a binary operation (base-2).
+                     * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
+                     */
+                    AND (
+                        failed_backfill_attempt_info.event_id IS NULL
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
+                            (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
+                            * ? /* step */
+                        )
+                    )
+                /**
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
+                 */
+                ORDER BY event.depth DESC, backward_extrem.event_id DESC
+                LIMIT ?
             """
 
-            txn.execute(sql, (room_id, False))
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    False,
+                    current_depth,
+                    self._clock.time_msec(),
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
+                    limit,
+                ),
+            )
 
-            return dict(txn)
+            return cast(List[Tuple[str, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
-            "get_oldest_event_ids_with_depth_in_room",
-            get_oldest_event_ids_with_depth_in_room_txn,
+            "get_backfill_points_in_room",
+            get_backfill_points_in_room_txn,
             room_id,
         )
 
+    @trace
     async def get_insertion_event_backward_extremities_in_room(
-        self, room_id
-    ) -> Dict[str, int]:
-        """Get the insertion events we know about that we haven't backfilled yet.
+        self,
+        room_id: str,
+        current_depth: int,
+        limit: int,
+    ) -> List[Tuple[str, int]]:
+        """
+        Get the insertion events we know about that we haven't backfilled yet
+        along with the approximate depth. Only returns insertion events that are
+        at a depth lower than or equal to the `current_depth`. Sorted by depth,
+        highest to lowest (descending) so the closest events to the
+        `current_depth` are first in the list.
 
-        We use this function so that we can compare and see if someones current
-        depth at their current scrollback is within pagination range of the
-        insertion event. If the current depth is close to the depth of given
-        insertion event, we can trigger a backfill.
+        We ignore insertion events that are newer than the user's current scroll
+        position (ie, those with depth greater than `current_depth`) as:
+            1. we don't really care about getting events that have happened
+               after our current position; and
+            2. by the nature of paginating and scrolling back, we have likely
+               previously tried and failed to backfill from that insertion event, so
+               to avoid getting "stuck" requesting the same backfill repeatedly
+               we drop those insertion event.
 
         Args:
             room_id: Room where we want to find the oldest events
+            current_depth: The depth at the user's current scrollback position
+            limit: The max number of insertion event extremities to return
 
         Returns:
-            Map from event_id to depth
+            List of (event_id, depth) tuples. Sorted by depth, highest to lowest
+            (descending) so the closest events to the `current_depth` are first
+            in the list.
         """
 
-        def get_insertion_event_backward_extremities_in_room_txn(txn, room_id):
-            sql = """
-                SELECT b.event_id, MAX(e.depth) FROM insertion_events as i
+        def get_insertion_event_backward_extremities_in_room_txn(
+            txn: LoggingTransaction, room_id: str
+        ) -> List[Tuple[str, int]]:
+            if isinstance(self.database_engine, PostgresEngine):
+                least_function = "LEAST"
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                least_function = "MIN"
+            else:
+                raise RuntimeError("Unknown database engine")
+
+            sql = f"""
+                SELECT
+                    insertion_event_extremity.event_id, event.depth
                 /* We only want insertion events that are also marked as backwards extremities */
-                INNER JOIN insertion_event_extremities as b USING (event_id)
+                FROM insertion_event_extremities AS insertion_event_extremity
                 /* Get the depth of the insertion event from the events table */
-                INNER JOIN events AS e USING (event_id)
-                WHERE b.room_id = ?
-                GROUP BY b.event_id
+                INNER JOIN events AS event USING (event_id)
+                /**
+                 * We use this info to make sure we don't retry to use a backfill point
+                 * if we've already attempted to backfill from it recently.
+                 */
+                LEFT JOIN event_failed_pull_attempts AS failed_backfill_attempt_info
+                ON
+                    failed_backfill_attempt_info.room_id = insertion_event_extremity.room_id
+                    AND failed_backfill_attempt_info.event_id = insertion_event_extremity.event_id
+                WHERE
+                    insertion_event_extremity.room_id = ?
+                    /**
+                     * We only want extremities that are older than or at
+                     * the same position of the given `current_depth` (where older
+                     * means less than the given depth) because we're looking backwards
+                     * from the `current_depth` when backfilling.
+                     *
+                     *                         current_depth (ignore events that come after this, ignore 2-4)
+                     *                         |
+                     *                         ▼
+                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
+                     */
+                    AND event.depth <= ? /* current_depth */
+                    /**
+                     * Exponential back-off (up to the upper bound) so we don't retry the
+                     * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
+                     *
+                     * We use `1 << n` as a power of 2 equivalent for compatibility
+                     * with older SQLites. The left shift equivalent only works with
+                     * powers of 2 because left shift is a binary operation (base-2).
+                     * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
+                     */
+                    AND (
+                        failed_backfill_attempt_info.event_id IS NULL
+                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
+                            (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
+                            * ? /* step */
+                        )
+                    )
+                /**
+                 * Sort from highest (closest to the `current_depth`) to the lowest depth
+                 * because the closest are most relevant to backfill from first.
+                 * Then tie-break on alphabetical order of the event_ids so we get a
+                 * consistent ordering which is nice when asserting things in tests.
+                 */
+                ORDER BY event.depth DESC, insertion_event_extremity.event_id DESC
+                LIMIT ?
             """
 
-            txn.execute(sql, (room_id,))
-
-            return dict(txn)
+            txn.execute(
+                sql,
+                (
+                    room_id,
+                    current_depth,
+                    self._clock.time_msec(),
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
+                    limit,
+                ),
+            )
+            return cast(List[Tuple[str, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
             "get_insertion_event_backward_extremities_in_room",
@@ -787,7 +1009,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             room_id,
         )
 
-    async def get_max_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
+    async def get_max_depth_of(
+        self, event_ids: Collection[str]
+    ) -> Tuple[Optional[str], int]:
         """Returns the event ID and depth for the event that has the max depth from a set of event IDs
 
         Args:
@@ -816,7 +1040,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             return max_depth_event_id, current_max_depth
 
-    async def get_min_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
+    async def get_min_depth_of(self, event_ids: List[str]) -> Tuple[Optional[str], int]:
         """Returns the event ID and depth for the event that has the min depth from a set of event IDs
 
         Args:
@@ -864,7 +1088,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             "get_prev_events_for_room", self._get_prev_events_for_room_txn, room_id
         )
 
-    def _get_prev_events_for_room_txn(self, txn, room_id: str):
+    def _get_prev_events_for_room_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> List[str]:
         # we just use the 10 newest events. Older events will become
         # prev_events of future events.
 
@@ -895,7 +1121,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             sorted by extremity count.
         """
 
-        def _get_rooms_with_many_extremities_txn(txn):
+        def _get_rooms_with_many_extremities_txn(txn: LoggingTransaction) -> List[str]:
             where_clause = "1=1"
             if room_id_filter:
                 where_clause = "room_id NOT IN (%s)" % (
@@ -922,7 +1148,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
     @cached(max_entries=5000, iterable=True)
-    async def get_latest_event_ids_in_room(self, room_id: str) -> List[str]:
+    async def get_latest_event_ids_in_room(self, room_id: str) -> Sequence[str]:
         return await self.db_pool.simple_select_onecol(
             table="event_forward_extremities",
             keyvalues={"room_id": room_id},
@@ -936,7 +1162,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             "get_min_depth", self._get_min_depth_interaction, room_id
         )
 
-    def _get_min_depth_interaction(self, txn, room_id):
+    def _get_min_depth_interaction(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> Optional[int]:
         min_depth = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="room_depth",
@@ -947,9 +1175,42 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return int(min_depth) if min_depth is not None else None
 
+    async def have_room_forward_extremities_changed_since(
+        self,
+        room_id: str,
+        stream_ordering: int,
+    ) -> bool:
+        """Check if the forward extremities in a room have changed since the
+        given stream ordering
+
+        Throws a StoreError if we have since purged the index for
+        stream_orderings from that point.
+        """
+        assert self.stream_ordering_month_ago is not None
+        if stream_ordering <= self.stream_ordering_month_ago:
+            raise StoreError(400, f"stream_ordering too old {stream_ordering}")
+
+        sql = """
+            SELECT 1 FROM stream_ordering_to_exterm
+            WHERE stream_ordering > ? AND room_id = ?
+            LIMIT 1
+        """
+
+        def have_room_forward_extremities_changed_since_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            txn.execute(sql, (stream_ordering, room_id))
+            return txn.fetchone() is not None
+
+        return await self.db_pool.runInteraction(
+            "have_room_forward_extremities_changed_since",
+            have_room_forward_extremities_changed_since_txn,
+        )
+
+    @cancellable
     async def get_forward_extremities_for_room_at_stream_ordering(
         self, room_id: str, stream_ordering: int
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """For a given room_id and stream_ordering, return the forward
         extremeties of the room at that point in "time".
 
@@ -965,29 +1226,32 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
         # We want to make the cache more effective, so we clamp to the last
         # change before the given ordering.
-        last_change = self._events_stream_cache.get_max_pos_of_last_change(room_id)
+        last_change = self._events_stream_cache.get_max_pos_of_last_change(room_id)  # type: ignore[attr-defined]
 
         # We don't always have a full stream_to_exterm_id table, e.g. after
         # the upgrade that introduced it, so we make sure we never ask for a
         # stream_ordering from before a restart
-        last_change = max(self._stream_order_on_start, last_change)
+        last_change = max(self._stream_order_on_start, last_change)  # type: ignore[attr-defined]
 
         # provided the last_change is recent enough, we now clamp the requested
         # stream_ordering to it.
+        assert self.stream_ordering_month_ago is not None
         if last_change > self.stream_ordering_month_ago:
             stream_ordering = min(last_change, stream_ordering)
 
         return await self._get_forward_extremeties_for_room(room_id, stream_ordering)
 
     @cached(max_entries=5000, num_args=2)
-    async def _get_forward_extremeties_for_room(self, room_id, stream_ordering):
+    async def _get_forward_extremeties_for_room(
+        self, room_id: str, stream_ordering: int
+    ) -> Sequence[str]:
         """For a given room_id and stream_ordering, return the forward
         extremeties of the room at that point in "time".
 
         Throws a StoreError if we have since purged the index for
         stream_orderings from that point.
         """
-
+        assert self.stream_ordering_month_ago is not None
         if stream_ordering <= self.stream_ordering_month_ago:
             raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
 
@@ -1001,13 +1265,20 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 WHERE room_id = ?
         """
 
-        def get_forward_extremeties_for_room_txn(txn):
+        def get_forward_extremeties_for_room_txn(txn: LoggingTransaction) -> List[str]:
             txn.execute(sql, (stream_ordering, room_id))
             return [event_id for event_id, in txn]
 
-        return await self.db_pool.runInteraction(
+        event_ids = await self.db_pool.runInteraction(
             "get_forward_extremeties_for_room", get_forward_extremeties_for_room_txn
         )
+
+        # If we didn't find any IDs, then we must have cleared out the
+        # associated `stream_ordering_to_exterm`.
+        if not event_ids:
+            raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
+
+        return event_ids
 
     def _get_connected_batch_event_backfill_results_txn(
         self, txn: LoggingTransaction, insertion_event_id: str, limit: int
@@ -1032,7 +1303,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             INNER JOIN batch_events AS c
             ON i.next_batch_id = c.batch_id
             /* Get the depth of the batch start event from the events table */
-            INNER JOIN events AS e USING (event_id)
+            INNER JOIN events AS e ON c.event_id = e.event_id
             /* Find an insertion event which matches the given event_id */
             WHERE i.event_id = ?
             LIMIT ?
@@ -1103,8 +1374,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         ]
 
     async def get_backfill_events(
-        self, room_id: str, seed_event_id_list: list, limit: int
-    ):
+        self, room_id: str, seed_event_id_list: List[str], limit: int
+    ) -> List[EventBase]:
         """Get a list of Events for a given topic that occurred before (and
         including) the events in seed_event_id_list. Return a list of max size `limit`
 
@@ -1122,10 +1393,19 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
         events = await self.get_events_as_list(event_ids)
         return sorted(
-            events, key=lambda e: (-e.depth, -e.internal_metadata.stream_ordering)
+            # type-ignore: mypy doesn't like negating the Optional[int] stream_ordering.
+            # But it's never None, because these events were previously persisted to the DB.
+            events,
+            key=lambda e: (-e.depth, -e.internal_metadata.stream_ordering),  # type: ignore[operator]
         )
 
-    def _get_backfill_events(self, txn, room_id, seed_event_id_list, limit):
+    def _get_backfill_events(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        seed_event_id_list: List[str],
+        limit: int,
+    ) -> Set[str]:
         """
         We want to make sure that we do a breadth-first, "depth" ordered search.
         We also handle navigating historical branches of history connected by
@@ -1138,7 +1418,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             limit,
         )
 
-        event_id_results = set()
+        event_id_results: Set[str] = set()
 
         # In a PriorityQueue, the lowest valued entries are retrieved first.
         # We're using depth as the priority in the queue and tie-break based on
@@ -1146,7 +1426,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # highest and newest-in-time message. We add events to the queue with a
         # negative depth so that we process the newest-in-time messages first
         # going backwards in time. stream_ordering follows the same pattern.
-        queue = PriorityQueue()
+        queue: "PriorityQueue[Tuple[int, int, str, str]]" = PriorityQueue()
 
         for seed_event_id in seed_event_id_list:
             event_lookup_result = self.db_pool.simple_select_one_txn(
@@ -1252,7 +1532,148 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         return event_id_results
 
-    async def get_missing_events(self, room_id, earliest_events, latest_events, limit):
+    @trace
+    async def record_event_failed_pull_attempt(
+        self, room_id: str, event_id: str, cause: str
+    ) -> None:
+        """
+        Record when we fail to pull an event over federation.
+
+        This information allows us to be more intelligent when we decide to
+        retry (we don't need to fail over and over) and we can process that
+        event in the background so we don't block on it each time.
+
+        Args:
+            room_id: The room where the event failed to pull from
+            event_id: The event that failed to be fetched or processed
+            cause: The error message or reason that we failed to pull the event
+        """
+        logger.debug(
+            "record_event_failed_pull_attempt room_id=%s, event_id=%s, cause=%s",
+            room_id,
+            event_id,
+            cause,
+        )
+        await self.db_pool.runInteraction(
+            "record_event_failed_pull_attempt",
+            self._record_event_failed_pull_attempt_upsert_txn,
+            room_id,
+            event_id,
+            cause,
+            db_autocommit=True,  # Safe as it's a single upsert
+        )
+
+    def _record_event_failed_pull_attempt_upsert_txn(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        event_id: str,
+        cause: str,
+    ) -> None:
+        sql = """
+            INSERT INTO event_failed_pull_attempts (
+                room_id, event_id, num_attempts, last_attempt_ts, last_cause
+            )
+                VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (room_id, event_id) DO UPDATE SET
+                num_attempts=event_failed_pull_attempts.num_attempts + 1,
+                last_attempt_ts=EXCLUDED.last_attempt_ts,
+                last_cause=EXCLUDED.last_cause;
+        """
+
+        txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
+
+    @trace
+    async def get_event_ids_with_failed_pull_attempts(
+        self, event_ids: StrCollection
+    ) -> Set[str]:
+        """
+        Filter the given list of `event_ids` and return events which have any failed
+        pull attempts.
+
+        Args:
+            event_ids: A list of events to filter down.
+
+        Returns:
+            A filtered down list of `event_ids` that have previous failed pull attempts.
+        """
+
+        rows = await self.db_pool.simple_select_many_batch(
+            table="event_failed_pull_attempts",
+            column="event_id",
+            iterable=event_ids,
+            keyvalues={},
+            retcols=("event_id",),
+            desc="get_event_ids_with_failed_pull_attempts",
+        )
+        event_ids_with_failed_pull_attempts: Set[str] = {
+            row["event_id"] for row in rows
+        }
+
+        return event_ids_with_failed_pull_attempts
+
+    @trace
+    async def get_event_ids_to_not_pull_from_backoff(
+        self,
+        room_id: str,
+        event_ids: Collection[str],
+    ) -> Dict[str, int]:
+        """
+        Filter down the events to ones that we've failed to pull before recently. Uses
+        exponential backoff.
+
+        Args:
+            room_id: The room that the events belong to
+            event_ids: A list of events to filter down
+
+        Returns:
+            A dictionary of event_ids that should not be attempted to be pulled and the
+            next timestamp at which we may try pulling them again.
+        """
+        event_failed_pull_attempts = await self.db_pool.simple_select_many_batch(
+            table="event_failed_pull_attempts",
+            column="event_id",
+            iterable=event_ids,
+            keyvalues={},
+            retcols=(
+                "event_id",
+                "last_attempt_ts",
+                "num_attempts",
+            ),
+            desc="get_event_ids_to_not_pull_from_backoff",
+        )
+
+        current_time = self._clock.time_msec()
+
+        event_ids_with_backoff = {}
+        for event_failed_pull_attempt in event_failed_pull_attempts:
+            event_id = event_failed_pull_attempt["event_id"]
+            # Exponential back-off (up to the upper bound) so we don't try to
+            # pull the same event over and over. ex. 2hr, 4hr, 8hr, 16hr, etc.
+            backoff_end_time = (
+                event_failed_pull_attempt["last_attempt_ts"]
+                + (
+                    2
+                    ** min(
+                        event_failed_pull_attempt["num_attempts"],
+                        BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
+                    )
+                )
+                * BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS
+            )
+
+            if current_time < backoff_end_time:  # `backoff_end_time` is exclusive
+                event_ids_with_backoff[event_id] = backoff_end_time
+
+        return event_ids_with_backoff
+
+    async def get_missing_events(
+        self,
+        room_id: str,
+        earliest_events: List[str],
+        latest_events: List[str],
+        limit: int,
+    ) -> List[EventBase]:
         ids = await self.db_pool.runInteraction(
             "get_missing_events",
             self._get_missing_events,
@@ -1263,25 +1684,28 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
         return await self.get_events_as_list(ids)
 
-    def _get_missing_events(self, txn, room_id, earliest_events, latest_events, limit):
-
+    def _get_missing_events(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        earliest_events: List[str],
+        latest_events: List[str],
+        limit: int,
+    ) -> List[str]:
         seen_events = set(earliest_events)
         front = set(latest_events) - seen_events
-        event_results = []
+        event_results: List[str] = []
 
         query = (
             "SELECT prev_event_id FROM event_edges "
-            "WHERE room_id = ? AND event_id = ? AND is_state = ? "
+            "WHERE event_id = ? AND NOT is_state "
             "LIMIT ?"
         )
 
         while front and len(event_results) < limit:
             new_front = set()
             for event_id in front:
-                txn.execute(
-                    query, (room_id, event_id, False, limit - len(event_results))
-                )
-
+                txn.execute(query, (event_id, limit - len(event_results)))
                 new_results = {t[0] for t in txn} - seen_events
 
                 new_front |= new_results
@@ -1295,45 +1719,36 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         event_results.reverse()
         return event_results
 
-    async def get_successor_events(self, event_ids: Iterable[str]) -> List[str]:
-        """Fetch all events that have the given events as a prev event
+    @trace
+    @tag_args
+    async def get_successor_events(self, event_id: str) -> List[str]:
+        """Fetch all events that have the given event as a prev event
 
         Args:
-            event_ids: The events to use as the previous events.
+            event_id: The event to search for as a prev_event.
         """
-        rows = await self.db_pool.simple_select_many_batch(
+        return await self.db_pool.simple_select_onecol(
             table="event_edges",
-            column="prev_event_id",
-            iterable=event_ids,
-            retcols=("event_id",),
+            keyvalues={"prev_event_id": event_id},
+            retcol="event_id",
             desc="get_successor_events",
         )
 
-        return [row["event_id"] for row in rows]
-
     @wrap_as_background_process("delete_old_forward_extrem_cache")
     async def _delete_old_forward_extrem_cache(self) -> None:
-        def _delete_old_forward_extrem_cache_txn(txn):
-            # Delete entries older than a month, while making sure we don't delete
-            # the only entries for a room.
+        def _delete_old_forward_extrem_cache_txn(txn: LoggingTransaction) -> None:
             sql = """
                 DELETE FROM stream_ordering_to_exterm
-                WHERE
-                room_id IN (
-                    SELECT room_id
-                    FROM stream_ordering_to_exterm
-                    WHERE stream_ordering > ?
-                ) AND stream_ordering < ?
+                WHERE stream_ordering < ?
             """
-            txn.execute(
-                sql, (self.stream_ordering_month_ago, self.stream_ordering_month_ago)
-            )
+            txn.execute(sql, (self.stream_ordering_month_ago,))
 
         await self.db_pool.runInteraction(
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
         )
 
+    @trace
     async def insert_insertion_extremity(self, event_id: str, room_id: str) -> None:
         await self.db_pool.simple_upsert(
             table="insertion_event_extremities",
@@ -1344,7 +1759,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             },
             insertion_values={},
             desc="insert_insertion_extremity",
-            lock=False,
         )
 
     async def insert_received_event_to_staging(
@@ -1384,7 +1798,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
         if self.db_pool.engine.supports_returning:
 
-            def _remove_received_event_from_staging_txn(txn):
+            def _remove_received_event_from_staging_txn(
+                txn: LoggingTransaction,
+            ) -> Optional[int]:
                 sql = """
                     DELETE FROM federation_inbound_events_staging
                     WHERE origin = ? AND event_id = ?
@@ -1392,21 +1808,24 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 """
 
                 txn.execute(sql, (origin, event_id))
-                return txn.fetchone()
+                row = cast(Optional[Tuple[int]], txn.fetchone())
 
-            row = await self.db_pool.runInteraction(
+                if row is None:
+                    return None
+
+                return row[0]
+
+            return await self.db_pool.runInteraction(
                 "remove_received_event_from_staging",
                 _remove_received_event_from_staging_txn,
                 db_autocommit=True,
             )
-            if row is None:
-                return None
-
-            return row[0]
 
         else:
 
-            def _remove_received_event_from_staging_txn(txn):
+            def _remove_received_event_from_staging_txn(
+                txn: LoggingTransaction,
+            ) -> Optional[int]:
                 received_ts = self.db_pool.simple_select_one_onecol_txn(
                     txn,
                     table="federation_inbound_events_staging",
@@ -1437,9 +1856,16 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         self,
         room_id: str,
     ) -> Optional[Tuple[str, str]]:
-        """Get the next event ID in the staging area for the given room."""
+        """
+        Get the next event ID in the staging area for the given room.
 
-        def _get_next_staged_event_id_for_room_txn(txn):
+        Returns:
+            Tuple of the `origin` and `event_id`
+        """
+
+        def _get_next_staged_event_id_for_room_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[Tuple[str, str]]:
             sql = """
                 SELECT origin, event_id
                 FROM federation_inbound_events_staging
@@ -1450,7 +1876,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             txn.execute(sql, (room_id,))
 
-            return txn.fetchone()
+            return cast(Optional[Tuple[str, str]], txn.fetchone())
 
         return await self.db_pool.runInteraction(
             "get_next_staged_event_id_for_room", _get_next_staged_event_id_for_room_txn
@@ -1463,7 +1889,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     ) -> Optional[Tuple[str, EventBase]]:
         """Get the next event in the staging area for the given room."""
 
-        def _get_next_staged_event_for_room_txn(txn):
+        def _get_next_staged_event_for_room_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[Tuple[str, str, str]]:
             sql = """
                 SELECT event_json, internal_metadata, origin
                 FROM federation_inbound_events_staging
@@ -1473,7 +1901,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             """
             txn.execute(sql, (room_id,))
 
-            return txn.fetchone()
+            return cast(Optional[Tuple[str, str, str]], txn.fetchone())
 
         row = await self.db_pool.runInteraction(
             "get_next_staged_event_for_room", _get_next_staged_event_for_room_txn
@@ -1547,7 +1975,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 logger.info("Invalid prev_events for %s", event_id)
                 continue
 
-            if room_version.event_format == EventFormatVersions.V1:
+            if room_version.event_format == EventFormatVersions.ROOM_V1_V2:
                 for prev_event_tuple in prev_events:
                     if (
                         not isinstance(prev_event_tuple, list)
@@ -1601,18 +2029,20 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
     @wrap_as_background_process("_get_stats_for_federation_staging")
-    async def _get_stats_for_federation_staging(self):
+    async def _get_stats_for_federation_staging(self) -> None:
         """Update the prometheus metrics for the inbound federation staging area."""
 
-        def _get_stats_for_federation_staging_txn(txn):
+        def _get_stats_for_federation_staging_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, int]:
             txn.execute("SELECT count(*) FROM federation_inbound_events_staging")
-            (count,) = txn.fetchone()
+            (count,) = cast(Tuple[int], txn.fetchone())
 
             txn.execute(
                 "SELECT min(received_ts) FROM federation_inbound_events_staging"
             )
 
-            (received_ts,) = txn.fetchone()
+            (received_ts,) = cast(Tuple[Optional[int]], txn.fetchone())
 
             # If there is nothing in the staging area default it to 0.
             age = 0
@@ -1653,19 +2083,21 @@ class EventFederationStore(EventFederationWorkerStore):
             self.EVENT_AUTH_STATE_ONLY, self._background_delete_non_state_event_auth
         )
 
-    async def clean_room_for_join(self, room_id):
-        return await self.db_pool.runInteraction(
+    async def clean_room_for_join(self, room_id: str) -> None:
+        await self.db_pool.runInteraction(
             "clean_room_for_join", self._clean_room_for_join_txn, room_id
         )
 
-    def _clean_room_for_join_txn(self, txn, room_id):
+    def _clean_room_for_join_txn(self, txn: LoggingTransaction, room_id: str) -> None:
         query = "DELETE FROM event_forward_extremities WHERE room_id = ?"
 
         txn.execute(query, (room_id,))
         txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
 
-    async def _background_delete_non_state_event_auth(self, progress, batch_size):
-        def delete_event_auth(txn):
+    async def _background_delete_non_state_event_auth(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        def delete_event_auth(txn: LoggingTransaction) -> bool:
             target_min_stream_id = progress.get("target_min_stream_id_inclusive")
             max_stream_id = progress.get("max_stream_id_exclusive")
 

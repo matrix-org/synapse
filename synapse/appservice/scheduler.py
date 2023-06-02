@@ -57,6 +57,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
 )
@@ -64,7 +65,7 @@ from typing import (
 from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
-    TransactionOneTimeKeyCounts,
+    TransactionOneTimeKeysCount,
     TransactionUnusedFallbackKeys,
 )
 from synapse.appservice.api import ApplicationServiceApi
@@ -258,7 +259,7 @@ class _ServiceQueuer:
                 ):
                     return
 
-                one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None
+                one_time_keys_count: Optional[TransactionOneTimeKeysCount] = None
                 unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None
 
                 if (
@@ -269,7 +270,7 @@ class _ServiceQueuer:
                     # for the users which are mentioned in this transaction,
                     # as well as the appservice's sender.
                     (
-                        one_time_key_counts,
+                        one_time_keys_count,
                         unused_fallback_keys,
                     ) = await self._compute_msc3202_otk_counts_and_fallback_keys(
                         service, events, ephemeral, to_device_messages_to_send
@@ -281,7 +282,7 @@ class _ServiceQueuer:
                         events,
                         ephemeral,
                         to_device_messages_to_send,
-                        one_time_key_counts,
+                        one_time_keys_count,
                         unused_fallback_keys,
                         device_list_summary,
                     )
@@ -296,7 +297,7 @@ class _ServiceQueuer:
         events: Iterable[EventBase],
         ephemerals: Iterable[JsonDict],
         to_device_messages: Iterable[JsonDict],
-    ) -> Tuple[TransactionOneTimeKeyCounts, TransactionUnusedFallbackKeys]:
+    ) -> Tuple[TransactionOneTimeKeysCount, TransactionUnusedFallbackKeys]:
         """
         Given a list of the events, ephemeral messages and to-device messages,
         - first computes a list of application services users that may have
@@ -319,7 +320,9 @@ class _ServiceQueuer:
         rooms_of_interesting_users.update(event.room_id for event in events)
         # EDUs
         rooms_of_interesting_users.update(
-            ephemeral["room_id"] for ephemeral in ephemerals
+            ephemeral["room_id"]
+            for ephemeral in ephemerals
+            if ephemeral.get("room_id") is not None
         )
 
         # Look up the AS users in those rooms
@@ -329,8 +332,9 @@ class _ServiceQueuer:
             )
 
         # Add recipients of to-device messages.
-        # device_message["user_id"] is the ID of the recipient.
-        users.update(device_message["user_id"] for device_message in to_device_messages)
+        users.update(
+            device_message["to_user_id"] for device_message in to_device_messages
+        )
 
         # Compute and return the counts / fallback key usage states
         otk_counts = await self._store.count_bulk_e2e_one_time_keys_for_as(users)
@@ -361,10 +365,10 @@ class _TransactionController:
     async def send(
         self,
         service: ApplicationService,
-        events: List[EventBase],
+        events: Sequence[EventBase],
         ephemeral: Optional[List[JsonDict]] = None,
         to_device_messages: Optional[List[JsonDict]] = None,
-        one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None,
+        one_time_keys_count: Optional[TransactionOneTimeKeysCount] = None,
         unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None,
         device_list_summary: Optional[DeviceListUpdates] = None,
     ) -> None:
@@ -377,23 +381,27 @@ class _TransactionController:
             events: The persistent events to include in the transaction.
             ephemeral: The ephemeral events to include in the transaction.
             to_device_messages: The to-device messages to include in the transaction.
-            one_time_key_counts: Counts of remaining one-time keys for relevant
+            one_time_keys_count: Counts of remaining one-time keys for relevant
                 appservice devices in the transaction.
             unused_fallback_keys: Lists of unused fallback keys for relevant
                 appservice devices in the transaction.
             device_list_summary: The device list summary to include in the transaction.
         """
         try:
+            service_is_up = await self._is_service_up(service)
+            # Don't create empty txns when in recovery mode (ephemeral events are dropped)
+            if not service_is_up and not events:
+                return
+
             txn = await self.store.create_appservice_txn(
                 service=service,
                 events=events,
                 ephemeral=ephemeral or [],
                 to_device_messages=to_device_messages or [],
-                one_time_key_counts=one_time_key_counts or {},
+                one_time_keys_count=one_time_keys_count or {},
                 unused_fallback_keys=unused_fallback_keys or {},
                 device_list_summary=device_list_summary or DeviceListUpdates(),
             )
-            service_is_up = await self._is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)
                 if sent:

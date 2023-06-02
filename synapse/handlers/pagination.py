@@ -13,21 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, List, Optional, Set
 
 import attr
 
 from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.room import ShutdownRoomResponse
+from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.state import StateFilter
+from synapse.rest.admin._base import assert_user_is_admin
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, Requester
+from synapse.types import JsonDict, Requester, StrCollection, StreamKeyType
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -129,8 +131,8 @@ class PaginationHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
         self._room_shutdown_handler = hs.get_room_shutdown_handler()
@@ -158,11 +160,9 @@ class PaginationHandler:
         self._retention_allowed_lifetime_max = (
             hs.config.retention.retention_allowed_lifetime_max
         )
+        self._is_master = hs.config.worker.worker_app is None
 
-        if (
-            hs.config.worker.run_background_tasks
-            and hs.config.retention.retention_enabled
-        ):
+        if hs.config.retention.retention_enabled and self._is_master:
             # Run the purge jobs described in the configuration file.
             for job in hs.config.retention.retention_purge_jobs:
                 logger.info("Setting up purge job with config: %s", job)
@@ -239,7 +239,7 @@ class PaginationHandler:
             # defined in the server's configuration, we can safely assume that's the
             # case and use it for this room.
             max_lifetime = (
-                retention_policy["max_lifetime"] or self._retention_default_max_lifetime
+                retention_policy.max_lifetime or self._retention_default_max_lifetime
             )
 
             # Cap the effective max_lifetime to be within the range allowed in the
@@ -352,7 +352,7 @@ class PaginationHandler:
         self._purges_in_progress_by_room.add(room_id)
         try:
             async with self.pagination_lock.write(room_id):
-                await self.storage.purge_events.purge_history(
+                await self._storage_controllers.purge_events.purge_history(
                     room_id, token, delete_local_events
                 )
             logger.info("[purge] complete")
@@ -360,7 +360,7 @@ class PaginationHandler:
         except Exception:
             f = Failure()
             logger.error(
-                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())  # type: ignore
+                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())
             )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
             self._purges_by_id[purge_id].error = f.getErrorMessage()
@@ -391,7 +391,7 @@ class PaginationHandler:
         """
         return self._delete_by_id.get(delete_id)
 
-    def get_delete_ids_by_room(self, room_id: str) -> Optional[Collection[str]]:
+    def get_delete_ids_by_room(self, room_id: str) -> Optional[StrCollection]:
         """Get all active delete ids by room
 
         Args:
@@ -414,8 +414,9 @@ class PaginationHandler:
                 if joined:
                     raise SynapseError(400, "Users are still joined to this room")
 
-            await self.storage.purge_events.purge_room(room_id)
+            await self._storage_controllers.purge_events.purge_room(room_id)
 
+    @trace
     async def get_messages(
         self,
         requester: Requester,
@@ -423,6 +424,7 @@ class PaginationHandler:
         pagin_config: PaginationConfig,
         as_client_event: bool = True,
         event_filter: Optional[Filter] = None,
+        use_admin_priviledge: bool = False,
     ) -> JsonDict:
         """Get messages in a room.
 
@@ -432,14 +434,26 @@ class PaginationHandler:
             pagin_config: The pagination config rules to apply, if any.
             as_client_event: True to get events in client-server format.
             event_filter: Filter to apply to results or None
+            use_admin_priviledge: if `True`, return all events, regardless
+                of whether `user` has access to them. To be used **ONLY**
+                from the admin API.
 
         Returns:
             Pagination API results
         """
+        if use_admin_priviledge:
+            await assert_user_is_admin(self.auth, requester)
+
         user_id = requester.user.to_string()
 
         if pagin_config.from_token:
             from_token = pagin_config.from_token
+        elif pagin_config.direction == Direction.FORWARDS:
+            from_token = (
+                await self.hs.get_event_sources().get_start_token_for_pagination(
+                    room_id
+                )
+            )
         else:
             from_token = (
                 await self.hs.get_event_sources().get_current_token_for_pagination(
@@ -448,24 +462,21 @@ class PaginationHandler:
             )
             # We expect `/messages` to use historic pagination tokens by default but
             # `/messages` should still works with live tokens when manually provided.
-            assert from_token.room_key.topological
-
-        if pagin_config.limit is None:
-            # This shouldn't happen as we've set a default limit before this
-            # gets called.
-            raise Exception("limit not set")
+            assert from_token.room_key.topological is not None
 
         room_token = from_token.room_key
 
         async with self.pagination_lock.read(room_id):
-            (
-                membership,
-                member_event_id,
-            ) = await self.auth.check_user_in_room_or_world_readable(
-                room_id, user_id, allow_departed_users=True
-            )
+            (membership, member_event_id) = (None, None)
+            if not use_admin_priviledge:
+                (
+                    membership,
+                    member_event_id,
+                ) = await self.auth.check_user_in_room_or_world_readable(
+                    room_id, requester, allow_departed_users=True
+                )
 
-            if pagin_config.direction == "b":
+            if pagin_config.direction == Direction.BACKWARDS:
                 # if we're going backwards, we might need to backfill. This
                 # requires that we have a topo token.
                 if room_token.topological:
@@ -475,7 +486,7 @@ class PaginationHandler:
                         room_id, room_token.stream
                     )
 
-                if membership == Membership.LEAVE:
+                if not use_admin_priviledge and membership == Membership.LEAVE:
                     # If they have left the room then clamp the token to be before
                     # they left the room, to save the effort of loading from the
                     # database.
@@ -491,7 +502,7 @@ class PaginationHandler:
 
                     if leave_token.topological < curr_topo:
                         from_token = from_token.copy_and_replace(
-                            "room_key", leave_token
+                            StreamKeyType.ROOM, leave_token
                         )
 
                 await self.hs.get_federation_handler().maybe_backfill(
@@ -513,16 +524,31 @@ class PaginationHandler:
                 event_filter=event_filter,
             )
 
-            next_token = from_token.copy_and_replace("room_key", next_key)
+            next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
 
-        if events:
-            if event_filter:
-                events = await event_filter.filter(events)
+        # if no events are returned from pagination, that implies
+        # we have reached the end of the available events.
+        # In that case we do not return end, to tell the client
+        # there is no need for further queries.
+        if not events:
+            return {
+                "chunk": [],
+                "start": await from_token.to_string(self.store),
+            }
 
+        if event_filter:
+            events = await event_filter.filter(events)
+
+        if not use_admin_priviledge:
             events = await filter_events_for_client(
-                self.storage, user_id, events, is_peeking=(member_event_id is None)
+                self._storage_controllers,
+                user_id,
+                events,
+                is_peeking=(member_event_id is None),
             )
 
+        # if after the filter applied there are no more events
+        # return immediately - but there might be more in next_token batch
         if not events:
             return {
                 "chunk": [],
@@ -539,7 +565,7 @@ class PaginationHandler:
                 (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = await self.state_store.get_state_ids_for_event(
+            state_ids = await self._state_storage_controller.get_state_ids_for_event(
                 events[0].event_id, state_filter=state_filter
             )
 
@@ -553,7 +579,9 @@ class PaginationHandler:
 
         time_now = self.clock.time_msec()
 
-        serialize_options = SerializeEventConfig(as_client_event=as_client_event)
+        serialize_options = SerializeEventConfig(
+            as_client_event=as_client_event, requester=requester
+        )
 
         chunk = {
             "chunk": (
@@ -653,15 +681,15 @@ class PaginationHandler:
                                 400, "Users are still joined to this room"
                             )
 
-                    await self.storage.purge_events.purge_room(room_id)
+                    await self._storage_controllers.purge_events.purge_room(room_id)
 
-            logger.info("complete")
+            logger.info("purge complete for room_id %s", room_id)
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_COMPLETE
         except Exception:
             f = Failure()
             logger.error(
                 "failed",
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_FAILED
             self._delete_by_id[delete_id].error = f.getErrorMessage()

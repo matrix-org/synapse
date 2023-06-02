@@ -19,6 +19,7 @@ from typing import (
     TYPE_CHECKING,
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -32,17 +33,17 @@ from typing import (
 import jsonschema
 from jsonschema import FormatChecker
 
-from synapse.api.constants import EventContentFields
+from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.types import JsonDict, RoomID, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "limit": {"type": "number"},
@@ -52,11 +53,17 @@ FILTER_SCHEMA = {
         # check types are valid event types
         "types": {"type": "array", "items": {"type": "string"}},
         "not_types": {"type": "array", "items": {"type": "string"}},
+        # MSC3874, filtering /messages.
+        "org.matrix.msc3874.rel_types": {"type": "array", "items": {"type": "string"}},
+        "org.matrix.msc3874.not_rel_types": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
     },
 }
 
 ROOM_FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "not_rooms": {"$ref": "#/definitions/room_id_array"},
@@ -70,7 +77,7 @@ ROOM_FILTER_SCHEMA = {
 }
 
 ROOM_EVENT_FILTER_SCHEMA = {
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
     "type": "object",
     "properties": {
         "limit": {"type": "number"},
@@ -83,6 +90,8 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "contains_url": {"type": "boolean"},
         "lazy_load_members": {"type": "boolean"},
         "include_redundant_members": {"type": "boolean"},
+        "unread_thread_notifications": {"type": "boolean"},
+        "org.matrix.msc3773.unread_thread_notifications": {"type": "boolean"},
         # Include or exclude events with the provided labels.
         # cf https://github.com/matrix-org/matrix-doc/pull/2326
         "org.matrix.labels": {"type": "array", "items": {"type": "string"}},
@@ -119,33 +128,20 @@ USER_FILTER_SCHEMA = {
         "account_data": {"$ref": "#/definitions/filter"},
         "room": {"$ref": "#/definitions/room_filter"},
         "event_format": {"type": "string", "enum": ["client", "federation"]},
-        "event_fields": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                # Don't allow '\\' in event field filters. This makes matching
-                # events a lot easier as we can then use a negative lookbehind
-                # assertion to split '\.' If we allowed \\ then it would
-                # incorrectly split '\\.' See synapse.events.utils.serialize_event
-                #
-                # Note that because this is a regular expression, we have to escape
-                # each backslash in the pattern.
-                "pattern": r"^((?!\\\\).)*$",
-            },
-        },
+        "event_fields": {"type": "array", "items": {"type": "string"}},
     },
-    "additionalProperties": False,
+    "additionalProperties": True,  # Allow new fields for forward compatibility
 }
 
 
 @FormatChecker.cls_checks("matrix_room_id")
-def matrix_room_id_validator(room_id_str: str) -> RoomID:
-    return RoomID.from_string(room_id_str)
+def matrix_room_id_validator(room_id: object) -> bool:
+    return isinstance(room_id, str) and RoomID.is_valid(room_id)
 
 
 @FormatChecker.cls_checks("matrix_user_id")
-def matrix_user_id_validator(user_id_str: str) -> UserID:
-    return UserID.from_string(user_id_str)
+def matrix_user_id_validator(user_id: object) -> bool:
+    return isinstance(user_id, str) and UserID.is_valid(user_id)
 
 
 class Filtering:
@@ -161,11 +157,9 @@ class Filtering:
         result = await self.store.get_user_filter(user_localpart, filter_id)
         return FilterCollection(self._hs, result)
 
-    def add_user_filter(
-        self, user_localpart: str, user_filter: JsonDict
-    ) -> Awaitable[int]:
+    def add_user_filter(self, user_id: UserID, user_filter: JsonDict) -> Awaitable[int]:
         self.check_valid_filter(user_filter)
-        return self.store.add_user_filter(user_localpart, user_filter)
+        return self.store.add_user_filter(user_id, user_filter)
 
     # TODO(paul): surely we should probably add a delete_user_filter or
     #   replace_user_filter at some point? There's no REST API specified for
@@ -210,9 +204,13 @@ class FilterCollection:
         self._room_timeline_filter = Filter(hs, room_filter_json.get("timeline", {}))
         self._room_state_filter = Filter(hs, room_filter_json.get("state", {}))
         self._room_ephemeral_filter = Filter(hs, room_filter_json.get("ephemeral", {}))
-        self._room_account_data = Filter(hs, room_filter_json.get("account_data", {}))
+        self._room_account_data_filter = Filter(
+            hs, room_filter_json.get("account_data", {})
+        )
         self._presence_filter = Filter(hs, filter_json.get("presence", {}))
-        self._account_data = Filter(hs, filter_json.get("account_data", {}))
+        self._global_account_data_filter = Filter(
+            hs, filter_json.get("account_data", {})
+        )
 
         self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
@@ -239,13 +237,18 @@ class FilterCollection:
     def include_redundant_members(self) -> bool:
         return self._room_state_filter.include_redundant_members
 
-    async def filter_presence(
-        self, events: Iterable[UserPresenceState]
-    ) -> List[UserPresenceState]:
-        return await self._presence_filter.filter(events)
+    def unread_thread_notifications(self) -> bool:
+        return self._room_timeline_filter.unread_thread_notifications
 
-    async def filter_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
-        return await self._account_data.filter(events)
+    async def filter_presence(
+        self, presence_states: Iterable[UserPresenceState]
+    ) -> List[UserPresenceState]:
+        return await self._presence_filter.filter(presence_states)
+
+    async def filter_global_account_data(
+        self, events: Iterable[JsonDict]
+    ) -> List[JsonDict]:
+        return await self._global_account_data_filter.filter(events)
 
     async def filter_room_state(self, events: Iterable[EventBase]) -> List[EventBase]:
         return await self._room_state_filter.filter(
@@ -267,9 +270,12 @@ class FilterCollection:
     async def filter_room_account_data(
         self, events: Iterable[JsonDict]
     ) -> List[JsonDict]:
-        return await self._room_account_data.filter(
+        return await self._room_account_data_filter.filter(
             await self._room_filter.filter(events)
         )
+
+    def blocks_all_rooms(self) -> bool:
+        return self._room_filter.filters_all_rooms()
 
     def blocks_all_presence(self) -> bool:
         return (
@@ -277,11 +283,25 @@ class FilterCollection:
             or self._presence_filter.filters_all_senders()
         )
 
+    def blocks_all_global_account_data(self) -> bool:
+        """True if all global acount data will be filtered out."""
+        return (
+            self._global_account_data_filter.filters_all_types()
+            or self._global_account_data_filter.filters_all_senders()
+        )
+
     def blocks_all_room_ephemeral(self) -> bool:
         return (
             self._room_ephemeral_filter.filters_all_types()
             or self._room_ephemeral_filter.filters_all_senders()
             or self._room_ephemeral_filter.filters_all_rooms()
+        )
+
+    def blocks_all_room_account_data(self) -> bool:
+        return (
+            self._room_account_data_filter.filters_all_types()
+            or self._room_account_data_filter.filters_all_senders()
+            or self._room_account_data_filter.filters_all_rooms()
         )
 
     def blocks_all_room_timeline(self) -> bool:
@@ -303,6 +323,16 @@ class Filter:
         self.include_redundant_members = filter_json.get(
             "include_redundant_members", False
         )
+        self.unread_thread_notifications: bool = filter_json.get(
+            "unread_thread_notifications", False
+        )
+        if (
+            not self.unread_thread_notifications
+            and hs.config.experimental.msc3773_enabled
+        ):
+            self.unread_thread_notifications = filter_json.get(
+                "org.matrix.msc3773.unread_thread_notifications", False
+            )
 
         self.types = filter_json.get("types", None)
         self.not_types = filter_json.get("not_types", [])
@@ -318,17 +348,24 @@ class Filter:
         self.labels = filter_json.get("org.matrix.labels", None)
         self.not_labels = filter_json.get("org.matrix.not_labels", [])
 
-        self.related_by_senders = self.filter_json.get("related_by_senders", None)
-        self.related_by_rel_types = self.filter_json.get("related_by_rel_types", None)
+        self.related_by_senders = filter_json.get("related_by_senders", None)
+        self.related_by_rel_types = filter_json.get("related_by_rel_types", None)
+
+        # For compatibility with _check_fields.
+        self.rel_types = None
+        self.not_rel_types = []
+        if hs.config.experimental.msc3874_enabled:
+            self.rel_types = filter_json.get("org.matrix.msc3874.rel_types", None)
+            self.not_rel_types = filter_json.get("org.matrix.msc3874.not_rel_types", [])
 
     def filters_all_types(self) -> bool:
-        return "*" in self.not_types
+        return self.types == [] or "*" in self.not_types
 
     def filters_all_senders(self) -> bool:
-        return "*" in self.not_senders
+        return self.senders == [] or "*" in self.not_senders
 
     def filters_all_rooms(self) -> bool:
-        return "*" in self.not_rooms
+        return self.rooms == [] or "*" in self.not_rooms
 
     def _check(self, event: FilterEvent) -> bool:
         """Checks whether the filter matches the given event.
@@ -346,7 +383,7 @@ class Filter:
             user_id = event.user_id
             field_matchers = {
                 "senders": lambda v: user_id == v,
-                "types": lambda v: "m.presence" == v,
+                "types": lambda v: EduTypes.PRESENCE == v,
             }
             return self._check_fields(field_matchers)
         else:
@@ -370,11 +407,19 @@ class Filter:
             # check if there is a string url field in the content for filtering purposes
             labels = content.get(EventContentFields.LABELS, [])
 
+            # Check if the event has a relation.
+            rel_type = None
+            if isinstance(event, EventBase):
+                relation = relation_from_event(event)
+                if relation:
+                    rel_type = relation.rel_type
+
             field_matchers = {
                 "rooms": lambda v: room_id == v,
                 "senders": lambda v: sender == v,
                 "types": lambda v: _matches_wildcard(ev_type, v),
                 "labels": lambda v: v in labels,
+                "rel_types": lambda v: rel_type == v,
             }
 
             result = self._check_fields(field_matchers)
@@ -413,8 +458,8 @@ class Filter:
             if any(map(match_func, disallowed_values)):
                 return False
 
-            # Other the event does not match at least one of the allowed values,
-            # reject it.
+            # Otherwise if the event does not match at least one of the allowed
+            # values, reject it.
             allowed_values = getattr(self, name)
             if allowed_values is not None:
                 if not any(map(match_func, allowed_values)):
@@ -444,9 +489,9 @@ class Filter:
         return room_ids
 
     async def _check_event_relations(
-        self, events: Iterable[FilterEvent]
+        self, events: Collection[FilterEvent]
     ) -> List[FilterEvent]:
-        # The event IDs to check, mypy doesn't understand the ifinstance check.
+        # The event IDs to check, mypy doesn't understand the isinstance check.
         event_ids = [event.event_id for event in events if isinstance(event, EventBase)]  # type: ignore[attr-defined]
         event_ids_to_keep = set(
             await self._store.events_have_relations(

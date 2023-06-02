@@ -35,7 +35,6 @@ from typing import (
 )
 
 import attr
-from matrix_common.versionstring import get_distribution_version_string
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Metric
 from prometheus_client.core import (
     REGISTRY,
@@ -47,13 +46,10 @@ from twisted.python.threadpool import ThreadPool
 
 # This module is imported for its side effects; flake8 needn't warn that it's unused.
 import synapse.metrics._reactor_metrics  # noqa: F401
-from synapse.metrics._exposition import (
-    MetricsResource,
-    generate_latest,
-    start_http_server,
-)
 from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
+from synapse.metrics._twisted_exposition import MetricsResource, generate_latest
 from synapse.metrics._types import Collector
+from synapse.util import SYNAPSE_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +87,6 @@ class LaterGauge(Collector):
     ]
 
     def collect(self) -> Iterable[Metric]:
-
         g = GaugeMetricFamily(self.name, self.desc, labels=self.labels)
 
         try:
@@ -419,7 +414,7 @@ build_info = Gauge(
 )
 build_info.labels(
     " ".join([platform.python_implementation(), platform.python_version()]),
-    get_distribution_version_string("matrix-synapse"),
+    SYNAPSE_VERSION,
     " ".join([platform.system(), platform.release()]),
 ).set(1)
 
@@ -474,7 +469,6 @@ __all__ = [
     "Collector",
     "MetricsResource",
     "generate_latest",
-    "start_http_server",
     "LaterGauge",
     "InFlightGauge",
     "GaugeBucketCollector",

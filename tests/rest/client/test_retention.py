@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, Dict
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -19,7 +20,7 @@ from synapse.api.constants import EventTypes
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
-from synapse.types import JsonDict
+from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 from synapse.visibility import filter_events_for_client
 
@@ -129,12 +130,13 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         We do this by setting a very long time between purge jobs.
         """
         store = self.hs.get_datastores().main
-        storage = self.hs.get_storage()
+        storage_controllers = self.hs.get_storage_controllers()
         room_id = self.helper.create_room_as(self.user_id, tok=self.token)
 
         # Send a first event, which should be filtered out at the end of the test.
         resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
         first_event_id = resp.get("event_id")
+        assert isinstance(first_event_id, str)
 
         # Advance the time by 2 days. We're using the default retention policy, therefore
         # after this the first event will still be valid.
@@ -143,6 +145,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # Send another event, which shouldn't get filtered out.
         resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
         valid_event_id = resp.get("event_id")
+        assert isinstance(valid_event_id, str)
 
         # Advance the time by another 2 days. After this, the first event should be
         # outdated but not the second one.
@@ -154,7 +157,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(2, len(events), "events retrieved from database")
         filtered_events = self.get_success(
-            filter_events_for_client(storage, self.user_id, events)
+            filter_events_for_client(storage_controllers, self.user_id, events)
         )
 
         # We should only get one event back.
@@ -187,7 +190,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         message_handler = self.hs.get_message_handler()
         create_event = self.get_success(
             message_handler.get_room_data(
-                self.user_id, room_id, EventTypes.Create, state_key=""
+                create_requester(self.user_id), room_id, EventTypes.Create, state_key=""
             )
         )
 
@@ -228,7 +231,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         # Check that we can still access state events that were sent before the event that
         # has been purged.
-        self.get_event(room_id, create_event.event_id)
+        self.get_event(room_id, bool(create_event))
 
     def get_event(self, event_id: str, expect_none: bool = False) -> JsonDict:
         event = self.get_success(self.store.get_event(event_id, allow_none=True))
@@ -237,7 +240,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
             self.assertIsNone(event)
             return {}
 
-        self.assertIsNotNone(event)
+        assert event is not None
 
         time_now = self.clock.time_msec()
         serialized = self.serializer.serialize_event(event, time_now)
@@ -252,16 +255,24 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        config = self.default_config()
-        config["retention"] = {
+    def default_config(self) -> Dict[str, Any]:
+        config = super().default_config()
+
+        retention_config = {
             "enabled": True,
         }
 
+        # Update this config with what's in the default config so that
+        # override_config works as expected.
+        retention_config.update(config.get("retention", {}))
+        config["retention"] = retention_config
+
+        return config
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         mock_federation_client = Mock(spec=["backfill"])
 
         self.hs = self.setup_test_homeserver(
-            config=config,
             federation_client=mock_federation_client,
         )
         return self.hs
@@ -294,6 +305,24 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         )
 
         self._test_retention(room_id, expected_code_for_first_event=404)
+
+    @unittest.override_config({"retention": {"enabled": False}})
+    def test_visibility_when_disabled(self) -> None:
+        """Retention policies should be ignored when the retention feature is disabled."""
+        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Retention,
+            body={"max_lifetime": one_day_ms},
+            tok=self.token,
+        )
+
+        resp = self.helper.send(room_id=room_id, body="test", tok=self.token)
+
+        self.reactor.advance(one_day_ms * 2 / 1000)
+
+        self.get_event(room_id, resp["event_id"])
 
     def _test_retention(
         self, room_id: str, expected_code_for_first_event: int = 200

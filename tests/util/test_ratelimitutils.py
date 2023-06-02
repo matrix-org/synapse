@@ -13,16 +13,20 @@
 # limitations under the License.
 from typing import Optional
 
+from twisted.internet import defer
+from twisted.internet.defer import Deferred
+
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-from tests.server import get_clock
+from tests.server import ThreadedMemoryReactorClock, get_clock
 from tests.unittest import TestCase
 from tests.utils import default_config
 
 
 class FederationRateLimiterTestCase(TestCase):
-    def test_ratelimit(self):
+    def test_ratelimit(self) -> None:
         """A simple test with the default values"""
         reactor, clock = get_clock()
         rc_config = build_rc_config()
@@ -32,7 +36,7 @@ class FederationRateLimiterTestCase(TestCase):
             # shouldn't block
             self.successResultOf(d1)
 
-    def test_concurrent_limit(self):
+    def test_concurrent_limit(self) -> None:
         """Test what happens when we hit the concurrent limit"""
         reactor, clock = get_clock()
         rc_config = build_rc_config({"rc_federation": {"concurrent": 2}})
@@ -54,9 +58,10 @@ class FederationRateLimiterTestCase(TestCase):
 
             # ... until we complete an earlier request
             cm2.__exit__(None, None, None)
+            reactor.advance(0.0)
             self.successResultOf(d3)
 
-    def test_sleep_limit(self):
+    def test_sleep_limit(self) -> None:
         """Test what happens when we hit the sleep limit"""
         reactor, clock = get_clock()
         rc_config = build_rc_config(
@@ -78,8 +83,45 @@ class FederationRateLimiterTestCase(TestCase):
             sleep_time = _await_resolution(reactor, d3)
             self.assertAlmostEqual(sleep_time, 500, places=3)
 
+    def test_lots_of_queued_things(self) -> None:
+        """Tests lots of synchronous things queued up behind a slow thing.
 
-def _await_resolution(reactor, d):
+        The stack should *not* explode when the slow thing completes.
+        """
+        reactor, clock = get_clock()
+        rc_config = build_rc_config(
+            {
+                "rc_federation": {
+                    "sleep_limit": 1000000000,  # never sleep
+                    "reject_limit": 1000000000,  # never reject requests
+                    "concurrent": 1,
+                }
+            }
+        )
+        ratelimiter = FederationRateLimiter(clock, rc_config)
+
+        with ratelimiter.ratelimit("testhost") as d:
+            # shouldn't block
+            self.successResultOf(d)
+
+            async def task() -> None:
+                with ratelimiter.ratelimit("testhost") as d:
+                    await d
+
+            for _ in range(1, 100):
+                defer.ensureDeferred(task())
+
+            last_task = defer.ensureDeferred(task())
+
+            # Upon exiting the context manager, all the synchronous things will resume.
+            # If a stack overflow occurs, the final task will not complete.
+
+        # Wait for all the things to complete.
+        reactor.advance(0.0)
+        self.successResultOf(last_task)
+
+
+def _await_resolution(reactor: ThreadedMemoryReactorClock, d: Deferred) -> float:
     """advance the clock until the deferred completes.
 
     Returns the number of milliseconds it took to complete.
@@ -90,7 +132,7 @@ def _await_resolution(reactor, d):
     return (reactor.seconds() - start_time) * 1000
 
 
-def build_rc_config(settings: Optional[dict] = None):
+def build_rc_config(settings: Optional[dict] = None) -> FederationRatelimitSettings:
     config_dict = default_config("test")
     config_dict.update(settings or {})
     config = HomeServerConfig()

@@ -1,0 +1,144 @@
+name: Bug report
+description: Create a report to help us improve
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **THIS IS NOT A SUPPORT CHANNEL!**
+        **IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**, please ask in **[#synapse:matrix.org](https://matrix.to/#/#synapse:matrix.org)** (using a matrix.org account if necessary).
+
+        If you want to report a security issue, please see https://matrix.org/security-disclosure-policy/
+
+        This is a bug report form. By following the instructions below and completing the sections with your information, you will help the us to get all the necessary data to fix your issue.
+
+        You can also preview your report before submitting it.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the problem that you are experiencing
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Describe the series of steps that leads you to the problem.
+
+        Describe how what happens differs from what you expected.
+      placeholder: Tell us what you see!
+      value: |
+        - list the steps
+        - that reproduce the bug
+        - using hyphens as bullet points
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        **IMPORTANT**: please answer the following questions, to help us narrow down the problem.
+  - type: input
+    id: homeserver
+    attributes:
+      label: Homeserver
+      description: Which homeserver was this issue identified on? (matrix.org, another homeserver, etc)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Synapse Version
+      description: |
+        What version of Synapse is this homeserver running?
+
+        You can find the Synapse version by visiting https://yourserver.example.com/_matrix/federation/v1/version
+
+        or with this command:
+
+        ```
+        $ curl http://localhost:8008/_synapse/admin/v1/server_version
+        ```
+
+        (You may need to replace `localhost:8008` if Synapse is not configured to listen on that port.)
+    validations:
+      required: true
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation Method
+      options:
+        - Docker (matrixdotorg/synapse)
+        - Debian packages from packages.matrix.org
+        - pip (from PyPI)
+        - Other (please mention below)
+        - I don't know
+    validations:
+      required: true
+  - type: input
+    id: database
+    attributes:
+      label: Database
+      description: |
+        Are you using SQLite or PostgreSQL? What's the version of your database?
+
+        If PostgreSQL, please also answer the following:
+         - are you using a single PostgreSQL server
+        or [separate servers for `main` and `state`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#databases)?
+         - have you previously ported from SQLite using the Synapse "portdb" script?
+         - have you previously restored from a backup?
+    validations:
+      required: true
+  - type: dropdown
+    id: workers
+    attributes:
+      label: Workers
+      description: |
+        Are you running a single Synapse process, or are you running
+        [2 or more workers](https://matrix-org.github.io/synapse/latest/workers.html)?
+      options:
+        - Single process
+        - Multiple workers
+        - I don't know
+    validations:
+      required: true
+  - type: textarea
+    id: platform
+    attributes:
+      label: Platform
+      description: |
+        Tell us about the environment in which your homeserver is operating...
+        e.g. distro, hardware, if it's running in a vm/container, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: |
+        Do you have any unusual config options turned on? If so, please provide details.
+
+        - Experimental or undocumented features
+        - [Presence](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#presence)
+        - [Message retention](https://matrix-org.github.io/synapse/latest/message_retention_policies.html)
+        - [Synapse modules](https://matrix-org.github.io/synapse/latest/modules/index.html)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        Please copy and paste any relevant log output as text (not images), ideally at INFO or DEBUG log level.
+        This will be automatically formatted into code, so there is no need for backticks (`\``).
+
+        Please be careful to remove any personal or private data.
+
+        **Bug reports are usually impossible to diagnose without logging.**
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: anything_else
+    attributes:
+      label: Anything else that would be useful to know?

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from collections import OrderedDict
+from typing import Generator
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -30,7 +30,7 @@ from tests.utils import default_config
 class SQLBaseStoreTestCase(unittest.TestCase):
     """Test the "simple" SQL generating methods in SQLBaseStore."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.db_pool = Mock(spec=["runInteraction"])
         self.mock_txn = Mock()
         self.mock_conn = Mock(spec_set=["cursor", "rollback", "commit"])
@@ -38,12 +38,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_conn.rollback.return_value = None
         # Our fake runInteraction just runs synchronously inline
 
-        def runInteraction(func, *args, **kwargs):
+        def runInteraction(func, *args, **kwargs) -> defer.Deferred:  # type: ignore[no-untyped-def]
             return defer.succeed(func(self.mock_txn, *args, **kwargs))
 
         self.db_pool.runInteraction = runInteraction
 
-        def runWithConnection(func, *args, **kwargs):
+        def runWithConnection(func, *args, **kwargs):  # type: ignore[no-untyped-def]
             return defer.succeed(func(self.mock_conn, *args, **kwargs))
 
         self.db_pool.runWithConnection = runWithConnection
@@ -54,16 +54,15 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         sqlite_config = {"name": "sqlite3"}
         engine = create_engine(sqlite_config)
         fake_engine = Mock(wraps=engine)
-        fake_engine.can_native_upsert = False
         fake_engine.in_transaction.return_value = False
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool
 
-        self.datastore = SQLBaseStore(db, None, hs)
+        self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
 
     @defer.inlineCallbacks
-    def test_insert_1col(self):
+    def test_insert_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -77,7 +76,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_insert_3cols(self):
+    def test_insert_3cols(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -93,7 +92,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_select_one_1col(self):
+    def test_select_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
         self.mock_txn.__iter__ = Mock(return_value=iter([("Value",)]))
 
@@ -109,7 +108,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_select_one_3col(self):
+    def test_select_one_3col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
         self.mock_txn.fetchone.return_value = (1, 2, 3)
 
@@ -127,7 +126,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_select_one_missing(self):
+    def test_select_one_missing(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 0
         self.mock_txn.fetchone.return_value = None
 
@@ -143,7 +144,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.assertFalse(ret)
 
     @defer.inlineCallbacks
-    def test_select_list(self):
+    def test_select_list(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 3
         self.mock_txn.__iter__ = Mock(return_value=iter([(1,), (2,), (3,)]))
         self.mock_txn.description = (("colA", None, None, None, None, None, None),)
@@ -160,7 +161,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_update_one_1col(self):
+    def test_update_one_1col(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -177,7 +178,9 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_update_one_4cols(self):
+    def test_update_one_4cols(
+        self,
+    ) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(
@@ -194,7 +197,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_delete_one(self):
+    def test_delete_one(self) -> Generator["defer.Deferred[object]", object, None]:
         self.mock_txn.rowcount = 1
 
         yield defer.ensureDeferred(

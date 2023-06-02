@@ -155,39 +155,32 @@ def run_upgrade(
 Boolean columns require special treatment, since SQLite treats booleans the
 same as integers.
 
-There are three separate aspects to this:
-
- * Any new boolean column must be added to the `BOOLEAN_COLUMNS` list in
+Any new boolean column must be added to the `BOOLEAN_COLUMNS` list in
    `synapse/_scripts/synapse_port_db.py`. This tells the port script to cast
    the integer value from SQLite to a boolean before writing the value to the
    postgres database.
 
- * Before SQLite 3.23, `TRUE` and `FALSE` were not recognised as constants by
-   SQLite, and the `IS [NOT] TRUE`/`IS [NOT] FALSE` operators were not
-   supported. This makes it necessary to avoid using `TRUE` and `FALSE`
-   constants in SQL commands.
 
-   For example, to insert a `TRUE` value into the database, write:
+## `event_id` global uniqueness
 
-   ```python
-   txn.execute("INSERT INTO tbl(col) VALUES (?)", (True, ))
-   ```
+`event_id`'s can be considered globally unique although there has been a lot of
+debate on this topic in places like
+[MSC2779](https://github.com/matrix-org/matrix-spec-proposals/issues/2779) and
+[MSC2848](https://github.com/matrix-org/matrix-spec-proposals/pull/2848) which
+has no resolution yet (as of 2022-09-01). There are several places in Synapse
+and even in the Matrix APIs like [`GET
+/_matrix/federation/v1/event/{eventId}`](https://spec.matrix.org/v1.1/server-server-api/#get_matrixfederationv1eventeventid)
+where we assume that event IDs are globally unique.
 
- * Default values for new boolean columns present a particular
-   difficulty. Generally it is best to create separate schema files for
-   Postgres and SQLite. For example:
+When scoping `event_id` in a database schema, it is often nice to accompany it
+with `room_id` (`PRIMARY KEY (room_id, event_id)` and a `FOREIGN KEY(room_id)
+REFERENCES rooms(room_id)`) which makes flexible lookups easy. For example it
+makes it very easy to find and clean up everything in a room when it needs to be
+purged (no need to use sub-`select` query or join from the `events` table).
 
-   ```sql
-   # in 00delta.sql.postgres:
-   ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT FALSE;
-   ```
+A note on collisions: In room versions `1` and `2` it's possible to end up with
+two events with the same `event_id` (in the same or different rooms). After room
+version `3`, that can only happen with a hash collision, which we basically hope
+will never happen (SHA256 has a massive big key space).
 
-   ```sql
-   # in 00delta.sql.sqlite:
-   ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT 0;
-   ```
 
-   Note that there is a particularly insidious failure mode here: the Postgres
-   flavour will be accepted by SQLite 3.22, but will give a column whose
-   default value is the **string** `"FALSE"` - which, when cast back to a boolean
-   in Python, evaluates to `True`.

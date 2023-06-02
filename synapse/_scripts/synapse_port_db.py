@@ -18,6 +18,7 @@
 import argparse
 import curses
 import logging
+import os
 import sys
 import time
 import traceback
@@ -40,7 +41,6 @@ from typing import (
 )
 
 import yaml
-from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import TypedDict
 
 from twisted.internet import defer, reactor as reactor_
@@ -52,26 +52,34 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.notifier import ReplicationNotifier
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
-from synapse.storage.databases.main import PushRuleStore
+from synapse.storage.databases.main import FilteringWorkerStore, PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
+from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyBackgroundStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
+from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
-from synapse.storage.databases.main.group_server import GroupServerWorkerStore
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
 from synapse.storage.databases.main.presence import PresenceBackgroundUpdateStore
-from synapse.storage.databases.main.pusher import PusherWorkerStore
+from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.pusher import (
+    PusherBackgroundUpdatesStore,
+    PusherWorkerStore,
+)
+from synapse.storage.databases.main.receipts import ReceiptsBackgroundUpdateStore
 from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
     find_max_generated_user_id_localpart,
 )
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomBackgroundUpdateStore
 from synapse.storage.databases.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.databases.main.search import SearchBackgroundUpdateStore
@@ -84,7 +92,7 @@ from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStor
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor
-from synapse.util import Clock
+from synapse.util import SYNAPSE_VERSION, Clock
 
 # Cast safety: Twisted does some naughty magic which replaces the
 # twisted.internet.reactor module with a Reactor instance at runtime.
@@ -92,68 +100,81 @@ reactor = cast(ISynapseReactor, reactor_)
 logger = logging.getLogger("synapse_port_db")
 
 
+# SQLite doesn't have a dedicated boolean type (it stores True/False as 1/0). This means
+# portdb will read sqlite bools as integers, then try to insert them into postgres
+# boolean columns---which fails. Lacking some Python-parseable metaschema, we must
+# specify which integer columns should be inserted as booleans into postgres.
 BOOLEAN_COLUMNS = {
-    "events": ["processed", "outlier", "contains_url"],
-    "rooms": ["is_public", "has_auth_chain_index"],
+    "access_tokens": ["used"],
+    "account_validity": ["email_sent"],
+    "device_lists_changes_in_room": ["converted_to_destinations"],
+    "device_lists_outbound_pokes": ["sent"],
+    "devices": ["hidden"],
+    "e2e_fallback_keys_json": ["used"],
+    "e2e_room_keys": ["is_verified"],
     "event_edges": ["is_state"],
+    "events": ["processed", "outlier", "contains_url"],
+    "local_media_repository": ["safe_from_quarantine"],
     "presence_list": ["accepted"],
     "presence_stream": ["currently_active"],
     "public_room_list_stream": ["visibility"],
-    "devices": ["hidden"],
-    "device_lists_outbound_pokes": ["sent"],
-    "users_who_share_rooms": ["share_private"],
-    "groups": ["is_public"],
-    "group_rooms": ["is_public"],
-    "group_users": ["is_public", "is_admin"],
-    "group_summary_rooms": ["is_public"],
-    "group_room_categories": ["is_public"],
-    "group_summary_users": ["is_public"],
-    "group_roles": ["is_public"],
-    "local_group_membership": ["is_publicised", "is_admin"],
-    "e2e_room_keys": ["is_verified"],
-    "account_validity": ["email_sent"],
+    "pushers": ["enabled"],
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
-    "local_media_repository": ["safe_from_quarantine"],
-    "users": ["shadow_banned"],
-    "e2e_fallback_keys_json": ["used"],
-    "access_tokens": ["used"],
-    "device_lists_changes_in_room": ["converted_to_destinations"],
+    "rooms": ["is_public", "has_auth_chain_index"],
+    "users": ["shadow_banned", "approved"],
+    "un_partial_stated_event_stream": ["rejection_status_changed"],
+    "users_who_share_rooms": ["share_private"],
+    "per_user_experimental_features": ["enabled"],
 }
 
 
+# These tables are never deleted from in normal operation [*], so we can resume porting
+# over rows from a previous attempt rather than starting from scratch.
+#
+# [*]: We do delete from many of these tables when purging a room, and
+#      presumably when purging old events. So we might e.g.
+#
+#      1. Run portdb and port half of some table.
+#      2. Stop portdb.
+#      3. Purge something, deleting some of the rows we've ported over.
+#      4. Restart portdb. The rows deleted from sqlite are still present in postgres.
+#
+#      But this isn't the end of the world: we should be able to repeat the purge
+#      on the postgres DB when porting completes.
 APPEND_ONLY_TABLES = [
-    "event_reference_hashes",
-    "events",
+    "cache_invalidation_stream_by_instance",
+    "event_auth",
+    "event_edges",
     "event_json",
-    "state_events",
-    "room_memberships",
-    "topics",
-    "room_names",
-    "rooms",
+    "event_reference_hashes",
+    "event_search",
+    "event_to_state_groups",
+    "events",
+    "ex_outlier_stream",
     "local_media_repository",
     "local_media_repository_thumbnails",
+    "presence_stream",
+    "public_room_list_stream",
+    "push_rules_stream",
+    "received_transactions",
+    "redactions",
+    "rejections",
     "remote_media_cache",
     "remote_media_cache_thumbnails",
-    "redactions",
-    "event_edges",
-    "event_auth",
-    "received_transactions",
+    "room_memberships",
+    "room_names",
+    "rooms",
     "sent_transactions",
-    "transaction_id_to_pdu",
-    "users",
+    "state_events",
+    "state_group_edges",
     "state_groups",
     "state_groups_state",
-    "event_to_state_groups",
-    "rejections",
-    "event_search",
-    "presence_stream",
-    "push_rules_stream",
-    "ex_outlier_stream",
-    "cache_invalidation_stream_by_instance",
-    "public_room_list_stream",
-    "state_group_edges",
     "stream_ordering_to_exterm",
+    "topics",
+    "transaction_id_to_pdu",
+    "un_partial_stated_event_stream",
+    "users",
 ]
 
 
@@ -193,6 +214,7 @@ R = TypeVar("R")
 
 
 class Store(
+    EventPushActionsStore,
     ClientIpBackgroundUpdateStore,
     DeviceInboxBackgroundUpdateStore,
     DeviceBackgroundUpdateStore,
@@ -206,12 +228,17 @@ class Store(
     MainStateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
+    EndToEndRoomKeyBackgroundStore,
     StatsStore,
     AccountDataWorkerStore,
+    FilteringWorkerStore,
+    ProfileWorkerStore,
     PushRuleStore,
     PusherWorkerStore,
+    PusherBackgroundUpdatesStore,
     PresenceBackgroundUpdateStore,
-    GroupServerWorkerStore,
+    ReceiptsBackgroundUpdateStore,
+    RelationsWorkerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -250,9 +277,7 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server.server_name
-        self.version_string = "Synapse/" + get_distribution_version_string(
-            "matrix-synapse"
-        )
+        self.version_string = SYNAPSE_VERSION
 
     def get_clock(self) -> Clock:
         return self.clock
@@ -262,6 +287,12 @@ class MockHomeserver:
 
     def get_instance_name(self) -> str:
         return "master"
+
+    def should_send_federation(self) -> bool:
+        return False
+
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
 
 class Porter:
@@ -410,12 +441,15 @@ class Porter:
             self.progress.update(table, table_size)  # Mark table as done
             return
 
+        # We sweep over rowids in two directions: one forwards (rowids 1, 2, 3, ...)
+        # and another backwards (rowids 0, -1, -2, ...).
         forward_select = (
             "SELECT rowid, * FROM %s WHERE rowid >= ? ORDER BY rowid LIMIT ?" % (table,)
         )
 
         backward_select = (
-            "SELECT rowid, * FROM %s WHERE rowid <= ? ORDER BY rowid LIMIT ?" % (table,)
+            "SELECT rowid, * FROM %s WHERE rowid <= ? ORDER BY rowid DESC LIMIT ?"
+            % (table,)
         )
 
         do_forward = [True]
@@ -613,6 +647,25 @@ class Porter:
                 self.postgres_store.db_pool.updates.has_completed_background_updates()
             )
 
+    @staticmethod
+    def _is_sqlite_autovacuum_enabled(txn: LoggingTransaction) -> bool:
+        """
+        Returns true if auto_vacuum is enabled in SQLite.
+        https://www.sqlite.org/pragma.html#pragma_auto_vacuum
+
+        Vacuuming changes the rowids on rows in the database.
+        Auto-vacuuming is therefore dangerous when used in conjunction with this script.
+
+        Note that the auto_vacuum setting can't be changed without performing
+        a VACUUM after trying to change the pragma.
+        """
+        txn.execute("PRAGMA auto_vacuum")
+        row = txn.fetchone()
+        assert row is not None, "`PRAGMA auto_vacuum` did not give a row."
+        (autovacuum_setting,) = row
+        # 0 means off. 1 means full. 2 means incremental.
+        return autovacuum_setting != 0
+
     async def run(self) -> None:
         """Ports the SQLite database to a PostgreSQL database.
 
@@ -628,6 +681,21 @@ class Porter:
                 DatabaseConnectionConfig("master-sqlite", self.sqlite_config),
                 allow_outdated_version=True,
             )
+
+            # For safety, ensure auto_vacuums are disabled.
+            if await self.sqlite_store.db_pool.runInteraction(
+                "is_sqlite_autovacuum_enabled", self._is_sqlite_autovacuum_enabled
+            ):
+                end_error = (
+                    "auto_vacuum is enabled in the SQLite database."
+                    " (This is not the default configuration.)\n"
+                    " This script relies on rowids being consistent and must not"
+                    " be used if the database could be vacuumed between re-runs.\n"
+                    " To disable auto_vacuum, you need to stop Synapse and run the following SQL:\n"
+                    " PRAGMA auto_vacuum=off;\n"
+                    " VACUUM;"
+                )
+                return
 
             # Check if all background updates are done, abort if not.
             updates_complete = (
@@ -1148,7 +1216,6 @@ class CursesProgress(Progress):
         if self.finished:
             status = "Time spent: %s (Done!)" % (duration_str,)
         else:
-
             if self.total_processed > 0:
                 left = float(self.total_remaining) / self.total_processed
 
@@ -1269,6 +1336,13 @@ def main() -> None:
         format="%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
         filename="port-synapse.log" if args.curses else None,
     )
+
+    if not os.path.isfile(args.sqlite_database):
+        sys.stderr.write(
+            "The sqlite database you specified does not exist, please check that you have the"
+            "correct path."
+        )
+        sys.exit(1)
 
     sqlite_config = {
         "name": "sqlite3",

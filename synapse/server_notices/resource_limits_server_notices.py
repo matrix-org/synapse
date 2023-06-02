@@ -21,7 +21,6 @@ from synapse.api.constants import (
     ServerNoticeMsgType,
 )
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
-from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -37,7 +36,8 @@ class ResourceLimitsServerNotices:
     def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastores().main
-        self._auth = hs.get_auth()
+        self._storage_controllers = hs.get_storage_controllers()
+        self._auth_blocking = hs.get_auth_blocking()
         self._config = hs.config
         self._resouce_limited = False
         self._account_data_handler = hs.get_account_data_handler()
@@ -71,18 +71,19 @@ class ResourceLimitsServerNotices:
             # In practice, not sure we can ever get here
             return
 
-        room_id = await self._server_notices_manager.get_or_create_notice_room_for_user(
+        # Check if there's a server notice room for this user.
+        room_id = await self._server_notices_manager.maybe_get_notice_room_for_user(
             user_id
         )
 
-        if not room_id:
-            logger.warning("Failed to get server notices room")
-            return
-
-        await self._check_and_set_tags(user_id, room_id)
-
-        # Determine current state of room
-        currently_blocked, ref_events = await self._is_room_currently_blocked(room_id)
+        if room_id is not None:
+            # Determine current state of room
+            currently_blocked, ref_events = await self._is_room_currently_blocked(
+                room_id
+            )
+        else:
+            currently_blocked = False
+            ref_events = []
 
         limit_msg = None
         limit_type = None
@@ -90,7 +91,7 @@ class ResourceLimitsServerNotices:
             # Normally should always pass in user_id to check_auth_blocking
             # if you have it, but in this case are checking what would happen
             # to other users if they were to arrive.
-            await self._auth.check_auth_blocking()
+            await self._auth_blocking.check_auth_blocking()
         except ResourceLimitError as e:
             limit_msg = e.msg
             limit_type = e.limit_type
@@ -161,26 +162,6 @@ class ResourceLimitsServerNotices:
             user_id, content, EventTypes.Pinned, ""
         )
 
-    async def _check_and_set_tags(self, user_id: str, room_id: str) -> None:
-        """
-        Since server notices rooms were originally not with tags,
-        important to check that tags have been set correctly
-        Args:
-            user_id(str): the user in question
-            room_id(str): the server notices room for that user
-        """
-        tags = await self._store.get_tags_for_room(user_id, room_id)
-        need_to_set_tag = True
-        if tags:
-            if SERVER_NOTICE_ROOM_TAG in tags:
-                # tag already present, nothing to do here
-                need_to_set_tag = False
-        if need_to_set_tag:
-            max_id = await self._account_data_handler.add_tag_to_room(
-                user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
-            )
-            self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
-
     async def _is_room_currently_blocked(self, room_id: str) -> Tuple[bool, List[str]]:
         """
         Determines if the room is currently blocked
@@ -189,17 +170,21 @@ class ResourceLimitsServerNotices:
             room_id: The room id of the server notices room
 
         Returns:
-            bool: Is the room currently blocked
-            list: The list of pinned event IDs that are unrelated to limit blocking
-            This list can be used as a convenience in the case where the block
-            is to be lifted and the remaining pinned event references need to be
-            preserved
+            Tuple of:
+                Is the room currently blocked
+
+                The list of pinned event IDs that are unrelated to limit blocking
+                This list can be used as a convenience in the case where the block
+                is to be lifted and the remaining pinned event references need to be
+                preserved
         """
         currently_blocked = False
         pinned_state_event = None
         try:
-            pinned_state_event = await self._state.get_current_state(
-                room_id, event_type=EventTypes.Pinned
+            pinned_state_event = (
+                await self._storage_controllers.state.get_current_state_event(
+                    room_id, event_type=EventTypes.Pinned, state_key=""
+                )
             )
         except AuthError:
             # The user has yet to join the server notices room

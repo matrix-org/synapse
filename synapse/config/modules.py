@@ -31,20 +31,3 @@ class ModulesConfig(Config):
                 raise ConfigError("expected a mapping", config_path)
 
             self.loaded_modules.append(load_module(module, config_path))
-
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """
-            ## Modules ##
-
-            # Server admins can expand Synapse's functionality with external modules.
-            #
-            # See https://matrix-org.github.io/synapse/latest/modules/index.html for more
-            # documentation on how to configure or create custom modules for Synapse.
-            #
-            modules:
-              #- module: my_super_module.MySuperClass
-              #  config:
-              #    do_thing: true
-              #- module: my_other_super_module.SomeClass
-              #  config: {}
-            """

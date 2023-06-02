@@ -59,8 +59,8 @@ namespace (such as anything under `/_matrix/client` for example). It is strongly
 recommended that modules register their web resources under the `/_synapse/client`
 namespace.
 
-The provided resource is a Python class that implements Twisted's [IResource](https://twistedmatrix.com/documents/current/api/twisted.web.resource.IResource.html)
-interface (such as [Resource](https://twistedmatrix.com/documents/current/api/twisted.web.resource.Resource.html)).
+The provided resource is a Python class that implements Twisted's [IResource](https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.IResource.html)
+interface (such as [Resource](https://docs.twistedmatrix.com/en/stable/api/twisted.web.resource.Resource.html)).
 
 Only one resource can be registered for a given path. If several modules attempt to
 register a resource for the same path, the module that appears first in Synapse's
@@ -83,3 +83,59 @@ the callback name as the argument name and the function as its value. A
 
 Callbacks for each category can be found on their respective page of the
 [Synapse documentation website](https://matrix-org.github.io/synapse).
+
+## Caching
+
+_Added in Synapse 1.74.0._
+
+Modules can leverage Synapse's caching tools to manage their own cached functions. This
+can be helpful for modules that need to repeatedly request the same data from the database
+or a remote service.
+
+Functions that need to be wrapped with a cache need to be decorated with a `@cached()`
+decorator (which can be imported from `synapse.module_api`) and registered with the
+[`ModuleApi.register_cached_function`](https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L888)
+API when initialising the module. If the module needs to invalidate an entry in a cache,
+it needs to use the [`ModuleApi.invalidate_cache`](https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L904)
+API, with the function to invalidate the cache of and the key(s) of the entry to
+invalidate.
+
+Below is an example of a simple module using a cached function:
+
+```python
+from typing import Any
+from synapse.module_api import cached, ModuleApi
+
+class MyModule:
+    def __init__(self, config: Any, api: ModuleApi):
+        self.api = api
+        
+        # Register the cached function so Synapse knows how to correctly invalidate
+        # entries for it.
+        self.api.register_cached_function(self.get_user_from_id)
+
+    @cached()
+    async def get_department_for_user(self, user_id: str) -> str:
+        """A function with a cache."""
+        # Request a department from an external service.
+        return await self.http_client.get_json(
+            "https://int.example.com/users", {"user_id": user_id)
+        )["department"]
+
+    async def do_something_with_users(self) -> None:
+        """Calls the cached function and then invalidates an entry in its cache."""
+        
+        user_id = "@alice:example.com"
+        
+        # Get the user. Since get_department_for_user is wrapped with a cache,
+        # the return value for this user_id will be cached.
+        department = await self.get_department_for_user(user_id)
+        
+        # Do something with `department`...
+        
+        # Let's say something has changed with our user, and the entry we have for
+        # them in the cache is out of date, so we want to invalidate it.
+        await self.api.invalidate_cache(self.get_department_for_user, (user_id,))
+```
+
+See the [`cached` docstring](https://github.com/matrix-org/synapse/blob/release-v1.77/synapse/module_api/__init__.py#L190) for more details.

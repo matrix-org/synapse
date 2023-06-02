@@ -97,7 +97,6 @@ class AuthRestServlet(RestServlet):
         return None
 
     async def on_POST(self, request: Request, stagetype: str) -> None:
-
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
@@ -112,7 +111,7 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.RECAPTCHA, authdict, request.getClientIP()
+                    LoginType.RECAPTCHA, authdict, request.getClientAddress().host
                 )
             except LoginError as e:
                 # Authentication failed, let user try again
@@ -132,7 +131,7 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.TERMS, authdict, request.getClientIP()
+                    LoginType.TERMS, authdict, request.getClientAddress().host
                 )
             except LoginError as e:
                 # Authentication failed, let user try again
@@ -161,7 +160,9 @@ class AuthRestServlet(RestServlet):
 
             try:
                 await self.auth_handler.add_oob_auth(
-                    LoginType.REGISTRATION_TOKEN, authdict, request.getClientIP()
+                    LoginType.REGISTRATION_TOKEN,
+                    authdict,
+                    request.getClientAddress().host,
                 )
             except LoginError as e:
                 html = self.registration_token_template.render(

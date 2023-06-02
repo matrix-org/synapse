@@ -13,8 +13,10 @@ environments where untrusted users have shell access.
 
 ## Configuring the manhole
 
-To enable it, first uncomment the `manhole` listener configuration in
-`homeserver.yaml`. The configuration is slightly different if you're using docker.
+To enable it, first add the `manhole` listener configuration in your
+`homeserver.yaml`. You can find information on how to do that 
+in the [configuration manual](usage/configuration/config_documentation.md#manhole_settings).
+The configuration is slightly different if you're using docker.
 
 #### Docker config
 

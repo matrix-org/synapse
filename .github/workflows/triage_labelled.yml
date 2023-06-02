@@ -1,0 +1,44 @@
+name: Move labelled issues to correct projects
+
+on:
+  issues:
+    types: [ labeled ]
+
+jobs:
+  move_needs_info:
+    name: Move X-Needs-Info on the triage board
+    runs-on: ubuntu-latest
+    if: >
+      contains(github.event.issue.labels.*.name, 'X-Needs-Info')
+    steps:
+      - uses: actions/add-to-project@main
+        id: add_project
+        with:
+          project-url: "https://github.com/orgs/matrix-org/projects/67"
+          github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+      - name: Set status
+        env:
+          GITHUB_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
+        run: |
+          gh api graphql -f query='
+          mutation(
+              $project: ID!
+              $item: ID!
+              $fieldid: ID!
+              $columnid: String!
+            )  {
+            updateProjectV2ItemFieldValue(
+              input: {
+               projectId: $project
+                itemId: $item
+                fieldId: $fieldid
+                value: { 
+                  singleSelectOptionId: $columnid
+                  }
+              }
+            ) {
+              projectV2Item {
+                id
+              }
+            }
+          }' -f project="PVT_kwDOAIB0Bs4AFDdZ" -f item=${{ steps.add_project.outputs.itemId }} -f fieldid="PVTSSF_lADOAIB0Bs4AFDdZzgC6ZA4" -f columnid=ba22e43c --silent

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, cast
 
 from typing_extensions import Literal
 
@@ -97,7 +97,7 @@ class E2eRoomKeysHandler:
                 user_id, version, room_id, session_id
             )
 
-            log_kv(results)
+            log_kv(cast(JsonDict, results))
             return results
 
     @trace
@@ -188,7 +188,6 @@ class E2eRoomKeysHandler:
 
         # XXX: perhaps we should use a finer grained lock here?
         async with self._upload_linearizer.queue(user_id):
-
             # Check that the version we're trying to upload is the current version
             try:
                 version_info = await self.store.get_e2e_room_keys_version_info(user_id)
@@ -377,8 +376,9 @@ class E2eRoomKeysHandler:
         """Deletes a given version of the user's e2e_room_keys backup
 
         Args:
-            user_id(str): the user whose current backup version we're deleting
-            version(str): the version id of the backup being deleted
+            user_id: the user whose current backup version we're deleting
+            version: Optional. the version ID of the backup version we're deleting
+                If missing, we delete the current backup version info.
         Raises:
             NotFoundError: if this backup version doesn't exist
         """

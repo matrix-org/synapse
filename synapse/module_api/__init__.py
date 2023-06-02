@@ -18,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -30,49 +31,21 @@ from typing import (
 
 import attr
 import jinja2
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
+from synapse.api import errors
 from synapse.api.errors import SynapseError
+from synapse.config import ConfigError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
     GET_INTERESTED_USERS_CALLBACK,
     GET_USERS_FOR_STATES_CALLBACK,
     PresenceRouter,
 )
-from synapse.events.spamcheck import (
-    CHECK_EVENT_FOR_SPAM_CALLBACK,
-    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
-    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
-    CHECK_USERNAME_FOR_SPAM_CALLBACK,
-    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
-    USER_MAY_CREATE_ROOM_CALLBACK,
-    USER_MAY_INVITE_CALLBACK,
-    USER_MAY_JOIN_ROOM_CALLBACK,
-    USER_MAY_PUBLISH_ROOM_CALLBACK,
-    USER_MAY_SEND_3PID_INVITE_CALLBACK,
-)
-from synapse.events.third_party_rules import (
-    CHECK_CAN_DEACTIVATE_USER_CALLBACK,
-    CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
-    CHECK_EVENT_ALLOWED_CALLBACK,
-    CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
-    CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
-    ON_CREATE_ROOM_CALLBACK,
-    ON_NEW_EVENT_CALLBACK,
-    ON_PROFILE_UPDATE_CALLBACK,
-    ON_THREEPID_BIND_CALLBACK,
-    ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
-)
 from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
-from synapse.handlers.account_validity import (
-    IS_USER_EXPIRED_CALLBACK,
-    ON_LEGACY_ADMIN_REQUEST,
-    ON_LEGACY_RENEW_CALLBACK,
-    ON_LEGACY_SEND_MAIL_CALLBACK,
-    ON_USER_REGISTRATION_CALLBACK,
-)
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
@@ -82,6 +55,8 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
+from synapse.handlers.device import DeviceHandler
+from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -96,6 +71,42 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api.callbacks.account_validity_callbacks import (
+    IS_USER_EXPIRED_CALLBACK,
+    ON_LEGACY_ADMIN_REQUEST,
+    ON_LEGACY_RENEW_CALLBACK,
+    ON_LEGACY_SEND_MAIL_CALLBACK,
+    ON_USER_REGISTRATION_CALLBACK,
+)
+from synapse.module_api.callbacks.spamchecker_callbacks import (
+    CHECK_EVENT_FOR_SPAM_CALLBACK,
+    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
+    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+    CHECK_USERNAME_FOR_SPAM_CALLBACK,
+    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
+    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
+    USER_MAY_CREATE_ROOM_CALLBACK,
+    USER_MAY_INVITE_CALLBACK,
+    USER_MAY_JOIN_ROOM_CALLBACK,
+    USER_MAY_PUBLISH_ROOM_CALLBACK,
+    USER_MAY_SEND_3PID_INVITE_CALLBACK,
+    SpamCheckerModuleApiCallbacks,
+)
+from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
+    CHECK_CAN_DEACTIVATE_USER_CALLBACK,
+    CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
+    CHECK_EVENT_ALLOWED_CALLBACK,
+    CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
+    CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
+    ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
+    ON_CREATE_ROOM_CALLBACK,
+    ON_NEW_EVENT_CALLBACK,
+    ON_PROFILE_UPDATE_CALLBACK,
+    ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK,
+    ON_THREEPID_BIND_CALLBACK,
+    ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
+)
+from synapse.push.httppusher import HttpPusher
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
@@ -105,28 +116,33 @@ from synapse.storage.background_updates import (
 )
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
+    JsonMapping,
     Requester,
+    RoomAlias,
+    RoomID,
     StateMap,
     UserID,
     UserInfo,
     UserProfile,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import CachedFunction, cached as _cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
-    from synapse.app.generic_worker import GenericWorkerSlavedStore
+    from synapse.app.generic_worker import GenericWorkerStore
     from synapse.server import HomeServer
 
 
 T = TypeVar("T")
+P = ParamSpec("P")
+F = TypeVar("F", bound=Callable[..., Any])
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -134,6 +150,7 @@ are loaded into Synapse.
 """
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
+NOT_SPAM = SpamCheckerModuleApiCallbacks.NOT_SPAM
 
 __all__ = [
     "errors",
@@ -141,7 +158,9 @@ __all__ = [
     "parse_json_object_from_request",
     "respond_with_html",
     "run_in_background",
+    "run_as_background_process",
     "cached",
+    "NOT_SPAM",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
@@ -151,9 +170,11 @@ __all__ = [
     "PRESENCE_ALL_USERS",
     "LoginResponse",
     "JsonDict",
+    "JsonMapping",
     "EventBase",
     "StateMap",
     "ProfileInfo",
+    "RoomAlias",
     "UserProfile",
 ]
 
@@ -172,6 +193,42 @@ class UserIpAndAgent:
     last_seen: int
 
 
+def cached(
+    *,
+    max_entries: int = 1000,
+    num_args: Optional[int] = None,
+    uncached_args: Optional[Collection[str]] = None,
+) -> Callable[[F], CachedFunction[F]]:
+    """Returns a decorator that applies a memoizing cache around the function. This
+    decorator behaves similarly to functools.lru_cache.
+
+    Example:
+
+        @cached()
+        def foo('a', 'b'):
+            ...
+
+    Added in Synapse v1.74.0.
+
+    Args:
+        max_entries: The maximum number of entries in the cache. If the cache is full
+            and a new entry is added, the least recently accessed entry will be evicted
+            from the cache.
+        num_args: The number of positional arguments (excluding `self`) to use as cache
+            keys. Defaults to all named args of the function.
+        uncached_args: A list of argument names to not use as the cache key. (`self` is
+            always ignored.) Cannot be used with num_args.
+
+    Returns:
+        A decorator that applies a memoizing cache around the function.
+    """
+    return _cached(
+        max_entries=max_entries,
+        num_args=num_args,
+        uncached_args=uncached_args,
+    )
+
+
 class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
@@ -182,9 +239,8 @@ class ModuleApi:
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
         #       out.
-        self._store: Union[
-            DataStore, "GenericWorkerSlavedStore"
-        ] = hs.get_datastores().main
+        self._store: Union[DataStore, "GenericWorkerStore"] = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
@@ -193,7 +249,12 @@ class ModuleApi:
         self._clock: Clock = hs.get_clock()
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
+        self._push_rules_handler = hs.get_push_rules_handler()
+        self._pusherpool = hs.get_pusherpool()
+        self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
+        self._callbacks = hs.get_module_api_callbacks()
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -214,9 +275,6 @@ class ModuleApi:
         self._public_room_list_manager = PublicRoomListManager(hs)
         self._account_data_manager = AccountDataManager(hs)
 
-        self._spam_checker = hs.get_spam_checker()
-        self._account_validity_handler = hs.get_account_validity_handler()
-        self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
         self._account_data_handler = hs.get_account_data_handler()
@@ -228,6 +286,9 @@ class ModuleApi:
         self,
         *,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        should_drop_federated_event: Optional[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
@@ -246,8 +307,9 @@ class ModuleApi:
 
         Added in Synapse v1.37.0.
         """
-        return self._spam_checker.register_callbacks(
+        return self._callbacks.spam_checker.register_callbacks(
             check_event_for_spam=check_event_for_spam,
+            should_drop_federated_event=should_drop_federated_event,
             user_may_join_room=user_may_join_room,
             user_may_invite=user_may_invite,
             user_may_send_3pid_invite=user_may_send_3pid_invite,
@@ -272,7 +334,7 @@ class ModuleApi:
 
         Added in Synapse v1.39.0.
         """
-        return self._account_validity_handler.register_account_validity_callbacks(
+        return self._callbacks.account_validity.register_callbacks(
             is_user_expired=is_user_expired,
             on_user_registration=on_user_registration,
             on_legacy_send_mail=on_legacy_send_mail,
@@ -299,12 +361,18 @@ class ModuleApi:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+        on_add_user_third_party_identifier: Optional[
+            ON_ADD_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
+        on_remove_user_third_party_identifier: Optional[
+            ON_REMOVE_USER_THIRD_PARTY_IDENTIFIER_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
         Added in Synapse v1.39.0.
         """
-        return self._third_party_event_rules.register_third_party_rules_callbacks(
+        return self._callbacks.third_party_event_rules.register_third_party_rules_callbacks(
             check_event_allowed=check_event_allowed,
             on_create_room=on_create_room,
             check_threepid_can_be_invited=check_threepid_can_be_invited,
@@ -315,6 +383,8 @@ class ModuleApi:
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
             on_threepid_bind=on_threepid_bind,
+            on_add_user_third_party_identifier=on_add_user_third_party_identifier,
+            on_remove_user_third_party_identifier=on_remove_user_third_party_identifier,
         )
 
     def register_presence_router_callbacks(
@@ -352,6 +422,11 @@ class ModuleApi:
 
         Added in Synapse v1.46.0.
         """
+        if self.msc3861_oauth_delegation_enabled:
+            raise ConfigError(
+                "Cannot use password auth provider callbacks when OAuth delegation is enabled"
+            )
+
         return self._password_auth_provider.register_password_auth_provider_callbacks(
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,
@@ -730,16 +805,16 @@ class ModuleApi:
             )
         )
 
-    def generate_short_term_login_token(
+    async def create_login_token(
         self,
         user_id: str,
         duration_in_ms: int = (2 * 60 * 1000),
-        auth_provider_id: str = "",
+        auth_provider_id: Optional[str] = None,
         auth_provider_session_id: Optional[str] = None,
     ) -> str:
-        """Generate a login token suitable for m.login.token authentication
+        """Create a login token suitable for m.login.token authentication
 
-        Added in Synapse v1.9.0.
+        Added in Synapse v1.69.0.
 
         Args:
             user_id: gives the ID of the user that the token is for
@@ -747,14 +822,17 @@ class ModuleApi:
             duration_in_ms: the time that the token will be valid for
 
             auth_provider_id: the ID of the SSO IdP that the user used to authenticate
-               to get this token, if any. This is encoded in the token so that
-               /login can report stats on number of successful logins by IdP.
+                to get this token, if any. This is encoded in the token so that
+                /login can report stats on number of successful logins by IdP.
+
+            auth_provider_session_id: The session ID got during login from the SSO IdP,
+                if any.
         """
-        return self._hs.get_macaroon_generator().generate_short_term_login_token(
+        return await self._hs.get_auth_handler().create_login_token_for_user_id(
             user_id,
+            duration_in_ms,
             auth_provider_id,
             auth_provider_session_id,
-            duration_in_ms,
         )
 
     @defer.inlineCallbacks
@@ -763,10 +841,12 @@ class ModuleApi:
     ) -> Generator["defer.Deferred[Any]", Any, None]:
         """Invalidate an access token for a user
 
+        Can only be called from the main process.
+
         Added in Synapse v0.25.0.
 
         Args:
-            access_token(str): access token
+            access_token: access token
 
         Returns:
             twisted.internet.defer.Deferred - resolves once the access token
@@ -775,6 +855,10 @@ class ModuleApi:
         Raises:
             synapse.api.errors.AuthError: the access token is invalid
         """
+        assert isinstance(
+            self._device_handler, DeviceHandler
+        ), "invalidate_access_token can only be called on the main process"
+
         # see if the access token corresponds to a device
         user_info = yield defer.ensureDeferred(
             self._auth.get_user_by_access_token(access_token)
@@ -784,7 +868,7 @@ class ModuleApi:
         if device_id:
             # delete the device, which will also delete its access tokens
             yield defer.ensureDeferred(
-                self._hs.get_device_handler().delete_device(user_id, device_id)
+                self._device_handler.delete_devices(user_id, [device_id])
             )
         else:
             # no associated device. Just delete the access token.
@@ -795,9 +879,9 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
         """Run a function with a database connection
 
@@ -811,35 +895,46 @@ class ModuleApi:
             **kwargs: named args to be passed to func
 
         Returns:
-            Deferred[object]: result of func
+            Result of func
         """
+        # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
-            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)  # type: ignore[arg-type]
         )
 
-    def complete_sso_login(
-        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
-    ) -> None:
-        """Complete a SSO login by redirecting the user to a page to confirm whether they
-        want their access token sent to `client_redirect_url`, or redirect them to that
-        URL with a token directly if the URL matches with one of the whitelisted clients.
+    def register_cached_function(self, cached_func: CachedFunction) -> None:
+        """Register a cached function that should be invalidated across workers.
+        Invalidation local to a worker can be done directly using `cached_func.invalidate`,
+        however invalidation that needs to go to other workers needs to call `invalidate_cache`
+        on the module API instead.
 
-        This is deprecated in favor of complete_sso_login_async.
-
-        Added in Synapse v1.11.1.
+        Added in Synapse v1.69.0.
 
         Args:
-            registered_user_id: The MXID that has been registered as a previous step of
-                of this SSO login.
-            request: The request to respond to.
-            client_redirect_url: The URL to which to offer to redirect the user (or to
-                redirect them directly if whitelisted).
+            cached_function: The cached function that will be registered to receive invalidation
+            locally and from other workers.
         """
-        self._auth_handler._complete_sso_login(
-            registered_user_id,
-            "<unknown>",
-            request,
-            client_redirect_url,
+        self._store.register_external_cached_function(
+            f"{cached_func.__module__}.{cached_func.__name__}", cached_func
+        )
+
+    async def invalidate_cache(
+        self, cached_func: CachedFunction, keys: Tuple[Any, ...]
+    ) -> None:
+        """Invalidate a cache entry of a cached function across workers. The cached function
+        needs to be registered on all workers first with `register_cached_function`.
+
+        Added in Synapse v1.69.0.
+
+        Args:
+            cached_function: The cached function that needs an invalidation
+            keys: keys of the entry to invalidate, usually matching the arguments of the
+            cached function.
+        """
+        cached_func.invalidate(keys)
+        await self._store.send_invalidation_to_replication(
+            f"{cached_func.__module__}.{cached_func.__name__}",
+            keys,
         )
 
     async def complete_sso_login_async(
@@ -892,11 +987,10 @@ class ModuleApi:
                 to represent 'any') of the room state to acquire.
 
         Returns:
-            twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
-                The filtered state events in the room.
+            The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
-            self._store.get_filtered_current_state_ids(
+            self._storage_controllers.state.get_current_state_ids(
                 room_id=room_id, state_filter=StateFilter.from_types(types)
             )
         )
@@ -910,10 +1004,12 @@ class ModuleApi:
         room_id: str,
         new_membership: str,
         content: Optional[JsonDict] = None,
+        remote_room_hosts: Optional[List[str]] = None,
     ) -> EventBase:
         """Updates the membership of a user to the given value.
 
         Added in Synapse v1.46.0.
+        Changed in Synapse v1.65.0: Added the 'remote_room_hosts' parameter.
 
         Args:
             sender: The user performing the membership change. Must be a user local to
@@ -927,6 +1023,7 @@ class ModuleApi:
                 https://spec.matrix.org/unstable/client-server-api/#mroommember for the
                 list of allowed values.
             content: Additional values to include in the resulting event's content.
+            remote_room_hosts: Remote servers to use for remote joins/knocks/etc.
 
         Returns:
             The newly created membership event.
@@ -986,14 +1083,11 @@ class ModuleApi:
             room_id=room_id,
             action=new_membership,
             content=content,
+            remote_room_hosts=remote_room_hosts,
         )
 
         # Try to retrieve the resulting event.
         event = await self._hs.get_datastores().main.get_event(event_id)
-
-        # update_membership is supposed to always return after the event has been
-        # successfully persisted.
-        assert event is not None
 
         return event
 
@@ -1081,7 +1175,7 @@ class ModuleApi:
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
             presence_handler.get_federation_queue().send_presence_to_destinations(
-                presence_events, destination
+                presence_events, [destination]
             )
 
     def looping_background_call(
@@ -1132,9 +1226,56 @@ class ModuleApi:
             )
 
     async def sleep(self, seconds: float) -> None:
-        """Sleeps for the given number of seconds."""
+        """Sleeps for the given number of seconds.
+
+        Added in Synapse v1.49.0.
+        """
 
         await self._clock.sleep(seconds)
+
+    async def send_http_push_notification(
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        content: JsonDict,
+        tweaks: Optional[JsonMapping] = None,
+        default_payload: Optional[JsonMapping] = None,
+    ) -> Dict[str, bool]:
+        """Send an HTTP push notification that is forwarded to the registered push gateway
+        for the specified user/device.
+
+        Added in Synapse v1.82.0.
+
+        Args:
+            user_id: The user ID to send the push notification to.
+            device_id: The device ID of the device where to send the push notification. If `None`,
+            the notification will be sent to all registered HTTP pushers of the user.
+            content: A dict of values that will be put in the `notification` field of the push
+            (cf Push Gateway spec). `devices` field will be overrided if included.
+            tweaks: A dict of `tweaks` that will be inserted in the `devices` section, cf spec.
+            default_payload: default payload to add in `devices[0].data.default_payload`.
+            This will be merged (and override if some matching values already exist there)
+            with existing `default_payload`.
+
+        Returns:
+            a dict reprensenting the status of the push per device ID
+        """
+        status = {}
+        if user_id in self._pusherpool.pushers:
+            for p in self._pusherpool.pushers[user_id].values():
+                if isinstance(p, HttpPusher) and (
+                    not device_id or p.device_id == device_id
+                ):
+                    res = await p.dispatch_push(content, tweaks, default_payload)
+                    # Check if the push was successful and no pushers were rejected.
+                    sent = res is not False and not res
+
+                    # This is mainly to accomodate mypy
+                    # device_id should never be empty after the `set_device_id_for_pushers`
+                    # background job has been properly run.
+                    if p.device_id:
+                        status[p.device_id] = sent
+        return status
 
     async def send_mail(
         self,
@@ -1271,20 +1412,16 @@ class ModuleApi:
                                                                 # regardless of their state key
                     ]
         """
+        state_filter = None
         if event_filter:
             # If a filter was provided, turn it into a StateFilter and retrieve a filtered
             # view of the state.
             state_filter = StateFilter.from_types(event_filter)
-            state_ids = await self._store.get_filtered_current_state_ids(
-                room_id,
-                state_filter,
-            )
-        else:
-            # If no filter was provided, get the whole state. We could also reuse the call
-            # to get_filtered_current_state_ids above, with `state_filter = StateFilter.all()`,
-            # but get_filtered_current_state_ids isn't cached and `get_current_state_ids`
-            # is, so using the latter when we can is better for perf.
-            state_ids = await self._store.get_current_state_ids(room_id)
+
+        state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id,
+            state_filter,
+        )
 
         state_events = await self._store.get_events(state_ids.values())
 
@@ -1292,9 +1429,9 @@ class ModuleApi:
 
     async def defer_to_thread(
         self,
-        f: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        f: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> T:
         """Runs the given function in a separate thread from Synapse's thread pool.
 
@@ -1349,6 +1486,218 @@ class ModuleApi:
 
         """
         await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
+
+    def check_push_rule_actions(
+        self, actions: List[Union[str, Dict[str, str]]]
+    ) -> None:
+        """Checks if the given push rule actions are valid according to the Matrix
+        specification.
+
+        See https://spec.matrix.org/v1.2/client-server-api/#actions for the list of valid
+        actions.
+
+        Added in Synapse v1.58.0.
+
+        Args:
+            actions: the actions to check.
+
+        Raises:
+            synapse.module_api.errors.InvalidRuleException if the actions are invalid.
+        """
+        check_actions(actions)
+
+    async def set_push_rule_action(
+        self,
+        user_id: str,
+        scope: str,
+        kind: str,
+        rule_id: str,
+        actions: List[Union[str, Dict[str, str]]],
+    ) -> None:
+        """Changes the actions of an existing push rule for the given user.
+
+        See https://spec.matrix.org/v1.2/client-server-api/#push-rules for more
+        information about push rules and their syntax.
+
+        Can only be called on the main process.
+
+        Added in Synapse v1.58.0.
+
+        Args:
+            user_id: the user for which to change the push rule's actions.
+            scope: the push rule's scope, currently only "global" is allowed.
+            kind: the push rule's kind.
+            rule_id: the push rule's identifier.
+            actions: the actions to run when the rule's conditions match.
+
+        Raises:
+            RuntimeError if this method is called on a worker or `scope` is invalid.
+            synapse.module_api.errors.RuleNotFoundException if the rule being modified
+                can't be found.
+            synapse.module_api.errors.InvalidRuleException if the actions are invalid.
+        """
+        if self.worker_app is not None:
+            raise RuntimeError("module tried to change push rule actions on a worker")
+
+        if scope != "global":
+            raise RuntimeError(
+                "invalid scope %s, only 'global' is currently allowed" % scope
+            )
+
+        spec = RuleSpec(scope, kind, rule_id, "actions")
+        await self._push_rules_handler.set_rule_attr(
+            user_id, spec, {"actions": actions}
+        )
+
+    async def get_monthly_active_users_by_service(
+        self, start_timestamp: Optional[int] = None, end_timestamp: Optional[int] = None
+    ) -> List[Tuple[str, str]]:
+        """Generates list of monthly active users and their services.
+        Please see corresponding storage docstring for more details.
+
+        Added in Synapse v1.61.0.
+
+        Arguments:
+            start_timestamp: If specified, only include users that were first active
+                at or after this point
+            end_timestamp: If specified, only include users that were first active
+                at or before this point
+
+        Returns:
+            A list of tuples (appservice_id, user_id)
+
+        """
+        return await self._store.get_monthly_active_users_by_service(
+            start_timestamp, end_timestamp
+        )
+
+    async def get_canonical_room_alias(self, room_id: RoomID) -> Optional[RoomAlias]:
+        """
+        Retrieve the given room's current canonical alias.
+
+        A room may declare an alias as "canonical", meaning that it is the
+        preferred alias to use when referring to the room. This function
+        retrieves that alias from the room's state.
+
+        Added in Synapse v1.86.0.
+
+        Args:
+            room_id: The Room ID to find the alias of.
+
+        Returns:
+            None if the room ID does not exist, or if the room exists but has no canonical alias.
+            Otherwise, the parsed room alias.
+        """
+        room_alias_str = (
+            await self._storage_controllers.state.get_canonical_alias_for_room(
+                room_id.to_string()
+            )
+        )
+        if room_alias_str:
+            return RoomAlias.from_string(room_alias_str)
+        return None
+
+    async def lookup_room_alias(self, room_alias: str) -> Tuple[str, List[str]]:
+        """
+        Get the room ID associated with a room alias.
+
+        Added in Synapse v1.65.0.
+
+        Args:
+            room_alias: The alias to look up.
+
+        Returns:
+            A tuple of:
+                The room ID (str).
+                Hosts likely to be participating in the room ([str]).
+
+        Raises:
+            SynapseError if room alias is invalid or could not be found.
+        """
+        alias = RoomAlias.from_string(room_alias)
+        (room_id, hosts) = await self._hs.get_room_member_handler().lookup_room_alias(
+            alias
+        )
+
+        return room_id.to_string(), hosts
+
+    async def create_room(
+        self,
+        user_id: str,
+        config: JsonDict,
+        ratelimit: bool = True,
+        creator_join_profile: Optional[JsonDict] = None,
+    ) -> Tuple[str, Optional[str]]:
+        """Creates a new room.
+
+        Added in Synapse v1.65.0.
+
+        Args:
+            user_id:
+                The user who requested the room creation.
+            config : A dict of configuration options. See "Request body" of:
+                https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
+            ratelimit: set to False to disable the rate limiter for this specific operation.
+
+            creator_join_profile:
+                Set to override the displayname and avatar for the creating
+                user in this room. If unset, displayname and avatar will be
+                derived from the user's profile. If set, should contain the
+                values to go in the body of the 'join' event (typically
+                `avatar_url` and/or `displayname`.
+
+        Returns:
+                A tuple containing: 1) the room ID (str), 2) if an alias was requested,
+                the room alias (str), otherwise None if no alias was requested.
+
+        Raises:
+            ResourceLimitError if server is blocked to some resource being
+            exceeded.
+            RuntimeError if the user_id does not refer to a local user.
+            SynapseError if the user_id is invalid, room ID couldn't be stored, or
+            something went horribly wrong.
+        """
+        if not self.is_mine(user_id):
+            raise RuntimeError(
+                "Tried to create a room as a user that isn't local to this homeserver",
+            )
+
+        requester = create_requester(user_id)
+        room_id, room_alias, _ = await self._hs.get_room_creation_handler().create_room(
+            requester=requester,
+            config=config,
+            ratelimit=ratelimit,
+            creator_join_profile=creator_join_profile,
+        )
+        room_alias_str = room_alias.to_string() if room_alias else None
+        return room_id, room_alias_str
+
+    async def set_displayname(
+        self,
+        user_id: UserID,
+        new_displayname: str,
+        deactivation: bool = False,
+    ) -> None:
+        """Sets a user's display name.
+
+        Added in Synapse v1.76.0.
+
+        Args:
+            user_id:
+                The user whose display name is to be changed.
+            new_displayname:
+                The new display name to give the user.
+            deactivation:
+                Whether this change was made while deactivating the user.
+        """
+        requester = create_requester(user_id)
+        await self._hs.get_profile_handler().set_displayname(
+            target_user=user_id,
+            requester=requester,
+            new_displayname=new_displayname,
+            by_admin=True,
+            deactivation=deactivation,
+        )
 
 
 class PublicRoomListManager:
@@ -1419,7 +1768,7 @@ class AccountDataManager:
                 f"{user_id} is not local to this homeserver; can't access account data for remote users."
             )
 
-    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonDict]:
+    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonMapping]:
         """
         Gets some global account data, of a specified type, for the specified user.
 

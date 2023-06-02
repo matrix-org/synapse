@@ -20,6 +20,7 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.api.errors
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
+from synapse.events import EventBase
 from synapse.rest.client import directory, login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, RoomAlias, create_requester
@@ -201,7 +202,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
         self.test_user_tok = self.login("user", "pass")
         self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
 
-    def _create_alias(self, user) -> None:
+    def _create_alias(self, user: str) -> None:
         # Create a new alias to this room.
         self.get_success(
             self.store.create_room_alias_association(
@@ -298,6 +299,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         self.store = hs.get_datastores().main
         self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         # Create user
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -323,7 +325,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
         return room_alias
 
-    def _set_canonical_alias(self, content) -> None:
+    def _set_canonical_alias(self, content: JsonDict) -> None:
         """Configure the canonical alias state on the room."""
         self.helper.send_state(
             self.room_id,
@@ -332,13 +334,15 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
             tok=self.admin_user_tok,
         )
 
-    def _get_canonical_alias(self):
+    def _get_canonical_alias(self) -> EventBase:
         """Get the canonical alias state of the room."""
-        return self.get_success(
-            self.state_handler.get_current_state(
+        result = self.get_success(
+            self._storage_controllers.state.get_current_state_event(
                 self.room_id, EventTypes.CanonicalAlias, ""
             )
         )
+        assert result is not None
+        return result
 
     def test_remove_alias(self) -> None:
         """Removing an alias that is the canonical alias should remove it there too."""
@@ -348,8 +352,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data["content"]["alias"], self.test_alias)
-        self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
+        self.assertEqual(data.content["alias"], self.test_alias)
+        self.assertEqual(data.content["alt_aliases"], [self.test_alias])
 
         # Finally, delete the alias.
         self.get_success(
@@ -359,8 +363,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertNotIn("alias", data["content"])
-        self.assertNotIn("alt_aliases", data["content"])
+        self.assertNotIn("alias", data.content)
+        self.assertNotIn("alt_aliases", data.content)
 
     def test_remove_other_alias(self) -> None:
         """Removing an alias listed as in alt_aliases should remove it there too."""
@@ -377,9 +381,9 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data["content"]["alias"], self.test_alias)
+        self.assertEqual(data.content["alias"], self.test_alias)
         self.assertEqual(
-            data["content"]["alt_aliases"], [self.test_alias, other_test_alias]
+            data.content["alt_aliases"], [self.test_alias, other_test_alias]
         )
 
         # Delete the second alias.
@@ -390,8 +394,8 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         data = self._get_canonical_alias()
-        self.assertEqual(data["content"]["alias"], self.test_alias)
-        self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
+        self.assertEqual(data.content["alias"], self.test_alias)
+        self.assertEqual(data.content["alt_aliases"], [self.test_alias])
 
 
 class TestCreateAliasACL(unittest.HomeserverTestCase):
@@ -480,16 +484,12 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
         return config
 
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, hs: HomeServer
-    ) -> HomeServer:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.allowed_user_id = self.register_user(self.allowed_localpart, "pass")
         self.allowed_access_token = self.login(self.allowed_localpart, "pass")
 
         self.denied_user_id = self.register_user("denied", "pass")
         self.denied_access_token = self.login("denied", "pass")
-
-        return hs
 
     def test_denied_without_publication_permission(self) -> None:
         """
@@ -574,9 +574,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
     servlets = [directory.register_servlets, room.register_servlets]
 
-    def prepare(
-        self, reactor: MemoryReactor, clock: Clock, hs: HomeServer
-    ) -> HomeServer:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         room_id = self.helper.create_room_as(self.user_id)
 
         channel = self.make_request(
@@ -586,8 +584,6 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
         self.room_list_handler = hs.get_room_list_handler()
         self.directory_handler = hs.get_directory_handler()
-
-        return hs
 
     def test_disabling_room_list(self) -> None:
         self.room_list_handler.enable_room_list_search = True

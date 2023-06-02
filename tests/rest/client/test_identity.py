@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from http import HTTPStatus
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -26,7 +25,6 @@ from tests import unittest
 
 
 class IdentityTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -34,7 +32,6 @@ class IdentityTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["enable_3pid_lookup"] = False
         self.hs = self.setup_test_homeserver(config=config)
@@ -51,12 +48,12 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         room_id = channel.json_body["room_id"]
 
-        params = {
+        request_data = {
             "id_server": "testis",
             "medium": "email",
             "address": "test@example.com",
+            "id_access_token": tok,
         }
-        request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
         channel = self.make_request(
             b"POST", request_url, request_data, access_token=tok

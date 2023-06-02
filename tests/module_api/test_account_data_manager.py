@@ -11,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.errors import SynapseError
 from synapse.rest import admin
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -22,7 +26,9 @@ class ModuleApiTestCase(HomeserverTestCase):
         admin.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, homeserver) -> None:
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self._store = homeserver.get_datastores().main
         self._module_api = homeserver.get_module_api()
         self._account_data_mgr = self._module_api.account_data_manager
@@ -91,7 +97,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
         with self.assertRaises(TypeError):
             # This throws an exception because it's a frozen dict.
-            the_data["wombat"] = False
+            the_data["wombat"] = False  # type: ignore[index]
 
     def test_put_global(self) -> None:
         """
@@ -143,15 +149,14 @@ class ModuleApiTestCase(HomeserverTestCase):
         with self.assertRaises(TypeError):
             # The account data type must be a string.
             self.get_success_or_raise(
-                self._module_api.account_data_manager.put_global(
-                    self.user_id, 42, {}  # type: ignore
-                )
+                self._module_api.account_data_manager.put_global(self.user_id, 42, {})  # type: ignore[arg-type]
             )
 
         with self.assertRaises(TypeError):
             # The account data dict must be a dict.
+            # noinspection PyTypeChecker
             self.get_success_or_raise(
                 self._module_api.account_data_manager.put_global(
-                    self.user_id, "test.data", 42  # type: ignore
+                    self.user_id, "test.data", 42  # type: ignore[arg-type]
                 )
             )

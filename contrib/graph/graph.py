@@ -1,11 +1,3 @@
-import argparse
-import cgi
-import datetime
-import json
-
-import pydot
-import urllib2
-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,12 +12,25 @@ import urllib2
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import cgi
+import datetime
+import json
+import urllib.request
+from typing import List
 
-def make_name(pdu_id, origin):
-    return "%s@%s" % (pdu_id, origin)
+import pydot
 
 
-def make_graph(pdus, room, filename_prefix):
+def make_name(pdu_id: str, origin: str) -> str:
+    return f"{pdu_id}@{origin}"
+
+
+def make_graph(pdus: List[dict], filename_prefix: str) -> None:
+    """
+    Generate a dot and SVG file for a graph of events in the room based on the
+    topological ordering by querying a homeserver.
+    """
     pdu_map = {}
     node_map = {}
 
@@ -111,10 +116,10 @@ def make_graph(pdus, room, filename_prefix):
     graph.write_svg("%s.svg" % filename_prefix, prog="dot")
 
 
-def get_pdus(host, room):
+def get_pdus(host: str, room: str) -> List[dict]:
     transaction = json.loads(
-        urllib2.urlopen(
-            "http://%s/_matrix/federation/v1/context/%s/" % (host, room)
+        urllib.request.urlopen(
+            f"http://{host}/_matrix/federation/v1/context/{room}/"
         ).read()
     )
 
@@ -141,4 +146,4 @@ if __name__ == "__main__":
 
     pdus = get_pdus(host, room)
 
-    make_graph(pdus, room, prefix)
+    make_graph(pdus, prefix)

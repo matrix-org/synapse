@@ -1,1 +1,0 @@
-Run lints under poetry in CI, and remove corresponding tox lint jobs.

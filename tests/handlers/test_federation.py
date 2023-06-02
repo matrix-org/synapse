@@ -12,25 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, cast
+from typing import Collection, Optional, cast
 from unittest import TestCase
+from unittest.mock import Mock, patch
 
+from twisted.internet.defer import Deferred
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.federation_base import event_from_pdu_json
+from synapse.federation.federation_client import SendJoinResult
 from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.test_utils import event_injection
+from tests.test_utils import event_injection, make_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +60,6 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastores().main
-        self.state_store = hs.get_storage().state
-        self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 
     def test_exchange_revoked_invite(self) -> None:
@@ -119,7 +127,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
 
         # check the state group
-        sg = self.successResultOf(
+        sg = self.get_success(
             self.store._get_state_group_for_event(join_event.event_id)
         )
 
@@ -149,7 +157,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.assertIsNotNone(e.rejected_reason)
 
         # ... and the state group should be the same as before
-        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+        sg2 = self.get_success(self.store._get_state_group_for_event(ev.event_id))
 
         self.assertEqual(sg, sg2)
 
@@ -172,7 +180,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
 
         # check the state group
-        sg = self.successResultOf(
+        sg = self.get_success(
             self.store._get_state_group_for_event(join_event.event_id)
         )
 
@@ -203,7 +211,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.assertIsNotNone(e.rejected_reason)
 
         # ... and the state group should be the same as before
-        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+        sg2 = self.get_success(self.store._get_state_group_for_event(ev.event_id))
 
         self.assertEqual(sg, sg2)
 
@@ -225,9 +233,10 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
 
         # we need a user on the remote server to be a member, so that we can send
         # extremity-causing events.
+        remote_server_user_id = f"@user:{self.OTHER_SERVER_NAME}"
         self.get_success(
             event_injection.inject_member_event(
-                self.hs, room_id, f"@user:{self.OTHER_SERVER_NAME}", "join"
+                self.hs, room_id, remote_server_user_id, "join"
             )
         )
 
@@ -237,7 +246,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         )
         current_state = self.get_success(
             self.store.get_events_as_list(
-                (self.get_success(self.store.get_current_state_ids(room_id))).values()
+                (
+                    self.get_success(self.store.get_partial_current_state_ids(room_id))
+                ).values()
             )
         )
 
@@ -245,9 +256,15 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         # create more than is 5 which corresponds to the number of backward
         # extremities we slice off in `_maybe_backfill_inner`
         federation_event_handler = self.hs.get_federation_event_handler()
+        auth_events = [
+            ev
+            for ev in current_state
+            if (ev.type, ev.state_key)
+            in {("m.room.create", ""), ("m.room.member", remote_server_user_id)}
+        ]
         for _ in range(0, 8):
             event = make_event_from_dict(
-                self.add_hashes_and_signatures(
+                self.add_hashes_and_signatures_from_other_server(
                     {
                         "origin_server_ts": 1,
                         "type": "m.room.message",
@@ -256,15 +273,14 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                             "body": "message connected to fake event",
                         },
                         "room_id": room_id,
-                        "sender": f"@user:{self.OTHER_SERVER_NAME}",
+                        "sender": remote_server_user_id,
                         "prev_events": [
                             ev1.event_id,
                             # We're creating an backward extremity each time thanks
                             # to this fake event
                             generate_fake_event_id(),
                         ],
-                        # lazy: *everything* is an auth event
-                        "auth_events": [ev.event_id for ev in current_state],
+                        "auth_events": [ev.event_id for ev in auth_events],
                         "depth": ev1.depth + 1,
                     },
                     room_version,
@@ -274,9 +290,21 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
 
             # we poke this directly into _process_received_pdu, to avoid the
             # federation handler wanting to backfill the fake event.
+            state_handler = self.hs.get_state_handler()
+            context = self.get_success(
+                state_handler.compute_event_context(
+                    event,
+                    state_ids_before_event={
+                        (e.type, e.state_key): e.event_id for e in current_state
+                    },
+                    partial_state=False,
+                )
+            )
             self.get_success(
                 federation_event_handler._process_received_pdu(
-                    self.OTHER_SERVER_NAME, event, state=current_state
+                    self.OTHER_SERVER_NAME,
+                    event,
+                    context,
                 )
             )
 
@@ -302,138 +330,101 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             )
         self.get_success(d)
 
-    def test_backfill_floating_outlier_membership_auth(self) -> None:
+    def test_backfill_ignores_known_events(self) -> None:
         """
-        As the local homeserver, check that we can properly process a federated
-        event from the OTHER_SERVER with auth_events that include a floating
-        membership event from the OTHER_SERVER.
-
-        Regression test, see #10439.
+        Tests that events that we already know about are ignored when backfilling.
         """
-        OTHER_SERVER = "otherserver"
-        OTHER_USER = "@otheruser:" + OTHER_SERVER
-
-        # create the room
+        # Set up users
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
-        room_id = self.helper.create_room_as(
-            room_creator=user_id,
-            is_public=True,
-            tok=tok,
-            extra_content={
-                "preset": "public_chat",
-            },
-        )
+
+        other_server = "otherserver"
+        other_user = "@otheruser:" + other_server
+
+        # Create a room to backfill events into
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
         room_version = self.get_success(self.store.get_room_version(room_id))
 
-        prev_event_ids = self.get_success(self.store.get_prev_events_for_room(room_id))
-        (
-            most_recent_prev_event_id,
-            most_recent_prev_event_depth,
-        ) = self.get_success(self.store.get_max_depth_of(prev_event_ids))
-        # mapping from (type, state_key) -> state_event_id
-        prev_state_map = self.get_success(
-            self.state_store.get_state_ids_for_event(most_recent_prev_event_id)
-        )
-        # List of state event ID's
-        prev_state_ids = list(prev_state_map.values())
-        auth_event_ids = prev_state_ids
-        auth_events = list(
-            self.get_success(self.store.get_events(auth_event_ids)).values()
-        )
-
-        # build a floating outlier member state event
-        fake_prev_event_id = "$" + random_string(43)
-        member_event_dict = {
-            "type": EventTypes.Member,
-            "content": {
-                "membership": "join",
+        # Build an event to backfill
+        event = event_from_pdu_json(
+            {
+                "type": EventTypes.Message,
+                "content": {"body": "hello world", "msgtype": "m.text"},
+                "room_id": room_id,
+                "sender": other_user,
+                "depth": 32,
+                "prev_events": [],
+                "auth_events": [],
+                "origin_server_ts": self.clock.time_msec(),
             },
-            "state_key": OTHER_USER,
-            "room_id": room_id,
-            "sender": OTHER_USER,
-            "depth": most_recent_prev_event_depth,
-            "prev_events": [fake_prev_event_id],
-            "origin_server_ts": self.clock.time_msec(),
-            "signatures": {OTHER_SERVER: {"ed25519:key_version": "SomeSignatureHere"}},
-        }
-        builder = self.hs.get_event_builder_factory().for_room_version(
-            room_version, member_event_dict
+            room_version,
         )
-        member_event = self.get_success(
-            builder.build(
-                prev_event_ids=member_event_dict["prev_events"],
-                auth_event_ids=self._event_auth_handler.compute_auth_events(
-                    builder,
-                    prev_state_map,
-                    for_verification=False,
-                ),
-                depth=member_event_dict["depth"],
+
+        # Ensure the event is not already in the DB
+        self.get_failure(
+            self.store.get_event(event.event_id),
+            NotFoundError,
+        )
+
+        # Backfill the event and check that it has entered the DB.
+
+        # We mock out the FederationClient.backfill method, to pretend that a remote
+        # server has returned our fake event.
+        federation_client_backfill_mock = Mock(return_value=make_awaitable([event]))
+        self.hs.get_federation_client().backfill = federation_client_backfill_mock  # type: ignore[assignment]
+
+        # We also mock the persist method with a side effect of itself. This allows us
+        # to track when it has been called while preserving its function.
+        persist_events_and_notify_mock = Mock(
+            side_effect=self.hs.get_federation_event_handler().persist_events_and_notify
+        )
+        self.hs.get_federation_event_handler().persist_events_and_notify = (  # type: ignore[assignment]
+            persist_events_and_notify_mock
+        )
+
+        # Small side-tangent. We populate the event cache with the event, even though
+        # it is not yet in the DB. This is an invalid scenario that can currently occur
+        # due to not properly invalidating the event cache.
+        # See https://github.com/matrix-org/synapse/issues/13476.
+        #
+        # As a result, backfill should not rely on the event cache to check whether
+        # we already have an event in the DB.
+        # TODO: Remove this bit when the event cache is properly invalidated.
+        cache_entry = EventCacheEntry(
+            event=event,
+            redacted_event=None,
+        )
+        self.store._get_event_cache.set_local((event.event_id,), cache_entry)
+
+        # We now call FederationEventHandler.backfill (a separate method) to trigger
+        # a backfill request. It should receive the fake event.
+        self.get_success(
+            self.hs.get_federation_event_handler().backfill(
+                other_user,
+                room_id,
+                limit=10,
+                extremities=[],
             )
         )
-        # Override the signature added from "test" homeserver that we created the event with
-        member_event.signatures = member_event_dict["signatures"]
 
-        # Add the new member_event to the StateMap
-        updated_state_map = dict(prev_state_map)
-        updated_state_map[
-            (member_event.type, member_event.state_key)
-        ] = member_event.event_id
-        auth_events.append(member_event)
+        # Check that our fake event was persisted.
+        persist_events_and_notify_mock.assert_called_once()
+        persist_events_and_notify_mock.reset_mock()
 
-        # build and send an event authed based on the member event
-        message_event_dict = {
-            "type": EventTypes.Message,
-            "content": {},
-            "room_id": room_id,
-            "sender": OTHER_USER,
-            "depth": most_recent_prev_event_depth,
-            "prev_events": prev_event_ids.copy(),
-            "origin_server_ts": self.clock.time_msec(),
-            "signatures": {OTHER_SERVER: {"ed25519:key_version": "SomeSignatureHere"}},
-        }
-        builder = self.hs.get_event_builder_factory().for_room_version(
-            room_version, message_event_dict
+        # Now we repeat the backfill, having the homeserver receive the fake event
+        # again.
+        self.get_success(
+            self.hs.get_federation_event_handler().backfill(
+                other_user,
+                room_id,
+                limit=10,
+                extremities=[],
+            ),
         )
-        message_event = self.get_success(
-            builder.build(
-                prev_event_ids=message_event_dict["prev_events"],
-                auth_event_ids=self._event_auth_handler.compute_auth_events(
-                    builder,
-                    updated_state_map,
-                    for_verification=False,
-                ),
-                depth=message_event_dict["depth"],
-            )
-        )
-        # Override the signature added from "test" homeserver that we created the event with
-        message_event.signatures = message_event_dict["signatures"]
 
-        # Stub the /event_auth response from the OTHER_SERVER
-        async def get_event_auth(
-            destination: str, room_id: str, event_id: str
-        ) -> List[EventBase]:
-            return [
-                event_from_pdu_json(ae.get_pdu_json(), room_version=room_version)
-                for ae in auth_events
-            ]
-
-        self.handler.federation_client.get_event_auth = get_event_auth  # type: ignore[assignment]
-
-        with LoggingContext("receive_pdu"):
-            # Fake the OTHER_SERVER federating the message event over to our local homeserver
-            d = run_in_background(
-                self.hs.get_federation_event_handler().on_receive_pdu,
-                OTHER_SERVER,
-                message_event,
-            )
-        self.get_success(d)
-
-        # Now try and get the events on our local homeserver
-        stored_event = self.get_success(
-            self.store.get_event(message_event.event_id, allow_none=True)
-        )
-        self.assertTrue(stored_event is not None)
+        # This time, we expect no event persistence to have occurred, as we already
+        # have this event.
+        persist_events_and_notify_mock.assert_not_called()
 
     @unittest.override_config(
         {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
@@ -449,7 +440,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
-        def create_invite():
+        def create_invite() -> EventBase:
             room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
             room_version = self.get_success(self.store.get_room_version(room_id))
             return event_from_pdu_json(
@@ -505,7 +496,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.get_success(d)
 
         # sanity-check: the room should show that the new user is a member
-        r = self.get_success(self.store.get_current_state_ids(room_id))
+        r = self.get_success(self.store.get_partial_current_state_ids(room_id))
         self.assertEqual(r[(EventTypes.Member, other_user)], join_event.event_id)
 
         return join_event
@@ -570,4 +561,231 @@ class EventFromPduTestCase(TestCase):
                     "origin_server_ts": 1234,
                 },
                 RoomVersions.V6,
+            )
+
+
+class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
+    def test_failed_partial_join_is_clean(self) -> None:
+        """
+        Tests that, when failing to partial-join a room, we don't get stuck with
+        a partial-state flag on a room.
+        """
+
+        fed_handler = self.hs.get_federation_handler()
+        fed_client = fed_handler.federation_client
+
+        room_id = "!room:example.com"
+
+        EVENT_CREATE = make_event_from_dict(
+            {
+                "room_id": room_id,
+                "type": "m.room.create",
+                "sender": "@kristina:example.com",
+                "state_key": "",
+                "depth": 0,
+                "content": {"creator": "@kristina:example.com", "room_version": "10"},
+                "auth_events": [],
+                "origin_server_ts": 1,
+            },
+            room_version=RoomVersions.V10,
+        )
+        EVENT_CREATOR_MEMBERSHIP = make_event_from_dict(
+            {
+                "room_id": room_id,
+                "type": "m.room.member",
+                "sender": "@kristina:example.com",
+                "state_key": "@kristina:example.com",
+                "content": {"membership": "join"},
+                "depth": 1,
+                "prev_events": [EVENT_CREATE.event_id],
+                "auth_events": [EVENT_CREATE.event_id],
+                "origin_server_ts": 1,
+            },
+            room_version=RoomVersions.V10,
+        )
+        EVENT_INVITATION_MEMBERSHIP = make_event_from_dict(
+            {
+                "room_id": room_id,
+                "type": "m.room.member",
+                "sender": "@kristina:example.com",
+                "state_key": "@alice:test",
+                "content": {"membership": "invite"},
+                "depth": 2,
+                "prev_events": [EVENT_CREATOR_MEMBERSHIP.event_id],
+                "auth_events": [
+                    EVENT_CREATE.event_id,
+                    EVENT_CREATOR_MEMBERSHIP.event_id,
+                ],
+                "origin_server_ts": 1,
+            },
+            room_version=RoomVersions.V10,
+        )
+        membership_event = make_event_from_dict(
+            {
+                "room_id": room_id,
+                "type": "m.room.member",
+                "sender": "@alice:test",
+                "state_key": "@alice:test",
+                "content": {"membership": "join"},
+                "prev_events": [EVENT_INVITATION_MEMBERSHIP.event_id],
+            },
+            RoomVersions.V10,
+        )
+        mock_make_membership_event = Mock(
+            return_value=make_awaitable(
+                (
+                    "example.com",
+                    membership_event,
+                    RoomVersions.V10,
+                )
+            )
+        )
+        mock_send_join = Mock(
+            return_value=make_awaitable(
+                SendJoinResult(
+                    membership_event,
+                    "example.com",
+                    state=[
+                        EVENT_CREATE,
+                        EVENT_CREATOR_MEMBERSHIP,
+                        EVENT_INVITATION_MEMBERSHIP,
+                    ],
+                    auth_chain=[
+                        EVENT_CREATE,
+                        EVENT_CREATOR_MEMBERSHIP,
+                        EVENT_INVITATION_MEMBERSHIP,
+                    ],
+                    partial_state=True,
+                    servers_in_room={"example.com"},
+                )
+            )
+        )
+
+        with patch.object(
+            fed_client, "make_membership_event", mock_make_membership_event
+        ), patch.object(fed_client, "send_join", mock_send_join):
+            # Join and check that our join event is rejected
+            # (The join event is rejected because it doesn't have any signatures)
+            join_exc = self.get_failure(
+                fed_handler.do_invite_join(["example.com"], room_id, "@alice:test", {}),
+                SynapseError,
+            )
+        self.assertIn("Join event was rejected", str(join_exc))
+
+        store = self.hs.get_datastores().main
+
+        # Check that we don't have a left-over partial_state entry.
+        self.assertFalse(
+            self.get_success(store.is_partial_state_room(room_id)),
+            f"Stale partial-stated room flag left over for {room_id} after a"
+            f" failed do_invite_join!",
+        )
+
+    def test_duplicate_partial_state_room_syncs(self) -> None:
+        """
+        Tests that concurrent partial state syncs are not started for the same room.
+        """
+        is_partial_state = True
+        end_sync: "Deferred[None]" = Deferred()
+
+        async def is_partial_state_room(room_id: str) -> bool:
+            return is_partial_state
+
+        async def sync_partial_state_room(
+            initial_destination: Optional[str],
+            other_destinations: Collection[str],
+            room_id: str,
+        ) -> None:
+            nonlocal end_sync
+            try:
+                await end_sync
+            finally:
+                end_sync = Deferred()
+
+        mock_is_partial_state_room = Mock(side_effect=is_partial_state_room)
+        mock_sync_partial_state_room = Mock(side_effect=sync_partial_state_room)
+
+        fed_handler = self.hs.get_federation_handler()
+        store = self.hs.get_datastores().main
+
+        with patch.object(
+            fed_handler, "_sync_partial_state_room", mock_sync_partial_state_room
+        ), patch.object(store, "is_partial_state_room", mock_is_partial_state_room):
+            # Start the partial state sync.
+            fed_handler._start_partial_state_room_sync("hs1", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # Try to start another partial state sync.
+            # Nothing should happen.
+            fed_handler._start_partial_state_room_sync("hs3", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # End the partial state sync
+            is_partial_state = False
+            end_sync.callback(None)
+
+            # The partial state sync should not be restarted.
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # The next attempt to start the partial state sync should work.
+            is_partial_state = True
+            fed_handler._start_partial_state_room_sync("hs3", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 2)
+
+    def test_partial_state_room_sync_restart(self) -> None:
+        """
+        Tests that partial state syncs are restarted when a second partial state sync
+        was deduplicated and the first partial state sync fails.
+        """
+        is_partial_state = True
+        end_sync: "Deferred[None]" = Deferred()
+
+        async def is_partial_state_room(room_id: str) -> bool:
+            return is_partial_state
+
+        async def sync_partial_state_room(
+            initial_destination: Optional[str],
+            other_destinations: Collection[str],
+            room_id: str,
+        ) -> None:
+            nonlocal end_sync
+            try:
+                await end_sync
+            finally:
+                end_sync = Deferred()
+
+        mock_is_partial_state_room = Mock(side_effect=is_partial_state_room)
+        mock_sync_partial_state_room = Mock(side_effect=sync_partial_state_room)
+
+        fed_handler = self.hs.get_federation_handler()
+        store = self.hs.get_datastores().main
+
+        with patch.object(
+            fed_handler, "_sync_partial_state_room", mock_sync_partial_state_room
+        ), patch.object(store, "is_partial_state_room", mock_is_partial_state_room):
+            # Start the partial state sync.
+            fed_handler._start_partial_state_room_sync("hs1", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # Fail the partial state sync.
+            # The partial state sync should not be restarted.
+            end_sync.errback(Exception("Failed to request /state_ids"))
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # Start the partial state sync again.
+            fed_handler._start_partial_state_room_sync("hs1", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 2)
+
+            # Deduplicate another partial state sync.
+            fed_handler._start_partial_state_room_sync("hs3", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 2)
+
+            # Fail the partial state sync.
+            # It should restart with the latest parameters.
+            end_sync.errback(Exception("Failed to request /state_ids"))
+            self.assertEqual(mock_sync_partial_state_room.call_count, 3)
+            mock_sync_partial_state_room.assert_called_with(
+                initial_destination="hs3",
+                other_destinations={"hs2"},
+                room_id="room_id",
             )

@@ -23,14 +23,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.types import (
-    JsonDict,
-    Requester,
-    UserID,
-    create_requester,
-    get_domain_from_id,
-)
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util.caches.descriptors import cached
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
@@ -50,9 +43,6 @@ class ProfileHandler:
     delegate to master when necessary.
     """
 
-    PROFILE_UPDATE_MS = 60 * 1000
-    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
-
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
@@ -69,39 +59,29 @@ class ProfileHandler:
         self.max_avatar_size = hs.config.server.max_avatar_size
         self.allowed_avatar_mimetypes = hs.config.server.allowed_avatar_mimetypes
 
-        self.server_name = hs.config.server.server_name
+        self._is_mine_server_name = hs.is_mine_server_name
 
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
-        if hs.config.worker.run_background_tasks:
-            self.clock.looping_call(
-                self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
-            )
-
-    async def get_profile(self, user_id: str) -> JsonDict:
+    async def get_profile(self, user_id: str, ignore_backoff: bool = True) -> JsonDict:
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
-            try:
-                displayname = await self.store.get_profile_displayname(
-                    target_user.localpart
-                )
-                avatar_url = await self.store.get_profile_avatar_url(
-                    target_user.localpart
-                )
-            except StoreError as e:
-                if e.code == 404:
-                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-                raise
+            profileinfo = await self.store.get_profileinfo(target_user.localpart)
+            if profileinfo.display_name is None:
+                raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
 
-            return {"displayname": displayname, "avatar_url": avatar_url}
+            return {
+                "displayname": profileinfo.display_name,
+                "avatar_url": profileinfo.avatar_url,
+            }
         else:
             try:
                 result = await self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": user_id},
-                    ignore_backoff=True,
+                    ignore_backoff=ignore_backoff,
                 )
                 return result
             except RequestSendFailed as e:
@@ -115,30 +95,6 @@ class ProfileHandler:
 
                     raise SynapseError(502, "Failed to fetch profile")
                 raise e.to_synapse_error()
-
-    async def get_profile_from_cache(self, user_id: str) -> JsonDict:
-        """Get the profile information from our local cache. If the user is
-        ours then the profile information will always be correct. Otherwise,
-        it may be out of date/missing.
-        """
-        target_user = UserID.from_string(user_id)
-        if self.hs.is_mine(target_user):
-            try:
-                displayname = await self.store.get_profile_displayname(
-                    target_user.localpart
-                )
-                avatar_url = await self.store.get_profile_avatar_url(
-                    target_user.localpart
-                )
-            except StoreError as e:
-                if e.code == 404:
-                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-                raise
-
-            return {"displayname": displayname, "avatar_url": avatar_url}
-        else:
-            profile = await self.store.get_from_remote_profile_cache(user_id)
-            return profile or {}
 
     async def get_displayname(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
@@ -214,17 +170,15 @@ class ProfileHandler:
             displayname_to_set = None
 
         # If the admin changes the display name of a user, the requesting user cannot send
-        # the join event to update the displayname in the rooms.
-        # This must be done by the target user himself.
+        # the join event to update the display name in the rooms.
+        # This must be done by the target user themselves.
         if by_admin:
             requester = create_requester(
                 target_user,
                 authenticated_entity=requester.authenticated_entity,
             )
 
-        await self.store.set_profile_displayname(
-            target_user.localpart, displayname_to_set
-        )
+        await self.store.set_profile_displayname(target_user, displayname_to_set)
 
         profile = await self.store.get_profileinfo(target_user.localpart)
         await self.user_directory_handler.handle_local_profile_change(
@@ -316,9 +270,7 @@ class ProfileHandler:
                 target_user, authenticated_entity=requester.authenticated_entity
             )
 
-        await self.store.set_profile_avatar_url(
-            target_user.localpart, avatar_url_to_set
-        )
+        await self.store.set_profile_avatar_url(target_user, avatar_url_to_set)
 
         profile = await self.store.get_profileinfo(target_user.localpart)
         await self.user_directory_handler.handle_local_profile_change(
@@ -351,9 +303,13 @@ class ProfileHandler:
         if not self.max_avatar_size and not self.allowed_avatar_mimetypes:
             return True
 
-        server_name, _, media_id = parse_and_validate_mxc_uri(mxc)
+        host, port, media_id = parse_and_validate_mxc_uri(mxc)
+        if port is not None:
+            server_name = host + ":" + str(port)
+        else:
+            server_name = host
 
-        if server_name == self.server_name:
+        if self._is_mine_server_name(server_name):
             media_info = await self.store.get_local_media(media_id)
         else:
             media_info = await self.store.get_cached_remote_media(server_name, media_id)
@@ -509,45 +465,3 @@ class ProfileHandler:
                 # so we act as if we couldn't find the profile.
                 raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
             raise
-
-    @wrap_as_background_process("Update remote profile")
-    async def _update_remote_profile_cache(self) -> None:
-        """Called periodically to check profiles of remote users we haven't
-        checked in a while.
-        """
-        entries = await self.store.get_remote_profile_cache_entries_that_expire(
-            last_checked=self.clock.time_msec() - self.PROFILE_UPDATE_EVERY_MS
-        )
-
-        for user_id, displayname, avatar_url in entries:
-            is_subscribed = await self.store.is_subscribed_remote_profile_for_user(
-                user_id
-            )
-            if not is_subscribed:
-                await self.store.maybe_delete_remote_profile_cache(user_id)
-                continue
-
-            try:
-                profile = await self.federation.make_query(
-                    destination=get_domain_from_id(user_id),
-                    query_type="profile",
-                    args={"user_id": user_id},
-                    ignore_backoff=True,
-                )
-            except Exception:
-                logger.exception("Failed to get avatar_url")
-
-                await self.store.update_remote_profile_cache(
-                    user_id, displayname, avatar_url
-                )
-                continue
-
-            new_name = profile.get("displayname")
-            if not isinstance(new_name, str):
-                new_name = None
-            new_avatar = profile.get("avatar_url")
-            if not isinstance(new_avatar, str):
-                new_avatar = None
-
-            # We always hit update to update the last_check timestamp
-            await self.store.update_remote_profile_cache(user_id, new_name, new_avatar)

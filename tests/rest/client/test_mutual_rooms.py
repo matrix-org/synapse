@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from urllib.parse import quote
+
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
@@ -36,18 +38,16 @@ class UserMutualRoomsTest(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["update_user_directory"] = True
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
-        self.handler = hs.get_user_directory_handler()
 
     def _get_mutual_rooms(self, token: str, other_user: str) -> FakeChannel:
         return self.make_request(
             "GET",
-            "/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms/%s"
-            % other_user,
+            "/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms"
+            f"?user_id={quote(other_user)}",
             access_token=token,
         )
 

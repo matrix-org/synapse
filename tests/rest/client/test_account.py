@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import os
 import re
 from email.parser import Parser
+from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Union
 from unittest.mock import Mock
 
@@ -40,7 +40,6 @@ from tests.unittest import override_config
 
 
 class PasswordResetTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         account.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -95,10 +94,8 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         """
         body = {"type": "m.login.password", "user": username, "password": password}
 
-        channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
-        )
-        self.assertEqual(channel.code, 403, channel.result)
+        channel = self.make_request("POST", "/_matrix/client/r0/login", body)
+        self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
 
     def test_basic_password_reset(self) -> None:
         """Test basic password reset flow"""
@@ -347,7 +344,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
         )
 
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
         # Now POST to the same endpoint, mimicking the same behaviour as clicking the
         # password reset confirm button
@@ -362,7 +359,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             content_is_form=True,
         )
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
     def _get_link_from_email(self) -> str:
         assert self.email_attempts, "No emails have been sent"
@@ -390,7 +387,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         new_password: str,
         session_id: str,
         client_secret: str,
-        expected_code: int = 200,
+        expected_code: int = HTTPStatus.OK,
     ) -> None:
         channel = self.make_request(
             "POST",
@@ -410,7 +407,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
 
 class DeactivateTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -478,25 +474,179 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(memberships), 1, memberships)
         self.assertEqual(memberships[0].room_id, room_id, memberships)
 
-    def deactivate(self, user_id: str, tok: str) -> None:
-        request_data = json.dumps(
-            {
-                "auth": {
-                    "type": "m.login.password",
-                    "user": user_id,
-                    "password": "test",
-                },
-                "erase": False,
+    def test_deactivate_account_deletes_server_side_backup_keys(self) -> None:
+        key_handler = self.hs.get_e2e_room_keys_handler()
+        room_keys = {
+            "rooms": {
+                "!abc:matrix.org": {
+                    "sessions": {
+                        "c0ff33": {
+                            "first_message_index": 1,
+                            "forwarded_count": 1,
+                            "is_verified": False,
+                            "session_data": "SSBBTSBBIEZJU0gK",
+                        }
+                    }
+                }
             }
+        }
+
+        user_id = self.register_user("missPiggy", "test")
+        tok = self.login("missPiggy", "test")
+
+        # add some backup keys/versions
+        version = self.get_success(
+            key_handler.create_version(
+                user_id,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "first_version_auth_data",
+                },
+            )
         )
+
+        self.get_success(key_handler.upload_room_keys(user_id, version, room_keys))
+
+        version2 = self.get_success(
+            key_handler.create_version(
+                user_id,
+                {
+                    "algorithm": "m.megolm_backup.v1",
+                    "auth_data": "second_version_auth_data",
+                },
+            )
+        )
+
+        self.get_success(key_handler.upload_room_keys(user_id, version2, room_keys))
+
+        self.deactivate(user_id, tok)
+        store = self.hs.get_datastores().main
+
+        # Check that the user has been marked as deactivated.
+        self.assertTrue(self.get_success(store.get_user_deactivated_status(user_id)))
+
+        # Check that there are no entries in 'e2e_room_keys` and `e2e_room_keys_versions`
+        res = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys", {"user_id": user_id}, "*", "simple_select"
+            )
+        )
+        self.assertEqual(len(res), 0)
+
+        res2 = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys_versions", {"user_id": user_id}, "*", "simple_select"
+            )
+        )
+        self.assertEqual(len(res2), 0)
+
+    def test_background_update_deletes_deactivated_users_server_side_backup_keys(
+        self,
+    ) -> None:
+        key_handler = self.hs.get_e2e_room_keys_handler()
+        room_keys = {
+            "rooms": {
+                "!abc:matrix.org": {
+                    "sessions": {
+                        "c0ff33": {
+                            "first_message_index": 1,
+                            "forwarded_count": 1,
+                            "is_verified": False,
+                            "session_data": "SSBBTSBBIEZJU0gK",
+                        }
+                    }
+                }
+            }
+        }
+        self.store = self.hs.get_datastores().main
+
+        # create a bunch of users and add keys for them
+        users = []
+        for i in range(0, 20):
+            user_id = self.register_user("missPiggy" + str(i), "test")
+            users.append((user_id,))
+
+            # add some backup keys/versions
+            version = self.get_success(
+                key_handler.create_version(
+                    user_id,
+                    {
+                        "algorithm": "m.megolm_backup.v1",
+                        "auth_data": str(i) + "_version_auth_data",
+                    },
+                )
+            )
+
+            self.get_success(key_handler.upload_room_keys(user_id, version, room_keys))
+
+            version2 = self.get_success(
+                key_handler.create_version(
+                    user_id,
+                    {
+                        "algorithm": "m.megolm_backup.v1",
+                        "auth_data": str(i) + "_version_auth_data",
+                    },
+                )
+            )
+
+            self.get_success(key_handler.upload_room_keys(user_id, version2, room_keys))
+
+        # deactivate most of the users by editing DB
+        self.get_success(
+            self.store.db_pool.simple_update_many(
+                table="users",
+                key_names=("name",),
+                key_values=users[0:18],
+                value_names=("deactivated",),
+                value_values=[(1,) for i in range(1, 19)],
+                desc="",
+            )
+        )
+
+        # run background update
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                {
+                    "update_name": "delete_e2e_backup_keys_for_deactivated_users",
+                    "progress_json": "{}",
+                },
+            )
+        )
+        self.store.db_pool.updates._all_done = False
+        self.wait_for_background_updates()
+
+        # check that keys are deleted for the deactivated users but not the others
+        res = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys", None, ("user_id",), "simple_select"
+            )
+        )
+        self.assertEqual(len(res), 4)
+
+        res2 = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_list(
+                "e2e_room_keys_versions", None, ("user_id",), "simple_select"
+            )
+        )
+        self.assertEqual(len(res2), 4)
+
+    def deactivate(self, user_id: str, tok: str) -> None:
+        request_data = {
+            "auth": {
+                "type": "m.login.password",
+                "user": user_id,
+                "password": "test",
+            },
+            "erase": False,
+        }
         channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
 
 class WhoamiTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -520,8 +670,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
-                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
-                "org.matrix.msc3069.is_guest": False,
                 "is_guest": False,
             },
         )
@@ -540,8 +688,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
-                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
-                "org.matrix.msc3069.is_guest": True,
                 "is_guest": True,
             },
         )
@@ -552,7 +698,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": user_id, "exclusive": True}]},
             sender=user_id,
@@ -564,8 +709,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             whoami,
             {
                 "user_id": user_id,
-                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
-                "org.matrix.msc3069.is_guest": False,
                 "is_guest": False,
             },
         )
@@ -578,7 +721,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
 
 class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         account.register_servlets,
         login.register_servlets,
@@ -652,21 +794,21 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     def test_add_email_no_at(self) -> None:
         self._request_token_invalid_email(
             "address-without-at.bar",
-            expected_errcode=Codes.UNKNOWN,
+            expected_errcode=Codes.BAD_JSON,
             expected_error="Unable to parse email address",
         )
 
     def test_add_email_two_at(self) -> None:
         self._request_token_invalid_email(
             "foo@foo@test.bar",
-            expected_errcode=Codes.UNKNOWN,
+            expected_errcode=Codes.BAD_JSON,
             expected_error="Unable to parse email address",
         )
 
     def test_add_email_bad_format(self) -> None:
         self._request_token_invalid_email(
             "user@bad.example.net@good.example.com",
-            expected_errcode=Codes.UNKNOWN,
+            expected_errcode=Codes.BAD_JSON,
             expected_error="Unable to parse email address",
         )
 
@@ -701,39 +843,21 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.hs.config.registration.enable_3pid_changes = False
 
         client_secret = "foobar"
-        session_id = self._request_token(self.email, client_secret)
-
-        self.assertEqual(len(self.email_attempts), 1)
-        link = self._get_link_from_email()
-
-        self._validate_token(link)
-
         channel = self.make_request(
             "POST",
-            b"/_matrix/client/unstable/account/3pid/add",
+            b"/_matrix/client/unstable/account/3pid/email/requestToken",
             {
                 "client_secret": client_secret,
-                "sid": session_id,
-                "auth": {
-                    "type": "m.login.password",
-                    "user": self.user_id,
-                    "password": "test",
-                },
+                "email": "test@example.com",
+                "send_attempt": 1,
             },
-            access_token=self.user_id_tok,
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
+
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
-
-        # Get user
-        channel = self.make_request(
-            "GET",
-            self.url_3pid,
-            access_token=self.user_id_tok,
-        )
-
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
-        self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email(self) -> None:
         """Test deleting an email from profile"""
@@ -754,7 +878,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             {"medium": "email", "address": self.email},
             access_token=self.user_id_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
 
         # Get user
         channel = self.make_request(
@@ -763,7 +887,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email_if_disabled(self) -> None:
@@ -788,7 +912,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Get user
@@ -798,7 +924,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual(self.email, channel.json_body["threepids"][0]["address"])
 
@@ -824,7 +950,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
         # Get user
@@ -834,7 +962,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     def test_no_valid_token(self) -> None:
@@ -859,7 +987,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
         # Get user
@@ -869,7 +999,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     @override_config({"next_link_domain_whitelist": None})
@@ -879,7 +1009,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="https://example.com/a/good/site",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
     @override_config({"next_link_domain_whitelist": None})
@@ -891,7 +1021,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="some-protocol://abcdefghijklmopqrstuvwxyz",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
     @override_config({"next_link_domain_whitelist": None})
@@ -902,7 +1032,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="file:///host/path",
-            expect_code=400,
+            expect_code=HTTPStatus.BAD_REQUEST,
         )
 
     @override_config({"next_link_domain_whitelist": ["example.com", "example.org"]})
@@ -914,28 +1044,28 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link=None,
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
         self._request_token(
             "something@example.com",
             "some_secret",
             next_link="https://example.com/some/good/page",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
         self._request_token(
             "something@example.com",
             "some_secret",
             next_link="https://example.org/some/also/good/page",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
         self._request_token(
             "something@example.com",
             "some_secret",
             next_link="https://bad.example.org/some/bad/page",
-            expect_code=400,
+            expect_code=HTTPStatus.BAD_REQUEST,
         )
 
     @override_config({"next_link_domain_whitelist": []})
@@ -947,7 +1077,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="https://example.com/a/page",
-            expect_code=400,
+            expect_code=HTTPStatus.BAD_REQUEST,
         )
 
     def _request_token(
@@ -955,8 +1085,8 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         email: str,
         client_secret: str,
         next_link: Optional[str] = None,
-        expect_code: int = 200,
-    ) -> str:
+        expect_code: int = HTTPStatus.OK,
+    ) -> Optional[str]:
         """Request a validation token to add an email address to a user's account
 
         Args:
@@ -966,7 +1096,8 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             expect_code: Expected return code of the call
 
         Returns:
-            The ID of the new threepid validation session
+            The ID of the new threepid validation session, or None if the response
+            did not contain a session ID.
         """
         body = {"client_secret": client_secret, "email": email, "send_attempt": 1}
         if next_link:
@@ -999,16 +1130,18 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             b"account/3pid/email/requestToken",
             {"client_secret": client_secret, "email": email, "send_attempt": 1},
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(expected_errcode, channel.json_body["errcode"])
-        self.assertEqual(expected_error, channel.json_body["error"])
+        self.assertIn(expected_error, channel.json_body["error"])
 
     def _validate_token(self, link: str) -> None:
         # Remove the host
         path = link.replace("https://example.com", "")
 
         channel = self.make_request("GET", path, shorthand=False)
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
     def _get_link_from_email(self) -> str:
         assert self.email_attempts, "No emails have been sent"
@@ -1058,7 +1191,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
 
         # Get user
         channel = self.make_request(
@@ -1067,7 +1200,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
 
         threepids = {threepid["address"] for threepid in channel.json_body["threepids"]}
@@ -1098,7 +1231,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
         """Tests that not providing any MXID raises an error."""
         self._test_status(
             users=None,
-            expected_status_code=400,
+            expected_status_code=HTTPStatus.BAD_REQUEST,
             expected_errcode=Codes.MISSING_PARAM,
         )
 
@@ -1106,7 +1239,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
         """Tests that providing an invalid MXID raises an error."""
         self._test_status(
             users=["bad:test"],
-            expected_status_code=400,
+            expected_status_code=HTTPStatus.BAD_REQUEST,
             expected_errcode=Codes.INVALID_PARAM,
         )
 
@@ -1213,7 +1346,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
                 return {}
 
         # Register a mock that will return the expected result depending on the remote.
-        self.hs.get_federation_http_client().post_json = Mock(side_effect=post_json)
+        self.hs.get_federation_http_client().post_json = Mock(side_effect=post_json)  # type: ignore[assignment]
 
         # Check that we've got the correct response from the client-side endpoint.
         self._test_status(
@@ -1273,9 +1406,8 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
             # account status will fail.
             return UserID.from_string(user_id).localpart == "someuser"
 
-        self.hs.get_account_validity_handler()._is_user_expired_callbacks.append(
-            is_expired
-        )
+        account_validity_callbacks = self.hs.get_module_api_callbacks().account_validity
+        account_validity_callbacks.is_user_expired_callbacks.append(is_expired)
 
         self._test_status(
             users=[user],
@@ -1292,7 +1424,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
     def _test_status(
         self,
         users: Optional[List[str]],
-        expected_status_code: int = 200,
+        expected_status_code: int = HTTPStatus.OK,
         expected_statuses: Optional[Dict[str, Dict[str, bool]]] = None,
         expected_failures: Optional[List[str]] = None,
         expected_errcode: Optional[str] = None,

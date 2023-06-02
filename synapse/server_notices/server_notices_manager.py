@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.events import EventBase
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import Requester, StreamKeyType, UserID, create_requester
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -91,6 +91,41 @@ class ServerNoticesManager:
         return event
 
     @cached()
+    async def maybe_get_notice_room_for_user(self, user_id: str) -> Optional[str]:
+        """Try to look up the server notice room for this user if it exists.
+
+        Does not create one if none can be found.
+
+        Args:
+            user_id: the user we want a server notice room for.
+
+        Returns:
+            The room's ID, or None if no room could be found.
+        """
+        # If there is no server notices MXID, then there is no server notices room
+        if self.server_notices_mxid is None:
+            return None
+
+        rooms = await self._store.get_rooms_for_local_user_where_membership_is(
+            user_id, [Membership.INVITE, Membership.JOIN]
+        )
+        for room in rooms:
+            # it's worth noting that there is an asymmetry here in that we
+            # expect the user to be invited or joined, but the system user must
+            # be joined. This is kinda deliberate, in that if somebody somehow
+            # manages to invite the system user to a room, that doesn't make it
+            # the server notices room.
+            is_server_notices_room = await self._store.check_local_user_in_room(
+                user_id=self.server_notices_mxid, room_id=room.room_id
+            )
+            if is_server_notices_room:
+                # we found a room which our user shares with the system notice
+                # user
+                return room.room_id
+
+        return None
+
+    @cached()
     async def get_or_create_notice_room_for_user(self, user_id: str) -> str:
         """Get the room for notices for a given user
 
@@ -112,31 +147,20 @@ class ServerNoticesManager:
             self.server_notices_mxid, authenticated_entity=self._server_name
         )
 
-        rooms = await self._store.get_rooms_for_local_user_where_membership_is(
-            user_id, [Membership.INVITE, Membership.JOIN]
-        )
-        for room in rooms:
-            # it's worth noting that there is an asymmetry here in that we
-            # expect the user to be invited or joined, but the system user must
-            # be joined. This is kinda deliberate, in that if somebody somehow
-            # manages to invite the system user to a room, that doesn't make it
-            # the server notices room.
-            user_ids = await self._store.get_users_in_room(room.room_id)
-            if len(user_ids) <= 2 and self.server_notices_mxid in user_ids:
-                # we found a room which our user shares with the system notice
-                # user
-                logger.info(
-                    "Using existing server notices room %s for user %s",
-                    room.room_id,
-                    user_id,
-                )
-                await self._update_notice_user_profile_if_changed(
-                    requester,
-                    room.room_id,
-                    self._config.servernotices.server_notices_mxid_display_name,
-                    self._config.servernotices.server_notices_mxid_avatar_url,
-                )
-                return room.room_id
+        room_id = await self.maybe_get_notice_room_for_user(user_id)
+        if room_id is not None:
+            logger.info(
+                "Using existing server notices room %s for user %s",
+                room_id,
+                user_id,
+            )
+            await self._update_notice_user_profile_if_changed(
+                requester,
+                room_id,
+                self._config.servernotices.server_notices_mxid_display_name,
+                self._config.servernotices.server_notices_mxid_avatar_url,
+            )
+            return room_id
 
         # apparently no existing notice room: create a new one
         logger.info("Creating server notices room for %s", user_id)
@@ -154,7 +178,7 @@ class ServerNoticesManager:
                 "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
-        info, _ = await self._room_creation_handler.create_room(
+        room_id, _, _ = await self._room_creation_handler.create_room(
             requester,
             config={
                 "preset": RoomCreationPreset.PRIVATE_CHAT,
@@ -164,12 +188,13 @@ class ServerNoticesManager:
             ratelimit=False,
             creator_join_profile=join_profile,
         )
-        room_id = info["room_id"]
+
+        self.maybe_get_notice_room_for_user.invalidate((user_id,))
 
         max_id = await self._account_data_handler.add_tag_to_room(
             user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
         )
-        self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
+        self._notifier.on_new_event(StreamKeyType.ACCOUNT_DATA, max_id, users=[user_id])
 
         logger.info("Created server notices room %s for %s", room_id, user_id)
         return room_id
@@ -224,7 +249,7 @@ class ServerNoticesManager:
         assert self.server_notices_mxid is not None
 
         notice_user_data_in_room = await self._message_handler.get_room_data(
-            self.server_notices_mxid,
+            create_requester(self.server_notices_mxid),
             room_id,
             EventTypes.Member,
             self.server_notices_mxid,

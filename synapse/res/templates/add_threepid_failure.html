@@ -1,8 +1,7 @@
-<html>
-<head></head>
-<body>
-<p>The request failed for the following reason: {{ failure_reason }}.</p>
+{% extends "_base.html" %}
+{% block title %}Request failed{% endblock %}
 
+{% block body %}
+<p>The request failed for the following reason: {{ failure_reason }}.</p>
 <p>No changes have been made to your account.</p>
-</body>
-</html>
+{% endblock %}

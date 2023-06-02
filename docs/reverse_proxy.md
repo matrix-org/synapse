@@ -45,6 +45,10 @@ listens to traffic on localhost. (Do not change `bind_addresses` to `127.0.0.1`
 when using a containerized Synapse, as that will prevent it from responding
 to proxied traffic.)
 
+Optionally, you can also set
+[`request_id_header`](./usage/configuration/config_documentation.md#listeners)
+so that the server extracts and re-uses the same request ID format that the
+reverse proxy is using.
 
 ## Reverse-proxy configuration examples
 
@@ -75,27 +79,10 @@ server {
         # Nginx by default only allows file uploads up to 1M in size
         # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
         client_max_body_size 50M;
+	
+	# Synapse responses may be chunked, which is an HTTP/1.1 feature.
+	proxy_http_version 1.1;
     }
-}
-```
-
-### Caddy v1
-
-```
-matrix.example.com {
-  proxy /_matrix http://localhost:8008 {
-    transparent
-  }
-
-  proxy /_synapse/client http://localhost:8008 {
-    transparent
-  }
-}
-
-example.com:8448 {
-  proxy / http://localhost:8008 {
-    transparent
-  }
 }
 ```
 
@@ -103,39 +90,28 @@ example.com:8448 {
 
 ```
 matrix.example.com {
-  reverse_proxy /_matrix/* http://localhost:8008
-  reverse_proxy /_synapse/client/* http://localhost:8008
+  reverse_proxy /_matrix/* localhost:8008
+  reverse_proxy /_synapse/client/* localhost:8008
 }
 
 example.com:8448 {
-  reverse_proxy http://localhost:8008
+  reverse_proxy localhost:8008
 }
 ```
+
 [Delegation](delegate.md) example:
+
 ```
-(matrix-well-known-header) {
-    # Headers
-    header Access-Control-Allow-Origin "*"
-    header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-    header Content-Type "application/json"
-}
-
 example.com {
-    handle /.well-known/matrix/server {
-        import matrix-well-known-header
-        respond `{"m.server":"matrix.example.com:443"}`
-    }
-
-    handle /.well-known/matrix/client {
-        import matrix-well-known-header
-        respond `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
-    }
+	header /.well-known/matrix/* Content-Type application/json
+	header /.well-known/matrix/* Access-Control-Allow-Origin *
+	respond /.well-known/matrix/server `{"m.server": "matrix.example.com:443"}`
+	respond /.well-known/matrix/client `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
 }
 
 matrix.example.com {
-    reverse_proxy /_matrix/* http://localhost:8008
-    reverse_proxy /_synapse/client/* http://localhost:8008
+    reverse_proxy /_matrix/* localhost:8008
+    reverse_proxy /_synapse/client/* localhost:8008
 }
 ```
 
@@ -204,6 +180,28 @@ frontend matrix-federation
 
 backend matrix
   server matrix 127.0.0.1:8008
+```
+
+
+[Delegation](delegate.md) example:
+```
+frontend https
+  acl matrix-well-known-client-path path /.well-known/matrix/client
+  acl matrix-well-known-server-path path /.well-known/matrix/server
+  use_backend matrix-well-known-client if matrix-well-known-client-path
+  use_backend matrix-well-known-server if matrix-well-known-server-path
+ 
+backend matrix-well-known-client
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}'
+
+backend matrix-well-known-server
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.server":"matrix.example.com:443"}'
 ```
 
 ### Relayd

@@ -1,9 +1,8 @@
-<html>
-<body>
-    <p>A request to add an email address to your Matrix account has been received. If this was you, please click the link below to confirm adding this email:</p>
+{% extends "_base.html" %}
+{% block title %}Request to add an email address to your Matrix account{% endblock %}
 
-    <a href="{{ link }}">{{ link }}</a>
-
-    <p>If this was not you, you can safely ignore this email. Thank you.</p>
-</body>
-</html>
+{% block body %}
+<p>A request to add an email address to your Matrix account has been received. If this was you, please click the link below to confirm adding this email:</p>
+<a href="{{ link }}">{{ link }}</a>
+<p>If this was not you, you can safely ignore this email. Thank you.</p>
+{% endblock %}

@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections.abc
 import logging
 import typing
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
+from typing_extensions import Protocol
 from unpaddedbase64 import decode_base64
 
 from synapse.api.constants import (
@@ -29,13 +31,27 @@ from synapse.api.constants import (
     JoinRules,
     Membership,
 )
-from synapse.api.errors import AuthError, EventSizeError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    EventSizeError,
+    SynapseError,
+    UnstableSpecAuthError,
+)
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
     RoomVersion,
+    RoomVersions,
 )
-from synapse.types import StateMap, UserID, get_domain_from_id
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.types import (
+    MutableStateMap,
+    StateMap,
+    StrCollection,
+    UserID,
+    get_domain_from_id,
+)
 
 if typing.TYPE_CHECKING:
     # conditional imports to avoid import cycle
@@ -45,9 +61,18 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def validate_event_for_room_version(
-    room_version_obj: RoomVersion, event: "EventBase"
-) -> None:
+class _EventSourceStore(Protocol):
+    async def get_events(
+        self,
+        event_ids: StrCollection,
+        redact_behaviour: EventRedactBehaviour,
+        get_prev_content: bool = False,
+        allow_rejected: bool = False,
+    ) -> Dict[str, "EventBase"]:
+        ...
+
+
+def validate_event_for_room_version(event: "EventBase") -> None:
     """Ensure that the event complies with the limits, and has the right signatures
 
     NB: does not *validate* the signatures - it assumes that any signatures present
@@ -60,12 +85,10 @@ def validate_event_for_room_version(
     NB: This is used to check events that have been received over federation. As such,
     it can only enforce the checks specified in the relevant room version, to avoid
     a split-brain situation where some servers accept such events, and others reject
-    them.
-
-    TODO: consider moving this into EventValidator
+    them. See also EventValidator, which contains extra checks which are applied only to
+    locally-generated events.
 
     Args:
-        room_version_obj: the version of the room which contains this event
         event: the event to be checked
 
     Raises:
@@ -94,7 +117,7 @@ def validate_event_for_room_version(
         if not is_invite_via_3pid:
             raise AuthError(403, "Event not signed by sender's server")
 
-    if event.format_version in (EventFormatVersions.V1,):
+    if event.format_version in (EventFormatVersions.ROOM_V1_V2,):
         # Only older room versions have event IDs to check.
         event_id_domain = get_domain_from_id(event.event_id)
 
@@ -103,7 +126,7 @@ def validate_event_for_room_version(
             raise AuthError(403, "Event not signed by sending server")
 
     is_invite_via_allow_rule = (
-        room_version_obj.msc3083_join_rules
+        event.room_version.msc3083_join_rules
         and event.type == EventTypes.Member
         and event.membership == Membership.JOIN
         and EventContentFields.AUTHORISING_USER in event.content
@@ -116,49 +139,97 @@ def validate_event_for_room_version(
             raise AuthError(403, "Event not signed by authorising server")
 
 
-def check_auth_rules_for_event(
-    room_version_obj: RoomVersion,
+async def check_state_independent_auth_rules(
+    store: _EventSourceStore,
     event: "EventBase",
-    auth_events: Iterable["EventBase"],
+    batched_auth_events: Optional[Mapping[str, "EventBase"]] = None,
 ) -> None:
-    """Check that an event complies with the auth rules
+    """Check that an event complies with auth rules that are independent of room state
 
-    Checks whether an event passes the auth rules with a given set of state events
-
-    Assumes that we have already checked that the event is the right shape (it has
-    enough signatures, has a room ID, etc). In other words:
-
-     - it's fine for use in state resolution, when we have already decided whether to
-       accept the event or not, and are now trying to decide whether it should make it
-       into the room state
-
-     - when we're doing the initial event auth, it is only suitable in combination with
-       a bunch of other tests.
+    Runs through the first few auth rules, which are independent of room state. (Which
+    means that we only need to them once for each received event)
 
     Args:
-        room_version_obj: the version of the room
+        store: the datastore; used to fetch the auth events for validation
         event: the event being checked.
-        auth_events: the room state to check the events against.
+        batched_auth_events: if the event being authed is part of a batch, any events
+            from the same batch that may be necessary to auth the current event
 
     Raises:
         AuthError if the checks fail
     """
-    # We need to ensure that the auth events are actually for the same room, to
-    # stop people from using powers they've been granted in other rooms for
-    # example.
-    #
-    # Arguably we don't need to do this when we're just doing state res, as presumably
-    # the state res algorithm isn't silly enough to give us events from different rooms.
-    # Still, it's easier to do it anyway.
+    # Implementation of https://spec.matrix.org/v1.2/rooms/v9/#authorization-rules
+
+    # 1. If type is m.room.create:
+    if event.type == EventTypes.Create:
+        _check_create(event)
+
+        # 1.5 Otherwise, allow
+        return
+
+    # 2. Reject if event has auth_events that: ...
+    if batched_auth_events:
+        # Copy the batched auth events to avoid mutating them.
+        auth_events = dict(batched_auth_events)
+        needed_auth_event_ids = set(event.auth_event_ids()) - batched_auth_events.keys()
+        if needed_auth_event_ids:
+            auth_events.update(
+                await store.get_events(
+                    needed_auth_event_ids,
+                    redact_behaviour=EventRedactBehaviour.as_is,
+                    allow_rejected=True,
+                )
+            )
+    else:
+        auth_events = await store.get_events(
+            event.auth_event_ids(),
+            redact_behaviour=EventRedactBehaviour.as_is,
+            allow_rejected=True,
+        )
+
     room_id = event.room_id
-    for auth_event in auth_events:
+    auth_dict: MutableStateMap[str] = {}
+    expected_auth_types = auth_types_for_event(event.room_version, event)
+    for auth_event_id in event.auth_event_ids():
+        auth_event = auth_events.get(auth_event_id)
+
+        # we should have all the auth events by now, so if we do not, that suggests
+        # a synapse programming error
+        if auth_event is None:
+            raise RuntimeError(
+                f"Event {event.event_id} has unknown auth event {auth_event_id}"
+            )
+
+        # We need to ensure that the auth events are actually for the same room, to
+        # stop people from using powers they've been granted in other rooms for
+        # example.
         if auth_event.room_id != room_id:
             raise AuthError(
                 403,
                 "During auth for event %s in room %s, found event %s in the state "
                 "which is in room %s"
-                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id),
+                % (event.event_id, room_id, auth_event_id, auth_event.room_id),
             )
+
+        k = (auth_event.type, auth_event.state_key)
+
+        # 2.1 ... have duplicate entries for a given type and state_key pair
+        if k in auth_dict:
+            raise AuthError(
+                403,
+                f"Event {event.event_id} has duplicate auth_events for {k}: {auth_dict[k]} and {auth_event_id}",
+            )
+
+        # 2.2 ... have entries whose type and state_key don’t match those specified by
+        #   the auth events selection algorithm described in the server
+        #   specification.
+        if k not in expected_auth_types:
+            raise AuthError(
+                403,
+                f"Event {event.event_id} has unexpected auth_event for {k}: {auth_event_id}",
+            )
+
+        # We also need to check that the auth event itself is not rejected.
         if auth_event.rejected_reason:
             raise AuthError(
                 403,
@@ -166,36 +237,45 @@ def check_auth_rules_for_event(
                 % (event.event_id, auth_event.event_id),
             )
 
-    # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
-    #
-    # 1. If type is m.room.create:
-    if event.type == EventTypes.Create:
-        # 1b. If the domain of the room_id does not match the domain of the sender,
-        # reject.
-        sender_domain = get_domain_from_id(event.sender)
-        room_id_domain = get_domain_from_id(event.room_id)
-        if room_id_domain != sender_domain:
-            raise AuthError(
-                403, "Creation event's room_id domain does not match sender's"
-            )
-
-        # 1c. If content.room_version is present and is not a recognised version, reject
-        room_version_prop = event.content.get("room_version", "1")
-        if room_version_prop not in KNOWN_ROOM_VERSIONS:
-            raise AuthError(
-                403,
-                "room appears to have unsupported version %s" % (room_version_prop,),
-            )
-
-        logger.debug("Allowing! %s", event)
-        return
-
-    auth_dict = {(e.type, e.state_key): e for e in auth_events}
+        auth_dict[k] = auth_event_id
 
     # 3. If event does not have a m.room.create in its auth_events, reject.
     creation_event = auth_dict.get((EventTypes.Create, ""), None)
     if not creation_event:
         raise AuthError(403, "No create event in auth events")
+
+
+def check_state_dependent_auth_rules(
+    event: "EventBase",
+    auth_events: Iterable["EventBase"],
+) -> None:
+    """Check that an event complies with auth rules that depend on room state
+
+    Runs through the parts of the auth rules that check an event against bits of room
+    state.
+
+    Note:
+
+     - it's fine for use in state resolution, when we have already decided whether to
+       accept the event or not, and are now trying to decide whether it should make it
+       into the room state
+
+     - when we're doing the initial event auth, it is only suitable in combination with
+       a bunch of other tests (including, but not limited to, check_state_independent_auth_rules).
+
+    Args:
+        event: the event being checked.
+        auth_events: the room state to check the events against.
+
+    Raises:
+        AuthError if the checks fail
+    """
+    # there are no state-dependent auth rules for create events.
+    if event.type == EventTypes.Create:
+        logger.debug("Allowing! %s", event)
+        return
+
+    auth_dict = {(e.type, e.state_key): e for e in auth_events}
 
     # additional check for m.federate
     creating_domain = get_domain_from_id(event.room_id)
@@ -205,7 +285,10 @@ def check_auth_rules_for_event(
             raise AuthError(403, "This room has been marked as unfederatable.")
 
     # 4. If type is m.room.aliases
-    if event.type == EventTypes.Aliases and room_version_obj.special_case_aliases_auth:
+    if (
+        event.type == EventTypes.Aliases
+        and event.room_version.special_case_aliases_auth
+    ):
         # 4a. If event has no state_key, reject
         if not event.is_state():
             raise AuthError(403, "Alias event must be a state event")
@@ -225,7 +308,7 @@ def check_auth_rules_for_event(
 
     # 5. If type is m.room.membership
     if event.type == EventTypes.Member:
-        _is_membership_change_allowed(room_version_obj, event, auth_dict)
+        _is_membership_change_allowed(event.room_version, event, auth_dict)
         logger.debug("Allowing! %s", event)
         return
 
@@ -239,7 +322,11 @@ def check_auth_rules_for_event(
         invite_level = get_named_level(auth_dict, "invite", 0)
 
         if user_level < invite_level:
-            raise AuthError(403, "You don't have permission to invite users")
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to invite users",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
         else:
             logger.debug("Allowing! %s", event)
             return
@@ -247,34 +334,133 @@ def check_auth_rules_for_event(
     _can_send_event(event, auth_dict)
 
     if event.type == EventTypes.PowerLevels:
-        _check_power_levels(room_version_obj, event, auth_dict)
+        _check_power_levels(event.room_version, event, auth_dict)
 
     if event.type == EventTypes.Redaction:
-        check_redaction(room_version_obj, event, auth_dict)
+        check_redaction(event.room_version, event, auth_dict)
 
     if (
         event.type == EventTypes.MSC2716_INSERTION
         or event.type == EventTypes.MSC2716_BATCH
         or event.type == EventTypes.MSC2716_MARKER
     ):
-        check_historical(room_version_obj, event, auth_dict)
+        check_historical(event.room_version, event, auth_dict)
 
     logger.debug("Allowing! %s", event)
 
 
+# Set of room versions where Synapse did not apply event key size limits
+# in bytes, but rather in codepoints.
+# In these room versions, we are more lenient with event size validation.
+LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS = {
+    RoomVersions.V1,
+    RoomVersions.V2,
+    RoomVersions.V3,
+    RoomVersions.V4,
+    RoomVersions.V5,
+    RoomVersions.V6,
+    RoomVersions.MSC2176,
+    RoomVersions.V7,
+    RoomVersions.V8,
+    RoomVersions.V9,
+    RoomVersions.MSC3787,
+    RoomVersions.V10,
+    RoomVersions.MSC2716v4,
+    RoomVersions.MSC1767v10,
+}
+
+
 def _check_size_limits(event: "EventBase") -> None:
-    if len(event.user_id) > 255:
-        raise EventSizeError("'user_id' too large")
-    if len(event.room_id) > 255:
-        raise EventSizeError("'room_id' too large")
-    if event.is_state() and len(event.state_key) > 255:
-        raise EventSizeError("'state_key' too large")
-    if len(event.type) > 255:
-        raise EventSizeError("'type' too large")
-    if len(event.event_id) > 255:
-        raise EventSizeError("'event_id' too large")
+    """
+    Checks the size limits in a PDU.
+
+    The entire size limit of the PDU is checked first.
+    Then the size of fields is checked, first in codepoints and then in bytes.
+
+    The codepoint size limits are only for Synapse compatibility.
+
+    Raises:
+        EventSizeError:
+            when a size limit has been violated.
+
+            unpersistable=True if Synapse never would have accepted the event and
+                the PDU must NOT be persisted.
+
+            unpersistable=False if a prior version of Synapse would have accepted the
+                event and so the PDU must be persisted as rejected to avoid
+                breaking the room.
+    """
+
+    # Whole PDU check
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
-        raise EventSizeError("event too large")
+        raise EventSizeError("event too large", unpersistable=True)
+
+    # Codepoint size check: Synapse always enforced these limits, so apply
+    # them strictly.
+    if len(event.user_id) > 255:
+        raise EventSizeError("'user_id' too large", unpersistable=True)
+    if len(event.room_id) > 255:
+        raise EventSizeError("'room_id' too large", unpersistable=True)
+    if event.is_state() and len(event.state_key) > 255:
+        raise EventSizeError("'state_key' too large", unpersistable=True)
+    if len(event.type) > 255:
+        raise EventSizeError("'type' too large", unpersistable=True)
+    if len(event.event_id) > 255:
+        raise EventSizeError("'event_id' too large", unpersistable=True)
+
+    strict_byte_limits = (
+        event.room_version not in LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS
+    )
+
+    # Byte size check: if these fail, then be lenient to avoid breaking rooms.
+    if len(event.user_id.encode("utf-8")) > 255:
+        raise EventSizeError("'user_id' too large", unpersistable=strict_byte_limits)
+    if len(event.room_id.encode("utf-8")) > 255:
+        raise EventSizeError("'room_id' too large", unpersistable=strict_byte_limits)
+    if event.is_state() and len(event.state_key.encode("utf-8")) > 255:
+        raise EventSizeError("'state_key' too large", unpersistable=strict_byte_limits)
+    if len(event.type.encode("utf-8")) > 255:
+        raise EventSizeError("'type' too large", unpersistable=strict_byte_limits)
+    if len(event.event_id.encode("utf-8")) > 255:
+        raise EventSizeError("'event_id' too large", unpersistable=strict_byte_limits)
+
+
+def _check_create(event: "EventBase") -> None:
+    """Implementation of the auth rules for m.room.create events
+
+    Args:
+        event: The `m.room.create` event to be checked
+
+    Raises:
+        AuthError if the event does not pass the auth rules
+    """
+    assert event.type == EventTypes.Create
+
+    #  1.1 If it has any previous events, reject.
+    if event.prev_event_ids():
+        raise AuthError(403, "Create event has prev events")
+
+    # 1.2 If the domain of the room_id does not match the domain of the sender,
+    # reject.
+    sender_domain = get_domain_from_id(event.sender)
+    room_id_domain = get_domain_from_id(event.room_id)
+    if room_id_domain != sender_domain:
+        raise AuthError(403, "Creation event's room_id domain does not match sender's")
+
+    # 1.3 If content.room_version is present and is not a recognised version, reject
+    room_version_prop = event.content.get("room_version", "1")
+    if room_version_prop not in KNOWN_ROOM_VERSIONS:
+        raise AuthError(
+            403,
+            "room appears to have unsupported version %s" % (room_version_prop,),
+        )
+
+    # 1.4 If content has no creator field, reject if the room version requires it.
+    if (
+        not event.room_version.msc2175_implicit_room_creator
+        and EventContentFields.ROOM_CREATOR not in event.content
+    ):
+        raise AuthError(403, "Create event lacks a 'creator' property")
 
 
 def _can_federate(event: "EventBase", auth_events: StateMap["EventBase"]) -> bool:
@@ -308,7 +494,11 @@ def _is_membership_change_allowed(
         key = (EventTypes.Create, "")
         create = auth_events.get(key)
         if create and event.prev_event_ids()[0] == create.event_id:
-            if create.content["creator"] == event.state_key:
+            if room_version.msc2175_implicit_room_creator:
+                creator = create.sender
+            else:
+                creator = create.content[EventContentFields.ROOM_CREATOR]
+            if creator == event.state_key:
                 return
 
     target_user_id = event.state_key
@@ -387,7 +577,11 @@ def _is_membership_change_allowed(
             return
 
         if not caller_in_room:  # caller isn't joined
-            raise AuthError(403, "%s not in room %s." % (event.user_id, event.room_id))
+            raise UnstableSpecAuthError(
+                403,
+                "%s not in room %s." % (event.user_id, event.room_id),
+                errcode=Codes.NOT_JOINED,
+            )
 
     if Membership.INVITE == membership:
         # TODO (erikj): We should probably handle this more intelligently
@@ -397,10 +591,18 @@ def _is_membership_change_allowed(
         if target_banned:
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         elif target_in_room:  # the target is already in the room.
-            raise AuthError(403, "%s is already in the room." % target_user_id)
+            raise UnstableSpecAuthError(
+                403,
+                "%s is already in the room." % target_user_id,
+                errcode=Codes.ALREADY_JOINED,
+            )
         else:
             if user_level < invite_level:
-                raise AuthError(403, "You don't have permission to invite users")
+                raise UnstableSpecAuthError(
+                    403,
+                    "You don't have permission to invite users",
+                    errcode=Codes.INSUFFICIENT_POWER,
+                )
     elif Membership.JOIN == membership:
         # Joins are valid iff caller == target and:
         # * They are not banned.
@@ -414,7 +616,12 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED:
+        elif (
+            room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED
+        ) or (
+            room_version.msc3787_knock_restricted_join_rule
+            and join_rule == JoinRules.KNOCK_RESTRICTED
+        ):
             # This is the same as public, but the event must contain a reference
             # to the server who authorised the join. If the event does not contain
             # the proper content it is rejected.
@@ -440,8 +647,13 @@ def _is_membership_change_allowed(
                 if authorising_user_level < invite_level:
                     raise AuthError(403, "Join event authorised by invalid server.")
 
-        elif join_rule == JoinRules.INVITE or (
-            room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+        elif (
+            join_rule == JoinRules.INVITE
+            or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+            or (
+                room_version.msc3787_knock_restricted_join_rule
+                and join_rule == JoinRules.KNOCK_RESTRICTED
+            )
         ):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
@@ -452,22 +664,41 @@ def _is_membership_change_allowed(
     elif Membership.LEAVE == membership:
         # TODO (erikj): Implement kicks.
         if target_banned and user_level < ban_level:
-            raise AuthError(403, "You cannot unban user %s." % (target_user_id,))
+            raise UnstableSpecAuthError(
+                403,
+                "You cannot unban user %s." % (target_user_id,),
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
         elif target_user_id != event.user_id:
             kick_level = get_named_level(auth_events, "kick", 50)
 
             if user_level < kick_level or user_level <= target_level:
-                raise AuthError(403, "You cannot kick user %s." % target_user_id)
+                raise UnstableSpecAuthError(
+                    403,
+                    "You cannot kick user %s." % target_user_id,
+                    errcode=Codes.INSUFFICIENT_POWER,
+                )
     elif Membership.BAN == membership:
         if user_level < ban_level or user_level <= target_level:
-            raise AuthError(403, "You don't have permission to ban")
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to ban",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
     elif room_version.msc2403_knocking and Membership.KNOCK == membership:
-        if join_rule != JoinRules.KNOCK:
+        if join_rule != JoinRules.KNOCK and (
+            not room_version.msc3787_knock_restricted_join_rule
+            or join_rule != JoinRules.KNOCK_RESTRICTED
+        ):
             raise AuthError(403, "You don't have permission to knock")
         elif target_user_id != event.user_id:
             raise AuthError(403, "You cannot knock for other users")
         elif target_in_room:
-            raise AuthError(403, "You cannot knock on a room you are already in")
+            raise UnstableSpecAuthError(
+                403,
+                "You cannot knock on a room you are already in",
+                errcode=Codes.ALREADY_JOINED,
+            )
         elif caller_invited:
             raise AuthError(403, "You are already invited to this room")
         elif target_banned:
@@ -538,10 +769,11 @@ def _can_send_event(event: "EventBase", auth_events: StateMap["EventBase"]) -> b
     user_level = get_user_power_level(event.user_id, auth_events)
 
     if user_level < send_level:
-        raise AuthError(
+        raise UnstableSpecAuthError(
             403,
             "You don't have permission to post that to the room. "
             + "user_level (%d) < send_level (%d)" % (user_level, send_level),
+            errcode=Codes.INSUFFICIENT_POWER,
         )
 
     # Check state_key
@@ -561,7 +793,7 @@ def check_redaction(
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
-        True if the the sender is allowed to redact the target event if the
+        True if the sender is allowed to redact the target event if the
         target event was created by them.
         False if the sender is allowed to redact the target event with no
         further checks.
@@ -577,7 +809,7 @@ def check_redaction(
     if user_level >= redact_level:
         return False
 
-    if room_version_obj.event_format == EventFormatVersions.V1:
+    if room_version_obj.event_format == EventFormatVersions.ROOM_V1_V2:
         redacter_domain = get_domain_from_id(event.event_id)
         if not isinstance(event.redacts, str):
             return False
@@ -616,9 +848,10 @@ def check_historical(
     historical_level = get_named_level(auth_events, "historical", 100)
 
     if user_level < historical_level:
-        raise AuthError(
+        raise UnstableSpecAuthError(
             403,
             'You don\'t have permission to send send historical related events ("insertion", "batch", and "marker")',
+            errcode=Codes.INSUFFICIENT_POWER,
         )
 
 
@@ -639,6 +872,32 @@ def _check_power_levels(
             int(v)
         except Exception:
             raise SynapseError(400, "Not a valid power level: %s" % (v,))
+
+    # Reject events with stringy power levels if required by room version
+    if (
+        event.type == EventTypes.PowerLevels
+        and room_version_obj.msc3667_int_only_power_levels
+    ):
+        for k, v in event.content.items():
+            if k in {
+                "users_default",
+                "events_default",
+                "state_default",
+                "ban",
+                "redact",
+                "kick",
+                "invite",
+            }:
+                if type(v) is not int:
+                    raise SynapseError(400, f"{v!r} must be an integer.")
+            if k in {"events", "notifications", "users"}:
+                if not isinstance(v, collections.abc.Mapping) or not all(
+                    type(v) is int for v in v.values()
+                ):
+                    raise SynapseError(
+                        400,
+                        f"{v!r} must be a dict wherein all the values are integers.",
+                    )
 
     key = (event.type, event.state_key)
     current_state = auth_events.get(key)
@@ -752,10 +1011,14 @@ def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> in
         # that.
         key = (EventTypes.Create, "")
         create_event = auth_events.get(key)
-        if create_event is not None and create_event.content["creator"] == user_id:
-            return 100
-        else:
-            return 0
+        if create_event is not None:
+            if create_event.room_version.msc2175_implicit_room_creator:
+                creator = create_event.sender
+            else:
+                creator = create_event.content[EventContentFields.ROOM_CREATOR]
+            if creator == user_id:
+                return 100
+        return 0
 
 
 def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int) -> int:
@@ -791,10 +1054,15 @@ def _verify_third_party_invite(
     """
     if "third_party_invite" not in event.content:
         return False
-    if "signed" not in event.content["third_party_invite"]:
+    third_party_invite = event.content["third_party_invite"]
+    if not isinstance(third_party_invite, collections.abc.Mapping):
         return False
-    signed = event.content["third_party_invite"]["signed"]
-    for key in {"mxid", "token"}:
+    if "signed" not in third_party_invite:
+        return False
+    signed = third_party_invite["signed"]
+    if not isinstance(signed, collections.abc.Mapping):
+        return False
+    for key in {"mxid", "token", "signatures"}:
         if key not in signed:
             return False
 
@@ -812,8 +1080,6 @@ def _verify_third_party_invite(
 
     if signed["mxid"] != event.state_key:
         return False
-    if signed["token"] != token:
-        return False
 
     for public_key_object in get_public_keys(invite_event):
         public_key = public_key_object["public_key"]
@@ -825,7 +1091,9 @@ def _verify_third_party_invite(
                     verify_key = decode_verify_key_bytes(
                         key_name, decode_base64(public_key)
                     )
-                    verify_signed_json(signed, server, verify_key)
+                    # verify_signed_json incorrectly states it wants a dict, it
+                    # just needs a mapping.
+                    verify_signed_json(signed, server, verify_key)  # type: ignore[arg-type]
 
                     # We got the public key from the invite, so we know that the
                     # correct server signed the signed bundle.

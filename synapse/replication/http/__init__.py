@@ -25,6 +25,8 @@ from synapse.replication.http import (
     push,
     register,
     send_event,
+    send_events,
+    state,
     streams,
 )
 
@@ -42,12 +44,14 @@ class ReplicationRestResource(JsonResource):
 
     def register_servlets(self, hs: "HomeServer") -> None:
         send_event.register_servlets(hs, self)
+        send_events.register_servlets(hs, self)
         federation.register_servlets(hs, self)
         presence.register_servlets(hs, self)
         membership.register_servlets(hs, self)
         streams.register_servlets(hs, self)
         account_data.register_servlets(hs, self)
         push.register_servlets(hs, self)
+        state.register_servlets(hs, self)
 
         # The following can't currently be instantiated on workers.
         if hs.config.worker.worker_app is None:

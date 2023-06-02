@@ -61,7 +61,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         cas_response = CasResponse("test_user", {})
         request = _mock_request()
@@ -89,7 +89,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # Map a user via SSO.
         cas_response = CasResponse("test_user", {})
@@ -129,7 +129,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         cas_response = CasResponse("föö", {})
         request = _mock_request()
@@ -160,7 +160,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = simple_async_mock()
+        auth_handler.complete_sso_login = simple_async_mock()  # type: ignore[assignment]
 
         # The response doesn't have the proper userGroup or department.
         cas_response = CasResponse("test_user", {})
@@ -199,6 +199,18 @@ class CasHandlerTestCase(HomeserverTestCase):
         )
 
 
-def _mock_request():
+def _mock_request() -> Mock:
     """Returns a mock which will stand in as a SynapseRequest"""
-    return Mock(spec=["getClientIP", "getHeader", "_disconnected"])
+    mock = Mock(
+        spec=[
+            "finish",
+            "getClientAddress",
+            "getHeader",
+            "setHeader",
+            "setResponseCode",
+            "write",
+        ]
+    )
+    # `_disconnected` musn't be another `Mock`, otherwise it will be truthy.
+    mock._disconnected = False
+    return mock

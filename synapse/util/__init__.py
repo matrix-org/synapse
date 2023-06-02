@@ -15,10 +15,12 @@
 import json
 import logging
 import typing
-from typing import Any, Callable, Dict, Generator, Optional
+from typing import Any, Callable, Dict, Generator, Optional, Sequence
 
 import attr
-from frozendict import frozendict
+from immutabledict import immutabledict
+from matrix_common.versionstring import get_distribution_version_string
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer, task
 from twisted.internet.defer import Deferred
@@ -39,22 +41,18 @@ def _reject_invalid_json(val: Any) -> None:
     raise ValueError("Invalid JSON value: '%s'" % val)
 
 
-def _handle_frozendict(obj: Any) -> Dict[Any, Any]:
-    """Helper for json_encoder. Makes frozendicts serializable by returning
+def _handle_immutabledict(obj: Any) -> Dict[Any, Any]:
+    """Helper for json_encoder. Makes immutabledicts serializable by returning
     the underlying dict
     """
-    if type(obj) is frozendict:
+    if type(obj) is immutabledict:
         # fishing the protected dict out of the object is a bit nasty,
         # but we don't really want the overhead of copying the dict.
         try:
             # Safety: we catch the AttributeError immediately below.
-            # See https://github.com/matrix-org/python-canonicaljson/issues/36#issuecomment-927816293
-            # for discussion on how frozendict's internals have changed over time.
-            return obj._dict  # type: ignore[attr-defined]
+            return obj._dict
         except AttributeError:
-            # When the C implementation of frozendict is used,
-            # there isn't a `_dict` attribute with a dict
-            # so we resort to making a copy of the frozendict
+            # If all else fails, resort to making a copy of the immutabledict
             return dict(obj)
     raise TypeError(
         "Object of type %s is not JSON serializable" % obj.__class__.__name__
@@ -62,11 +60,11 @@ def _handle_frozendict(obj: Any) -> Dict[Any, Any]:
 
 
 # A custom JSON encoder which:
-#   * handles frozendicts
+#   * handles immutabledicts
 #   * produces valid JSON (no NaNs etc)
 #   * reduces redundant whitespace
 json_encoder = json.JSONEncoder(
-    allow_nan=False, separators=(",", ":"), default=_handle_frozendict
+    allow_nan=False, separators=(",", ":"), default=_handle_immutabledict
 )
 
 # Create a custom decoder to reject Python extensions to JSON.
@@ -78,7 +76,10 @@ def unwrapFirstError(failure: Failure) -> Failure:
     # the subFailure's value, which will do a better job of preserving stacktraces.
     # (actually, you probably want to use yieldable_gather_results anyway)
     failure.trap(defer.FirstError)
-    return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
+    return failure.value.subFailure
+
+
+P = ParamSpec("P")
 
 
 @attr.s(slots=True)
@@ -109,7 +110,7 @@ class Clock:
         return int(self.time() * 1000)
 
     def looping_call(
-        self, f: Callable, msec: float, *args: Any, **kwargs: Any
+        self, f: Callable[P, object], msec: float, *args: P.args, **kwargs: P.kwargs
     ) -> LoopingCall:
         """Call a function repeatedly.
 
@@ -177,9 +178,26 @@ def log_failure(
     """
 
     logger.error(
-        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())  # type: ignore[arg-type]
+        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())
     )
 
     if not consumeErrors:
         return failure
     return None
+
+
+# Version string with git info. Computed here once so that we don't invoke git multiple
+# times.
+SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse", __file__)
+
+
+class ExceptionBundle(Exception):
+    # A poor stand-in for something like Python 3.11's ExceptionGroup.
+    # (A backport called `exceptiongroup` exists but seems overkill: we just want a
+    # container type here.)
+    def __init__(self, message: str, exceptions: Sequence[Exception]):
+        parts = [message]
+        for e in exceptions:
+            parts.append(str(e))
+        super().__init__("\n  - ".join(parts))
+        self.exceptions = exceptions

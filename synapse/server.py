@@ -21,17 +21,9 @@
 import abc
 import functools
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, TypeVar, cast
+
+from typing_extensions import TypeAlias
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
@@ -39,6 +31,8 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
+from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
@@ -49,8 +43,6 @@ from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.presence_router import PresenceRouter
-from synapse.events.spamcheck import SpamChecker
-from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
@@ -60,14 +52,12 @@ from synapse.federation.federation_server import (
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
-from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
-from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers.account import AccountHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler, MacaroonGenerator, PasswordAuthProvider
+from synapse.handlers.auth import AuthHandler, PasswordAuthProvider
 from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
@@ -79,7 +69,6 @@ from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.federation_event import FederationEventHandler
-from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
@@ -91,6 +80,7 @@ from synapse.handlers.presence import (
     WorkerPresenceHandler,
 )
 from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.push_rules import PushRulesHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
@@ -103,7 +93,11 @@ from synapse.handlers.room import (
 )
 from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
+from synapse.handlers.room_member import (
+    RoomForgetterHandler,
+    RoomMemberHandler,
+    RoomMemberMasterHandler,
+)
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
@@ -114,32 +108,38 @@ from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
-from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
+from synapse.http.client import (
+    InsecureInterceptableContextFactory,
+    ReplicationClient,
+    SimpleHttpClient,
+)
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.media.media_repository import MediaRepository
+from synapse.metrics.common_usage_metrics import CommonUsageMetricsManager
 from synapse.module_api import ModuleApi
-from synapse.notifier import Notifier
-from synapse.push.action_generator import ActionGenerator
+from synapse.module_api.callbacks import ModuleApiCallbacks
+from synapse.notifier import Notifier, ReplicationNotifier
+from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
-from synapse.rest.media.v1.media_repository import (
-    MediaRepository,
-    MediaRepositoryResource,
-)
+from synapse.rest.media.media_repository_resource import MediaRepositoryResource
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import Databases, Storage
+from synapse.storage import Databases
+from synapse.storage.controllers import StorageControllers
 from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.util.macaroons import MacaroonGenerator
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 
@@ -148,14 +148,36 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from txredisapi import ConnectionHandler
 
+    from synapse.handlers.jwt import JwtHandler
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
 
 
-T = TypeVar("T", bound=Callable[..., Any])
+# The annotation for `cache_in_self` used to be
+#     def (builder: Callable[["HomeServer"],T]) -> Callable[["HomeServer"],T]
+# which mypy was happy with.
+#
+# But PyCharm was confused by this. If `foo` was decorated by `@cache_in_self`, then
+# an expression like `hs.foo()`
+#
+# - would erroneously warn that we hadn't provided a `hs` argument to foo (PyCharm
+#   confused about boundmethods and unbound methods?), and
+# - would be considered to have type `Any`, making for a poor autocomplete and
+#   cross-referencing experience.
+#
+# Instead, use a typevar `F` to express that `@cache_in_self` returns exactly the
+# same type it receives. This isn't strictly true [*], but it's more than good
+# enough to keep PyCharm and mypy happy.
+#
+# [*]: (e.g. `builder` could be an object with a __call__ attribute rather than a
+#      types.FunctionType instance, whereas the return value is always a
+#      types.FunctionType instance.)
+
+T: TypeAlias = object
+F = TypeVar("F", bound=Callable[["HomeServer"], T])
 
 
-def cache_in_self(builder: T) -> T:
+def cache_in_self(builder: F) -> F:
     """Wraps a function called e.g. `get_foo`, checking if `self.foo` exists and
     returning if so. If not, calls the given function and sets `self.foo` to it.
 
@@ -174,7 +196,7 @@ def cache_in_self(builder: T) -> T:
     building = [False]
 
     @functools.wraps(builder)
-    def _get(self):
+    def _get(self: "HomeServer") -> T:
         try:
             return getattr(self, depname)
         except AttributeError:
@@ -193,9 +215,7 @@ def cache_in_self(builder: T) -> T:
 
         return dep
 
-    # We cast here as we need to tell mypy that `_get` has the same signature as
-    # `builder`.
-    return cast(T, _get)
+    return cast(F, _get)
 
 
 class HomeServer(metaclass=abc.ABCMeta):
@@ -221,6 +241,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         "message",
         "pagination",
         "profile",
+        "room_forgetter",
         "stats",
     ]
 
@@ -228,8 +249,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastores()
     DATASTORE_CLASS = abc.abstractproperty()
-
-    tls_server_context_factory: Optional[IOpenSSLContextFactory]
 
     def __init__(
         self,
@@ -265,6 +284,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
+
+        # This attribute is set by the free function `refresh_certificate`.
+        self.tls_server_context_factory: Optional[IOpenSSLContextFactory] = None
 
     def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
@@ -323,7 +345,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
-    def start_listening(self) -> None:
+    def start_listening(self) -> None:  # noqa: B027 (no-op by design)
         """Start the HTTP, manhole, metrics, etc listeners
 
         Does nothing in this base class; overridden in derived classes to start the
@@ -349,7 +371,21 @@ class HomeServer(metaclass=abc.ABCMeta):
         return domain_specific_string.domain == self.hostname
 
     def is_mine_id(self, string: str) -> bool:
-        return string.split(":", 1)[1] == self.hostname
+        """Determines whether a user ID or room alias originates from this homeserver.
+
+        Returns:
+            `True` if the hostname part of the user ID or room alias matches this
+            homeserver.
+            `False` otherwise, or if the user ID or room alias is malformed.
+        """
+        localpart_hostname = string.split(":", 1)
+        if len(localpart_hostname) < 2:
+            return False
+        return localpart_hostname[1] == self.hostname
+
+    def is_mine_server_name(self, server_name: str) -> bool:
+        """Determines whether a server name refers to this homeserver."""
+        return server_name == self.hostname
 
     @cache_in_self
     def get_clock(self) -> Clock:
@@ -387,8 +423,20 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Notifier(self)
 
     @cache_in_self
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
+
+    @cache_in_self
     def get_auth(self) -> Auth:
-        return Auth(self)
+        if self.config.experimental.msc3861.enabled:
+            from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
+
+            return MSC3861DelegatedAuth(self)
+        return InternalAuth(self)
+
+    @cache_in_self
+    def get_auth_blocking(self) -> AuthBlocking:
+        return AuthBlocking(self)
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
@@ -411,15 +459,15 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
-    def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
+    def get_proxied_blocklisted_http_client(self) -> SimpleHttpClient:
         """
-        An HTTP client that uses configured HTTP(S) proxies and blacklists IPs
-        based on the IP range blacklist/whitelist.
+        An HTTP client that uses configured HTTP(S) proxies and blocks IPs
+        based on the configured IP ranges.
         """
         return SimpleHttpClient(
             self,
-            ip_whitelist=self.config.server.ip_range_whitelist,
-            ip_blacklist=self.config.server.ip_range_blacklist,
+            ip_allowlist=self.config.server.ip_range_allowlist,
+            ip_blocklist=self.config.server.ip_range_blocklist,
             use_proxy=True,
         )
 
@@ -432,6 +480,13 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config
         )
         return MatrixFederationHttpClient(self, tls_client_options_factory)
+
+    @cache_in_self
+    def get_replication_client(self) -> ReplicationClient:
+        """
+        An HTTP client for HTTP replication.
+        """
+        return ReplicationClient(self)
 
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
@@ -485,6 +540,12 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SsoHandler(self)
 
     @cache_in_self
+    def get_jwt_handler(self) -> "JwtHandler":
+        from synapse.handlers.jwt import JwtHandler
+
+        return JwtHandler(self)
+
+    @cache_in_self
     def get_sync_handler(self) -> SyncHandler:
         return SyncHandler(self)
 
@@ -498,10 +559,12 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_macaroon_generator(self) -> MacaroonGenerator:
-        return MacaroonGenerator(self)
+        return MacaroonGenerator(
+            self.get_clock(), self.hostname, self.config.key.macaroon_secret_key
+        )
 
     @cache_in_self
-    def get_device_handler(self):
+    def get_device_handler(self) -> DeviceWorkerHandler:
         if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
@@ -643,48 +706,16 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ReplicationCommandHandler(self)
 
     @cache_in_self
-    def get_action_generator(self) -> ActionGenerator:
-        return ActionGenerator(self)
+    def get_bulk_push_rule_evaluator(self) -> BulkPushRuleEvaluator:
+        return BulkPushRuleEvaluator(self)
 
     @cache_in_self
     def get_user_directory_handler(self) -> UserDirectoryHandler:
         return UserDirectoryHandler(self)
 
     @cache_in_self
-    def get_groups_local_handler(
-        self,
-    ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
-        if self.config.worker.worker_app:
-            return GroupsLocalWorkerHandler(self)
-        else:
-            return GroupsLocalHandler(self)
-
-    @cache_in_self
-    def get_groups_server_handler(self):
-        if self.config.worker.worker_app:
-            return GroupsServerWorkerHandler(self)
-        else:
-            return GroupsServerHandler(self)
-
-    @cache_in_self
-    def get_groups_attestation_signing(self) -> GroupAttestationSigning:
-        return GroupAttestationSigning(self)
-
-    @cache_in_self
-    def get_groups_attestation_renewer(self) -> GroupAttestionRenewer:
-        return GroupAttestionRenewer(self)
-
-    @cache_in_self
     def get_stats_handler(self) -> StatsHandler:
         return StatsHandler(self)
-
-    @cache_in_self
-    def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker()
-
-    @cache_in_self
-    def get_third_party_event_rules(self) -> ThirdPartyEventRules:
-        return ThirdPartyEventRules(self)
 
     @cache_in_self
     def get_password_auth_provider(self) -> PasswordAuthProvider:
@@ -758,15 +789,17 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(
+            msc3970_enabled=self.config.experimental.msc3970_enabled
+        )
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
         return PasswordPolicyHandler(self)
 
     @cache_in_self
-    def get_storage(self) -> Storage:
-        return Storage(self, self.get_datastores())
+    def get_storage_controllers(self) -> StorageControllers:
+        return StorageControllers(self, self.get_datastores())
 
     @cache_in_self
     def get_replication_streamer(self) -> ReplicationStreamer:
@@ -783,12 +816,18 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
         return FederationRateLimiter(
-            self.get_clock(), config=self.config.ratelimiting.rc_federation
+            self.get_clock(),
+            config=self.config.ratelimiting.rc_federation,
+            metrics_name="federation_servlets",
         )
 
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
         return ModuleApi(self, self.get_auth_handler())
+
+    @cache_in_self
+    def get_module_api_callbacks(self) -> ModuleApiCallbacks:
+        return ModuleApiCallbacks(self)
 
     @cache_in_self
     def get_account_data_handler(self) -> AccountDataHandler:
@@ -811,6 +850,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountHandler(self)
 
     @cache_in_self
+    def get_push_rules_handler(self) -> PushRulesHandler:
+        return PushRulesHandler(self)
+
+    @cache_in_self
+    def get_room_forgetter_handler(self) -> RoomForgetterHandler:
+        return RoomForgetterHandler(self)
+
+    @cache_in_self
     def get_outbound_redis_connection(self) -> "ConnectionHandler":
         """
         The Redis connection used for replication.
@@ -822,21 +869,36 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         # We only want to import redis module if we're using it, as we have
         # `txredisapi` as an optional dependency.
-        from synapse.replication.tcp.redis import lazyConnection
+        from synapse.replication.tcp.redis import lazyConnection, lazyUnixConnection
 
-        logger.info(
-            "Connecting to redis (host=%r port=%r) for external cache",
-            self.config.redis.redis_host,
-            self.config.redis.redis_port,
-        )
+        if self.config.redis.redis_path is None:
+            logger.info(
+                "Connecting to redis (host=%r port=%r) for external cache",
+                self.config.redis.redis_host,
+                self.config.redis.redis_port,
+            )
 
-        return lazyConnection(
-            hs=self,
-            host=self.config.redis.redis_host,
-            port=self.config.redis.redis_port,
-            password=self.config.redis.redis_password,
-            reconnect=True,
-        )
+            return lazyConnection(
+                hs=self,
+                host=self.config.redis.redis_host,
+                port=self.config.redis.redis_port,
+                dbid=self.config.redis.redis_dbid,
+                password=self.config.redis.redis_password,
+                reconnect=True,
+            )
+        else:
+            logger.info(
+                "Connecting to redis (path=%r) for external cache",
+                self.config.redis.redis_path,
+            )
+
+            return lazyUnixConnection(
+                hs=self,
+                path=self.config.redis.redis_path,
+                dbid=self.config.redis.redis_dbid,
+                password=self.config.redis.redis_password,
+                reconnect=True,
+            )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
@@ -850,3 +912,8 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,
         )
+
+    @cache_in_self
+    def get_common_usage_metrics_manager(self) -> CommonUsageMetricsManager:
+        """Usage metrics shared between phone home stats and the prometheus exporter."""
+        return CommonUsageMetricsManager(self)

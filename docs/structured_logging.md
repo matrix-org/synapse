@@ -43,7 +43,7 @@ loggers:
 The above logging config will set Synapse as 'INFO' logging level by default,
 with the SQL layer at 'WARNING', and will log to a file, stored as JSON.
 
-It is also possible to figure Synapse to log to a remote endpoint by using the
+It is also possible to configure Synapse to log to a remote endpoint by using the
 `synapse.logging.RemoteHandler` class included with Synapse. It takes the
 following arguments:
 

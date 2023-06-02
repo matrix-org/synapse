@@ -14,33 +14,45 @@
 # limitations under the License.
 
 import argparse
-from typing import Any, List, Union
+import logging
+from typing import Any, Dict, List, Union
 
 import attr
+from pydantic import BaseModel, Extra, StrictBool, StrictInt, StrictStr
 
-from synapse.types import JsonDict
-
-from ._base import (
+from synapse.config._base import (
     Config,
     ConfigError,
     RoutableShardedWorkerHandlingConfig,
     ShardedWorkerHandlingConfig,
 )
-from .server import ListenerConfig, parse_listener_def
+from synapse.config._util import parse_and_validate_mapping
+from synapse.config.server import (
+    DIRECT_TCP_ERROR,
+    TCPListenerConfig,
+    parse_listener_def,
+)
+from synapse.types import JsonDict
 
-_FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR = """
-The send_federation config option must be disabled in the main
-synapse process before they can be run in a separate worker.
-
-Please add ``send_federation: false`` to the main config
+_DEPRECATED_WORKER_DUTY_OPTION_USED = """
+The '%s' configuration option is deprecated and will be removed in a future
+Synapse version. Please use ``%s: name_of_worker`` instead.
 """
 
-_PUSHER_WITH_START_PUSHERS_ENABLED_ERROR = """
-The start_pushers config option must be disabled in the main
-synapse process before they can be run in a separate worker.
-
-Please add ``start_pushers: false`` to the main config
+_MISSING_MAIN_PROCESS_INSTANCE_MAP_DATA = """
+Missing data for a worker to connect to main process. Please include '%s' in the
+`instance_map` declared in your shared yaml configuration, or optionally(as a deprecated
+solution) in every worker's yaml as various `worker_replication_*` settings as defined
+in workers documentation here:
+`https://matrix-org.github.io/synapse/latest/workers.html#worker-configuration`
 """
+# This allows for a handy knob when it's time to change from 'master' to
+# something with less 'history'
+MAIN_PROCESS_INSTANCE_NAME = "master"
+# Use this to adjust what the main process is known as in the yaml instance_map
+MAIN_PROCESS_INSTANCE_MAP_NAME = "main"
+
+logger = logging.getLogger(__name__)
 
 
 def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
@@ -53,12 +65,43 @@ def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
     return obj
 
 
-@attr.s(auto_attribs=True)
-class InstanceLocationConfig:
+class ConfigModel(BaseModel):
+    """A custom version of Pydantic's BaseModel which
+
+     - ignores unknown fields and
+     - does not allow fields to be overwritten after construction,
+
+    but otherwise uses Pydantic's default behaviour.
+
+    For now, ignore unknown fields. In the future, we could change this so that unknown
+    config values cause a ValidationError, provided the error messages are meaningful to
+    server operators.
+
+    Subclassing in this way is recommended by
+    https://pydantic-docs.helpmanual.io/usage/model_config/#change-behaviour-globally
+    """
+
+    class Config:
+        # By default, ignore fields that we don't recognise.
+        extra = Extra.ignore
+        # By default, don't allow fields to be reassigned after parsing.
+        allow_mutation = False
+
+
+class InstanceLocationConfig(ConfigModel):
     """The host and port to talk to an instance via HTTP replication."""
 
-    host: str
-    port: int
+    host: StrictStr
+    port: StrictInt
+    tls: StrictBool = False
+
+    def scheme(self) -> str:
+        """Hardcode a retrievable scheme based on self.tls"""
+        return "https" if self.tls else "http"
+
+    def netloc(self) -> str:
+        """Nicely format the network location data"""
+        return f"{self.host}:{self.port}"
 
 
 @attr.s
@@ -120,7 +163,8 @@ class WorkerConfig(Config):
             self.worker_app = None
 
         self.worker_listeners = [
-            parse_listener_def(x) for x in config.get("worker_listeners", [])
+            parse_listener_def(i, x)
+            for i, x in enumerate(config.get("worker_listeners", []))
         ]
         self.worker_daemonize = bool(config.get("worker_daemonize"))
         self.worker_pid_file = config.get("worker_pid_file")
@@ -130,79 +174,97 @@ class WorkerConfig(Config):
             raise ConfigError("worker_log_config must be a string")
         self.worker_log_config = worker_log_config
 
-        # The host used to connect to the main synapse
-        self.worker_replication_host = config.get("worker_replication_host", None)
-
         # The port on the main synapse for TCP replication
-        self.worker_replication_port = config.get("worker_replication_port", None)
-
-        # The port on the main synapse for HTTP replication endpoint
-        self.worker_replication_http_port = config.get("worker_replication_http_port")
+        if "worker_replication_port" in config:
+            raise ConfigError(DIRECT_TCP_ERROR, ("worker_replication_port",))
 
         # The shared secret used for authentication when connecting to the main synapse.
         self.worker_replication_secret = config.get("worker_replication_secret", None)
 
         self.worker_name = config.get("worker_name", self.worker_app)
-        self.instance_name = self.worker_name or "master"
+        self.instance_name = self.worker_name or MAIN_PROCESS_INSTANCE_NAME
 
+        # FIXME: Remove this check after a suitable amount of time.
         self.worker_main_http_uri = config.get("worker_main_http_uri", None)
+        if self.worker_main_http_uri is not None:
+            logger.warning(
+                "The config option worker_main_http_uri is unused since Synapse 1.73. "
+                "It can be safely removed from your configuration."
+            )
 
         # This option is really only here to support `--manhole` command line
         # argument.
         manhole = config.get("worker_manhole")
         if manhole:
             self.worker_listeners.append(
-                ListenerConfig(
+                TCPListenerConfig(
                     port=manhole,
                     bind_addresses=["127.0.0.1"],
                     type="manhole",
                 )
             )
 
-        # Handle federation sender configuration.
-        #
-        # There are two ways of configuring which instances handle federation
-        # sending:
-        #   1. The old way where "send_federation" is set to false and running a
-        #      `synapse.app.federation_sender` worker app.
-        #   2. Specifying the workers sending federation in
-        #      `federation_sender_instances`.
-        #
-
-        send_federation = config.get("send_federation", True)
-
-        federation_sender_instances = config.get("federation_sender_instances")
-        if federation_sender_instances is None:
-            # Default to an empty list, which means "another, unknown, worker is
-            # responsible for it".
-            federation_sender_instances = []
-
-            # If no federation sender instances are set we check if
-            # `send_federation` is set, which means use master
-            if send_federation:
-                federation_sender_instances = ["master"]
-
-            if self.worker_app == "synapse.app.federation_sender":
-                if send_federation:
-                    # If we're running federation senders, and not using
-                    # `federation_sender_instances`, then we should have
-                    # explicitly set `send_federation` to false.
-                    raise ConfigError(
-                        _FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR
-                    )
-
-                federation_sender_instances = [self.worker_name]
-
+        federation_sender_instances = self._worker_names_performing_this_duty(
+            config,
+            "send_federation",
+            "synapse.app.federation_sender",
+            "federation_sender_instances",
+        )
         self.send_federation = self.instance_name in federation_sender_instances
         self.federation_shard_config = ShardedWorkerHandlingConfig(
             federation_sender_instances
         )
 
         # A map from instance name to host/port of their HTTP replication endpoint.
-        instance_map = config.get("instance_map") or {}
-        self.instance_map = {
-            name: InstanceLocationConfig(**c) for name, c in instance_map.items()
-        }
+        # Check if the main process is declared. Inject it into the map if it's not,
+        # based first on if a 'main' block is declared then on 'worker_replication_*'
+        # data. If both are available, default to instance_map. The main process
+        # itself doesn't need this data as it would never have to talk to itself.
+        instance_map: Dict[str, Any] = config.get("instance_map", {})
+
+        if self.instance_name is not MAIN_PROCESS_INSTANCE_NAME:
+            # The host used to connect to the main synapse
+            main_host = config.get("worker_replication_host", None)
+
+            # The port on the main synapse for HTTP replication endpoint
+            main_port = config.get("worker_replication_http_port")
+
+            # The tls mode on the main synapse for HTTP replication endpoint.
+            # For backward compatibility this defaults to False.
+            main_tls = config.get("worker_replication_http_tls", False)
+
+            # For now, accept 'main' in the instance_map, but the replication system
+            # expects 'master', force that into being until it's changed later.
+            if MAIN_PROCESS_INSTANCE_MAP_NAME in instance_map:
+                instance_map[MAIN_PROCESS_INSTANCE_NAME] = instance_map[
+                    MAIN_PROCESS_INSTANCE_MAP_NAME
+                ]
+                del instance_map[MAIN_PROCESS_INSTANCE_MAP_NAME]
+
+            # This is the backwards compatibility bit that handles the
+            # worker_replication_* bits using setdefault() to not overwrite anything.
+            elif main_host is not None and main_port is not None:
+                instance_map.setdefault(
+                    MAIN_PROCESS_INSTANCE_NAME,
+                    {
+                        "host": main_host,
+                        "port": main_port,
+                        "tls": main_tls,
+                    },
+                )
+
+            else:
+                # If we've gotten here, it means that the main process is not on the
+                # instance_map and that not enough worker_replication_* variables
+                # were declared in the worker's yaml.
+                raise ConfigError(
+                    _MISSING_MAIN_PROCESS_INSTANCE_MAP_DATA
+                    % MAIN_PROCESS_INSTANCE_MAP_NAME
+                )
+
+        self.instance_map: Dict[
+            str, InstanceLocationConfig
+        ] = parse_and_validate_mapping(instance_map, InstanceLocationConfig)
 
         # Map from type of streams to source, c.f. WriterLocations.
         writers = config.get("stream_writers") or {}
@@ -259,27 +321,12 @@ class WorkerConfig(Config):
         )
 
         # Handle sharded push
-        start_pushers = config.get("start_pushers", True)
-        pusher_instances = config.get("pusher_instances")
-        if pusher_instances is None:
-            # Default to an empty list, which means "another, unknown, worker is
-            # responsible for it".
-            pusher_instances = []
-
-            # If no pushers instances are set we check if `start_pushers` is
-            # set, which means use master
-            if start_pushers:
-                pusher_instances = ["master"]
-
-            if self.worker_app == "synapse.app.pusher":
-                if start_pushers:
-                    # If we're running pushers, and not using
-                    # `pusher_instances`, then we should have explicitly set
-                    # `start_pushers` to false.
-                    raise ConfigError(_PUSHER_WITH_START_PUSHERS_ENABLED_ERROR)
-
-                pusher_instances = [self.instance_name]
-
+        pusher_instances = self._worker_names_performing_this_duty(
+            config,
+            "start_pushers",
+            "synapse.app.pusher",
+            "pusher_instances",
+        )
         self.start_pushers = self.instance_name in pusher_instances
         self.pusher_shard_config = ShardedWorkerHandlingConfig(pusher_instances)
 
@@ -296,54 +343,169 @@ class WorkerConfig(Config):
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
 
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        ## Workers ##
+        self.should_notify_appservices = self._should_this_worker_perform_duty(
+            config,
+            legacy_master_option_name="notify_appservices",
+            legacy_worker_app_name="synapse.app.appservice",
+            new_option_name="notify_appservices_from_worker",
+        )
 
-        # Disables sending of outbound federation transactions on the main process.
-        # Uncomment if using a federation sender worker.
-        #
-        #send_federation: false
+        self.should_update_user_directory = self._should_this_worker_perform_duty(
+            config,
+            legacy_master_option_name="update_user_directory",
+            legacy_worker_app_name="synapse.app.user_dir",
+            new_option_name="update_user_directory_from_worker",
+        )
 
-        # It is possible to run multiple federation sender workers, in which case the
-        # work is balanced across them.
-        #
-        # This configuration must be shared between all federation sender workers, and if
-        # changed all federation sender workers must be stopped at the same time and then
-        # started, to ensure that all instances are running with the same config (otherwise
-        # events may be dropped).
-        #
-        #federation_sender_instances:
-        #  - federation_sender1
-
-        # When using workers this should be a map from `worker_name` to the
-        # HTTP replication listener of the worker, if configured.
-        #
-        #instance_map:
-        #  worker1:
-        #    host: localhost
-        #    port: 8034
-
-        # Experimental: When using workers you can define which workers should
-        # handle event persistence and typing notifications. Any worker
-        # specified here must also be in the `instance_map`.
-        #
-        #stream_writers:
-        #  events: worker1
-        #  typing: worker1
-
-        # The worker that is used to run background tasks (e.g. cleaning up expired
-        # data). If not provided this defaults to the main process.
-        #
-        #run_background_tasks_on: worker1
-
-        # A shared secret used by the replication APIs to authenticate HTTP requests
-        # from workers.
-        #
-        # By default this is unused and traffic is not authenticated.
-        #
-        #worker_replication_secret: ""
+    def _should_this_worker_perform_duty(
+        self,
+        config: Dict[str, Any],
+        legacy_master_option_name: str,
+        legacy_worker_app_name: str,
+        new_option_name: str,
+    ) -> bool:
         """
+        Figures out whether this worker should perform a certain duty.
+
+        This function is temporary and is only to deal with the complexity
+        of allowing old, transitional and new configurations all at once.
+
+        Contradictions between the legacy and new part of a transitional configuration
+        will lead to a ConfigError.
+
+        Parameters:
+            config: The config dictionary
+            legacy_master_option_name: The name of a legacy option, whose value is boolean,
+                specifying whether it's the master that should handle a certain duty.
+                e.g. "notify_appservices"
+            legacy_worker_app_name: The name of a legacy Synapse worker application
+                that would traditionally perform this duty.
+                e.g. "synapse.app.appservice"
+            new_option_name: The name of the new option, whose value is the name of a
+                designated worker to perform the duty.
+                e.g. "notify_appservices_from_worker"
+        """
+
+        # None means 'unspecified'; True means 'run here' and False means
+        # 'don't run here'.
+        new_option_should_run_here = None
+        if new_option_name in config:
+            designated_worker = config[new_option_name] or "master"
+            new_option_should_run_here = (
+                designated_worker == "master" and self.worker_name is None
+            ) or designated_worker == self.worker_name
+
+        legacy_option_should_run_here = None
+        if legacy_master_option_name in config:
+            run_on_master = bool(config[legacy_master_option_name])
+
+            legacy_option_should_run_here = (
+                self.worker_name is None and run_on_master
+            ) or (self.worker_app == legacy_worker_app_name and not run_on_master)
+
+            # Suggest using the new option instead.
+            logger.warning(
+                _DEPRECATED_WORKER_DUTY_OPTION_USED,
+                legacy_master_option_name,
+                new_option_name,
+            )
+
+        if self.worker_app == legacy_worker_app_name and config.get(
+            legacy_master_option_name, True
+        ):
+            # As an extra bit of complication, we need to check that the
+            # specialised worker is only used if the legacy config says the
+            # master isn't performing the duties.
+            raise ConfigError(
+                f"Cannot use deprecated worker app type '{legacy_worker_app_name}' whilst deprecated option '{legacy_master_option_name}' is not set to false.\n"
+                f"Consider setting `worker_app: synapse.app.generic_worker` and using the '{new_option_name}' option instead.\n"
+                f"The '{new_option_name}' option replaces '{legacy_master_option_name}'."
+            )
+
+        if new_option_should_run_here is None and legacy_option_should_run_here is None:
+            # Neither option specified; the fallback behaviour is to run on the main process
+            return self.worker_name is None
+
+        if (
+            new_option_should_run_here is not None
+            and legacy_option_should_run_here is not None
+        ):
+            # Both options specified; ensure they match!
+            if new_option_should_run_here != legacy_option_should_run_here:
+                update_worker_type = (
+                    " and set worker_app: synapse.app.generic_worker"
+                    if self.worker_app == legacy_worker_app_name
+                    else ""
+                )
+                # If the values conflict, we suggest the admin removes the legacy option
+                # for simplicity.
+                raise ConfigError(
+                    f"Conflicting configuration options: {legacy_master_option_name} (legacy), {new_option_name} (new).\n"
+                    f"Suggestion: remove {legacy_master_option_name}{update_worker_type}.\n"
+                )
+
+        # We've already validated that these aren't conflicting; now just see if
+        # either is True.
+        # (By this point, these are either the same value or only one is not None.)
+        return bool(new_option_should_run_here or legacy_option_should_run_here)
+
+    def _worker_names_performing_this_duty(
+        self,
+        config: Dict[str, Any],
+        legacy_option_name: str,
+        legacy_app_name: str,
+        modern_instance_list_name: str,
+    ) -> List[str]:
+        """
+        Retrieves the names of the workers handling a given duty, by either legacy
+        option or instance list.
+
+        There are two ways of configuring which instances handle a given duty, e.g.
+        for configuring pushers:
+
+        1. The old way where "start_pushers" is set to false and running a
+          `synapse.app.pusher'` worker app.
+        2. Specifying the workers sending federation in `pusher_instances`.
+
+        Args:
+            config: settings read from yaml.
+            legacy_option_name: the old way of enabling options. e.g. 'start_pushers'
+            legacy_app_name: The historical app name. e.g. 'synapse.app.pusher'
+            modern_instance_list_name: the string name of the new instance_list. e.g.
+            'pusher_instances'
+
+        Returns:
+            A list of worker instance names handling the given duty.
+        """
+
+        legacy_option = config.get(legacy_option_name, True)
+
+        worker_instances = config.get(modern_instance_list_name)
+        if worker_instances is None:
+            # Default to an empty list, which means "another, unknown, worker is
+            # responsible for it".
+            worker_instances = []
+
+            # If no worker instances are set we check if the legacy option
+            # is set, which means use the main process.
+            if legacy_option:
+                worker_instances = ["master"]
+
+            if self.worker_app == legacy_app_name:
+                if legacy_option:
+                    # If we're using `legacy_app_name`, and not using
+                    # `modern_instance_list_name`, then we should have
+                    # explicitly set `legacy_option_name` to false.
+                    raise ConfigError(
+                        f"The '{legacy_option_name}' config option must be disabled in "
+                        "the main synapse process before they can be run in a separate "
+                        "worker.\n"
+                        f"Please add `{legacy_option_name}: false` to the main config.\n",
+                    )
+
+                worker_instances = [self.worker_name]
+
+        return worker_instances
 
     def read_arguments(self, args: argparse.Namespace) -> None:
         # We support a bunch of command line arguments that override options in

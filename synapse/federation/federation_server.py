@@ -23,6 +23,7 @@ from typing import (
     Collection,
     Dict,
     List,
+    Mapping,
     Optional,
     Tuple,
     Union,
@@ -34,13 +35,20 @@ from prometheus_client import Counter, Gauge, Histogram
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EduTypes, EventContentFields, EventTypes, Membership
+from synapse.api.constants import (
+    Direction,
+    EduTypes,
+    EventContentFields,
+    EventTypes,
+    Membership,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
     FederationError,
     IncompatibleRoomVersionError,
     NotFoundError,
+    PartialStateConflictError,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -48,7 +56,11 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.federation.federation_base import FederationBase, event_from_pdu_json
+from synapse.federation.federation_base import (
+    FederationBase,
+    InvalidEventSignatureError,
+    event_from_pdu_json,
+)
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.servlet import assert_params_in_dict
@@ -57,15 +69,24 @@ from synapse.logging.context import (
     nested_logging_context,
     run_in_background,
 )
-from synapse.logging.opentracing import log_kv, start_active_span_from_edu, trace
+from synapse.logging.opentracing import (
+    SynapseTags,
+    log_kv,
+    set_tag,
+    start_active_span_from_edu,
+    tag_args,
+    trace,
+)
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
 from synapse.storage.databases.main.lock import Lock
+from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
+from synapse.storage.roommember import MemberSummary
 from synapse.types import JsonDict, StateMap, get_domain_from_id
-from synapse.util import json_decoder, unwrapFirstError
+from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_server_name
@@ -108,11 +129,16 @@ class FederationServer(FederationBase):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
+        self.server_name = hs.hostname
         self.handler = hs.get_federation_handler()
-        self.storage = hs.get_storage()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
+        self._room_member_handler = hs.get_room_member_handler()
+        self._e2e_keys_handler = hs.get_e2e_keys_handler()
+
+        self._state_storage_controller = hs.get_storage_controllers().state
 
         self.device_handler = hs.get_device_handler()
 
@@ -201,7 +227,7 @@ class FederationServer(FederationBase):
         return 200, res
 
     async def on_timestamp_to_event_request(
-        self, origin: str, room_id: str, timestamp: int, direction: str
+        self, origin: str, room_id: str, timestamp: int, direction: Direction
     ) -> Tuple[int, Dict[str, Any]]:
         """When we receive a federated `/timestamp_to_event` request,
         handle all of the logic for validating and fetching the event.
@@ -211,7 +237,7 @@ class FederationServer(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -268,8 +294,8 @@ class FederationServer(FederationBase):
             transaction_id=transaction_id,
             destination=destination,
             origin=origin,
-            origin_server_ts=transaction_data.get("origin_server_ts"),  # type: ignore
-            pdus=transaction_data.get("pdus"),  # type: ignore
+            origin_server_ts=transaction_data.get("origin_server_ts"),  # type: ignore[arg-type]
+            pdus=transaction_data.get("pdus"),
             edus=transaction_data.get("edus"),
         )
 
@@ -461,13 +487,21 @@ class FederationServer(FederationBase):
                     )
                     for pdu in pdus_by_room[room_id]:
                         event_id = pdu.event_id
-                        pdu_results[event_id] = e.error_dict()
+                        pdu_results[event_id] = e.error_dict(self.hs.config)
                     return
 
                 for pdu in pdus_by_room[room_id]:
                     pdu_results[pdu.event_id] = await process_pdu(pdu)
 
         async def process_pdu(pdu: EventBase) -> JsonDict:
+            """
+            Processes a pushed PDU sent to us via a `/send` transaction
+
+            Returns:
+                JsonDict representing a "PDU Processing Result" that will be bundled up
+                with the other processed PDU's in the `/send` transaction and sent back
+                to remote homeserver.
+            """
             event_id = pdu.event_id
             with nested_logging_context(event_id):
                 try:
@@ -481,7 +515,7 @@ class FederationServer(FederationBase):
                     logger.error(
                         "Failed to handle PDU %s",
                         event_id,
-                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                        exc_info=(f.type, f.value, f.getTracebackObject()),
                     )
                     return {"error": str(e)}
 
@@ -517,12 +551,9 @@ class FederationServer(FederationBase):
     async def on_room_state_request(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
-
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
 
         # we grab the linearizer to protect ourselves from servers which hammer
         # us. In theory we might already have the response to this query
@@ -539,18 +570,17 @@ class FederationServer(FederationBase):
 
         return 200, resp
 
+    @trace
+    @tag_args
     async def on_state_ids_request(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         if not event_id:
             raise NotImplementedError("Specify an event")
 
+        await self._event_auth_handler.assert_host_in_room(room_id, origin)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
-
-        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
-        if not in_room:
-            raise AuthError(403, "Host not in room.")
 
         resp = await self._state_ids_resp_cache.wrap(
             (room_id, event_id),
@@ -561,6 +591,8 @@ class FederationServer(FederationBase):
 
         return 200, resp
 
+    @trace
+    @tag_args
     async def _on_state_ids_request_compute(
         self, room_id: str, event_id: str
     ) -> JsonDict:
@@ -614,6 +646,15 @@ class FederationServer(FederationBase):
             )
             raise IncompatibleRoomVersionError(room_version=room_version)
 
+        # Refuse the request if that room has seen too many joins recently.
+        # This is in addition to the HS-level rate limiting applied by
+        # BaseFederationServlet.
+        # type-ignore: mypy doesn't seem able to deduce the type of the limiter(!?)
+        await self._room_member_handler._join_rate_per_room_limiter.ratelimit(  # type: ignore[has-type]
+            requester=None,
+            key=room_id,
+            update=False,
+        )
         pdu = await self.handler.on_make_join_request(origin, room_id, user_id)
         return {"event": pdu.get_templated_pdu_json(), "room_version": room_version}
 
@@ -631,7 +672,12 @@ class FederationServer(FederationBase):
         pdu = event_from_pdu_json(content, room_version)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        try:
+            pdu = await self._check_sigs_and_hash(room_version, pdu)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {pdu.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
         ret_pdu = await self.handler.on_invite_request(origin, pdu, room_version)
         time_now = self._clock.time_msec()
         return {"event": ret_pdu.get_pdu_json(time_now)}
@@ -643,6 +689,16 @@ class FederationServer(FederationBase):
         room_id: str,
         caller_supports_partial_state: bool = False,
     ) -> Dict[str, Any]:
+        set_tag(
+            SynapseTags.SEND_JOIN_RESPONSE_IS_PARTIAL_STATE,
+            caller_supports_partial_state,
+        )
+        await self._room_member_handler._join_rate_per_room_limiter.ratelimit(  # type: ignore[has-type]
+            requester=None,
+            key=room_id,
+            update=False,
+        )
+
         event, context = await self._on_send_membership_event(
             origin, content, Membership.JOIN, room_id
         )
@@ -652,8 +708,9 @@ class FederationServer(FederationBase):
         state_event_ids: Collection[str]
         servers_in_room: Optional[Collection[str]]
         if caller_supports_partial_state:
+            summary = await self.store.get_room_summary(room_id)
             state_event_ids = _get_event_ids_for_partial_state_join(
-                event, prev_state_ids
+                event, prev_state_ids, summary
             )
             servers_in_room = await self.state.get_hosts_in_room_at_events(
                 room_id, event_ids=event.prev_event_ids()
@@ -682,11 +739,11 @@ class FederationServer(FederationBase):
             "event": event_json,
             "state": [p.get_pdu_json(time_now) for p in state_events],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain_events],
-            "org.matrix.msc3706.partial_state": caller_supports_partial_state,
+            "members_omitted": caller_supports_partial_state,
         }
 
         if servers_in_room is not None:
-            resp["org.matrix.msc3706.servers_in_room"] = list(servers_in_room)
+            resp["servers_in_room"] = list(servers_in_room)
 
         return resp
 
@@ -726,6 +783,17 @@ class FederationServer(FederationBase):
             The partial knock event.
         """
         origin_host, _ = parse_server_name(origin)
+
+        if await self.store.is_partial_state_room(room_id):
+            # Before we do anything: check if the room is partial-stated.
+            # Note that at the time this check was added, `on_make_knock_request` would
+            # block due to https://github.com/matrix-org/synapse/issues/12997.
+            raise SynapseError(
+                404,
+                "Unable to handle /make_knock right now; this server is not fully joined.",
+                errcode=Codes.NOT_FOUND,
+            )
+
         await self.check_server_matches_acl(origin_host, room_id)
 
         room_version = await self.store.get_room_version(room_id)
@@ -782,7 +850,14 @@ class FederationServer(FederationBase):
                 context, self._room_prejoin_state_types
             )
         )
-        return {"knock_state_events": stripped_room_state}
+        return {
+            "knock_room_state": stripped_room_state,
+            # Since v1.37, Synapse incorrectly used "knock_state_events" for this field.
+            # Thus, we also populate a 'knock_state_events' with the same content to
+            # support old instances.
+            # See https://github.com/matrix-org/synapse/issues/14088.
+            "knock_state_events": stripped_room_state,
+        }
 
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
@@ -815,7 +890,24 @@ class FederationServer(FederationBase):
                 Codes.BAD_JSON,
             )
 
+        # Note that get_room_version throws if the room does not exist here.
         room_version = await self.store.get_room_version(room_id)
+
+        if await self.store.is_partial_state_room(room_id):
+            # If our server is still only partially joined, we can't give a complete
+            # response to /send_join, /send_knock or /send_leave.
+            # This is because we will not be able to provide the server list (for partial
+            # joins) or the full state (for full joins).
+            # Return a 404 as we would if we weren't in the room at all.
+            logger.info(
+                f"Rejecting /send_{membership_type} to %s because it's a partial state room",
+                room_id,
+            )
+            raise SynapseError(
+                404,
+                f"Unable to handle /send_{membership_type} right now; this server is not fully joined.",
+                errcode=Codes.NOT_FOUND,
+            )
 
         if membership_type == Membership.KNOCK and not room_version.msc2403_knocking:
             raise SynapseError(
@@ -849,7 +941,7 @@ class FederationServer(FederationBase):
             authorising_server = get_domain_from_id(
                 event.content[EventContentFields.AUTHORISING_USER]
             )
-            if authorising_server != self.server_name:
+            if not self._is_mine_server_name(authorising_server):
                 raise SynapseError(
                     400,
                     f"Cannot authorise request from resident server: {authorising_server}",
@@ -864,16 +956,33 @@ class FederationServer(FederationBase):
                 )
             )
 
-        event = await self._check_sigs_and_hash(room_version, event)
+        try:
+            event = await self._check_sigs_and_hash(room_version, event)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {event.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
-        return await self._federation_event_handler.on_send_membership_event(
-            origin, event
-        )
+        try:
+            return await self._federation_event_handler.on_send_membership_event(
+                origin, event
+            )
+        except PartialStateConflictError:
+            # The room was un-partial stated while we were persisting the event.
+            # Try once more, with full state this time.
+            logger.info(
+                "Room %s was un-partial stated during `on_send_membership_event`, trying again.",
+                room_id,
+            )
+            return await self._federation_event_handler.on_send_membership_event(
+                origin, event
+            )
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, Dict[str, Any]]:
         async with self._server_linearizer.queue((origin, room_id)):
+            await self._event_auth_handler.assert_host_in_room(room_id, origin)
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
@@ -895,23 +1004,19 @@ class FederationServer(FederationBase):
 
     @trace
     async def on_claim_client_keys(
-        self, origin: str, content: JsonDict
+        self, query: List[Tuple[str, str, str, int]], always_include_fallback_keys: bool
     ) -> Dict[str, Any]:
-        query = []
-        for user_id, device_keys in content.get("one_time_keys", {}).items():
-            for device_id, algorithm in device_keys.items():
-                query.append((user_id, device_id, algorithm))
-
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
-        results = await self.store.claim_e2e_one_time_keys(query)
+        results = await self._e2e_keys_handler.claim_local_one_time_keys(
+            query, always_include_fallback_keys=always_include_fallback_keys
+        )
 
-        json_result: Dict[str, Dict[str, dict]] = {}
-        for user_id, device_keys in results.items():
-            for device_id, keys in device_keys.items():
-                for key_id, json_str in keys.items():
-                    json_result.setdefault(user_id, {})[device_id] = {
-                        key_id: json_decoder.decode(json_str)
-                    }
+        json_result: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
+        for result in results:
+            for user_id, device_keys in result.items():
+                for device_id, keys in device_keys.items():
+                    for key_id, key in keys.items():
+                        json_result.setdefault(user_id, {})[device_id] = {key_id: key}
 
         logger.info(
             "Claimed one-time-keys: %s",
@@ -1016,8 +1121,15 @@ class FederationServer(FederationBase):
         # Check signature.
         try:
             pdu = await self._check_sigs_and_hash(room_version, pdu)
-        except SynapseError as e:
-            raise FederationError("ERROR", e.code, e.msg, affected=pdu.event_id)
+        except InvalidEventSignatureError as e:
+            logger.warning("event id %s: %s", pdu.event_id, e)
+            raise FederationError("ERROR", 403, str(e), affected=pdu.event_id)
+
+        if await self._spam_checker_module_callbacks.should_drop_federated_event(pdu):
+            logger.warning(
+                "Unstaged federated event contains spam, dropping %s", pdu.event_id
+            )
+            return
 
         # Add the event to our staging area
         await self.store.insert_received_event_to_staging(origin, pdu)
@@ -1031,6 +1143,43 @@ class FederationServer(FederationBase):
             self._process_incoming_pdus_in_room_inner(
                 pdu.room_id, room_version, lock, origin, pdu
             )
+
+    async def _get_next_nonspam_staged_event_for_room(
+        self, room_id: str, room_version: RoomVersion
+    ) -> Optional[Tuple[str, EventBase]]:
+        """Fetch the first non-spam event from staging queue.
+
+        Args:
+            room_id: the room to fetch the first non-spam event in.
+            room_version: the version of the room.
+
+        Returns:
+            The first non-spam event in that room.
+        """
+
+        while True:
+            # We need to do this check outside the lock to avoid a race between
+            # a new event being inserted by another instance and it attempting
+            # to acquire the lock.
+            next = await self.store.get_next_staged_event_for_room(
+                room_id, room_version
+            )
+
+            if next is None:
+                return None
+
+            origin, event = next
+
+            if await self._spam_checker_module_callbacks.should_drop_federated_event(
+                event
+            ):
+                logger.warning(
+                    "Staged federated event contains spam, dropping %s",
+                    event.event_id,
+                )
+                continue
+
+            return next
 
     @wrap_as_background_process("_process_incoming_pdus_in_room_inner")
     async def _process_incoming_pdus_in_room_inner(
@@ -1098,7 +1247,7 @@ class FederationServer(FederationBase):
                     logger.error(
                         "Failed to handle PDU %s",
                         event.event_id,
-                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                        exc_info=(f.type, f.value, f.getTracebackObject()),
                     )
 
                 received_ts = await self.store.remove_received_event_from_staging(
@@ -1109,12 +1258,10 @@ class FederationServer(FederationBase):
                         (self._clock.time_msec() - received_ts) / 1000
                     )
 
-            # We need to do this check outside the lock to avoid a race between
-            # a new event being inserted by another instance and it attempting
-            # to acquire the lock.
-            next = await self.store.get_next_staged_event_for_room(
+            next = await self._get_next_nonspam_staged_event_for_room(
                 room_id, room_version
             )
+
             if not next:
                 break
 
@@ -1144,9 +1291,6 @@ class FederationServer(FederationBase):
                 return
             lock = new_lock
 
-    def __str__(self) -> str:
-        return "<ReplicationLayer(%s)>" % self.server_name
-
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: Dict
     ) -> None:
@@ -1167,14 +1311,10 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        state_ids = await self.store.get_current_state_ids(room_id)
-        acl_event_id = state_ids.get((EventTypes.ServerACL, ""))
-
-        if not acl_event_id:
-            return
-
-        acl_event = await self.store.get_event(acl_event_id)
-        if server_matches_acl_event(server_name, acl_event):
+        acl_event = await self._storage_controllers.state.get_current_state_event(
+            room_id, EventTypes.ServerACL, ""
+        )
+        if not acl_event or server_matches_acl_event(server_name, acl_event):
             return
 
         raise AuthError(code=403, msg="Server is banned from room")
@@ -1313,7 +1453,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
-        if not self.config.server.use_presence and edu_type == EduTypes.Presence:
+        if not self.config.server.use_presence and edu_type == EduTypes.PRESENCE:
             return
 
         # Check if we have a handler on this instance
@@ -1368,8 +1508,9 @@ class FederationHandlerRegistry:
 def _get_event_ids_for_partial_state_join(
     join_event: EventBase,
     prev_state_ids: StateMap[str],
+    summary: Mapping[str, MemberSummary],
 ) -> Collection[str]:
-    """Calculate state to be retuned in a partial_state send_join
+    """Calculate state to be returned in a partial_state send_join
 
     Args:
         join_event: the join event being send_joined
@@ -1394,8 +1535,19 @@ def _get_event_ids_for_partial_state_join(
     if current_membership_event_id is not None:
         state_event_ids.add(current_membership_event_id)
 
-    # TODO: return a few more members:
-    #   - those with invites
-    #   - those that are kicked? / banned
+    name_id = prev_state_ids.get((EventTypes.Name, ""))
+    canonical_alias_id = prev_state_ids.get((EventTypes.CanonicalAlias, ""))
+    if not name_id and not canonical_alias_id:
+        # Also include the hero members of the room (for DM rooms without a title).
+        # To do this properly, we should select the correct subset of membership events
+        # from `prev_state_ids`. Instead, we are lazier and use the (cached)
+        # `get_room_summary` function, which is based on the current state of the room.
+        # This introduces races; we choose to ignore them because a) they should be rare
+        # and b) even if it's wrong, joining servers will get the full state eventually.
+        heroes = extract_heroes_from_room_summary(summary, join_event.state_key)
+        for hero in heroes:
+            membership_event_id = prev_state_ids.get((EventTypes.Member, hero))
+            if membership_event_id:
+                state_event_ids.add(membership_event_id)
 
     return state_event_ids

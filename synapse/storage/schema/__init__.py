@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 69  # remember to update the list below when updating
+SCHEMA_VERSION = 77  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -61,14 +61,61 @@ Changes in SCHEMA_VERSION = 68:
 
 Changes in SCHEMA_VERSION = 69:
     - We now write to `device_lists_changes_in_room` table.
-    - Use sequence to generate future `application_services_txns.txn_id`s
+    - We now use a PostgreSQL sequence to generate future txn_ids for
+      `application_services_txns`. `application_services_state.last_txn` is no longer
+      updated.
+
+Changes in SCHEMA_VERSION = 70:
+    - event_reference_hashes is no longer written to.
+
+Changes in SCHEMA_VERSION = 71:
+    - event_edges.room_id is no longer read from.
+    - Tables related to groups are no longer accessed.
+
+Changes in SCHEMA_VERSION = 72:
+    - event_edges.(room_id, is_state) are no longer written to.
+    - Tables related to groups are dropped.
+    - Unused column application_services_state.last_txn is dropped
+    - Cache invalidation stream id sequence now begins at 2 to match code expectation.
+
+Changes in SCHEMA_VERSION = 73:
+    - thread_id column is added to event_push_actions, event_push_actions_staging
+      event_push_summary, receipts_linearized, and receipts_graph.
+    - Add table `event_failed_pull_attempts` to keep track when we fail to pull
+      events over federation.
+    - Add indexes to various tables (`event_failed_pull_attempts`, `insertion_events`,
+      `batch_events`) to make it easy to delete all associated rows when purging a room.
+    - `inserted_ts` column is added to `event_push_actions_staging` table.
+
+Changes in SCHEMA_VERSION = 74:
+    - A query on `event_stream_ordering` column has now been disambiguated (i.e. the
+      codebase can handle the `current_state_events`, `local_current_memberships` and
+      `room_memberships` tables having an `event_stream_ordering` column).
+
+Changes in SCHEMA_VERSION = 75:
+    - The `event_stream_ordering` column in membership tables (`current_state_events`,
+      `local_current_membership` & `room_memberships`) is now being populated for new
+      rows. When the background job to populate historical rows lands this will
+      become the compat schema version.
+
+Changes in SCHEMA_VERSION = 76:
+    - Adds a full_user_id column to tables profiles and user_filters.
+
+Changes in SCHEMA_VERSION = 77
+    - (Postgres) Add NOT VALID CHECK (full_user_id IS NOT NULL) to tables profiles and user_filters
 """
 
 
 SCHEMA_COMPAT_VERSION = (
-    # We now assume that `device_lists_changes_in_room` has been filled out for
-    # recent device_list_updates.
-    69
+    # Queries against `event_stream_ordering` columns in membership tables must
+    # be disambiguated.
+    #
+    # The threads_id column must written to with non-null values for the
+    # event_push_actions, event_push_actions_staging, and event_push_summary tables.
+    #
+    # insertions to the column `full_user_id` of tables profiles and user_filters can no
+    # longer be null
+    76
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

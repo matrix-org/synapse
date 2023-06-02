@@ -17,6 +17,7 @@
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import EduTypes
 from synapse.rest.client import room
 from synapse.server import HomeServer
 from synapse.types import UserID
@@ -58,7 +59,8 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             self.event_source.get_new_events(
                 user=UserID.from_string(self.user_id),
                 from_key=0,
-                limit=None,
+                # Limit is unused.
+                limit=0,
                 room_ids=[self.room_id],
                 is_guest=False,
             )
@@ -67,7 +69,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             events[0],
             [
                 {
-                    "type": "m.typing",
+                    "type": EduTypes.TYPING,
                     "room_id": self.room_id,
                     "content": {"user_ids": [self.user_id]},
                 }

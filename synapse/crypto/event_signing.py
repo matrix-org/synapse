@@ -28,6 +28,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
 from synapse.events.utils import prune_event, prune_event_dict
+from synapse.logging.opentracing import trace
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 Hasher = Callable[[bytes], "hashlib._Hash"]
 
 
+@trace
 def check_event_content_hash(
     event: EventBase, hash_algorithm: Hasher = hashlib.sha256
 ) -> bool:
@@ -49,7 +51,7 @@ def check_event_content_hash(
     # some malformed events lack a 'hashes'. Protect against it being missing
     # or a weird type by basically treating it the same as an unhashed event.
     hashes = event.get("hashes")
-    # nb it might be a frozendict or a dict
+    # nb it might be a immutabledict or a dict
     if not isinstance(hashes, collections.abc.Mapping):
         raise SynapseError(
             400, "Malformed 'hashes': %s" % (type(hashes),), Codes.UNAUTHORIZED

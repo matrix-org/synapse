@@ -9,7 +9,7 @@ in, allowing them to specify custom templates:
 
 ```yaml
 templates:
-  custom_templates_directory: /path/to/custom/templates/
+  custom_template_directory: /path/to/custom/templates/
 ```
 
 If this setting is not set, or the files named below are not found within the directory,

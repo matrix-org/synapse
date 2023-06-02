@@ -33,31 +33,22 @@ class AppServiceConfig(Config):
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.app_service_config_files = config.get("app_service_config_files", [])
-        self.notify_appservices = config.get("notify_appservices", True)
+        if not isinstance(self.app_service_config_files, list) or not all(
+            type(x) is str for x in self.app_service_config_files
+        ):
+            raise ConfigError(
+                "Expected '%s' to be a list of AS config files:"
+                % (self.app_service_config_files),
+                ("app_service_config_files",),
+            )
+
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
-
-    def generate_config_section(cls, **kwargs: Any) -> str:
-        return """\
-        # A list of application service config files to use
-        #
-        #app_service_config_files:
-        #  - app_service_1.yaml
-        #  - app_service_2.yaml
-
-        # Uncomment to enable tracking of application service IP addresses. Implicitly
-        # enables MAU tracking for application service users.
-        #
-        #track_appservice_user_ips: true
-        """
 
 
 def load_appservices(
     hostname: str, config_files: List[str]
 ) -> List[ApplicationService]:
     """Returns a list of Application Services from the config files."""
-    if not isinstance(config_files, list):
-        logger.warning("Expected %s to be a list of AS config files.", config_files)
-        return []
 
     # Dicts of value -> filename
     seen_as_tokens: Dict[str, str] = {}
@@ -179,7 +170,6 @@ def _load_appservice(
 
     return ApplicationService(
         token=as_info["as_token"],
-        hostname=hostname,
         url=as_info["url"],
         namespaces=as_info["namespaces"],
         hs_token=as_info["hs_token"],

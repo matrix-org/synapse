@@ -4,12 +4,15 @@
 # things to include
 !docker
 !synapse
+!rust
 !README.rst
 !pyproject.toml
 !poetry.lock
+!Cargo.lock
+!Cargo.toml
+!build_rust.py
 
-# TODO: remove these once we have moved over to using poetry-core in pyproject.toml
-!MANIFEST.in
-!setup.py
+rust/target
+synapse/*.so
 
 **/__pycache__
