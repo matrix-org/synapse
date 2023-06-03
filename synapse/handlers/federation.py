@@ -311,6 +311,14 @@ class FederationHandler:
             len(sorted_backfill_points),
             sorted_backfill_points,
         )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points",
+            str(sorted_backfill_points),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points.length",
+            str(len(sorted_backfill_points)),
+        )
 
         # If we have no backfill points lower than the `current_depth` then
         # either we can a) bail or b) still attempt to backfill. We opt to try
