@@ -327,9 +327,7 @@ class FederationHandler:
             logger.debug(
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Trying again with later backfill points."
             )
-            run_as_background_process(
-                "_maybe_backfill_inner_anyway_with_max_depth",
-                self._maybe_backfill_inner,
+            return await self._maybe_backfill_inner(
                 room_id=room_id,
                 # We use `MAX_DEPTH` so that we find all backfill points next
                 # time (all events are below the `MAX_DEPTH`)
@@ -340,11 +338,6 @@ class FederationHandler:
                 # overall otherwise the smaller one will throw off the results.
                 processing_start_time=None,
             )
-            # We return `False` because we're backfilling but doing it in the background
-            # and is just a best effort attempt for eventual consistency's sake. The
-            # return value of this function isn't used for anything yet anyway.
-            return False
-
         # Even after recursing with `MAX_DEPTH`, we didn't find any
         # backward extremities to backfill from.
         if not sorted_backfill_points:
