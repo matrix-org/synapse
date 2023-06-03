@@ -338,6 +338,7 @@ class FederationHandler:
                 # overall otherwise the smaller one will throw off the results.
                 processing_start_time=None,
             )
+
         # Even after recursing with `MAX_DEPTH`, we didn't find any
         # backward extremities to backfill from.
         if not sorted_backfill_points:
