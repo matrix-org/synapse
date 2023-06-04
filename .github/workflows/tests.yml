@@ -571,6 +571,7 @@ jobs:
         env:
           POSTGRES: ${{ (matrix.database == 'Postgres') && 1 || '' }}
           WORKERS: ${{ (matrix.arrangement == 'workers') && 1 || '' }}
+          UNIX_SOCKETS: 1
         name: Run Complement Tests
 
   cargo-test:
