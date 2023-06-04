@@ -462,6 +462,21 @@ See the docs [request log format](../administration/request_log.md).
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
 
+  _Added in Synapse 1.86.0_
+
+* UNIX socket support:
+  * `path`: A path and filename for a UNIX socket. Ensure it is in a readable/writeable
+     directory. No default
+    * **Note**: Declaring a `path` is not compatible while also having a `port`
+       configuration for the same `listener`
+    * **Note**: `metrics` and `manhole` are not supported as `types` on UNIX socket `listeners`
+    * The `x_forwarded` option will default to true and may be left out.
+    * Other options that would not make sense to use with a UNIX socket, such as 
+    `bind_address[es]` and `tls` will be ignored and can be removed.
+  * `mode`: The file permissions to set on the UNIX socket. Defaults to `666`
+  * `type: http` is valid (provided `metrics` is not included in the `resources`:`names`)
+
+
 Valid resource names are:
 
 * `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies `media` and `static`.
@@ -474,7 +489,7 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See [here](../../metrics-howto.md).
+* `metrics`: the metrics interface. See [here](../../metrics-howto.md). (Not usable on a UNIX Socket `listener`)
 
 * `openid`: OpenID authentication. See [here](../../openid.md).
 
@@ -533,6 +548,21 @@ listeners:
     bind_addresses: ['::1', '127.0.0.1']
     type: manhole
 ```
+Example configuration #3:
+```yaml
+listeners:
+  # UNIX socket listener: for when Synapse is behind a reverse proxy that can utilise such.
+  #
+  # Note that x_forwarded will default to true, when using a UNIX socket. Please see
+  # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
+  #
+  - path: /var/run/synapse/main_public.sock
+    mode: 660
+    type: http
+    resources:
+      - names: [client, federation]
+```
+
 ---
 ### `manhole_settings`
 
@@ -3909,8 +3939,8 @@ HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
 a HTTP replication listener, and that listener should be included in the `instance_map`.
 The main process also needs an entry on the `instance_map`, and it should be listed under
-`main` **if even one other worker exists**. Ensure the port matches with what is declared 
-inside the `listener` block for a `replication` listener.
+`main` **if even one other worker exists**. Ensure the `port` or `path` matches with
+what is declared inside the `listener` or `worker_listener` block for a `replication` listener.
 
 
 Example configuration:
@@ -3922,6 +3952,14 @@ instance_map:
   worker1:
     host: localhost
     port: 8034
+```
+Example configuration(#2, for UNIX sockets):
+```yaml
+instance_map:
+  main:
+    path: /var/run/synapse/main_replication.sock
+  worker1:
+    path: /var/run/synapse/worker1_replication.sock
 ```
 ---
 ### `stream_writers`
@@ -4126,6 +4164,18 @@ worker_listeners:
     port: 8083
     resources:
       - names: [client, federation]
+```
+Example configuration(#2, using UNIX sockets with a `replication` listener):
+```yaml
+worker_listeners:
+  - type: http
+    path: /var/run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
+  - type: http
+    path: /var/run/synapse/worker_replication.sock
+    resources:
+      - names: [replication]
 ```
 ---
 ### `worker_manhole`
