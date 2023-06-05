@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-INSERT INTO background_updates (ordering, update_name, progress_json)
+INSERT INTO background_updates (ordering, update_name, progress_json, depends_on)
     VALUES
-        (7714, 'current_state_events_stream_ordering_idx', '{}'),
-        (7714, 'local_current_membership_stream_ordering_idx', '{}'),
-        (7714, 'room_memberships_stream_ordering_idx', '{}');
+        (7714, 'current_state_events_stream_ordering_idx', '{}', 'add_event_stream_ordering'),
+        (7714, 'local_current_membership_stream_ordering_idx', '{}', 'add_event_stream_ordering'),
+        (7714, 'room_memberships_stream_ordering_idx', '{}', 'add_event_stream_ordering');
