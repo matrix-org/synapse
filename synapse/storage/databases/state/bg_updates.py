@@ -22,7 +22,7 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import MutableStateMap, StateMap
 from synapse.types.state import StateFilter
 from synapse.util.caches import intern_string
@@ -328,6 +328,10 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             columns=["event_stream_ordering"],
         )
 
+        self.db_pool.updates.register_background_update_handler(
+            "add_event_stream_ordering",
+            self._add_event_stream_ordering,
+        )
     async def _background_deduplicate_state(
         self, progress: dict, batch_size: int
     ) -> int:
@@ -503,4 +507,101 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             self.STATE_GROUP_INDEX_UPDATE_NAME
         )
 
+        return 1
+
+    async def _add_event_stream_ordering(self, progress: dict, batch_size: int) -> int:
+        """
+        Add denormalised copies of `stream_ordering` from the corresponding row in `events`
+        to the tables current_state_events, local_current_membership, and room_memberships.
+        This is done to improve database performance by reduring JOINs.
+
+        """
+        tables = [
+            "current_state_events",
+            "local_current_membership",
+            "room_memberships",
+        ]
+
+        if isinstance(self.database_engine, PostgresEngine):
+
+            def check_pg_column(txn: LoggingTransaction, table: str) -> list:
+                """
+                check if the column event_stream_ordering already exists
+                """
+                check_sql = f"""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = '{table}' and column_name = 'event_stream_ordering';
+                    """
+                txn.execute(check_sql)
+                column = txn.fetchall()
+                return column
+
+            def add_pg_column(txn: LoggingTransaction, table: str) -> None:
+                """
+                Add column event_stream_ordering to A given table
+                """
+                add_column_sql = f"""
+                ALTER TABLE {table} ADD COLUMN event_stream_ordering BIGINT;
+                """
+                txn.execute(add_column_sql)
+
+                add_fk_sql = f"""
+                ALTER TABLE {table} ADD CONSTRAINT event_stream_ordering_fkey
+                FOREIGN KEY(event_stream_ordering) REFERENCES events(stream_ordering) NOT VALID;
+                """
+                txn.execute(add_fk_sql)
+
+            for table in tables:
+                res = await self.db_pool.runInteraction(
+                    "check_column", check_pg_column, table
+                )
+                # if the column exists do nothing
+                if not res:
+                    await self.db_pool.runInteraction(
+                        "add_event_stream_ordering",
+                        add_pg_column,
+                        table,
+                    )
+            await self.db_pool.updates._end_background_update(
+                "add_event_stream_ordering"
+            )
+            return 1
+
+        elif isinstance(self.database_engine, Sqlite3Engine):
+
+            def check_sqlite_column(txn: LoggingTransaction, table: str) -> List[tuple]:
+                """
+                Get table info (to see if column event_stream_ordering exists)
+                """
+                check_sql = f"""
+                PRAGMA table_info({table})
+                """
+                txn.execute(check_sql)
+                res = txn.fetchall()
+                return res
+
+            def add_sqlite_column(txn: LoggingTransaction, table: str) -> None:
+                """
+                Add column event_stream_ordering to given table
+                """
+                add_column_sql = f"""
+                ALTER TABLE {table} ADD COLUMN event_stream_ordering BIGINT REFERENCES events(stream_ordering);
+                """
+                txn.execute(add_column_sql)
+
+            for table in tables:
+                res = await self.db_pool.runInteraction(
+                    "check_column", check_sqlite_column, table
+                )
+                columns = [tup[1] for tup in res]
+
+                # if the column exists do nothing
+                if "event_stream_ordering" not in columns:
+                    await self.db_pool.runInteraction(
+                        "add_event_stream_ordering", add_sqlite_column, table
+                    )
+
+            await self.db_pool.updates._end_background_update(
+                "add_event_stream_ordering"
+            )
         return 1
