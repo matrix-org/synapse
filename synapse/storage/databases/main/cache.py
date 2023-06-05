@@ -46,6 +46,9 @@ logger = logging.getLogger(__name__)
 # based on the current state when notifying workers over replication.
 CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 
+# As above, but for invalidating
+DELETE_ROOM_CACHE_NAME = "dr_cache_fake"
+
 
 class CacheInvalidationWorkerStore(SQLBaseStore):
     def __init__(
@@ -175,6 +178,14 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     room_id = row.keys[0]
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)
+                elif row.cache_func == DELETE_ROOM_CACHE_NAME:
+                    if row.keys is None:
+                        raise Exception(
+                            "Can't send an 'invalidate all' for 'delete room' cache"
+                        )
+
+                    room_id = row.keys[0]
+                    self._invalidate_caches_for_room(room_id)
                 else:
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
@@ -273,6 +284,18 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_thread_summary", (relates_to,))
             self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
             self._attempt_to_invalidate_cache("get_threads", (room_id,))
+
+    def _invalidate_caches_for_room_and_stream(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> None:
+        """Invalidate caches associated with rooms, and stream to replication.
+
+        Used when we delete events in rooms, but don't know which events we've
+        deleted.
+        """
+
+        self._send_invalidation_to_replication(txn, DELETE_ROOM_CACHE_NAME, [room_id])
+        txn.call_after(self._invalidate_caches_for_room, room_id)
 
     def _invalidate_caches_for_room(self, room_id: str) -> None:
         """Invalidate caches associated with rooms.
@@ -463,6 +486,9 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             raise Exception(
                 "Can't stream invalidate all with magic current state cache"
             )
+
+        if cache_name == DELETE_ROOM_CACHE_NAME and keys is None:
+            raise Exception("Can't stream invalidate all with magic delete room cache")
 
         if isinstance(self.database_engine, PostgresEngine):
             assert self._cache_id_gen is not None

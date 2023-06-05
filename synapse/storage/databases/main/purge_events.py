@@ -64,8 +64,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         token: RoomStreamToken,
         delete_local_events: bool,
     ) -> Set[int]:
-        # TODO: Also stream this
-        txn.call_after(self._invalidate_caches_for_room, room_id)
+        self._invalidate_caches_for_room_and_stream(txn, room_id)
 
         # Tables that should be pruned:
         #     event_auth
@@ -349,8 +348,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         return state_groups_to_delete
 
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
-        # TODO: Also stream this
-        txn.call_after(self._invalidate_caches_for_room, room_id)
+        self._invalidate_caches_for_room_and_stream(txn, room_id)
 
         # TODO: Also clear all state caches?
 
