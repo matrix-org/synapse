@@ -187,6 +187,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             for room_version in details["support"]:
                 self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, str(room_version))
 
+    @override_config({"login_via_existing_session": {"enabled": False}})
     def test_get_get_token_login_fields_when_disabled(self) -> None:
         """By default login via an existing session is disabled."""
         access_token = self.get_success(
@@ -201,7 +202,6 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, HTTPStatus.OK)
         self.assertFalse(capabilities["m.get_login_token"]["enabled"])
 
-    @override_config({"login_via_existing_session": {"enabled": True}})
     def test_get_get_token_login_fields_when_enabled(self) -> None:
         access_token = self.get_success(
             self.auth_handler.create_access_token_for_user_id(

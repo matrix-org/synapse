@@ -45,6 +45,7 @@ class JWKSTestCase(HomeserverTestCase):
     @override_config(
         {
             "disable_registration": True,
+            "login_via_existing_session": {"enabled": False},
             "experimental_features": {
                 "msc3861": {
                     "enabled": True,
@@ -65,6 +66,7 @@ class JWKSTestCase(HomeserverTestCase):
     @override_config(
         {
             "disable_registration": True,
+            "login_via_existing_session": {"enabled": False},
             "experimental_features": {
                 "msc3861": {
                     "enabled": True,
