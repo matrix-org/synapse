@@ -332,6 +332,11 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             "add_event_stream_ordering",
             self._add_event_stream_ordering,
         )
+
+        self.db_pool.updates.register_background_update_handler(
+            "add_stream_ordering_triggers", self._add_triggers_in_bg
+        )
+
     async def _background_deduplicate_state(
         self, progress: dict, batch_size: int
     ) -> int:
@@ -604,4 +609,79 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             await self.db_pool.updates._end_background_update(
                 "add_event_stream_ordering"
             )
+        return 1
+
+    async def _add_triggers_in_bg(self, progress: dict, batch_size: int) -> int:
+        """
+        Adds triggers to the room membership tables to enforce consistency
+        """
+        # Complain if the `event_stream_ordering` in membership tables doesn't match
+        # the `stream_ordering` row with the same `event_id` in `events`.
+        if isinstance(self.database_engine, Sqlite3Engine):
+
+            def add_sqlite_triggers(txn: LoggingTransaction) -> None:
+                for table in (
+                    "current_state_events",
+                    "local_current_membership",
+                    "room_memberships",
+                ):
+                    txn.execute(
+                        f"""
+                        CREATE TRIGGER IF NOT EXISTS {table}_bad_event_stream_ordering
+                        BEFORE INSERT ON {table}
+                        FOR EACH ROW
+                        BEGIN
+                            SELECT RAISE(ABORT, 'Incorrect event_stream_ordering in {table}')
+                            WHERE EXISTS (
+                                SELECT 1 FROM events
+                                WHERE events.event_id = NEW.event_id
+                                   AND events.stream_ordering != NEW.event_stream_ordering
+                            );
+                        END;
+                        """
+                    )
+
+            await self.db_pool.runInteraction("add_sqlite_triggers", add_sqlite_triggers)
+        elif isinstance(self.database_engine, PostgresEngine):
+
+            def add_pg_triggers(txn: LoggingTransaction) -> None:
+                txn.execute(
+                    """
+                    CREATE OR REPLACE FUNCTION check_event_stream_ordering() RETURNS trigger AS $BODY$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM events
+                            WHERE events.event_id = NEW.event_id
+                               AND events.stream_ordering != NEW.event_stream_ordering
+                        ) THEN
+                            RAISE EXCEPTION 'Incorrect event_stream_ordering';
+                        END IF;
+                        RETURN NEW;
+                    END;
+                    $BODY$ LANGUAGE plpgsql;
+                    """
+                )
+
+                for table in (
+                    "current_state_events",
+                    "local_current_membership",
+                    "room_memberships",
+                ):
+                    txn.execute(
+                        f"""
+                        CREATE TRIGGER check_event_stream_ordering BEFORE INSERT OR UPDATE ON {table}
+                        FOR EACH ROW
+                        EXECUTE PROCEDURE check_event_stream_ordering()
+                        """
+                    )
+
+            await self.db_pool.runInteraction(
+                "add_postgres_triggers", add_pg_triggers
+            )
+        else:
+            raise NotImplementedError("Unknown database engine")
+
+        await self.db_pool.updates._end_background_update(
+            "add_stream_ordering_triggers"
+        )
         return 1
