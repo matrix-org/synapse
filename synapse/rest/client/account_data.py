@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 from typing import TYPE_CHECKING, Tuple
 
@@ -19,6 +20,7 @@ from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
+from synapse.rest.client.read_marker import ReadMarkerRestServlet
 from synapse.types import JsonDict, RoomID
 
 from ._base import client_patterns
@@ -286,6 +288,7 @@ class RoomBeeperInboxStateServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
+        self.read_marker_client = ReadMarkerRestServlet(hs)
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str, room_id: str
@@ -319,6 +322,14 @@ class RoomBeeperInboxStateServlet(RestServlet):
                 user_id, room_id, "com.beeper.inbox.done", done
             )
             logger.info(f"SetBeeperDone done_delta_ms={delta_ms}")
+
+        if "read_markers" in body:
+            await self.read_marker_client.handle_read_marker(
+                room_id, body["read_markers"], requester
+            )
+            logger.info(
+                f"SetBeeperReadMarkers read_markers={json.dumps(body['read_markers'])}"
+            )
 
         return 200, {}
 

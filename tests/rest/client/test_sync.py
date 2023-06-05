@@ -28,7 +28,16 @@ from synapse.api.constants import (
     ReceiptTypes,
     RelationTypes,
 )
-from synapse.rest.client import devices, knock, login, read_marker, receipts, room, sync
+from synapse.rest.client import (
+    account_data,
+    devices,
+    knock,
+    login,
+    read_marker,
+    receipts,
+    room,
+    sync,
+)
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -528,6 +537,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
 
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     servlets = [
+        account_data.register_servlets,
         synapse.rest.admin.register_servlets,
         login.register_servlets,
         read_marker.register_servlets,
@@ -721,6 +731,28 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             "POST",
             f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res2['event_id']}",
             {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
+
+    def test_beeper_inbox_state_can_update_unread_count(self) -> None:
+        # increase unread count
+        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+        res = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        self._check_unread_count(1)
+
+        # Beeper: inbox_state should be able to send read receipts
+        res = self.helper.send(self.room_id, "hello", tok=self.tok2)
+
+        channel = self.make_request(
+            "PUT",
+            f"/_matrix/client/unstable/com.beeper.inbox/user/{self.user_id}/rooms/{self.room_id}/inbox_state",
+            {
+                "read_markers": {
+                    ReceiptTypes.READ: res["event_id"],
+                },
+            },
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
