@@ -64,8 +64,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         token: RoomStreamToken,
         delete_local_events: bool,
     ) -> Set[int]:
-        self._invalidate_caches_for_room_and_stream(txn, room_id)
-
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
@@ -310,6 +308,8 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         logger.info("[purge] done")
 
+        self._invalidate_caches_for_room_and_stream(txn, room_id)
+
         return referenced_state_groups
 
     async def purge_room(self, room_id: str) -> List[int]:
@@ -348,10 +348,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         return state_groups_to_delete
 
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
-        self._invalidate_caches_for_room_and_stream(txn, room_id)
-
-        # TODO: Also clear all state caches?
-
         # This collides with event persistence so we cannot write new events and metadata into
         # a room while deleting it or this transaction will fail.
         if isinstance(self.database_engine, PostgresEngine):
@@ -491,10 +487,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         #       index on them. In any case we should be clearing out 'stream' tables
         #       periodically anyway (#5888)
 
-        # TODO: we could probably usefully do a bunch more cache invalidation here
-
-        # XXX: as with purge_history, this is racy, but no worse than other races
-        #   that already exist.
-        self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
+        self._invalidate_caches_for_room_and_stream(txn, room_id)
 
         return state_groups
