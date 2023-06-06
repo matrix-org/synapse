@@ -953,8 +953,9 @@ def _custom_sync_async_decorator(
                             scope.__exit__(type(e), None, e.__traceback__)
                             raise
 
-                    # The original method returned a coroutine, so we create another
-                    # coroutine wrapping it, that calls `scope.__exit__(...)`.
+                    # The original method returned an awaitable, eg. a coroutine, so we
+                    # create another awaitable wrapping it that calls
+                    # `scope.__exit__(...)`.
                     return await_coroutine()
                 else:
                     # Just a simple sync function so we can just exit the scope and
