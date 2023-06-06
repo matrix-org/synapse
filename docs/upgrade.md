@@ -102,7 +102,7 @@ This will also require that the master and all workers are restarted together af
 Once all workers are upgraded to v1.86.0 and the master and workers are restarted event replication will
 be able to resume.
 
-# Upgrading to v1.86.0
+# Upgrading to v1.85.0
 
 ## Application service registration with "user" property deprecation
 
@@ -112,7 +112,6 @@ should no longer be included.
 
 A future version of Synapse (v1.88.0 or later) will remove support for legacy
 application service login.
-
 
 # Upgrading to v1.84.0
 
