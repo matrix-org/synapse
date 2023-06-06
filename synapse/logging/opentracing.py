@@ -942,7 +942,7 @@ def _custom_sync_async_decorator(
 
                 elif inspect.isawaitable(result):
 
-                    async def await_coroutine() -> Any:
+                    async def wrap_awaitable() -> Any:
                         try:
                             assert isinstance(result, Awaitable)
                             awaited_result = await result
@@ -955,7 +955,7 @@ def _custom_sync_async_decorator(
                     # The original method returned an awaitable, eg. a coroutine, so we
                     # create another awaitable wrapping it that calls
                     # `scope.__exit__(...)`.
-                    return await_coroutine()
+                    return wrap_awaitable()
                 else:
                     # Just a simple sync function so we can just exit the scope and
                     # return the result without any fuss.
