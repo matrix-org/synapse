@@ -18,7 +18,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_repo:
+    if: github.repository == 'matrix-org/synapse'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_workflow: ${{ steps.check_condition.outputs.should_run_workflow }}
+    steps:
+      - id: check_condition
+        run: echo "::set-output name=should_run_workflow::${{ github.repository == 'matrix-org/synapse' }}"
+
   mypy:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -41,6 +52,8 @@ jobs:
       - run: poetry run mypy
 
   trial:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -75,6 +88,8 @@ jobs:
           || true
 
   sytest:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:buster
@@ -119,7 +134,8 @@ jobs:
             /logs/**/*.log*
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
+    needs: check_repo
+    if: "!failure() && !cancelled() && needs.check_repo.outputs.should_run_workflow == 'true'"
     runs-on: ubuntu-latest
 
     strategy:
@@ -166,7 +182,7 @@ jobs:
 
   # open an issue if the build fails, so we know about it.
   open-issue:
-    if: failure()
+    if: failure() && needs.check_repo.outputs.should_run_workflow == 'true'
     needs:
       - mypy
       - trial
