@@ -534,7 +534,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                 check if the column event_stream_ordering already exists
                 """
                 check_sql = f"""
-                    SELECT column_name FROM information_schema.columns 
+                    SELECT column_name FROM information_schema.columns
                     WHERE table_name = '{table}' and column_name = 'event_stream_ordering';
                     """
                 txn.execute(check_sql)
@@ -641,7 +641,9 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                         """
                     )
 
-            await self.db_pool.runInteraction("add_sqlite_triggers", add_sqlite_triggers)
+            await self.db_pool.runInteraction(
+                "add_sqlite_triggers", add_sqlite_triggers
+            )
         elif isinstance(self.database_engine, PostgresEngine):
 
             def add_pg_triggers(txn: LoggingTransaction) -> None:
@@ -675,9 +677,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                         """
                     )
 
-            await self.db_pool.runInteraction(
-                "add_postgres_triggers", add_pg_triggers
-            )
+            await self.db_pool.runInteraction("add_postgres_triggers", add_pg_triggers)
         else:
             raise NotImplementedError("Unknown database engine")
 
