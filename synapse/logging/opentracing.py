@@ -917,8 +917,7 @@ def _custom_sync_async_decorator(
 
     else:
         # The other case here handles sync functions including those decorated with
-        # `@defer.inlineCallbacks` or return a `Deferred`, and those that return
-        # `Awaitable`
+        # `@defer.inlineCallbacks` or that return a `Deferred` or other `Awaitable`.
         @wraps(func)
         def _wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
             scope = wrapping_logic(func, *args, **kwargs)
