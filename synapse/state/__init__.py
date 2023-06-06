@@ -595,7 +595,6 @@ class StateResolutionHandler:
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
         # dict of set of event_ids -> _StateCacheEntry.
-        # TODO: Clear this when we purge history?
         self._state_cache: ExpiringCache[
             FrozenSet[int], _StateCacheEntry
         ] = ExpiringCache(
