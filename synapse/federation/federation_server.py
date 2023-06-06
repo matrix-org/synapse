@@ -515,7 +515,7 @@ class FederationServer(FederationBase):
                     logger.error(
                         "Failed to handle PDU %s",
                         event_id,
-                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                        exc_info=(f.type, f.value, f.getTracebackObject()),
                     )
                     return {"error": str(e)}
 
@@ -739,12 +739,10 @@ class FederationServer(FederationBase):
             "event": event_json,
             "state": [p.get_pdu_json(time_now) for p in state_events],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain_events],
-            "org.matrix.msc3706.partial_state": caller_supports_partial_state,
             "members_omitted": caller_supports_partial_state,
         }
 
         if servers_in_room is not None:
-            resp["org.matrix.msc3706.servers_in_room"] = list(servers_in_room)
             resp["servers_in_room"] = list(servers_in_room)
 
         return resp
@@ -1249,7 +1247,7 @@ class FederationServer(FederationBase):
                     logger.error(
                         "Failed to handle PDU %s",
                         event.event_id,
-                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                        exc_info=(f.type, f.value, f.getTracebackObject()),
                     )
 
                 received_ts = await self.store.remove_received_event_from_staging(
@@ -1292,9 +1290,6 @@ class FederationServer(FederationBase):
             if not new_lock:
                 return
             lock = new_lock
-
-    def __str__(self) -> str:
-        return "<ReplicationLayer(%s)>" % self.server_name
 
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: Dict

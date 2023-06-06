@@ -17,6 +17,13 @@ from synapse.rest.well_known import well_known_resource
 
 from tests import unittest
 
+try:
+    import authlib  # noqa: F401
+
+    HAS_AUTHLIB = True
+except ImportError:
+    HAS_AUTHLIB = False
+
 
 class WellKnownTests(unittest.HomeserverTestCase):
     def create_test_resource(self) -> Resource:
@@ -96,3 +103,37 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "GET", "/.well-known/matrix/server", shorthand=False
         )
         self.assertEqual(channel.code, 404)
+
+    @unittest.skip_unless(HAS_AUTHLIB, "requires authlib")
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://homeserver",  # this is only required so that client well known is served
+            "experimental_features": {
+                "msc3861": {
+                    "enabled": True,
+                    "issuer": "https://issuer",
+                    "account_management_url": "https://my-account.issuer",
+                    "client_id": "id",
+                    "client_auth_method": "client_secret_post",
+                    "client_secret": "secret",
+                },
+            },
+            "disable_registration": True,
+        }
+    )
+    def test_client_well_known_msc3861_oauth_delegation(self) -> None:
+        channel = self.make_request(
+            "GET", "/.well-known/matrix/client", shorthand=False
+        )
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body,
+            {
+                "m.homeserver": {"base_url": "https://homeserver/"},
+                "org.matrix.msc2965.authentication": {
+                    "issuer": "https://issuer",
+                    "account": "https://my-account.issuer",
+                },
+            },
+        )

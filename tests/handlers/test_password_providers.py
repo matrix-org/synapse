@@ -18,13 +18,17 @@ from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Type, Union
 from unittest.mock import Mock
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.handlers.account import AccountHandler
 from synapse.module_api import ModuleApi
 from synapse.rest.client import account, devices, login, logout, register
+from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID
+from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -162,10 +166,16 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
     CALLBACK_USERNAME = "get_username_for_registration"
     CALLBACK_DISPLAYNAME = "get_displayname_for_registration"
 
-    def setUp(self) -> None:
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         # we use a global mock device, so make sure we are starting with a clean slate
         mock_password_provider.reset_mock()
-        super().setUp()
+
+        # The mock password provider doesn't register the users, so ensure they
+        # are registered first.
+        self.register_user("u", "not-the-tested-password")
+        self.register_user("user", "not-the-tested-password")
 
     @override_config(legacy_providers_config(LegacyPasswordOnlyAuthProvider))
     def test_password_only_auth_progiver_login_legacy(self) -> None:
@@ -185,21 +195,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.reset_mock()
 
         # login with mxid should work too
-        channel = self._send_password_login("@u:bz", "p")
+        channel = self._send_password_login("@u:test", "p")
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
-        self.assertEqual("@u:bz", channel.json_body["user_id"])
-        mock_password_provider.check_password.assert_called_once_with("@u:bz", "p")
+        self.assertEqual("@u:test", channel.json_body["user_id"])
+        mock_password_provider.check_password.assert_called_once_with("@u:test", "p")
         mock_password_provider.reset_mock()
-
-        # try a weird username / pass. Honestly it's unclear what we *expect* to happen
-        # in these cases, but at least we can guard against the API changing
-        # unexpectedly
-        channel = self._send_password_login(" USER🙂NAME ", " pASS\U0001F622word ")
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
-        self.assertEqual("@ USER🙂NAME :test", channel.json_body["user_id"])
-        mock_password_provider.check_password.assert_called_once_with(
-            "@ USER🙂NAME :test", " pASS😢word "
-        )
 
     @override_config(legacy_providers_config(LegacyPasswordOnlyAuthProvider))
     def test_password_only_auth_provider_ui_auth_legacy(self) -> None:
@@ -207,10 +207,6 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
     def password_only_auth_provider_ui_auth_test_body(self) -> None:
         """UI Auth should delegate correctly to the password provider"""
-
-        # create the user, otherwise access doesn't work
-        module_api = self.hs.get_module_api()
-        self.get_success(module_api.register_user("u"))
 
         # log in twice, to get two devices
         mock_password_provider.check_password.return_value = make_awaitable(True)
@@ -401,28 +397,15 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.check_auth.assert_not_called()
 
         mock_password_provider.check_auth.return_value = make_awaitable(
-            ("@user:bz", None)
+            ("@user:test", None)
         )
         channel = self._send_login("test.login_type", "u", test_field="y")
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
-        self.assertEqual("@user:bz", channel.json_body["user_id"])
+        self.assertEqual("@user:test", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
         )
         mock_password_provider.reset_mock()
-
-        # try a weird username. Again, it's unclear what we *expect* to happen
-        # in these cases, but at least we can guard against the API changing
-        # unexpectedly
-        mock_password_provider.check_auth.return_value = make_awaitable(
-            ("@ MALFORMED! :bz", None)
-        )
-        channel = self._send_login("test.login_type", " USER🙂NAME ", test_field=" abc ")
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
-        self.assertEqual("@ MALFORMED! :bz", channel.json_body["user_id"])
-        mock_password_provider.check_auth.assert_called_once_with(
-            " USER🙂NAME ", "test.login_type", {"test_field": " abc "}
-        )
 
     @override_config(legacy_providers_config(LegacyCustomAuthProvider))
     def test_custom_auth_provider_ui_auth_legacy(self) -> None:
@@ -465,7 +448,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # right params, but authing as the wrong user
         mock_password_provider.check_auth.return_value = make_awaitable(
-            ("@user:bz", None)
+            ("@user:test", None)
         )
         body["auth"]["test_field"] = "foo"
         channel = self._delete_device(tok1, "dev2", body)
@@ -498,11 +481,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         callback = Mock(return_value=make_awaitable(None))
 
         mock_password_provider.check_auth.return_value = make_awaitable(
-            ("@user:bz", callback)
+            ("@user:test", callback)
         )
         channel = self._send_login("test.login_type", "u", test_field="y")
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
-        self.assertEqual("@user:bz", channel.json_body["user_id"])
+        self.assertEqual("@user:test", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
         )
@@ -512,7 +495,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         call_args, call_kwargs = callback.call_args
         # should be one positional arg
         self.assertEqual(len(call_args), 1)
-        self.assertEqual(call_args[0]["user_id"], "@user:bz")
+        self.assertEqual(call_args[0]["user_id"], "@user:test")
         for p in ["user_id", "access_token", "device_id", "home_server"]:
             self.assertIn(p, call_args[0])
 

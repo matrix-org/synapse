@@ -561,6 +561,50 @@ class BackgroundUpdater:
             updater, oneshot=True
         )
 
+    def register_background_validate_constraint(
+        self, update_name: str, constraint_name: str, table: str
+    ) -> None:
+        """Helper for store classes to do a background validate constraint.
+
+        This only applies on PostgreSQL.
+
+        To use:
+
+        1. use a schema delta file to add a background update. Example:
+            INSERT INTO background_updates (update_name, progress_json) VALUES
+                ('validate_my_constraint', '{}');
+
+        2. In the Store constructor, call this method
+
+        Args:
+            update_name: update_name to register for
+            constraint_name: name of constraint to validate
+            table: table the constraint is applied to
+        """
+
+        def runner(conn: Connection) -> None:
+            c = conn.cursor()
+
+            sql = f"""
+            ALTER TABLE {table} VALIDATE CONSTRAINT {constraint_name};
+            """
+            logger.debug("[SQL] %s", sql)
+            c.execute(sql)
+
+        async def updater(progress: JsonDict, batch_size: int) -> int:
+            assert isinstance(
+                self.db_pool.engine, engines.PostgresEngine
+            ), "validate constraint background update registered for non-Postres database"
+
+            logger.info("Validating constraint %s to %s", constraint_name, table)
+            await self.db_pool.runWithConnection(runner)
+            await self._end_background_update(update_name)
+            return 1
+
+        self._background_update_handlers[update_name] = _BackgroundUpdateHandler(
+            updater, oneshot=True
+        )
+
     async def create_index_in_background(
         self,
         index_name: str,

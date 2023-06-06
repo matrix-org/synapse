@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -33,7 +34,7 @@ class LoginTokenRequestServlet(RestServlet):
 
     Request:
 
-    POST /login/token HTTP/1.1
+    POST /login/get_token HTTP/1.1
     Content-Type: application/json
 
     {}
@@ -43,30 +44,45 @@ class LoginTokenRequestServlet(RestServlet):
     HTTP/1.1 200 OK
     {
         "login_token": "ABDEFGH",
-        "expires_in": 3600,
+        "expires_in_ms": 3600000,
     }
     """
 
-    PATTERNS = client_patterns(
-        "/org.matrix.msc3882/login/token$", releases=[], v1=False, unstable=True
-    )
+    PATTERNS = [
+        *client_patterns(
+            "/login/get_token$", releases=["v1"], v1=False, unstable=False
+        ),
+        # TODO: this is no longer needed once unstable MSC3882 does not need to be supported:
+        *client_patterns(
+            "/org.matrix.msc3882/login/token$", releases=[], v1=False, unstable=True
+        ),
+    ]
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastores().main
-        self.clock = hs.get_clock()
-        self.server_name = hs.config.server.server_name
+        self._main_store = hs.get_datastores().main
         self.auth_handler = hs.get_auth_handler()
-        self.token_timeout = hs.config.experimental.msc3882_token_timeout
-        self.ui_auth = hs.config.experimental.msc3882_ui_auth
+        self.token_timeout = hs.config.auth.login_via_existing_token_timeout
+        self._require_ui_auth = hs.config.auth.login_via_existing_require_ui_auth
+
+        # Ratelimit aggressively to a maxmimum of 1 request per minute.
+        #
+        # This endpoint can be used to spawn additional sessions and could be
+        # abused by a malicious client to create many sessions.
+        self._ratelimiter = Ratelimiter(
+            store=self._main_store,
+            clock=hs.get_clock(),
+            rate_hz=1 / 60,
+            burst_count=1,
+        )
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         body = parse_json_object_from_request(request)
 
-        if self.ui_auth:
+        if self._require_ui_auth:
             await self.auth_handler.validate_user_via_ui_auth(
                 requester,
                 request,
@@ -75,9 +91,12 @@ class LoginTokenRequestServlet(RestServlet):
                 can_skip_ui_auth=False,  # Don't allow skipping of UI auth
             )
 
+        # Ensure that this endpoint isn't being used too often. (Ensure this is
+        # done *after* UI auth.)
+        await self._ratelimiter.ratelimit(None, requester.user.to_string().lower())
+
         login_token = await self.auth_handler.create_login_token_for_user_id(
             user_id=requester.user.to_string(),
-            auth_provider_id="org.matrix.msc3882.login_token_request",
             duration_ms=self.token_timeout,
         )
 
@@ -85,11 +104,13 @@ class LoginTokenRequestServlet(RestServlet):
             200,
             {
                 "login_token": login_token,
+                # TODO: this is no longer needed once unstable MSC3882 does not need to be supported:
                 "expires_in": self.token_timeout // 1000,
+                "expires_in_ms": self.token_timeout,
             },
         )
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    if hs.config.experimental.msc3882_enabled:
+    if hs.config.auth.login_via_existing_enabled:
         LoginTokenRequestServlet(hs).register(http_server)

@@ -27,7 +27,7 @@ from synapse.appservice import ApplicationService
 from synapse.handlers.device import DeviceHandler
 from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
 from tests import unittest
@@ -45,6 +45,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = hs.get_e2e_keys_handler()
         self.store = self.hs.get_datastores().main
+        self.requester = UserID.from_string(f"@test_requester:{self.hs.hostname}")
 
     def test_query_local_devices_no_devices(self) -> None:
         """If the user has no devices, we expect an empty list."""
@@ -161,6 +162,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         res2 = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -206,6 +208,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -225,6 +228,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -274,6 +278,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -286,6 +291,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -307,6 +313,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -348,6 +355,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -370,6 +378,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1080,6 +1089,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id_1: {"alg1": 1}, device_id_2: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=False,
             )
@@ -1125,6 +1135,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id_1: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1169,6 +1180,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id_1: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1202,6 +1214,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id_1: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=True,
             )
@@ -1229,6 +1242,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         claim_res = self.get_success(
             self.handler.claim_one_time_keys(
                 {local_user: {device_id_1: {"alg1": 1}}},
+                self.requester,
                 timeout=None,
                 always_include_fallback_keys=True,
             )

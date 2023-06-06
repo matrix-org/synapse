@@ -28,7 +28,7 @@ from unittest.mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
@@ -240,7 +240,7 @@ class StateTestCase(unittest.TestCase):
         hs.get_macaroon_generator.return_value = MacaroonGenerator(
             clock, "tesths", b"verysecret"
         )
-        hs.get_auth.return_value = Auth(hs)
+        hs.get_auth.return_value = InternalAuth(hs)
         hs.get_state_resolution_handler = lambda: StateResolutionHandler(hs)
         hs.get_storage_controllers.return_value = storage_controllers
 

@@ -55,6 +55,7 @@ class WorkerSchemaTests(HomeserverTestCase):
 
         # Mark this as a worker app.
         conf["worker_app"] = "yes"
+        conf["instance_map"] = {"main": {"host": "127.0.0.1", "port": 0}}
 
         return conf
 
