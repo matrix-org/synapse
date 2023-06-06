@@ -227,8 +227,6 @@ class LogContextScopeManagerTestCase(TestCase):
         Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
         with functions that return deferreds
         """
-        reactor = MemoryReactorClock()
-
         with LoggingContext("root context"):
 
             @trace_with_opname("fixture_deferred_func", tracer=self._tracer)
@@ -239,9 +237,6 @@ class LogContextScopeManagerTestCase(TestCase):
                 return d1
 
             result_d1 = fixture_deferred_func()
-
-            # let the tasks complete
-            reactor.pump((2,) * 8)
 
             self.assertEqual(self.successResultOf(result_d1), "foo")
 
@@ -256,8 +251,6 @@ class LogContextScopeManagerTestCase(TestCase):
         Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
         with async functions
         """
-        reactor = MemoryReactorClock()
-
         with LoggingContext("root context"):
 
             @trace_with_opname("fixture_async_func", tracer=self._tracer)
@@ -266,9 +259,6 @@ class LogContextScopeManagerTestCase(TestCase):
                 return "foo"
 
             d1 = defer.ensureDeferred(fixture_async_func())
-
-            # let the tasks complete
-            reactor.pump((2,) * 8)
 
             self.assertEqual(self.successResultOf(d1), "foo")
 
@@ -283,8 +273,6 @@ class LogContextScopeManagerTestCase(TestCase):
         Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
         with functions that return an awaitable (e.g. a coroutine)
         """
-        reactor = MemoryReactorClock()
-
         with LoggingContext("root context"):
             # Something we can return without `await` to get a coroutine
             async def fixture_async_func() -> str:
@@ -302,9 +290,6 @@ class LogContextScopeManagerTestCase(TestCase):
                 return await fixture_awaitable_return_func()
 
             d1 = defer.ensureDeferred(runner())
-
-            # let the tasks complete
-            reactor.pump((2,) * 8)
 
             self.assertEqual(self.successResultOf(d1), "foo")
 
