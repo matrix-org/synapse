@@ -19,6 +19,10 @@ concurrency:
 
 jobs:
   check_repo:
+    # Prevent this workflow from running on any fork of Synapse other than matrix-org/synapse, as it is
+    # only useful to the Synapse core team.
+    # All other workflow steps depend on this one, thus if 'should_run_workflow' is not 'true', the rest
+    # of the workflow will be skipped as well.
     if: github.repository == 'matrix-org/synapse'
     runs-on: ubuntu-latest
     outputs:
