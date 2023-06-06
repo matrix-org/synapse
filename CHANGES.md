@@ -6,7 +6,7 @@ No significant changes since 1.85.0rc2.
 
 ## Security advisory
 
-The following issues are fixed in 1.85.0.
+The following issues are fixed in 1.85.0 (and RCs).
 
 - [GHSA-26c5-ppr8-f33p](https://github.com/matrix-org/synapse/security/advisories/GHSA-26c5-ppr8-f33p) / [CVE-2023-32682](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-32683) — Low Severity
 
