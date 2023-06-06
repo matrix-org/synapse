@@ -3552,6 +3552,10 @@ This setting has the following sub-options:</p>
 localhost and 6379</p>
 </li>
 <li>
+<p><code>path</code>: The full path to a local Unix socket file. <strong>If this is used, <code>host</code> and
+<code>port</code> are ignored.</strong> Defaults to `/tmp/redis.sock'</p>
+</li>
+<li>
 <p><code>password</code>: Optional password if configured on the Redis instance.</p>
 </li>
 <li>
@@ -3573,6 +3577,7 @@ localhost and 6379</p>
 <p><code>ca_path</code>: Optional path to the folder containing the CA certificate file</p>
 <p><em>Added in Synapse 1.78.0.</em></p>
 <p><em>Changed in Synapse 1.84.0: Added use_tls, certificate_file, private_key_file, ca_file and ca_path attributes</em></p>
+<p><em>Changed in Synapse 1.85.0: Added path option to use a local Unix socket</em></p>
 </li>
 </ul>
 <p>Example configuration:</p>

@@ -1779,6 +1779,13 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1850"><a class="header" href="#upgrading-to-v1850">Upgrading to v1.85.0</a></h1>
+<h2 id="application-service-registration-with-user-property-deprecation"><a class="header" href="#application-service-registration-with-user-property-deprecation">Application service registration with &quot;user&quot; property deprecation</a></h2>
+<p>Application services should ensure they call the <code>/register</code> endpoint with a
+<code>username</code> property. The legacy <code>user</code> property is considered deprecated and
+should no longer be included.</p>
+<p>A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service login.</p>
 <h1 id="upgrading-to-v1840"><a class="header" href="#upgrading-to-v1840">Upgrading to v1.84.0</a></h1>
 <h2 id="deprecation-of-worker_replication_-configuration-settings"><a class="header" href="#deprecation-of-worker_replication_-configuration-settings">Deprecation of <code>worker_replication_*</code> configuration settings</a></h2>
 <p>When using workers,</p>
@@ -7042,6 +7049,10 @@ This setting has the following sub-options:</p>
 localhost and 6379</p>
 </li>
 <li>
+<p><code>path</code>: The full path to a local Unix socket file. <strong>If this is used, <code>host</code> and
+<code>port</code> are ignored.</strong> Defaults to `/tmp/redis.sock'</p>
+</li>
+<li>
 <p><code>password</code>: Optional password if configured on the Redis instance.</p>
 </li>
 <li>
@@ -7063,6 +7074,7 @@ localhost and 6379</p>
 <p><code>ca_path</code>: Optional path to the folder containing the CA certificate file</p>
 <p><em>Added in Synapse 1.78.0.</em></p>
 <p><em>Changed in Synapse 1.84.0: Added use_tls, certificate_file, private_key_file, ca_file and ca_path attributes</em></p>
+<p><em>Changed in Synapse 1.85.0: Added path option to use a local Unix socket</em></p>
 </li>
 </ul>
 <p>Example configuration:</p>
@@ -7352,9 +7364,7 @@ root:
     # Write logs to the `buffer` handler, which will buffer them together in memory,
     # then write them to a file.
     #
-    # Replace &quot;buffer&quot; with &quot;console&quot; to log to stderr instead. (Note that you'll
-    # also need to update the configuration for the `twisted` logger above, in
-    # this case.)
+    # Replace &quot;buffer&quot; with &quot;console&quot; to log to stderr instead.
     #
     handlers: [buffer]
 
@@ -10334,6 +10344,8 @@ the client.</p>
 <code>/login</code> request. If the module doesn't wish to return a callback, it must return <code>None</code>
 instead.</p>
 <p>If the authentication is unsuccessful, the module must return <code>None</code>.</p>
+<p>Note that the user is not automatically registered, the <code>register_user(..)</code> method of
+the <a href="modules/writing_a_module.html">module API</a> can be used to lazily create users.</p>
 <p>If multiple modules register an auth checker for the same login type but with different
 fields, Synapse will refuse to start.</p>
 <p>If multiple modules register an auth checker for the same login type with the same fields,
@@ -14305,6 +14317,26 @@ devices was last seen. (May be a few minutes out of date, for efficiency reasons
 <p><code>total</code> - Total number of user's devices.</p>
 </li>
 </ul>
+<h3 id="create-a-device"><a class="header" href="#create-a-device">Create a device</a></h3>
+<p>Creates a new device for a specific <code>user_id</code> and <code>device_id</code>. Does nothing if the <code>device_id</code> 
+exists already.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v2/users/&lt;user_id&gt;/devices
+
+{
+  &quot;device_id&quot;: &quot;QBUAZIFURK&quot;
+}
+</code></pre>
+<p>An empty JSON dict is returned.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p>The following fields are required in the JSON request body:</p>
+<ul>
+<li><code>device_id</code> - The device ID to create.</li>
+</ul>
 <h3 id="delete-multiple-devices"><a class="header" href="#delete-multiple-devices">Delete multiple devices</a></h3>
 <p>Deletes the given devices for a specific <code>user_id</code>, and invalidates
 any access token associated with them.</p>
@@ -15212,11 +15244,6 @@ homeserver configuration options that exist to tweak it.</p>
 <tr><td><code>daily_e2ee_messages</code></td><td>int</td><td>The number of (state) events with the type <code>m.room.encrypted</code> seen in the last 24 hours.</td></tr>
 <tr><td><code>daily_sent_messages</code></td><td>int</td><td>The number of (state) events sent by a local user with the type <code>m.room.message</code> seen in the last 24 hours.</td></tr>
 <tr><td><code>daily_sent_e2ee_messages</code></td><td>int</td><td>The number of (state) events sent by a local user with the type <code>m.room.encrypted</code> seen in the last 24 hours.</td></tr>
-<tr><td><code>r30_users_all</code></td><td>int</td><td>The number of 30 day retained users, defined as users who have created their accounts more than 30 days ago, where they were last seen at most 30 days ago and where those two timestamps are over 30 days apart. Includes clients that do not fit into the below r30 client types.</td></tr>
-<tr><td><code>r30_users_android</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;Android&quot; in the user agent string.</td></tr>
-<tr><td><code>r30_users_ios</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;iOS&quot; in the user agent string.</td></tr>
-<tr><td><code>r30_users_electron</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;Electron&quot; in the user agent string.</td></tr>
-<tr><td><code>r30_users_web</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with &quot;Mozilla&quot; or &quot;Gecko&quot; in the user agent string.</td></tr>
 <tr><td><code>r30v2_users_all</code></td><td>int</td><td>The number of 30 day retained users, with a revised algorithm. Defined as users that appear more than once in the past 60 days, and have more than 30 days between the most and least recent appearances in the past 60 days. Includes clients that do not fit into the below r30 client types.</td></tr>
 <tr><td><code>r30v2_users_android</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with (&quot;riot&quot; or &quot;element&quot;) and &quot;android&quot; (case-insensitive) in the user agent string.</td></tr>
 <tr><td><code>r30v2_users_ios</code></td><td>int</td><td>The number of 30 day retained users, as defined above. Filtered only to clients with (&quot;riot&quot; or &quot;element&quot;) and &quot;ios&quot; (case-insensitive) in the user agent string.</td></tr>
@@ -15819,12 +15846,12 @@ recommended for development. More information about WSL can be found at
 <a href="https://docs.microsoft.com/en-us/windows/wsl/install">https://docs.microsoft.com/en-us/windows/wsl/install</a>. Running Synapse natively
 on Windows is not officially supported.</p>
 <p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://www.python.org/downloads/">a recent version of Python 3</a>. Your Python also needs support for <a href="https://docs.python.org/3/library/venv.html">virtual environments</a>. This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running <code>sudo apt install python3-venv</code> should be enough.</p>
+<p>A recent version of the Rust compiler is needed to build the native modules. The
+easiest way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <p>Synapse can connect to PostgreSQL via the <a href="https://pypi.org/project/psycopg2/">psycopg2</a> Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with <code>sudo apt install libpq-dev</code>.</p>
 <p>Synapse has an optional, improved user search with better Unicode support. For that you need the development package of <code>libicu</code>. On Debian or Ubuntu Linux, this can be installed with <code>sudo apt install libicu-dev</code>.</p>
 <p>The source code of Synapse is hosted on GitHub. You will also need <a href="https://github.com/git-guides/install-git">a recent version of git</a>.</p>
 <p>For some tests, you will need <a href="https://docs.docker.com/get-docker/">a recent version of Docker</a>.</p>
-<p>A recent version of the Rust compiler is needed to build the native modules. The
-easiest way of installing the latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <h1 id="3-get-the-source"><a class="header" href="#3-get-the-source">3. Get the source.</a></h1>
 <p>The preferred and easiest way to contribute changes is to fork the relevant
 project on GitHub, and then <a href="https://help.github.com/articles/using-pull-requests/">create a pull request</a> to ask us to pull your
@@ -15836,6 +15863,9 @@ git checkout develop
 <p>If you need help getting started with git, this is beyond the scope of the document, but you
 can find many good git tutorials on the web.</p>
 <h1 id="4-install-the-dependencies"><a class="header" href="#4-install-the-dependencies">4. Install the dependencies</a></h1>
+<p>Before installing the Python dependencies, make sure you have installed a recent version
+of Rust (see the &quot;What do I need?&quot; section above). The easiest way of installing the
+latest version is to use <a href="https://rustup.rs/">rustup</a>.</p>
 <p>Synapse uses the <a href="https://python-poetry.org/">poetry</a> project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
 source, you should install <code>poetry</code>.
@@ -15851,14 +15881,28 @@ for other installation methods.</p>
 <pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
 poetry install --extras all
 </code></pre>
-<p>This will install the runtime and developer dependencies for the project.</p>
+<p>This will install the runtime and developer dependencies for the project.  Be sure to check
+that the <code>poetry install</code> step completed cleanly.</p>
 <h2 id="running-synapse-via-poetry"><a class="header" href="#running-synapse-via-poetry">Running Synapse via poetry</a></h2>
 <p>To start a local instance of Synapse in the locked poetry environment, create a config file:</p>
 <pre><code class="language-sh">cp docs/sample_config.yaml homeserver.yaml
+cp docs/sample_log_config.yaml log_config.yaml
 </code></pre>
-<p>Now edit homeserver.yaml, and run Synapse with:</p>
+<p>Now edit <code>homeserver.yaml</code>, things you might want to change include:</p>
+<ul>
+<li>Set a <code>server_name</code></li>
+<li>Adjusting paths to be correct for your system like the <code>log_config</code> to point to the log config you just copied</li>
+<li>Using a <a href="https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#database">PostgreSQL database instead of SQLite</a></li>
+<li>Adding a <a href="https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration_shared_secret"><code>registration_shared_secret</code></a> so you can use <a href="https://matrix-org.github.io/synapse/latest/setup/installation.html#registering-a-user"><code>register_new_matrix_user</code> command</a>.</li>
+</ul>
+<p>And then run Synapse with the following command:</p>
 <pre><code class="language-sh">poetry run python -m synapse.app.homeserver -c homeserver.yaml
 </code></pre>
+<p>If you get an error like the following:</p>
+<pre><code>importlib.metadata.PackageNotFoundError: matrix-synapse
+</code></pre>
+<p>this probably indicates that the <code>poetry install</code> step did not complete cleanly - go back and
+resolve any issues and re-run until successful.</p>
 <h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
 <p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
 <h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
@@ -17019,15 +17063,16 @@ poetry lock --no-update
 doesn't require poetry. (It's what we use in CI too). However, you could try
 <code>poetry build</code> too.</p>
 <h2 id="handle-a-dependabot-pull-request"><a class="header" href="#handle-a-dependabot-pull-request">...handle a Dependabot pull request?</a></h2>
-<p>Synapse uses Dependabot to keep the <code>poetry.lock</code> file up-to-date. When it
-creates a pull request a GitHub Action will run to automatically create a changelog
-file. Ensure that:</p>
+<p>Synapse uses Dependabot to keep the <code>poetry.lock</code> and <code>Cargo.lock</code> file 
+up-to-date with the latest releases of our dependencies. The changelog check is
+omitted for Dependabot PRs; the release script will include them in the 
+changelog.</p>
+<p>When reviewing a dependabot PR, ensure that:</p>
 <ul>
 <li>the lockfile changes look reasonable;</li>
 <li>the upstream changelog file (linked in the description) doesn't include any
 breaking changes;</li>
-<li>continuous integration passes (due to permissions, the GitHub Actions run on
-the changelog commit will fail, look at the initial commit of the pull request);</li>
+<li>continuous integration passes.</li>
 </ul>
 <p>In particular, any updates to the type hints (usually packages which start with <code>types-</code>)
 should be safe to merge if linting passes.</p>
@@ -17714,10 +17759,6 @@ minimal.</p>
 <h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
 <h3 id="the-replication-protocol"><a class="header" href="#the-replication-protocol">The Replication Protocol</a></h3>
 <p>See <a href="tcp_replication.html">the TCP replication documentation</a>.</p>
-<h3 id="the-slaved-datastore"><a class="header" href="#the-slaved-datastore">The Slaved DataStore</a></h3>
-<p>There are read-only version of the synapse storage layer in
-<code>synapse/replication/slave/storage</code> that use the response of the
-replication API to invalidate their caches.</p>
 <h3 id="the-tcp-replication-module"><a class="header" href="#the-tcp-replication-module">The TCP Replication Module</a></h3>
 <p>Information about how the tcp replication module is structured, including how
 the classes interact, can be found in
