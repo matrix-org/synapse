@@ -60,3 +60,13 @@ class AuthConfig(Config):
         self.ui_auth_session_timeout = self.parse_duration(
             ui_auth.get("session_timeout", 0)
         )
+
+        # Logging in with an existing session.
+        login_via_existing = config.get("login_via_existing_session", {})
+        self.login_via_existing_enabled = login_via_existing.get("enabled", False)
+        self.login_via_existing_require_ui_auth = login_via_existing.get(
+            "require_ui_auth", True
+        )
+        self.login_via_existing_token_timeout = self.parse_duration(
+            login_via_existing.get("token_timeout", "5m")
+        )

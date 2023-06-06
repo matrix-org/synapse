@@ -1,3 +1,45 @@
+Synapse 1.85.0 (2023-06-06)
+===========================
+
+No significant changes since 1.85.0rc2.
+
+
+## Security advisory
+
+The following issues are fixed in 1.85.0 (and RCs).
+
+- [GHSA-26c5-ppr8-f33p](https://github.com/matrix-org/synapse/security/advisories/GHSA-26c5-ppr8-f33p) / [CVE-2023-32682](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-32682) — Low Severity
+
+  It may be possible for a deactivated user to login when using uncommon configurations.
+
+- [GHSA-98px-6486-j7qc](https://github.com/matrix-org/synapse/security/advisories/GHSA-98px-6486-j7qc) / [CVE-2023-32683](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-32683) — Low Severity
+
+  A discovered oEmbed or image URL can bypass the `url_preview_url_blacklist` setting potentially allowing server side request forgery or bypassing network policies. Impact is limited to IP addresses allowed by the `url_preview_ip_range_blacklist` setting (by default this only allows public IPs).
+
+See the advisories for more details. If you have any questions, email security@matrix.org.
+
+
+Synapse 1.85.0rc2 (2023-06-01)
+==============================
+
+Bugfixes
+--------
+
+- Fix a performance issue introduced in Synapse v1.83.0 which meant that purging rooms was very slow and database-intensive. ([\#15693](https://github.com/matrix-org/synapse/issues/15693))
+
+
+Deprecations and Removals
+-------------------------
+
+- Deprecate calling the `/register` endpoint with an unspecced `user` property for application services. ([\#15703](https://github.com/matrix-org/synapse/issues/15703))
+
+
+Internal Changes
+----------------
+
+- Speed up background jobs `populate_full_user_id_user_filters` and `populate_full_user_id_profiles`. ([\#15700](https://github.com/matrix-org/synapse/issues/15700))
+
+
 Synapse 1.85.0rc1 (2023-05-30)
 ==============================
 
