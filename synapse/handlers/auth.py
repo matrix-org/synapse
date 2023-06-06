@@ -1759,7 +1759,7 @@ class AuthHandler:
             return
 
         user_profile_data = await self.store.get_profileinfo(
-            UserID.from_string(registered_user_id).localpart
+            UserID.from_string(registered_user_id)
         )
 
         # Store any extra attributes which will be passed in the login response.

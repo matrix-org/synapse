@@ -1061,12 +1061,15 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             # The array of numbers are the weights for the various part of the
             # search: (domain, _, display name, localpart)
             sql = """
+                WITH matching_users AS (
+                    SELECT user_id, vector FROM user_directory_search WHERE vector @@ to_tsquery('simple', ?)
+                    LIMIT 10000
+                )
                 SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search as t
+                FROM matching_users as t
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
                     %(where_clause)s
-                    AND vector @@ to_tsquery('simple', ?)
                 ORDER BY
                     (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
@@ -1095,8 +1098,9 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 "order_case_statements": " ".join(additional_ordering_statements),
             }
             args = (
-                join_args
-                + (full_query, exact_query, prefix_query)
+                (full_query,)
+                + join_args
+                + (exact_query, prefix_query)
                 + ordering_arguments
                 + (limit + 1,)
             )
