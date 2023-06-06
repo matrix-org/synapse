@@ -944,7 +944,7 @@ class FederationServer(FederationBase):
             if not self._is_mine_server_name(authorising_server):
                 raise SynapseError(
                     400,
-                    f"Cannot authorise request from resident server: {authorising_server}",
+                    f"Cannot authorise membership event for {authorising_server}. We can only authorise requests from our own homeserver",
                 )
 
             event.signatures.update(
