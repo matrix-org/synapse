@@ -25,7 +25,7 @@ jobs:
       should_run_workflow: ${{ steps.check_condition.outputs.should_run_workflow }}
     steps:
       - id: check_condition
-        run: echo "::set-output name=should_run_workflow::${{ github.repository == 'matrix-org/synapse' }}"
+        run: echo "should_run_workflow=${{ github.repository == 'matrix-org/synapse' }}" >> "$GITHUB_OUTPUT"
 
   mypy:
     needs: check_repo
