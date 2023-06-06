@@ -22,7 +22,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_repo:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_workflow: ${{ steps.check_condition.outputs.should_run_workflow }}
+    steps:
+      - id: check_condition
+        run: echo "::set-output name=should_run_workflow::${{ github.repository == 'matrix-org/synapse' }}"
+
   mypy:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -47,6 +57,8 @@ jobs:
         run: sed '/warn_unused_ignores = True/d' -i mypy.ini
       - run: poetry run mypy
   trial:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -105,6 +117,8 @@ jobs:
 
 
   sytest:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:testing
@@ -156,7 +170,8 @@ jobs:
 
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
+    needs: check_repo
+    if: "!failure() && !cancelled() && needs.check_repo.outputs.should_run_workflow == 'true'"
     runs-on: ubuntu-latest
 
     strategy:
@@ -192,7 +207,7 @@ jobs:
   # Open an issue if the build fails, so we know about it.
   # Only do this if we're not experimenting with this action in a PR.
   open-issue:
-    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request'"
+    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request' && needs.check_repo.outputs.should_run_workflow == 'true'"
     needs:
       # TODO: should mypy be included here? It feels more brittle than the others.
       - mypy
