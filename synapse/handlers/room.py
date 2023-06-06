@@ -1490,7 +1490,6 @@ class RoomContextHandler:
 
 class TimestampLookupHandler:
     def __init__(self, hs: "HomeServer"):
-        self.server_name = hs.hostname
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()
