@@ -934,8 +934,8 @@ def _custom_sync_async_decorator(
                         return result
 
                     def err_back(result: R) -> R:
-                        # XXX: Feels like we could put the error details into the
-                        # `scope.__exit__(...)`
+                        # TODO: Pass the error details into `scope.__exit__(...)` for
+                        #       consistency with the other paths.
                         scope.__exit__(None, None, None)
                         return result
 
