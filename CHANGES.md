@@ -1,3 +1,14 @@
+Synapse 1.85.1 (2023-06-07)
+===========================
+
+Note: this release only fixes a bug that stopped some deployments from upgrading to v1.85.0. There is no need to upgrade to v1.85.1 if successfully running v1.85.0.
+
+Bugfixes
+--------
+
+- Fix bug in schema delta that broke upgrades for some deployments. Introduced in v1.85.0. ([\#15738](https://github.com/matrix-org/synapse/issues/15738), [\#15739](https://github.com/matrix-org/synapse/issues/15739))
+
+
 Synapse 1.85.0 (2023-06-06)
 ===========================
 
