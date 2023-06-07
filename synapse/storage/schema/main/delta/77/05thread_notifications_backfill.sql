@@ -22,11 +22,13 @@ DELETE FROM background_updates WHERE update_name = 'event_push_backfill_thread_i
 UPDATE event_push_actions_staging SET thread_id = 'main' WHERE thread_id IS NULL;
 UPDATE event_push_actions SET thread_id = 'main' WHERE thread_id IS NULL;
 
+-- Empirically we can end up with entries in the push summary table with both a
+-- `NULL` and `main` thread ID, which causes the update below to fail. We fudge
+-- this by deleting any `NULL` rows that have a corresponding `main`.
 DELETE FROM event_push_summary AS a WHERE thread_id IS NULL AND EXISTS (
     SELECT 1 FROM event_push_summary AS b
     WHERE b.thread_id = 'main' AND a.user_id = b.user_id AND a.room_id = b.room_id
 );
-
 UPDATE event_push_summary SET thread_id = 'main' WHERE thread_id IS NULL;
 
 -- Drop the background updates to calculate the indexes used to find null thread_ids.
