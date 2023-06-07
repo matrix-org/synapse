@@ -522,7 +522,11 @@ class PaginationHandler:
                 number_of_gaps = 0
                 previous_event_depth = None
                 for event_depth in sorted_event_depths:
-                    depth_gap = event_depth - previous_event_depth
+                    depth_gap = (
+                        event_depth - previous_event_depth
+                        if previous_event_depth is not None
+                        else 0
+                    )
                     if depth_gap > 0:
                         number_of_gaps += 1
 
@@ -535,7 +539,7 @@ class PaginationHandler:
                     # given events `prev_events` is one that has failed pull attempts and we
                     # could just treat it like a dead branch of history for now or at least
                     # something that we don't need the block the client on to try pulling.
-                    if event_depth - previous_event_depth > 1:
+                    if depth_gap > 1:
                         found_big_gap = True
                         break
                     previous_event_depth = event_depth
