@@ -194,6 +194,7 @@ class BackgroundUpdater:
         """An integer summarising the updater status. Used as a metric."""
         if self._aborted:
             return UpdaterStatus.ABORTED
+        # TODO: a status for "have seen at least one failure, but haven't aborted yet".
         if not self.enabled:
             return UpdaterStatus.DISABLED
 
@@ -324,6 +325,7 @@ class BackgroundUpdater:
                 except Exception:
                     back_to_back_failures += 1
                     if back_to_back_failures >= 5:
+                        self._aborted = True
                         raise RuntimeError(
                             "5 back-to-back background update failures; aborting."
                         )
