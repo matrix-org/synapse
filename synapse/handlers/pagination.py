@@ -514,7 +514,7 @@ class PaginationHandler:
                 to_room_key = pagin_config.to_token.room_key
 
             # Initially fetch the events from the database. With any luck, we can return
-            # these without having to backfill anything (handled below).
+            # these without blocking on backfill (handled below).
             events, next_key = await self.store.paginate_room_events(
                 room_id=room_id,
                 from_key=from_token.room_key,
@@ -551,11 +551,9 @@ class PaginationHandler:
                     previous_event_depth = event_depth
 
                 # Backfill in the foreground if we found a big gap and want to fill in
-                # that history.
-                #
-                # TODO: Should we also consider not enough events to fill the `limit` as
-                # cause to backfill in the foreground?
-                if found_big_gap:
+                # that history or we don't have enough events to fill the limit that the
+                # client asked for.
+                if found_big_gap or len(events) < pagin_config.limit:
                     did_backfill = (
                         await self.hs.get_federation_handler().maybe_backfill(
                             room_id,
