@@ -22,9 +22,7 @@ class FederationConfig(Config):
     section = "federation"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-        federation_config = config.get("federation")
-        if federation_config is None:
-            federation_config = {}
+        federation_config = config.setdefault("federation", {})
 
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist: Optional[dict] = None
@@ -53,8 +51,9 @@ class FederationConfig(Config):
             "allow_device_name_lookup_over_federation", False
         )
 
-        # Allow for the configuration of max request retries and min/max retry delays
-        # in the matrix federation client
+        # Allow for the configuration of timeout, max request retries
+        # and min/max retry delays in the matrix federation client.
+        self.client_timeout = federation_config.get("client_timeout", 60)
         self.max_long_retry_delay = federation_config.get("max_long_retry_delay", 60)
         self.max_short_retry_delay = federation_config.get("max_short_retry_delay", 2)
         self.max_long_retries = federation_config.get("max_long_retries", 10)
