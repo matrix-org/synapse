@@ -1,0 +1,1 @@
+Remove redundant table join with `current_state_events` when doing a `get_users_in_room_with_profiles()`/`get_subset_users_in_room_with_profiles()` call.
