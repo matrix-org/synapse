@@ -224,7 +224,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             )
 
             sql = """
-                SELECT state_key, display_name, avatar_url FROM room_memberships
+                SELECT user_id, display_name, avatar_url FROM room_memberships
                 WHERE room_id = ? AND membership = ? AND %s
             """ % (
                 clause,
@@ -263,7 +263,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             txn: LoggingTransaction,
         ) -> Dict[str, ProfileInfo]:
             sql = """
-                SELECT state_key, display_name, avatar_url FROM room_memberships
+                SELECT user_id, display_name, avatar_url FROM room_memberships
                 WHERE room_id = ? AND membership = ?
             """
             txn.execute(sql, (room_id, Membership.JOIN))
