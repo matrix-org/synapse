@@ -476,7 +476,70 @@ class PaginationHandler:
                     room_id, requester, allow_departed_users=True
                 )
 
+            # If they have left the room then clamp the token to be before
+            # they left the room, to save the effort of loading from the
+            # database.
+            if (
+                pagin_config.direction == Direction.BACKWARDS
+                and not use_admin_priviledge
+                and membership == Membership.LEAVE
+            ):
+                # This is only None if the room is world_readable, in which case
+                # "Membership.JOIN" would have been returned and we should never hit
+                # this branch.
+                assert member_event_id
+
+                leave_token = await self.store.get_topological_token_for_event(
+                    member_event_id
+                )
+                assert leave_token.topological is not None
+
+                if leave_token.topological < curr_topo:
+                    from_token = from_token.copy_and_replace(
+                        StreamKeyType.ROOM, leave_token
+                    )
+
+            to_room_key = None
+            if pagin_config.to_token:
+                to_room_key = pagin_config.to_token.room_key
+
+            # Initially fetch the events from the database. With any luck, we can return
+            # these without having to backfill anything (handled below).
+            events, next_key = await self.store.paginate_room_events(
+                room_id=room_id,
+                from_key=from_token.room_key,
+                to_key=to_room_key,
+                direction=pagin_config.direction,
+                limit=pagin_config.limit,
+                event_filter=event_filter,
+            )
+
             if pagin_config.direction == Direction.BACKWARDS:
+                event_depths: Set[int] = {event.depth for event in events}
+                sorted_event_depths = sorted(event_depths)
+
+                found_big_gap = False
+                number_of_gaps = 0
+                previous_event_depth = None
+                for event_depth in sorted_event_depths:
+                    depth_gap = event_depth - previous_event_depth
+                    if depth_gap > 0:
+                        number_of_gaps += 1
+
+                    # We only tolerate a single-event long gaps in the returned events
+                    # because those are most likely just events we've failed to pull in the
+                    # past. Anything longer than that is probably a sign that we're missing
+                    # a decent chunk of history and we should try to backfill it.
+                    #
+                    # XXX: It's possible we could tolerate longer gaps if we checked that a
+                    # given events `prev_events` is one that has failed pull attempts and we
+                    # could just treat it like a dead branch of history for now or at least
+                    # something that we don't need the block the client on to try pulling.
+                    if event_depth - previous_event_depth > 1:
+                        found_big_gap = True
+                        break
+                    previous_event_depth = event_depth
+
                 # if we're going backwards, we might need to backfill. This
                 # requires that we have a topo token.
                 if room_token.topological:
@@ -486,43 +549,42 @@ class PaginationHandler:
                         room_id, room_token.stream
                     )
 
-                if not use_admin_priviledge and membership == Membership.LEAVE:
-                    # If they have left the room then clamp the token to be before
-                    # they left the room, to save the effort of loading from the
-                    # database.
-
-                    # This is only None if the room is world_readable, in which
-                    # case "JOIN" would have been returned.
-                    assert member_event_id
-
-                    leave_token = await self.store.get_topological_token_for_event(
-                        member_event_id
-                    )
-                    assert leave_token.topological is not None
-
-                    if leave_token.topological < curr_topo:
-                        from_token = from_token.copy_and_replace(
-                            StreamKeyType.ROOM, leave_token
+                # Backfill in the foreground if we found a big gap and want to fill in
+                # that history.
+                #
+                # TODO: Should we also consider not enough events to fill the `limit` as
+                # cause to backfill in the foreground?
+                if found_big_gap:
+                    did_backfill = (
+                        await self.hs.get_federation_handler().maybe_backfill(
+                            room_id,
+                            curr_topo,
+                            limit=pagin_config.limit,
                         )
+                    )
 
-                await self.hs.get_federation_handler().maybe_backfill(
-                    room_id,
-                    curr_topo,
-                    limit=pagin_config.limit,
-                )
-
-            to_room_key = None
-            if pagin_config.to_token:
-                to_room_key = pagin_config.to_token.room_key
-
-            events, next_key = await self.store.paginate_room_events(
-                room_id=room_id,
-                from_key=from_token.room_key,
-                to_key=to_room_key,
-                direction=pagin_config.direction,
-                limit=pagin_config.limit,
-                event_filter=event_filter,
-            )
+                    # If we did backfill something, refetch the events from the database to
+                    # catch anything new that might have been added since we last fetched.
+                    if did_backfill:
+                        events, next_key = await self.store.paginate_room_events(
+                            room_id=room_id,
+                            from_key=from_token.room_key,
+                            to_key=to_room_key,
+                            direction=pagin_config.direction,
+                            limit=pagin_config.limit,
+                            event_filter=event_filter,
+                        )
+                else:
+                    # Otherwise, we can backfill in the background for eventual
+                    # consistency's sake but we don't need to block the client waiting
+                    # for a costly federation call and processing.
+                    run_as_background_process(
+                        "maybe_backfill_in_the_background",
+                        self.hs.get_federation_handler().maybe_backfill,
+                        room_id,
+                        curr_topo,
+                        limit=pagin_config.limit,
+                    )
 
             next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
 
