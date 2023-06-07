@@ -1,6 +1,8 @@
 Synapse 1.85.1 (2023-06-07)
 ===========================
 
+Note: this release only fixes a bug that stopped some deployments from upgrading to v1.85.0. There is no need to upgrade to v1.85.1 if successfully running v1.85.0.
+
 Bugfixes
 --------
 
