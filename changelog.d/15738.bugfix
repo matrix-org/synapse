@@ -1,0 +1,1 @@
+Fix bug in schema delta that broke upgrades for some deployments. Introduced in v1.85.0.
