@@ -220,16 +220,12 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             txn: LoggingTransaction,
         ) -> Dict[str, ProfileInfo]:
             clause, ids = make_in_list_sql_clause(
-                self.database_engine, "c.state_key", user_ids
+                self.database_engine, "user_id", user_ids
             )
 
             sql = """
-                SELECT state_key, display_name, avatar_url FROM room_memberships as m
-                INNER JOIN current_state_events as c
-                ON m.event_id = c.event_id
-                AND m.room_id = c.room_id
-                AND m.user_id = c.state_key
-                WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ? AND %s
+                SELECT state_key, display_name, avatar_url FROM room_memberships
+                WHERE room_id = ? AND membership = ? AND %s
             """ % (
                 clause,
             )
@@ -267,12 +263,8 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             txn: LoggingTransaction,
         ) -> Dict[str, ProfileInfo]:
             sql = """
-                SELECT state_key, display_name, avatar_url FROM room_memberships as m
-                INNER JOIN current_state_events as c
-                ON m.event_id = c.event_id
-                AND m.room_id = c.room_id
-                AND m.user_id = c.state_key
-                WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
+                SELECT state_key, display_name, avatar_url FROM room_memberships
+                WHERE room_id = ? AND membership = ?
             """
             txn.execute(sql, (room_id, Membership.JOIN))
 
