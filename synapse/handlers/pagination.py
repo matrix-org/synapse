@@ -476,6 +476,16 @@ class PaginationHandler:
                     room_id, requester, allow_departed_users=True
                 )
 
+            if pagin_config.direction == Direction.BACKWARDS:
+                # if we're going backwards, we might need to backfill. This
+                # requires that we have a topo token.
+                if room_token.topological:
+                    curr_topo = room_token.topological
+                else:
+                    curr_topo = await self.store.get_current_topological_token(
+                        room_id, room_token.stream
+                    )
+
             # If they have left the room then clamp the token to be before
             # they left the room, to save the effort of loading from the
             # database.
@@ -520,13 +530,9 @@ class PaginationHandler:
 
                 found_big_gap = False
                 number_of_gaps = 0
-                previous_event_depth = None
+                previous_event_depth = sorted_event_depths[0]
                 for event_depth in sorted_event_depths:
-                    depth_gap = (
-                        event_depth - previous_event_depth
-                        if previous_event_depth is not None
-                        else 0
-                    )
+                    depth_gap = event_depth - previous_event_depth
                     if depth_gap > 0:
                         number_of_gaps += 1
 
@@ -543,15 +549,6 @@ class PaginationHandler:
                         found_big_gap = True
                         break
                     previous_event_depth = event_depth
-
-                # if we're going backwards, we might need to backfill. This
-                # requires that we have a topo token.
-                if room_token.topological:
-                    curr_topo = room_token.topological
-                else:
-                    curr_topo = await self.store.get_current_topological_token(
-                        room_id, room_token.stream
-                    )
 
                 # Backfill in the foreground if we found a big gap and want to fill in
                 # that history.
