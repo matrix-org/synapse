@@ -438,12 +438,6 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         self.federation_sender.wake_destination = wake_destination_track  # type: ignore[assignment]
 
-        # cancel the pre-existing timer for _wake_destinations_needing_catchup
-        # this is because we are calling it manually rather than waiting for it
-        # to be called automatically
-        assert self.federation_sender._catchup_after_startup_timer is not None
-        self.federation_sender._catchup_after_startup_timer.cancel()
-
         self.get_success(
             self.federation_sender._wake_destinations_needing_catchup(), by=5.0
         )

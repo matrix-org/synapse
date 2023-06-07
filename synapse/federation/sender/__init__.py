@@ -184,14 +184,18 @@ sent_pdus_destination_dist_total = Counter(
     "Total number of PDUs queued for sending across all destinations",
 )
 
-# Time (in s) after Synapse's startup that we will begin to wake up destinations
-# that have catch-up outstanding.
-CATCH_UP_STARTUP_DELAY_SEC = 15
+# Time (in s) to wait before trying to wake up destinations that have
+# catch-up outstanding. This will also be the delay applied at startup
+# before trying the same.
+# Please note that rate limiting still applies, so while the loop is
+# executed every X seconds the destinations may not be wake up because
+# they are being rate limited following previous attempt failures.
+WAKEUP_RETRY_PERIOD_SEC = 60
 
 # Time (in s) to wait in between waking up each destination, i.e. one destination
-# will be woken up every <x> seconds after Synapse's startup until we have woken
-# every destination has outstanding catch-up.
-CATCH_UP_STARTUP_INTERVAL_SEC = 5
+# will be woken up every <x> seconds until we have woken every destination
+# has outstanding catch-up.
+WAKEUP_INTERVAL_BETWEEN_DESTINATIONS_SEC = 1
 
 
 class AbstractFederationSender(metaclass=abc.ABCMeta):
@@ -415,12 +419,10 @@ class FederationSender(AbstractFederationSender):
             / hs.config.ratelimiting.federation_rr_transactions_per_room_per_second
         )
 
-        # wake up destinations that have outstanding PDUs to be caught up
-        self._catchup_after_startup_timer: Optional[
-            IDelayedCall
-        ] = self.clock.call_later(
-            CATCH_UP_STARTUP_DELAY_SEC,
+        # Regularly wake up destinations that have outstanding PDUs to be caught up
+        self.clock.looping_call(
             run_as_background_process,
+            WAKEUP_RETRY_PERIOD_SEC * 1000.0,
             "wake_destinations_needing_catchup",
             self._wake_destinations_needing_catchup,
         )
@@ -964,11 +966,6 @@ class FederationSender(AbstractFederationSender):
                 await self.store.get_catch_up_outstanding_destinations(last_processed)
             )
 
-            if not destinations_to_wake:
-                # finished waking all destinations!
-                self._catchup_after_startup_timer = None
-                break
-
             last_processed = destinations_to_wake[-1]
 
             destinations_to_wake = [
@@ -983,4 +980,4 @@ class FederationSender(AbstractFederationSender):
                     last_processed,
                 )
                 self.wake_destination(destination)
-                await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)
+                await self.clock.sleep(WAKEUP_INTERVAL_BETWEEN_DESTINATIONS_SEC)
