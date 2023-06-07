@@ -145,7 +145,6 @@ from prometheus_client import Counter
 from typing_extensions import Literal
 
 from twisted.internet import defer
-from twisted.internet.interfaces import IDelayedCall
 
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
