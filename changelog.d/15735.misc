@@ -1,0 +1,1 @@
+Simplify query to `_count_known_servers()` for the `synapse_federation_known_servers` metric.
