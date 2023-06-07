@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from enum import IntEnum
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -136,6 +137,15 @@ class BackgroundUpdatePerformance:
             return float(self.total_item_count) / float(self.total_duration_ms)
 
 
+class UpdaterStatus(IntEnum):
+    # Use negative values for error conditions.
+    ABORTED = -1
+    DISABLED = 0
+    NOT_STARTED = 1
+    RUNNING_UPDATE = 2
+    COMPLETE = 3
+
+
 class BackgroundUpdater:
     """Background updates are updates to the database that run in the
     background. Each update processes a batch of data at once. We attempt to
@@ -158,10 +168,15 @@ class BackgroundUpdater:
 
         self._background_update_performance: Dict[str, BackgroundUpdatePerformance] = {}
         self._background_update_handlers: Dict[str, _BackgroundUpdateHandler] = {}
+        # TODO: all these bool flags make me feel icky---can we combine into a status
+        # enum?
         self._all_done = False
 
         # Whether we're currently running updates
         self._running = False
+
+        # Marker to be set if we abort and halt all background updates.
+        self._aborted = False
 
         # Whether background updates are enabled. This allows us to
         # enable/disable background updates via the admin API.
@@ -174,6 +189,20 @@ class BackgroundUpdater:
         self.update_duration_ms = hs.config.background_updates.update_duration_ms
         self.sleep_duration_ms = hs.config.background_updates.sleep_duration_ms
         self.sleep_enabled = hs.config.background_updates.sleep_enabled
+
+    def get_status(self) -> UpdaterStatus:
+        """An integer summarising the updater status. Used as a metric."""
+        if self._aborted:
+            return UpdaterStatus.ABORTED
+        # TODO: a status for "have seen at least one failure, but haven't aborted yet".
+        if not self.enabled:
+            return UpdaterStatus.DISABLED
+
+        if self._all_done:
+            return UpdaterStatus.COMPLETE
+        if self._running:
+            return UpdaterStatus.RUNNING_UPDATE
+        return UpdaterStatus.NOT_STARTED
 
     def register_update_controller_callbacks(
         self,
@@ -296,6 +325,7 @@ class BackgroundUpdater:
                 except Exception:
                     back_to_back_failures += 1
                     if back_to_back_failures >= 5:
+                        self._aborted = True
                         raise RuntimeError(
                             "5 back-to-back background update failures; aborting."
                         )
