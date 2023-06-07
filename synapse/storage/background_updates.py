@@ -192,7 +192,6 @@ class BackgroundUpdater:
 
     def get_status(self) -> UpdaterStatus:
         """An integer summarising the updater status. Used as a metric."""
-        logger.warning("DMR: giff status pls")
         if self._aborted:
             return UpdaterStatus.ABORTED
         if not self.enabled:
