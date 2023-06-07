@@ -15653,9 +15653,8 @@ to make further changes.</p>
 <h2 id="what-servers-are-currently-participating-in-this-room"><a class="header" href="#what-servers-are-currently-participating-in-this-room">What servers are currently participating in this room?</a></h2>
 <p>Run this sql query on your db:</p>
 <pre><code class="language-sql">SELECT DISTINCT split_part(state_key, ':', 2)
-    FROM current_state_events AS c
-    INNER JOIN room_memberships AS m USING (room_id, event_id)
-    WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
+FROM current_state_events
+WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
 </code></pre>
 <h2 id="what-users-are-registered-on-my-server"><a class="header" href="#what-users-are-registered-on-my-server">What users are registered on my server?</a></h2>
 <pre><code class="language-sql">SELECT NAME from users;
