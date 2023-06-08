@@ -1200,10 +1200,10 @@ allow_device_name_lookup_over_federation: true
 
 The federation section defines some sub-options related to federation.
 
-The following options are related to configuring timeout&retry logic for one request,
+The following options are related to configuring timeout and retry logic for one request,
 independently of the others.
-Short retry algo is used when something or someone will wait for the request to have an
-answer, while long retry is used for stuffs not really needing immediate interactivity,
+Short retry algorithm is used when something or someone will wait for the request to have an
+answer, while long retry is used for requests that happen in the background,
 like sending a federation transaction.
 
 * `client_timeout`: timeout for the federation requests in seconds. Default to 60s.
