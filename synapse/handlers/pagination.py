@@ -41,7 +41,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # How many single events we tolerate returning in a `/messages` response before we
-# backfill and try to fill in the history
+# backfill and try to fill in the history. This is an arbitrarily picked number and may
+# need to be tuned in the future.
 BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD = 3
 
 
