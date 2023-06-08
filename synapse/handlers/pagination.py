@@ -537,7 +537,9 @@ class PaginationHandler:
 
                 found_big_gap = False
                 number_of_gaps = 0
-                previous_event_depth = sorted_event_depths[0]
+                previous_event_depth = (
+                    sorted_event_depths[0] if len(sorted_event_depths) > 0 else 0
+                )
                 for event_depth in sorted_event_depths:
                     # We don't expect a negative depth but we'll just deal with it in
                     # any case by taking the absolute value to get the true gap between
