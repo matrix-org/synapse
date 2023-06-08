@@ -536,6 +536,7 @@ class PaginationHandler:
                 event_depths: Set[int] = {event.depth for event in events}
                 sorted_event_depths = sorted(event_depths)
 
+                # Inspect the depths of the returned events to see if there are any gaps
                 found_big_gap = False
                 number_of_gaps = 0
                 previous_event_depth = (
