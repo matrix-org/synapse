@@ -503,6 +503,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 "Can't stream invalidate all with magic current state cache"
             )
 
+        if cache_name == PURGE_HISTORY_CACHE_NAME and keys is None:
+            raise Exception(
+                "Can't stream invalidate all with magic purge history cache"
+            )
+
         if cache_name == DELETE_ROOM_CACHE_NAME and keys is None:
             raise Exception("Can't stream invalidate all with magic delete room cache")
 
