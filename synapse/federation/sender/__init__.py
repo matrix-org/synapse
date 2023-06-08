@@ -965,6 +965,10 @@ class FederationSender(AbstractFederationSender):
                 await self.store.get_catch_up_outstanding_destinations(last_processed)
             )
 
+            if not destinations_to_wake:
+                # finished waking all destinations!
+                break
+
             last_processed = destinations_to_wake[-1]
 
             destinations_to_wake = [

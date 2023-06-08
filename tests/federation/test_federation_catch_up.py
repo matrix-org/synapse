@@ -431,22 +431,22 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # ACT: call _wake_destinations_needing_catchup
 
         # patch wake_destination to just count the destinations instead
-        woken = []
+        woken = set()
 
         def wake_destination_track(destination: str) -> None:
-            woken.append(destination)
+            woken.add(destination)
 
         self.federation_sender.wake_destination = wake_destination_track  # type: ignore[assignment]
 
-        self.get_success(
-            self.federation_sender._wake_destinations_needing_catchup(), by=5.0
-        )
+        self.pump(by=5.0)
 
         # ASSERT (_wake_destinations_needing_catchup):
         # - all remotes are woken up, save for zzzerver
         self.assertNotIn("zzzerver", woken)
-        # - all destinations are woken exactly once; they appear once in woken.
-        self.assertCountEqual(woken, server_names[:-1])
+        # - all destinations are woken, potentially more than once, since the
+        # wake up is called regularly and we don't ack in this test that at transaction
+        # has been successfully sent.
+        self.assertCountEqual(woken, set(server_names[:-1]))
 
     def test_not_latest_event(self) -> None:
         """Test that we send the latest event in the room even if its not ours."""
