@@ -444,7 +444,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # - all remotes are woken up, save for zzzerver
         self.assertNotIn("zzzerver", woken)
         # - all destinations are woken, potentially more than once, since the
-        # wake up is called regularly and we don't ack in this test that at transaction
+        # wake up is called regularly and we don't ack in this test that a transaction
         # has been successfully sent.
         self.assertCountEqual(woken, set(server_names[:-1]))
 
