@@ -442,8 +442,6 @@ class RoomVersions:
         msc3083_join_rules=True,
         msc3375_redaction_rules=True,
         msc2403_knocking=True,
-        msc2716_historical=False,
-        msc2716_redactions=False,
         msc3389_relation_redactions=False,
         msc3787_knock_restricted_join_rule=True,
         msc3667_int_only_power_levels=True,

@@ -1310,41 +1310,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             event_id_results.add(event_id)
 
-            # TODO: Remove
-            # Try and find any potential historical batches of message history.
-            if self.hs.config.experimental.msc2716_enabled:
-                # We need to go and try to find any batch events connected
-                # to a given insertion event (by batch_id). If we find any, we'll
-                # add them to the queue and navigate up the DAG like normal in the
-                # next iteration of the loop.
-                if event_type == EventTypes.MSC2716_INSERTION:
-                    # Find any batch connections for the given insertion event
-                    connected_batch_event_backfill_results = (
-                        self._get_connected_batch_event_backfill_results_txn(
-                            txn, event_id, limit - len(event_id_results)
-                        )
-                    )
-                    logger.debug(
-                        "_get_backfill_events(room_id=%s): connected_batch_event_backfill_results=%s",
-                        room_id,
-                        connected_batch_event_backfill_results,
-                    )
-                    for (
-                        connected_batch_event_backfill_item
-                    ) in connected_batch_event_backfill_results:
-                        if (
-                            connected_batch_event_backfill_item.event_id
-                            not in event_id_results
-                        ):
-                            queue.put(
-                                (
-                                    -connected_batch_event_backfill_item.depth,
-                                    -connected_batch_event_backfill_item.stream_ordering,
-                                    connected_batch_event_backfill_item.event_id,
-                                    connected_batch_event_backfill_item.type,
-                                )
-                            )
-
             # Now we just look up the DAG by prev_events as normal
             connected_prev_event_backfill_results = (
                 self._get_connected_prev_event_backfill_results_txn(
