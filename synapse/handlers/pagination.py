@@ -40,6 +40,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# How many single events we tolerate returning in a `/messages` response before we
+# backfill and try to fill in the history
+BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD = 3
+
 
 @attr.s(slots=True, auto_attribs=True)
 class PurgeStatus:
@@ -525,6 +529,9 @@ class PaginationHandler:
             )
 
             if pagin_config.direction == Direction.BACKWARDS:
+                # We use a `Set` because there can be multiple events at a given depth
+                # and we only care about looking at the unique continum of depths to
+                # find gaps.
                 event_depths: Set[int] = {event.depth for event in events}
                 sorted_event_depths = sorted(event_depths)
 
@@ -532,28 +539,45 @@ class PaginationHandler:
                 number_of_gaps = 0
                 previous_event_depth = sorted_event_depths[0]
                 for event_depth in sorted_event_depths:
-                    depth_gap = event_depth - previous_event_depth
-                    if depth_gap > 0:
+                    # We don't expect a negative depth but we'll just deal with it in
+                    # any case by taking the absolute value to get the true gap between
+                    # any two integers.
+                    depth_gap = abs(event_depth - previous_event_depth)
+                    # A `depth_gap` of 1 is a normal continuous chain to the next event
+                    # (1 <-- 2 <-- 3) so anything larger indicates a missing event (it's
+                    # also possible there is no event at a given depth but we can't ever
+                    # know that for sure)
+                    if depth_gap > 1:
                         number_of_gaps += 1
 
-                    # We only tolerate a single-event long gaps in the returned events
-                    # because those are most likely just events we've failed to pull in the
-                    # past. Anything longer than that is probably a sign that we're missing
-                    # a decent chunk of history and we should try to backfill it.
+                    # We only tolerate a small number single-event long gaps in the
+                    # returned events because those are most likely just events we've
+                    # failed to pull in the past. Anything longer than that is probably
+                    # a sign that we're missing a decent chunk of history and we should
+                    # try to backfill it.
                     #
-                    # XXX: It's possible we could tolerate longer gaps if we checked that a
-                    # given events `prev_events` is one that has failed pull attempts and we
-                    # could just treat it like a dead branch of history for now or at least
-                    # something that we don't need the block the client on to try pulling.
-                    if depth_gap > 1:
+                    # XXX: It's possible we could tolerate longer gaps if we checked
+                    # that a given events `prev_events` is one that has failed pull
+                    # attempts and we could just treat it like a dead branch of history
+                    # for now or at least something that we don't need the block the
+                    # client on to try pulling.
+                    if depth_gap > 2:
                         found_big_gap = True
                         break
                     previous_event_depth = event_depth
 
-                # Backfill in the foreground if we found a big gap and want to fill in
-                # that history or we don't have enough events to fill the limit that the
-                # client asked for.
-                if found_big_gap or len(events) < pagin_config.limit:
+                # Backfill in the foreground if we found a big gap, have too many holes,
+                # or we don't have enough events to fill the limit that the client asked
+                # for.
+                missing_too_many_events = (
+                    number_of_gaps > BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD
+                )
+                not_enough_events_to_fill_response = len(events) < pagin_config.limit
+                if (
+                    found_big_gap
+                    or missing_too_many_events
+                    or not_enough_events_to_fill_response
+                ):
                     did_backfill = (
                         await self.hs.get_federation_handler().maybe_backfill(
                             room_id,
