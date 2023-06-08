@@ -308,7 +308,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         logger.info("[purge] done")
 
-        self._invalidate_caches_for_events_and_stream(txn, room_id)
+        self._invalidate_caches_for_room_events_and_stream(txn, room_id)
 
         return referenced_state_groups
 

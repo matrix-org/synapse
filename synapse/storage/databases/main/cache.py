@@ -188,7 +188,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                         )
 
                     room_id = row.keys[0]
-                    self._invalidate_caches_for_events(room_id)
+                    self._invalidate_caches_for_room_events(room_id)
                 elif row.cache_func == DELETE_ROOM_CACHE_NAME:
                     if row.keys is None:
                         raise Exception(
@@ -196,7 +196,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                         )
 
                     room_id = row.keys[0]
-                    self._invalidate_caches_for_events(room_id)
+                    self._invalidate_caches_for_room_events(room_id)
                     self._invalidate_caches_for_room(room_id)
                 else:
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
@@ -250,7 +250,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         backfilled: bool,
     ) -> None:
         # XXX: If you add something to this function make sure you add it to
-        # `_invalidate_caches_for_room` as well.
+        # `_invalidate_caches_for_room_events` as well.
 
         # This invalidates any local in-memory cached event objects, the original
         # process triggering the invalidation is responsible for clearing any external
@@ -297,24 +297,24 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
             self._attempt_to_invalidate_cache("get_threads", (room_id,))
 
-    def _invalidate_caches_for_events_and_stream(
+    def _invalidate_caches_for_room_events_and_stream(
         self, txn: LoggingTransaction, room_id: str
     ) -> None:
-        """Invalidate caches associated with events in rooms, and stream to
+        """Invalidate caches associated with events in a room, and stream to
         replication.
 
-        Used when we delete events in rooms, but don't know which events we've
+        Used when we delete events a room, but don't know which events we've
         deleted.
         """
 
         self._send_invalidation_to_replication(txn, PURGE_HISTORY_CACHE_NAME, [room_id])
-        txn.call_after(self._invalidate_caches_for_events, room_id)
+        txn.call_after(self._invalidate_caches_for_room_events, room_id)
 
-    def _invalidate_caches_for_events(self, room_id: str) -> None:
-        """Invalidate caches associated with events in rooms, and stream to
+    def _invalidate_caches_for_room_events(self, room_id: str) -> None:
+        """Invalidate caches associated with events in a room, and stream to
         replication.
 
-        Used when we delete events in rooms, but don't know which events we've
+        Used when we delete events in a room, but don't know which events we've
         deleted.
         """
 
@@ -365,7 +365,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         """
 
         # If we've deleted the room then we also need to purge all event caches.
-        self._invalidate_caches_for_events(room_id)
+        self._invalidate_caches_for_room_events(room_id)
 
         self._attempt_to_invalidate_cache("get_account_data_for_room", None)
         self._attempt_to_invalidate_cache("get_account_data_for_room_and_type", None)
