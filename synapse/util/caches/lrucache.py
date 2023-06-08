@@ -862,5 +862,5 @@ class AsyncLruCache(Generic[KT, VT]):
     async def contains(self, key: KT) -> bool:
         return self._lru_cache.contains(key)
 
-    async def clear(self) -> None:
+    def clear(self) -> None:
         self._lru_cache.clear()

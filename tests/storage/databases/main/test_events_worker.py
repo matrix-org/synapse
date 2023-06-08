@@ -188,7 +188,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
         self.event_id = res["event_id"]
 
         # Reset the event cache so the tests start with it empty
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
     def test_simple(self) -> None:
         """Test that we cache events that we pull from the DB."""
@@ -205,7 +205,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
         """
 
         # Reset the event cache
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
         with LoggingContext("test") as ctx:
             # We keep hold of the event event though we never use it.
@@ -215,7 +215,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
             self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 1)
 
         # Reset the event cache
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
         with LoggingContext("test") as ctx:
             self.get_success(self.store.get_event(self.event_id))
@@ -390,7 +390,7 @@ class GetEventCancellationTestCase(unittest.HomeserverTestCase):
         self.event_id = res["event_id"]
 
         # Reset the event cache so the tests start with it empty
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
     @contextmanager
     def blocking_get_event_calls(
