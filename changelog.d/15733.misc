@@ -1,0 +1,1 @@
+Remove superfluous `room_memberships` join from background update.
