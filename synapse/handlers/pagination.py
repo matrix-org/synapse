@@ -564,6 +564,10 @@ class PaginationHandler:
                     # attempts and we could just treat it like a dead branch of history
                     # for now or at least something that we don't need the block the
                     # client on to try pulling.
+                    #
+                    # XXX: If we had something like MSC3871 to indicate gaps in the
+                    # timeline to the client, we could also get away with any sized gap
+                    # and just have the client refetch the holes as they see fit.
                     if depth_gap > 2:
                         found_big_gap = True
                         break
