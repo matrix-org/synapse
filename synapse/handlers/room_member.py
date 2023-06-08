@@ -309,6 +309,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # the table `current_state_events` and `get_current_state_events` is `None`.
         await self.store.forget(user_id, room_id)
 
+        # If everyone locally has left the room, then there is no reason for us to keep the
+        # room around and we automatically purge room after a little bit
         if self._purge_retention_period and await self.store.is_locally_forgotten_room(
             room_id
         ):

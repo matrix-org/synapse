@@ -1343,7 +1343,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         )
 
     async def get_rooms_to_purge(self) -> List[Dict[str, Any]]:
-        """Returns all rooms to shutdown/purge. This includes those that has
+        """Returns all rooms to shutdown/purge. This includes those that have
         been interrupted by a stop/restart of synapse, but also scheduled ones
         like locally forgotten rooms.
         """
