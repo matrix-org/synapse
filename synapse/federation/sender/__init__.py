@@ -194,7 +194,7 @@ WAKEUP_RETRY_PERIOD_SEC = 60
 # Time (in s) to wait in between waking up each destination, i.e. one destination
 # will be woken up every <x> seconds until we have woken every destination
 # has outstanding catch-up.
-WAKEUP_INTERVAL_BETWEEN_DESTINATIONS_SEC = 1
+WAKEUP_INTERVAL_BETWEEN_DESTINATIONS_SEC = 5
 
 
 class AbstractFederationSender(metaclass=abc.ABCMeta):
