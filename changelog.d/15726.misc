@@ -1,0 +1,1 @@
+Prevent the `latest_deps` and `twisted_trunk` daily GitHub Actions workflows from running on forks of the codebase.

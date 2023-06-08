@@ -1,0 +1,1 @@
+Add support for tracing functions which return `Awaitable`s.

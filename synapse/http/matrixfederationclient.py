@@ -499,8 +499,15 @@ class MatrixFederationHttpClient:
                 Note that the above intervals are *in addition* to the time spent
                 waiting for the request to complete (up to `timeout` ms).
 
-                NB: the long retry algorithm takes over 20 minutes to complete, with
-                a default timeout of 60s!
+                NB: the long retry algorithm takes over 20 minutes to complete, with a
+                default timeout of 60s! It's best not to use the `long_retries` option
+                for something that is blocking a client so we don't make them wait for
+                aaaaages, whereas some things like sending transactions (server to
+                server) we can be a lot more lenient but its very fuzzy / hand-wavey.
+
+                In the future, we could be more intelligent about doing this sort of
+                thing by looking at things with the bigger picture in mind,
+                https://github.com/matrix-org/synapse/issues/8917
 
             ignore_backoff: true to ignore the historical backoff data
                 and try the request anyway.
