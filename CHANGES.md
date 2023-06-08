@@ -1,3 +1,12 @@
+Synapse 1.85.2 (2023-06-08)
+===========================
+
+Bugfixes
+--------
+
+- Fix regression where using TLS for replication did not work. Introduced in v1.85.0. ([\#15746](https://github.com/matrix-org/synapse/issues/15746))
+
+
 Synapse 1.85.1 (2023-06-07)
 ===========================
 
