@@ -228,7 +228,6 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
         return len(result) > 0
 
-    @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
     def test_user_mentions(self) -> None:
         """Test the behavior of an event which includes invalid user mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -237,9 +236,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.assertFalse(self._create_and_process(bulk_evaluator))
         # An empty mentions field should not notify.
         self.assertFalse(
-            self._create_and_process(
-                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {}}
-            )
+            self._create_and_process(bulk_evaluator, {EventContentFields.MENTIONS: {}})
         )
 
         # Non-dict mentions should be ignored.
@@ -253,7 +250,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             for mentions in (None, True, False, 1, "foo", []):
                 self.assertFalse(
                     self._create_and_process(
-                        bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: mentions}
+                        bulk_evaluator, {EventContentFields.MENTIONS: mentions}
                     )
                 )
 
@@ -262,7 +259,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 self.assertFalse(
                     self._create_and_process(
                         bulk_evaluator,
-                        {EventContentFields.MSC3952_MENTIONS: {"user_ids": mentions}},
+                        {EventContentFields.MENTIONS: {"user_ids": mentions}},
                     )
                 )
 
@@ -270,14 +267,14 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.assertTrue(
             self._create_and_process(
                 bulk_evaluator,
-                {EventContentFields.MSC3952_MENTIONS: {"user_ids": [self.alice]}},
+                {EventContentFields.MENTIONS: {"user_ids": [self.alice]}},
             )
         )
         self.assertTrue(
             self._create_and_process(
                 bulk_evaluator,
                 {
-                    EventContentFields.MSC3952_MENTIONS: {
+                    EventContentFields.MENTIONS: {
                         "user_ids": ["@another:test", self.alice]
                     }
                 },
@@ -288,11 +285,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         self.assertTrue(
             self._create_and_process(
                 bulk_evaluator,
-                {
-                    EventContentFields.MSC3952_MENTIONS: {
-                        "user_ids": [self.alice, self.alice]
-                    }
-                },
+                {EventContentFields.MENTIONS: {"user_ids": [self.alice, self.alice]}},
             )
         )
 
@@ -307,7 +300,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 self._create_and_process(
                     bulk_evaluator,
                     {
-                        EventContentFields.MSC3952_MENTIONS: {
+                        EventContentFields.MENTIONS: {
                             "user_ids": [None, True, False, {}, []]
                         }
                     },
@@ -317,7 +310,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 self._create_and_process(
                     bulk_evaluator,
                     {
-                        EventContentFields.MSC3952_MENTIONS: {
+                        EventContentFields.MENTIONS: {
                             "user_ids": [None, True, False, {}, [], self.alice]
                         }
                     },
@@ -331,12 +324,11 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 {
                     "body": self.alice,
                     "msgtype": "m.text",
-                    EventContentFields.MSC3952_MENTIONS: {},
+                    EventContentFields.MENTIONS: {},
                 },
             )
         )
 
-    @override_config({"experimental_features": {"msc3952_intentional_mentions": True}})
     def test_room_mentions(self) -> None:
         """Test the behavior of an event which includes invalid room mentions."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -344,7 +336,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         # Room mentions from those without power should not notify.
         self.assertFalse(
             self._create_and_process(
-                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {"room": True}}
+                bulk_evaluator, {EventContentFields.MENTIONS: {"room": True}}
             )
         )
 
@@ -358,7 +350,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         )
         self.assertTrue(
             self._create_and_process(
-                bulk_evaluator, {EventContentFields.MSC3952_MENTIONS: {"room": True}}
+                bulk_evaluator, {EventContentFields.MENTIONS: {"room": True}}
             )
         )
 
@@ -374,7 +366,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 self.assertFalse(
                     self._create_and_process(
                         bulk_evaluator,
-                        {EventContentFields.MSC3952_MENTIONS: {"room": mentions}},
+                        {EventContentFields.MENTIONS: {"room": mentions}},
                     )
                 )
 
@@ -385,7 +377,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
                 {
                     "body": "@room",
                     "msgtype": "m.text",
-                    EventContentFields.MSC3952_MENTIONS: {},
+                    EventContentFields.MENTIONS: {},
                 },
             )
         )

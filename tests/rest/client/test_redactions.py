@@ -217,9 +217,9 @@ class RedactionsTestCase(HomeserverTestCase):
             self._redact_event(self.mod_access_token, self.room_id, msg_id)
 
     @override_config({"experimental_features": {"msc3912_enabled": True}})
-    def test_redact_relations(self) -> None:
-        """Tests that we can redact the relations of an event at the same time as the
-        event itself.
+    def test_redact_relations_with_types(self) -> None:
+        """Tests that we can redact the relations of an event of specific types
+        at the same time as the event itself.
         """
         # Send a root event.
         res = self.helper.send_event(
@@ -316,6 +316,104 @@ class RedactionsTestCase(HomeserverTestCase):
             self.room_id, reaction_event_id, self.mod_access_token
         )
         self.assertNotIn("redacted_because", event_dict, event_dict)
+
+    @override_config({"experimental_features": {"msc3912_enabled": True}})
+    def test_redact_all_relations(self) -> None:
+        """Tests that we can redact all the relations of an event at the same time as the
+        event itself.
+        """
+        # Send a root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "hello"},
+            tok=self.mod_access_token,
+        )
+        root_event_id = res["event_id"]
+
+        # Send an edit to this root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "body": " * hello world",
+                "m.new_content": {
+                    "body": "hello world",
+                    "msgtype": "m.text",
+                },
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.REPLACE,
+                },
+                "msgtype": "m.text",
+            },
+            tok=self.mod_access_token,
+        )
+        edit_event_id = res["event_id"]
+
+        # Also send a threaded message whose root is the same as the edit's.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "message 1",
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.THREAD,
+                },
+            },
+            tok=self.mod_access_token,
+        )
+        threaded_event_id = res["event_id"]
+
+        # Also send a reaction, again with the same root.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Reaction,
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": root_event_id,
+                    "key": "👍",
+                }
+            },
+            tok=self.mod_access_token,
+        )
+        reaction_event_id = res["event_id"]
+
+        # Redact the root event, specifying that we also want to delete all events that
+        # relate to it.
+        self._redact_event(
+            self.mod_access_token,
+            self.room_id,
+            root_event_id,
+            with_relations=["*"],
+        )
+
+        # Check that the root event got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, root_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the edit got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, edit_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the threaded message got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, threaded_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the reaction got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, reaction_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
 
     @override_config({"experimental_features": {"msc3912_enabled": True}})
     def test_redact_relations_no_perms(self) -> None:

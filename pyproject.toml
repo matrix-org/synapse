@@ -89,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.84.0"
+version = "1.85.2"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -314,6 +314,7 @@ black = ">=22.3.0"
 ruff = "0.0.265"
 
 # Typechecking
+lxml-stubs = ">=0.4.0"
 mypy = "*"
 mypy-zope = "*"
 types-bleach = ">=4.1.0"

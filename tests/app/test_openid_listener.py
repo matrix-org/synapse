@@ -42,6 +42,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         # have to tell the FederationHandler not to try to access stuff that is only
         # in the primary store.
         conf["worker_app"] = "yes"
+        conf["instance_map"] = {"main": {"host": "127.0.0.1", "port": 0}}
 
         return conf
 

@@ -46,7 +46,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrCollection
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
@@ -1421,6 +1421,35 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
+
+    @trace
+    async def get_event_ids_with_failed_pull_attempts(
+        self, event_ids: StrCollection
+    ) -> Set[str]:
+        """
+        Filter the given list of `event_ids` and return events which have any failed
+        pull attempts.
+
+        Args:
+            event_ids: A list of events to filter down.
+
+        Returns:
+            A filtered down list of `event_ids` that have previous failed pull attempts.
+        """
+
+        rows = await self.db_pool.simple_select_many_batch(
+            table="event_failed_pull_attempts",
+            column="event_id",
+            iterable=event_ids,
+            keyvalues={},
+            retcols=("event_id",),
+            desc="get_event_ids_with_failed_pull_attempts",
+        )
+        event_ids_with_failed_pull_attempts: Set[str] = {
+            row["event_id"] for row in rows
+        }
+
+        return event_ids_with_failed_pull_attempts
 
     @trace
     async def get_event_ids_to_not_pull_from_backoff(
