@@ -27,6 +27,7 @@ from typing import (
 import attr
 
 from synapse.api.constants import Direction
+from synapse.api.errors import StoreError
 from synapse.logging.opentracing import trace
 from synapse.media._base import ThumbnailInfo
 from synapse.storage._base import SQLBaseStore
@@ -469,6 +470,36 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             updatevalues={"safe_from_quarantine": safe},
             desc="mark_local_media_as_safe",
         )
+
+    async def count_pending_media(self, user_id: UserID) -> Tuple[int, int]:
+        """Count the number of pending media for a user.
+
+        Returns:
+            A tuple of two integers: the total pending media requests and the earliest
+            expiration timestamp.
+        """
+
+        def get_pending_media_txn(txn: LoggingTransaction) -> Tuple[int, int]:
+            sql = """
+            SELECT COUNT(*), MIN(created_at)
+            FROM local_media_repository
+            WHERE user_id = ?
+                AND created_at > ?
+                AND media_length IS NULL
+            """
+            txn.execute(
+                sql,
+                (
+                    user_id.to_string(),
+                    self._clock.time_msec() - self.unused_expiration_time,
+                ),
+            )
+            row = txn.fetchone()
+            if not row:
+                raise StoreError(404, "Failed to count pending media for user")
+            return row[0], row[1] or 0
+
+        return await self.db_pool.runInteraction("get_url_cache", get_pending_media_txn)
 
     async def get_url_cache(self, url: str, ts: int) -> Optional[UrlCache]:
         """Get the media_id and ts for a cached URL as of the given timestamp

@@ -213,6 +213,26 @@ class MediaRepository:
         return f"mxc://{self.server_name}/{media_id}", unused_expires_at
 
     @trace
+    async def reached_pending_media_limit(
+        self, auth_user: UserID, limit: int
+    ) -> Tuple[bool, int]:
+        """Check if the user is over the limit for pending media uploads.
+
+        Args:
+            auth_user: The user_id of the uploader
+            limit: The maximum number of pending media uploads a user is allowed to have
+
+        Returns:
+            A tuple with a boolean and an integer indicating whether the user has too
+            many pending media uploads and the timestamp at which the first pending
+            media will expire, respectively.
+        """
+        pending, first_expiration_ts = await self.store.count_pending_media(
+            user_id=auth_user
+        )
+        return pending >= limit, first_expiration_ts
+
+    @trace
     async def verify_can_upload(self, media_id: str, auth_user: UserID) -> None:
         """Verify that the media ID can be uploaded to by the given user. This
         function checks that:

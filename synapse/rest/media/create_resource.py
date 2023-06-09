@@ -38,6 +38,7 @@ class CreateResource(RestServlet):
         self.media_repo = media_repo
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
+        self.max_pending_media_uploads = hs.config.media.max_pending_media_uploads
 
         # A rate limiter for creating new media IDs.
         self._create_media_rate_limiter = Ratelimiter(
