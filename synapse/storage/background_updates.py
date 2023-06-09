@@ -27,6 +27,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Tuple,
     Type,
 )
 
@@ -79,19 +80,22 @@ class ForeignKeyConstraint(Constraint):
 
     Attributes:
         referenced_table: The "parent" table name.
-        columns: The list of foreign key columns
+        columns: The list of mappings of columns from table to referenced table
     """
 
     referenced_table: str
-    columns: Sequence[str]
+    columns: Sequence[Tuple[str, str]]
 
     def make_check_clause(self, table: str) -> str:
-        join_clause = " AND ".join(f"{col} = {table}.{col}" for col in self.columns)
+        join_clause = " AND ".join(
+            f"{col1} = {table}.{col2}" for col1, col2 in self.columns
+        )
         return f"EXISTS (SELECT 1 FROM {self.referenced_table} WHERE {join_clause})"
 
     def make_constraint_clause_postgres(self) -> str:
-        column_list = ", ".join(self.columns)
-        return f"FOREIGN KEY ({column_list}) REFERENCES {self.referenced_table} ({column_list})"
+        column1_list = ", ".join(col1 for col1, col2 in self.columns)
+        column2_list = ", ".join(col2 for col1, col2 in self.columns)
+        return f"FOREIGN KEY ({column1_list}) REFERENCES {self.referenced_table} ({column2_list})"
 
 
 @attr.s(auto_attribs=True)
@@ -1037,6 +1041,7 @@ def run_validate_constraint_and_delete_rows_schema_delta(
     constraint: Constraint,
     sqlite_table_name: str,
     sqlite_table_schema: str,
+    sqlite_post_schema: Optional[str],
 ) -> None:
     """Runs a schema delta to add a constraint to the table. This should be run
     in a schema delta file.
@@ -1055,6 +1060,8 @@ def run_validate_constraint_and_delete_rows_schema_delta(
         new constraint constraint: A `Constraint` object describing the
         constraint sqlite_table_name: For SQLite the name of the empty copy of
         table sqlite_table_schema: A SQL script for creating the above table.
+        sqlite_post_schema: A SQL script run after migration, to add back
+          indices and the like.
     """
 
     if isinstance(txn.database_engine, PostgresEngine):
@@ -1093,3 +1100,6 @@ def run_validate_constraint_and_delete_rows_schema_delta(
 
         txn.execute(f"DROP TABLE {table}")
         txn.execute(f"ALTER TABLE {sqlite_table_name} RENAME TO {table}")
+
+        if sqlite_post_schema:
+            execute_statements_from_stream(txn, StringIO(sqlite_post_schema))
