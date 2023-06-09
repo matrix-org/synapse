@@ -161,7 +161,7 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
         response = []
         for delete_id in delete_ids:
             delete = self._pagination_handler.get_delete_status(delete_id)
-            if delete and delete.status != DeleteStatus.STATUS_WAIT_PURGE:
+            if delete and delete.status != DeleteStatus.STATUS_SCHEDULED_PURGE:
                 response += [
                     {
                         "delete_id": delete_id,

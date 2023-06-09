@@ -163,8 +163,8 @@ class PaginationHandler:
                 or status == DeleteStatus.STATUS_FAILED
             ):
                 # remove the delete from the list 24 hours after it completes or fails
-                time_since_completed = self.clock.time_msec() - timestamp
-                if time_since_completed >= PaginationHandler.CLEAR_PURGE_AFTER_MS:
+                ms_since_completed = self.clock.time_msec() - timestamp
+                if ms_since_completed >= PaginationHandler.CLEAR_PURGE_AFTER_MS:
                     await self.store.delete_room_to_purge(room_id, delete_id)
 
                     del self._delete_by_id[delete_id]
@@ -199,12 +199,15 @@ class PaginationHandler:
                 )
                 continue
 
-            # launch a purge from the DB
-            # it may be an interrupted purge or a scheduled one
-            purge_now = True if status == DeleteStatus.STATUS_PURGING else False
-            if status == DeleteStatus.STATUS_WAIT_PURGE:
-                if timestamp is None or self.clock.time_msec() >= timestamp:
-                    purge_now = True
+            # If the database says we were last in the middle of purging the room,
+            # let's continue the purge process.
+            if status == DeleteStatus.STATUS_PURGING:
+                purge_now = True
+            # Or if we're at or past the scheduled purge time, let's start that one as well
+            elif status == DeleteStatus.STATUS_SCHEDULED_PURGE and (
+                timestamp is None or self.clock.time_msec() >= timestamp
+            ):
+                purge_now = True
 
             # TODO 2 stages purge, keep memberships for a while so we don't "break" sync
             if purge_now:

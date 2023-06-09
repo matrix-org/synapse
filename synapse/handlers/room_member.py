@@ -318,7 +318,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             await self.store.upsert_room_to_purge(
                 room_id,
                 delete_id,
-                DeleteStatus.STATUS_WAIT_PURGE,
+                DeleteStatus.STATUS_SCHEDULED_PURGE,
                 timestamp=self.clock.time_msec() + self._purge_retention_period,
             )
 

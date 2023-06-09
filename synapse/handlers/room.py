@@ -1815,12 +1815,12 @@ class DeleteStatus:
     return by get_delete_status.
     """
 
+    STATUS_SHUTTING_DOWN = "shutting_down"
+    # Scheduled purge waiting to be launch at a specific time
+    STATUS_SCHEDULED_PURGE = "scheduled_purge"
     STATUS_PURGING = "purging"
     STATUS_COMPLETE = "complete"
     STATUS_FAILED = "failed"
-    STATUS_SHUTTING_DOWN = "shutting_down"
-    # Purge waiting to be launch at a specific time
-    STATUS_WAIT_PURGE = "wait_purge"
 
     # Tracks whether this request has completed.
     # One of STATUS_{PURGING,COMPLETE,FAILED,SHUTTING_DOWN,WAIT_PURGE}.
