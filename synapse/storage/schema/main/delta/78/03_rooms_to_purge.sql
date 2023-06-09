@@ -17,10 +17,10 @@
 CREATE TABLE IF NOT EXISTS rooms_to_purge(
     room_id text NOT NULL,
     delete_id text NOT NULL,
-    "status" text NOT NULL,
-    "error" text,
-    "timestamp" bigint,
-    "shutdown_params" text,
-    "shutdown_response" text,
+    status text NOT NULL,
+    error text,
+    timestamp bigint,
+    shutdown_params text,
+    shutdown_response text,
     UNIQUE(room_id, delete_id)
 );
