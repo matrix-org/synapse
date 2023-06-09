@@ -84,7 +84,7 @@ class PaginationHandler:
     CLEAR_PURGE_AFTER_MS = 1000 * 3600 * 24  # 24 hours
 
     # how often to run the purge rooms loop
-    PURGE_ROOMS_PERIOD = 1000 * 3600  # 1 hour
+    PURGE_ROOMS_INTERVAL_MS = 1000 * 3600  # 1 hour
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -139,7 +139,7 @@ class PaginationHandler:
         if self._is_master:
             self.clock.looping_call(
                 run_as_background_process,
-                PaginationHandler.PURGE_ROOMS_PERIOD,
+                PaginationHandler.PURGE_ROOMS_INTERVAL_MS,
                 "purge_rooms",
                 self.purge_rooms,
             )
