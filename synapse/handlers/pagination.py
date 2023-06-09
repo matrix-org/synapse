@@ -450,7 +450,7 @@ class PaginationHandler:
             force: set true to skip checking for joined users.
             shutdown_response: optional response coming from the shutdown phase
         """
-        logger.info("starting purge room_id %s", room_id)
+        logger.info("starting purge room_id=%s force=%s", room_id, force)
 
         async with self.pagination_lock.write(room_id):
             # first check that we have no users in this room
