@@ -60,7 +60,6 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.replication.http.send_events import ReplicationSendEventsRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
-    MutableStateMap,
     PersistedEventPosition,
     Requester,
     RoomAlias,
@@ -573,7 +572,6 @@ class EventCreationHandler:
         state_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
-        historical: bool = False,
         depth: Optional[int] = None,
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
@@ -625,10 +623,6 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
 
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
@@ -713,8 +707,6 @@ class EventCreationHandler:
             builder.internal_metadata.txn_id = txn_id
 
         builder.internal_metadata.outlier = outlier
-
-        builder.internal_metadata.historical = historical
 
         event, unpersisted_context = await self.create_new_client_event(
             builder=builder,
@@ -944,7 +936,6 @@ class EventCreationHandler:
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
         outlier: bool = False,
-        historical: bool = False,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
         """
@@ -975,9 +966,6 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -1047,7 +1035,6 @@ class EventCreationHandler:
                     prev_event_ids=prev_event_ids,
                     state_event_ids=state_event_ids,
                     outlier=outlier,
-                    historical=historical,
                     depth=depth,
                 )
                 context = await unpersisted_context.persist(event)
@@ -1858,18 +1845,12 @@ class EventCreationHandler:
                 if prev_state_ids:
                     raise AuthError(403, "Changing the room create event is forbidden")
 
-            # Mark any `m.historical` messages as backfilled so they don't appear
-            # in `/sync` and have the proper decrementing `stream_ordering` as we import
-            backfilled = False
-            if event.internal_metadata.is_historical():
-                backfilled = True
-
         assert self._storage_controllers.persistence is not None
         (
             persisted_events,
             max_stream_token,
         ) = await self._storage_controllers.persistence.persist_events(
-            events_and_context, backfilled=backfilled
+            events_and_context,
         )
 
         events_and_pos = []
