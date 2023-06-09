@@ -44,6 +44,7 @@ import jinja2
 import pkg_resources
 import yaml
 
+from synapse.types import StrSequence
 from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ class ConfigError(Exception):
            the problem lies.
     """
 
-    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+    def __init__(self, msg: str, path: Optional[StrSequence] = None):
         self.msg = msg
         self.path = path
 

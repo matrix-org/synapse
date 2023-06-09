@@ -928,11 +928,10 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             raise Exception("Invalid host name")
 
         sql = """
-            SELECT state_key FROM current_state_events AS c
-            INNER JOIN room_memberships AS m USING (event_id)
-            WHERE m.membership = ?
+            SELECT state_key FROM current_state_events
+            WHERE membership = ?
                 AND type = 'm.room.member'
-                AND c.room_id = ?
+                AND room_id = ?
                 AND state_key LIKE ?
             LIMIT 1
         """
@@ -1100,7 +1099,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         # `get_joined_hosts` is called with the "current" state group for the
         # room, and so consecutive calls will be for consecutive state groups
         # which point to the previous state group.
-        cache = await self._get_joined_hosts_cache(room_id)  # type: ignore[misc]
+        cache = await self._get_joined_hosts_cache(room_id)
 
         # If the state group in the cache matches, we already have the data we need.
         if state_entry.state_group == cache.state_group:
@@ -1539,7 +1538,6 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
                 SELECT stream_ordering, event_id, events.room_id, event_json.json
                 FROM events
                 INNER JOIN event_json USING (event_id)
-                INNER JOIN room_memberships USING (event_id)
                 WHERE ? <= stream_ordering AND stream_ordering < ?
                 AND type = 'm.room.member'
                 ORDER BY stream_ordering DESC

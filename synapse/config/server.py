@@ -27,7 +27,7 @@ from netaddr import AddrFormatError, IPNetwork, IPSet
 from twisted.conch.ssh.keys import Key
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrSequence
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -73,7 +73,7 @@ def _6to4(network: IPNetwork) -> IPNetwork:
 def generate_ip_set(
     ip_addresses: Optional[Iterable[str]],
     extra_addresses: Optional[Iterable[str]] = None,
-    config_path: Optional[Iterable[str]] = None,
+    config_path: Optional[StrSequence] = None,
 ) -> IPSet:
     """
     Generate an IPSet from a list of IP addresses or CIDRs.
@@ -115,7 +115,7 @@ def generate_ip_set(
 
 
 # IP ranges that are considered private / unroutable / don't make sense.
-DEFAULT_IP_RANGE_BLACKLIST = [
+DEFAULT_IP_RANGE_BLOCKLIST = [
     # Localhost
     "127.0.0.0/8",
     # Private networks.
@@ -510,36 +510,36 @@ class ServerConfig(Config):
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
 
-        ip_range_blacklist = config.get(
-            "ip_range_blacklist", DEFAULT_IP_RANGE_BLACKLIST
+        ip_range_blocklist = config.get(
+            "ip_range_blacklist", DEFAULT_IP_RANGE_BLOCKLIST
         )
 
         # Attempt to create an IPSet from the given ranges
 
-        # Always blacklist 0.0.0.0, ::
-        self.ip_range_blacklist = generate_ip_set(
-            ip_range_blacklist, ["0.0.0.0", "::"], config_path=("ip_range_blacklist",)
+        # Always block 0.0.0.0, ::
+        self.ip_range_blocklist = generate_ip_set(
+            ip_range_blocklist, ["0.0.0.0", "::"], config_path=("ip_range_blacklist",)
         )
 
-        self.ip_range_whitelist = generate_ip_set(
+        self.ip_range_allowlist = generate_ip_set(
             config.get("ip_range_whitelist", ()), config_path=("ip_range_whitelist",)
         )
         # The federation_ip_range_blacklist is used for backwards-compatibility
         # and only applies to federation and identity servers.
         if "federation_ip_range_blacklist" in config:
-            # Always blacklist 0.0.0.0, ::
-            self.federation_ip_range_blacklist = generate_ip_set(
+            # Always block 0.0.0.0, ::
+            self.federation_ip_range_blocklist = generate_ip_set(
                 config["federation_ip_range_blacklist"],
                 ["0.0.0.0", "::"],
                 config_path=("federation_ip_range_blacklist",),
             )
             # 'federation_ip_range_whitelist' was never a supported configuration option.
-            self.federation_ip_range_whitelist = None
+            self.federation_ip_range_allowlist = None
         else:
             # No backwards-compatiblity requrired, as federation_ip_range_blacklist
             # is not given. Default to ip_range_blacklist and ip_range_whitelist.
-            self.federation_ip_range_blacklist = self.ip_range_blacklist
-            self.federation_ip_range_whitelist = self.ip_range_whitelist
+            self.federation_ip_range_blocklist = self.ip_range_blocklist
+            self.federation_ip_range_allowlist = self.ip_range_allowlist
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before

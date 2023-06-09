@@ -1,0 +1,29 @@
+/* Copyright 2022 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- The thread_id columns can now be made non-nullable, this is done by using a
+-- constraint (and not altering the column) to avoid taking out a full table lock.
+--
+-- We initially add an invalid constraint which guards against new data (this
+-- doesn't lock the table).
+ALTER TABLE event_push_summary
+    ADD CONSTRAINT event_push_summary_thread_id CHECK (thread_id IS NOT NULL) NOT VALID;
+
+-- We then validate the constraint which doesn't need to worry about new data. It
+-- only needs a SHARE UPDATE EXCLUSIVE lock but can still take a while to complete.
+INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
+  (7706, 'event_push_summary_thread_id', '{}', 'event_push_actions_thread_id'),
+  -- Also clean-up the old indexes.
+  (7706, 'event_push_drop_null_thread_id_indexes', '{}', 'event_push_summary_thread_id');

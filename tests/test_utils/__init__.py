@@ -33,7 +33,7 @@ from twisted.web.http import RESPONSES
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IResponse
 
-from synapse.types import JsonDict
+from synapse.types import JsonSerializable
 
 if TYPE_CHECKING:
     from sys import UnraisableHookArgs
@@ -145,7 +145,7 @@ class FakeResponse:  # type: ignore[misc]
         protocol.connectionLost(Failure(ResponseDone()))
 
     @classmethod
-    def json(cls, *, code: int = 200, payload: JsonDict) -> "FakeResponse":
+    def json(cls, *, code: int = 200, payload: JsonSerializable) -> "FakeResponse":
         headers = Headers({"Content-Type": ["application/json"]})
         body = json.dumps(payload).encode("utf-8")
         return cls(code=code, body=body, headers=headers)

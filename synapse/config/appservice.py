@@ -36,11 +36,10 @@ class AppServiceConfig(Config):
         if not isinstance(self.app_service_config_files, list) or not all(
             type(x) is str for x in self.app_service_config_files
         ):
-            # type-ignore: this function gets arbitrary json value; we do use this path.
             raise ConfigError(
                 "Expected '%s' to be a list of AS config files:"
                 % (self.app_service_config_files),
-                "app_service_config_files",
+                ("app_service_config_files",),
             )
 
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)

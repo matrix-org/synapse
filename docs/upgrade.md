@@ -88,19 +88,37 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.85.0
+
+## Application service registration with "user" property deprecation
+
+Application services should ensure they call the `/register` endpoint with a
+`username` property. The legacy `user` property is considered deprecated and
+should no longer be included.
+
+A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service login.
+
 # Upgrading to v1.84.0
 
 ## Deprecation of `worker_replication_*` configuration settings
 
-When using workers, 
+When using workers,
+
 * `worker_replication_host`
 * `worker_replication_http_port`
 * `worker_replication_http_tls`
  
-can now be removed from individual worker YAML configuration ***if*** you add the main process to the `instance_map` in the shared YAML configuration,
-using the name `main`.
+should now be removed from individual worker YAML configurations and the main process should instead be added to the `instance_map`
+in the shared YAML configuration, using the name `main`.
 
-### Before:
+The old `worker_replication_*` settings are now considered deprecated and are expected to be removed in Synapse v1.88.0.
+
+
+### Example change
+
+#### Before:
+
 Shared YAML
 ```yaml
 instance_map:
@@ -109,6 +127,7 @@ instance_map:
     port: 5678
     tls: false
 ```
+
 Worker YAML
 ```yaml
 worker_app: synapse.app.generic_worker
@@ -130,7 +149,10 @@ worker_listeners:
 
 worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 ```
-### After:
+
+
+#### After:
+
 Shared YAML
 ```yaml
 instance_map:
@@ -143,6 +165,7 @@ instance_map:
     port: 5678
     tls: false
 ```
+
 Worker YAML
 ```yaml
 worker_app: synapse.app.generic_worker
@@ -163,7 +186,6 @@ worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 ```
 Notes: 
 * `tls` is optional but mirrors the functionality of `worker_replication_http_tls`
-
 
 
 # Upgrading to v1.81.0
