@@ -36,6 +36,9 @@ from tests import unittest
 """Tests admin REST events for /rooms paths."""
 
 
+ONE_HOUR_IN_S = 3600
+
+
 class DeleteRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -995,7 +998,8 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         with self.assertRaises(AssertionError):
             self._is_purged(room_id)
 
-        self.reactor.advance(3600 * 24)
+        # Advance 24 hours in the future, past the `purge_retention_period`
+        self.reactor.advance(24 * ONE_HOUR_IN_S)
 
         self._is_purged(room_id)
 
@@ -1019,7 +1023,9 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         with self.assertRaises(AssertionError):
             self._is_purged(room_id)
 
-        self.reactor.advance(3600 * 1)
+        # Advance one hour in the future past `PURGE_ROOMS_INTERVAL_MS` so that
+        # the automatic purging takes place and resumes the purge
+        self.reactor.advance(ONE_HOUR_IN_S)
 
         self._is_purged(room_id)
 
@@ -1058,7 +1064,9 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         with self.assertRaises(AssertionError):
             self._is_purged(room_id)
 
-        self.reactor.advance(3600 * 1)
+        # Advance one hour in the future past `PURGE_ROOMS_INTERVAL_MS` so that
+        # the automatic purging takes place and resumes the purge
+        self.reactor.advance(ONE_HOUR_IN_S)
 
         # Test that all users has been kicked (room is shutdown)
         self._has_no_members(room_id)
