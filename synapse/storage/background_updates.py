@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import logging
-from enum import IntEnum
+from enum import Enum, IntEnum
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -24,10 +25,12 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Type,
 )
 
 import attr
+from pydantic import BaseModel
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.types import Connection, Cursor
@@ -46,6 +49,60 @@ logger = logging.getLogger(__name__)
 ON_UPDATE_CALLBACK = Callable[[str, str, bool], AsyncContextManager[int]]
 DEFAULT_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
 MIN_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
+
+
+class Constraint(metaclass=abc.ABCMeta):
+    """Base class representing different constraints.
+
+    Used by `register_background_validate_constraint_and_delete_rows`.
+    """
+
+    @abc.abstractmethod
+    def make_check_clause(self, table: str) -> str:
+        """Returns an SQL expression that checks the row passes the constraint."""
+        pass
+
+
+@attr.s(auto_attribs=True)
+class ForeignKeyConstraint(Constraint):
+    """A foreign key constraint.
+
+    Attributes:
+        referenced_table: The "parent" table name.
+        columns: The list of foreign key columns
+    """
+
+    referenced_table: str
+    columns: Sequence[str]
+
+    def make_check_clause(self, table: str) -> str:
+        join_clause = " AND ".join(f"{col} = {table}.{col}" for col in self.columns)
+        return f"EXISTS (SELECT 1 FROM {self.referenced_table} WHERE {join_clause})"
+
+
+@attr.s(auto_attribs=True)
+class NotNullConstraint(Constraint):
+    """A NOT NULL column constraint"""
+
+    column: str
+
+    def make_check_clause(self, table: str) -> str:
+        return f"{self.column} IS NOT NULL"
+
+
+class ValidateConstraintProgress(BaseModel):
+    """The format of the progress JSON for validate constraint background
+    updates.
+
+    Used by `register_background_validate_constraint_and_delete_rows`.
+    """
+
+    class State(str, Enum):
+        check = "check"
+        validate = "validate"
+
+    state: State = State.validate
+    lower_bound: Sequence[Any] = ()
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -739,6 +796,163 @@ class BackgroundUpdater:
 
         logger.info("Adding index %s to %s", index_name, table)
         await self.db_pool.runWithConnection(runner)
+
+    def register_background_validate_constraint_and_delete_rows(
+        self,
+        update_name: str,
+        table: str,
+        constraint_name: str,
+        constraint: Constraint,
+        unique_columns: Sequence[str],
+    ) -> None:
+        """Helper for store classes to do a background validate constraint, and
+        delete rows that do not pass the constraint check.
+
+        This only applies on PostgreSQL.
+
+        Args:
+            update_name: The name of the background update.
+            table: The table with the invalid constraint.
+            constraint_name: The name of the constraint
+            constraint: A `Constraint` object matching the type of constraint.
+            unique_columns: A sequence of columns that form a unique constraint
+              on the table. Used to iterate over the table.
+        """
+
+        assert isinstance(
+            self.db_pool.engine, engines.PostgresEngine
+        ), "validate constraint background update registered for non-Postres database"
+
+        async def updater(progress: JsonDict, batch_size: int) -> int:
+            return await self.validate_constraint_and_delete_in_background(
+                update_name=update_name,
+                table=table,
+                constraint_name=constraint_name,
+                constraint=constraint,
+                unique_columns=unique_columns,
+                progress=progress,
+                batch_size=batch_size,
+            )
+
+        self._background_update_handlers[update_name] = _BackgroundUpdateHandler(
+            updater, oneshot=True
+        )
+
+    async def validate_constraint_and_delete_in_background(
+        self,
+        update_name: str,
+        table: str,
+        constraint_name: str,
+        constraint: Constraint,
+        unique_columns: Sequence[str],
+        progress: JsonDict,
+        batch_size: int,
+    ) -> int:
+        """Validates a table constraint that has been marked as `NOT VALID`,
+        deleting rows that don't pass the constraint check.
+
+        This will delete rows that do not meet the validation check.
+
+        update_name: str,
+        table: str,
+        constraint_name: str,
+        constraint: Constraint,
+        unique_columns: Sequence[str],
+        """
+
+        # We validate the constraint by:
+        #   1. Trying to validate the constraint as is. If this succeeds then
+        #      we're done.
+        #   2. Otherwise, we manually scan the table to remove rows that don't
+        #      match the constraint.
+        #   3. We try re-validating the constraint.
+
+        parsed_progress = ValidateConstraintProgress.parse_obj(progress)
+
+        if parsed_progress.state == ValidateConstraintProgress.State.check:
+            return_columns = ", ".join(unique_columns)
+            order_columns = ", ".join(unique_columns)
+
+            where_clause = ""
+            args: List[Any] = []
+            if parsed_progress.lower_bound:
+                where_clause = f"""WHERE ({order_columns}) > ({", ".join("?" for _ in unique_columns)})"""
+                args.extend(parsed_progress.lower_bound)
+
+            args.append(batch_size)
+
+            sql = f"""
+                SELECT
+                    {return_columns},
+                    {constraint.make_check_clause(table)} AS check
+                FROM {table}
+                {where_clause}
+                ORDER BY {order_columns}
+                LIMIT ?
+            """
+
+            def validate_constraint_in_background_check(
+                txn: "LoggingTransaction",
+            ) -> None:
+                txn.execute(sql, args)
+                rows = txn.fetchall()
+
+                new_progress = parsed_progress.copy()
+
+                if not rows:
+                    new_progress.state = ValidateConstraintProgress.State.validate
+                    self._background_update_progress_txn(
+                        txn, update_name, new_progress.dict()
+                    )
+                    return
+
+                new_progress.lower_bound = rows[-1][:-1]
+
+                to_delete = [row[:-1] for row in rows if not row[-1]]
+
+                self.db_pool.simple_delete_many_batch_txn(
+                    txn, table=table, keys=unique_columns, values=to_delete
+                )
+
+                self._background_update_progress_txn(
+                    txn, update_name, new_progress.dict()
+                )
+
+            await self.db_pool.runInteraction(
+                "validate_constraint_in_background_check",
+                validate_constraint_in_background_check,
+            )
+
+            return batch_size
+
+        elif parsed_progress.state == ValidateConstraintProgress.State.validate:
+            sql = f"ALTER TABLE {table} VALIDATE CONSTRAINT {constraint_name}"
+
+            def validate_constraint_in_background_validate(
+                txn: "LoggingTransaction",
+            ) -> None:
+                txn.execute(sql)
+
+            try:
+                await self.db_pool.runInteraction(
+                    "validate_constraint_in_background_validate",
+                    validate_constraint_in_background_validate,
+                )
+
+                await self._end_background_update(update_name)
+            except self.db_pool.engine.module.IntegrityError as e:
+                # If we get an integrity error here, then we go back and recheck the table.
+                logger.warning("Integrity error when validating constraint: %s", e)
+                await self._background_update_progress(
+                    update_name,
+                    ValidateConstraintProgress(
+                        state=ValidateConstraintProgress.State.check
+                    ).dict(),
+                )
+
+            return batch_size
+        else:
+            raise Exception(f"Unrecognized state '{parsed_progress.state}'")
 
     async def _end_background_update(self, update_name: str) -> None:
         """Removes a completed background update task from the queue.

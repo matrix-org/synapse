@@ -20,13 +20,18 @@ from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.server import HomeServer
-from synapse.storage.background_updates import BackgroundUpdater
+from synapse.storage.background_updates import (
+    BackgroundUpdater,
+    ForeignKeyConstraint,
+    NotNullConstraint,
+)
 from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable, simple_async_mock
 from tests.unittest import override_config
+from tests.utils import USE_POSTGRES_FOR_TESTS
 
 
 class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
@@ -404,3 +409,157 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         self.pump()
         self._update_ctx_manager.__aexit__.assert_called()
         self.get_success(do_update_d)
+
+
+class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
+    """Tests the validate contraint and delete background handlers."""
+
+    if not USE_POSTGRES_FOR_TESTS:
+        skip = "Requires Postgres"
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.updates: BackgroundUpdater = self.hs.get_datastores().main.db_pool.updates
+        # the base test class should have run the real bg updates for us
+        self.assertTrue(
+            self.get_success(self.updates.has_completed_background_updates())
+        )
+
+        self.store = self.hs.get_datastores().main
+
+    def test_not_null_constraint(self) -> None:
+        """Tests adding a not null constraint."""
+        sql = """
+            CREATE TABLE test_constraint(
+                a INT PRIMARY KEY,
+                b INT
+            );
+        """
+        self.get_success(
+            self.store.db_pool.execute("test_not_null_constraint", lambda _: None, sql)
+        )
+
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 1, "b": 1})
+        )
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 2, "b": None})
+        )
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 3, "b": 3})
+        )
+
+        sql = """
+            ALTER TABLE test_constraint
+            ADD CONSTRAINT test_constraint_name CHECK (b IS NOT NULL) NOT VALID
+        """
+        self.get_success(
+            self.store.db_pool.execute("test_not_null_constraint", lambda _: None, sql)
+        )
+
+        self.updates.register_background_validate_constraint_and_delete_rows(
+            "test_bg_update",
+            table="test_constraint",
+            constraint_name="test_constraint_name",
+            constraint=NotNullConstraint("b"),
+            unique_columns=["a"],
+        )
+
+        # Register the background update to run again.
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                table="background_updates",
+                values={
+                    "update_name": "test_bg_update",
+                    "progress_json": "{}",
+                    "depends_on": None,
+                },
+            )
+        )
+
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.store.db_pool.updates._all_done = False
+
+        # Now let's actually drive the updates to completion
+        self.wait_for_background_updates()
+
+        rows = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="test_constraint",
+                keyvalues={},
+                retcols=("a", "b"),
+            )
+        )
+
+        self.assertCountEqual(rows, [{"a": 1, "b": 1}, {"a": 3, "b": 3}])
+
+    def test_foreign_constraint(self) -> None:
+        """Tests adding a not foreign key constraint."""
+        sql = """
+            CREATE TABLE base_table(
+                b INT PRIMARY KEY
+            );
+
+            CREATE TABLE test_constraint(
+                a INT PRIMARY KEY,
+                b INT NOT NULL
+            );
+        """
+        self.get_success(
+            self.store.db_pool.execute("test_not_null_constraint", lambda _: None, sql)
+        )
+
+        self.get_success(self.store.db_pool.simple_insert("base_table", {"b": 1}))
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 1, "b": 1})
+        )
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 2, "b": 2})
+        )
+        self.get_success(self.store.db_pool.simple_insert("base_table", {"b": 3}))
+        self.get_success(
+            self.store.db_pool.simple_insert("test_constraint", {"a": 3, "b": 3})
+        )
+
+        sql = """
+            ALTER TABLE test_constraint
+            ADD CONSTRAINT test_constraint_name FOREIGN KEY (b) REFERENCES base_table (b) NOT VALID
+        """
+        self.get_success(
+            self.store.db_pool.execute("test_not_null_constraint", lambda _: None, sql)
+        )
+
+        self.updates.register_background_validate_constraint_and_delete_rows(
+            "test_bg_update",
+            table="test_constraint",
+            constraint_name="test_constraint_name",
+            constraint=ForeignKeyConstraint("base_table", ["b"]),
+            unique_columns=["a"],
+        )
+
+        # Register the background update to run again.
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                table="background_updates",
+                values={
+                    "update_name": "test_bg_update",
+                    "progress_json": "{}",
+                    "depends_on": None,
+                },
+            )
+        )
+
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.store.db_pool.updates._all_done = False
+
+        # Now let's actually drive the updates to completion
+        self.wait_for_background_updates()
+
+        rows = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="test_constraint",
+                keyvalues={},
+                retcols=("a", "b"),
+            )
+        )
+
+        self.assertCountEqual(rows, [{"a": 1, "b": 1}, {"a": 3, "b": 3}])
