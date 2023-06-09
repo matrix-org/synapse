@@ -1827,6 +1827,17 @@ Example configuration:
 media_store_path: "DATADIR/media_store"
 ```
 ---
+### `max_pending_media_uploads`
+
+How many *pending media uploads* can a given user have? A pending media upload
+is a created MXC URI that (a) is not expired (the `unused_expires_at` timestamp
+has not passed) and (b) the media has not yet been uploaded for. Defaults to 5.
+
+Example configuration:
+```yaml
+max_pending_media_uploads: 5
+```
+---
 ### `unused_expiration_time`
 
 How long to wait in milliseconds before expiring created media IDs. Defaults to

@@ -145,6 +145,8 @@ class ContentRepositoryConfig(Config):
             config.get("unused_expiration_time", "24h")
         )
 
+        self.max_pending_media_uploads = config.get("max_pending_media_uploads", 5)
+
         self.media_store_path = self.ensure_directory(
             config.get("media_store_path", "media_store")
         )
