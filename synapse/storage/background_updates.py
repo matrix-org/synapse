@@ -14,6 +14,7 @@
 import abc
 import logging
 from enum import Enum, IntEnum
+from io import StringIO
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -33,6 +34,7 @@ import attr
 from pydantic import BaseModel
 
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Connection, Cursor
 from synapse.types import JsonDict
 from synapse.util import Clock, json_encoder
@@ -62,6 +64,14 @@ class Constraint(metaclass=abc.ABCMeta):
         """Returns an SQL expression that checks the row passes the constraint."""
         pass
 
+    @abc.abstractmethod
+    def make_constraint_clause_postgres(self) -> str:
+        """Returns an SQL clause for creating the constraint.
+
+        Only used on Postgres DBs
+        """
+        pass
+
 
 @attr.s(auto_attribs=True)
 class ForeignKeyConstraint(Constraint):
@@ -79,6 +89,10 @@ class ForeignKeyConstraint(Constraint):
         join_clause = " AND ".join(f"{col} = {table}.{col}" for col in self.columns)
         return f"EXISTS (SELECT 1 FROM {self.referenced_table} WHERE {join_clause})"
 
+    def make_constraint_clause_postgres(self) -> str:
+        column_list = ", ".join(self.columns)
+        return f"FOREIGN KEY ({column_list}) REFERENCES {self.referenced_table} ({column_list})"
+
 
 @attr.s(auto_attribs=True)
 class NotNullConstraint(Constraint):
@@ -88,6 +102,9 @@ class NotNullConstraint(Constraint):
 
     def make_check_clause(self, table: str) -> str:
         return f"{self.column} IS NOT NULL"
+
+    def make_constraint_clause_postgres(self) -> str:
+        return f"CHECK ({self.column} IS NOT NULL)"
 
 
 class ValidateConstraintProgress(BaseModel):
@@ -1009,3 +1026,70 @@ class BackgroundUpdater:
             keyvalues={"update_name": update_name},
             updatevalues={"progress_json": progress_json},
         )
+
+
+def run_validate_constraint_and_delete_rows_schema_delta(
+    txn: "LoggingTransaction",
+    ordering: int,
+    update_name: str,
+    table: str,
+    constraint_name: str,
+    constraint: Constraint,
+    sqlite_table_name: str,
+    sqlite_table_schema: str,
+) -> None:
+    """Runs a schema delta to add a constraint to the table. This should be run
+    in a schema delta file.
+
+    For PostgreSQL the constraint is added and validated in the background.
+
+    For SQLite the table is recreated and data copied across immediately. This
+    is done by the caller passing in a script to create the new table.
+
+    There must be a corresponding call to
+    `register_background_validate_constraint_and_delete_rows`.
+
+    Attributes:
+        txn ordering, update_name: For adding a row to background_updates table.
+        table: The table to add constraint to. constraint_name: The name of the
+        new constraint constraint: A `Constraint` object describing the
+        constraint sqlite_table_name: For SQLite the name of the empty copy of
+        table sqlite_table_schema: A SQL script for creating the above table.
+    """
+
+    if isinstance(txn.database_engine, PostgresEngine):
+        # For postgres we can just add the constraint and mark it as NOT VALID,
+        # and then insert a background update to go and check the validity in
+        # the background.
+        txn.execute(
+            f"""
+            ALTER TABLE {table}
+            ADD CONSTRAINT {constraint_name} {constraint.make_constraint_clause_postgres()}
+            NOT VALID
+            """
+        )
+
+        txn.execute(
+            "INSERT INTO background_updates (ordering, update_name, progress_json) VALUES (?, ?, '{}')",
+            (ordering, update_name),
+        )
+    else:
+        # For SQLite, we:
+        #   1. create an empty copy of the table
+        #   2. copy across the rows (that satisfy the check)
+        #   3. replace the old table with the new able.
+
+        # We import this here to avoid circular imports.
+        from synapse.storage.prepare_database import execute_statements_from_stream
+
+        execute_statements_from_stream(txn, StringIO(sqlite_table_schema))
+
+        sql = f"""
+            INSERT INTO {sqlite_table_name} SELECT * FROM {table}
+            WHERE {constraint.make_check_clause(table)}
+        """
+
+        txn.execute(sql)
+
+        txn.execute(f"DROP TABLE {table}")
+        txn.execute(f"ALTER TABLE {sqlite_table_name} RENAME TO {table}")
