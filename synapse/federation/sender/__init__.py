@@ -109,10 +109,8 @@ was enabled*, Catch-Up Mode is exited and we return to `_transaction_transmissio
 
 If a remote server is unreachable over federation, we back off from that server,
 with an exponentially-increasing retry interval.
-Whilst we don't automatically retry after the interval, we prevent making new attempts
-until such time as the back-off has cleared.
-Once the back-off is cleared and a new PDU or EDU arrives for transmission, the transmission
-loop resumes and empties the queue by making federation requests.
+We automatically retry after the retry interval expires (roughly, the logic to do so
+being triggered every minute).
 
 If the backoff grows too large (> 1 hour), the in-memory queue is emptied (to prevent
 unbounded growth) and Catch-Up Mode is entered.
