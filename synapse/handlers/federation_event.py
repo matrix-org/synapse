@@ -601,18 +601,6 @@ class FederationEventHandler:
                 room_id, [(event, context)]
             )
 
-            # If we're joining the room again, check if there is new marker
-            # state indicating that there is new history imported somewhere in
-            # the DAG. Multiple markers can exist in the current state with
-            # unique state_keys.
-            #
-            # Do this after the state from the remote join was persisted (via
-            # `persist_events_and_notify`). Otherwise we can run into a
-            # situation where the create event doesn't exist yet in the
-            # `current_state_events`
-            for e in state:
-                await self._handle_marker_event(origin, e)
-
             return stream_id_after_persist
 
     async def update_state_for_partial_state_event(
@@ -1452,8 +1440,6 @@ class FederationEventHandler:
             await self._check_for_soft_fail(event, context=context, origin=origin)
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
-
-        await self._handle_marker_event(origin, event)
 
         if backfilled or context.rejected:
             return
