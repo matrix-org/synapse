@@ -95,6 +95,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.58.1
       - uses: Swatinem/rust-cache@v2
+        with:
+          # We want to avoid rebuilding the top-level crate each time.
+          cache-all-crates: "true"
 
       - name: Setup Poetry
         uses: matrix-org/setup-python-poetry@v1
