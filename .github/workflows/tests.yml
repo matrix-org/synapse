@@ -92,6 +92,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.58.1
+      - uses: Swatinem/rust-cache@v2
+
       - name: Setup Poetry
         uses: matrix-org/setup-python-poetry@v1
         with:
@@ -102,10 +106,6 @@ jobs:
           # https://github.com/matrix-org/synapse/pull/15376#issuecomment-1498983775
           # To make CI green, err towards caution and install the project.
           install-project: "true"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
-      - uses: Swatinem/rust-cache@v2
 
       # Cribbed from
       # https://github.com/AustinScola/mypy-cache-github-action/blob/85ea4f2972abed39b33bd02c36e341b28ca59213/src/restore.ts#L10-L17
