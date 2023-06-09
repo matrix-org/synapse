@@ -184,8 +184,8 @@ class PaginationHandler:
             self._delete_by_id[delete_id].status = status
             self._delete_by_room.setdefault(room_id, []).append(delete_id)
 
-            # restore a shutdown from the DB
-            # also take care of purging if needed
+            # If the database says we were last in the middle of shutting down the room,
+            # let's continue the shutdown process.
             shutdown_response = None
             if status == DeleteStatus.STATUS_SHUTTING_DOWN:
                 shutdown_params = json.loads(r["shutdown_params"])
@@ -683,7 +683,7 @@ class PaginationHandler:
             shutdown_params: parameters for the shutdown, cf `RoomShutdownHandler.ShutdownRoomParams`
             shutdown_response: current status of the shutdown, if it was interrupted
 
-        Saves a `RoomShutdownHandler.ShutdownRoomResponse` in `DeleteStatus` and in DB
+        Keeps track of the `DeleteStatus` (and `ShutdownRoomResponse`) in `self._delete_by_id` and persisted in DB
         """
 
         self._purges_in_progress_by_room.add(room_id)

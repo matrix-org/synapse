@@ -1730,7 +1730,7 @@ class ShutdownRoomParams(TypedDict):
             If set to `true`, purge the given room from the database.
         force_purge:
             If set to `true`, the room will be purged from database
-            also if it fails to remove some users from room.
+            even if there are still users joined to the room.
     """
 
     requester_user_id: str
