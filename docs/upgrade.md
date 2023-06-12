@@ -88,19 +88,6 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.86.0
-
-## Changes to event replication 
-
-Synapse has changed the format of serialization format used when persisting events over replication.
-This is a forwards- and backwards-incompatible change: v1.85.0 and below workers will not be
-able to send events to v1.86.0 workers, and vice versa. 
-If the master is updated to v1.86.0 then the workers must be updated to v1.86.0 for event replication to 
-function.
-This will also require that the master and all workers are restarted together after the upgrade.
-
-Once all workers are upgraded to v1.86.0 and the master and workers are restarted event replication will
-be able to resume.
 
 # Upgrading to v1.85.0
 
