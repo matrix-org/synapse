@@ -1,1 +1,1 @@
-MSC3983: only one OTK was returned through federation.
+MSC3983: only one OTK per device was returned through federation.
