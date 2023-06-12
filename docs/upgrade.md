@@ -88,7 +88,6 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-
 # Upgrading to v1.85.0
 
 ## Application service registration with "user" property deprecation
