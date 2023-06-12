@@ -931,9 +931,15 @@ class BackgroundUpdater:
 
                 to_delete = [row[:-1] for row in rows if not row[-1]]
 
-                self.db_pool.simple_delete_many_batch_txn(
-                    txn, table=table, keys=unique_columns, values=to_delete
-                )
+                if to_delete:
+                    logger.warning(
+                        "Deleting %d rows that do not pass new constraint",
+                        len(to_delete),
+                    )
+
+                    self.db_pool.simple_delete_many_batch_txn(
+                        txn, table=table, keys=unique_columns, values=to_delete
+                    )
 
                 self._background_update_progress_txn(
                     txn, update_name, new_progress.dict()
