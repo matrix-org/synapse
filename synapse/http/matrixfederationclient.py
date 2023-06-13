@@ -398,6 +398,7 @@ class MatrixFederationHttpClient:
             hs.config.worker.outbound_federation_restricted_to
         )
         if hs.get_instance_name() in outbound_federation_restricted_to:
+            logger.info("asdf")
             federation_agent = MatrixFederationAgent(
                 self.reactor,
                 tls_client_options_factory,
