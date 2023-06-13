@@ -661,6 +661,7 @@ class E2eKeysHandler:
     async def claim_one_time_keys(
         self,
         query: Dict[str, Dict[str, Dict[str, int]]],
+        user: UserID,
         timeout: Optional[int],
         always_include_fallback_keys: bool,
     ) -> JsonDict:
@@ -703,7 +704,7 @@ class E2eKeysHandler:
             device_keys = remote_queries[destination]
             try:
                 remote_result = await self.federation.claim_client_keys(
-                    destination, device_keys, timeout=timeout
+                    user, destination, device_keys, timeout=timeout
                 )
                 for user_id, keys in remote_result["one_time_keys"].items():
                     if user_id in device_keys:

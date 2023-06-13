@@ -38,10 +38,11 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
 
     def default_config(self) -> JsonDict:
         conf = super().default_config()
-        # we're using FederationReaderServer, which uses a SlavedStore, so we
+        # we're using GenericWorkerServer, which uses a GenericWorkerStore, so we
         # have to tell the FederationHandler not to try to access stuff that is only
         # in the primary store.
         conf["worker_app"] = "yes"
+        conf["instance_map"] = {"main": {"host": "127.0.0.1", "port": 0}}
 
         return conf
 

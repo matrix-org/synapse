@@ -872,6 +872,8 @@ class RoomCreationHandler:
         visibility = config.get("visibility", "private")
         is_public = visibility == "public"
 
+        self._validate_room_config(config, visibility)
+
         room_id = await self._generate_and_create_room_id(
             creator_id=user_id,
             is_public=is_public,
@@ -1111,20 +1113,7 @@ class RoomCreationHandler:
 
             return new_event, new_unpersisted_context
 
-        visibility = room_config.get("visibility", "private")
-        preset_config = room_config.get(
-            "preset",
-            RoomCreationPreset.PRIVATE_CHAT
-            if visibility == "private"
-            else RoomCreationPreset.PUBLIC_CHAT,
-        )
-
-        try:
-            config = self._presets_dict[preset_config]
-        except KeyError:
-            raise SynapseError(
-                400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
-            )
+        preset_config, config = self._room_preset_config(room_config)
 
         # MSC2175 removes the creator field from the create event.
         if not room_version.msc2175_implicit_room_creator:
@@ -1305,6 +1294,65 @@ class RoomCreationHandler:
         )
         assert last_event.internal_metadata.stream_ordering is not None
         return last_event.internal_metadata.stream_ordering, last_event.event_id, depth
+
+    def _validate_room_config(
+        self,
+        config: JsonDict,
+        visibility: str,
+    ) -> None:
+        """Checks configuration parameters for a /createRoom request.
+
+        If validation detects invalid parameters an exception may be raised to
+        cause room creation to be aborted and an error response to be returned
+        to the client.
+
+        Args:
+            config: A dict of configuration options. Originally from the body of
+                the /createRoom request
+            visibility: One of "public" or "private"
+        """
+
+        # Validate the requested preset, raise a 400 error if not valid
+        preset_name, preset_config = self._room_preset_config(config)
+
+        # If the user is trying to create an encrypted room and this is forbidden
+        # by the configured default_power_level_content_override, then reject the
+        # request before the room is created.
+        raw_initial_state = config.get("initial_state", [])
+        room_encryption_event = any(
+            s.get("type", "") == EventTypes.RoomEncryption for s in raw_initial_state
+        )
+
+        if preset_config["encrypted"] or room_encryption_event:
+            if self._default_power_level_content_override:
+                override = self._default_power_level_content_override.get(preset_name)
+                if override is not None:
+                    event_levels = override.get("events", {})
+                    room_admin_level = event_levels.get(EventTypes.PowerLevels, 100)
+                    encryption_level = event_levels.get(EventTypes.RoomEncryption, 100)
+                    if encryption_level > room_admin_level:
+                        raise SynapseError(
+                            403,
+                            f"You cannot create an encrypted room. user_level ({room_admin_level}) < send_level ({encryption_level})",
+                        )
+
+    def _room_preset_config(self, room_config: JsonDict) -> Tuple[str, dict]:
+        # The spec says rooms should default to private visibility if
+        # `visibility` is not specified.
+        visibility = room_config.get("visibility", "private")
+        preset_name = room_config.get(
+            "preset",
+            RoomCreationPreset.PRIVATE_CHAT
+            if visibility == "private"
+            else RoomCreationPreset.PUBLIC_CHAT,
+        )
+        try:
+            preset_config = self._presets_dict[preset_name]
+        except KeyError:
+            raise SynapseError(
+                400, f"'{preset_name}' is not a valid preset", errcode=Codes.BAD_JSON
+            )
+        return preset_name, preset_config
 
     def _generate_room_id(self) -> str:
         """Generates a random room ID.
@@ -1490,7 +1538,6 @@ class RoomContextHandler:
 
 class TimestampLookupHandler:
     def __init__(self, hs: "HomeServer"):
-        self.server_name = hs.hostname
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()

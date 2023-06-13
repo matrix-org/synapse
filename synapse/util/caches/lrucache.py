@@ -93,10 +93,8 @@ VT = TypeVar("VT")
 # a general type var, distinct from either KT or VT
 T = TypeVar("T")
 
-P = TypeVar("P")
 
-
-class _TimedListNode(ListNode[P]):
+class _TimedListNode(ListNode[T]):
     """A `ListNode` that tracks last access time."""
 
     __slots__ = ["last_access_ts_secs"]
@@ -821,7 +819,7 @@ class AsyncLruCache(Generic[KT, VT]):
     utilize external cache systems that require await behaviour to be created.
     """
 
-    def __init__(self, *args, **kwargs):  # type: ignore
+    def __init__(self, *args: Any, **kwargs: Any):
         self._lru_cache: LruCache[KT, VT] = LruCache(*args, **kwargs)
 
     async def get(
@@ -864,5 +862,5 @@ class AsyncLruCache(Generic[KT, VT]):
     async def contains(self, key: KT) -> bool:
         return self._lru_cache.contains(key)
 
-    async def clear(self) -> None:
+    def clear(self) -> None:
         self._lru_cache.clear()

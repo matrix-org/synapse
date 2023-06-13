@@ -61,7 +61,7 @@ class ProxyAgent(_AgentBase):
             connections.
 
         proxy_reactor: twisted reactor to use for connections to the proxy server
-                       reactor might have some blacklisting applied (i.e. for DNS queries),
+                       reactor might have some blocking applied (i.e. for DNS queries),
                        but we need unblocked access to the proxy.
 
         contextFactory: A factory for TLS contexts, to control the

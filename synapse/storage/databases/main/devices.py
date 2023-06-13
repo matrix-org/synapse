@@ -105,8 +105,6 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             is_writer=hs.config.worker.worker_app is None,
         )
 
-        # Type-ignore: _device_list_id_gen is mixed in from either DataStore (as a
-        # StreamIdGenerator) or SlavedDataStore (as a SlavedIdTracker).
         device_list_max = self._device_list_id_gen.get_current_token()
         device_list_prefill, min_device_list_id = self.db_pool.get_cache_dict(
             db_conn,
@@ -1942,6 +1940,10 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             self._device_list_stream_cache.entity_has_changed,
             user_id,
             stream_ids[-1],
+        )
+        txn.call_after(
+            self._get_e2e_device_keys_for_federation_query_inner.invalidate,
+            (user_id,),
         )
 
         min_stream_id = stream_ids[0]

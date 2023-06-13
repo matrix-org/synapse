@@ -54,7 +54,7 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
-from synapse.metrics import register_threadpool
+from synapse.metrics import LaterGauge, register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
@@ -547,6 +547,12 @@ class DatabasePool:
         self._db_pool = make_pool(hs.get_reactor(), database_config, engine)
 
         self.updates = BackgroundUpdater(hs, self)
+        LaterGauge(
+            "synapse_background_update_status",
+            "Background update status",
+            [],
+            self.updates.get_status,
+        )
 
         self._previous_txn_total_time = 0.0
         self._current_txn_total_time = 0.0
@@ -565,9 +571,8 @@ class DatabasePool:
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = set(UNIQUE_INDEX_BACKGROUND_UPDATES.keys())
 
-        # We add the user_directory_search table to the blacklist on SQLite
-        # because the existing search table does not have an index, making it
-        # unsafe to use native upserts.
+        # The user_directory_search table is unsafe to use native upserts
+        # on SQLite because the existing search table does not have an index.
         if isinstance(self.engine, Sqlite3Engine):
             self._unsafe_to_upsert_tables.add("user_directory_search")
 

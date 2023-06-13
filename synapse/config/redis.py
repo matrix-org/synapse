@@ -33,5 +33,12 @@ class RedisConfig(Config):
 
         self.redis_host = redis_config.get("host", "localhost")
         self.redis_port = redis_config.get("port", 6379)
+        self.redis_path = redis_config.get("path", None)
         self.redis_dbid = redis_config.get("dbid", None)
         self.redis_password = redis_config.get("password")
+
+        self.redis_use_tls = redis_config.get("use_tls", False)
+        self.redis_certificate = redis_config.get("certificate_file", None)
+        self.redis_private_key = redis_config.get("private_key_file", None)
+        self.redis_ca_file = redis_config.get("ca_file", None)
+        self.redis_ca_path = redis_config.get("ca_path", None)

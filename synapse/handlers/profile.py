@@ -67,7 +67,7 @@ class ProfileHandler:
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
-            profileinfo = await self.store.get_profileinfo(target_user.localpart)
+            profileinfo = await self.store.get_profileinfo(target_user)
             if profileinfo.display_name is None:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
 
@@ -99,9 +99,7 @@ class ProfileHandler:
     async def get_displayname(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
             try:
-                displayname = await self.store.get_profile_displayname(
-                    target_user.localpart
-                )
+                displayname = await self.store.get_profile_displayname(target_user)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
@@ -147,7 +145,7 @@ class ProfileHandler:
             raise AuthError(400, "Cannot set another user's displayname")
 
         if not by_admin and not self.hs.config.registration.enable_set_displayname:
-            profile = await self.store.get_profileinfo(target_user.localpart)
+            profile = await self.store.get_profileinfo(target_user)
             if profile.display_name:
                 raise SynapseError(
                     400,
@@ -180,7 +178,7 @@ class ProfileHandler:
 
         await self.store.set_profile_displayname(target_user, displayname_to_set)
 
-        profile = await self.store.get_profileinfo(target_user.localpart)
+        profile = await self.store.get_profileinfo(target_user)
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
         )
@@ -194,9 +192,7 @@ class ProfileHandler:
     async def get_avatar_url(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
             try:
-                avatar_url = await self.store.get_profile_avatar_url(
-                    target_user.localpart
-                )
+                avatar_url = await self.store.get_profile_avatar_url(target_user)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
@@ -241,7 +237,7 @@ class ProfileHandler:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
         if not by_admin and not self.hs.config.registration.enable_set_avatar_url:
-            profile = await self.store.get_profileinfo(target_user.localpart)
+            profile = await self.store.get_profileinfo(target_user)
             if profile.avatar_url:
                 raise SynapseError(
                     400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
@@ -272,7 +268,7 @@ class ProfileHandler:
 
         await self.store.set_profile_avatar_url(target_user, avatar_url_to_set)
 
-        profile = await self.store.get_profileinfo(target_user.localpart)
+        profile = await self.store.get_profileinfo(target_user)
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
         )
@@ -369,14 +365,10 @@ class ProfileHandler:
         response = {}
         try:
             if just_field is None or just_field == "displayname":
-                response["displayname"] = await self.store.get_profile_displayname(
-                    user.localpart
-                )
+                response["displayname"] = await self.store.get_profile_displayname(user)
 
             if just_field is None or just_field == "avatar_url":
-                response["avatar_url"] = await self.store.get_profile_avatar_url(
-                    user.localpart
-                )
+                response["avatar_url"] = await self.store.get_profile_avatar_url(user)
         except StoreError as e:
             if e.code == 404:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)

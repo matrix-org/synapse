@@ -1196,6 +1196,32 @@ Example configuration:
 allow_device_name_lookup_over_federation: true
 ```
 ---
+### `federation`
+
+The federation section defines some sub-options related to federation.
+
+The following options are related to configuring timeout and retry logic for one request,
+independently of the others.
+Short retry algorithm is used when something or someone will wait for the request to have an
+answer, while long retry is used for requests that happen in the background,
+like sending a federation transaction.
+
+* `client_timeout`: timeout for the federation requests in seconds. Default to 60s.
+* `max_short_retry_delay`: maximum delay to be used for the short retry algo in seconds. Default to 2s.
+* `max_long_retry_delay`: maximum delay to be used for the short retry algo in seconds. Default to 60s.
+* `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
+* `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
+
+Example configuration:
+```yaml
+federation:
+  client_timeout: 180
+  max_short_retry_delay: 7
+  max_long_retry_delay: 100
+  max_short_retries: 5
+  max_long_retries: 20
+```
+---
 ## Caching
 
 Options related to caching.
@@ -2570,7 +2596,50 @@ Example configuration:
 ```yaml
 nonrefreshable_access_token_lifetime: 24h
 ```
+---
+### `ui_auth`
 
+The amount of time to allow a user-interactive authentication session to be active.
+
+This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.
+
+This is ignored for potentially "dangerous" operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).
+
+Use the `session_timeout` sub-option here to change the time allowed for credential validation.
+
+Example configuration:
+```yaml
+ui_auth:
+    session_timeout: "15s"
+```
+---
+### `login_via_existing_session`
+
+Matrix supports the ability of an existing session to mint a login token for
+another client.
+
+Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.
+
+The duration of time the generated token is valid for can be configured with the
+`token_timeout` sub-option.
+
+User-interactive authentication is required when this is enabled unless the
+`require_ui_auth` sub-option is set to `False`.
+
+Example configuration:
+```yaml
+login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: "5m"
+```
 ---
 ## Metrics
 Config options related to metrics.
@@ -3415,28 +3484,6 @@ password_config:
       require_uppercase: true
 ```
 ---
-### `ui_auth`
-
-The amount of time to allow a user-interactive authentication session to be active.
-
-This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.
-
-This is ignored for potentially "dangerous" operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).
-
-Use the `session_timeout` sub-option here to change the time allowed for credential validation.
-
-Example configuration:
-```yaml
-ui_auth:
-    session_timeout: "15s"
-```
----
 ## Push
 Configuration settings related to push notifications
 
@@ -3884,15 +3931,20 @@ federation_sender_instances:
 ### `instance_map`
 
 When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured.
+HTTP replication listener of the worker, if configured, and to the main process.
 Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
 a HTTP replication listener, and that listener should be included in the `instance_map`.
-(The main process also needs an HTTP replication listener, but it should not be
-listed in the `instance_map`.)
+The main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is declared 
+inside the `listener` block for a `replication` listener.
+
 
 Example configuration:
 ```yaml
 instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
@@ -3974,10 +4026,21 @@ This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
+* `path`: The full path to a local Unix socket file. **If this is used, `host` and
+ `port` are ignored.** Defaults to `/tmp/redis.sock'
 * `password`: Optional password if configured on the Redis instance.
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+* `use_tls`: Whether to use tls connection. Defaults to false.
+* `certificate_file`: Optional path to the certificate file
+* `private_key_file`: Optional path to the private key file
+* `ca_file`: Optional path to the CA certificate file. Use this one or:
+* `ca_path`: Optional path to the folder containing the CA certificate file
 
   _Added in Synapse 1.78.0._
+
+  _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
+
+  _Changed in Synapse 1.85.0: Added path option to use a local Unix socket_
 
 Example configuration:
 ```yaml
@@ -3987,6 +4050,10 @@ redis:
   port: 6379
   password: <secret_password>
   dbid: <dbid>
+  #use_tls: True
+  #certificate_file: <path_to_the_certificate_file>
+  #private_key_file: <path_to_the_private_key_file>
+  #ca_file: <path_to_the_ca_certificate_file>
 ```
 ---
 ## Individual worker configuration
@@ -4024,6 +4091,7 @@ worker_name: generic_worker1
 ```
 ---
 ### `worker_replication_host`
+*Deprecated as of version 1.84.0. Place `host` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication endpoint that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -4035,6 +4103,7 @@ worker_replication_host: 127.0.0.1
 ```
 ---
 ### `worker_replication_http_port`
+*Deprecated as of version 1.84.0. Place `port` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 The HTTP replication port that it should talk to on the main Synapse process.
 The main Synapse process defines this with a `replication` resource in
@@ -4046,6 +4115,7 @@ worker_replication_http_port: 9093
 ```
 ---
 ### `worker_replication_http_tls`
+*Deprecated as of version 1.84.0. Place `tls` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
 
 Whether TLS should be used for talking to the HTTP replication port on the main
 Synapse process.
@@ -4071,9 +4141,9 @@ A worker can handle HTTP requests. To do so, a `worker_listeners` option
 must be declared, in the same way as the [`listeners` option](#listeners)
 in the shared config.
 
-Workers declared in [`stream_writers`](#stream_writers) will need to include a
-`replication` listener here, in order to accept internal HTTP requests from
-other workers.
+Workers declared in [`stream_writers`](#stream_writers) and [`instance_map`](#instance_map)
+ will need to include a `replication` listener here, in order to accept internal HTTP 
+requests from other workers.
 
 Example configuration:
 ```yaml

@@ -100,6 +100,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
@@ -303,6 +304,37 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             constraint_name="event_push_summary_thread_id",
             table="event_push_summary",
         )
+
+        self.db_pool.updates.register_background_update_handler(
+            "event_push_drop_null_thread_id_indexes",
+            self._background_drop_null_thread_id_indexes,
+        )
+
+    async def _background_drop_null_thread_id_indexes(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """
+        Drop the indexes used to find null thread_ids for event_push_actions and
+        event_push_summary.
+        """
+
+        def drop_null_thread_id_indexes_txn(txn: LoggingTransaction) -> None:
+            sql = "DROP INDEX IF EXISTS event_push_actions_thread_id_null"
+            logger.debug("[SQL] %s", sql)
+            txn.execute(sql)
+
+            sql = "DROP INDEX IF EXISTS event_push_summary_thread_id_null"
+            logger.debug("[SQL] %s", sql)
+            txn.execute(sql)
+
+        await self.db_pool.runInteraction(
+            "drop_null_thread_id_indexes_txn",
+            drop_null_thread_id_indexes_txn,
+        )
+        await self.db_pool.updates._end_background_update(
+            "event_push_drop_null_thread_id_indexes"
+        )
+        return 0
 
     async def get_unread_counts_by_room_for_user(self, user_id: str) -> Dict[str, int]:
         """Get the notification count by room for a user. Only considers notifications,

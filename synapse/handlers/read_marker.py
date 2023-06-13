@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from synapse.api.constants import ReceiptTypes
+from synapse.api.errors import SynapseError
 from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
@@ -26,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 class ReadMarkerHandler:
     def __init__(self, hs: "HomeServer"):
-        self.server_name = hs.config.server.server_name
         self.store = hs.get_datastores().main
         self.account_data_handler = hs.get_account_data_handler()
         self.read_marker_linearizer = Linearizer(name="read_marker")
@@ -47,12 +47,21 @@ class ReadMarkerHandler:
             )
 
             should_update = True
+            # Get event ordering, this also ensures we know about the event
+            event_ordering = await self.store.get_event_ordering(event_id)
 
             if existing_read_marker:
-                # Only update if the new marker is ahead in the stream
-                should_update = await self.store.is_event_after(
-                    event_id, existing_read_marker["event_id"]
-                )
+                try:
+                    old_event_ordering = await self.store.get_event_ordering(
+                        existing_read_marker["event_id"]
+                    )
+                except SynapseError:
+                    # Old event no longer exists, assume new is ahead. This may
+                    # happen if the old event was removed due to retention.
+                    pass
+                else:
+                    # Only update if the new marker is ahead in the stream
+                    should_update = event_ordering > old_event_ordering
 
             if should_update:
                 content = {"event_id": event_id}

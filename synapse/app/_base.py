@@ -21,6 +21,7 @@ import socket
 import sys
 import traceback
 import warnings
+from textwrap import indent
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -212,8 +213,12 @@ def handle_startup_exception(e: Exception) -> NoReturn:
     # Exceptions that occur between setting up the logging and forking or starting
     # the reactor are written to the logs, followed by a summary to stderr.
     logger.exception("Exception during startup")
+
+    error_string = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    indented_error_string = indent(error_string, "    ")
+
     quit_with_error(
-        f"Error during initialisation:\n   {e}\nThere may be more information in the logs."
+        f"Error during initialisation:\n{indented_error_string}\nThere may be more information in the logs."
     )
 
 

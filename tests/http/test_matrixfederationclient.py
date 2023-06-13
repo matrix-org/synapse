@@ -40,7 +40,7 @@ from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests.server import FakeTransport
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 
 def check_logcontext(context: LoggingContextOrSentinel) -> None:
@@ -231,11 +231,11 @@ class FederationClientTests(HomeserverTestCase):
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
 
-    def test_client_ip_range_blacklist(self) -> None:
-        """Ensure that Synapse does not try to connect to blacklisted IPs"""
+    def test_client_ip_range_blocklist(self) -> None:
+        """Ensure that Synapse does not try to connect to blocked IPs"""
 
-        # Set up the ip_range blacklist
-        self.hs.config.server.federation_ip_range_blacklist = IPSet(
+        # Set up the ip_range blocklist
+        self.hs.config.server.federation_ip_range_blocklist = IPSet(
             ["127.0.0.0/8", "fe80::/64"]
         )
         self.reactor.lookups["internal"] = "127.0.0.1"
@@ -243,7 +243,7 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.lookups["fine"] = "10.20.30.40"
         cl = MatrixFederationHttpClient(self.hs, None)
 
-        # Try making a GET request to a blacklisted IPv4 address
+        # Try making a GET request to a blocked IPv4 address
         # ------------------------------------------------------
         # Make the request
         d = defer.ensureDeferred(cl.get_json("internal:8008", "foo/bar", timeout=10000))
@@ -261,7 +261,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, DNSLookupError)
 
-        # Try making a POST request to a blacklisted IPv6 address
+        # Try making a POST request to a blocked IPv6 address
         # -------------------------------------------------------
         # Make the request
         d = defer.ensureDeferred(
@@ -278,11 +278,11 @@ class FederationClientTests(HomeserverTestCase):
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 0)
 
-        # Check that it was due to a blacklisted DNS lookup
+        # Check that it was due to a blocked DNS lookup
         f = self.failureResultOf(d, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, DNSLookupError)
 
-        # Try making a GET request to a non-blacklisted IPv4 address
+        # Try making a GET request to an allowed IPv4 address
         # ----------------------------------------------------------
         # Make the request
         d = defer.ensureDeferred(cl.post_json("fine:8008", "foo/bar", timeout=10000))
@@ -640,3 +640,21 @@ class FederationClientTests(HomeserverTestCase):
             self.cl.build_auth_headers(
                 b"", b"GET", b"https://example.com", destination_is=b""
             )
+
+    @override_config(
+        {
+            "federation": {
+                "client_timeout": 180,
+                "max_long_retry_delay": 100,
+                "max_short_retry_delay": 7,
+                "max_long_retries": 20,
+                "max_short_retries": 5,
+            }
+        }
+    )
+    def test_configurable_retry_and_delay_values(self) -> None:
+        self.assertEqual(self.cl.default_timeout, 180)
+        self.assertEqual(self.cl.max_long_retry_delay, 100)
+        self.assertEqual(self.cl.max_short_retry_delay, 7)
+        self.assertEqual(self.cl.max_long_retries, 20)
+        self.assertEqual(self.cl.max_short_retries, 5)

@@ -52,7 +52,6 @@ from synapse.api.errors import (
     NotFoundError,
     StoreError,
     SynapseError,
-    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import (
@@ -275,6 +274,8 @@ class AuthHandler:
         # response.
         self._extra_attributes: Dict[str, SsoLoginExtraAttributes] = {}
 
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
+
     async def validate_user_via_ui_auth(
         self,
         requester: Requester,
@@ -323,8 +324,12 @@ class AuthHandler:
 
             LimitExceededError if the ratelimiter's failed request count for this
                 user is too high to proceed
-
         """
+        if self.msc3861_oauth_delegation_enabled:
+            raise SynapseError(
+                HTTPStatus.INTERNAL_SERVER_ERROR, "UIA shouldn't be used with MSC3861"
+            )
+
         if not requester.access_token_id:
             raise ValueError("Cannot validate a user without an access token")
         if can_skip_ui_auth and self._ui_auth_session_timeout:
@@ -1419,12 +1424,6 @@ class AuthHandler:
             return None
         (user_id, password_hash) = lookupres
 
-        # If the password hash is None, the account has likely been deactivated
-        if not password_hash:
-            deactivated = await self.store.get_user_deactivated_status(user_id)
-            if deactivated:
-                raise UserDeactivatedError("This account has been deactivated")
-
         result = await self.validate_hash(password, password_hash)
         if not result:
             logger.warning("Failed password login for user %s", user_id)
@@ -1749,15 +1748,18 @@ class AuthHandler:
                 registered.
             auth_provider_session_id: The session ID from the SSO IdP received during login.
         """
-        # If the account has been deactivated, do not proceed with the login
-        # flow.
+        # If the account has been deactivated, do not proceed with the login.
+        #
+        # This gets checked again when the token is submitted but this lets us
+        # provide an HTML error page to the user (instead of issuing a token and
+        # having it error later).
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
             respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
         user_profile_data = await self.store.get_profileinfo(
-            UserID.from_string(registered_user_id).localpart
+            UserID.from_string(registered_user_id)
         )
 
         # Store any extra attributes which will be passed in the login response.
