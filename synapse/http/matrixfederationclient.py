@@ -398,8 +398,7 @@ class MatrixFederationHttpClient:
             hs.config.worker.outbound_federation_restricted_to
         )
         if hs.get_instance_name() in outbound_federation_restricted_to:
-            logger.info("asdf")
-            federation_agent = MatrixFederationAgent(
+            federation_agent: IAgent = MatrixFederationAgent(
                 self.reactor,
                 tls_client_options_factory,
                 user_agent.encode("ascii"),
@@ -408,7 +407,7 @@ class MatrixFederationHttpClient:
             )
         else:
             federation_proxies = outbound_federation_restricted_to.locations
-            federation_agent: IAgent = ProxyAgent(
+            federation_agent = ProxyAgent(
                 self.reactor,
                 self.reactor,
                 tls_client_options_factory,
