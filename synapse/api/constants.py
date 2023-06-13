@@ -258,6 +258,7 @@ class AccountDataTypes:
     DIRECT: Final = "m.direct"
     IGNORED_USER_LIST: Final = "m.ignored_user_list"
     TAG: Final = "m.tag"
+    PUSH_RULES: Final = "m.push_rules"
 
 
 class HistoryVisibility:

@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
 import gc
 import hashlib
 import hmac
@@ -150,7 +151,11 @@ def deepcopy_config(config: _TConfig) -> _TConfig:
     return new_config
 
 
-_make_homeserver_config_obj_cache: Dict[str, Union[RootConfig, Config]] = {}
+@functools.lru_cache(maxsize=8)
+def _parse_config_dict(config: str) -> RootConfig:
+    config_obj = HomeServerConfig()
+    config_obj.parse_config_dict(json.loads(config), "", "")
+    return config_obj
 
 
 def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
@@ -164,21 +169,7 @@ def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
     but it keeps a cache of `HomeServerConfig` instances and deepcopies them as needed,
     to avoid validating the whole configuration every time.
     """
-    cache_key = json.dumps(config)
-
-    if cache_key in _make_homeserver_config_obj_cache:
-        # Cache hit: reuse the existing instance
-        config_obj = _make_homeserver_config_obj_cache[cache_key]
-    else:
-        # Cache miss; create the actual instance
-        config_obj = HomeServerConfig()
-        config_obj.parse_config_dict(config, "", "")
-
-        # Add to the cache
-        _make_homeserver_config_obj_cache[cache_key] = config_obj
-
-    assert isinstance(config_obj, RootConfig)
-
+    config_obj = _parse_config_dict(json.dumps(config, sort_keys=True))
     return deepcopy_config(config_obj)
 
 
@@ -229,13 +220,20 @@ class TestCase(unittest.TestCase):
         #
         # The easiest way to do this would be to do a full GC after each test
         # run, but that is very expensive. Instead, we disable GC (above) for
-        # the duration of the test so that we only need to run a gen-0 GC, which
-        # is a lot quicker.
+        # the duration of the test and only run a gen-0 GC, which is a lot
+        # quicker. This doesn't clean up everything, since the TestCase
+        # instance still holds references to objects created during the test,
+        # such as HomeServers, so we do a full GC every so often.
 
         @around(self)
         def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
             gc.collect(0)
+            # Run a full GC every 50 gen-0 GCs.
+            gen0_stats = gc.get_stats()[0]
+            gen0_collections = gen0_stats["collections"]
+            if gen0_collections % 50 == 0:
+                gc.collect()
             gc.enable()
             set_current_context(SENTINEL_CONTEXT)
 
@@ -566,7 +564,9 @@ class HomeserverTestCase(TestCase):
             client_ip,
         )
 
-    def setup_test_homeserver(self, *args: Any, **kwargs: Any) -> HomeServer:
+    def setup_test_homeserver(
+        self, name: Optional[str] = None, **kwargs: Any
+    ) -> HomeServer:
         """
         Set up the test homeserver, meant to be called by the overridable
         make_homeserver. It automatically passes through the test class's
@@ -585,15 +585,25 @@ class HomeserverTestCase(TestCase):
         else:
             config = kwargs["config"]
 
+        # The server name can be specified using either the `name` argument or a config
+        # override. The `name` argument takes precedence over any config overrides.
+        if name is not None:
+            config["server_name"] = name
+
         # Parse the config from a config dict into a HomeServerConfig
         config_obj = make_homeserver_config_obj(config)
         kwargs["config"] = config_obj
+
+        # The server name in the config is now `name`, if provided, or the `server_name`
+        # from a config override, or the default of "test". Whichever it is, we
+        # construct a homeserver with a matching name.
+        kwargs["name"] = config_obj.server.server_name
 
         async def run_bg_updates() -> None:
             with LoggingContext("run_bg_updates"):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
-        hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        hs = setup_test_homeserver(self.addCleanup, **kwargs)
         stor = hs.get_datastores().main
 
         # Run the database background updates, when running against "master".

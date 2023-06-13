@@ -228,6 +228,7 @@ class StateTestCase(unittest.TestCase):
                 "get_macaroon_generator",
                 "get_instance_name",
                 "get_simple_http_client",
+                "get_replication_client",
                 "hostname",
             ]
         )
@@ -263,7 +264,7 @@ class StateTestCase(unittest.TestCase):
 
         self.dummy_store.register_events(graph.walk())
 
-        context_store: dict[str, EventContext] = {}
+        context_store: Dict[str, EventContext] = {}
 
         for event in graph.walk():
             context = yield defer.ensureDeferred(

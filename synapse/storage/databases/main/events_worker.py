@@ -215,13 +215,10 @@ class EventsWorkerStore(SQLBaseStore):
                 writers=hs.config.worker.writers.events,
             )
         else:
+            # Multiple writers are not supported for SQLite.
+            #
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support it for unit tests.
-            #
-            # If this process is the writer than we need to use
-            # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
-            # updated over replication. (Multiple writers are not supported for
-            # SQLite).
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
                 hs.get_replication_notifier(),
@@ -1994,12 +1991,6 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
         return rows, to_token, True
-
-    async def is_event_after(self, event_id1: str, event_id2: str) -> bool:
-        """Returns True if event_id1 is after event_id2 in the stream"""
-        to_1, so_1 = await self.get_event_ordering(event_id1)
-        to_2, so_2 = await self.get_event_ordering(event_id2)
-        return (to_1, so_1) > (to_2, so_2)
 
     @cached(max_entries=5000)
     async def get_event_ordering(self, event_id: str) -> Tuple[int, int]:

@@ -57,7 +57,7 @@ pub const BASE_PREPEND_OVERRIDE_RULES: &[PushRule] = &[PushRule {
     rule_id: Cow::Borrowed("global/override/.m.rule.master"),
     priority_class: 5,
     conditions: Cow::Borrowed(&[]),
-    actions: Cow::Borrowed(&[Action::DontNotify]),
+    actions: Cow::Borrowed(&[]),
     default: true,
     default_enabled: false,
 }];
@@ -163,7 +163,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 pattern: Cow::Borrowed("m.room.member"),
             },
         ))]),
-        actions: Cow::Borrowed(&[Action::DontNotify]),
+        actions: Cow::Borrowed(&[]),
         default: true,
         default_enabled: true,
     },

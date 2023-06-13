@@ -103,7 +103,7 @@ from synapse.util.httpresourcetree import create_resource_tree
 logger = logging.getLogger("synapse.app.generic_worker")
 
 
-class GenericWorkerSlavedStore(
+class GenericWorkerStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
     UserDirectoryStore,
@@ -156,7 +156,7 @@ class GenericWorkerSlavedStore(
 
 
 class GenericWorkerServer(HomeServer):
-    DATASTORE_CLASS = GenericWorkerSlavedStore  # type: ignore
+    DATASTORE_CLASS = GenericWorkerStore  # type: ignore
 
     def _listen_http(self, listener_config: ListenerConfig) -> None:
         assert listener_config.http_options is not None

@@ -399,7 +399,7 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
             "PUT",
             url,
             content={
-                "features": {"msc3026": True, "msc2654": True},
+                "features": {"msc3026": True, "msc3881": True},
             },
             access_token=self.admin_user_tok,
         )
@@ -420,7 +420,7 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             True,
-            channel.json_body["features"]["msc2654"],
+            channel.json_body["features"]["msc3881"],
         )
 
         # test disabling a feature works
@@ -448,10 +448,6 @@ class ExperimentalFeaturesTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             True,
-            channel.json_body["features"]["msc2654"],
-        )
-        self.assertEqual(
-            False,
             channel.json_body["features"]["msc3881"],
         )
         self.assertEqual(

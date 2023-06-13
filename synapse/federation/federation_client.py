@@ -236,6 +236,7 @@ class FederationClient(FederationBase):
 
     async def claim_client_keys(
         self,
+        user: UserID,
         destination: str,
         query: Dict[str, Dict[str, Dict[str, int]]],
         timeout: Optional[int],
@@ -243,6 +244,7 @@ class FederationClient(FederationBase):
         """Claims one-time keys for a device hosted on a remote server.
 
         Args:
+            user: The user id of the requesting user
             destination: Domain name of the remote homeserver
             content: The query content.
 
@@ -279,7 +281,7 @@ class FederationClient(FederationBase):
         if use_unstable:
             try:
                 return await self.transport_layer.claim_client_keys_unstable(
-                    destination, unstable_content, timeout
+                    user, destination, unstable_content, timeout
                 )
             except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised endpoint,
@@ -295,7 +297,7 @@ class FederationClient(FederationBase):
             logger.debug("Skipping unstable claim client keys API")
 
         return await self.transport_layer.claim_client_keys(
-            destination, content, timeout
+            user, destination, content, timeout
         )
 
     @trace
@@ -854,7 +856,7 @@ class FederationClient(FederationBase):
 
         for destination in destinations:
             # We don't want to ask our own server for information we don't have
-            if destination == self.server_name:
+            if self._is_mine_server_name(destination):
                 continue
 
             try:
@@ -1536,7 +1538,7 @@ class FederationClient(FederationBase):
         self, destinations: Iterable[str], room_id: str, event_dict: JsonDict
     ) -> None:
         for destination in destinations:
-            if destination == self.server_name:
+            if self._is_mine_server_name(destination):
                 continue
 
             try:

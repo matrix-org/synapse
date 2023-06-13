@@ -362,6 +362,7 @@ class FederationSender(AbstractFederationSender):
 
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         self._presence_router: Optional["PresenceRouter"] = None
         self._transaction_manager = TransactionManager(hs)
@@ -773,7 +774,7 @@ class FederationSender(AbstractFederationSender):
         domains = [
             d
             for d in domains_set
-            if d != self.server_name
+            if not self.is_mine_server_name(d)
             and self._federation_shard_config.should_handle(self._instance_name, d)
         ]
         if not domains:
@@ -839,7 +840,7 @@ class FederationSender(AbstractFederationSender):
             assert self.is_mine_id(state.user_id)
 
         for destination in destinations:
-            if destination == self.server_name:
+            if self.is_mine_server_name(destination):
                 continue
             if not self._federation_shard_config.should_handle(
                 self._instance_name, destination
@@ -867,7 +868,7 @@ class FederationSender(AbstractFederationSender):
             content: content of EDU
             key: clobbering key for this edu
         """
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.info("Not sending EDU to ourselves")
             return
 
@@ -904,7 +905,7 @@ class FederationSender(AbstractFederationSender):
             queue.send_edu(edu)
 
     def send_device_messages(self, destination: str, immediate: bool = True) -> None:
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.warning("Not sending device update to ourselves")
             return
 
@@ -926,7 +927,7 @@ class FederationSender(AbstractFederationSender):
         might have come back.
         """
 
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.warning("Not waking up ourselves")
             return
 

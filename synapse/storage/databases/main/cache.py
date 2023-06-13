@@ -279,11 +279,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]
     ) -> None:
-        """Invalidates the cache and adds it to the cache stream so slaves
+        """Invalidates the cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
 
-        This should only be used to invalidate caches where slaves won't
-        otherwise know from other replication streams that the cache should
+        This should only be used to invalidate caches where other workers won't
+        otherwise have known from other replication streams that the cache should
         be invalidated.
         """
         cache_func = getattr(self, cache_name, None)
@@ -302,11 +302,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         cache_func: CachedFunction,
         keys: Tuple[Any, ...],
     ) -> None:
-        """Invalidates the cache and adds it to the cache stream so slaves
+        """Invalidates the cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
 
-        This should only be used to invalidate caches where slaves won't
-        otherwise know from other replication streams that the cache should
+        This should only be used to invalidate caches where other workers won't
+        otherwise have known from other replication streams that the cache should
         be invalidated.
         """
         txn.call_after(cache_func.invalidate, keys)
@@ -315,7 +315,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
     def _invalidate_all_cache_and_stream(
         self, txn: LoggingTransaction, cache_func: CachedFunction
     ) -> None:
-        """Invalidates the entire cache and adds it to the cache stream so slaves
+        """Invalidates the entire cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
         """
 

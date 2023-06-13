@@ -20,6 +20,7 @@ import attr
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.events.snapshot import UnpersistedEventContext, UnpersistedEventContextBase
+from synapse.logging.opentracing import tag_args, trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -159,6 +160,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             "get_state_group_delta", _get_state_group_delta_txn
         )
 
+    @trace
+    @tag_args
     @cancellable
     async def _get_state_groups_from_groups(
         self, groups: List[int], state_filter: StateFilter
@@ -187,6 +190,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         return results
 
+    @trace
+    @tag_args
     def _get_state_for_group_using_cache(
         self,
         cache: DictionaryCache[int, StateKey, str],
@@ -239,6 +244,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         return state_filter.filter_state(state_dict_ids), not missing_types
 
+    @trace
+    @tag_args
     @cancellable
     async def _get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
@@ -305,6 +312,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         return state
 
+    @trace
+    @tag_args
     def _get_state_for_groups_using_cache(
         self,
         groups: Iterable[int],
@@ -403,6 +412,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 fetched_keys=non_member_types,
             )
 
+    @trace
+    @tag_args
     async def store_state_deltas_for_batched(
         self,
         events_and_context: List[Tuple[EventBase, UnpersistedEventContextBase]],
@@ -520,6 +531,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             prev_group,
         )
 
+    @trace
+    @tag_args
     async def store_state_group(
         self,
         event_id: str,
@@ -772,6 +785,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             ((sg,) for sg in state_groups_to_delete),
         )
 
+    @trace
+    @tag_args
     async def get_previous_state_groups(
         self, state_groups: Iterable[int]
     ) -> Dict[int, int]:

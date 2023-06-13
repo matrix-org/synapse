@@ -42,7 +42,7 @@ from tests.test_utils.html_parsers import TestHtmlParser
 from tests.unittest import HomeserverTestCase, override_config, skip_unless
 
 try:
-    from authlib.jose import jwk, jwt
+    from authlib.jose import JsonWebKey, jwt
 
     HAS_JWT = True
 except ImportError:
@@ -1054,6 +1054,22 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Token field for JWT is missing")
 
+    def test_deactivated_user(self) -> None:
+        """Logging in as a deactivated account should error."""
+        user_id = self.register_user("kermit", "monkey")
+        self.get_success(
+            self.hs.get_deactivate_account_handler().deactivate_account(
+                user_id, erase_data=False, requester=create_requester(user_id)
+            )
+        )
+
+        channel = self.jwt_login({"sub": "kermit"})
+        self.assertEqual(channel.code, 403, msg=channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_USER_DEACTIVATED")
+        self.assertEqual(
+            channel.json_body["error"], "This account has been deactivated"
+        )
+
 
 # The JWTPubKeyTestCase is a complement to JWTTestCase where we instead use
 # RSS256, with a public key configured in synapse as "jwt_secret", and tokens
@@ -1121,7 +1137,7 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_privatekey) -> str:
         header = {"alg": "RS256"}
         if secret.startswith("-----BEGIN RSA PRIVATE KEY-----"):
-            secret = jwk.dumps(secret, kty="RSA")
+            secret = JsonWebKey.import_key(secret, {"kty": "RSA"})
         result: bytes = jwt.encode(header, payload, secret)
         return result.decode("ascii")
 

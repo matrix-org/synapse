@@ -129,6 +129,7 @@ class FederationServer(FederationBase):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
+        self.server_name = hs.hostname
         self.handler = hs.get_federation_handler()
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self._federation_event_handler = hs.get_federation_event_handler()
@@ -738,12 +739,10 @@ class FederationServer(FederationBase):
             "event": event_json,
             "state": [p.get_pdu_json(time_now) for p in state_events],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain_events],
-            "org.matrix.msc3706.partial_state": caller_supports_partial_state,
             "members_omitted": caller_supports_partial_state,
         }
 
         if servers_in_room is not None:
-            resp["org.matrix.msc3706.servers_in_room"] = list(servers_in_room)
             resp["servers_in_room"] = list(servers_in_room)
 
         return resp
@@ -942,7 +941,7 @@ class FederationServer(FederationBase):
             authorising_server = get_domain_from_id(
                 event.content[EventContentFields.AUTHORISING_USER]
             )
-            if authorising_server != self.server_name:
+            if not self._is_mine_server_name(authorising_server):
                 raise SynapseError(
                     400,
                     f"Cannot authorise request from resident server: {authorising_server}",

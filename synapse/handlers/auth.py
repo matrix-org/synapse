@@ -52,7 +52,6 @@ from synapse.api.errors import (
     NotFoundError,
     StoreError,
     SynapseError,
-    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import (
@@ -212,7 +211,7 @@ class AuthHandler:
         self._password_enabled_for_login = hs.config.auth.password_enabled_for_login
         self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -1423,12 +1422,6 @@ class AuthHandler:
             return None
         (user_id, password_hash) = lookupres
 
-        # If the password hash is None, the account has likely been deactivated
-        if not password_hash:
-            deactivated = await self.store.get_user_deactivated_status(user_id)
-            if deactivated:
-                raise UserDeactivatedError("This account has been deactivated")
-
         result = await self.validate_hash(password, password_hash)
         if not result:
             logger.warning("Failed password login for user %s", user_id)
@@ -1753,8 +1746,11 @@ class AuthHandler:
                 registered.
             auth_provider_session_id: The session ID from the SSO IdP received during login.
         """
-        # If the account has been deactivated, do not proceed with the login
-        # flow.
+        # If the account has been deactivated, do not proceed with the login.
+        #
+        # This gets checked again when the token is submitted but this lets us
+        # provide an HTML error page to the user (instead of issuing a token and
+        # having it error later).
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
             respond_with_html(request, 403, self._sso_account_deactivated_template)

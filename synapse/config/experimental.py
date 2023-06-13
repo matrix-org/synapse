@@ -88,18 +88,6 @@ class ExperimentalConfig(Config):
             "msc3984_appservice_key_query", False
         )
 
-        # MSC3706 (server-side support for partial state in /send_join responses)
-        # Synapse will always serve partial state responses to requests using the stable
-        # query parameter `omit_members`. If this flag is set, Synapse will also serve
-        # partial state responses to requests using the unstable query parameter
-        # `org.matrix.msc3706.partial_state`.
-        self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
-
-        # experimental support for faster joins over federation
-        # (MSC2775, MSC3706, MSC3895)
-        # requires a target server that can provide a partial join response (MSC3706)
-        self.faster_joins_enabled: bool = experimental.get("faster_joins", True)
-
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
 
@@ -201,9 +189,6 @@ class ExperimentalConfig(Config):
         # MSC3967: Do not require UIA when first uploading cross signing keys
         self.msc3967_enabled = experimental.get("msc3967_enabled", False)
 
-        # MSC2659: Application service ping endpoint
-        self.msc2659_enabled = experimental.get("msc2659_enabled", False)
-
         # MSC3981: Recurse relations
         self.msc3981_recurse_relations = experimental.get(
             "msc3981_recurse_relations", False
@@ -211,3 +196,11 @@ class ExperimentalConfig(Config):
 
         # MSC3970: Scope transaction IDs to devices
         self.msc3970_enabled = experimental.get("msc3970_enabled", False)
+
+        # MSC4009: E.164 Matrix IDs
+        self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)
+
+        # MSC4010: Do not allow setting m.push_rules account data.
+        self.msc4010_push_rules_account_data = experimental.get(
+            "msc4010_push_rules_account_data", False
+        )

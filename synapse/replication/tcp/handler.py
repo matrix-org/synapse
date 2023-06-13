@@ -46,6 +46,7 @@ from synapse.replication.tcp.commands import (
     UserIpCommand,
     UserSyncCommand,
 )
+from synapse.replication.tcp.context import ClientContextFactory
 from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams import (
     STREAMS_MAP,
@@ -350,13 +351,35 @@ class ReplicationCommandHandler:
             outbound_redis_connection,
             channel_names=self._channels_to_subscribe_to,
         )
-        hs.get_reactor().connectTCP(
-            hs.config.redis.redis_host,
-            hs.config.redis.redis_port,
-            self._factory,
-            timeout=30,
-            bindAddress=None,
-        )
+
+        reactor = hs.get_reactor()
+        redis_config = hs.config.redis
+        if redis_config.redis_path is not None:
+            reactor.connectUNIX(
+                redis_config.redis_path,
+                self._factory,
+                timeout=30,
+                checkPID=False,
+            )
+
+        elif hs.config.redis.redis_use_tls:
+            ssl_context_factory = ClientContextFactory(hs.config.redis)
+            reactor.connectSSL(
+                redis_config.redis_host,
+                redis_config.redis_port,
+                self._factory,
+                ssl_context_factory,
+                timeout=30,
+                bindAddress=None,
+            )
+        else:
+            reactor.connectTCP(
+                redis_config.redis_host,
+                redis_config.redis_port,
+                self._factory,
+                timeout=30,
+                bindAddress=None,
+            )
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a map from stream name to all streams."""

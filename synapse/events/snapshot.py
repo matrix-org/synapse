@@ -19,6 +19,7 @@ from immutabledict import immutabledict
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
+from synapse.logging.opentracing import tag_args, trace
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
@@ -242,6 +243,8 @@ class EventContext(UnpersistedEventContextBase):
 
         return self._state_group
 
+    @trace
+    @tag_args
     async def get_current_state_ids(
         self, state_filter: Optional["StateFilter"] = None
     ) -> Optional[StateMap[str]]:
@@ -275,6 +278,8 @@ class EventContext(UnpersistedEventContextBase):
 
         return prev_state_ids
 
+    @trace
+    @tag_args
     async def get_prev_state_ids(
         self, state_filter: Optional["StateFilter"] = None
     ) -> StateMap[str]:

@@ -11,14 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import attr
 
 from synapse.api.errors import SynapseError, UnrecognizedRequestError
+from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.push_rule import RuleNotFoundException
 from synapse.synapse_rust.push import get_base_rule_ids
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -115,6 +116,17 @@ class PushRulesHandler:
         stream_id = self._main_store.get_max_push_rules_stream_id()
         self._notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
+    async def push_rules_for_user(
+        self, user: UserID
+    ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+        """
+        Push rules aren't really account data, but get formatted as such for /sync.
+        """
+        user_id = user.to_string()
+        rules_raw = await self._main_store.get_push_rules_for_user(user_id)
+        rules = format_push_rules_for_user(user, rules_raw)
+        return rules
+
 
 def check_actions(actions: List[Union[str, JsonDict]]) -> None:
     """Check if the given actions are spec compliant.
@@ -129,6 +141,8 @@ def check_actions(actions: List[Union[str, JsonDict]]) -> None:
         raise InvalidRuleException("No actions found")
 
     for a in actions:
+        # "dont_notify" and "coalesce" are legacy actions. They are allowed, but
+        # ignored (resulting in no action from the pusher).
         if a in ["notify", "dont_notify", "coalesce"]:
             pass
         elif isinstance(a, dict) and "set_tweak" in a:

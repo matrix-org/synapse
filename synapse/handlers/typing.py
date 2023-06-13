@@ -68,6 +68,7 @@ class FollowerTypingHandler:
         self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         self.federation = None
         if hs.should_send_federation():
@@ -153,7 +154,7 @@ class FollowerTypingHandler:
                 member.room_id
             )
             for domain in hosts:
-                if domain != self.server_name:
+                if not self.is_mine_server_name(domain):
                     logger.debug("sending typing update to %s", domain)
                     self.federation.build_and_send_edu(
                         destination=domain,

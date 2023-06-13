@@ -338,7 +338,7 @@ class UserRestServletV2(RestServlet):
                         HTTPStatus.CONFLICT, "External id is already in use."
                     )
 
-            if "avatar_url" in body and isinstance(body["avatar_url"], str):
+            if "avatar_url" in body:
                 await self.profile_handler.set_avatar_url(
                     target_user, requester, body["avatar_url"], True
                 )
