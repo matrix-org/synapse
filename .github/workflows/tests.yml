@@ -45,16 +45,6 @@ jobs:
       - run: poetry run scripts-dev/generate_sample_config.sh --check
       - run: poetry run scripts-dev/config-lint.sh
 
-  check-schema-delta:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
-      - run: "pip install 'click==8.1.1' 'GitPython>=3.1.20'"
-      - run: scripts-dev/check_schema_delta.py --force-colors
-
   check-lockfile:
     runs-on: ubuntu-latest
     steps:
@@ -221,7 +211,6 @@ jobs:
       - lint-newsfile
       - lint-pydantic
       - check-sampleconfig
-      - check-schema-delta
       - check-lockfile
       - lint-clippy
       - lint-rustfmt
@@ -608,6 +597,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo bench --no-run
+
+  check-schema-delta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - run: "pip install 'click==8.1.1' 'GitPython>=3.1.20'"
+      - run: scripts-dev/check_schema_delta.py --force-colors
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
