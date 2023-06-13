@@ -1,3 +1,72 @@
+Synapse 1.86.0rc1 (2023-06-13)
+==============================
+
+Features
+--------
+
+- Stable support for [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882) to allow an existing device/session to generate a login token for use on a new device/session. ([\#15388](https://github.com/matrix-org/synapse/issues/15388))
+- Support resolving a room's [canonical alias](https://spec.matrix.org/v1.7/client-server-api/#mroomcanonical_alias) via the module API. ([\#15450](https://github.com/matrix-org/synapse/issues/15450))
+- Enable support for [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952): intentional mentions. ([\#15520](https://github.com/matrix-org/synapse/issues/15520))
+- Experimental [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) support: delegate auth to an OIDC provider. ([\#15582](https://github.com/matrix-org/synapse/issues/15582))
+- Add Syanpse version deploy annotations to Grafana dashboard which enables easy correlation between behavior changes witnessed in a graph to a certain Synapse version and nail down regressions. ([\#15674](https://github.com/matrix-org/synapse/issues/15674))
+- Add a catch-all * to the supported relation types when redacting an event and its related events. This is an update to [MSC3912](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) implementation. ([\#15705](https://github.com/matrix-org/synapse/issues/15705))
+- Speed up `/messages` by backfilling in the background when there are no backward extremities where we are directly paginating. ([\#15710](https://github.com/matrix-org/synapse/issues/15710))
+- Expose a metric reporting the database background update status. ([\#15740](https://github.com/matrix-org/synapse/issues/15740))
+
+
+Bugfixes
+--------
+
+- Correctly clear caches when we delete a room. ([\#15609](https://github.com/matrix-org/synapse/issues/15609))
+- Check permissions for enabling encryption earlier during room creation to avoid creating broken rooms. ([\#15695](https://github.com/matrix-org/synapse/issues/15695))
+
+
+Improved Documentation
+----------------------
+
+- Simplify query to find participating servers in a room. ([\#15732](https://github.com/matrix-org/synapse/issues/15732))
+
+
+Internal Changes
+----------------
+
+- Allow for the configuration of max request retries and min/max retry delays in the matrix federation client. ([\#12504](https://github.com/matrix-org/synapse/issues/12504))
+- Log when events are (maybe unexpectedly) filtered out of responses in tests. ([\#14213](https://github.com/matrix-org/synapse/issues/14213))
+- Read from column `full_user_id` rather than `user_id` of tables `profiles` and `user_filters`. ([\#15649](https://github.com/matrix-org/synapse/issues/15649))
+- Add support for tracing functions which return `Awaitable`s. ([\#15650](https://github.com/matrix-org/synapse/issues/15650))
+- Cache requests for user's devices over federation. ([\#15675](https://github.com/matrix-org/synapse/issues/15675))
+- Add fully qualified docker image names to Dockerfiles. ([\#15689](https://github.com/matrix-org/synapse/issues/15689))
+- Remove some unused code. ([\#15690](https://github.com/matrix-org/synapse/issues/15690))
+- Improve type hints. ([\#15694](https://github.com/matrix-org/synapse/issues/15694), [\#15697](https://github.com/matrix-org/synapse/issues/15697))
+- Update docstring and traces on `maybe_backfill()` functions. ([\#15709](https://github.com/matrix-org/synapse/issues/15709))
+- Add context for when/why to use the `long_retries` option when sending Federation requests. ([\#15721](https://github.com/matrix-org/synapse/issues/15721))
+- Removed some unused fields. ([\#15723](https://github.com/matrix-org/synapse/issues/15723))
+- Update federation error to more plainly explain we can only authorize our own membership events. ([\#15725](https://github.com/matrix-org/synapse/issues/15725))
+- Prevent the `latest_deps` and `twisted_trunk` daily GitHub Actions workflows from running on forks of the codebase. ([\#15726](https://github.com/matrix-org/synapse/issues/15726))
+- Improve performance of user directory search. ([\#15729](https://github.com/matrix-org/synapse/issues/15729))
+- Remove redundant table join with `room_memberships` when doing a `is_host_joined()`/`is_host_invited()` call (`membership` is already part of the `current_state_events`). ([\#15731](https://github.com/matrix-org/synapse/issues/15731))
+- Remove superfluous `room_memberships` join from background update. ([\#15733](https://github.com/matrix-org/synapse/issues/15733))
+- Speed up typechecking CI. ([\#15752](https://github.com/matrix-org/synapse/issues/15752))
+- Bump minimum supported Rust version to 1.60.0. ([\#15768](https://github.com/matrix-org/synapse/issues/15768))
+
+### Updates to locked dependencies
+
+* Bump importlib-metadata from 6.1.0 to 6.6.0. ([\#15711](https://github.com/matrix-org/synapse/issues/15711))
+* Bump library/redis from 6-bullseye to 7-bullseye in /docker. ([\#15712](https://github.com/matrix-org/synapse/issues/15712))
+* Bump log from 0.4.18 to 0.4.19. ([\#15761](https://github.com/matrix-org/synapse/issues/15761))
+* Bump phonenumbers from 8.13.11 to 8.13.13. ([\#15763](https://github.com/matrix-org/synapse/issues/15763))
+* Bump pyasn1 from 0.4.8 to 0.5.0. ([\#15713](https://github.com/matrix-org/synapse/issues/15713))
+* Bump pydantic from 1.10.8 to 1.10.9. ([\#15762](https://github.com/matrix-org/synapse/issues/15762))
+* Bump pyo3-log from 0.8.1 to 0.8.2. ([\#15759](https://github.com/matrix-org/synapse/issues/15759))
+* Bump pyopenssl from 23.1.1 to 23.2.0. ([\#15765](https://github.com/matrix-org/synapse/issues/15765))
+* Bump regex from 1.7.3 to 1.8.4. ([\#15769](https://github.com/matrix-org/synapse/issues/15769))
+* Bump sentry-sdk from 1.22.1 to 1.25.0. ([\#15714](https://github.com/matrix-org/synapse/issues/15714))
+* Bump sentry-sdk from 1.25.0 to 1.25.1. ([\#15764](https://github.com/matrix-org/synapse/issues/15764))
+* Bump serde from 1.0.163 to 1.0.164. ([\#15760](https://github.com/matrix-org/synapse/issues/15760))
+* Bump types-jsonschema from 4.17.0.7 to 4.17.0.8. ([\#15716](https://github.com/matrix-org/synapse/issues/15716))
+* Bump types-pyopenssl from 23.1.0.2 to 23.2.0.0. ([\#15766](https://github.com/matrix-org/synapse/issues/15766))
+* Bump types-requests from 2.31.0.0 to 2.31.0.1. ([\#15715](https://github.com/matrix-org/synapse/issues/15715))
+
 Synapse 1.85.2 (2023-06-08)
 ===========================
 
