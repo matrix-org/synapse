@@ -404,10 +404,10 @@ class MatrixFederationHttpClient:
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
-        self.default_timeout = hs.config.federation.client_timeout
+        self.default_timeout = hs.config.federation.client_timeout / 1000
 
-        self.max_long_retry_delay = hs.config.federation.max_long_retry_delay
-        self.max_short_retry_delay = hs.config.federation.max_short_retry_delay
+        self.max_long_retry_delay = hs.config.federation.max_long_retry_delay / 1000
+        self.max_short_retry_delay = hs.config.federation.max_short_retry_delay / 1000
         self.max_long_retries = hs.config.federation.max_long_retries
         self.max_short_retries = hs.config.federation.max_short_retries
 
@@ -538,10 +538,10 @@ class MatrixFederationHttpClient:
             logger.exception(f"Invalid destination: {request.destination}.")
             raise FederationDeniedError(request.destination)
 
-        if timeout:
-            _sec_timeout = timeout / 1000
-        else:
-            _sec_timeout = self.default_timeout
+        if timeout is None:
+            timeout = int(self.default_timeout)
+
+        _sec_timeout = timeout / 1000
 
         if (
             self.hs.config.federation.federation_domain_whitelist is not None
@@ -946,10 +946,9 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
-        if timeout is not None:
-            _sec_timeout = timeout / 1000
-        else:
-            _sec_timeout = self.default_timeout
+        if timeout is None:
+            timeout = int(self.default_timeout)
+        _sec_timeout = timeout / 1000
 
         if parser is None:
             parser = cast(ByteParser[T], JsonParser())
@@ -1135,10 +1134,9 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
-        if timeout is not None:
-            _sec_timeout = timeout / 1000
-        else:
-            _sec_timeout = self.default_timeout
+        if timeout is None:
+            timeout = int(self.default_timeout)
+        _sec_timeout = timeout / 1000
 
         if parser is None:
             parser = cast(ByteParser[T], JsonParser())
@@ -1211,10 +1209,9 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
         )
 
-        if timeout is not None:
-            _sec_timeout = timeout / 1000
-        else:
-            _sec_timeout = self.default_timeout
+        if timeout is None:
+            timeout = int(self.default_timeout)
+        _sec_timeout = timeout / 1000
 
         body = await _handle_response(
             self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()

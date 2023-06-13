@@ -644,9 +644,9 @@ class FederationClientTests(HomeserverTestCase):
     @override_config(
         {
             "federation": {
-                "client_timeout": 180,
-                "max_long_retry_delay": 100,
-                "max_short_retry_delay": 7,
+                "client_timeout": "180s",
+                "max_long_retry_delay": "100s",
+                "max_short_retry_delay": "7s",
                 "max_long_retries": 20,
                 "max_short_retries": 5,
             }
