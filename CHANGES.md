@@ -8,7 +8,7 @@ Features
 - Support resolving a room's [canonical alias](https://spec.matrix.org/v1.7/client-server-api/#mroomcanonical_alias) via the module API. ([\#15450](https://github.com/matrix-org/synapse/issues/15450))
 - Enable support for [MSC3952](https://github.com/matrix-org/matrix-spec-proposals/pull/3952): intentional mentions. ([\#15520](https://github.com/matrix-org/synapse/issues/15520))
 - Experimental [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) support: delegate auth to an OIDC provider. ([\#15582](https://github.com/matrix-org/synapse/issues/15582))
-- Add Syanpse version deploy annotations to Grafana dashboard which enables easy correlation between behavior changes witnessed in a graph to a certain Synapse version and nail down regressions. ([\#15674](https://github.com/matrix-org/synapse/issues/15674))
+- Add Synapse version deploy annotations to Grafana dashboard which enables easy correlation between behavior changes witnessed in a graph to a certain Synapse version and nail down regressions. ([\#15674](https://github.com/matrix-org/synapse/issues/15674))
 - Add a catch-all * to the supported relation types when redacting an event and its related events. This is an update to [MSC3912](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) implementation. ([\#15705](https://github.com/matrix-org/synapse/issues/15705))
 - Speed up `/messages` by backfilling in the background when there are no backward extremities where we are directly paginating. ([\#15710](https://github.com/matrix-org/synapse/issues/15710))
 - Expose a metric reporting the database background update status. ([\#15740](https://github.com/matrix-org/synapse/issues/15740))
