@@ -394,26 +394,24 @@ class MatrixFederationHttpClient:
         if hs.config.server.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
 
-        if (
-            hs.get_instance_name()
-            not in hs.config.worker.outbound_federation_restricted_to
-        ):
-            federation_proxies = (
-                hs.config.worker.outbound_federation_restricted_to.locations
-            )
-            federation_agent: IAgent = ProxyAgent(
-                self.reactor,
-                self.reactor,
-                tls_client_options_factory,
-                federation_proxies=federation_proxies,
-            )
-        else:
+        outbound_federation_restricted_to = (
+            hs.config.worker.outbound_federation_restricted_to
+        )
+        if hs.get_instance_name() in outbound_federation_restricted_to:
             federation_agent = MatrixFederationAgent(
                 self.reactor,
                 tls_client_options_factory,
                 user_agent.encode("ascii"),
                 hs.config.server.federation_ip_range_allowlist,
                 hs.config.server.federation_ip_range_blocklist,
+            )
+        else:
+            federation_proxies = outbound_federation_restricted_to.locations
+            federation_agent: IAgent = ProxyAgent(
+                self.reactor,
+                self.reactor,
+                tls_client_options_factory,
+                federation_proxies=federation_proxies,
             )
 
         # Use a BlocklistingAgentWrapper to prevent circumventing the IP
