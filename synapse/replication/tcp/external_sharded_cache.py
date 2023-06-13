@@ -236,7 +236,7 @@ class ExternalShardedCache:
                     for shard_id, keys in shard_id_to_key_mapping.items()
                 ]
                 results: Union[
-                    list, list[Dict[str, Any]]
+                    list, List[Dict[str, Any]]
                 ] = await make_deferred_yieldable(
                     defer.gatherResults(deferreds, consumeErrors=True)
                 ).addErrback(

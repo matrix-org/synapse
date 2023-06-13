@@ -15,9 +15,9 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
-from synapse.types import JsonDict
 from synapse.api.constants import ReceiptTypes
 from synapse.api.errors import SynapseError
+from synapse.types import JsonDict
 from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
