@@ -173,11 +173,15 @@ class Requester:
         if input["app_server_id"]:
             appservice = store.get_app_service_by_id(input["app_server_id"])
 
+        scope = set()
+        if input["scope"]:
+            scope.add(input["scope"])
+
         return Requester(
             user=UserID.from_string(input["user_id"]),
             access_token_id=input["access_token_id"],
             is_guest=input["is_guest"],
-            scope=set(input["scope"]),
+            scope=scope,
             shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
             app_service=appservice,
