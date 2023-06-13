@@ -1216,7 +1216,7 @@ The following options are related to configuring the backoff parameters used for
 Unlike previous configuration options, these values apply across all requests
 and the state of the backoff is stored in the database.
 
-* `destination_min_retry_interval`: the initial backoff, after the first request fails, in seconds. Defaults to 10m.
+* `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
 * `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
 * `destination_max_retry_interval`: a cap on the backoff. Defaults to one day.
 
@@ -1228,6 +1228,9 @@ federation:
   max_long_retry_delay: 100
   max_short_retries: 5
   max_long_retries: 20
+  destination_min_retry_interval: 30s
+  destination_retry_multiplier: 5
+  destination_max_retry_interval: 12h
 ```
 ---
 ## Caching

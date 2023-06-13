@@ -161,13 +161,13 @@ class RetryDestinationLimiter:
         self.replication_client = replication_client
 
         self.destination_min_retry_interval = (
-            self.store.hs.config.federation.destination_min_retry_interval * 1000
+            self.store.hs.config.federation.destination_min_retry_interval
         )
         self.destination_retry_multiplier = (
             self.store.hs.config.federation.destination_retry_multiplier
         )
         self.destination_max_retry_interval = (
-            self.store.hs.config.federation.destination_max_retry_interval * 1000
+            self.store.hs.config.federation.destination_max_retry_interval
         )
 
     def __enter__(self) -> None:
