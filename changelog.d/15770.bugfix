@@ -1,1 +1,1 @@
-MSC3983: only one OTK per device was returned through federation.
+Fix requesting multiple keys at once over federation, related to [MSC3983](https://github.com/matrix-org/matrix-spec-proposals/pull/3983).
