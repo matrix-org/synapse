@@ -12,14 +12,215 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional
+import enum
+from typing import TYPE_CHECKING, Any, Optional
 
 import attr
+import attr.validators
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.config import ConfigError
-from synapse.config._base import Config
+from synapse.config._base import Config, RootConfig
 from synapse.types import JsonDict
+
+# Determine whether authlib is installed.
+try:
+    import authlib  # noqa: F401
+
+    HAS_AUTHLIB = True
+except ImportError:
+    HAS_AUTHLIB = False
+
+if TYPE_CHECKING:
+    # Only import this if we're type checking, as it might not be installed at runtime.
+    from authlib.jose.rfc7517 import JsonWebKey
+
+
+class ClientAuthMethod(enum.Enum):
+    """List of supported client auth methods."""
+
+    CLIENT_SECRET_POST = "client_secret_post"
+    CLIENT_SECRET_BASIC = "client_secret_basic"
+    CLIENT_SECRET_JWT = "client_secret_jwt"
+    PRIVATE_KEY_JWT = "private_key_jwt"
+
+
+def _parse_jwks(jwks: Optional[JsonDict]) -> Optional["JsonWebKey"]:
+    """A helper function to parse a JWK dict into a JsonWebKey."""
+
+    if jwks is None:
+        return None
+
+    from authlib.jose.rfc7517 import JsonWebKey
+
+    return JsonWebKey.import_key(jwks)
+
+
+@attr.s(slots=True, frozen=True)
+class MSC3861:
+    """Configuration for MSC3861: Matrix architecture change to delegate authentication via OIDC"""
+
+    enabled: bool = attr.ib(default=False, validator=attr.validators.instance_of(bool))
+    """Whether to enable MSC3861 auth delegation."""
+
+    @enabled.validator
+    def _check_enabled(self, attribute: attr.Attribute, value: bool) -> None:
+        # Only allow enabling MSC3861 if authlib is installed
+        if value and not HAS_AUTHLIB:
+            raise ConfigError(
+                "MSC3861 is enabled but authlib is not installed. "
+                "Please install authlib to use MSC3861.",
+                ("experimental", "msc3861", "enabled"),
+            )
+
+    issuer: str = attr.ib(default="", validator=attr.validators.instance_of(str))
+    """The URL of the OIDC Provider."""
+
+    issuer_metadata: Optional[JsonDict] = attr.ib(default=None)
+    """The issuer metadata to use, otherwise discovered from /.well-known/openid-configuration as per MSC2965."""
+
+    client_id: str = attr.ib(
+        default="",
+        validator=attr.validators.instance_of(str),
+    )
+    """The client ID to use when calling the introspection endpoint."""
+
+    client_auth_method: ClientAuthMethod = attr.ib(
+        default=ClientAuthMethod.CLIENT_SECRET_POST, converter=ClientAuthMethod
+    )
+    """The auth method used when calling the introspection endpoint."""
+
+    client_secret: Optional[str] = attr.ib(
+        default=None,
+        validator=attr.validators.optional(attr.validators.instance_of(str)),
+    )
+    """
+    The client secret to use when calling the introspection endpoint,
+    when using any of the client_secret_* client auth methods.
+    """
+
+    jwk: Optional["JsonWebKey"] = attr.ib(default=None, converter=_parse_jwks)
+    """
+    The JWKS to use when calling the introspection endpoint,
+    when using the private_key_jwt client auth method.
+    """
+
+    @client_auth_method.validator
+    def _check_client_auth_method(
+        self, attribute: attr.Attribute, value: ClientAuthMethod
+    ) -> None:
+        # Check that the right client credentials are provided for the client auth method.
+        if not self.enabled:
+            return
+
+        if value == ClientAuthMethod.PRIVATE_KEY_JWT and self.jwk is None:
+            raise ConfigError(
+                "A JWKS must be provided when using the private_key_jwt client auth method",
+                ("experimental", "msc3861", "client_auth_method"),
+            )
+
+        if (
+            value
+            in (
+                ClientAuthMethod.CLIENT_SECRET_POST,
+                ClientAuthMethod.CLIENT_SECRET_BASIC,
+                ClientAuthMethod.CLIENT_SECRET_JWT,
+            )
+            and self.client_secret is None
+        ):
+            raise ConfigError(
+                f"A client secret must be provided when using the {value} client auth method",
+                ("experimental", "msc3861", "client_auth_method"),
+            )
+
+    account_management_url: Optional[str] = attr.ib(
+        default=None,
+        validator=attr.validators.optional(attr.validators.instance_of(str)),
+    )
+    """The URL of the My Account page on the OIDC Provider as per MSC2965."""
+
+    admin_token: Optional[str] = attr.ib(
+        default=None,
+        validator=attr.validators.optional(attr.validators.instance_of(str)),
+    )
+    """
+    A token that should be considered as an admin token.
+    This is used by the OIDC provider, to make admin calls to Synapse.
+    """
+
+    def check_config_conflicts(self, root: RootConfig) -> None:
+        """Checks for any configuration conflicts with other parts of Synapse.
+
+        Raises:
+            ConfigError: If there are any configuration conflicts.
+        """
+
+        if not self.enabled:
+            return
+
+        if (
+            root.auth.password_enabled_for_reauth
+            or root.auth.password_enabled_for_login
+        ):
+            raise ConfigError(
+                "Password auth cannot be enabled when OAuth delegation is enabled",
+                ("password_config", "enabled"),
+            )
+
+        if root.registration.enable_registration:
+            raise ConfigError(
+                "Registration cannot be enabled when OAuth delegation is enabled",
+                ("enable_registration",),
+            )
+
+        if (
+            root.oidc.oidc_enabled
+            or root.saml2.saml2_enabled
+            or root.cas.cas_enabled
+            or root.jwt.jwt_enabled
+        ):
+            raise ConfigError("SSO cannot be enabled when OAuth delegation is enabled")
+
+        if bool(root.authproviders.password_providers):
+            raise ConfigError(
+                "Password auth providers cannot be enabled when OAuth delegation is enabled"
+            )
+
+        if root.captcha.enable_registration_captcha:
+            raise ConfigError(
+                "CAPTCHA cannot be enabled when OAuth delegation is enabled",
+                ("captcha", "enable_registration_captcha"),
+            )
+
+        if root.auth.login_via_existing_enabled:
+            raise ConfigError(
+                "Login via existing session cannot be enabled when OAuth delegation is enabled",
+                ("login_via_existing_session", "enabled"),
+            )
+
+        if root.registration.refresh_token_lifetime:
+            raise ConfigError(
+                "refresh_token_lifetime cannot be set when OAuth delegation is enabled",
+                ("refresh_token_lifetime",),
+            )
+
+        if root.registration.nonrefreshable_access_token_lifetime:
+            raise ConfigError(
+                "nonrefreshable_access_token_lifetime cannot be set when OAuth delegation is enabled",
+                ("nonrefreshable_access_token_lifetime",),
+            )
+
+        if root.registration.session_lifetime:
+            raise ConfigError(
+                "session_lifetime cannot be set when OAuth delegation is enabled",
+                ("session_lifetime",),
+            )
+
+        if not root.experimental.msc3970_enabled:
+            raise ConfigError(
+                "experimental_features.msc3970_enabled must be 'true' when OAuth delegation is enabled",
+                ("experimental_features", "msc3970_enabled"),
+            )
 
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
@@ -118,13 +319,6 @@ class ExperimentalConfig(Config):
         # MSC3881: Remotely toggle push notifications for another client
         self.msc3881_enabled: bool = experimental.get("msc3881_enabled", False)
 
-        # MSC3882: Allow an existing session to sign in a new session
-        self.msc3882_enabled: bool = experimental.get("msc3882_enabled", False)
-        self.msc3882_ui_auth: bool = experimental.get("msc3882_ui_auth", True)
-        self.msc3882_token_timeout = self.parse_duration(
-            experimental.get("msc3882_token_timeout", "5m")
-        )
-
         # MSC3874: Filtering /messages with rel_types / not_rel_types.
         self.msc3874_enabled: bool = experimental.get("msc3874_enabled", False)
 
@@ -164,11 +358,6 @@ class ExperimentalConfig(Config):
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
-        # MSC3952: Intentional mentions, this depends on MSC3966.
-        self.msc3952_intentional_mentions = experimental.get(
-            "msc3952_intentional_mentions", False
-        )
-
         # MSC3959: Do not generate notifications for edits.
         self.msc3958_supress_edit_notifs = experimental.get(
             "msc3958_supress_edit_notifs", False
@@ -182,8 +371,19 @@ class ExperimentalConfig(Config):
             "msc3981_recurse_relations", False
         )
 
+        # MSC3861: Matrix architecture change to delegate authentication via OIDC
+        try:
+            self.msc3861 = MSC3861(**experimental.get("msc3861", {}))
+        except ValueError as exc:
+            raise ConfigError(
+                "Invalid MSC3861 configuration", ("experimental", "msc3861")
+            ) from exc
+
         # MSC3970: Scope transaction IDs to devices
-        self.msc3970_enabled = experimental.get("msc3970_enabled", False)
+        self.msc3970_enabled = experimental.get("msc3970_enabled", self.msc3861.enabled)
+
+        # Check that none of the other config options conflict with MSC3861 when enabled
+        self.msc3861.check_config_conflicts(self.root)
 
         # MSC4009: E.164 Matrix IDs
         self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)

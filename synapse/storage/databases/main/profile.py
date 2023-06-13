@@ -137,11 +137,11 @@ class ProfileWorkerStore(SQLBaseStore):
 
         return 50
 
-    async def get_profileinfo(self, user_localpart: str) -> ProfileInfo:
+    async def get_profileinfo(self, user_id: UserID) -> ProfileInfo:
         try:
             profile = await self.db_pool.simple_select_one(
                 table="profiles",
-                keyvalues={"user_id": user_localpart},
+                keyvalues={"full_user_id": user_id.to_string()},
                 retcols=("displayname", "avatar_url"),
                 desc="get_profileinfo",
             )
@@ -156,18 +156,18 @@ class ProfileWorkerStore(SQLBaseStore):
             avatar_url=profile["avatar_url"], display_name=profile["displayname"]
         )
 
-    async def get_profile_displayname(self, user_localpart: str) -> Optional[str]:
+    async def get_profile_displayname(self, user_id: UserID) -> Optional[str]:
         return await self.db_pool.simple_select_one_onecol(
             table="profiles",
-            keyvalues={"user_id": user_localpart},
+            keyvalues={"full_user_id": user_id.to_string()},
             retcol="displayname",
             desc="get_profile_displayname",
         )
 
-    async def get_profile_avatar_url(self, user_localpart: str) -> Optional[str]:
+    async def get_profile_avatar_url(self, user_id: UserID) -> Optional[str]:
         return await self.db_pool.simple_select_one_onecol(
             table="profiles",
-            keyvalues={"user_id": user_localpart},
+            keyvalues={"full_user_id": user_id.to_string()},
             retcol="avatar_url",
             desc="get_profile_avatar_url",
         )

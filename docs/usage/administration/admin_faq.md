@@ -27,9 +27,8 @@ What servers are currently participating in this room?
 Run this sql query on your db:
 ```sql
 SELECT DISTINCT split_part(state_key, ':', 2)
-    FROM current_state_events AS c
-    INNER JOIN room_memberships AS m USING (room_id, event_id)
-    WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
+FROM current_state_events
+WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
 ```
 
 What users are registered on my server?

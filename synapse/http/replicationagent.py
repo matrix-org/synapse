@@ -76,7 +76,7 @@ class ReplicationEndpointFactory:
                 endpoint = wrapClientTLS(
                     # The 'port' argument below isn't actually used by the function
                     self.context_factory.creatorForNetloc(
-                        self.instance_map[worker_name].host,
+                        self.instance_map[worker_name].host.encode("utf-8"),
                         self.instance_map[worker_name].port,
                     ),
                     endpoint,

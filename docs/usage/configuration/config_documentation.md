@@ -1196,6 +1196,32 @@ Example configuration:
 allow_device_name_lookup_over_federation: true
 ```
 ---
+### `federation`
+
+The federation section defines some sub-options related to federation.
+
+The following options are related to configuring timeout and retry logic for one request,
+independently of the others.
+Short retry algorithm is used when something or someone will wait for the request to have an
+answer, while long retry is used for requests that happen in the background,
+like sending a federation transaction.
+
+* `client_timeout`: timeout for the federation requests in seconds. Default to 60s.
+* `max_short_retry_delay`: maximum delay to be used for the short retry algo in seconds. Default to 2s.
+* `max_long_retry_delay`: maximum delay to be used for the short retry algo in seconds. Default to 60s.
+* `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
+* `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
+
+Example configuration:
+```yaml
+federation:
+  client_timeout: 180
+  max_short_retry_delay: 7
+  max_long_retry_delay: 100
+  max_short_retries: 5
+  max_long_retries: 20
+```
+---
 ## Caching
 
 Options related to caching.
@@ -2570,7 +2596,50 @@ Example configuration:
 ```yaml
 nonrefreshable_access_token_lifetime: 24h
 ```
+---
+### `ui_auth`
 
+The amount of time to allow a user-interactive authentication session to be active.
+
+This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.
+
+This is ignored for potentially "dangerous" operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).
+
+Use the `session_timeout` sub-option here to change the time allowed for credential validation.
+
+Example configuration:
+```yaml
+ui_auth:
+    session_timeout: "15s"
+```
+---
+### `login_via_existing_session`
+
+Matrix supports the ability of an existing session to mint a login token for
+another client.
+
+Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.
+
+The duration of time the generated token is valid for can be configured with the
+`token_timeout` sub-option.
+
+User-interactive authentication is required when this is enabled unless the
+`require_ui_auth` sub-option is set to `False`.
+
+Example configuration:
+```yaml
+login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: "5m"
+```
 ---
 ## Metrics
 Config options related to metrics.
@@ -3413,28 +3482,6 @@ password_config:
       require_symbol: true
       require_lowercase: true
       require_uppercase: true
-```
----
-### `ui_auth`
-
-The amount of time to allow a user-interactive authentication session to be active.
-
-This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.
-
-This is ignored for potentially "dangerous" operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).
-
-Use the `session_timeout` sub-option here to change the time allowed for credential validation.
-
-Example configuration:
-```yaml
-ui_auth:
-    session_timeout: "15s"
 ```
 ---
 ## Push

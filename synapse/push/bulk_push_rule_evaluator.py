@@ -120,9 +120,6 @@ class BulkPushRuleEvaluator:
         self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
-        self._intentional_mentions_enabled = (
-            self.hs.config.experimental.msc3952_intentional_mentions
-        )
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -390,10 +387,7 @@ class BulkPushRuleEvaluator:
                         del notification_levels[key]
 
         # Pull out any user and room mentions.
-        has_mentions = (
-            self._intentional_mentions_enabled
-            and EventContentFields.MSC3952_MENTIONS in event.content
-        )
+        has_mentions = EventContentFields.MENTIONS in event.content
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),
