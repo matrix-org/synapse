@@ -210,6 +210,12 @@ class JsonResourceTests(unittest.TestCase):
 class OptionsResourceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
+        self.hs_clock = Clock(self.reactor)
+        self.homeserver = setup_test_homeserver(
+            self.addCleanup,
+            clock=self.hs_clock,
+            reactor=self.reactor,
+        )
 
         class DummyResource(Resource):
             isLeaf = True
@@ -242,6 +248,7 @@ class OptionsResourceTests(unittest.TestCase):
             "1.0",
             max_request_body_size=4096,
             reactor=self.reactor,
+            federation_agent=self.homeserver.get_federation_http_client().agent,
         )
 
         # render the request and return the channel

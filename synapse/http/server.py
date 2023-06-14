@@ -328,7 +328,8 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             # trace.
             f = failure.Failure()
             logger.exception(
-                "Error handling request", exc_info=(f.type, f.value, f.getTracebackObject())  # type: ignore[arg-type]
+                "Error handling request",
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
             self._send_error_response(f, request)
 
