@@ -51,7 +51,8 @@ class ProxyResource(_AsyncResource):
         self.agent = federation_agent
 
     async def _async_render(self, request: "SynapseRequest") -> Tuple[int, Any]:
-        assert request.uri.startswith(b"matrix://")
+        uri = urllib.parse.urlparse(request.uri)
+        assert uri.scheme == b"matrix-federation"
 
         logger.info("Got proxy request %s", request.uri)
 
@@ -144,7 +145,7 @@ class ProxySite(Site):
 
     def getResourceFor(self, request: "SynapseRequest") -> IResource:
         uri = urllib.parse.urlparse(request.uri)
-        if uri.scheme == b"matrix":
+        if uri.scheme == b"matrix-federation":
             return self._proxy_resource
 
         return super().getResourceFor(request)
