@@ -72,6 +72,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
             homeserver_to_use=GenericWorkerServer,
             config=self._get_worker_hs_config(),
             reactor=self.reactor,
+            federation_http_client=None,
         )
 
         # Since we use sqlite in memory databases we need to make sure the
