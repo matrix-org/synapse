@@ -50,7 +50,6 @@ class JsonResourceTests(unittest.TestCase):
         self.reactor = reactor
         self.homeserver = setup_test_homeserver(
             self.addCleanup,
-            federation_http_client=None,
             clock=clock,
             reactor=self.reactor,
         )
