@@ -1,5 +1,16 @@
+Synapse 1.86.0rc2 (2023-06-14)
+==============================
+
+Bugfixes
+--------
+
+- Fix an error when having workers of different versions running. ([\#15774](https://github.com/matrix-org/synapse/issues/15774))
+
+
 Synapse 1.86.0rc1 (2023-06-13)
 ==============================
+
+This version was tagged but never released.
 
 Features
 --------
