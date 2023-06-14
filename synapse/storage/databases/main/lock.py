@@ -185,53 +185,6 @@ class LockStore(SQLBaseStore):
 
         return lock
 
-    async def _is_lock_still_valid(
-        self, lock_name: str, lock_key: str, token: str
-    ) -> bool:
-        """Checks whether this instance still holds the lock."""
-        last_renewed_ts = await self.db_pool.simple_select_one_onecol(
-            table="worker_locks",
-            keyvalues={
-                "lock_name": lock_name,
-                "lock_key": lock_key,
-                "token": token,
-            },
-            retcol="last_renewed_ts",
-            allow_none=True,
-            desc="is_lock_still_valid",
-        )
-        return (
-            last_renewed_ts is not None
-            and self._clock.time_msec() - _LOCK_TIMEOUT_MS < last_renewed_ts
-        )
-
-    async def _renew_lock(self, lock_name: str, lock_key: str, token: str) -> None:
-        """Attempt to renew the lock if we still hold it."""
-        await self.db_pool.simple_update(
-            table="worker_locks",
-            keyvalues={
-                "lock_name": lock_name,
-                "lock_key": lock_key,
-                "token": token,
-            },
-            updatevalues={"last_renewed_ts": self._clock.time_msec()},
-            desc="renew_lock",
-        )
-
-    async def _drop_lock(self, lock_name: str, lock_key: str, token: str) -> None:
-        """Attempt to drop the lock, if we still hold it"""
-        await self.db_pool.simple_delete(
-            table="worker_locks",
-            keyvalues={
-                "lock_name": lock_name,
-                "lock_key": lock_key,
-                "token": token,
-            },
-            desc="drop_lock",
-        )
-
-        self._live_tokens.pop((lock_name, lock_key), None)
-
 
 class Lock:
     """An async context manager that manages an acquired lock, ensuring it is
@@ -272,7 +225,7 @@ class Lock:
         self._token = token
 
         self._looping_call = clock.looping_call(
-            self._renew, _RENEWAL_INTERVAL_MS, store, lock_name, lock_key, token
+            self._renew, _RENEWAL_INTERVAL_MS, store, clock, lock_name, lock_key, token
         )
 
         self._dropped = False
@@ -281,6 +234,7 @@ class Lock:
     @wrap_as_background_process("Lock._renew")
     async def _renew(
         store: LockStore,
+        clock: Clock,
         lock_name: str,
         lock_key: str,
         token: str,
@@ -291,12 +245,33 @@ class Lock:
         don't end up with a reference to `self` in the reactor, which would stop
         this from being cleaned up if we dropped the context manager.
         """
-        await store._renew_lock(lock_name, lock_key, token)
+        await store.db_pool.simple_update(
+            table="worker_locks",
+            keyvalues={
+                "lock_name": lock_name,
+                "lock_key": lock_key,
+                "token": token,
+            },
+            updatevalues={"last_renewed_ts": clock.time_msec()},
+            desc="renew_lock",
+        )
 
     async def is_still_valid(self) -> bool:
         """Check if the lock is still held by us"""
-        return await self._store._is_lock_still_valid(
-            self._lock_name, self._lock_key, self._token
+        last_renewed_ts = await self._store.db_pool.simple_select_one_onecol(
+            table="worker_locks",
+            keyvalues={
+                "lock_name": self._lock_name,
+                "lock_key": self._lock_key,
+                "token": self._token,
+            },
+            retcol="last_renewed_ts",
+            allow_none=True,
+            desc="is_lock_still_valid",
+        )
+        return (
+            last_renewed_ts is not None
+            and self._clock.time_msec() - _LOCK_TIMEOUT_MS < last_renewed_ts
         )
 
     async def __aenter__(self) -> None:
@@ -325,7 +300,18 @@ class Lock:
         if self._looping_call.running:
             self._looping_call.stop()
 
-        await self._store._drop_lock(self._lock_name, self._lock_key, self._token)
+        await self._store.db_pool.simple_delete(
+            table="worker_locks",
+            keyvalues={
+                "lock_name": self._lock_name,
+                "lock_key": self._lock_key,
+                "token": self._token,
+            },
+            desc="drop_lock",
+        )
+
+        self._store._live_tokens.pop((self._lock_name, self._lock_key), None)
+
         self._dropped = True
 
     def __del__(self) -> None:
