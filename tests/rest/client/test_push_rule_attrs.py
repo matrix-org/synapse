@@ -412,3 +412,41 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         )
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
+
+
+    def test_contains_user_name(self) -> None:
+        """
+        Tests that `contains_user_name` rule is present and have proper value in `pattern`.
+        """
+        username = "bob"
+        self.register_user(username, "pass")
+        token = self.login(username, "pass")
+
+        channel = self.make_request(
+            "GET",
+            "/pushrules/global/content/.m.rule.contains_user_name",
+            access_token=token,
+        )
+
+        self.assertEqual(channel.code, 200)
+        self.assertIn("pattern", channel.json_body)
+        self.assertEqual(channel.json_body["pattern"], username)
+
+    def test_is_user_mention(self) -> None:
+        """
+        Tests that `is_user_mention` rule is present and have proper value in `value`.
+        """
+        user = self.register_user("bob", "pass")
+        token = self.login("bob", "pass")
+
+        channel = self.make_request(
+            "GET",
+            "/pushrules/global/override/.m.rule.is_user_mention",
+            access_token=token,
+        )
+
+        self.assertEqual(channel.code, 200)
+        self.assertIn("conditions", channel.json_body)
+        self.assertEqual(len(channel.json_body["conditions"]), 1)
+        self.assertIn("value", channel.json_body["conditions"][0])
+        self.assertEqual(channel.json_body["conditions"][0]["value"], user)
