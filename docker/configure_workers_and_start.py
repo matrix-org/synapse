@@ -794,11 +794,13 @@ def generate_worker_files(
 
     # A list of internal endpoints to healthcheck, starting with the main process
     # which exists even if no workers do.
-    # This list ends up being part of the command line to curl, which added unix socket
-    # support in version 7.40. The scheme and hostname are ignored, the path is not.
+    # This list ends up being part of the command line to curl, (curl added support unix sockets
+    # in version 7.40).
     if using_unix_sockets:
         healthcheck_urls = [
             f"--unix-socket {MAIN_PROCESS_UNIX_SOCKET_PUBLIC_PATH} "
+            # The scheme and hostname from the following URL are ignored.
+            # The only thing that matters is the path `/health`
             "http://localhost/health"
         ]
     else:

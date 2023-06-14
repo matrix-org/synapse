@@ -63,7 +63,7 @@ database:
     password: "{{ POSTGRES_PASSWORD }}"
     database: "{{ POSTGRES_DB or "synapse" }}"
 {% if not SYNAPSE_USE_UNIX_SOCKET %}
-{# Fun fact: if left with no host or port, Synapse looks for the default Unix socket instead. #}
+{# Synapse will use a default unix socket for Postgres when host/port is not specified (behavior from `psycopg2`). #}
     host: "{{ POSTGRES_HOST or "db" }}"
     port: "{{ POSTGRES_PORT or "5432" }}"
 {% endif %}

@@ -489,7 +489,7 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See [here](../../metrics-howto.md). (Not usable on a UNIX Socket `listener`)
+* `metrics`: the metrics interface. See [here](../../metrics-howto.md). (Not compatible with Unix sockets)
 
 * `openid`: OpenID authentication. See [here](../../openid.md).
 
