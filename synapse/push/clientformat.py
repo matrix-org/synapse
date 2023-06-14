@@ -41,6 +41,8 @@ def format_push_rules_for_user(
 
         rulearray.append(template_rule)
 
+        _convert_type_to_value(template_rule, user)
+
         template_rule["enabled"] = enabled
 
         if "conditions" not in template_rule:
@@ -56,14 +58,18 @@ def format_push_rules_for_user(
         for c in template_rule["conditions"]:
             c.pop("_cache_key", None)
 
-            for type_key in ("pattern", "sender", "value"):
-                type_value = c.pop(f"{type_key}_type", None)
-                if type_value == "user_id":
-                    c[type_key] = user.to_string()
-                elif type_value == "user_localpart":
-                    c[type_key] = user.localpart
+            _convert_type_to_value(c, user)
 
     return rules
+
+
+def _convert_type_to_value(rule_or_cond: Dict[str, Any], user: UserID) -> None:
+    for type_key in ("pattern", "value"):
+        type_value = rule_or_cond.pop(f"{type_key}_type", None)
+        if type_value == "user_id":
+            rule_or_cond[type_key] = user.to_string()
+        elif type_value == "user_localpart":
+            rule_or_cond[type_key] = user.localpart
 
 
 def _add_empty_priority_class_arrays(d: Dict[str, list]) -> Dict[str, list]:
