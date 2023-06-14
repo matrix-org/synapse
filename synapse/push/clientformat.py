@@ -41,13 +41,6 @@ def format_push_rules_for_user(
 
         rulearray.append(template_rule)
 
-        for type_key in ("pattern", "value"):
-            type_value = template_rule.pop(f"{type_key}_type", None)
-            if type_value == "user_id":
-                template_rule[type_key] = user.to_string()
-            elif type_value == "user_localpart":
-                template_rule[type_key] = user.localpart
-
         template_rule["enabled"] = enabled
 
         if "conditions" not in template_rule:
@@ -63,15 +56,12 @@ def format_push_rules_for_user(
         for c in template_rule["conditions"]:
             c.pop("_cache_key", None)
 
-            pattern_type = c.pop("pattern_type", None)
-            if pattern_type == "user_id":
-                c["pattern"] = user.to_string()
-            elif pattern_type == "user_localpart":
-                c["pattern"] = user.localpart
-
-            sender_type = c.pop("sender_type", None)
-            if sender_type == "user_id":
-                c["sender"] = user.to_string()
+            for type_key in ("pattern", "sender", "value"):
+                type_value = c.pop(f"{type_key}_type", None)
+                if type_value == "user_id":
+                    c[type_key] = user.to_string()
+                elif type_value == "user_localpart":
+                    c[type_key] = user.localpart
 
     return rules
 
