@@ -413,7 +413,6 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
-
     def test_contains_user_name(self) -> None:
         """
         Tests that `contains_user_name` rule is present and have proper value in `pattern`.
