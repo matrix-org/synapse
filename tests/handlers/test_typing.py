@@ -15,8 +15,9 @@
 
 import json
 from typing import Dict, List, Set
-from netaddr import IPSet
 from unittest.mock import ANY, Mock, call
+
+from netaddr import IPSet
 
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource

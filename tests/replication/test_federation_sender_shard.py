@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from netaddr import IPSet
 from unittest.mock import Mock
+
+from netaddr import IPSet
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory
@@ -24,10 +25,8 @@ from synapse.rest.client import login, room
 from synapse.types import UserID, create_requester
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
+from tests.server import get_clock
 from tests.test_utils import make_awaitable
-from tests.server import (
-    get_clock,
-)
 
 logger = logging.getLogger(__name__)
 
