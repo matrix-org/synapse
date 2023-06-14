@@ -30,7 +30,6 @@ Improved Documentation
 Internal Changes
 ----------------
 
-- Allow for the configuration of max request retries and min/max retry delays in the matrix federation client. ([\#12504](https://github.com/matrix-org/synapse/issues/12504))
 - Log when events are (maybe unexpectedly) filtered out of responses in tests. ([\#14213](https://github.com/matrix-org/synapse/issues/14213))
 - Read from column `full_user_id` rather than `user_id` of tables `profiles` and `user_filters`. ([\#15649](https://github.com/matrix-org/synapse/issues/15649))
 - Add support for tracing functions which return `Awaitable`s. ([\#15650](https://github.com/matrix-org/synapse/issues/15650))

@@ -95,6 +95,8 @@ incoming_responses_counter = Counter(
 )
 
 
+MAX_LONG_RETRIES = 10
+MAX_SHORT_RETRIES = 3
 MAXINT = sys.maxsize
 
 
@@ -404,12 +406,7 @@ class MatrixFederationHttpClient:
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
-        self.default_timeout = hs.config.federation.client_timeout
-
-        self.max_long_retry_delay = hs.config.federation.max_long_retry_delay
-        self.max_short_retry_delay = hs.config.federation.max_short_retry_delay
-        self.max_long_retries = hs.config.federation.max_long_retries
-        self.max_short_retries = hs.config.federation.max_short_retries
+        self.default_timeout = 60
 
         self._cooperator = Cooperator(scheduler=_make_scheduler(self.reactor))
 
@@ -586,9 +583,9 @@ class MatrixFederationHttpClient:
             # XXX: Would be much nicer to retry only at the transaction-layer
             # (once we have reliable transactions in place)
             if long_retries:
-                retries_left = self.max_long_retries
+                retries_left = MAX_LONG_RETRIES
             else:
-                retries_left = self.max_short_retries
+                retries_left = MAX_SHORT_RETRIES
 
             url_bytes = request.uri
             url_str = url_bytes.decode("ascii")
@@ -733,12 +730,12 @@ class MatrixFederationHttpClient:
 
                     if retries_left and not timeout:
                         if long_retries:
-                            delay = 4 ** (self.max_long_retries + 1 - retries_left)
-                            delay = min(delay, self.max_long_retry_delay)
+                            delay = 4 ** (MAX_LONG_RETRIES + 1 - retries_left)
+                            delay = min(delay, 60)
                             delay *= random.uniform(0.8, 1.4)
                         else:
-                            delay = 0.5 * 2 ** (self.max_short_retries - retries_left)
-                            delay = min(delay, self.max_short_retry_delay)
+                            delay = 0.5 * 2 ** (MAX_SHORT_RETRIES - retries_left)
+                            delay = min(delay, 2)
                             delay *= random.uniform(0.8, 1.4)
 
                         logger.debug(
