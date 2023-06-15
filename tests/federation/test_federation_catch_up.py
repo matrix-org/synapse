@@ -438,6 +438,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         self.federation_sender.wake_destination = wake_destination_track  # type: ignore[assignment]
 
+        # We wait quite long so that all dests can be woken up, since there is a delay
+        # between them.
         self.pump(by=5.0)
 
         # ASSERT (_wake_destinations_needing_catchup):
