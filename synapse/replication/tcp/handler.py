@@ -39,6 +39,7 @@ from synapse.replication.tcp.commands import (
     ClearUserSyncsCommand,
     Command,
     FederationAckCommand,
+    LockReleasedCommand,
     PositionCommand,
     RdataCommand,
     RemoteServerUpCommand,
@@ -648,6 +649,12 @@ class ReplicationCommandHandler:
 
         self._notifier.notify_remote_server_up(cmd.data)
 
+    def on_LOCK_RELEASED(
+        self, conn: IReplicationConnection, cmd: LockReleasedCommand
+    ) -> None:
+        """Called when we get a new LOCK_RELEASED command."""
+        self._notifier.notify_lock_released(cmd.lock_name, cmd.lock_key)
+
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""
         self._connections.append(connection)
@@ -753,6 +760,10 @@ class ReplicationCommandHandler:
         We need to check if the client is interested in the stream or not
         """
         self.send_command(RdataCommand(stream_name, self._instance_name, token, data))
+
+    def send_lock_released(self, lock_name: str, lock_key: str) -> None:
+        """Called when we released a lock and should notify other instances."""
+        self.send_command(LockReleasedCommand(lock_name, lock_key))
 
 
 UpdateToken = TypeVar("UpdateToken")
