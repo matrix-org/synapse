@@ -531,8 +531,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         timeout: float = 30,
         checkPID: int = 0,
     ) -> IConnector:
-        """Unix sockets are not actually implemented for unit tests, tell them so"""
-        raise Exception("Unix sockets are not implemented for tests, sorry.")
+        """Unix sockets aren't supported for unit tests yet. Make it obvious to any developer trying it out that they will need to do some work before being able to use it in tests."""
+        raise Exception("Unix sockets are not implemented for tests yet, sorry.")
 
     def listenUNIX(
         self,

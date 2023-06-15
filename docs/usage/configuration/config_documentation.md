@@ -557,7 +557,6 @@ listeners:
   # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
   #
   - path: /var/run/synapse/main_public.sock
-    mode: 660
     type: http
     resources:
       - names: [client, federation]
