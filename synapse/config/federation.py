@@ -53,13 +53,13 @@ class FederationConfig(Config):
 
         # Allow for the configuration of timeout, max request retries
         # and min/max retry delays in the matrix federation client.
-        self.client_timeout = Config.parse_duration(
+        self.client_timeout_ms = Config.parse_duration(
             federation_config.get("client_timeout", "60s")
         )
-        self.max_long_retry_delay = Config.parse_duration(
+        self.max_long_retry_delay_ms = Config.parse_duration(
             federation_config.get("max_long_retry_delay", "60s")
         )
-        self.max_short_retry_delay = Config.parse_duration(
+        self.max_short_retry_delay_ms = Config.parse_duration(
             federation_config.get("max_short_retry_delay", "2s")
         )
         self.max_long_retries = federation_config.get("max_long_retries", 10)

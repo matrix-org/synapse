@@ -404,10 +404,10 @@ class MatrixFederationHttpClient:
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
-        self.default_timeout = hs.config.federation.client_timeout / 1000
+        self.default_timeout = hs.config.federation.client_timeout_ms / 1000
 
-        self.max_long_retry_delay = hs.config.federation.max_long_retry_delay / 1000
-        self.max_short_retry_delay = hs.config.federation.max_short_retry_delay / 1000
+        self.max_long_retry_delay = hs.config.federation.max_long_retry_delay_ms / 1000
+        self.max_short_retry_delay = hs.config.federation.max_short_retry_delay_ms / 1000
         self.max_long_retries = hs.config.federation.max_long_retries
         self.max_short_retries = hs.config.federation.max_short_retries
 
