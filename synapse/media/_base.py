@@ -152,6 +152,9 @@ def add_file_headers(
         content_type = media_type
 
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
+
+    # Use a Content-Disposition of attachment to force download of media.
+    disposition = "attachment"
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
@@ -173,11 +176,17 @@ def add_file_headers(
         # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
         # may as well just do the filename* version.
         if _can_encode_filename_as_token(upload_name):
-            disposition = "inline; filename=%s" % (upload_name,)
+            disposition = "%s; filename=%s" % (
+                disposition,
+                upload_name,
+            )
         else:
-            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
+            disposition = "%s; filename*=utf-8''%s" % (
+                disposition,
+                _quote(upload_name),
+            )
 
-        request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
+    request.setHeader(b"Content-Disposition", disposition.encode("ascii"))
 
     # cache for at least a day.
     # XXX: we might want to turn this off for data we don't want to
