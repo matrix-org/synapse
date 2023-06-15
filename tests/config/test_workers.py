@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from immutabledict import immutabledict
 
 from synapse.config import ConfigError
-from synapse.config.workers import InstanceTCPLocationConfig, WorkerConfig
+from synapse.config.workers import InstanceTcpLocationConfig, WorkerConfig
 
 from tests.unittest import TestCase
 
@@ -343,7 +343,7 @@ class WorkerDutyConfigTestCase(TestCase):
         self.assertEqual(
             worker1_config.instance_map,
             {
-                "master": InstanceTCPLocationConfig(
+                "master": InstanceTcpLocationConfig(
                     host="127.0.0.42", port=1979, tls=False
                 ),
             },

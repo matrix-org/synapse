@@ -38,8 +38,8 @@ from twisted.web.iweb import (
 
 from synapse.config.workers import (
     InstanceLocationConfig,
-    InstanceTCPLocationConfig,
-    InstanceUNIXLocationConfig,
+    InstanceTcpLocationConfig,
+    InstanceUnixLocationConfig,
 )
 from synapse.types import ISynapseReactor
 
@@ -75,7 +75,7 @@ class ReplicationEndpointFactory:
         location_config = self.instance_map[worker_name]
         scheme = location_config.scheme()
 
-        if isinstance(location_config, InstanceTCPLocationConfig):
+        if isinstance(location_config, InstanceTcpLocationConfig):
             endpoint = HostnameEndpoint(
                 self.reactor,
                 location_config.host,
@@ -91,7 +91,7 @@ class ReplicationEndpointFactory:
                     endpoint,
                 )
             return endpoint
-        elif isinstance(location_config, InstanceUNIXLocationConfig):
+        elif isinstance(location_config, InstanceUnixLocationConfig):
             return UNIXClientEndpoint(self.reactor, location_config.path)
         else:
             raise SchemeNotSupported(f"Unsupported scheme: {scheme}")

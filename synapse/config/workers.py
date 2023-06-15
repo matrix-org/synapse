@@ -88,7 +88,7 @@ class ConfigModel(BaseModel):
         allow_mutation = False
 
 
-class InstanceTCPLocationConfig(ConfigModel):
+class InstanceTcpLocationConfig(ConfigModel):
     """The host and port to talk to an instance via HTTP replication."""
 
     host: StrictStr
@@ -104,7 +104,7 @@ class InstanceTCPLocationConfig(ConfigModel):
         return f"{self.host}:{self.port}"
 
 
-class InstanceUNIXLocationConfig(ConfigModel):
+class InstanceUnixLocationConfig(ConfigModel):
     """The socket file to talk to an instance via HTTP replication."""
 
     path: StrictStr
@@ -118,7 +118,7 @@ class InstanceUNIXLocationConfig(ConfigModel):
         return f"{self.path}"
 
 
-InstanceLocationConfig = Union[InstanceTCPLocationConfig, InstanceUNIXLocationConfig]
+InstanceLocationConfig = Union[InstanceTcpLocationConfig, InstanceUnixLocationConfig]
 
 
 @attr.s
