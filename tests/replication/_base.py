@@ -22,7 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 from synapse.app.generic_worker import GenericWorkerServer
-from synapse.config.workers import InstanceTCPLocationConfig
+from synapse.config.workers import InstanceTCPLocationConfig, InstanceUNIXLocationConfig
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -360,6 +360,10 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 self.reactor.lookups[instance_loc.host],
                 instance_loc.port,
                 lambda: self._handle_http_replication_attempt(worker_hs, port),
+            )
+        elif instance_loc and isinstance(instance_loc, InstanceUNIXLocationConfig):
+            raise Exception(
+                "Unix sockets are not supported for unit tests at this time."
             )
 
         store = worker_hs.get_datastores().main
