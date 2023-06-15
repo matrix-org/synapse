@@ -46,7 +46,9 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"filter_id": "0"})
         filter = self.get_success(
-            self.store.get_user_filter(user_localpart="apple", filter_id=0)
+            self.store.get_user_filter(
+                user_id=UserID.from_string(FilterTestCase.user_id), filter_id=0
+            )
         )
         self.pump()
         self.assertEqual(filter, self.EXAMPLE_FILTER)

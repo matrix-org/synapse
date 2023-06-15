@@ -200,6 +200,7 @@ class FederationHandler:
             )
 
     @trace
+    @tag_args
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
@@ -214,6 +215,9 @@ class FederationHandler:
             limit: The number of events that the pagination request will
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
+
+        Returns:
+            True if we actually tried to backfill something, otherwise False.
         """
         # Starting the processing time here so we can include the room backfill
         # linearizer lock queue in the timing
@@ -227,6 +231,8 @@ class FederationHandler:
                 processing_start_time=processing_start_time,
             )
 
+    @trace
+    @tag_args
     async def _maybe_backfill_inner(
         self,
         room_id: str,
@@ -247,6 +253,9 @@ class FederationHandler:
             limit: The max number of events to request from the remote federated server.
             processing_start_time: The time when `maybe_backfill` started processing.
                 Only used for timing. If `None`, no timing observation will be made.
+
+        Returns:
+            True if we actually tried to backfill something, otherwise False.
         """
         backwards_extremities = [
             _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
@@ -302,15 +311,30 @@ class FederationHandler:
             len(sorted_backfill_points),
             sorted_backfill_points,
         )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points",
+            str(sorted_backfill_points),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points.length",
+            str(len(sorted_backfill_points)),
+        )
 
-        # If we have no backfill points lower than the `current_depth` then
-        # either we can a) bail or b) still attempt to backfill. We opt to try
-        # backfilling anyway just in case we do get relevant events.
+        # If we have no backfill points lower than the `current_depth` then either we
+        # can a) bail or b) still attempt to backfill. We opt to try backfilling anyway
+        # just in case we do get relevant events. This is good for eventual consistency
+        # sake but we don't need to block the client for something that is just as
+        # likely not to return anything relevant so we backfill in the background. The
+        # only way, this could return something relevant is if we discover a new branch
+        # of history that extends all the way back to where we are currently paginating
+        # and it's within the 100 events that are returned from `/backfill`.
         if not sorted_backfill_points and current_depth != MAX_DEPTH:
             logger.debug(
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Trying again with later backfill points."
             )
-            return await self._maybe_backfill_inner(
+            run_as_background_process(
+                "_maybe_backfill_inner_anyway_with_max_depth",
+                self._maybe_backfill_inner,
                 room_id=room_id,
                 # We use `MAX_DEPTH` so that we find all backfill points next
                 # time (all events are below the `MAX_DEPTH`)
@@ -321,6 +345,9 @@ class FederationHandler:
                 # overall otherwise the smaller one will throw off the results.
                 processing_start_time=None,
             )
+            # We return `False` because we're backfilling in the background and there is
+            # no new events immediately for the caller to know about yet.
+            return False
 
         # Even after recursing with `MAX_DEPTH`, we didn't find any
         # backward extremities to backfill from.

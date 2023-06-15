@@ -655,7 +655,9 @@ class ModuleApi:
         Returns:
             The profile information (i.e. display name and avatar URL).
         """
-        return await self._store.get_profileinfo(localpart)
+        server_name = self._hs.hostname
+        user_id = UserID.from_string(f"@{localpart}:{server_name}")
+        return await self._store.get_profileinfo(user_id)
 
     async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
         """Look up the threepids (email addresses and phone numbers) associated with the

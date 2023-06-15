@@ -944,7 +944,7 @@ class FederationServer(FederationBase):
             if not self._is_mine_server_name(authorising_server):
                 raise SynapseError(
                     400,
-                    f"Cannot authorise request from resident server: {authorising_server}",
+                    f"Cannot authorise membership event for {authorising_server}. We can only authorise requests from our own homeserver",
                 )
 
             event.signatures.update(
@@ -1016,7 +1016,9 @@ class FederationServer(FederationBase):
             for user_id, device_keys in result.items():
                 for device_id, keys in device_keys.items():
                     for key_id, key in keys.items():
-                        json_result.setdefault(user_id, {})[device_id] = {key_id: key}
+                        json_result.setdefault(user_id, {}).setdefault(device_id, {})[
+                            key_id
+                        ] = key
 
         logger.info(
             "Claimed one-time-keys: %s",
