@@ -462,7 +462,7 @@ See the docs [request log format](../administration/request_log.md).
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
 
-  _Added in Synapse 1.86.0_
+  #### _Added in Synapse 1.86.0_
 
 * UNIX socket support:
   * `path`: A path and filename for a UNIX socket. Ensure it is in a readable/writeable
