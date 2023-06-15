@@ -38,7 +38,7 @@ listeners:
   # using another process in the same container
 {% if SYNAPSE_USE_UNIX_SOCKET %}
   # Unix sockets don't care about TLS or IP addresses or ports
-  - path: '/run/mainpublic.sock'
+  - path: '/run/main_public.sock'
     type: http
 {% else %}
   - port: {{ SYNAPSE_HTTP_PORT or 8008 }}

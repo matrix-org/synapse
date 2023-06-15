@@ -36,7 +36,7 @@ server {
     # Send all other traffic to the main process
     location ~* ^(\\/_matrix|\\/_synapse) {
 {% if using_unix_sockets %}
-        proxy_pass http://unix:/run/mainpublic.sock;
+        proxy_pass http://unix:/run/main_public.sock;
 {% else %}
         proxy_pass http://localhost:8080;
 {% endif %}

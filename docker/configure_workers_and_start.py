@@ -75,8 +75,8 @@ MAIN_PROCESS_INSTANCE_NAME = "main"
 MAIN_PROCESS_LOCALHOST_ADDRESS = "127.0.0.1"
 MAIN_PROCESS_REPLICATION_PORT = 9093
 # Obviously, these would only be used with the UNIX socket option
-MAIN_PROCESS_UNIX_SOCKET_PUBLIC_PATH = "/run/mainpublic.sock"
-MAIN_PROCESS_UNIX_SOCKET_PRIVATE_PATH = "/run/mainprivate.sock"
+MAIN_PROCESS_UNIX_SOCKET_PUBLIC_PATH = "/run/main_public.sock"
+MAIN_PROCESS_UNIX_SOCKET_PRIVATE_PATH = "/run/main_private.sock"
 
 # A simple name used as a placeholder in the WORKERS_CONFIG below. This will be replaced
 # during processing with the name of the worker.
