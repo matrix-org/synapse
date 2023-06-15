@@ -466,7 +466,7 @@ See the docs [request log format](../administration/request_log.md).
 
 * UNIX socket support:
   * `path`: A path and filename for a UNIX socket. Ensure it is in a readable/writeable
-     directory. No default
+     directory and is pre-existing(the directory will not be created). No default
     * **Note**: Declaring a `path` is not compatible while also having a `port`
        configuration for the same `listener`
     * **Note**: `metrics` and `manhole` are not supported as `types` on UNIX socket `listeners`
