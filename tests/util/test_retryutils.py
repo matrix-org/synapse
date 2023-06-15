@@ -37,7 +37,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
 
         limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
-        min_retry_interval = self.hs.config.federation.destination_min_retry_interval
+        min_retry_interval = self.hs.config.federation.destination_min_retry_interval_ms
         retry_multiplier = self.hs.config.federation.destination_retry_multiplier
 
         self.pump(1)
