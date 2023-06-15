@@ -1,0 +1,1 @@
+Document `looping_call()` functionality that will wait for the given function to finish before scheduling another.
