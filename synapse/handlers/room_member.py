@@ -1498,7 +1498,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # put the server which owns the alias at the front of the server list.
         if room_alias.domain in servers:
             servers.remove(room_alias.domain)
-        servers.insert(0, room_alias.domain)
+            servers.insert(0, room_alias.domain)
 
         return RoomID.from_string(room_id), servers
 
