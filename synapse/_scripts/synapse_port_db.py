@@ -196,6 +196,11 @@ IGNORED_TABLES = {
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
     "ui_auth_sessions_ips",
+    # Ignore the worker locks table, as a) there shouldn't be any acquired locks
+    # after porting, and b) the circular foreign key constraints make it hard to
+    # port.
+    "worker_read_write_locks_mode",
+    "worker_read_write_locks",
 }
 
 
@@ -803,7 +808,9 @@ class Porter:
             )
             # Map from table name to args passed to `handle_table`, i.e. a tuple
             # of: `postgres_size`, `table_size`, `forward_chunk`, `backward_chunk`.
-            tables_to_port_info_map = {r[0]: r[1:] for r in setup_res}
+            tables_to_port_info_map = {
+                r[0]: r[1:] for r in setup_res if r[0] not in IGNORED_TABLES
+            }
 
             # Step 5. Do the copying.
             #
