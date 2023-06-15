@@ -82,6 +82,8 @@ class ProxyAgent(_AgentBase):
         use_proxy: Whether proxy settings should be discovered and used
             from conventional environment variables.
 
+        federation_proxies: TODO
+
     Raises:
         ValueError if use_proxy is set and the environment variables
             contain an invalid proxy specification.
