@@ -434,7 +434,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
                 "rule_id": ".m.rule.contains_user_name",
                 "default": True,
                 "enabled": True,
-                "pattern": "bob",
+                "pattern": username,
                 "actions": [
                     "notify",
                     {"set_tweak": "highlight"},
@@ -448,7 +448,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         """
         Tests that `is_user_mention` rule is present and have proper value in `value`.
         """
-        self.register_user("bob", "pass")
+        user = self.register_user("bob", "pass")
         token = self.login("bob", "pass")
 
         channel = self.make_request(
@@ -468,7 +468,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
                     {
                         "kind": "event_property_contains",
                         "key": "content.m\\.mentions.user_ids",
-                        "value": "@bob:test",
+                        "value": user,
                     }
                 ],
                 "actions": [
