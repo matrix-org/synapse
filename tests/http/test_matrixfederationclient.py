@@ -677,71 +677,47 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         """
         TODO
         """
-        import logging
+        # Mock out the `MatrixFederationHttpClient` of the `federation_sender` instance
+        # so we can act like some remote server responding to requests
+        mock_client_on_federation_sender = Mock()
+        mock_agent_on_federation_sender = create_autospec(Agent, spec_set=True)
+        mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
 
-        logger = logging.getLogger(__name__)
-
-        self.reactor.lookups["remoteserv"] = "1.2.3.4"
-
-        mock_client = Mock()
-        # mock out the Agent used by the federation client, which is easier than
-        # catching the HTTPS connection and do the TLS stuff.
-        self._mock_agent = create_autospec(Agent, spec_set=True)
-        mock_client.agent = self._mock_agent
-
+        # Make the `federation_sender` worker
         self.federation_sender = self.make_worker_hs(
             "synapse.app.generic_worker",
             {"worker_name": "federation_sender"},
-            federation_http_client=mock_client,
+            federation_http_client=mock_client_on_federation_sender,
         )
 
-        # TODO: Mock HTTP of the `federation_sender` instance
-        # self.federation_sender.get_federation_http_client().post_json = Mock(side_effect=post_json)  # type: ignore[assignment]
-        # self.federation_sender.get_federation_http_client().agent.request = Mock(side_effect=request)
-
-        def _request_stub(
-            method: bytes,
-            uri: bytes,
-            # headers: Optional[Headers] = None,
-            # bodyProducer: Optional[IBodyProducer] = None,
-        ) -> IResponse:
-            logger.info("asdfasdf request(%s, %s)", method, uri)
-            return FakeResponse.json(
-                payload={
-                    "foo": "bar",
-                }
+        # Fake `remoteserv:8008` responding to requests
+        mock_agent_on_federation_sender.request.side_effect = (
+            lambda *args, **kwargs: defer.succeed(
+                FakeResponse.json(
+                    payload={
+                        "foo": "bar",
+                    }
+                )
             )
+        )
 
-        # mock up the response, and have the agent return it
-        # self._mock_agent.request.side_effect = lambda *args, **kwargs: defer.succeed(
-        #     FakeResponse.json(
-        #         payload={
-        #             "foo": "bar",
-        #         }
-        #     )
-        # )
-        self._mock_agent.request.side_effect = _request_stub
-
-        # self.get_success(
-        #     self.hs.get_federation_http_client().get_json("remoteserv:8008", "foo/bar")
-        # )
-
-        # This request should go through the `federation_sender` worker off to the remote
-        # server
+        # This federation request from the main worker should be proxied through the
+        # `federation_sender` worker off to the remote server
         test_d = defer.ensureDeferred(
             self.hs.get_federation_http_client().get_json("remoteserv:8008", "foo/bar")
         )
 
-        self.pump(5.0)
+        # Pump the reactor so our deferred goes through the motions
+        self.pump()
 
-        self._mock_agent.request.assert_called_once_with(
+        # Make sure that the request was proxied through the `federation_sender` worker
+        mock_agent_on_federation_sender.request.assert_called_once_with(
             b"GET",
             b"matrix-federation://remoteserv:8008/foo/bar",
             headers=ANY,
-            bodyProducer=None,
+            bodyProducer=ANY,
         )
 
+        # Make sure the response is as expected back on the main worker
         res = self.successResultOf(test_d)
-
-        # check the response is as expected
-        self.assertEqual(res, {"a": 1})
+        self.assertEqual(res, {"foo": "bar"})
