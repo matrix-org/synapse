@@ -540,10 +540,10 @@ class MatrixFederationHttpClient:
             logger.exception(f"Invalid destination: {request.destination}.")
             raise FederationDeniedError(request.destination)
 
-        if timeout is None:
-            timeout = int(self.default_timeout)
-
-        _sec_timeout = timeout / 1000
+        if timeout:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
 
         if (
             self.hs.config.federation.federation_domain_whitelist is not None
@@ -948,9 +948,10 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
-        if timeout is None:
-            timeout = int(self.default_timeout)
-        _sec_timeout = timeout / 1000
+        if timeout:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
 
         if parser is None:
             parser = cast(ByteParser[T], JsonParser())
@@ -1136,9 +1137,10 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
-        if timeout is None:
-            timeout = int(self.default_timeout)
-        _sec_timeout = timeout / 1000
+        if timeout:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
 
         if parser is None:
             parser = cast(ByteParser[T], JsonParser())
@@ -1211,9 +1213,10 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
         )
 
-        if timeout is None:
-            timeout = int(self.default_timeout)
-        _sec_timeout = timeout / 1000
+        if timeout:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
 
         body = await _handle_response(
             self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
