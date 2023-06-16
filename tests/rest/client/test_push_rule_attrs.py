@@ -428,14 +428,27 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(channel.code, 200)
-        self.assertIn("pattern", channel.json_body)
-        self.assertEqual(channel.json_body["pattern"], username)
+
+        self.assertEqual(
+            {
+                "rule_id": ".m.rule.contains_user_name",
+                "default": True,
+                "enabled": True,
+                "pattern": "bob",
+                "actions": [
+                    "notify",
+                    {"set_tweak": "highlight"},
+                    {"set_tweak": "sound", "value": "default"},
+                ],
+            },
+            channel.json_body,
+        )
 
     def test_is_user_mention(self) -> None:
         """
         Tests that `is_user_mention` rule is present and have proper value in `value`.
         """
-        user = self.register_user("bob", "pass")
+        self.register_user("bob", "pass")
         token = self.login("bob", "pass")
 
         channel = self.make_request(
@@ -445,7 +458,24 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         )
 
         self.assertEqual(channel.code, 200)
-        self.assertIn("conditions", channel.json_body)
-        self.assertEqual(len(channel.json_body["conditions"]), 1)
-        self.assertIn("value", channel.json_body["conditions"][0])
-        self.assertEqual(channel.json_body["conditions"][0]["value"], user)
+
+        self.assertEqual(
+            {
+                "rule_id": ".m.rule.is_user_mention",
+                "default": True,
+                "enabled": True,
+                "conditions": [
+                    {
+                        "kind": "event_property_contains",
+                        "key": "content.m\\.mentions.user_ids",
+                        "value": "@bob:test",
+                    }
+                ],
+                "actions": [
+                    "notify",
+                    {"set_tweak": "highlight"},
+                    {"set_tweak": "sound", "value": "default"},
+                ],
+            },
+            channel.json_body,
+        )
