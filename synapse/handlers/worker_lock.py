@@ -23,11 +23,13 @@ from twisted.internet import defer
 from twisted.internet.interfaces import IReactorTime
 
 from synapse.logging.context import PreserveLoggingContext
+from synapse.logging.opentracing import start_active_span
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage.databases.main.lock import Lock, LockStore
 from synapse.util.async_helpers import timeout_deferred
 
 if TYPE_CHECKING:
+    from synapse.logging.opentracing import opentracing
     from synapse.server import HomeServer
 
 
@@ -143,31 +145,39 @@ class WaitingLock:
     deferred: "defer.Deferred[None]" = attr.Factory(defer.Deferred)
     _inner_lock: Optional[Lock] = None
     _retry_interval: float = 0.1
+    _lock_span: "opentracing.Scope" = attr.Factory(
+        lambda: start_active_span("WaitingLock.lock")
+    )
 
     async def __aenter__(self) -> None:
-        while self._inner_lock is None:
-            self.deferred = defer.Deferred()
+        self._lock_span.__enter__()
 
-            if self.write is not None:
-                lock = await self.store.try_acquire_read_write_lock(
-                    self.lock_name, self.lock_key, write=self.write
-                )
-            else:
-                lock = await self.store.try_acquire_lock(self.lock_name, self.lock_key)
+        with start_active_span("WaitingLock.waiting_for_lock"):
+            while self._inner_lock is None:
+                self.deferred = defer.Deferred()
 
-            if lock:
-                self._inner_lock = lock
-                break
-
-            try:
-                with PreserveLoggingContext():
-                    await timeout_deferred(
-                        deferred=self.deferred,
-                        timeout=self._get_next_retry_interval(),
-                        reactor=self.reactor,
+                if self.write is not None:
+                    lock = await self.store.try_acquire_read_write_lock(
+                        self.lock_name, self.lock_key, write=self.write
                     )
-            except Exception:
-                pass
+                else:
+                    lock = await self.store.try_acquire_lock(
+                        self.lock_name, self.lock_key
+                    )
+
+                if lock:
+                    self._inner_lock = lock
+                    break
+
+                try:
+                    with PreserveLoggingContext():
+                        await timeout_deferred(
+                            deferred=self.deferred,
+                            timeout=self._get_next_retry_interval(),
+                            reactor=self.reactor,
+                        )
+                except Exception:
+                    pass
 
         return await self._inner_lock.__aenter__()
 
@@ -181,7 +191,12 @@ class WaitingLock:
 
         self.handler.notify_lock_released(self.lock_name, self.lock_key)
 
-        return await self._inner_lock.__aexit__(exc_type, exc, tb)
+        try:
+            r = await self._inner_lock.__aexit__(exc_type, exc, tb)
+        finally:
+            self._lock_span.__exit__(exc_type, exc, tb)
+
+        return r
 
     def _get_next_retry_interval(self) -> float:
         next = self._retry_interval
