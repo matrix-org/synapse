@@ -354,6 +354,12 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             # not going to reset `instance_loc` to `None` under its feet. See
             # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
             port = instance_loc.port
+            logger.info(
+                "asdf make_worker_hs %s -> host=%s port=%s",
+                instance_name,
+                instance_loc.host,
+                instance_loc.port,
+            )
 
             self.reactor.add_tcp_client_callback(
                 self.reactor.lookups[instance_loc.host],

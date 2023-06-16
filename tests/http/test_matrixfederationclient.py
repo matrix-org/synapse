@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Generator
-from unittest.mock import Mock
+from typing import Any, Dict, Generator
+from unittest.mock import ANY, Mock, create_autospec
 
 from netaddr import IPSet
 from parameterized import parameterized
@@ -21,8 +21,9 @@ from twisted.internet import defer
 from twisted.internet.defer import Deferred, TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.test.proto_helpers import MemoryReactor, StringTransport
-from twisted.web.client import ResponseNeverReceived
+from twisted.web.client import Agent, ResponseNeverReceived
 from twisted.web.http import HTTPChannel
+from twisted.web.iweb import IResponse
 
 from synapse.api.errors import RequestSendFailed
 from synapse.http.matrixfederationclient import (
@@ -39,7 +40,9 @@ from synapse.logging.context import (
 from synapse.server import HomeServer
 from synapse.util import Clock
 
+from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import FakeTransport
+from tests.test_utils import FakeResponse
 from tests.unittest import HomeserverTestCase, override_config
 
 
@@ -658,3 +661,87 @@ class FederationClientTests(HomeserverTestCase):
         self.assertEqual(self.cl.max_short_retry_delay, 7)
         self.assertEqual(self.cl.max_long_retries, 20)
         self.assertEqual(self.cl.max_short_retries, 5)
+
+
+class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
+    def default_config(self) -> Dict[str, Any]:
+        conf = super().default_config()
+        conf["instance_map"] = {
+            "main": {"host": "testserv", "port": 8765},
+            "federation_sender": {"host": "testserv", "port": 1001},
+        }
+        return conf
+
+    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    def test_asdf(self) -> None:
+        """
+        TODO
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        self.reactor.lookups["remoteserv"] = "1.2.3.4"
+
+        mock_client = Mock()
+        # mock out the Agent used by the federation client, which is easier than
+        # catching the HTTPS connection and do the TLS stuff.
+        self._mock_agent = create_autospec(Agent, spec_set=True)
+        mock_client.agent = self._mock_agent
+
+        self.federation_sender = self.make_worker_hs(
+            "synapse.app.generic_worker",
+            {"worker_name": "federation_sender"},
+            federation_http_client=mock_client,
+        )
+
+        # TODO: Mock HTTP of the `federation_sender` instance
+        # self.federation_sender.get_federation_http_client().post_json = Mock(side_effect=post_json)  # type: ignore[assignment]
+        # self.federation_sender.get_federation_http_client().agent.request = Mock(side_effect=request)
+
+        def _request_stub(
+            method: bytes,
+            uri: bytes,
+            # headers: Optional[Headers] = None,
+            # bodyProducer: Optional[IBodyProducer] = None,
+        ) -> IResponse:
+            logger.info("asdfasdf request(%s, %s)", method, uri)
+            return FakeResponse.json(
+                payload={
+                    "foo": "bar",
+                }
+            )
+
+        # mock up the response, and have the agent return it
+        # self._mock_agent.request.side_effect = lambda *args, **kwargs: defer.succeed(
+        #     FakeResponse.json(
+        #         payload={
+        #             "foo": "bar",
+        #         }
+        #     )
+        # )
+        self._mock_agent.request.side_effect = _request_stub
+
+        # self.get_success(
+        #     self.hs.get_federation_http_client().get_json("remoteserv:8008", "foo/bar")
+        # )
+
+        # This request should go through the `federation_sender` worker off to the remote
+        # server
+        test_d = defer.ensureDeferred(
+            self.hs.get_federation_http_client().get_json("remoteserv:8008", "foo/bar")
+        )
+
+        self.pump(5.0)
+
+        self._mock_agent.request.assert_called_once_with(
+            b"GET",
+            b"matrix-federation://remoteserv:8008/foo/bar",
+            headers=ANY,
+            bodyProducer=None,
+        )
+
+        res = self.successResultOf(test_d)
+
+        # check the response is as expected
+        self.assertEqual(res, {"a": 1})
