@@ -320,14 +320,21 @@ class FederationHandler:
             str(len(sorted_backfill_points)),
         )
 
-        # If we have no backfill points lower than the `current_depth` then
-        # either we can a) bail or b) still attempt to backfill. We opt to try
-        # backfilling anyway just in case we do get relevant events.
+        # If we have no backfill points lower than the `current_depth` then either we
+        # can a) bail or b) still attempt to backfill. We opt to try backfilling anyway
+        # just in case we do get relevant events. This is good for eventual consistency
+        # sake but we don't need to block the client for something that is just as
+        # likely not to return anything relevant so we backfill in the background. The
+        # only way, this could return something relevant is if we discover a new branch
+        # of history that extends all the way back to where we are currently paginating
+        # and it's within the 100 events that are returned from `/backfill`.
         if not sorted_backfill_points and current_depth != MAX_DEPTH:
             logger.debug(
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Trying again with later backfill points."
             )
-            return await self._maybe_backfill_inner(
+            run_as_background_process(
+                "_maybe_backfill_inner_anyway_with_max_depth",
+                self._maybe_backfill_inner,
                 room_id=room_id,
                 # We use `MAX_DEPTH` so that we find all backfill points next
                 # time (all events are below the `MAX_DEPTH`)
@@ -338,6 +345,9 @@ class FederationHandler:
                 # overall otherwise the smaller one will throw off the results.
                 processing_start_time=None,
             )
+            # We return `False` because we're backfilling in the background and there is
+            # no new events immediately for the caller to know about yet.
+            return False
 
         # Even after recursing with `MAX_DEPTH`, we didn't find any
         # backward extremities to backfill from.
