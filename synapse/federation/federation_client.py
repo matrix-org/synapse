@@ -236,6 +236,7 @@ class FederationClient(FederationBase):
 
     async def claim_client_keys(
         self,
+        user: UserID,
         destination: str,
         query: Dict[str, Dict[str, Dict[str, int]]],
         timeout: Optional[int],
@@ -243,6 +244,7 @@ class FederationClient(FederationBase):
         """Claims one-time keys for a device hosted on a remote server.
 
         Args:
+            user: The user id of the requesting user
             destination: Domain name of the remote homeserver
             content: The query content.
 
@@ -258,7 +260,9 @@ class FederationClient(FederationBase):
         use_unstable = False
         for user_id, one_time_keys in query.items():
             for device_id, algorithms in one_time_keys.items():
-                if any(count > 1 for count in algorithms.values()):
+                # If more than one algorithm is requested, attempt to use the unstable
+                # endpoint.
+                if sum(algorithms.values()) > 1:
                     use_unstable = True
                 if algorithms:
                     # For the stable query, choose only the first algorithm.
@@ -279,7 +283,7 @@ class FederationClient(FederationBase):
         if use_unstable:
             try:
                 return await self.transport_layer.claim_client_keys_unstable(
-                    destination, unstable_content, timeout
+                    user, destination, unstable_content, timeout
                 )
             except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised endpoint,
@@ -294,8 +298,9 @@ class FederationClient(FederationBase):
         else:
             logger.debug("Skipping unstable claim client keys API")
 
+        # TODO Potentially attempt multiple queries and combine the results?
         return await self.transport_layer.claim_client_keys(
-            destination, content, timeout
+            user, destination, content, timeout
         )
 
     @trace

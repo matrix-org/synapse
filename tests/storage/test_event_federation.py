@@ -1134,6 +1134,43 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         backfill_event_ids = [backfill_point[0] for backfill_point in backfill_points]
         self.assertEqual(backfill_event_ids, ["insertion_eventA"])
 
+    def test_get_event_ids_with_failed_pull_attempts(self) -> None:
+        """
+        Test to make sure we properly get event_ids based on whether they have any
+        failed pull attempts.
+        """
+        # Create the room
+        user_id = self.register_user("alice", "test")
+        tok = self.login("alice", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(
+                room_id, "$failed_event_id1", "fake cause"
+            )
+        )
+        self.get_success(
+            self.store.record_event_failed_pull_attempt(
+                room_id, "$failed_event_id2", "fake cause"
+            )
+        )
+
+        event_ids_with_failed_pull_attempts = self.get_success(
+            self.store.get_event_ids_with_failed_pull_attempts(
+                event_ids=[
+                    "$failed_event_id1",
+                    "$fresh_event_id1",
+                    "$failed_event_id2",
+                    "$fresh_event_id2",
+                ]
+            )
+        )
+
+        self.assertEqual(
+            event_ids_with_failed_pull_attempts,
+            {"$failed_event_id1", "$failed_event_id2"},
+        )
+
     def test_get_event_ids_to_not_pull_from_backoff(self) -> None:
         """
         Test to make sure only event IDs we should backoff from are returned.

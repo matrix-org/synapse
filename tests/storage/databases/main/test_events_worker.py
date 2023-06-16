@@ -139,6 +139,55 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             # That should result in a single db query to lookup
             self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
 
+    def test_persisting_event_prefills_get_event_cache(self) -> None:
+        """
+        Test to make sure that the `_get_event_cache` is prefilled after we persist an
+        event and returns the updated value.
+        """
+        event, event_context = self.get_success(
+            create_event(
+                self.hs,
+                room_id=self.room_id,
+                sender=self.user,
+                type="test_event_type",
+                content={"body": "conflabulation"},
+            )
+        )
+
+        # First, check `_get_event_cache` for the event we just made
+        # to verify it's not in the cache.
+        res = self.store._get_event_cache.get_local((event.event_id,))
+        self.assertEqual(res, None, "Event was cached when it should not have been.")
+
+        with LoggingContext(name="test") as ctx:
+            # Persist the event which should invalidate then prefill the
+            # `_get_event_cache` so we don't return stale values.
+            # Side Note: Apparently, persisting an event isn't a transaction in the
+            # sense that it is recorded in the LoggingContext
+            persistence = self.hs.get_storage_controllers().persistence
+            assert persistence is not None
+            self.get_success(
+                persistence.persist_event(
+                    event,
+                    event_context,
+                )
+            )
+
+            # Check `_get_event_cache` again and we should see the updated fact
+            # that we now have the event cached after persisting it.
+            res = self.store._get_event_cache.get_local((event.event_id,))
+            self.assertEqual(res.event, event, "Event not cached as expected.")  # type: ignore
+
+            # Try and fetch the event from the database.
+            self.get_success(self.store.get_event(event.event_id))
+
+            # Verify that the database hit was avoided.
+            self.assertEqual(
+                ctx.get_resource_usage().evt_db_fetch_count,
+                0,
+                "Database was hit, which would not happen if event was cached.",
+            )
+
     def test_invalidate_cache_by_room_id(self) -> None:
         """
         Test to make sure that all events associated with the given `(room_id,)`
@@ -188,7 +237,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
         self.event_id = res["event_id"]
 
         # Reset the event cache so the tests start with it empty
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
     def test_simple(self) -> None:
         """Test that we cache events that we pull from the DB."""
@@ -205,7 +254,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
         """
 
         # Reset the event cache
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
         with LoggingContext("test") as ctx:
             # We keep hold of the event event though we never use it.
@@ -215,7 +264,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
             self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 1)
 
         # Reset the event cache
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
         with LoggingContext("test") as ctx:
             self.get_success(self.store.get_event(self.event_id))
@@ -390,7 +439,7 @@ class GetEventCancellationTestCase(unittest.HomeserverTestCase):
         self.event_id = res["event_id"]
 
         # Reset the event cache so the tests start with it empty
-        self.get_success(self.store._get_event_cache.clear())
+        self.store._get_event_cache.clear()
 
     @contextmanager
     def blocking_get_event_calls(

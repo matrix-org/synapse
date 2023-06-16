@@ -835,6 +835,7 @@ class ReplicationClient(BaseHttpClient):
 
         self.agent: IAgent = ReplicationAgent(
             hs.get_reactor(),
+            hs.config.worker.instance_map,
             contextFactory=hs.get_http_client_context_factory(),
             pool=pool,
         )

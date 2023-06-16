@@ -119,14 +119,20 @@ class Codes(str, Enum):
 
 
 class CodeMessageException(RuntimeError):
-    """An exception with integer code and message string attributes.
+    """An exception with integer code, a message string attributes and optional headers.
 
     Attributes:
         code: HTTP error code
         msg: string describing the error
+        headers: optional response headers to send
     """
 
-    def __init__(self, code: Union[int, HTTPStatus], msg: str):
+    def __init__(
+        self,
+        code: Union[int, HTTPStatus],
+        msg: str,
+        headers: Optional[Dict[str, str]] = None,
+    ):
         super().__init__("%d: %s" % (code, msg))
 
         # Some calls to this method pass instances of http.HTTPStatus for `code`.
@@ -137,6 +143,7 @@ class CodeMessageException(RuntimeError):
         # To eliminate this behaviour, we convert them to their integer equivalents here.
         self.code = int(code)
         self.msg = msg
+        self.headers = headers
 
 
 class RedirectException(CodeMessageException):
@@ -182,6 +189,7 @@ class SynapseError(CodeMessageException):
         msg: str,
         errcode: str = Codes.UNKNOWN,
         additional_fields: Optional[Dict] = None,
+        headers: Optional[Dict[str, str]] = None,
     ):
         """Constructs a synapse error.
 
@@ -190,7 +198,7 @@ class SynapseError(CodeMessageException):
             msg: The human-readable error message.
             errcode: The matrix error code e.g 'M_FORBIDDEN'
         """
-        super().__init__(code, msg)
+        super().__init__(code, msg, headers)
         self.errcode = errcode
         if additional_fields is None:
             self._additional_fields: Dict = {}
@@ -333,6 +341,20 @@ class AuthError(SynapseError):
         additional_fields: Optional[dict] = None,
     ):
         super().__init__(code, msg, errcode, additional_fields)
+
+
+class OAuthInsufficientScopeError(SynapseError):
+    """An error raised when the caller does not have sufficient scope to perform the requested action"""
+
+    def __init__(
+        self,
+        required_scopes: List[str],
+    ):
+        headers = {
+            "WWW-Authenticate": 'Bearer error="insufficient_scope", scope="%s"'
+            % (" ".join(required_scopes))
+        }
+        super().__init__(401, "Insufficient scope", Codes.FORBIDDEN, None, headers)
 
 
 class UnstableSpecAuthError(AuthError):

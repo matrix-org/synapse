@@ -32,6 +32,7 @@ class FederationAckTestCase(HomeserverTestCase):
         config["worker_app"] = "synapse.app.generic_worker"
         config["worker_name"] = "federation_sender1"
         config["federation_sender_instances"] = ["federation_sender1"]
+        config["instance_map"] = {"main": {"host": "127.0.0.1", "port": 0}}
         return config
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:

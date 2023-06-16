@@ -2570,7 +2570,50 @@ Example configuration:
 ```yaml
 nonrefreshable_access_token_lifetime: 24h
 ```
+---
+### `ui_auth`
 
+The amount of time to allow a user-interactive authentication session to be active.
+
+This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.
+
+This is ignored for potentially "dangerous" operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).
+
+Use the `session_timeout` sub-option here to change the time allowed for credential validation.
+
+Example configuration:
+```yaml
+ui_auth:
+    session_timeout: "15s"
+```
+---
+### `login_via_existing_session`
+
+Matrix supports the ability of an existing session to mint a login token for
+another client.
+
+Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.
+
+The duration of time the generated token is valid for can be configured with the
+`token_timeout` sub-option.
+
+User-interactive authentication is required when this is enabled unless the
+`require_ui_auth` sub-option is set to `False`.
+
+Example configuration:
+```yaml
+login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: "5m"
+```
 ---
 ## Metrics
 Config options related to metrics.
@@ -3415,28 +3458,6 @@ password_config:
       require_uppercase: true
 ```
 ---
-### `ui_auth`
-
-The amount of time to allow a user-interactive authentication session to be active.
-
-This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.
-
-This is ignored for potentially "dangerous" operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).
-
-Use the `session_timeout` sub-option here to change the time allowed for credential validation.
-
-Example configuration:
-```yaml
-ui_auth:
-    session_timeout: "15s"
-```
----
 ## Push
 Configuration settings related to push notifications
 
@@ -3979,6 +4000,8 @@ This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
+* `path`: The full path to a local Unix socket file. **If this is used, `host` and
+ `port` are ignored.** Defaults to `/tmp/redis.sock'
 * `password`: Optional password if configured on the Redis instance.
 * `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
 * `use_tls`: Whether to use tls connection. Defaults to false.
@@ -3990,6 +4013,8 @@ This setting has the following sub-options:
   _Added in Synapse 1.78.0._
 
   _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
+
+  _Changed in Synapse 1.85.0: Added path option to use a local Unix socket_
 
 Example configuration:
 ```yaml

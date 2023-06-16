@@ -28,7 +28,7 @@ from unittest.mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
@@ -240,7 +240,7 @@ class StateTestCase(unittest.TestCase):
         hs.get_macaroon_generator.return_value = MacaroonGenerator(
             clock, "tesths", b"verysecret"
         )
-        hs.get_auth.return_value = Auth(hs)
+        hs.get_auth.return_value = InternalAuth(hs)
         hs.get_state_resolution_handler = lambda: StateResolutionHandler(hs)
         hs.get_storage_controllers.return_value = storage_controllers
 
@@ -555,10 +555,15 @@ class StateTestCase(unittest.TestCase):
             (e.event_id for e in old_state + [event]), current_state_ids.values()
         )
 
-        self.assertIsNotNone(context.state_group_before_event)
+        assert context.state_group_before_event is not None
+        assert context.state_group is not None
+        self.assertEqual(
+            context.state_group_deltas.get(
+                (context.state_group_before_event, context.state_group)
+            ),
+            {(event.type, event.state_key): event.event_id},
+        )
         self.assertNotEqual(context.state_group_before_event, context.state_group)
-        self.assertEqual(context.state_group_before_event, context.prev_group)
-        self.assertEqual({("state", ""): event.event_id}, context.delta_ids)
 
     @defer.inlineCallbacks
     def test_trivial_annotate_message(

@@ -219,11 +219,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             with outgoing_gauge.track_inprogress():
                 if instance_name == local_instance_name:
                     raise Exception("Trying to send HTTP request to self")
-                if instance_name in instance_map:
-                    host = instance_map[instance_name].host
-                    port = instance_map[instance_name].port
-                    tls = instance_map[instance_name].tls
-                else:
+                if instance_name not in instance_map:
                     raise Exception(
                         "Instance %r not in 'instance_map' config" % (instance_name,)
                     )
@@ -271,13 +267,11 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                         "Unknown METHOD on %s replication endpoint" % (cls.NAME,)
                     )
 
-                # Here the protocol is hard coded to be http by default or https in case the replication
-                # port is set to have tls true.
-                scheme = "https" if tls else "http"
-                uri = "%s://%s:%s/_synapse/replication/%s/%s" % (
-                    scheme,
-                    host,
-                    port,
+                # Hard code a special scheme to show this only used for replication. The
+                # instance_name will be passed into the ReplicationEndpointFactory to
+                # determine connection details from the instance_map.
+                uri = "synapse-replication://%s/_synapse/replication/%s/%s" % (
+                    instance_name,
                     cls.NAME,
                     "/".join(url_args),
                 )
