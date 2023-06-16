@@ -198,7 +198,6 @@ class _EventInternalMetadata:
     soft_failed: DictProperty[bool] = DictProperty("soft_failed")
     proactively_send: DictProperty[bool] = DictProperty("proactively_send")
     redacted: DictProperty[bool] = DictProperty("redacted")
-    historical: DictProperty[bool] = DictProperty("historical")
 
     txn_id: DictProperty[str] = DictProperty("txn_id")
     """The transaction ID, if it was set when the event was created."""
@@ -287,14 +286,6 @@ class _EventInternalMetadata:
         marked as redacted without needing to make another database call.
         """
         return self._dict.get("redacted", False)
-
-    def is_historical(self) -> bool:
-        """Whether this is a historical message.
-        This is used by the batchsend historical message endpoint and
-        is needed to and mark the event as backfilled and skip some checks
-        like push notifications.
-        """
-        return self._dict.get("historical", False)
 
     def is_notifiable(self) -> bool:
         """Whether this event can trigger a push notification"""

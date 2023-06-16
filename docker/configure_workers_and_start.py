@@ -244,7 +244,6 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/join/",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/knock/",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/profile/",
-            "^/_matrix/client/(v1|unstable/org.matrix.msc2716)/rooms/.*/batch_send",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
