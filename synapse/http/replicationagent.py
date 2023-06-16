@@ -149,14 +149,16 @@ class ReplicationAgent(_AgentBase):
         An existing connection from the connection pool may be used or a new
         one may be created.
 
-        Currently, HTTP and HTTPS schemes are supported in uri.
+        Currently, HTTP, HTTPS and UNIX schemes are supported in uri.
 
         This is copied from twisted.web.client.Agent, except:
 
         * It uses a different pool key (combining the scheme with either host & port or
           socket path).
-        * It does not call _ensureValidURI(...) since it breaks when using a worker's
-          name as a 'hostname'.
+        * It does not call _ensureValidURI(...) as the strictness of IDNA2008 is not
+          required when using a worker's name as a 'hostname' for Synapse HTTP
+          Replication machinery. Specifically, this allows a range of ascii characters
+          such as '+' and '_' in hostnames/worker's names.
 
         See: twisted.web.iweb.IAgent.request
         """
