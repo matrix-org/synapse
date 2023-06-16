@@ -540,7 +540,7 @@ class MatrixFederationHttpClient:
             logger.exception(f"Invalid destination: {request.destination}.")
             raise FederationDeniedError(request.destination)
 
-        if timeout:
+        if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
             _sec_timeout = self.default_timeout
@@ -948,7 +948,7 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
-        if timeout:
+        if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
             _sec_timeout = self.default_timeout
@@ -1029,7 +1029,7 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
         )
 
-        if timeout:
+        if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
             _sec_timeout = self.default_timeout
@@ -1137,7 +1137,7 @@ class MatrixFederationHttpClient:
             timeout=timeout,
         )
 
-        if timeout:
+        if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
             _sec_timeout = self.default_timeout
@@ -1213,7 +1213,7 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
         )
 
-        if timeout:
+        if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
             _sec_timeout = self.default_timeout
