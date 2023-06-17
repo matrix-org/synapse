@@ -97,7 +97,7 @@ ALLOWED_ATTRS = {
     "img": ["src"],
 }
 # When bleach release a version with this option, we can specify schemes
-# ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
+ALLOWED_SCHEMES = ["http", "https", "ftp", "mailto"]
 
 
 class Mailer:
@@ -890,7 +890,7 @@ def safe_markup(raw_html: str) -> Markup:
                 tags=ALLOWED_TAGS,
                 attributes=ALLOWED_ATTRS,
                 # bleach master has this, but it isn't released yet
-                # protocols=ALLOWED_SCHEMES,
+                protocols=ALLOWED_SCHEMES,
                 strip=True,
             )
         )
