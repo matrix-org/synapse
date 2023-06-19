@@ -1549,13 +1549,13 @@ class PersistEventsStore:
             for event, _ in events_and_contexts
             if not event.internal_metadata.is_redacted()
         ]
-        sql = "UPDATE redactions SET have_censored = ? WHERE "
+        sql = "UPDATE redactions SET have_censored = False WHERE "
         clause, args = make_in_list_sql_clause(
             self.database_engine,
             "redacts",
             unredacted_events,
         )
-        txn.execute(sql + clause, [False] + args)
+        txn.execute(sql + clause, args)
 
         self.db_pool.simple_insert_many_txn(
             txn,
@@ -2318,14 +2318,14 @@ class PersistEventsStore:
             "   SELECT 1 FROM events"
             "   LEFT JOIN event_edges edge"
             "   ON edge.event_id = events.event_id"
-            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = ? OR edge.event_id IS NULL)"
+            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = False OR edge.event_id IS NULL)"
             " )"
         )
 
         txn.execute_batch(
             query,
             [
-                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
+                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id)
                 for ev in events
                 for e_id in ev.prev_event_ids()
                 if not ev.internal_metadata.is_outlier()
