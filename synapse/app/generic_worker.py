@@ -83,7 +83,6 @@ from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
 from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
-from synapse.storage.databases.main.room_batch import RoomBatchStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
@@ -120,7 +119,6 @@ class GenericWorkerStore(
     # the races it creates aren't too bad.
     KeyStore,
     RoomWorkerStore,
-    RoomBatchStore,
     DirectoryWorkerStore,
     PushRulesWorkerStore,
     ApplicationServiceTransactionWorkerStore,
