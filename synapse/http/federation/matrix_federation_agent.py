@@ -381,7 +381,7 @@ class MatrixHostnameEndpoint:
         connect to.
         """
 
-        if self._parsed_uri.scheme != b"matrix":
+        if self._parsed_uri.scheme != b"matrix-federation":
             return [Server(host=self._parsed_uri.host, port=self._parsed_uri.port)]
 
         # Note: We don't do well-known lookup as that needs to have happened
