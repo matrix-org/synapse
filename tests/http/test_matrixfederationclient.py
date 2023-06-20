@@ -654,9 +654,10 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         return conf
 
     @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
-    def test_asdf(self) -> None:
+    def test_proxy_requests_through_federation_sender_worker(self) -> None:
         """
-        TODO
+        Test that all outbound federation requests go through the `federation_sender`
+        worker
         """
         # Mock out the `MatrixFederationHttpClient` of the `federation_sender` instance
         # so we can act like some remote server responding to requests
@@ -664,7 +665,7 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         mock_agent_on_federation_sender = create_autospec(Agent, spec_set=True)
         mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
 
-        # Make the `federation_sender` worker
+        # Create the `federation_sender` worker
         self.federation_sender = self.make_worker_hs(
             "synapse.app.generic_worker",
             {"worker_name": "federation_sender"},
@@ -682,9 +683,9 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
             )
         )
 
-        # This federation request from the main worker should be proxied through the
+        # This federation request from the main process should be proxied through the
         # `federation_sender` worker off to the remote server
-        test_d = defer.ensureDeferred(
+        test_request_from_main_process_d = defer.ensureDeferred(
             self.hs.get_federation_http_client().get_json("remoteserv:8008", "foo/bar")
         )
 
@@ -700,5 +701,5 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         )
 
         # Make sure the response is as expected back on the main worker
-        res = self.successResultOf(test_d)
+        res = self.successResultOf(test_request_from_main_process_d)
         self.assertEqual(res, {"foo": "bar"})

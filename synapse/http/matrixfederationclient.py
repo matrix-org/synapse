@@ -400,9 +400,6 @@ class MatrixFederationHttpClient:
             hs.config.worker.outbound_federation_restricted_to
         )
         if hs.get_instance_name() in outbound_federation_restricted_to:
-            logger.info(
-                "asdf currently=%s asking federation directly", hs.get_instance_name()
-            )
             federation_agent: IAgent = MatrixFederationAgent(
                 self.reactor,
                 tls_client_options_factory,
@@ -411,11 +408,6 @@ class MatrixFederationHttpClient:
                 hs.config.server.federation_ip_range_blocklist,
             )
         else:
-            logger.info(
-                "asdf currently=%s proxying over to %s",
-                hs.get_instance_name(),
-                outbound_federation_restricted_to,
-            )
             federation_proxies = outbound_federation_restricted_to.locations
             federation_agent = ProxyAgent(
                 self.reactor,
@@ -666,12 +658,6 @@ class MatrixFederationHttpClient:
                             # * The `Deferred` that joins the forks back together is
                             #   wrapped in `make_deferred_yieldable` to restore the
                             #   logging context regardless of the path taken.
-                            logger.info(
-                                "asdf %s matrixfederationclient._send_request %s %s",
-                                self.hs.get_instance_name(),
-                                method_bytes,
-                                url_bytes,
-                            )
                             request_deferred = run_in_background(
                                 self.agent.request,
                                 method_bytes,
