@@ -462,19 +462,18 @@ See the docs [request log format](../administration/request_log.md).
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
 
-  #### _Added in Synapse 1.86.0_
-
-* UNIX socket support:
-  * `path`: A path and filename for a UNIX socket. Ensure it is in a readable/writeable
-     directory and is pre-existing(the directory will not be created). No default
-    * **Note**: Declaring a `path` is not compatible while also having a `port`
-       configuration for the same `listener`
-    * **Note**: `metrics` and `manhole` are not supported as `types` on UNIX socket `listeners`
-    * The `x_forwarded` option will default to true and may be left out.
+UNIX socket support(_Added in Synapse 1.87.0_):
+  * `path`: A path and filename for a Unix socket. Make sure it is located in a
+    directory with read and write permissions, and that it already exists (the directory
+    will not be created). Defaults to `None`."
+    * **Note**: The use of both `path` and `port` options for the same `listener` is not
+      compatible.
+    * The `x_forwarded` option defaults to true  when using Unix sockets and can be omitted.
     * Other options that would not make sense to use with a UNIX socket, such as 
-    `bind_address[es]` and `tls` will be ignored and can be removed.
+      `bind_addresses` and `tls` will be ignored and can be removed.
   * `mode`: The file permissions to set on the UNIX socket. Defaults to `666`
-  * `type: http` is valid (provided `metrics` is not included in the `resources`:`names`)
+  * **Note:** Must be set as `type: http` (does not support `metrics` and `manhole`). 
+    Also make sure that `metrics` is not included in `resources` -> `names`
 
 
 Valid resource names are:
