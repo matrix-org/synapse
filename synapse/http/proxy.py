@@ -108,7 +108,8 @@ class ProxyResource(_AsyncResource):
 
 class _ProxyResponseBody(protocol.Protocol):
     """
-    A protocol that passes the data back out through the given request.
+    A protocol that proxies the given response data back out to the given original
+    request.
     """
 
     transport: Optional[ITCPTransport] = None
@@ -117,19 +118,27 @@ class _ProxyResponseBody(protocol.Protocol):
         self._request = request
 
     def dataReceived(self, data: bytes) -> None:
+        # Avoid sending response data to a request that already disconnected
         if self._request._disconnected and self.transport is not None:
+            # Close the connection (forcefully) since all the data will get
+            # discarded anyway.
             self.transport.abortConnection()
             return
 
         self._request.write(data)
 
     def connectionLost(self, reason: Failure = connectionDone) -> None:
+        # If the underlying request is already finished (successfully or failed), don't
+        # worry about sending anything back.
         if self._request.finished:
             return
 
         if reason.check(ResponseDone):
             self._request.finish()
         else:
+            # TODO: Should we also log something?
+            #
+            # Abort the underlying request since our remote request also failed.
             self._request.transport.abortConnection()
 
 
