@@ -737,24 +737,34 @@ class MatrixFederationHttpClient:
 
                     if retries_left and not timeout:
                         if long_retries:
-                            delay = 4 ** (self.max_long_retries + 1 - retries_left)
-                            delay = min(delay, self.max_long_retry_delay_seconds)
-                            delay *= random.uniform(0.8, 1.4)
+                            delay_seconds = 4 ** (
+                                self.max_long_retries + 1 - retries_left
+                            )
+                            delay_seconds = min(
+                                delay_seconds, self.max_long_retry_delay_seconds
+                            )
+                            delay_seconds *= random.uniform(0.8, 1.4)
                         else:
-                            delay = 0.5 * 2 ** (self.max_short_retries - retries_left)
-                            delay = min(delay, self.max_short_retry_delay_seconds)
-                            delay *= random.uniform(0.8, 1.4)
+                            delay_seconds = 0.5 * 2 ** (
+                                self.max_short_retries - retries_left
+                            )
+                            delay_seconds = min(
+                                delay_seconds, self.max_short_retry_delay_seconds
+                            )
+                            delay_seconds *= random.uniform(0.8, 1.4)
 
                         logger.debug(
                             "{%s} [%s] Waiting %ss before re-sending...",
                             request.txn_id,
                             request.destination,
-                            delay,
+                            delay_seconds,
                         )
 
                         # Sleep for the calculated delay, or wake up immediately
                         # if we get notified that the server is back up.
-                        await self._sleeper.sleep(request.destination, delay * 1000)
+                        await self._sleeper.sleep(
+                            request.destination, delay_seconds * 1000
+                        )
                         retries_left -= 1
                     else:
                         raise
