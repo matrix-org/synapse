@@ -39,6 +39,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+INBOX_SIZE_LIMIT_FOR_KEY_REQUEST = 100
+
+
 class DeviceMessageHandler:
     def __init__(self, hs: "HomeServer"):
         """
@@ -166,7 +169,7 @@ class DeviceMessageHandler:
         found marks the remote cache for the user as stale.
         """
 
-        if message_type != "m.room_key_request":
+        if message_type != ToDeviceEventTypes.RoomKeyRequest:
             return
 
         # Get the sending device IDs
@@ -286,10 +289,16 @@ class DeviceMessageHandler:
                 "org.matrix.opentracing_context": json_encoder.encode(context),
             }
 
+        device_inbox_size_limit = None
+        if message_type == ToDeviceEventTypes.RoomKeyRequest and self.is_mine(
+            UserID.from_string(user_id)
+        ):
+            device_inbox_size_limit = INBOX_SIZE_LIMIT_FOR_KEY_REQUEST
+
         # Add messages to the database.
         # Retrieve the stream id of the last-processed to-device message.
         last_stream_id = await self.store.add_messages_to_device_inbox(
-            local_messages, remote_edu_contents
+            local_messages, remote_edu_contents, device_inbox_size_limit
         )
 
         # Notify listeners that there are new to-device messages to process,
