@@ -29,6 +29,7 @@ from twisted.web.iweb import IAgent, IResponse
 from twisted.web.resource import IResource
 from twisted.web.server import Site
 
+from synapse.api.errors import Codes
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.server import _AsyncResource
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -103,12 +104,24 @@ class ProxyResource(_AsyncResource):
         request: "SynapseRequest",
     ) -> None:
         request.setResponseCode(502)
+        request.setHeader(b"Content-Type", b"application/json")
+        request.write(
+            (
+                '{"errcode": "%s","err":"ProxyResource: Error when proxying request: %s %s -> %s"}'
+                % (
+                    Codes.UNKNOWN,
+                    request.method.decode("ascii"),
+                    request.uri.decode("ascii"),
+                    f,
+                )
+            ).encode()
+        )
         request.finish()
 
 
 class _ProxyResponseBody(protocol.Protocol):
     """
-    A protocol that proxies the given response data back out to the given original
+    A protocol that proxies the given remote response data back out to the given local
     request.
     """
 
@@ -118,7 +131,7 @@ class _ProxyResponseBody(protocol.Protocol):
         self._request = request
 
     def dataReceived(self, data: bytes) -> None:
-        # Avoid sending response data to a request that already disconnected
+        # Avoid sending response data to the local request that already disconnected
         if self._request._disconnected and self.transport is not None:
             # Close the connection (forcefully) since all the data will get
             # discarded anyway.
@@ -128,7 +141,7 @@ class _ProxyResponseBody(protocol.Protocol):
         self._request.write(data)
 
     def connectionLost(self, reason: Failure = connectionDone) -> None:
-        # If the underlying request is already finished (successfully or failed), don't
+        # If the local request is already finished (successfully or failed), don't
         # worry about sending anything back.
         if self._request.finished:
             return
@@ -136,8 +149,6 @@ class _ProxyResponseBody(protocol.Protocol):
         if reason.check(ResponseDone):
             self._request.finish()
         else:
-            # TODO: Should we also log something?
-            #
             # Abort the underlying request since our remote request also failed.
             self._request.transport.abortConnection()
 

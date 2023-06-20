@@ -758,7 +758,7 @@ class MatrixFederationHttpClient:
                             delay = min(delay, 2)
                             delay *= random.uniform(0.8, 1.4)
 
-                        logger.debug(
+                        logger.info(
                             "{%s} [%s] Waiting %ss before re-sending...",
                             request.txn_id,
                             request.destination,

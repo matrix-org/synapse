@@ -24,7 +24,7 @@ from twisted.test.proto_helpers import MemoryReactor, StringTransport
 from twisted.web.client import Agent, ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
-from synapse.api.errors import RequestSendFailed
+from synapse.api.errors import RequestSendFailed, HttpResponseException
 from synapse.http.matrixfederationclient import (
     ByteParser,
     MatrixFederationHttpClient,
@@ -703,3 +703,53 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         # Make sure the response is as expected back on the main worker
         res = self.successResultOf(test_request_from_main_process_d)
         self.assertEqual(res, {"foo": "bar"})
+
+    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    def test_proxy_request_with_network_error_through_federation_sender_worker(
+        self,
+    ) -> None:
+        """
+        Test that when the outbound federation request fails with a network related
+        error, a sensible error makes its way back to the main process.
+        """
+        # Mock out the `MatrixFederationHttpClient` of the `federation_sender` instance
+        # so we can act like some remote server responding to requests
+        mock_client_on_federation_sender = Mock()
+        mock_agent_on_federation_sender = create_autospec(Agent, spec_set=True)
+        mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
+
+        # Create the `federation_sender` worker
+        self.federation_sender = self.make_worker_hs(
+            "synapse.app.generic_worker",
+            {"worker_name": "federation_sender"},
+            federation_http_client=mock_client_on_federation_sender,
+        )
+
+        # Fake `remoteserv:8008` responding to requests
+        mock_agent_on_federation_sender.request.side_effect = (
+            lambda *args, **kwargs: defer.fail(ResponseNeverReceived("fake error"))
+        )
+
+        # This federation request from the main process should be proxied through the
+        # `federation_sender` worker off to the remote server
+        test_request_from_main_process_d = defer.ensureDeferred(
+            self.hs.get_federation_http_client().get_json("remoteserv:8008", "foo/bar")
+        )
+
+        # Pump the reactor so our deferred goes through the motions. We pump with 10
+        # seconds (0.1 * 100) so the `MatrixFederationHttpClient` runs out of retries
+        # and finally passes along the error response.
+        self.pump(0.1)
+
+        # Make sure that the request was proxied through the `federation_sender` worker
+        mock_agent_on_federation_sender.request.assert_called_with(
+            b"GET",
+            b"matrix-federation://remoteserv:8008/foo/bar",
+            headers=ANY,
+            bodyProducer=ANY,
+        )
+
+        # Make sure we get some sort of error back on the main worker
+        failure_res = self.failureResultOf(test_request_from_main_process_d)
+        self.assertIsInstance(failure_res.value, RequestSendFailed)
+        self.assertIsInstance(failure_res.value.inner_exception, HttpResponseException)
