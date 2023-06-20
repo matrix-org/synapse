@@ -107,6 +107,10 @@ class ProxyResource(_AsyncResource):
 
 
 class _ProxyResponseBody(protocol.Protocol):
+    """
+    A protocol that passes the data back out through the given request.
+    """
+
     transport: Optional[ITCPTransport] = None
 
     def __init__(self, request: "SynapseRequest") -> None:
@@ -124,9 +128,6 @@ class _ProxyResponseBody(protocol.Protocol):
             return
 
         if reason.check(ResponseDone):
-            self._request.finish()
-        elif reason.check(PotentialDataLoss):
-            # TODO: ARGH
             self._request.finish()
         else:
             self._request.transport.abortConnection()
