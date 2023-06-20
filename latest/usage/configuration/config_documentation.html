@@ -2268,6 +2268,38 @@ retrospectively to existing sessions for users that have already logged in.</p>
 <pre><code class="language-yaml">nonrefreshable_access_token_lifetime: 24h
 </code></pre>
 <hr />
+<h3 id="ui_auth"><a class="header" href="#ui_auth"><code>ui_auth</code></a></h3>
+<p>The amount of time to allow a user-interactive authentication session to be active.</p>
+<p>This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.</p>
+<p>This is ignored for potentially &quot;dangerous&quot; operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).</p>
+<p>Use the <code>session_timeout</code> sub-option here to change the time allowed for credential validation.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">ui_auth:
+    session_timeout: &quot;15s&quot;
+</code></pre>
+<hr />
+<h3 id="login_via_existing_session"><a class="header" href="#login_via_existing_session"><code>login_via_existing_session</code></a></h3>
+<p>Matrix supports the ability of an existing session to mint a login token for
+another client.</p>
+<p>Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.</p>
+<p>The duration of time the generated token is valid for can be configured with the
+<code>token_timeout</code> sub-option.</p>
+<p>User-interactive authentication is required when this is enabled unless the
+<code>require_ui_auth</code> sub-option is set to <code>False</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: &quot;5m&quot;
+</code></pre>
+<hr />
 <h2 id="metrics"><a class="header" href="#metrics">Metrics</a></h2>
 <p>Config options related to metrics.</p>
 <hr />
@@ -3071,22 +3103,6 @@ Defaults to false.</li>
       require_symbol: true
       require_lowercase: true
       require_uppercase: true
-</code></pre>
-<hr />
-<h3 id="ui_auth"><a class="header" href="#ui_auth"><code>ui_auth</code></a></h3>
-<p>The amount of time to allow a user-interactive authentication session to be active.</p>
-<p>This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.</p>
-<p>This is ignored for potentially &quot;dangerous&quot; operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).</p>
-<p>Use the <code>session_timeout</code> sub-option here to change the time allowed for credential validation.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">ui_auth:
-    session_timeout: &quot;15s&quot;
 </code></pre>
 <hr />
 <h2 id="push"><a class="header" href="#push">Push</a></h2>

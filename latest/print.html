@@ -1779,6 +1779,11 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1860"><a class="header" href="#upgrading-to-v1860">Upgrading to v1.86.0</a></h1>
+<h2 id="minimum-supported-rust-version"><a class="header" href="#minimum-supported-rust-version">Minimum supported Rust version</a></h2>
+<p>The minimum supported Rust version has been increased from v1.58.1 to v1.60.0.
+Users building from source will need to ensure their <code>rustc</code> version is up to
+date.</p>
 <h1 id="upgrading-to-v1850"><a class="header" href="#upgrading-to-v1850">Upgrading to v1.85.0</a></h1>
 <h2 id="application-service-registration-with-user-property-deprecation"><a class="header" href="#application-service-registration-with-user-property-deprecation">Application service registration with &quot;user&quot; property deprecation</a></h2>
 <p>Application services should ensure they call the <code>/register</code> endpoint with a
@@ -5765,6 +5770,38 @@ retrospectively to existing sessions for users that have already logged in.</p>
 <pre><code class="language-yaml">nonrefreshable_access_token_lifetime: 24h
 </code></pre>
 <hr />
+<h3 id="ui_auth"><a class="header" href="#ui_auth"><code>ui_auth</code></a></h3>
+<p>The amount of time to allow a user-interactive authentication session to be active.</p>
+<p>This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.</p>
+<p>This is ignored for potentially &quot;dangerous&quot; operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).</p>
+<p>Use the <code>session_timeout</code> sub-option here to change the time allowed for credential validation.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">ui_auth:
+    session_timeout: &quot;15s&quot;
+</code></pre>
+<hr />
+<h3 id="login_via_existing_session"><a class="header" href="#login_via_existing_session"><code>login_via_existing_session</code></a></h3>
+<p>Matrix supports the ability of an existing session to mint a login token for
+another client.</p>
+<p>Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.</p>
+<p>The duration of time the generated token is valid for can be configured with the
+<code>token_timeout</code> sub-option.</p>
+<p>User-interactive authentication is required when this is enabled unless the
+<code>require_ui_auth</code> sub-option is set to <code>False</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: &quot;5m&quot;
+</code></pre>
+<hr />
 <h2 id="metrics"><a class="header" href="#metrics">Metrics</a></h2>
 <p>Config options related to metrics.</p>
 <hr />
@@ -6568,22 +6605,6 @@ Defaults to false.</li>
       require_symbol: true
       require_lowercase: true
       require_uppercase: true
-</code></pre>
-<hr />
-<h3 id="ui_auth"><a class="header" href="#ui_auth"><code>ui_auth</code></a></h3>
-<p>The amount of time to allow a user-interactive authentication session to be active.</p>
-<p>This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.</p>
-<p>This is ignored for potentially &quot;dangerous&quot; operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).</p>
-<p>Use the <code>session_timeout</code> sub-option here to change the time allowed for credential validation.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">ui_auth:
-    session_timeout: &quot;15s&quot;
 </code></pre>
 <hr />
 <h2 id="push"><a class="header" href="#push">Push</a></h2>
@@ -15637,9 +15658,8 @@ to make further changes.</p>
 <h2 id="what-servers-are-currently-participating-in-this-room"><a class="header" href="#what-servers-are-currently-participating-in-this-room">What servers are currently participating in this room?</a></h2>
 <p>Run this sql query on your db:</p>
 <pre><code class="language-sql">SELECT DISTINCT split_part(state_key, ':', 2)
-    FROM current_state_events AS c
-    INNER JOIN room_memberships AS m USING (room_id, event_id)
-    WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
+FROM current_state_events
+WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
 </code></pre>
 <h2 id="what-users-are-registered-on-my-server"><a class="header" href="#what-users-are-registered-on-my-server">What users are registered on my server?</a></h2>
 <pre><code class="language-sql">SELECT NAME from users;
