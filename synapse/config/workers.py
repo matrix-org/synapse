@@ -162,6 +162,10 @@ class OutboundFederationRestrictedTo:
     locations: List[InstanceLocationConfig] = attr.Factory(list)
 
     def __contains__(self, instance: str) -> bool:
+        # It feels a bit dirty to return `True` if `instances` is `None`, but it makes
+        # sense in downstream usage in the sense that if
+        # `outbound_federation_restricted_to` is not configured, then any instance can
+        # talk to federation (no restrictions so always return `True`).
         return self.instances is None or instance in self.instances
 
 

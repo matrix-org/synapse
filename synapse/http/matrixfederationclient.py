@@ -400,6 +400,7 @@ class MatrixFederationHttpClient:
             hs.config.worker.outbound_federation_restricted_to
         )
         if hs.get_instance_name() in outbound_federation_restricted_to:
+            # Talk to federation directly
             federation_agent: IAgent = MatrixFederationAgent(
                 self.reactor,
                 tls_client_options_factory,
@@ -408,6 +409,8 @@ class MatrixFederationHttpClient:
                 hs.config.server.federation_ip_range_blocklist,
             )
         else:
+            # We need to talk to federation via the proxy via one of the configured
+            # locations
             federation_proxies = outbound_federation_restricted_to.locations
             federation_agent = ProxyAgent(
                 self.reactor,
@@ -426,6 +429,8 @@ class MatrixFederationHttpClient:
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
+        # This is an arbitrary magic value timeout but make sure that if this is
+        # changed, the timeout in `ProxyResource` is set to something higher.
         self.default_timeout = 60
 
         self._cooperator = Cooperator(scheduler=_make_scheduler(self.reactor))

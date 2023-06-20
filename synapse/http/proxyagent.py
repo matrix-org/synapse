@@ -82,7 +82,8 @@ class ProxyAgent(_AgentBase):
         use_proxy: Whether proxy settings should be discovered and used
             from conventional environment variables.
 
-        federation_proxies: TODO
+        federation_proxies: An optional list of locations to proxy outbound federation
+            traffic through (only requests that use the `matrix-federation://` scheme).
 
     Raises:
         ValueError if use_proxy is set and the environment variables

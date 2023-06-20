@@ -43,6 +43,12 @@ logger = logging.getLogger(__name__)
 
 
 class ProxyResource(_AsyncResource):
+    """
+    A stub resource that proxies any requests with a `matrix-federation://` scheme
+    through the given `federation_agent` to the remote homeserver and ferries back the
+    info.
+    """
+
     isLeaf = True
 
     def __init__(self, reactor: ISynapseReactor, federation_agent: IAgent):
@@ -72,6 +78,9 @@ class ProxyResource(_AsyncResource):
         )
         request_deferred = timeout_deferred(
             request_deferred,
+            # This should be set longer than the timeout in `MatrixFederationHttpClient`
+            # so that it has enough time to complete and pass us the data before we give
+            # up.
             timeout=90,
             reactor=self.reactor,
         )
@@ -154,6 +163,11 @@ class _ProxyResponseBody(protocol.Protocol):
 
 
 class ProxySite(Site):
+    """
+    Proxies any requests with a `matrix-federation://` scheme through the given
+    `federation_agent`. Otherwise, behaves like a normal `Site`.
+    """
+
     def __init__(
         self,
         resource: IResource,
