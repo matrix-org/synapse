@@ -23,7 +23,6 @@ from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.test.proto_helpers import MemoryReactor, StringTransport
 from twisted.web.client import Agent, ResponseNeverReceived
 from twisted.web.http import HTTPChannel
-from twisted.web.iweb import IResponse
 
 from synapse.api.errors import RequestSendFailed
 from synapse.http.matrixfederationclient import (
@@ -643,24 +642,6 @@ class FederationClientTests(HomeserverTestCase):
             self.cl.build_auth_headers(
                 b"", b"GET", b"https://example.com", destination_is=b""
             )
-
-    @override_config(
-        {
-            "federation": {
-                "client_timeout": 180,
-                "max_long_retry_delay": 100,
-                "max_short_retry_delay": 7,
-                "max_long_retries": 20,
-                "max_short_retries": 5,
-            }
-        }
-    )
-    def test_configurable_retry_and_delay_values(self) -> None:
-        self.assertEqual(self.cl.default_timeout, 180)
-        self.assertEqual(self.cl.max_long_retry_delay, 100)
-        self.assertEqual(self.cl.max_short_retry_delay, 7)
-        self.assertEqual(self.cl.max_long_retries, 20)
-        self.assertEqual(self.cl.max_short_retries, 5)
 
 
 class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):

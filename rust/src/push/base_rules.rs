@@ -142,7 +142,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.is_user_mention"),
+        rule_id: Cow::Borrowed("global/override/.m.rule.is_user_mention"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(
             KnownCondition::ExactEventPropertyContainsType(EventPropertyIsTypeCondition {
@@ -163,7 +163,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         default_enabled: true,
     },
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.m.is_room_mention"),
+        rule_id: Cow::Borrowed("global/override/.m.rule.is_room_mention"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::EventPropertyIs(EventPropertyIsCondition {
