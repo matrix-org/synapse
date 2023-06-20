@@ -23,7 +23,6 @@ from twisted.internet.protocol import connectionDone
 from twisted.python import failure
 from twisted.python.failure import Failure
 from twisted.web.client import ResponseDone
-from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IResponse
 from twisted.web.resource import IResource

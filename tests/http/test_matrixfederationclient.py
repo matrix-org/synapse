@@ -24,7 +24,7 @@ from twisted.test.proto_helpers import MemoryReactor, StringTransport
 from twisted.web.client import Agent, ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
-from synapse.api.errors import RequestSendFailed, HttpResponseException
+from synapse.api.errors import HttpResponseException, RequestSendFailed
 from synapse.http.matrixfederationclient import (
     ByteParser,
     MatrixFederationHttpClient,

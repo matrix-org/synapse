@@ -51,8 +51,10 @@ logger = logging.getLogger(__name__)
 @implementer(IAgent)
 class MatrixFederationAgent:
     """An Agent-like thing which provides a `request` method which correctly
-    handles resolving matrix server names when using matrix-federation://. Handles standard
-    https URIs as normal.
+    handles resolving matrix server names when using `matrix-federation://`. Handles
+    standard https URIs as normal. The `matrix-federation://` scheme is internal to
+    Synapse and we purposely want to avoid colliding with the `matrix://` URL scheme
+    which is now specced.
 
     Doesn't implement any retries. (Those are done in MatrixFederationHttpClient.)
 
