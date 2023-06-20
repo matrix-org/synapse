@@ -523,7 +523,7 @@ for a server admin: see <a href="../usage/administration/admin_api/">Admin API</
 <ul>
 <li><code>from</code> (required) - The token to start returning events from. This token can be obtained from a prev_batch
 or next_batch token returned by the /sync endpoint, or from an end token returned by a previous request to this endpoint.</li>
-<li><code>to</code> - The token to spot returning events at.</li>
+<li><code>to</code> - The token to stop returning events at.</li>
 <li><code>limit</code> - The maximum number of events to return. Defaults to <code>10</code>.</li>
 <li><code>filter</code> - A JSON RoomEventFilter to filter returned events with.</li>
 <li><code>dir</code> - The direction to return events from. Either <code>f</code> for forwards or <code>b</code> for backwards. Setting
