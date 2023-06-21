@@ -60,8 +60,6 @@ class ProxyResource(_AsyncResource):
         uri = urllib.parse.urlparse(request.uri)
         assert uri.scheme == b"matrix-federation"
 
-        logger.info("Got proxy request %s", request.uri)
-
         headers = Headers()
         for header_name in (b"User-Agent", b"Authorization", b"Content-Type"):
             header_value = request.getHeader(header_name)
@@ -85,8 +83,6 @@ class ProxyResource(_AsyncResource):
         )
 
         response = await make_deferred_yieldable(request_deferred)
-
-        logger.info("Got proxy response %s", response.code)
 
         return response.code, response
 
