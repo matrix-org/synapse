@@ -61,9 +61,7 @@ def run_upgrade(
             full_user_id text NOT NULL,
             user_id text NOT NULL,
             filter_id bigint NOT NULL,
-            filter_json bytea NOT NULL,
-            UNIQUE (full_user_id),
-            UNIQUE (user_id)
+            filter_json bytea NOT NULL
         )
         """
         cur.execute(create_sql)
@@ -73,6 +71,12 @@ def run_upgrade(
             temp_user_filters (user_id, filter_id)
         """
         cur.execute(index_sql)
+
+        full_user_id_idx_sql = """
+        CREATE UNIQUE INDEX IF NOT EXISTS user_filters_full_user_id_unique ON
+            temp_user_filters (full_user_id, filter_id)
+        """
+        cur.execute(full_user_id_idx_sql)
 
         copy_sql = """
         INSERT INTO temp_user_filters (
