@@ -1529,7 +1529,7 @@ class DatabasePool:
         # Lock the table just once, to prevent it being done once per row.
         # Note that, according to Postgres' documentation, once obtained,
         # the lock is held for the remainder of the current transaction.
-        self.engine.lock_table(txn, "user_ips")
+        self.engine.lock_table(txn, table)
 
         for keyv, valv in zip(key_values, value_values):
             _keys = dict(zip(key_names, keyv))

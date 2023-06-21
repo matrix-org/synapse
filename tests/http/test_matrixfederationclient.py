@@ -644,17 +644,17 @@ class FederationClientTests(HomeserverTestCase):
     @override_config(
         {
             "federation": {
-                "client_timeout": 180,
-                "max_long_retry_delay": 100,
-                "max_short_retry_delay": 7,
+                "client_timeout": "180s",
+                "max_long_retry_delay": "100s",
+                "max_short_retry_delay": "7s",
                 "max_long_retries": 20,
                 "max_short_retries": 5,
             }
         }
     )
     def test_configurable_retry_and_delay_values(self) -> None:
-        self.assertEqual(self.cl.default_timeout, 180)
-        self.assertEqual(self.cl.max_long_retry_delay, 100)
-        self.assertEqual(self.cl.max_short_retry_delay, 7)
+        self.assertEqual(self.cl.default_timeout_seconds, 180)
+        self.assertEqual(self.cl.max_long_retry_delay_seconds, 100)
+        self.assertEqual(self.cl.max_short_retry_delay_seconds, 7)
         self.assertEqual(self.cl.max_long_retries, 20)
         self.assertEqual(self.cl.max_short_retries, 5)

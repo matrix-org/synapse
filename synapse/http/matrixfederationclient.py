@@ -172,7 +172,14 @@ class MatrixFederationRequest:
 
         # The object is frozen so we can pre-compute this.
         uri = urllib.parse.urlunparse(
-            (b"matrix", destination_bytes, path_bytes, None, query_bytes, b"")
+            (
+                b"matrix-federation",
+                destination_bytes,
+                path_bytes,
+                None,
+                query_bytes,
+                b"",
+            )
         )
         object.__setattr__(self, "uri", uri)
 
@@ -404,10 +411,14 @@ class MatrixFederationHttpClient:
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
-        self.default_timeout = hs.config.federation.client_timeout
+        self.default_timeout_seconds = hs.config.federation.client_timeout_ms / 1000
 
-        self.max_long_retry_delay = hs.config.federation.max_long_retry_delay
-        self.max_short_retry_delay = hs.config.federation.max_short_retry_delay
+        self.max_long_retry_delay_seconds = (
+            hs.config.federation.max_long_retry_delay_ms / 1000
+        )
+        self.max_short_retry_delay_seconds = (
+            hs.config.federation.max_short_retry_delay_ms / 1000
+        )
         self.max_long_retries = hs.config.federation.max_long_retries
         self.max_short_retries = hs.config.federation.max_short_retries
 
@@ -538,10 +549,10 @@ class MatrixFederationHttpClient:
             logger.exception(f"Invalid destination: {request.destination}.")
             raise FederationDeniedError(request.destination)
 
-        if timeout:
+        if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = self.default_timeout
+            _sec_timeout = self.default_timeout_seconds
 
         if (
             self.hs.config.federation.federation_domain_whitelist is not None
@@ -733,24 +744,34 @@ class MatrixFederationHttpClient:
 
                     if retries_left and not timeout:
                         if long_retries:
-                            delay = 4 ** (self.max_long_retries + 1 - retries_left)
-                            delay = min(delay, self.max_long_retry_delay)
-                            delay *= random.uniform(0.8, 1.4)
+                            delay_seconds = 4 ** (
+                                self.max_long_retries + 1 - retries_left
+                            )
+                            delay_seconds = min(
+                                delay_seconds, self.max_long_retry_delay_seconds
+                            )
+                            delay_seconds *= random.uniform(0.8, 1.4)
                         else:
-                            delay = 0.5 * 2 ** (self.max_short_retries - retries_left)
-                            delay = min(delay, self.max_short_retry_delay)
-                            delay *= random.uniform(0.8, 1.4)
+                            delay_seconds = 0.5 * 2 ** (
+                                self.max_short_retries - retries_left
+                            )
+                            delay_seconds = min(
+                                delay_seconds, self.max_short_retry_delay_seconds
+                            )
+                            delay_seconds *= random.uniform(0.8, 1.4)
 
                         logger.debug(
                             "{%s} [%s] Waiting %ss before re-sending...",
                             request.txn_id,
                             request.destination,
-                            delay,
+                            delay_seconds,
                         )
 
                         # Sleep for the calculated delay, or wake up immediately
                         # if we get notified that the server is back up.
-                        await self._sleeper.sleep(request.destination, delay * 1000)
+                        await self._sleeper.sleep(
+                            request.destination, delay_seconds * 1000
+                        )
                         retries_left -= 1
                     else:
                         raise
@@ -949,7 +970,7 @@ class MatrixFederationHttpClient:
         if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = self.default_timeout
+            _sec_timeout = self.default_timeout_seconds
 
         if parser is None:
             parser = cast(ByteParser[T], JsonParser())
@@ -1027,10 +1048,10 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
         )
 
-        if timeout:
+        if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = self.default_timeout
+            _sec_timeout = self.default_timeout_seconds
 
         body = await _handle_response(
             self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
@@ -1138,7 +1159,7 @@ class MatrixFederationHttpClient:
         if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = self.default_timeout
+            _sec_timeout = self.default_timeout_seconds
 
         if parser is None:
             parser = cast(ByteParser[T], JsonParser())
@@ -1214,7 +1235,7 @@ class MatrixFederationHttpClient:
         if timeout is not None:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = self.default_timeout
+            _sec_timeout = self.default_timeout_seconds
 
         body = await _handle_response(
             self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
@@ -1266,7 +1287,7 @@ class MatrixFederationHttpClient:
 
         try:
             d = read_body_with_max_size(response, output_stream, max_size)
-            d.addTimeout(self.default_timeout, self.reactor)
+            d.addTimeout(self.default_timeout_seconds, self.reactor)
             length = await make_deferred_yieldable(d)
         except BodyExceededMaxSize:
             msg = "Requested file is too large > %r bytes" % (max_size,)

@@ -1206,9 +1206,9 @@ Short retry algorithm is used when something or someone will wait for the reques
 answer, while long retry is used for requests that happen in the background,
 like sending a federation transaction.
 
-* `client_timeout`: timeout for the federation requests in seconds. Default to 60s.
-* `max_short_retry_delay`: maximum delay to be used for the short retry algo in seconds. Default to 2s.
-* `max_long_retry_delay`: maximum delay to be used for the short retry algo in seconds. Default to 60s.
+* `client_timeout`: timeout for the federation requests. Default to 60s.
+* `max_short_retry_delay`: maximum delay to be used for the short retry algo. Default to 2s.
+* `max_long_retry_delay`: maximum delay to be used for the short retry algo. Default to 60s.
 * `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
 * `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
 
@@ -1223,9 +1223,9 @@ and the state of the backoff is stored in the database.
 Example configuration:
 ```yaml
 federation:
-  client_timeout: 180
-  max_short_retry_delay: 7
-  max_long_retry_delay: 100
+  client_timeout: 180s
+  max_short_retry_delay: 7s
+  max_long_retry_delay: 100s
   max_short_retries: 5
   max_long_retries: 20
   destination_min_retry_interval: 30s
