@@ -15,7 +15,7 @@
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Optional, Set, Tuple, cast
 
 from twisted.internet import protocol
 from twisted.internet.interfaces import ITCPTransport
@@ -39,6 +39,55 @@ if TYPE_CHECKING:
     from synapse.http.site import SynapseRequest
 
 logger = logging.getLogger(__name__)
+
+# "Hop-by-hop" headers (as opposed to "end-to-end" headers) as defined by RFC2616
+# section 13.5.1 and referenced in RFC9110 section 7.6.1. These are meant to only be
+# consumed by the immediate recipient and not be forwarded on.
+HOP_BY_HOP_HEADERS = {
+    "Connection",
+    "Keep-Alive",
+    "Proxy-Authenticate",
+    "Proxy-Authorization",
+    "TE",
+    "Trailers",
+    "Transfer-Encoding",
+    "Upgrade",
+}
+
+
+def parse_connection_header_value(
+    connection_header_value: Optional[bytes],
+) -> Tuple[Optional[str], Set[str]]:
+    """
+    Parse the `Connection` header to determine which headers we should not be copied
+    over from the remote response.
+
+    As defined by RFC2616 section 14.10 and RFC9110 section 7.6.1
+
+    Example: `Connection: close, X-Foo, X-Bar` will return `{"X-Foo", "X-Bar"}`
+
+    Args:
+        connection_header_value: The value of the `Connection` header.
+
+    Returns:
+        A tuple containing the connection name and the set of header names that should
+        not be copied over from the remote response. The keys are capitalized in
+        canonical capitalization.
+    """
+    headers = Headers()
+    connection = None
+    extra_headers_to_remove: Set[str] = set()
+    if connection_header_value:
+        connection_options = [
+            headers._canonicalNameCaps(connection_option.strip()).decode("ascii")
+            for connection_option in connection_header_value.split(b",")
+        ]
+        # This is probably `close` or `keep-alive
+        connection = connection_options[0]
+        # The rest is a list of headers that should not be copied over.
+        extra_headers_to_remove = Set(connection_options[1:])
+
+    return connection, extra_headers_to_remove
 
 
 class ProxyResource(_AsyncResource):
@@ -93,11 +142,27 @@ class ProxyResource(_AsyncResource):
         response_object: Any,
     ) -> None:
         response = cast(IResponse, response_object)
+        response_headers = cast(Headers, response.headers)
 
         request.setResponseCode(code)
 
+        # The `Connection` header also defines which headers should not be copied over.
+        connection_header = response_headers.getRawHeaders(b"connection")
+        _, extra_headers_to_remove = parse_connection_header_value(
+            connection_header[0] if connection_header else None
+        )
+
         # Copy headers.
-        for k, v in response.headers.getAllRawHeaders():
+        for k, v in response_headers.getAllRawHeaders():
+            # Do not copy over any hop-by-hop headers. These are meant to only be
+            # consumed by the immediate recipient and not be forwarded on.
+            header_key = k.decode("ascii")
+            if (
+                header_key in HOP_BY_HOP_HEADERS
+                or header_key in extra_headers_to_remove
+            ):
+                continue
+
             request.responseHeaders.setRawHeaders(k, v)
 
         response.deliverBody(_ProxyResponseBody(request))
