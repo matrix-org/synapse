@@ -1,1 +1,1 @@
-Add configuration setting for CAS protocol version. Contributed by Aurélien Grimpard
+Add configuration setting for CAS protocol version. Contributed by Aurélien Grimpard.
