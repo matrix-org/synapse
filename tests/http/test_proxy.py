@@ -23,19 +23,18 @@ from tests.unittest import TestCase
 class ProxyTests(TestCase):
     @parameterized.expand(
         [
-            [b"close, X-Foo, X-Bar", True, {"Close", "X-Foo", "X-Bar"}],
+            [b"close, X-Foo, X-Bar", {"Close", "X-Foo", "X-Bar"}],
             # No whitespace
-            [b"close,X-Foo,X-Bar", True, {"Close", "X-Foo", "X-Bar"}],
+            [b"close,X-Foo,X-Bar", {"Close", "X-Foo", "X-Bar"}],
             # More whitespace
-            [b"close,    X-Foo,      X-Bar", True, {"Close", "X-Foo", "X-Bar"}],
+            [b"close,    X-Foo,      X-Bar", {"Close", "X-Foo", "X-Bar"}],
             # "close" directive in not the first position
-            [b"X-Foo, X-Bar, close", True, {"X-Foo", "X-Bar", "Close"}],
+            [b"X-Foo, X-Bar, close", {"X-Foo", "X-Bar", "Close"}],
             # Normalizes header capitalization
-            [b"keep-alive, x-fOo, x-bAr", False, {"Keep-Alive", "X-Foo", "X-Bar"}],
+            [b"keep-alive, x-fOo, x-bAr", {"Keep-Alive", "X-Foo", "X-Bar"}],
             # Handles header names with whitespace
             [
                 b"keep-alive, x  foo, x bar",
-                False,
                 {"Keep-Alive", "X  foo", "X bar"},
             ],
         ]
@@ -43,16 +42,12 @@ class ProxyTests(TestCase):
     def test_parse_connection_header_value(
         self,
         connection_header_value: bytes,
-        expected_close: bool,
         expected_extra_headers_to_remove: Set[str],
     ) -> None:
         """
         Tests that the connection header value is parsed correctly
         """
         self.assertEqual(
-            (
-                expected_close,
-                expected_extra_headers_to_remove,
-            ),
+            expected_extra_headers_to_remove,
             parse_connection_header_value(connection_header_value),
         )
