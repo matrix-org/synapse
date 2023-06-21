@@ -79,13 +79,18 @@ def parse_connection_header_value(
     extra_headers_to_remove: Set[str] = set()
     if connection_header_value:
         connection_options = [
-            headers._canonicalNameCaps(connection_option.strip()).decode("ascii")
+            connection_option.strip()
             for connection_option in connection_header_value.split(b",")
         ]
         # This is probably `close` or `keep-alive
-        connection = connection_options[0]
+        connection = connection_options[0].decode("ascii")
         # The rest is a list of headers that should not be copied over.
-        extra_headers_to_remove = Set(connection_options[1:])
+        extra_headers_to_remove = set(
+            [
+                headers._canonicalNameCaps(x).decode("ascii")
+                for x in connection_options[1:]
+            ]
+        )
 
     return connection, extra_headers_to_remove
 
