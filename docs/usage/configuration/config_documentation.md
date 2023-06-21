@@ -550,7 +550,9 @@ listeners:
 Example configuration #3:
 ```yaml
 listeners:
-  # Unix socket listener: Ideal for Synapse deployments behind a reverse proxy, offering lightweight interprocess communication without TCP/IP overhead, avoid port conflicts, and providing enhanced security through system file permissions.
+  # Unix socket listener: Ideal for Synapse deployments behind a reverse proxy, offering
+  # lightweight interprocess communication without TCP/IP overhead, avoid port
+  # conflicts, and providing enhanced security through system file permissions.
   #
   # Note that x_forwarded will default to true, when using a UNIX socket. Please see
   # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
