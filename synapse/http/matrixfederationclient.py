@@ -1150,7 +1150,8 @@ class MatrixFederationHttpClient:
             timeout=timeout,
             ignore_backoff=ignore_backoff,
             try_trailing_slash_on_400=try_trailing_slash_on_400,
-            parser=parser,
+            # TODO: type-ignore: can we resolve this? Argument "parser" to "get_json_with_headers" of "MatrixFederationHttpClient" has incompatible type "Optional[ByteParser[T]]"; expected "Optional[ByteParser[Union[Dict[str, Any], T]]]"
+            parser=parser,  # type: ignore[arg-type]
         )
         return json_dict
 
