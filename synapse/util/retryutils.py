@@ -226,8 +226,8 @@ class RetryDestinationLimiter:
                     * random.uniform(0.8, 1.4)
                 )
 
-                if self.retry_interval >= self.destination_max_retry_interva_ms:
-                    self.retry_interval = self.destination_max_retry_interva_ms
+                if self.retry_interval >= self.destination_max_retry_interval_ms:
+                    self.retry_interval = self.destination_max_retry_interval_ms
             else:
                 self.retry_interval = self.destination_min_retry_interval_ms
 

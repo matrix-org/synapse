@@ -57,7 +57,7 @@ class TransactionStoreTestCase(HomeserverTestCase):
 
     def test_large_destination_retry(self) -> None:
         max_retry_interval = (
-            self.hs.config.federation.destination_max_retry_interval * 1000
+            self.hs.config.federation.destination_max_retry_interval_ms * 1000
         )
         d = self.store.set_destination_retry_timings(
             "example.com", max_retry_interval, max_retry_interval, max_retry_interval
