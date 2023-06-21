@@ -41,6 +41,7 @@ class CasConfig(Config):
             public_baseurl = self.root.server.public_baseurl
             self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
 
+            self.cas_protocol_version = cas_config.get("protocol_version")
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
             required_attributes = cas_config.get("required_attributes") or {}
             self.cas_required_attributes = _parsed_required_attributes_def(
@@ -50,6 +51,7 @@ class CasConfig(Config):
         else:
             self.cas_server_url = None
             self.cas_service_url = None
+            self.cas_protocol_version = None
             self.cas_displayname_attribute = None
             self.cas_required_attributes = []
 
