@@ -1369,6 +1369,9 @@ def main() -> None:
         sys.stderr.write("Database must use the 'psycopg2' connector.\n")
         sys.exit(3)
 
+    # Don't run the background tasks that get started by the data stores.
+    hs_config["run_background_tasks_on"] = "some_other_process"
+
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")
 
