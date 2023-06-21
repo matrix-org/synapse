@@ -105,13 +105,11 @@ backfill_processing_before_timer = Histogram(
 )
 
 
+# TODO: We can refactor this away now that there is only one backfill point again
 class _BackfillPointType(Enum):
     # a regular backwards extremity (ie, an event which we don't yet have, but which
     # is referred to by other events in the DAG)
     BACKWARDS_EXTREMITY = enum.auto()
-
-    # an MSC2716 "insertion event"
-    INSERTION_PONT = enum.auto()
 
 
 @attr.s(slots=True, auto_attribs=True, frozen=True)
@@ -273,32 +271,10 @@ class FederationHandler:
             )
         ]
 
-        insertion_events_to_be_backfilled: List[_BackfillPoint] = []
-        if self.hs.config.experimental.msc2716_enabled:
-            insertion_events_to_be_backfilled = [
-                _BackfillPoint(event_id, depth, _BackfillPointType.INSERTION_PONT)
-                for event_id, depth in await self.store.get_insertion_event_backward_extremities_in_room(
-                    room_id=room_id,
-                    current_depth=current_depth,
-                    # We only need to end up with 5 extremities combined with
-                    # the backfill points to make the `/backfill` request ...
-                    # (see the other comment above for more context).
-                    limit=50,
-                )
-            ]
-        logger.debug(
-            "_maybe_backfill_inner: backwards_extremities=%s insertion_events_to_be_backfilled=%s",
-            backwards_extremities,
-            insertion_events_to_be_backfilled,
-        )
-
         # we now have a list of potential places to backpaginate from. We prefer to
         # start with the most recent (ie, max depth), so let's sort the list.
         sorted_backfill_points: List[_BackfillPoint] = sorted(
-            itertools.chain(
-                backwards_extremities,
-                insertion_events_to_be_backfilled,
-            ),
+            backwards_extremities,
             key=lambda e: -int(e.depth),
         )
 
@@ -411,10 +387,7 @@ class FederationHandler:
             #   event but not anything before it. This would require looking at the
             #   state *before* the event, ignoring the special casing certain event
             #   types have.
-            if bp.type == _BackfillPointType.INSERTION_PONT:
-                event_ids_to_check = [bp.event_id]
-            else:
-                event_ids_to_check = await self.store.get_successor_events(bp.event_id)
+            event_ids_to_check = await self.store.get_successor_events(bp.event_id)
 
             events_to_check = await self.store.get_events_as_list(
                 event_ids_to_check,

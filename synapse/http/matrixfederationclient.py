@@ -174,7 +174,14 @@ class MatrixFederationRequest:
 
         # The object is frozen so we can pre-compute this.
         uri = urllib.parse.urlunparse(
-            (b"matrix", destination_bytes, path_bytes, None, query_bytes, b"")
+            (
+                b"matrix-federation",
+                destination_bytes,
+                path_bytes,
+                None,
+                query_bytes,
+                b"",
+            )
         )
         object.__setattr__(self, "uri", uri)
 
