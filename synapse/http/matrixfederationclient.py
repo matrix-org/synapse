@@ -1164,10 +1164,37 @@ class MatrixFederationHttpClient:
             timeout=timeout,
             ignore_backoff=ignore_backoff,
             try_trailing_slash_on_400=try_trailing_slash_on_400,
-            # TODO: type-ignore: can we resolve this? Argument "parser" to "get_json_with_headers" of "MatrixFederationHttpClient" has incompatible type "Optional[ByteParser[T]]"; expected "Optional[ByteParser[Union[Dict[str, Any], T]]]"
-            parser=parser,  # type: ignore[arg-type]
+            parser=parser,
         )
         return json_dict
+
+    @overload
+    async def get_json_with_headers(
+        self,
+        destination: str,
+        path: str,
+        args: Optional[QueryParams] = None,
+        retry_on_dns_fail: bool = True,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        try_trailing_slash_on_400: bool = False,
+        parser: Literal[None] = None,
+    ) -> Tuple[JsonDict, Dict[bytes, List[bytes]]]:
+        ...
+
+    @overload
+    async def get_json_with_headers(
+        self,
+        destination: str,
+        path: str,
+        args: Optional[QueryParams] = ...,
+        retry_on_dns_fail: bool = ...,
+        timeout: Optional[int] = ...,
+        ignore_backoff: bool = ...,
+        try_trailing_slash_on_400: bool = ...,
+        parser: ByteParser[T] = ...,
+    ) -> Tuple[T, Dict[bytes, List[bytes]]]:
+        ...
 
     async def get_json_with_headers(
         self,
