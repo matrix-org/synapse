@@ -644,6 +644,24 @@ class FederationClientTests(HomeserverTestCase):
                 b"", b"GET", b"https://example.com", destination_is=b""
             )
 
+    @override_config(
+        {
+            "federation": {
+                "client_timeout": "180s",
+                "max_long_retry_delay": "100s",
+                "max_short_retry_delay": "7s",
+                "max_long_retries": 20,
+                "max_short_retries": 5,
+            }
+        }
+    )
+    def test_configurable_retry_and_delay_values(self) -> None:
+        self.assertEqual(self.cl.default_timeout_seconds, 180)
+        self.assertEqual(self.cl.max_long_retry_delay_seconds, 100)
+        self.assertEqual(self.cl.max_short_retry_delay_seconds, 7)
+        self.assertEqual(self.cl.max_long_retries, 20)
+        self.assertEqual(self.cl.max_short_retries, 5)
+
 
 class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
     def default_config(self) -> Dict[str, Any]:
