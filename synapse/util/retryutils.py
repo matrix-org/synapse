@@ -160,13 +160,13 @@ class RetryDestinationLimiter:
         self.notifier = notifier
         self.replication_client = replication_client
 
-        self.destination_min_retry_interval = (
+        self.destination_min_retry_interval_ms = (
             self.store.hs.config.federation.destination_min_retry_interval_ms
         )
         self.destination_retry_multiplier = (
             self.store.hs.config.federation.destination_retry_multiplier
         )
-        self.destination_max_retry_interval = (
+        self.destination_max_retry_interval_ms = (
             self.store.hs.config.federation.destination_max_retry_interval_ms
         )
 
@@ -226,10 +226,10 @@ class RetryDestinationLimiter:
                     * random.uniform(0.8, 1.4)
                 )
 
-                if self.retry_interval >= self.destination_max_retry_interval:
-                    self.retry_interval = self.destination_max_retry_interval
+                if self.retry_interval >= self.destination_max_retry_interva_ms:
+                    self.retry_interval = self.destination_max_retry_interva_ms
             else:
-                self.retry_interval = self.destination_min_retry_interval
+                self.retry_interval = self.destination_min_retry_interval_ms
 
             logger.info(
                 "Connection to %s was unsuccessful (%s(%s)); backoff now %i",
