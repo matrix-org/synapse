@@ -23,6 +23,7 @@ from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.test.proto_helpers import MemoryReactor, StringTransport
 from twisted.web.client import Agent, ResponseNeverReceived
 from twisted.web.http import HTTPChannel
+from twisted.web.http_headers import Headers
 
 from synapse.api.errors import HttpResponseException, RequestSendFailed
 from synapse.http.matrixfederationclient import (
@@ -753,3 +754,70 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         failure_res = self.failureResultOf(test_request_from_main_process_d)
         self.assertIsInstance(failure_res.value, RequestSendFailed)
         self.assertIsInstance(failure_res.value.inner_exception, HttpResponseException)
+
+    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    def test_proxy_requests_and_discards_hop_by_hop_headers(self) -> None:
+        """
+        Test to make sure hop-by-hop headers and addional headers defined in the
+        `Connection` header are discarded when proxying requests
+        """
+        # Mock out the `MatrixFederationHttpClient` of the `federation_sender` instance
+        # so we can act like some remote server responding to requests
+        mock_client_on_federation_sender = Mock()
+        mock_agent_on_federation_sender = create_autospec(Agent, spec_set=True)
+        mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
+
+        # Create the `federation_sender` worker
+        self.federation_sender = self.make_worker_hs(
+            "synapse.app.generic_worker",
+            {"worker_name": "federation_sender"},
+            federation_http_client=mock_client_on_federation_sender,
+        )
+
+        # Fake `remoteserv:8008` responding to requests
+        mock_agent_on_federation_sender.request.side_effect = lambda *args, **kwargs: defer.succeed(
+            FakeResponse(
+                code=200,
+                body=b'{"foo": "bar"}',
+                headers=Headers(
+                    {
+                        "Content-Type": ["application/json"],
+                        "Connection": ["close, X-Foo, X-Bar"],
+                        # Should be removed because it's defined in the `Connection` header
+                        "X-Foo": ["foo"],
+                        "X-Bar": ["bar"],
+                        # Should be removed because it's a hop-by-hop header
+                        "Proxy-Authorization": "abcdef",
+                    }
+                ),
+            )
+        )
+
+        # This federation request from the main process should be proxied through the
+        # `federation_sender` worker off to the remote server
+        test_request_from_main_process_d = defer.ensureDeferred(
+            self.hs.get_federation_http_client().get_json_with_headers(
+                "remoteserv:8008", "foo/bar"
+            )
+        )
+
+        # Pump the reactor so our deferred goes through the motions
+        self.pump()
+
+        # Make sure that the request was proxied through the `federation_sender` worker
+        mock_agent_on_federation_sender.request.assert_called_once_with(
+            b"GET",
+            b"matrix-federation://remoteserv:8008/foo/bar",
+            headers=ANY,
+            bodyProducer=ANY,
+        )
+
+        res, headers = self.successResultOf(test_request_from_main_process_d)
+        header_names = set(headers.keys())
+
+        # Make sure the response does not include the hop-by-hop headers
+        self.assertNotIn(b"X-Foo", header_names)
+        self.assertNotIn(b"X-Bar", header_names)
+        self.assertNotIn(b"Proxy-Authorization", header_names)
+        # Make sure the response is as expected back on the main worker
+        self.assertEqual(res, {"foo": "bar"})

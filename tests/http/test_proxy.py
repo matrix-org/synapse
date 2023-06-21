@@ -11,11 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import base64
-import logging
-import os
-from typing import List, Optional, Set
-from unittest.mock import patch
+from typing import Set
 
 from parameterized import parameterized
 
@@ -27,21 +23,27 @@ from tests.unittest import TestCase
 class ProxyTests(TestCase):
     @parameterized.expand(
         [
-            [b"close, X-Foo, X-Bar", "close", set(["X-Foo", "X-Bar"])],
+            [b"close, X-Foo, X-Bar", True, {"Close", "X-Foo", "X-Bar"}],
             # No whitespace
-            [b"close,X-Foo,X-Bar", "close", set(["X-Foo", "X-Bar"])],
+            [b"close,X-Foo,X-Bar", True, {"Close", "X-Foo", "X-Bar"}],
             # More whitespace
-            [b"close,    X-Foo,      X-Bar", "close", set(["X-Foo", "X-Bar"])],
-            # Keeps connection captilization and normalizes headers
-            [b"kEep-AliVe, x-foo, x-bar", "kEep-AliVe", set(["X-Foo", "X-Bar"])],
+            [b"close,    X-Foo,      X-Bar", True, {"Close", "X-Foo", "X-Bar"}],
+            # "close" directive in not the first position
+            [b"X-Foo, X-Bar, close", True, {"X-Foo", "X-Bar", "Close"}],
+            # Normalizes header capitalization
+            [b"keep-alive, x-fOo, x-bAr", False, {"Keep-Alive", "X-Foo", "X-Bar"}],
             # Handles header names with whitespace
-            [b"keep-alive, x  foo, x bar", "keep-alive", set(["X  foo", "X bar"])],
+            [
+                b"keep-alive, x  foo, x bar",
+                False,
+                {"Keep-Alive", "X  foo", "X bar"},
+            ],
         ]
     )
     def test_parse_connection_header_value(
         self,
-        connection_header_value: str,
-        expected_connection: Optional[str],
+        connection_header_value: bytes,
+        expected_close: bool,
         expected_extra_headers_to_remove: Set[str],
     ) -> None:
         """
@@ -49,7 +51,7 @@ class ProxyTests(TestCase):
         """
         self.assertEqual(
             (
-                expected_connection,
+                expected_close,
                 expected_extra_headers_to_remove,
             ),
             parse_connection_header_value(connection_header_value),

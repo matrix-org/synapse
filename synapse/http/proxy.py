@@ -57,42 +57,35 @@ HOP_BY_HOP_HEADERS = {
 
 def parse_connection_header_value(
     connection_header_value: Optional[bytes],
-) -> Tuple[Optional[str], Set[str]]:
+) -> Tuple[bool, Set[str]]:
     """
     Parse the `Connection` header to determine which headers we should not be copied
     over from the remote response.
 
     As defined by RFC2616 section 14.10 and RFC9110 section 7.6.1
 
-    Example: `Connection: close, X-Foo, X-Bar` will return `{"X-Foo", "X-Bar"}`
+    Example: `Connection: close, X-Foo, X-Bar` will return `[True, {"X-Foo", "X-Bar"}]`
 
     Args:
         connection_header_value: The value of the `Connection` header.
 
     Returns:
-        A tuple containing the connection name and the set of header names that should
-        not be copied over from the remote response. The keys are capitalized in
-        canonical capitalization.
+        A tuple indicating whether the connection should be closed and the set of header
+        names that should not be copied over from the remote response. The keys are
+        capitalized in canonical capitalization.
     """
     headers = Headers()
-    connection = None
+    close = False
     extra_headers_to_remove: Set[str] = set()
     if connection_header_value:
-        connection_options = [
-            connection_option.strip()
+        connection_options = {
+            headers._canonicalNameCaps(connection_option.strip()).decode("ascii")
             for connection_option in connection_header_value.split(b",")
-        ]
-        # This is probably `close` or `keep-alive
-        connection = connection_options[0].decode("ascii")
-        # The rest is a list of headers that should not be copied over.
-        extra_headers_to_remove = set(
-            [
-                headers._canonicalNameCaps(x).decode("ascii")
-                for x in connection_options[1:]
-            ]
-        )
+        }
+        close = "Close" in connection_options
+        extra_headers_to_remove = connection_options
 
-    return connection, extra_headers_to_remove
+    return close, extra_headers_to_remove
 
 
 class ProxyResource(_AsyncResource):
