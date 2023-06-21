@@ -386,7 +386,7 @@ class WorkerConfig(Config):
         )
         if outbound_federation_restricted_to:
             for instance in outbound_federation_restricted_to:
-                if instance != "master" and instance not in self.instance_map:
+                if instance not in self.instance_map:
                     raise ConfigError(
                         "Instance %r is configured in 'outbound_federation_restricted_to' but does not appear in `instance_map` config."
                         % (instance,)
