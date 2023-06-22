@@ -1118,6 +1118,239 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations={"server2", "server3"}, states=[expected_state]
         )
 
+    def test_remote_joins_with_previously_shared_rooms_do_not_send_presence(
+        self,
+    ) -> None:
+        # This test starts with our local user, test:server, presence set to "offline"
+        # Create two rooms
+        # Join our second local user, test2:server, to the room
+        # Set test2:server's presence to "online"
+        # Verify local user test2:server has presence "online"
+        # Add remote user alice:server2 to room 1
+        # Verify that presence was sent to server2
+        # Add remote user to room 2, alice:server2
+        # Verify that NO presence was sent
+        # Add remote user bob:server3 to room 2
+        # Verify that presence was sent only to server3
+        # Add remote user bob:server3 to room 1
+        # Verify that NO presence was sent
+
+        # We advance time to something that isn't 0, as we use 0 as a special
+        # value.
+        self.reactor.advance(1000000000000)
+
+        # Create two rooms with two local users
+        room_id_1 = self.helper.create_room_as(self.user_id)
+        room_id_2 = self.helper.create_room_as(self.user_id)
+
+        self.helper.join(room_id_1, "@test2:server")
+        self.helper.join(room_id_2, "@test2:server")
+
+        # Mark test2 as online, test will be offline with a last_active of 0
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
+        )
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        self.federation_sender.reset_mock()
+
+        # Add a new remote server to the room
+        self._add_new_user(room_id_1, "@alice:server2")
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        # When new server is joined we send it the local users presence states.
+        # We expect to only see user @test2:server, as @test:server is offline
+        # and has a zero last_active_ts
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test2:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+            destinations={"server2"}, states=[expected_state]
+        )
+
+        # Don't forget to reset the Mock or we get old data
+        self.federation_sender.reset_mock()
+
+        # Now add alice to the second room. As she and test2 share a room, no presence
+        # should be sent
+        self._add_new_user(room_id_2, "@alice:server2")
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
+
+        # Now do the same thing with bob, in reverse order
+        self.federation_sender.reset_mock()
+        self._add_new_user(room_id_2, "@bob:server3")
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        # When new server is joined we send it the local users presence states.
+        # We expect to only see user @test2:server, as @test:server is offline
+        # and has a zero last_active_ts
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test2:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+            destinations={"server3"}, states=[expected_state]
+        )
+
+        # Now add bob to the first room, no presence should be sent as he is already in
+        # a room on this server
+        self.federation_sender.reset_mock()
+        self._add_new_user(room_id_1, "@bob:server3")
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
+
+    def test_remote_gets_presence_after_remote_join_leave_join(self) -> None:
+        # This test starts with our local user, test:server, presence set to "offline"
+        # Create one rooms
+        # Set test:server's presence to "online"
+        # Verify local user test:server has presence "online"
+        # Add remote user alice:server2 to room 1
+        # Verify that presence was sent to server2
+        # Remove remote user(alice:server2) from room
+        # Re-add alice to room
+        # Verify that presence is again sent to server2
+
+        # We advance time to something that isn't 0, as we use 0 as a special
+        # value. Not sure if this is actually relevant for this test, but makes
+        # last_active not be 0
+        self.reactor.advance(1000000000000)
+
+        # Create a room with our local user
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # Mark test as online
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
+            )
+        )
+
+        # Pump the reactor to give presence a chance to update and reload the Mock
+        self.reactor.pump([0])
+        self.federation_sender.reset_mock()
+
+        # Add remote user alice to room
+        self._add_new_user(room_id, "@alice:server2")
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        # When new server is joined we send it the local users presence states.
+        # We expect it to send to server2.
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+            destinations={"server2"}, states=[expected_state]
+        )
+
+        # Don't forget to reset the Mock or we get old data
+        self.federation_sender.reset_mock()
+
+        # Have the remote user leave the room
+        self._leave_user_from_room(room_id, "@alice:server2")
+
+        # Pump the reactor again, but we should see no new presence as they left
+        self.reactor.pump([0])
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
+
+        # Re-add remote user alice to room, and pump the reactor again
+        self._add_new_user(room_id, "@alice:server2")
+        self.reactor.pump([0])
+
+        # This server was here before, but they left the room and came back. We should
+        # be sending them presence again. There is only the one user, test:server
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+            destinations={"server2"}, states=[expected_state]
+        )
+
+    def test_remote_gets_presence_after_local_join_leave_join(self) -> None:
+        # This test starts with our local user, test:server, presence set to "offline"
+        # Create one room
+        # Join our second local user, test2:server, to the room
+        # Set test2:server's presence to "online"
+        # Verify local user test2:server has presence "online"
+        # Add remote user alice:server2 to room 1
+        # Verify that presence was sent to server2
+        # Remove local user from room
+        # Re-add local user to room
+        # Verify that presence is again sent to server2
+
+        # We advance time to something that isn't 0, as we use 0 as a special
+        # value.
+        self.reactor.advance(1000000000000)
+
+        # Create a room with two local users
+        room_id = self.helper.create_room_as(self.user_id)
+        self.helper.join(room_id, "@test2:server")
+
+        # Mark test2 as online, test will be offline with a last_active of 0
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
+        )
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        # Don't forget to reset the Mock or we get old data
+        self.federation_sender.reset_mock()
+
+        # Add remote user alice to room and pump the reactor so presence can update
+        self._add_new_user(room_id, "@alice:server2")
+        self.reactor.pump([0])
+
+        # When new server is joined we send it the local users presence states.
+        # We expect to only see user @test2:server, as @test:server is offline
+        # and has a zero last_active_ts
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test2:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+            destinations={"server2"}, states=[expected_state]
+        )
+
+        # Don't forget to reset the Mock or we get old data
+        self.federation_sender.reset_mock()
+
+        # Have the local user leave the room and pump the reactor again
+        self.helper.leave(room_id, "@test2:server")
+        self.reactor.pump([0])
+
+        # Should get no new presence updates
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
+
+        # Re-add local user test2 to room, and pump the reactor
+        self.helper.join(room_id, "@test2:server")
+        self.reactor.pump([0])
+
+        # This user was here before, but they left the room and came back. We should
+        # be sending presence to the (only) remote server in the room again.
+        # We expect to only see user @test2:server, as @test:server is offline
+        # and has a zero last_active_ts
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test2:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+            destinations={"server2"}, states=[expected_state]
+        )
+
     def _add_new_user(self, room_id: str, user_id: str) -> None:
         """Add new user to the room by creating an event and poking the federation API."""
 
@@ -1138,6 +1371,45 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             sender=user_id,
             state_key=user_id,
             content={"membership": Membership.JOIN},
+        )
+
+        prev_event_ids = self.get_success(
+            self.store.get_latest_event_ids_in_room(room_id)
+        )
+
+        event = self.get_success(
+            builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
+        )
+
+        self.get_success(self.federation_event_handler.on_receive_pdu(hostname, event))
+
+        # Check that it was successfully persisted.
+        self.get_success(self.store.get_event(event.event_id))
+        self.get_success(self.store.get_event(event.event_id))
+
+    def _leave_user_from_room(self, room_id: str, user_id: str) -> None:
+        """
+        Remove user to the room by creating an event and poking the federation API.
+        Copied and modified from _add_new_user(), please check
+        """
+
+        hostname = get_domain_from_id(user_id)
+
+        room_version = self.get_success(self.store.get_room_version_id(room_id))
+
+        builder = EventBuilder(
+            state=self.state,
+            event_auth_handler=self._event_auth_handler,
+            store=self.store,
+            clock=self.clock,
+            hostname=hostname,
+            signing_key=self.random_signing_key,
+            room_version=KNOWN_ROOM_VERSIONS[room_version],
+            room_id=room_id,
+            type=EventTypes.Member,
+            sender=user_id,
+            state_key=user_id,
+            content={"membership": Membership.LEAVE},
         )
 
         prev_event_ids = self.get_success(
