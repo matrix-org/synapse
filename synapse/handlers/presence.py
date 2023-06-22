@@ -1430,7 +1430,7 @@ class PresenceHandler(BasePresenceHandler):
         #   2. presence states of newly joined users to all remote servers in
         #      the room.
         #
-        # TODO: Only send presence states to remote hosts that don't already
+        # However, only send presence states to remote hosts that don't already
         # have them (because they already share rooms).
 
         # Get all the users who were already in the room, by fetching the
@@ -1438,29 +1438,78 @@ class PresenceHandler(BasePresenceHandler):
         users = await self.store.get_users_in_room(room_id)
         prev_users = set(users) - newly_joined_users
 
+        async def is_only_room_shared(current_user_id: str, other_user_id: str) -> bool:
+            """Check to see if there is more than one shared room between these users"""
+            pair_of_users_to_check = frozenset((current_user_id, other_user_id))
+            # By learning if these two users share any other room, we can tell
+            # if user_id's server needs to receive presence or not
+            rooms_shared = await self.store.get_mutual_rooms_between_users(
+                pair_of_users_to_check
+            )
+
+            # They always share at least one room, the current one. As such this will
+            # never be zero
+            if len(rooms_shared) < 2:
+                return True
+
+            return False
+
         # Construct sets for all the local users and remote hosts that were
         # already in the room
         prev_local_users = []
-        prev_remote_hosts = set()
+        prev_remote_hosts: Set[str] = set()
+
         for user_id in prev_users:
             if self.is_mine_id(user_id):
                 prev_local_users.append(user_id)
             else:
-                prev_remote_hosts.add(get_domain_from_id(user_id))
+                # Only save a host to send presence to if this user shares no other
+                # rooms with other users this server knows about
+                host = get_domain_from_id(user_id)
+
+                # Remove current user_id from the set to check against
+                prev_users_excluding_current_user = prev_users.copy() - {user_id}
+
+                for other_user_id in prev_users_excluding_current_user:
+                    # If this host has been seen in a list already, skip it.
+                    if host not in prev_remote_hosts:
+                        if await is_only_room_shared(user_id, other_user_id):
+                            prev_remote_hosts.add(host)
+                            # Since we are focusing on the host from user_id, break out
+                            # of the loop once its found
+                            break
 
         # Similarly, construct sets for all the local users and remote hosts
         # that were *not* already in the room. Care needs to be taken with the
         # calculating the remote hosts, as a host may have already been in the
         # room even if there is a newly joined user from that host.
         newly_joined_local_users = []
-        newly_joined_remote_hosts = set()
+        newly_joined_remote_hosts: Set[str] = set()
+
         for user_id in newly_joined_users:
             if self.is_mine_id(user_id):
                 newly_joined_local_users.append(user_id)
             else:
                 host = get_domain_from_id(user_id)
-                if host not in prev_remote_hosts:
-                    newly_joined_remote_hosts.add(host)
+                # To filter out hosts that are already in other rooms shared with
+                # this user, use the set constructed to get the full list of users as
+                # we need to check not just prev_users but newly joined as well
+                #
+                # We still remove the current user, as checking yourself is redundant
+                users_excluding_current_user_id = set(users) - {user_id}
+                for other_user_id in users_excluding_current_user_id:
+                    # If a host is present in either of these lists, there is no point
+                    # looking for it again. This is the key difference from the
+                    # 'previous users' section above.
+                    if (
+                        host not in prev_remote_hosts
+                        and host not in newly_joined_remote_hosts
+                    ):
+                        if await is_only_room_shared(user_id, other_user_id):
+                            newly_joined_remote_hosts.add(host)
+                            # Since we are focusing on the host from user_id, break out
+                            # of the loop once its found
+                            break
 
         # Send presence states of all local users in the room to newly joined
         # remote servers. (We actually only send states for local users already
