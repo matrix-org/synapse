@@ -136,11 +136,11 @@ def request(
         authorization_headers.append(header)
         print("Authorization: %s" % header, file=sys.stderr)
 
-    dest = "matrix://%s%s" % (destination, path)
+    dest = "matrix-federation://%s%s" % (destination, path)
     print("Requesting %s" % dest, file=sys.stderr)
 
     s = requests.Session()
-    s.mount("matrix://", MatrixConnectionAdapter())
+    s.mount("matrix-federation://", MatrixConnectionAdapter())
 
     headers: Dict[str, str] = {
         "Authorization": authorization_headers[0],
