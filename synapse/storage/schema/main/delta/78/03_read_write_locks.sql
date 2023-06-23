@@ -24,8 +24,7 @@
 -- associated with a random `token`.
 --
 -- The second table (`worker_read_write_locks`) tracks who has currently
--- acquired a given lock. It ensures that a lock can only be acquired once in
--- write mode by using unique constraints.
+-- acquired a given lock. For a given lock_name/lock_key, there can be multiple read locks at a time but only one write lock (no mixing read and write locks at the same time).
 --
 -- The foreign key from the second to first table enforces that for any given
 -- lock the second table cannot have a mix of rows with read or write.

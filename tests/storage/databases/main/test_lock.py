@@ -229,7 +229,7 @@ class ReadWriteLockTestCase(unittest.HomeserverTestCase):
         self.assertEqual(max_in_lock, 1)
 
     def test_acquire_multiple_reads(self) -> None:
-        """Test that we can only acquire multiple read locks at a time"""
+        """Test that we can acquire multiple read locks at a time"""
         # Track the number of tasks holding the lock.
         in_lock = 0
         max_in_lock = 0
@@ -369,7 +369,7 @@ class ReadWriteLockTestCase(unittest.HomeserverTestCase):
         self.get_success(lock5.__aexit__(None, None, None))
 
     def test_maintain_lock(self) -> None:
-        """Test that we don't time out locks while they're still active"""
+        """Test that we don't time out locks while they're still active (lock is renewed in the background if the process is still alive)"""
 
         lock = self.get_success(
             self.store.try_acquire_read_write_lock("name", "key", write=True)
