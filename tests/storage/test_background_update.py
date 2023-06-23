@@ -526,7 +526,7 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             # Ensure the index exists in the schema.
             self.get_success(
                 self.store.db_pool.simple_select_one_onecol(
-                    table="sqlite_schema",
+                    table="sqlite_master",
                     keyvalues={"tbl_name": "test_constraint"},
                     retcol="name",
                 )

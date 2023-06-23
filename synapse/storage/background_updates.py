@@ -1105,7 +1105,7 @@ def run_validate_constraint_and_delete_rows_schema_delta(
         # PRIMARY KEY), and so don't need to be recreated.
         txn.execute(
             """
-            SELECT sql FROM sqlite_schema
+            SELECT sql FROM sqlite_master
             WHERE tbl_name = ? AND type != 'table' AND sql IS NOT NULL
             """,
             (table,),
