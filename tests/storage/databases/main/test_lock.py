@@ -369,7 +369,8 @@ class ReadWriteLockTestCase(unittest.HomeserverTestCase):
         self.get_success(lock5.__aexit__(None, None, None))
 
     def test_maintain_lock(self) -> None:
-        """Test that we don't time out locks while they're still active (lock is renewed in the background if the process is still alive)"""
+        """Test that we don't time out locks while they're still active (lock is
+        renewed in the background if the process is still alive)"""
 
         lock = self.get_success(
             self.store.try_acquire_read_write_lock("name", "key", write=True)
