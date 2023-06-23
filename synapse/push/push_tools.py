@@ -50,7 +50,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
 async def get_context_for_event(
     storage: StorageControllers, ev: EventBase, user_id: str
 ) -> Dict[str, str]:
-    ctx = {}
+    ctx: Dict[str, str] = {}
 
     if ev.internal_metadata.outlier:
         # We don't have state for outliers, so we can't compute the context
