@@ -41,8 +41,8 @@ FORWARD_EXTREMITIES_INDICES_SCHEMA = """
 def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     run_validate_constraint_and_delete_rows_schema_delta(
         cur,
-        ordering=7715,
-        update_name="event_forward_extremities_constraint_update",
+        ordering=7803,
+        update_name="event_forward_extremities_event_id_foreign_key_constraint_update",
         table="event_forward_extremities",
         constraint_name="event_forward_extremities_event_id",
         constraint=ForeignKeyConstraint("events", [("event_id", "event_id")]),

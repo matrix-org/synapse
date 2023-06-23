@@ -428,14 +428,16 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
     def test_not_null_constraint(self) -> None:
         # Create the initial tables, where we have some invalid data.
         """Tests adding a not null constraint."""
-        sql = """
+        table_sql = """
             CREATE TABLE test_constraint(
                 a INT PRIMARY KEY,
                 b INT
             );
         """
         self.get_success(
-            self.store.db_pool.execute("test_not_null_constraint", lambda _: None, sql)
+            self.store.db_pool.execute(
+                "test_not_null_constraint", lambda _: None, table_sql
+            )
         )
 
         self.get_success(
@@ -529,12 +531,12 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
         """
         self.get_success(
             self.store.db_pool.execute(
-                "test_not_null_constraint", lambda _: None, base_sql
+                "test_foreign_key_constraint", lambda _: None, base_sql
             )
         )
         self.get_success(
             self.store.db_pool.execute(
-                "test_not_null_constraint", lambda _: None, table_sql
+                "test_foreign_key_constraint", lambda _: None, table_sql
             )
         )
 
@@ -573,7 +575,7 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.store.db_pool.runInteraction(
-                "test_not_null_constraint",
+                "test_foreign_key_constraint",
                 delta,
             )
         )

@@ -829,14 +829,20 @@ class BackgroundUpdater:
         """Helper for store classes to do a background validate constraint, and
         delete rows that do not pass the constraint check.
 
+        Note: This deletes rows that don't match the constraint. This may not be
+        appropriate in all situations, and so the suitability of using this
+        method should be considered on a case-by-case basis.
+
         This only applies on PostgreSQL.
 
+        For SQLite the table gets recreated as part of the schema delta.
+
         Args:
-            update_name: The name of the background update.
-            table: The table with the invalid constraint.
-            constraint_name: The name of the constraint
-            constraint: A `Constraint` object matching the type of constraint.
-            unique_columns: A sequence of columns that form a unique constraint
+            update_name: The name of the background update. table: The table
+            with the invalid constraint. constraint_name: The name of the
+            constraint constraint: A `Constraint` object matching the type of
+            constraint. unique_columns: A sequence of columns that form a unique
+            constraint
               on the table. Used to iterate over the table.
         """
 
@@ -979,7 +985,9 @@ class BackgroundUpdater:
 
             return batch_size
         else:
-            raise Exception(f"Unrecognized state '{parsed_progress.state}'")
+            raise Exception(
+                f"Unrecognized state '{parsed_progress.state}' when trying to validate_constraint_and_delete_in_background"
+            )
 
     async def _end_background_update(self, update_name: str) -> None:
         """Removes a completed background update task from the queue.
@@ -1058,7 +1066,8 @@ def run_validate_constraint_and_delete_rows_schema_delta(
     is done by the caller passing in a script to create the new table.
 
     There must be a corresponding call to
-    `register_background_validate_constraint_and_delete_rows`.
+    `register_background_validate_constraint_and_delete_rows` to register the
+    background update in one of the data store classes.
 
     Attributes:
         txn ordering, update_name: For adding a row to background_updates table.
