@@ -23,20 +23,28 @@ from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN, DeviceHandler
+from synapse.handlers.devicemessage import INBOX_SIZE_LIMIT_FOR_KEY_REQUEST
 from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
-from synapse.types import JsonDict
+from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
+import synapse
+
 user1 = "@boris:aaa"
 user2 = "@theresa:bbb"
 
 
 class DeviceTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        synapse.rest.client.login.register_servlets,
+    ]
+
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.appservice_api = mock.Mock()
         hs = self.setup_test_homeserver(
@@ -47,6 +55,8 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         handler = hs.get_device_handler()
         assert isinstance(handler, DeviceHandler)
         self.handler = handler
+        self.msg_handler = hs.get_device_message_handler()
+        self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastores().main
         return hs
 
@@ -397,6 +407,79 @@ class DeviceTestCase(unittest.HomeserverTestCase):
                 {"device_id": device_3, "keys": device_key_3},
             ],
         )
+
+    def test_room_key_request_limit(self) -> None:
+        store = self.hs.get_datastores().main
+
+        myuser = self.register_user("myuser", "pass")
+        self.login("myuser", "pass", "device")
+        self.login("myuser", "pass", "device2")
+
+        requester = requester = create_requester(myuser)
+
+        from_token = self.event_sources.get_current_token()
+
+        #     for i in range(0, INBOX_SIZE_LIMIT_FOR_KEY_REQUEST * 2):
+        #         self.get_success(
+        #             self.msg_handler.send_device_message(
+        #                 requester,
+        #                 "m.room_key",
+        #                 {
+        #                     myuser2: {
+        #                         "device": {
+        # "algorithm": "m.megolm.v1.aes-sha2",
+        # "room_id": "!Cuyf34gef24t:localhost",
+        # "session_id": "X3lUlvLELLYxeTx4yOVu6UDpasGEVO0Jbu+QFnm0cKQ",
+        # "session_key": "AgAAAADxKHa9uFxcXzwYoNueL5Xqi69IkD4sni8LlfJL7qNBEY..."
+
+        #                         }
+        #                     }
+        #                 },
+        #             )
+        #         )
+
+        #     to_token = self.event_sources.get_current_token()
+
+        # res = self.get_success(self.store.get_messages_for_device(
+        #     myuser2,
+        #     "device",
+        #     from_token.to_device_key,
+        #     to_token.to_device_key,
+        #     INBOX_SIZE_LIMIT_FOR_KEY_REQUEST * 5,
+        # ))
+        # self.assertEqual(len(res[0]), INBOX_SIZE_LIMIT_FOR_KEY_REQUEST * 2)
+
+        # from_token = to_token
+
+        for i in range(0, INBOX_SIZE_LIMIT_FOR_KEY_REQUEST * 2):
+            self.get_success(
+                self.msg_handler.send_device_message(
+                    requester,
+                    "m.room_key_request",
+                    {
+                        myuser: {
+                            "device2": {
+                                "action": "request",
+                                "request_id": f"request_id_{i}",
+                                "requesting_device_id": "device",
+                            }
+                        }
+                    },
+                )
+            )
+
+        to_token = self.event_sources.get_current_token()
+
+        res = self.get_success(
+            self.store.get_messages_for_device(
+                myuser,
+                "device2",
+                from_token.to_device_key,
+                to_token.to_device_key,
+                INBOX_SIZE_LIMIT_FOR_KEY_REQUEST * 5,
+            )
+        )
+        self.assertEqual(len(res[0]), INBOX_SIZE_LIMIT_FOR_KEY_REQUEST)
 
 
 class DehydrationTestCase(unittest.HomeserverTestCase):

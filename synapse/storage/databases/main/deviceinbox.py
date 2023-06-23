@@ -816,7 +816,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
-            inboxes_size = {}
+            inbox_sizes = {}
             if size_limit:
                 sql = """
                     SELECT device_id, COUNT(*) FROM device_inbox
@@ -825,7 +825,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 """
                 txn.execute(sql, (user_id,))
                 for r in txn:
-                    inboxes_size[r[0]] = r[1]
+                    inbox_sizes[r[0]] = r[1]
 
             messages_json_for_user = {}
             devices = list(messages_by_device.keys())
@@ -842,10 +842,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
                 message_json = json_encoder.encode(messages_by_device["*"])
                 for device_id in devices:
-                    if (
-                        size_limit is None
-                        or inboxes_size.get(device_id, 0) <= size_limit
-                    ):
+                    if size_limit is None or inbox_sizes.get(device_id, 0) < size_limit:
                         # Add the message for all devices for this user on this
                         # server.
                         messages_json_for_user[device_id] = message_json
@@ -881,10 +878,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                         )
                         message_json = json_encoder.encode(msg)
 
-                    if (
-                        size_limit is None
-                        or inboxes_size.get(device_id, 0) <= size_limit
-                    ):
+                    if size_limit is None or inbox_sizes.get(device_id, 0) < size_limit:
                         messages_json_for_user[device_id] = message_json
 
             if messages_json_for_user:
