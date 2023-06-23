@@ -225,10 +225,6 @@ class LockStore(SQLBaseStore):
             insert_sql = """
                 INSERT INTO worker_read_write_locks (lock_name, lock_key, write_lock, instance_name, token, last_renewed_ts)
                 VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (lock_name, lock_key, token)
-                DO UPDATE
-                    SET
-                        last_renewed_ts = EXCLUDED.last_renewed_ts
             """
 
             if isinstance(self.database_engine, PostgresEngine):
