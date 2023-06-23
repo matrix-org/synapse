@@ -20,6 +20,10 @@
 -- `worker_read_write_locks_mode` then there must be a corresponding row in
 -- `worker_read_write_locks` (i.e. we don't accidentally end up with a row in
 -- `worker_read_write_locks_mode` when the lock is not currently acquired).
+--
+-- We only add to PostgreSQL as SQLite does not support adding constraints
+-- after table creation, and so doesn't support "circular" foreign key
+-- constraints.
 ALTER TABLE worker_read_write_locks_mode ADD CONSTRAINT worker_read_write_locks_mode_foreign
     FOREIGN KEY (lock_name, lock_key, token) REFERENCES worker_read_write_locks(lock_name, lock_key, token) DEFERRABLE INITIALLY DEFERRED;
 

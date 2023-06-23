@@ -68,8 +68,7 @@ CREATE TABLE worker_read_write_locks (
     -- from it.
     -- Note: instance names aren't guarenteed to be unique.
     instance_name TEXT NOT NULL,
-    -- A token that has currently acquired the lock. We need this so that we can
-    -- add a foreign constraint from this table to `worker_read_write_locks`.
+    -- Whether the process has taken out a "read" or a "write" lock.
     write_lock BOOLEAN NOT NULL,
     -- A random string generated each time an instance takes out a lock. Used by
     -- the instance to tell whether the lock is still held by it (e.g. in the

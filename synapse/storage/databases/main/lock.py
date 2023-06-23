@@ -76,7 +76,9 @@ class LockStore(SQLBaseStore):
         ] = WeakValueDictionary()
 
         # A map from `(lock_name, lock_key, token)` to read/write lock that we
-        # think we currently hold.
+        # think we currently hold. For a given lock_name/lock_key, there can be
+        # multiple read locks at a time but only one write lock (no mixing read
+        # and write locks at the same time).
         self._live_read_write_lock_tokens: WeakValueDictionary[
             Tuple[str, str, str], Lock
         ] = WeakValueDictionary()
