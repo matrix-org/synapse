@@ -87,6 +87,14 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+# Upgrading to v1.86.0
+
+## Minimum supported Rust version
+
+The minimum supported Rust version has been increased from v1.58.1 to v1.60.0.
+Users building from source will need to ensure their `rustc` version is up to
+date.
+
 
 # Upgrading to v1.85.0
 

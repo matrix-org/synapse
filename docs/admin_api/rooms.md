@@ -419,7 +419,7 @@ The following query parameters are available:
 
 * `from` (required) - The token to start returning events from. This token can be obtained from a prev_batch
   or next_batch token returned by the /sync endpoint, or from an end token returned by a previous request to this endpoint.
-* `to` - The token to spot returning events at.
+* `to` - The token to stop returning events at.
 * `limit` - The maximum number of events to return. Defaults to `10`.
 * `filter` - A JSON RoomEventFilter to filter returned events with.
 * `dir` - The direction to return events from. Either `f` for forwards or `b` for backwards. Setting

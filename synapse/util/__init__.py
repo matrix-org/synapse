@@ -116,6 +116,11 @@ class Clock:
 
         Waits `msec` initially before calling `f` for the first time.
 
+        If the function given to `looping_call` returns an awaitable/deferred, the next
+        call isn't scheduled until after the returned awaitable has finished. We get
+        this functionality thanks to this function being a thin wrapper around
+        `twisted.internet.task.LoopingCall`.
+
         Note that the function will be called with no logcontext, so if it is anything
         other than trivial, you probably want to wrap it in run_as_background_process.
 

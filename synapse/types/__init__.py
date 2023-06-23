@@ -177,7 +177,7 @@ class Requester:
             user=UserID.from_string(input["user_id"]),
             access_token_id=input["access_token_id"],
             is_guest=input["is_guest"],
-            scope=set(input["scope"]),
+            scope=set(input.get("scope", [])),
             shadow_banned=input["shadow_banned"],
             device_id=input["device_id"],
             app_service=appservice,
