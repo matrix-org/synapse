@@ -883,7 +883,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
         """
-        Invalidates an event in the asyncronous get event cache, which may be remote.
+        Invalidates an event in the asynchronous get event cache, which may be remote.
 
         Arguments:
             event_id: the event ID to invalidate
