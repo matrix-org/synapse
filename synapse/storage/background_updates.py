@@ -14,7 +14,6 @@
 import abc
 import logging
 from enum import Enum, IntEnum
-from io import StringIO
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -1055,7 +1054,6 @@ def run_validate_constraint_and_delete_rows_schema_delta(
     constraint: Constraint,
     sqlite_table_name: str,
     sqlite_table_schema: str,
-    sqlite_post_schema: Optional[str],
 ) -> None:
     """Runs a schema delta to add a constraint to the table. This should be run
     in a schema delta file.
@@ -1063,7 +1061,8 @@ def run_validate_constraint_and_delete_rows_schema_delta(
     For PostgreSQL the constraint is added and validated in the background.
 
     For SQLite the table is recreated and data copied across immediately. This
-    is done by the caller passing in a script to create the new table.
+    is done by the caller passing in a script to create the new table. Note that
+    table indexes and triggers are copied over automatically.
 
     There must be a corresponding call to
     `register_background_validate_constraint_and_delete_rows` to register the
@@ -1075,8 +1074,6 @@ def run_validate_constraint_and_delete_rows_schema_delta(
         new constraint constraint: A `Constraint` object describing the
         constraint sqlite_table_name: For SQLite the name of the empty copy of
         table sqlite_table_schema: A SQL script for creating the above table.
-        sqlite_post_schema: A SQL script run after migration, to add back
-          indices and the like.
     """
 
     if isinstance(txn.database_engine, PostgresEngine):
@@ -1097,14 +1094,25 @@ def run_validate_constraint_and_delete_rows_schema_delta(
         )
     else:
         # For SQLite, we:
-        #   1. create an empty copy of the table
-        #   2. copy across the rows (that satisfy the check)
-        #   3. replace the old table with the new able.
+        #   1. fetch all indexes/triggers/etc related to the table
+        #   2. create an empty copy of the table
+        #   3. copy across the rows (that satisfy the check)
+        #   4. replace the old table with the new able.
+        #   5. add back all the indexes/triggers/etc
 
-        # We import this here to avoid circular imports.
-        from synapse.storage.prepare_database import execute_statements_from_stream
+        # Fetch the indexes/triggers/etc. Note that `sql` column being null is
+        # due to indexes being auto created based on the class definition (e.g.
+        # PRIMARY KEY), and so don't need to be recreated.
+        txn.execute(
+            """
+            SELECT sql FROM sqlite_schema
+            WHERE tbl_name = ? AND type != 'table' AND sql IS NOT NULL
+            """,
+            (table,),
+        )
+        extras = [row[0] for row in txn]
 
-        execute_statements_from_stream(txn, StringIO(sqlite_table_schema))
+        txn.execute(sqlite_table_schema)
 
         sql = f"""
             INSERT INTO {sqlite_table_name} SELECT * FROM {table}
@@ -1116,5 +1124,5 @@ def run_validate_constraint_and_delete_rows_schema_delta(
         txn.execute(f"DROP TABLE {table}")
         txn.execute(f"ALTER TABLE {sqlite_table_name} RENAME TO {table}")
 
-        if sqlite_post_schema:
-            execute_statements_from_stream(txn, StringIO(sqlite_post_schema))
+        for extra in extras:
+            txn.execute(extra)

@@ -27,7 +27,7 @@ from synapse.storage.background_updates import (
     run_validate_constraint_and_delete_rows_schema_delta,
 )
 from synapse.storage.database import LoggingTransaction
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import JsonDict
 from synapse.util import Clock
 
@@ -440,6 +440,15 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             )
         )
 
+        # We add an index so that we can check that its correctly recreated when
+        # using SQLite.
+        index_sql = "CREATE INDEX test_index ON test_constraint(a)"
+        self.get_success(
+            self.store.db_pool.execute(
+                "test_not_null_constraint", lambda _: None, index_sql
+            )
+        )
+
         self.get_success(
             self.store.db_pool.simple_insert("test_constraint", {"a": 1, "b": 1})
         )
@@ -470,7 +479,6 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
                 constraint=NotNullConstraint("b"),
                 sqlite_table_name="test_constraint2",
                 sqlite_table_schema=table2_sqlite,
-                sqlite_post_schema=None,
             )
 
         self.get_success(
@@ -512,6 +520,17 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
             self.store.db_pool.simple_insert("test_constraint", {"a": 2, "b": None}),
             exc=self.store.database_engine.module.IntegrityError,
         )
+
+        # Check the index is still there for SQLite.
+        if isinstance(self.store.database_engine, Sqlite3Engine):
+            # Ensure the index exists in the schema.
+            self.get_success(
+                self.store.db_pool.simple_select_one_onecol(
+                    table="sqlite_schema",
+                    keyvalues={"tbl_name": "test_constraint"},
+                    retcol="name",
+                )
+            )
 
     def test_foreign_constraint(self) -> None:
         """Tests adding a not foreign key constraint."""
@@ -570,7 +589,6 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
                 constraint=ForeignKeyConstraint("base_table", [("b", "b")]),
                 sqlite_table_name="test_constraint2",
                 sqlite_table_schema=table2_sqlite,
-                sqlite_post_schema=None,
             )
 
         self.get_success(

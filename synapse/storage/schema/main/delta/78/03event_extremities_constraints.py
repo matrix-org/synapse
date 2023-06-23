@@ -29,12 +29,7 @@ FORWARD_EXTREMITIES_TABLE_SCHEMA = """
         room_id TEXT NOT NULL,
         UNIQUE (event_id, room_id),
         CONSTRAINT event_forward_extremities_event_id FOREIGN KEY (event_id) REFERENCES events (event_id)
-    );
-"""
-
-FORWARD_EXTREMITIES_INDICES_SCHEMA = """
-    CREATE INDEX ev_extrem_room ON event_forward_extremities(room_id);
-    CREATE INDEX ev_extrem_id ON event_forward_extremities(event_id);
+    )
 """
 
 
@@ -48,7 +43,6 @@ def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> 
         constraint=ForeignKeyConstraint("events", [("event_id", "event_id")]),
         sqlite_table_name="event_forward_extremities2",
         sqlite_table_schema=FORWARD_EXTREMITIES_TABLE_SCHEMA,
-        sqlite_post_schema=FORWARD_EXTREMITIES_INDICES_SCHEMA,
     )
 
     # We can't add a similar constraint to `event_backward_extremities` as the
