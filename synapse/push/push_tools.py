@@ -63,6 +63,8 @@ async def get_context_for_event(
 
         invite_room_state = ev.unsigned.get("invite_room_state", [])
 
+        # Ideally we'd reuse the logic in `calculate_room_name`, but that gets
+        # complicated to handle partial events vs pulling events from the DB.
         for state_dict in invite_room_state:
             type_tuple = (state_dict["type"], state_dict.get("state_key"))
             if type_tuple == (EventTypes.Member, ev.sender):
