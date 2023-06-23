@@ -13,6 +13,7 @@
 # limitations under the License.
 from typing import Dict
 
+from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 from synapse.storage.controllers import StorageControllers
@@ -50,6 +51,30 @@ async def get_context_for_event(
     storage: StorageControllers, ev: EventBase, user_id: str
 ) -> Dict[str, str]:
     ctx = {}
+
+    if ev.internal_metadata.outlier:
+        # We don't have state for outliers, so we can't compute the context
+        # except for invites with `invite_room_state` set..
+        if (
+            ev.type != EventTypes.Member
+            or ev.content.get("membership") != Membership.INVITE
+        ):
+            return ctx
+
+        invite_room_state = ev.unsigned.get("invite_room_state", [])
+
+        for state_dict in invite_room_state:
+            type_tuple = (state_dict["type"], state_dict.get("state_key"))
+            if type_tuple == (EventTypes.Member, ev.sender):
+                display_name = state_dict["content"].get("displayname")
+                if display_name:
+                    ctx["sender_display_name"] = display_name
+            elif type_tuple == (EventTypes.Name, ""):
+                room_name = state_dict["content"].get("name")
+                if room_name:
+                    ctx["name"] = room_name
+
+        return ctx
 
     room_state_ids = await storage.state.get_state_ids_for_event(ev.event_id)
 
