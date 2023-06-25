@@ -289,6 +289,17 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             )
             self._attempt_to_invalidate_cache("get_rooms_for_user", (state_key,))
 
+            self._attempt_to_invalidate_cache(
+                "did_forget",
+                (
+                    state_key,
+                    room_id,
+                ),
+            )
+            self._attempt_to_invalidate_cache(
+                "get_forgotten_rooms_for_user", (state_key,)
+            )
+
         if relates_to:
             self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
             self._attempt_to_invalidate_cache("get_references_for_event", (relates_to,))
@@ -336,6 +347,8 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             "get_rooms_for_user_with_stream_ordering", None
         )
         self._attempt_to_invalidate_cache("get_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("did_forget", None)
+        self._attempt_to_invalidate_cache("get_forgotten_rooms_for_user", None)
         self._attempt_to_invalidate_cache("get_references_for_event", None)
         self._attempt_to_invalidate_cache("get_thread_summary", None)
         self._attempt_to_invalidate_cache("get_thread_participated", None)
