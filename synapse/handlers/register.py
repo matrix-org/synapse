@@ -609,14 +609,26 @@ class RegistrationHandler:
         if (
             self.hs.config.registration.autocreate_auto_join_rooms
             and await self.store.is_real_user(user_id)
+            and not user_id.startswith(
+                "bot_"
+            )  # Check if the user is a bot based on your specific logic
         ):
             count = await self.store.count_real_users()
-            should_auto_create_rooms = count == 1
+            should_auto_create_rooms = count == 1 or not await self._does_room_exist(
+                user_id
+            )  # Check if the room already exists for the user
 
         if should_auto_create_rooms:
             await self._create_and_join_rooms(user_id)
         else:
             await self._join_rooms(user_id)
+
+        # Add this helper method to the class
+
+    async def _does_room_exist(self, user_id: str) -> bool:
+        """Check if a room exists for the given user."""
+        user_rooms = await self.store.get_rooms_for_user(user_id)
+        return bool(user_rooms)
 
     async def post_consent_actions(self, user_id: str) -> None:
         """A series of registration actions that can only be carried out once consent
