@@ -1,0 +1,1 @@
+Added the functionality to check if there is a room in the homeserver in the scenario where bot/support users will try to join when they should not. Contributed by Vemmos Tasos
