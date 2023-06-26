@@ -135,7 +135,9 @@ class DenyAllSpamChecker:
         Literal["NOT_SPAM"],
         Tuple["synapse.module_api.errors.Codes", JsonDict],
     ]:
-        return Codes.FORBIDDEN, {}
+        # Return an odd set of values to ensure that they get correctly passed
+        # to the client.
+        return Codes.LIMIT_EXCEEDED, {"extra": "value"}
 
 
 class LoginRestServletTestCase(unittest.HomeserverTestCase):
@@ -567,6 +569,9 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             body,
         )
         self.assertEqual(channel.code, 403, channel.result)
+        self.assertDictContainsSubset(
+            {"errcode": Codes.LIMIT_EXCEEDED, "extra": "value"}, channel.json_body
+        )
 
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")
