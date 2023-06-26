@@ -25,9 +25,10 @@ from synapse import types
 from synapse.api.constants import (
     MAX_USERID_LENGTH,
     EventContentFields,
+    UserTypes,
     EventTypes,
     JoinRules,
-    LoginType,
+    LoginType
 )
 from synapse.api.errors import (
     AuthError,
@@ -589,7 +590,14 @@ class RegistrationHandler:
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
+    def is_bot_user(self, user_type):
+        return user_type == UserTypes.BOT
+
+    def is_support_user(self, user_type):
+        return user_type == UserTypes.SUPPORT
+
     async def _auto_join_rooms(self, user_id: str) -> None:
+        
         """Automatically joins users to auto join rooms - creating the room in the first place
         if the user is the first to be created.
 
@@ -601,7 +609,7 @@ class RegistrationHandler:
             return
 
         # auto-join the user to any rooms we're supposed to dump them into
-
+        
         # try to create the room if we're the first real user on the server. Note
         # that an auto-generated support or bot user is not a real user and will never be
         # the user to create the room
@@ -609,26 +617,23 @@ class RegistrationHandler:
         if (
             self.hs.config.registration.autocreate_auto_join_rooms
             and await self.store.is_real_user(user_id)
-            and not user_id.startswith(
-                "bot_"
-            )  # Check if the user is a bot based on your specific logic
+            and not (self.is_support_user(user_type) or self.is_bot_user(user_type))
+              # Check if the user is a bot based on your specific logic
         ):
             count = await self.store.count_real_users()
             should_auto_create_rooms = count == 1 or not await self._does_room_exist(
-                user_id
-            )  # Check if the room already exists for the user
+                room_id
+            )
 
         if should_auto_create_rooms:
             await self._create_and_join_rooms(user_id)
         else:
             await self._join_rooms(user_id)
 
-        # Add this helper method to the class
-
-    async def _does_room_exist(self, user_id: str) -> bool:
-        """Check if a room exists for the given user."""
-        user_rooms = await self.store.get_rooms_for_user(user_id)
-        return bool(user_rooms)
+    async def _does_room_exist(self, room_id: str) -> bool:
+        """Check if a room exists with the given room ID or alias."""
+        room_exists = await self.store.is_room_exists(room_id)
+        return room_exists
 
     async def post_consent_actions(self, user_id: str) -> None:
         """A series of registration actions that can only be carried out once consent
