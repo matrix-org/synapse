@@ -1212,9 +1212,9 @@ like sending a federation transaction.
 * `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
 * `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
 
-The following options are related to configuring the backoff parameters used for a specific destination.
-Unlike previous configuration options, these values apply across all requests
-and the state of the backoff is stored in the database.
+The following options control the retry logic when communicating with a specific homeserver destination.
+Unlike the previous configuration options, these values apply across all requests
+for a given destination and the state of the backoff is stored in the database.
 
 * `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
 * `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
