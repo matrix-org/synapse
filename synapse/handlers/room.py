@@ -1815,12 +1815,20 @@ class DeleteStatus:
     return by get_delete_status.
     """
 
+    ACTION_SHUTDOWN = "shutdown"
+    ACTION_PURGE = "purge"
+    ACTION_PURGE_HISTORY = "purge_history"
+
+    # Scheduled delete waiting to be launch at a specific time
+    STATUS_SCHEDULED = "scheduled"
     STATUS_SHUTTING_DOWN = "shutting_down"
-    # Scheduled purge waiting to be launch at a specific time
-    STATUS_SCHEDULED_PURGE = "scheduled_purge"
     STATUS_PURGING = "purging"
     STATUS_COMPLETE = "complete"
     STATUS_FAILED = "failed"
+
+    delete_id: str = ""
+
+    action: str = ACTION_PURGE
 
     # Tracks whether this request has completed.
     # One of STATUS_{PURGING,COMPLETE,FAILED,SHUTTING_DOWN,WAIT_PURGE}.
@@ -1839,6 +1847,7 @@ class DeleteStatus:
 
     def asdict(self) -> JsonDict:
         ret = {
+            "delete_id": self.delete_id,
             "status": self.status,
             "shutdown_room": self.shutdown_room,
         }
@@ -1925,12 +1934,13 @@ class RoomShutdownHandler:
                 "new_room_id": None,
             }
 
-        await self.store.upsert_room_to_purge(
+        await self.store.upsert_room_to_delete(
             room_id,
             delete_id,
+            DeleteStatus.ACTION_SHUTDOWN,
             DeleteStatus.STATUS_SHUTTING_DOWN,
-            shutdown_params=json.dumps(shutdown_params),
-            shutdown_response=json.dumps(shutdown_response),
+            params=json.dumps(shutdown_params),
+            response=json.dumps(shutdown_response),
         )
 
         # Action the block first (even if the room doesn't exist yet)
@@ -1965,12 +1975,13 @@ class RoomShutdownHandler:
             )
 
             shutdown_response["new_room_id"] = new_room_id
-            await self.store.upsert_room_to_purge(
+            await self.store.upsert_room_to_delete(
                 room_id,
                 delete_id,
+                DeleteStatus.ACTION_SHUTDOWN,
                 DeleteStatus.STATUS_SHUTTING_DOWN,
-                shutdown_params=json.dumps(shutdown_params),
-                shutdown_response=json.dumps(shutdown_response),
+                params=json.dumps(shutdown_params),
+                response=json.dumps(shutdown_response),
             )
 
             logger.info(
@@ -2017,7 +2028,9 @@ class RoomShutdownHandler:
                     stream_id,
                 )
 
-                await self.room_member_handler.forget(target_requester.user, room_id)
+                await self.room_member_handler.forget(
+                    target_requester.user, room_id, do_not_schedule_purge=True
+                )
 
                 # Join users to new room
                 if new_room_user_id:
@@ -2033,24 +2046,26 @@ class RoomShutdownHandler:
                     )
 
                 shutdown_response["kicked_users"].append(user_id)
-                await self.store.upsert_room_to_purge(
+                await self.store.upsert_room_to_delete(
                     room_id,
                     delete_id,
+                    DeleteStatus.ACTION_SHUTDOWN,
                     DeleteStatus.STATUS_SHUTTING_DOWN,
-                    shutdown_params=json.dumps(shutdown_params),
-                    shutdown_response=json.dumps(shutdown_response),
+                    params=json.dumps(shutdown_params),
+                    response=json.dumps(shutdown_response),
                 )
             except Exception:
                 logger.exception(
                     "Failed to leave old room and join new room for %r", user_id
                 )
                 shutdown_response["failed_to_kick_users"].append(user_id)
-                await self.store.upsert_room_to_purge(
+                await self.store.upsert_room_to_delete(
                     room_id,
                     delete_id,
+                    DeleteStatus.ACTION_SHUTDOWN,
                     DeleteStatus.STATUS_SHUTTING_DOWN,
-                    shutdown_params=json.dumps(shutdown_params),
-                    shutdown_response=json.dumps(shutdown_response),
+                    params=json.dumps(shutdown_params),
+                    response=json.dumps(shutdown_response),
                 )
 
         # Send message in new room and move aliases

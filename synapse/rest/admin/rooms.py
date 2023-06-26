@@ -154,20 +154,14 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
             )
 
-        delete_ids = self._pagination_handler.get_delete_ids_by_room(room_id)
-        if delete_ids is None:
-            delete_ids = []
+        delete_statuses = await self._pagination_handler.get_delete_statuses_by_room(
+            room_id
+        )
 
         response = []
-        for delete_id in delete_ids:
-            delete = self._pagination_handler.get_delete_status(delete_id)
-            if delete and delete.status != DeleteStatus.STATUS_SCHEDULED_PURGE:
-                response += [
-                    {
-                        "delete_id": delete_id,
-                        **delete.asdict(),
-                    }
-                ]
+        for delete_status in delete_statuses:
+            if delete_status.status != DeleteStatus.STATUS_SCHEDULED:
+                response += [delete_status.asdict()]
 
         if response:
             return HTTPStatus.OK, {"results": cast(JsonDict, response)}
@@ -189,7 +183,7 @@ class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self._auth, request)
 
-        delete_status = self._pagination_handler.get_delete_status(delete_id)
+        delete_status = await self._pagination_handler.get_delete_status(delete_id)
         if delete_status is None:
             raise NotFoundError("delete id '%s' not found" % delete_id)
 

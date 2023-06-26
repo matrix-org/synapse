@@ -14,9 +14,7 @@
 # limitations under the License.
 import json
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Set
-
-import attr
+from typing import TYPE_CHECKING, List, Optional, Set
 
 from twisted.python.failure import Failure
 
@@ -29,7 +27,7 @@ from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, Requester, StrCollection, StreamKeyType
+from synapse.types import JsonDict, Requester, StreamKeyType
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
@@ -40,37 +38,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-@attr.s(slots=True, auto_attribs=True)
-class PurgeStatus:
-    """Object tracking the status of a purge request
-
-    This class contains information on the progress of a purge request, for
-    return by get_purge_status.
-    """
-
-    STATUS_ACTIVE = 0
-    STATUS_COMPLETE = 1
-    STATUS_FAILED = 2
-
-    STATUS_TEXT = {
-        STATUS_ACTIVE: "active",
-        STATUS_COMPLETE: "complete",
-        STATUS_FAILED: "failed",
-    }
-
-    # Save the error message if an error occurs
-    error: str = ""
-
-    # Tracks whether this request has completed. One of STATUS_{ACTIVE,COMPLETE,FAILED}.
-    status: int = STATUS_ACTIVE
-
-    def asdict(self) -> JsonDict:
-        ret = {"status": PurgeStatus.STATUS_TEXT[self.status]}
-        if self.error:
-            ret["error"] = self.error
-        return ret
 
 
 class PaginationHandler:
@@ -100,13 +67,6 @@ class PaginationHandler:
         self.pagination_lock = ReadWriteLock()
         # IDs of rooms in which there currently an active purge *or delete* operation.
         self._purges_in_progress_by_room: Set[str] = set()
-        # map from purge id to PurgeStatus
-        self._purges_by_id: Dict[str, PurgeStatus] = {}
-        # map from purge id to DeleteStatus
-        self._delete_by_id: Dict[str, DeleteStatus] = {}
-        # map from room id to delete ids
-        # Dict[`room_id`, List[`delete_id`]]
-        self._delete_by_room: Dict[str, List[str]] = {}
         self._event_serializer = hs.get_event_client_serializer()
 
         self._retention_default_max_lifetime = (
@@ -151,11 +111,12 @@ class PaginationHandler:
 
         It should be run regularly.
         """
-        rooms_to_purge = await self.store.get_rooms_to_purge()
-        for r in rooms_to_purge:
+        rooms_to_delete = await self.store.get_rooms_to_delete()
+        for r in rooms_to_delete:
             room_id = r["room_id"]
             delete_id = r["delete_id"]
             status = r["status"]
+            action = r["action"]
             timestamp = r["timestamp"]
 
             if (
@@ -165,32 +126,25 @@ class PaginationHandler:
                 # remove the delete from the list 24 hours after it completes or fails
                 ms_since_completed = self.clock.time_msec() - timestamp
                 if ms_since_completed >= PaginationHandler.CLEAR_PURGE_AFTER_MS:
-                    await self.store.delete_room_to_purge(room_id, delete_id)
-
-                    del self._delete_by_id[delete_id]
-                    self._delete_by_room[room_id].remove(delete_id)
-                    if not self._delete_by_room[room_id]:
-                        del self._delete_by_room[room_id]
+                    await self.store.delete_room_to_delete(room_id, delete_id)
 
                 continue
 
-            delete_status = self._delete_by_id.get(delete_id)
-            if delete_status is not None:
+            if room_id in self._purges_in_progress_by_room:
                 # a delete background task is already running (or has run)
-                # for this delete id, let's ignore it
+                # for this room id, let's ignore it for now
                 continue
-
-            self._delete_by_id[delete_id] = DeleteStatus()
-            self._delete_by_id[delete_id].status = status
-            self._delete_by_room.setdefault(room_id, []).append(delete_id)
 
             # If the database says we were last in the middle of shutting down the room,
             # let's continue the shutdown process.
             shutdown_response = None
-            if status == DeleteStatus.STATUS_SHUTTING_DOWN:
-                shutdown_params = json.loads(r["shutdown_params"])
-                if r["shutdown_response"]:
-                    shutdown_response = json.loads(r["shutdown_response"])
+            if (
+                action == DeleteStatus.ACTION_SHUTDOWN
+                and status == DeleteStatus.STATUS_SHUTTING_DOWN
+            ):
+                shutdown_params = json.loads(r["params"])
+                if r["response"]:
+                    shutdown_response = json.loads(r["response"])
                 await self._shutdown_and_purge_room(
                     room_id,
                     delete_id,
@@ -204,16 +158,33 @@ class PaginationHandler:
             if status == DeleteStatus.STATUS_PURGING:
                 purge_now = True
             # Or if we're at or past the scheduled purge time, let's start that one as well
-            elif status == DeleteStatus.STATUS_SCHEDULED_PURGE and (
+            elif status == DeleteStatus.STATUS_SCHEDULED and (
                 timestamp is None or self.clock.time_msec() >= timestamp
             ):
                 purge_now = True
 
             # TODO 2 stages purge, keep memberships for a while so we don't "break" sync
             if purge_now:
-                await self.purge_room(
-                    room_id, delete_id, True, shutdown_response=shutdown_response
-                )
+                params = {}
+                if r["params"]:
+                    params = json.loads(r["params"])
+
+                if action == DeleteStatus.ACTION_PURGE_HISTORY:
+                    if "token" in params:
+                        await self._purge_history(
+                            delete_id,
+                            room_id,
+                            params["token"],
+                            params.get("delete_local_events", False),
+                            True,
+                        )
+                elif action == DeleteStatus.ACTION_PURGE:
+                    await self.purge_room(
+                        room_id,
+                        delete_id,
+                        params.get("force", False),
+                        shutdown_response=shutdown_response,
+                    )
 
     async def purge_history_for_rooms_in_range(
         self, min_ms: Optional[int], max_ms: Optional[int]
@@ -323,8 +294,6 @@ class PaginationHandler:
 
             purge_id = random_string(16)
 
-            self._purges_by_id[purge_id] = PurgeStatus()
-
             logger.info(
                 "Starting purging events in room %s (purge_id %s)" % (room_id, purge_id)
             )
@@ -339,9 +308,10 @@ class PaginationHandler:
                 room_id,
                 token,
                 True,
+                False,
             )
 
-    def start_purge_history(
+    async def start_purge_history(
         self, room_id: str, token: str, delete_local_events: bool = False
     ) -> str:
         """Start off a history purge on a room.
@@ -366,7 +336,16 @@ class PaginationHandler:
         # request id in the log lines.
         logger.info("[purge] starting purge_id %s", purge_id)
 
-        self._purges_by_id[purge_id] = PurgeStatus()
+        await self.store.upsert_room_to_delete(
+            room_id,
+            purge_id,
+            DeleteStatus.ACTION_PURGE_HISTORY,
+            DeleteStatus.STATUS_PURGING,
+            params=json.dumps(
+                {"token": token, "delete_local_events": delete_local_events}
+            ),
+        )
+
         run_as_background_process(
             "purge_history",
             self._purge_history,
@@ -374,11 +353,17 @@ class PaginationHandler:
             room_id,
             token,
             delete_local_events,
+            True,
         )
         return purge_id
 
     async def _purge_history(
-        self, purge_id: str, room_id: str, token: str, delete_local_events: bool
+        self,
+        purge_id: str,
+        room_id: str,
+        token: str,
+        delete_local_events: bool,
+        update_rooms_to_delete_table: bool,
     ) -> None:
         """Carry out a history purge on a room.
 
@@ -387,6 +372,10 @@ class PaginationHandler:
             room_id: The room to purge from
             token: topological token to delete events before
             delete_local_events: True to delete local events as well as remote ones
+            update_rooms_to_delete_table: True if we don't want to update/persist this
+                purge history action to the DB to be restorable. Used with the retention
+                functionality since we don't need to explicitly restore those, they
+                will be relaunch by the retention logic.
         """
         self._purges_in_progress_by_room.add(room_id)
         try:
@@ -395,48 +384,75 @@ class PaginationHandler:
                     room_id, token, delete_local_events
                 )
             logger.info("[purge] complete")
-            self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
+            if update_rooms_to_delete_table:
+                await self.store.upsert_room_to_delete(
+                    room_id,
+                    purge_id,
+                    DeleteStatus.ACTION_PURGE_HISTORY,
+                    DeleteStatus.STATUS_COMPLETE,
+                    timestamp=self.clock.time_msec(),
+                )
         except Exception:
             f = Failure()
             logger.error(
                 "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())
             )
-            self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
-            self._purges_by_id[purge_id].error = f.getErrorMessage()
+            if update_rooms_to_delete_table:
+                await self.store.upsert_room_to_delete(
+                    room_id,
+                    purge_id,
+                    DeleteStatus.ACTION_PURGE_HISTORY,
+                    DeleteStatus.STATUS_FAILED,
+                    error=f.getErrorMessage(),
+                    timestamp=self.clock.time_msec(),
+                )
         finally:
             self._purges_in_progress_by_room.discard(room_id)
 
-            # remove the purge from the list 24 hours after it completes
-            def clear_purge() -> None:
-                del self._purges_by_id[purge_id]
+            if update_rooms_to_delete_table:
+                # remove the purge from the list 24 hours after it completes
+                async def clear_purge() -> None:
+                    await self.store.delete_room_to_delete(room_id, purge_id)
 
-            self.hs.get_reactor().callLater(
-                PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000, clear_purge
-            )
+                self.hs.get_reactor().callLater(
+                    PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000, clear_purge
+                )
 
-    def get_purge_status(self, purge_id: str) -> Optional[PurgeStatus]:
-        """Get the current status of an active purge
-
-        Args:
-            purge_id: purge_id returned by start_purge_history
-        """
-        return self._purges_by_id.get(purge_id)
-
-    def get_delete_status(self, delete_id: str) -> Optional[DeleteStatus]:
+    async def get_delete_status(self, delete_id: str) -> Optional[DeleteStatus]:
         """Get the current status of an active deleting
 
         Args:
             delete_id: delete_id returned by start_shutdown_and_purge_room
+                or start_purge_history.
         """
-        return self._delete_by_id.get(delete_id)
+        res = await self.store.get_room_to_delete(delete_id)
+        if res:
+            status = DeleteStatus()
+            status.delete_id = res["delete_id"]
+            status.action = res["action"]
+            status.status = res["status"]
+            if status.action == DeleteStatus.ACTION_SHUTDOWN and res["response"]:
+                status.shutdown_room = json.loads(res["response"])
+            return status
+        return None
 
-    def get_delete_ids_by_room(self, room_id: str) -> Optional[StrCollection]:
-        """Get all active delete ids by room
+    async def get_delete_statuses_by_room(self, room_id: str) -> List[DeleteStatus]:
+        """Get all active delete statuses by room
 
         Args:
             room_id: room_id that is deleted
         """
-        return self._delete_by_room.get(room_id)
+        res = await self.store.get_rooms_to_delete(room_id)
+        statuses = []
+        for r in res:
+            status = DeleteStatus()
+            status.delete_id = r["delete_id"]
+            status.action = r["action"]
+            status.status = r["status"]
+            if status.action == DeleteStatus.ACTION_SHUTDOWN and r["response"]:
+                status.shutdown_room = json.loads(r["response"])
+            statuses.append(status)
+        return statuses
 
     async def purge_room(
         self,
@@ -455,6 +471,10 @@ class PaginationHandler:
         """
         logger.info("starting purge room_id=%s force=%s", room_id, force)
 
+        action = DeleteStatus.ACTION_PURGE
+        if shutdown_response:
+            action = DeleteStatus.ACTION_SHUTDOWN
+
         async with self.pagination_lock.write(room_id):
             # first check that we have no users in this room
             if not force:
@@ -462,21 +482,23 @@ class PaginationHandler:
                 if joined:
                     raise SynapseError(400, "Users are still joined to this room")
 
-            await self.store.upsert_room_to_purge(
+            await self.store.upsert_room_to_delete(
                 room_id,
                 delete_id,
+                action,
                 DeleteStatus.STATUS_PURGING,
-                shutdown_response=json.dumps(shutdown_response),
+                response=json.dumps(shutdown_response),
             )
 
             await self._storage_controllers.purge_events.purge_room(room_id)
 
-            await self.store.upsert_room_to_purge(
+            await self.store.upsert_room_to_delete(
                 room_id,
                 delete_id,
+                action,
                 DeleteStatus.STATUS_COMPLETE,
                 timestamp=self.clock.time_msec(),
-                shutdown_response=json.dumps(shutdown_response),
+                response=json.dumps(shutdown_response),
             )
 
         logger.info("purge complete for room_id %s", room_id)
@@ -691,44 +713,41 @@ class PaginationHandler:
 
         self._purges_in_progress_by_room.add(room_id)
         try:
-            self._delete_by_id[delete_id].status = DeleteStatus.STATUS_SHUTTING_DOWN
             shutdown_response = await self._room_shutdown_handler.shutdown_room(
                 room_id=room_id,
                 delete_id=delete_id,
                 shutdown_params=shutdown_params,
                 shutdown_response=shutdown_response,
             )
-            self._delete_by_id[delete_id].shutdown_room = shutdown_response
 
             if shutdown_params["purge"]:
-                self._delete_by_id[delete_id].status = DeleteStatus.STATUS_PURGING
                 await self.purge_room(
                     room_id,
                     delete_id,
                     shutdown_params["force_purge"],
-                    shutdown_response=self._delete_by_id[delete_id].shutdown_room,
+                    shutdown_response=shutdown_response,
                 )
 
-            await self.store.upsert_room_to_purge(
+            await self.store.upsert_room_to_delete(
                 room_id,
                 delete_id,
+                DeleteStatus.ACTION_SHUTDOWN,
                 DeleteStatus.STATUS_COMPLETE,
                 timestamp=self.clock.time_msec(),
-                shutdown_response=json.dumps(shutdown_response),
+                response=json.dumps(shutdown_response),
             )
-            self._delete_by_id[delete_id].status = DeleteStatus.STATUS_COMPLETE
         except Exception:
             f = Failure()
             logger.error(
                 "failed",
                 exc_info=(f.type, f.value, f.getTracebackObject()),
             )
-            self._delete_by_id[delete_id].status = DeleteStatus.STATUS_FAILED
-            self._delete_by_id[delete_id].error = f.getErrorMessage()
-            await self.store.upsert_room_to_purge(
+            await self.store.upsert_room_to_delete(
                 room_id,
                 delete_id,
+                DeleteStatus.ACTION_SHUTDOWN,
                 DeleteStatus.STATUS_FAILED,
+                timestamp=self.clock.time_msec(),
                 error=f.getErrorMessage(),
             )
         finally:
@@ -749,9 +768,7 @@ class PaginationHandler:
             unique ID for this delete transaction.
         """
         if room_id in self._purges_in_progress_by_room:
-            raise SynapseError(
-                400, "History purge already in progress for %s" % (room_id,)
-            )
+            raise SynapseError(400, "Purge already in progress for %s" % (room_id,))
 
         # This check is double to `RoomShutdownHandler.shutdown_room`
         # But here the requester get a direct response / error with HTTP request
@@ -773,8 +790,6 @@ class PaginationHandler:
             delete_id,
         )
 
-        self._delete_by_id[delete_id] = DeleteStatus()
-        self._delete_by_room.setdefault(room_id, []).append(delete_id)
         run_as_background_process(
             "shutdown_and_purge_room",
             self._shutdown_and_purge_room,

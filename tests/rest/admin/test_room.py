@@ -24,7 +24,7 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
-from synapse.handlers.pagination import DeleteStatus, PaginationHandler, PurgeStatus
+from synapse.handlers.pagination import DeleteStatus, PaginationHandler
 from synapse.rest.client import directory, events, login, room
 from synapse.server import HomeServer
 from synapse.types import UserID
@@ -693,8 +693,10 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(2, len(channel.json_body["results"]))
         self.assertEqual("complete", channel.json_body["results"][0]["status"])
         self.assertEqual("complete", channel.json_body["results"][1]["status"])
-        self.assertEqual(delete_id1, channel.json_body["results"][0]["delete_id"])
-        self.assertEqual(delete_id2, channel.json_body["results"][1]["delete_id"])
+        delete_ids = {delete_id1, delete_id2}
+        self.assertTrue(channel.json_body["results"][0]["delete_id"] in delete_ids)
+        delete_ids.remove(channel.json_body["results"][0]["delete_id"])
+        self.assertTrue(channel.json_body["results"][1]["delete_id"] in delete_ids)
 
         # get status after more than clearing time for first task
         # second task is not cleared
@@ -749,7 +751,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, second_channel.code, msg=second_channel.json_body)
         self.assertEqual(Codes.UNKNOWN, second_channel.json_body["errcode"])
         self.assertEqual(
-            f"History purge already in progress for {self.room_id}",
+            f"Purge already in progress for {self.room_id}",
             second_channel.json_body["error"],
         )
 
@@ -1012,9 +1014,10 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
 
         self.get_success(
-            self.store.upsert_room_to_purge(
+            self.store.upsert_room_to_delete(
                 room_id,
                 random_string(16),
+                DeleteStatus.ACTION_PURGE,
                 DeleteStatus.STATUS_PURGING,
             )
         )
@@ -1039,11 +1042,12 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         delete_id = random_string(16)
 
         self.get_success(
-            self.store.upsert_room_to_purge(
+            self.store.upsert_room_to_delete(
                 room_id,
                 delete_id,
+                DeleteStatus.ACTION_SHUTDOWN,
                 DeleteStatus.STATUS_SHUTTING_DOWN,
-                shutdown_params=json.dumps(
+                params=json.dumps(
                     {
                         "requester_user_id": self.admin_user,
                         "new_room_user_id": self.admin_user,
@@ -2078,13 +2082,13 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
 
         # Purge every event before the second event.
         purge_id = random_string(16)
-        pagination_handler._purges_by_id[purge_id] = PurgeStatus()
         self.get_success(
             pagination_handler._purge_history(
                 purge_id=purge_id,
                 room_id=self.room_id,
                 token=second_token_str,
                 delete_local_events=True,
+                update_rooms_to_delete_table=True,
             )
         )
 

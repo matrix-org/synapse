@@ -196,7 +196,7 @@ class PurgeHistoryRestServlet(RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = self.pagination_handler.start_purge_history(
+        purge_id = await self.pagination_handler.start_purge_history(
             room_id, token, delete_local_events=delete_local_events
         )
 
@@ -215,10 +215,11 @@ class PurgeHistoryStatusRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        purge_status = self.pagination_handler.get_purge_status(purge_id)
+        purge_status = await self.pagination_handler.get_delete_status(purge_id)
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
+        # TODO active vs purging etc
         return HTTPStatus.OK, purge_status.asdict()
 
 

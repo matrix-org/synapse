@@ -289,7 +289,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
-    async def forget(self, user: UserID, room_id: str) -> None:
+    async def forget(
+        self, user: UserID, room_id: str, do_not_schedule_purge: bool = False
+    ) -> None:
         user_id = user.to_string()
 
         member = await self._storage_controllers.state.get_current_state_event(
@@ -311,14 +313,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # If everyone locally has left the room, then there is no reason for us to keep the
         # room around and we automatically purge room after a little bit
-        if self._purge_retention_period and await self.store.is_locally_forgotten_room(
-            room_id
+        if (
+            not do_not_schedule_purge
+            and self._purge_retention_period
+            and await self.store.is_locally_forgotten_room(room_id)
         ):
             delete_id = random_string(16)
-            await self.store.upsert_room_to_purge(
+            await self.store.upsert_room_to_delete(
                 room_id,
                 delete_id,
-                DeleteStatus.STATUS_SCHEDULED_PURGE,
+                DeleteStatus.ACTION_PURGE,
+                DeleteStatus.STATUS_SCHEDULED,
                 timestamp=self.clock.time_msec() + self._purge_retention_period,
             )
 

@@ -13,14 +13,15 @@
  * limitations under the License.
  */
 
--- cf upsert_room_to_purge docstring for the meaning of the fields.
-CREATE TABLE IF NOT EXISTS rooms_to_purge(
+-- cf upsert_room_to_delete docstring for the meaning of the fields.
+CREATE TABLE IF NOT EXISTS rooms_to_delete(
     room_id text NOT NULL,
     delete_id text NOT NULL,
+    action text NOT NULL,
     status text NOT NULL,
-    error text,
     timestamp bigint,
-    shutdown_params text,
-    shutdown_response text,
+    params text,
+    response text,
+    error text,
     UNIQUE(room_id, delete_id)
 );

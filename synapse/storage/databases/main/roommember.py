@@ -1284,47 +1284,48 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         # If any rows still exist it means someone has not forgotten this room yet
         return not rows[0][0]
 
-    async def upsert_room_to_purge(
+    async def upsert_room_to_delete(
         self,
         room_id: str,
         delete_id: str,
+        action: str,
         status: str,
-        error: Optional[str] = None,
         timestamp: Optional[int] = None,
-        shutdown_params: Optional[str] = None,
-        shutdown_response: Optional[str] = None,
+        params: Optional[str] = None,
+        response: Optional[str] = None,
+        error: Optional[str] = None,
     ) -> None:
         """Insert or update a room to shutdown/purge.
 
         Args:
             room_id: The room ID to shutdown/purge
             delete_id: The delete ID identifying this action
+            action: the type of job, mainly `shutdown` `purge` or `purge_history`
             status: Current status of the delete. Cf `DeleteStatus` for possible values
-            error: Error message to return, if any
             timestamp: Time of the last update. If status is `wait_purge`,
                 then it specifies when to do the purge, with an empty value specifying ASAP
-            shutdown_params: JSON representation of shutdown parameters, cf `ShutdownRoomParams`
-            shutdown_response: JSON representation of shutdown current status, cf `ShutdownRoomResponse`
+            error: Error message to return, if any
+            params: JSON representation of delete job parameters
+            response: JSON representation of delete current status
         """
         await self.db_pool.simple_upsert(
-            "rooms_to_purge",
+            "rooms_to_delete",
             {
                 "room_id": room_id,
                 "delete_id": delete_id,
             },
             {
-                "room_id": room_id,
-                "delete_id": delete_id,
+                "action": action,
                 "status": status,
-                "error": error,
                 "timestamp": timestamp,
-                "shutdown_params": shutdown_params,
-                "shutdown_response": shutdown_response,
+                "params": params,
+                "response": response,
+                "error": error,
             },
-            desc="upsert_room_to_purge",
+            desc="upsert_room_to_delete",
         )
 
-    async def delete_room_to_purge(self, room_id: str, delete_id: str) -> None:
+    async def delete_room_to_delete(self, room_id: str, delete_id: str) -> None:
         """Remove a room from the list of rooms to purge.
 
         Args:
@@ -1333,32 +1334,61 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         """
 
         await self.db_pool.simple_delete(
-            "rooms_to_purge",
+            "rooms_to_delete",
             keyvalues={
                 "room_id": room_id,
                 "delete_id": delete_id,
             },
-            desc="delete_room_to_purge",
+            desc="delete_room_to_delete",
         )
 
-    async def get_rooms_to_purge(self) -> List[Dict[str, Any]]:
-        """Returns all rooms to shutdown/purge. This includes those that have
-        been interrupted by a stop/restart of synapse, but also scheduled ones
+    async def get_rooms_to_delete(
+        self, room_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Returns all delete jobs. This includes those that have been
+        interrupted by a stop/restart of synapse, but also scheduled ones
         like locally forgotten rooms.
+
+        Args:
+            room_id: if specified, will only return the delete jobs for a specific room
+
         """
+        keyvalues = {}
+        if room_id is not None:
+            keyvalues["room_id"] = room_id
+
         return await self.db_pool.simple_select_list(
-            table="rooms_to_purge",
-            keyvalues={},
+            table="rooms_to_delete",
+            keyvalues=keyvalues,
             retcols=(
                 "room_id",
                 "delete_id",
-                "timestamp",
+                "action",
                 "status",
+                "timestamp",
+                "params",
+                "response",
                 "error",
-                "shutdown_params",
-                "shutdown_response",
             ),
-            desc="rooms_to_purge_fetch",
+            desc="rooms_to_delete_fetch",
+        )
+
+    async def get_room_to_delete(self, delete_id: str) -> Optional[Dict[str, Any]]:
+        """Return the delete job identified by delete_id."""
+        return await self.db_pool.simple_select_one(
+            table="rooms_to_delete",
+            keyvalues={"delete_id": delete_id},
+            retcols=(
+                "room_id",
+                "delete_id",
+                "action",
+                "status",
+                "timestamp",
+                "params",
+                "response",
+                "error",
+            ),
+            desc="rooms_to_delete_fetch",
         )
 
     async def get_rooms_user_has_been_in(self, user_id: str) -> Set[str]:

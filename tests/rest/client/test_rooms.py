@@ -41,7 +41,6 @@ from synapse.api.errors import Codes, HttpResponseException
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, register, room, sync
 from synapse.server import HomeServer
@@ -2090,13 +2089,13 @@ class RoomMessageListTestCase(RoomBase):
 
         # Purge every event before the second event.
         purge_id = random_string(16)
-        pagination_handler._purges_by_id[purge_id] = PurgeStatus()
         self.get_success(
             pagination_handler._purge_history(
                 purge_id=purge_id,
                 room_id=self.room_id,
                 token=second_token_str,
                 delete_local_events=True,
+                update_rooms_to_delete_table=True,
             )
         )
 
