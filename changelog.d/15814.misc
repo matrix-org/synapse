@@ -1,1 +1,0 @@
-Fix harmless exceptions being printed when running the port DB script.
