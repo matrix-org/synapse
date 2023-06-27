@@ -13,6 +13,7 @@
 #  limitations under the License.
 #
 
+import json
 import logging
 import urllib.parse
 from typing import TYPE_CHECKING, Any, Optional, Set, Tuple, cast
@@ -174,12 +175,16 @@ class ProxyResource(_AsyncResource):
         request.setHeader(b"Content-Type", b"application/json")
         request.write(
             (
-                '{"errcode": "%s","err":"ProxyResource: Error when proxying request: %s %s -> %s"}'
-                % (
-                    Codes.UNKNOWN,
-                    request.method.decode("ascii"),
-                    request.uri.decode("ascii"),
-                    f,
+                json.dumps(
+                    {
+                        "errcode": Codes.UNKNOWN,
+                        "err": "ProxyResource: Error when proxying request: %s %s -> %s"
+                        % (
+                            request.method.decode("ascii"),
+                            request.uri.decode("ascii"),
+                            f,
+                        ),
+                    }
                 )
             ).encode()
         )
