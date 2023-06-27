@@ -1,5 +1,8 @@
 # Synapse 1.87.0rc1 (2023-06-27)
 
+Please note that this will be the last release of Synapse that is compatible with
+Python 3.7 and earlier.
+
 ### Features
 
 - Improve `/messages` response time by avoiding backfill when we already have messages to return. ([\#15737](https://github.com/matrix-org/synapse/issues/15737))
