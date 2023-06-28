@@ -1,3 +1,58 @@
+# Synapse 1.87.0rc1 (2023-06-27)
+
+Please note that this will be the last release of Synapse that is compatible with
+Python 3.7 and earlier.
+
+### Features
+
+- Improve `/messages` response time by avoiding backfill when we already have messages to return. ([\#15737](https://github.com/matrix-org/synapse/issues/15737))
+- Add spam checker module API for logins. ([\#15838](https://github.com/matrix-org/synapse/issues/15838))
+
+### Bugfixes
+
+- Fix a long-standing bug where media files were served in an unsafe manner. Contributed by @joshqou. ([\#15680](https://github.com/matrix-org/synapse/issues/15680))
+- Avoid invalidating a cache that was just prefilled. ([\#15758](https://github.com/matrix-org/synapse/issues/15758))
+- Fix requesting multiple keys at once over federation, related to [MSC3983](https://github.com/matrix-org/matrix-spec-proposals/pull/3983). ([\#15770](https://github.com/matrix-org/synapse/issues/15770))
+- Fix joining rooms through aliases where the alias server isn't a real homeserver. Contributed by @tulir @ Beeper. ([\#15776](https://github.com/matrix-org/synapse/issues/15776))
+- Fix a bug in push rules handling leading to an invalid (per spec) `is_user_mention` rule sent to clients. Also fix wrong rule names for `is_user_mention` and `is_room_mention`. ([\#15781](https://github.com/matrix-org/synapse/issues/15781))
+- Fix a bug introduced in 1.57.0 where the wrong table would be locked on updating database rows when using SQLite as the database backend. ([\#15788](https://github.com/matrix-org/synapse/issues/15788))
+- Fix Sytest environmental variable evaluation in CI. ([\#15804](https://github.com/matrix-org/synapse/issues/15804))
+- Fix forgotten rooms missing from initial sync after rejoining them. Contributed by Nico from Famedly. ([\#15815](https://github.com/matrix-org/synapse/issues/15815))
+- Fix sqlite `user_filters` upgrade introduced in v1.86.0. ([\#15817](https://github.com/matrix-org/synapse/issues/15817))
+
+### Improved Documentation
+
+- Document `looping_call()` functionality that will wait for the given function to finish before scheduling another. ([\#15772](https://github.com/matrix-org/synapse/issues/15772))
+- Fix a typo in the [Admin API](https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/index.html). ([\#15805](https://github.com/matrix-org/synapse/issues/15805))
+- Fix typo in MSC number in faster remote room join architecture doc. ([\#15812](https://github.com/matrix-org/synapse/issues/15812))
+
+### Deprecations and Removals
+
+- Remove experimental [MSC2716](https://github.com/matrix-org/matrix-spec-proposals/pull/2716) implementation to incrementally import history into existing rooms. ([\#15748](https://github.com/matrix-org/synapse/issues/15748))
+
+### Internal Changes
+
+- Replace `EventContext` fields `prev_group` and `delta_ids` with field `state_group_deltas`. ([\#15233](https://github.com/matrix-org/synapse/issues/15233))
+- Regularly try to send transactions to other servers after they failed instead of waiting for a new event to be available before trying. ([\#15743](https://github.com/matrix-org/synapse/issues/15743))
+- Fix requesting multiple keys at once over federation, related to [MSC3983](https://github.com/matrix-org/matrix-spec-proposals/pull/3983). ([\#15755](https://github.com/matrix-org/synapse/issues/15755))
+- Allow for the configuration of max request retries and min/max retry delays in the matrix federation client. ([\#15783](https://github.com/matrix-org/synapse/issues/15783))
+- Switch from `matrix://` to `matrix-federation://` scheme for internal Synapse routing of outbound federation traffic. ([\#15806](https://github.com/matrix-org/synapse/issues/15806))
+- Fix harmless exceptions being printed when running the port DB script. ([\#15814](https://github.com/matrix-org/synapse/issues/15814))
+
+### Updates to locked dependencies
+
+* Bump attrs from 22.2.0 to 23.1.0. ([\#15801](https://github.com/matrix-org/synapse/issues/15801))
+* Bump cryptography from 40.0.2 to 41.0.1. ([\#15800](https://github.com/matrix-org/synapse/issues/15800))
+* Bump ijson from 3.2.0.post0 to 3.2.1. ([\#15802](https://github.com/matrix-org/synapse/issues/15802))
+* Bump phonenumbers from 8.13.13 to 8.13.14. ([\#15798](https://github.com/matrix-org/synapse/issues/15798))
+* Bump ruff from 0.0.265 to 0.0.272. ([\#15799](https://github.com/matrix-org/synapse/issues/15799))
+* Bump ruff from 0.0.272 to 0.0.275. ([\#15833](https://github.com/matrix-org/synapse/issues/15833))
+* Bump serde_json from 1.0.96 to 1.0.97. ([\#15797](https://github.com/matrix-org/synapse/issues/15797))
+* Bump serde_json from 1.0.97 to 1.0.99. ([\#15832](https://github.com/matrix-org/synapse/issues/15832))
+* Bump towncrier from 22.12.0 to 23.6.0. ([\#15831](https://github.com/matrix-org/synapse/issues/15831))
+* Bump types-opentracing from 2.4.10.4 to 2.4.10.5. ([\#15830](https://github.com/matrix-org/synapse/issues/15830))
+* Bump types-setuptools from 67.8.0.0 to 68.0.0.0. ([\#15835](https://github.com/matrix-org/synapse/issues/15835))
+
 Synapse 1.86.0 (2023-06-20)
 ===========================
 

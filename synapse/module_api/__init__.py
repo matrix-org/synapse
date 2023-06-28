@@ -80,6 +80,7 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
 )
 from synapse.module_api.callbacks.spamchecker_callbacks import (
     CHECK_EVENT_FOR_SPAM_CALLBACK,
+    CHECK_LOGIN_FOR_SPAM_CALLBACK,
     CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
     CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
@@ -302,6 +303,7 @@ class ModuleApi:
             CHECK_REGISTRATION_FOR_SPAM_CALLBACK
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
+        check_login_for_spam: Optional[CHECK_LOGIN_FOR_SPAM_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for spam checking capabilities.
 
@@ -319,6 +321,7 @@ class ModuleApi:
             check_username_for_spam=check_username_for_spam,
             check_registration_for_spam=check_registration_for_spam,
             check_media_file_for_spam=check_media_file_for_spam,
+            check_login_for_spam=check_login_for_spam,
         )
 
     def register_account_validity_callbacks(
