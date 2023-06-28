@@ -2763,4 +2763,4 @@ Internal Changes
 - Work around Mjolnir compatibility issue by adding an import for `glob_to_regex` in `synapse.util`, where it moved from. ([\#11696](https://github.com/matrix-org/synapse/issues/11696))
 
 
-**Changelogs for older versions can be found [here](CHANGES-20201.md).**
+**Changelogs for older versions can be found [here](CHANGES-2021.md).**
