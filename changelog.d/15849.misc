@@ -1,1 +1,1 @@
-Add check constraint to current_state_delta_stream. (#15849)
+Add check constraint to current_state_delta_stream (#15849).
