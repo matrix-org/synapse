@@ -86,6 +86,7 @@ class StorageProviderWrapper(StorageProvider):
     def __str__(self) -> str:
         return "StorageProviderWrapper[%s]" % (self.backend,)
 
+    @trace
     async def store_file(self, path: str, file_info: FileInfo) -> None:
         if not file_info.server_name and not self.store_local:
             return None
@@ -114,6 +115,7 @@ class StorageProviderWrapper(StorageProvider):
 
             run_in_background(store)
 
+    @trace
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         if file_info.url_cache:
             # Files in the URL preview cache definitely aren't stored here,
@@ -141,6 +143,7 @@ class FileStorageProviderBackend(StorageProvider):
     def __str__(self) -> str:
         return "FileStorageProviderBackend[%s]" % (self.base_directory,)
 
+    @trace
     async def store_file(self, path: str, file_info: FileInfo) -> None:
         """See StorageProvider.store_file"""
 
@@ -159,6 +162,7 @@ class FileStorageProviderBackend(StorageProvider):
             backup_fname,
         )
 
+    @trace
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         """See StorageProvider.fetch"""
 
