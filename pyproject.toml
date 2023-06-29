@@ -1,38 +1,38 @@
 [tool.towncrier]
-package = "synapse"
-filename = "CHANGES.md"
-directory = "changelog.d"
-issue_format = "[\\#{issue}](https://github.com/matrix-org/synapse/issues/{issue})"
+    package = "synapse"
+    filename = "CHANGES.md"
+    directory = "changelog.d"
+    issue_format = "[\\#{issue}](https://github.com/matrix-org/synapse/issues/{issue})"
 
-[[tool.towncrier.type]]
-directory = "feature"
-name = "Features"
-showcontent = true
+    [[tool.towncrier.type]]
+        directory = "feature"
+        name = "Features"
+        showcontent = true
 
-[[tool.towncrier.type]]
-directory = "bugfix"
-name = "Bugfixes"
-showcontent = true
+    [[tool.towncrier.type]]
+        directory = "bugfix"
+        name = "Bugfixes"
+        showcontent = true
 
-[[tool.towncrier.type]]
-directory = "docker"
-name = "Updates to the Docker image"
-showcontent = true
+    [[tool.towncrier.type]]
+        directory = "docker"
+        name = "Updates to the Docker image"
+        showcontent = true
 
-[[tool.towncrier.type]]
-directory = "doc"
-name = "Improved Documentation"
-showcontent = true
+    [[tool.towncrier.type]]
+        directory = "doc"
+        name = "Improved Documentation"
+        showcontent = true
 
-[[tool.towncrier.type]]
-directory = "removal"
-name = "Deprecations and Removals"
-showcontent = true
+    [[tool.towncrier.type]]
+        directory = "removal"
+        name = "Deprecations and Removals"
+        showcontent = true
 
-[[tool.towncrier.type]]
-directory = "misc"
-name = "Internal Changes"
-showcontent = true
+    [[tool.towncrier.type]]
+        directory = "misc"
+        name = "Internal Changes"
+        showcontent = true
 
 [tool.black]
 target-version = ['py37', 'py38', 'py39', 'py310']
@@ -53,7 +53,13 @@ line-length = 88
 #  B019: Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
 #  B023: Functions defined inside a loop must not use variables redefined in the loop
 #  B024: Abstract base class with no abstract method.
-ignore = ["B019", "B023", "B024", "E501", "E731"]
+ignore = [
+    "B019",
+    "B023",
+    "B024",
+    "E501",
+    "E731",
+]
 select = [
     # pycodestyle checks.
     "E",
@@ -68,15 +74,7 @@ select = [
 
 [tool.isort]
 line_length = 88
-sections = [
-    "FUTURE",
-    "STDLIB",
-    "THIRDPARTY",
-    "TWISTED",
-    "FIRSTPARTY",
-    "TESTS",
-    "LOCALFOLDER",
-]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "TWISTED", "FIRSTPARTY", "TESTS", "LOCALFOLDER"]
 default_section = "THIRDPARTY"
 known_first_party = ["synapse"]
 known_tests = ["tests"]
@@ -97,7 +95,9 @@ authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
 readme = "README.rst"
 repository = "https://github.com/matrix-org/synapse"
-packages = [{ include = "synapse" }]
+packages = [
+    { include = "synapse" },
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Topic :: Communications :: Chat",
@@ -113,7 +113,7 @@ include = [
     { path = "INSTALL.md", format = "sdist" },
     { path = "mypy.ini", format = "sdist" },
     { path = "scripts-dev", format = "sdist" },
-    { path = "synmark", format = "sdist" },
+    { path = "synmark", format="sdist" },
     { path = "sytest-blacklist", format = "sdist" },
     { path = "tests", format = "sdist" },
     { path = "UPGRADE.rst", format = "sdist" },
@@ -123,7 +123,9 @@ include = [
     { path = "rust/build.rs", format = "sdist" },
     { path = "rust/src/**", format = "sdist" },
 ]
-exclude = [{ path = "synapse/*.so", format = "sdist" }]
+exclude = [
+    { path = "synapse/*.so", format = "sdist"}
+]
 
 [tool.poetry.build]
 script = "build_rust.py"
@@ -164,7 +166,7 @@ signedjson = "^1.1.0"
 service-identity = ">=18.1.0"
 # Twisted 18.9 introduces some logger improvements that the structured
 # logger utilises
-Twisted = { extras = ["tls"], version = ">=18.9.0" }
+Twisted = {extras = ["tls"], version = ">=18.9.0"}
 treq = ">=15.1"
 # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
 pyOpenSSL = ">=16.0.0"
@@ -280,9 +282,7 @@ all = [
     # matrix-synapse-ldap3
     "matrix-synapse-ldap3",
     # postgres
-    "psycopg2",
-    "psycopg2cffi",
-    "psycopg2cffi-compat",
+    "psycopg2", "psycopg2cffi", "psycopg2cffi-compat",
     # saml2
     "pysaml2",
     # oidc and jwt
@@ -292,11 +292,9 @@ all = [
     # sentry
     "sentry-sdk",
     # opentracing
-    "jaeger-client",
-    "opentracing",
+    "jaeger-client", "opentracing",
     # redis
-    "txredisapi",
-    "hiredis",
+    "txredisapi", "hiredis",
     # cache-memory
     "pympler",
     # improved user search
@@ -356,9 +354,9 @@ tomli = ">=1.2.3"
 optional = true
 
 [tool.poetry.group.dev-docs.dependencies]
-sphinx = { version = "^6.1", python = "^3.8" }
-sphinx-autodoc2 = { version = "^0.4.2", python = "^3.8" }
-myst-parser = { version = "^1.0.0", python = "^3.8" }
+sphinx = {version = "^6.1", python = "^3.8"}
+sphinx-autodoc2 = {version = "^0.4.2", python = "^3.8"}
+myst-parser = {version = "^1.0.0", python = "^3.8"}
 furo = ">=2022.12.7,<2024.0.0"
 
 
@@ -377,8 +375,8 @@ build-backend = "poetry.core.masonry.api"
 skip = "cp36* *-musllinux_i686 pp*aarch64 *-musllinux_aarch64"
 
 # We need a rust compiler
-before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
-environment = { PATH = "$PATH:$HOME/.cargo/bin" }
+before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
+environment= { PATH = "$PATH:$HOME/.cargo/bin" }
 
 # For some reason if we don't manually clean the build directory we
 # can end up polluting the next build with a .so that is for the wrong
