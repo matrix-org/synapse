@@ -62,11 +62,6 @@ FROM docker.io/library/${distro}
 ARG distro=""
 ENV distro ${distro}
 
-# Python < 3.7 assumes LANG="C" means ASCII-only and throws on printing unicode
-# http://bugs.python.org/issue19846
-# TODO: We can possibly remove this now that we don't support Python 3.7
-ENV LANG C.UTF-8
-
 # Install the build dependencies
 #
 # NB: keep this list in sync with the list of build-deps in debian/control
