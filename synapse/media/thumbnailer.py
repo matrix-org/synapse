@@ -19,6 +19,8 @@ from typing import Optional, Tuple, Type
 
 from PIL import Image
 
+from synapse.logging.opentracing import trace
+
 logger = logging.getLogger(__name__)
 
 EXIF_ORIENTATION_TAG = 0x0112

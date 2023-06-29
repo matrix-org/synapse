@@ -27,6 +27,7 @@ from typing import (
 )
 
 from synapse.api.constants import Direction
+from synapse.logging.opentracing import trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,

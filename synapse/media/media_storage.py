@@ -38,6 +38,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import NotFoundError
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
+from synapse.logging.opentracing import trace
 from synapse.util import Clock
 from synapse.util.file_consumer import BackgroundFileConsumer
 

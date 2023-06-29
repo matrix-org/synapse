@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from synapse.config._base import Config
 from synapse.logging.context import defer_to_thread, run_in_background
+from synapse.logging.opentracing import trace
 from synapse.util.async_helpers import maybe_awaitable
 
 from ._base import FileInfo, Responder

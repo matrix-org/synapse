@@ -35,6 +35,7 @@ from synapse.api.errors import (
 from synapse.config.repository import ThumbnailRequirement
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
+from synapse.logging.opentracing import trace
 from synapse.media._base import (
     FileInfo,
     Responder,
