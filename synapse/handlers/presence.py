@@ -1438,7 +1438,9 @@ class PresenceHandler(BasePresenceHandler):
         users = await self.store.get_users_in_room(room_id)
         prev_users = set(users) - newly_joined_users
 
-        async def is_only_one_room_shared(current_user_id: str, other_user_id: str) -> bool:
+        async def is_only_one_room_shared(
+            current_user_id: str, other_user_id: str
+        ) -> bool:
             """Check to see if there is more than one shared room between these users"""
             pair_of_users_to_check = frozenset((current_user_id, other_user_id))
             # By learning if these two users share any other room, we can tell
