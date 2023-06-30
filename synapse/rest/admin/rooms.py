@@ -160,6 +160,8 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
 
         response = []
         for delete_status in delete_statuses:
+            # We ignore scheduled deletes because currently they are only used
+            # for automatically purging forgotten room after X time.
             if delete_status.status != DeleteStatus.STATUS_SCHEDULED:
                 response += [delete_status.asdict()]
 
