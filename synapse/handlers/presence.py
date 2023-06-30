@@ -487,11 +487,12 @@ class WorkerPresenceHandler(BasePresenceHandler):
         if prev_state.state != PresenceState.BUSY:
             # We set state here but pass ignore_status_msg = True as we don't want to
             # cause the status message to be cleared.
-            # Note that this causes last_active_ts to be incremented which is not
-            # what the spec wants: see comment in the BasePresenceHandler version
-            # of this function.
+            # Note that this causes last_active_ts to be incremented only if changing
+            # state to 'online' from anything else.
             await self.set_state(
-                UserID.from_string(user_id), {"presence": presence_state}, True
+                UserID.from_string(user_id),
+                {"presence": presence_state},
+                ignore_status_msg=True,
             )
 
         curr_sync = self._user_to_num_current_syncs.get(user_id, 0)
@@ -1005,35 +1006,29 @@ class PresenceHandler(BasePresenceHandler):
             # If they're busy then they don't stop being busy just by syncing,
             # so just update the last sync time.
             if prev_state.state != PresenceState.BUSY:
-                # XXX: We set_state separately here and just update the last_active_ts above
                 # This keeps the logic as similar as possible between the worker and single
-                # process modes. Using set_state will actually cause last_active_ts to be
-                # updated always, which is not what the spec calls for, but synapse has done
-                # this for... forever, I think.
+                # process modes.
+                # TODO: for the BUSY state, I think it would be fine to pass this in, as
+                #  it will be evaluated to update last_active_ts, which I think meets
+                #  the proposed spec change for MSC3026.
                 await self.set_state(
-                    UserID.from_string(user_id), {"presence": presence_state}, True
+                    UserID.from_string(user_id),
+                    {"presence": presence_state},
+                    ignore_status_msg=True,
                 )
                 # Retrieve the new state for the logic below. This should come from the
                 # in-memory cache.
                 prev_state = await self.current_state_for_user(user_id)
 
-            # To keep the single process behaviour consistent with worker mode, run the
-            # same logic as `update_external_syncs_row`, even though it looks weird.
-            if prev_state.state == PresenceState.OFFLINE:
-                await self._update_states(
-                    [
-                        prev_state.copy_and_replace(
-                            state=PresenceState.ONLINE,
-                            last_active_ts=self.clock.time_msec(),
-                            last_user_sync_ts=self.clock.time_msec(),
-                        )
-                    ]
-                )
             # otherwise, set the new presence state & update the last sync time,
             # but don't update last_active_ts as this isn't an indication that
             # they've been active (even though it's probably been updated by
-            # set_state above)
-            else:
+            # set_state above).
+            # TODO: This will be removed in future work as it's
+            #  literally done again at the '_end' of this context manager and the
+            #  only time last_user_sync_ts matters is when processing timeouts in
+            #  handle_timeout().
+            if prev_state.state != PresenceState.OFFLINE:
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
@@ -1046,10 +1041,10 @@ class PresenceHandler(BasePresenceHandler):
             try:
                 self.user_to_num_current_syncs[user_id] -= 1
 
-                prev_state = await self.current_state_for_user(user_id)
+                prev_state_inner = await self.current_state_for_user(user_id)
                 await self._update_states(
                     [
-                        prev_state.copy_and_replace(
+                        prev_state_inner.copy_and_replace(
                             last_user_sync_ts=self.clock.time_msec()
                         )
                     ]
@@ -1255,9 +1250,10 @@ class PresenceHandler(BasePresenceHandler):
         if not ignore_status_msg:
             new_fields["status_msg"] = status_msg
 
-        if presence == PresenceState.ONLINE or (
-            presence == PresenceState.BUSY and self._busy_presence_enabled
-        ):
+        if (
+            prev_state.state != PresenceState.ONLINE
+            and presence == PresenceState.ONLINE
+        ) or (presence == PresenceState.BUSY and self._busy_presence_enabled):
             new_fields["last_active_ts"] = self.clock.time_msec()
 
         await self._update_states(
