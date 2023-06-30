@@ -14,7 +14,7 @@
 # limitations under the License.
 import json
 import logging
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from twisted.python.failure import Failure
 
@@ -418,6 +418,20 @@ class PaginationHandler:
                     PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000, clear_purge
                 )
 
+    @staticmethod
+    def _convert_to_delete_status(res: Dict[str, Any]) -> DeleteStatus:
+        status = DeleteStatus()
+        status.delete_id = res["delete_id"]
+        status.action = res["action"]
+        status.status = res["status"]
+        if "error" in res:
+            status.error = res["error"]
+
+        if status.action == DeleteStatus.ACTION_SHUTDOWN and res["response"]:
+            status.shutdown_room = json.loads(res["response"])
+
+        return status
+
     async def get_delete_status(self, delete_id: str) -> Optional[DeleteStatus]:
         """Get the current status of an active deleting
 
@@ -427,13 +441,7 @@ class PaginationHandler:
         """
         res = await self.store.get_room_to_delete(delete_id)
         if res:
-            status = DeleteStatus()
-            status.delete_id = res["delete_id"]
-            status.action = res["action"]
-            status.status = res["status"]
-            if status.action == DeleteStatus.ACTION_SHUTDOWN and res["response"]:
-                status.shutdown_room = json.loads(res["response"])
-            return status
+            return PaginationHandler._convert_to_delete_status(res)
         return None
 
     async def get_delete_statuses_by_room(self, room_id: str) -> List[DeleteStatus]:
@@ -443,16 +451,7 @@ class PaginationHandler:
             room_id: room_id that is deleted
         """
         res = await self.store.get_rooms_to_delete(room_id)
-        statuses = []
-        for r in res:
-            status = DeleteStatus()
-            status.delete_id = r["delete_id"]
-            status.action = r["action"]
-            status.status = r["status"]
-            if status.action == DeleteStatus.ACTION_SHUTDOWN and r["response"]:
-                status.shutdown_room = json.loads(r["response"])
-            statuses.append(status)
-        return statuses
+        return [PaginationHandler._convert_to_delete_status(r) for r in res]
 
     async def purge_room(
         self,
