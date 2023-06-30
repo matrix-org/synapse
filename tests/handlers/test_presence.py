@@ -773,6 +773,32 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # we should still be busy
         self.assertEqual(state.state, PresenceState.BUSY)
 
+    def test_syncing_appropriately_handles_last_active_ts(self) -> None:
+        """Test that syncing does not bump last_active_ts when already online"""
+
+        user_id = "@test:server"
+
+        # Start from a time that is not zero
+        self.reactor.advance(2)
+
+        self._set_presencestate_with_status_msg(user_id, PresenceState.ONLINE, None)
+
+        prev_state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+
+        # Poke the reactor so some time passes
+        self.reactor.advance(2)
+        self.get_success(
+            self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
+        )
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        # last_active_ts should not have changed as no pro-active event has occurred
+        self.assertEqual(prev_state.last_active_ts, state.last_active_ts)
+
     def _set_presencestate_with_status_msg(
         self, user_id: str, state: str, status_msg: Optional[str]
     ) -> None:
