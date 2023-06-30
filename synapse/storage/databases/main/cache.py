@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Tuple
 
 from synapse.api.constants import EventTypes
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.streams import BackfillStream, CachesStream
 from synapse.replication.tcp.streams.events import (
     EventsStream,
@@ -51,6 +52,21 @@ PURGE_HISTORY_CACHE_NAME = "ph_cache_fake"
 
 # As above, but for invalidating room caches on room deletion
 DELETE_ROOM_CACHE_NAME = "dr_cache_fake"
+
+# How long between cache invalidation table cleanups, once we have caught up
+# with the backlog.
+REGULAR_CLEANUP_INTERVAL_MILLISEC = 60 * 60 * 1000
+
+# How long between cache invalidation table cleanups, before we have caught
+# up with the backlog.
+CATCH_UP_CLEANUP_INTERVAL_MILLISEC = 5 * 60 * 1000
+
+# Maximum number of cache invalidation rows to delete at once.
+CLEAN_UP_MAX_BATCH_SIZE = 200_000
+
+# Keep cache invalidations for 7 days
+# (This is likely to be quite excessive.)
+RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MILLISEC = 7 * 24 * 60 * 60 * 1000
 
 
 class CacheInvalidationWorkerStore(SQLBaseStore):
@@ -97,6 +113,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
         else:
             self._cache_id_gen = None
+
+        # TODO should run background jobs?
+        if False and isinstance(self.database_engine, PostgresEngine):
+            self.hs.get_clock().call_later(
+                CATCH_UP_CLEANUP_INTERVAL_MILLISEC,
+                self._clean_up_cache_invalidation_wrapper,
+            )
 
     async def get_all_updated_caches(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -554,3 +577,103 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             return self._cache_id_gen.get_current_token_for_writer(instance_name)
         else:
             return 0
+
+    def _clean_up_cache_invalidation_wrapper(self) -> None:
+        async def _clean_up_cache_invalidation_background():
+            delete_up_to: int = (
+                self.hs.get_clock().time_msec()
+                - RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MILLISEC
+            )
+
+            in_backlog = await self._clean_up_batch_of_old_cache_invalidations(
+                delete_up_to
+            )
+
+            # Vary how long we wait before calling again depending on whether we
+            # are still sifting through backlog or we have caught up.
+            if in_backlog:
+                next_interval = CATCH_UP_CLEANUP_INTERVAL_MILLISEC
+            else:
+                next_interval = REGULAR_CLEANUP_INTERVAL_MILLISEC
+
+            self.hs.get_clock().call_later(
+                next_interval, self._clean_up_cache_invalidation_wrapper
+            )
+
+        run_as_background_process(
+            "clean_up_old_cache_invalidations", _clean_up_cache_invalidation_background
+        )
+
+    async def _clean_up_batch_of_old_cache_invalidations(
+        self, delete_up_to_millisec: int
+    ) -> bool:
+        """
+        Cleans up a batch of old cache invalidations.
+
+        Up to `CLEAN_UP_BATCH_SIZE` rows will be deleted at once.
+
+        Returns true iff we were limited by batch size (i.e. we are in backlog).
+        """
+
+        def _clean_up_batch_of_old_cache_invalidations_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            # First get the earliest stream ID
+            txn.execute(
+                """
+                SELECT stream_id FROM cache_invalidation_stream_by_instance
+                ORDER BY stream_id LIMIT 1
+                """
+            )
+            row = txn.fetchone()
+            if row is None:
+                return False
+            earliest_stream_id: int = row[0]
+
+            # Then find the last stream ID of the range we will delete
+            txn.execute(
+                """
+                SELECT stream_id FROM cache_invalidation_stream_by_instance
+                WHERE stream_id <= ? AND invalidation_ts <= ?
+                ORDER BY stream_id DESC
+                LIMIT 1
+                """,
+                (earliest_stream_id + CLEAN_UP_MAX_BATCH_SIZE, delete_up_to_millisec),
+            )
+            row = txn.fetchone()
+            if row is None:
+                return False
+            cutoff_stream_id: int = row[0]
+
+            # Determine whether we are caught up or still catching up
+            txn.execute(
+                """
+                SELECT invalidation_ts FROM cache_invalidation_stream_by_instance
+                WHERE stream_id > ?
+                ORDER BY stream_id ASC
+                LIMIT 1
+                """,
+                (cutoff_stream_id,),
+            )
+            row = txn.fetchone()
+            if row is None:
+                in_backlog = False
+            else:
+                # We are in backlog if the next row could have been deleted
+                # if we didn't have such a small batch size
+                in_backlog = row[0] <= delete_up_to_millisec
+
+            txn.execute(
+                """
+                DELETE FROM cache_invalidation_stream_by_instance
+                WHERE ? <= stream_id AND stream_id <= ?
+                """,
+                (earliest_stream_id, cutoff_stream_id),
+            )
+
+            return in_backlog
+
+        return await self.db_pool.runInteraction(
+            "clean_up_old_cache_invalidations",
+            _clean_up_batch_of_old_cache_invalidations_txn,
+        )
