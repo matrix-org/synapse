@@ -521,6 +521,11 @@ class SynapseRequest(Request):
         else:
             return self.getClientAddress().host
 
+    def request_info(self) -> "RequestInfo":
+        h = self.getHeader(b"User-Agent")
+        user_agent = h.decode("ascii", "replace") if h else None
+        return RequestInfo(user_agent=user_agent, ip=self.get_client_ip_if_available())
+
 
 class XForwardedForRequest(SynapseRequest):
     """Request object which honours proxy headers
@@ -661,3 +666,9 @@ class SynapseSite(Site):
 
     def log(self, request: SynapseRequest) -> None:
         pass
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class RequestInfo:
+    user_agent: Optional[str]
+    ip: str
