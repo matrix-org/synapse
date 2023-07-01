@@ -1862,7 +1862,7 @@ def handle_timeout(
     """Checks the presence of the user to see if any of the timers have elapsed
 
     Args:
-        state
+        state: the current state of the user, not the state at the setting of the timer
         is_mine: Whether the user is ours
         syncing_user_ids: Set of user_ids with active syncs.
         now: Current time in ms.
