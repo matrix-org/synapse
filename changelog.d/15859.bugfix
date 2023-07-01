@@ -1,0 +1,1 @@
+Fix long standing bug of `last_active_ts` being bumped far to often.
