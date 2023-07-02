@@ -87,6 +87,14 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+# Upgrading to v1.88.0
+
+## Removal of `worker_replication_*` settings
+As mentioned in v1.84.0, these settings are deprecated and are being removed. Ensure you
+have migrated to using `main` on your shared configuration `instance_map`(or create one
+if necessary) if you have ***any*** workers at all.
+
+
 # Upgrading to v1.86.0
 
 ## Minimum supported Rust version
