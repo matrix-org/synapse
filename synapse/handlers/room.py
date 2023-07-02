@@ -1845,12 +1845,20 @@ class DeleteStatus:
         "new_room_id": None,
     }
 
-    def asdict(self) -> JsonDict:
-        ret = {
-            "delete_id": self.delete_id,
-            "status": self.status,
-            "shutdown_room": self.shutdown_room,
-        }
+    def asdict(self, use_purge_history_format: bool = False) -> JsonDict:
+        if not use_purge_history_format:
+            ret = {
+                "delete_id": self.delete_id,
+                "status": self.status,
+                "shutdown_room": self.shutdown_room,
+            }
+        else:
+            ret = {
+                "status": self.status
+                if self.status == DeleteStatus.STATUS_COMPLETE
+                or self.status == DeleteStatus.STATUS_FAILED
+                else "active",
+            }
         if self.error:
             ret["error"] = self.error
         return ret

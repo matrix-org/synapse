@@ -220,7 +220,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
         # TODO active vs purging etc
-        return HTTPStatus.OK, purge_status.asdict()
+        return HTTPStatus.OK, purge_status.asdict(use_purge_history_format=True)
 
 
 ########################################################################################
