@@ -126,6 +126,13 @@ class InternalAuth(BaseAuth):
                     access_token, allow_expired=allow_expired
                 )
 
+                if await self.store.get_user_locked_status(requester.user.to_string()):
+                    raise AuthError(
+                        403,
+                        "User account has been locked",
+                        errcode=Codes.USER_LOCKED,
+                    )
+
                 # Deny the request if the user account has expired.
                 # This check is only done for regular users, not appservice ones.
                 if not allow_expired:

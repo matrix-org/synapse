@@ -1116,6 +1116,27 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         # Convert the integer into a boolean.
         return res == 1
 
+    @cached()
+    async def get_user_locked_status(self, user_id: str) -> bool:
+        """Retrieve the value for the `locked` property for the provided user.
+
+        Args:
+            user_id: The ID of the user to retrieve the status for.
+
+        Returns:
+            True if the user was locked, false if the user is still active.
+        """
+
+        res = await self.db_pool.simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="locked",
+            desc="get_user_locked_status",
+        )
+
+        # Convert the integer into a boolean.
+        return res == 1
+
     async def get_threepid_validation_session(
         self,
         medium: Optional[str],
@@ -2109,6 +2130,35 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             txn, self.get_user_deactivated_status, (user_id,)
         )
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+        txn.call_after(self.is_guest.invalidate, (user_id,))
+
+    async def set_user_locked_status(self, user_id: str, locked: bool) -> None:
+        """Set the `locked` property for the provided user to the provided value.
+
+        Args:
+            user_id: The ID of the user to set the status for.
+            locked: The value to set for `locked`.
+        """
+
+        await self.db_pool.runInteraction(
+            "set_user_locked_status",
+            self.set_user_locked_status_txn,
+            user_id,
+            locked,
+        )
+
+    def set_user_locked_status_txn(
+        self, txn: LoggingTransaction, user_id: str, locked: bool
+    ) -> None:
+        self.db_pool.simple_update_one_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            updatevalues={"locked": 1 if locked else 0},
+        )
+        self._invalidate_cache_and_stream(txn, self.get_user_locked_status, (user_id,))
+        self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+        # TODO is it useful ?
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
     def update_user_approval_status_txn(

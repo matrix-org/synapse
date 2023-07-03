@@ -80,6 +80,8 @@ class Codes(str, Enum):
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+    # USER_LOCKED = "M_USER_LOCKED"
+    USER_LOCKED = "ORG_MATRIX_MSC3939_USER_LOCKED"
 
     # Part of MSC3848
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
