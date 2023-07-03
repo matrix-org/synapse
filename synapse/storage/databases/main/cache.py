@@ -121,7 +121,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             # This is only applicable if we are on Postgres and therefore populate
             # those tables.
             self.hs.get_clock().call_later(
-                CATCH_UP_CLEANUP_INTERVAL_MILLISEC,
+                CATCH_UP_CLEANUP_INTERVAL_MILLISEC / 1000,
                 self._clean_up_cache_invalidation_wrapper,
             )
 
@@ -607,7 +607,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 next_interval = REGULAR_CLEANUP_INTERVAL_MILLISEC
 
             self.hs.get_clock().call_later(
-                next_interval, self._clean_up_cache_invalidation_wrapper
+                next_interval / 1000, self._clean_up_cache_invalidation_wrapper
             )
 
         run_as_background_process(
