@@ -90,9 +90,14 @@ process, for example:
 # Upgrading to v1.88.0
 
 ## Removal of `worker_replication_*` settings
-As mentioned in v1.84.0, these settings are deprecated and are being removed. Ensure you
+As mentioned below in [Upgrading to v1.84.0](#upgrading-to-v1840), these settings are deprecated and are being removed. Ensure you
 have migrated to using `main` on your shared configuration `instance_map`(or create one
 if necessary) if you have ***any*** workers at all.
+
+Specifically, to be removed(links for relevant docs attached):
+* [`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host)
+* [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)
+* [`worker_replication_http_tls`](usage/configuration/config_documentation.md#worker_replication_http_tls)
 
 
 # Upgrading to v1.86.0
