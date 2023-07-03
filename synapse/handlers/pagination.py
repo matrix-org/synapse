@@ -476,9 +476,14 @@ class PaginationHandler:
 
         async with self.pagination_lock.write(room_id):
             # first check that we have no users in this room
-            if not force:
-                joined = await self.store.is_host_joined(room_id, self._server_name)
-                if joined:
+            joined = await self.store.is_host_joined(room_id, self._server_name)
+            if joined:
+                if force:
+                    logger.info(
+                        "force-purging room %s with some local users still joined",
+                        room_id,
+                    )
+                else:
                     raise SynapseError(400, "Users are still joined to this room")
 
             await self.store.upsert_room_to_delete(
