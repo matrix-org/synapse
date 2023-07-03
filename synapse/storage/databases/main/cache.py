@@ -59,10 +59,10 @@ REGULAR_CLEANUP_INTERVAL_MILLISEC = 60 * 60 * 1000
 
 # How long between cache invalidation table cleanups, before we have caught
 # up with the backlog.
-CATCH_UP_CLEANUP_INTERVAL_MILLISEC = 5 * 60 * 1000
+CATCH_UP_CLEANUP_INTERVAL_MILLISEC = 60 * 1000
 
 # Maximum number of cache invalidation rows to delete at once.
-CLEAN_UP_MAX_BATCH_SIZE = 200_000
+CLEAN_UP_MAX_BATCH_SIZE = 20_000
 
 # Keep cache invalidations for 7 days
 # (This is likely to be quite excessive.)
@@ -584,6 +584,12 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
     def _clean_up_cache_invalidation_wrapper(self) -> None:
         async def _clean_up_cache_invalidation_background():
+            """
+            Clean up cache invalidation stream table entries occasionally.
+            If we are behind (i.e. there are entries old enough to
+            be deleted but too many of them to be deleted in one go),
+            then we run slightly more frequently.
+            """
             delete_up_to: int = (
                 self.hs.get_clock().time_msec()
                 - RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MILLISEC
