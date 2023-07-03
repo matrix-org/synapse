@@ -1,0 +1,1 @@
+Remove old `worker_replication_*` based settings in worker's example configuration.
