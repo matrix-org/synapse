@@ -583,7 +583,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             return 0
 
     def _clean_up_cache_invalidation_wrapper(self) -> None:
-        async def _clean_up_cache_invalidation_background():
+        async def _clean_up_cache_invalidation_background() -> None:
             """
             Clean up cache invalidation stream table entries occasionally.
             If we are behind (i.e. there are entries old enough to
