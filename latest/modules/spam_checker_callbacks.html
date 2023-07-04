@@ -452,6 +452,33 @@ doing.</strong></p>
 callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
+<h3 id="check_login_for_spam"><a class="header" href="#check_login_for_spam"><code>check_login_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.87.0</em></p>
+<pre><code class="language-python">async def check_login_for_spam(
+    user_id: str,
+    device_id: Optional[str],
+    initial_display_name: Optional[str],
+    request_info: Collection[Tuple[Optional[str], str]],
+    auth_provider_id: Optional[str] = None,
+) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;]
+</code></pre>
+<p>Called when a user logs in.</p>
+<p>The arguments passed to this callback are:</p>
+<ul>
+<li><code>user_id</code>: The user ID the user is logging in with</li>
+<li><code>device_id</code>: The device ID the user is re-logging into.</li>
+<li><code>initial_display_name</code>: The device display name, if any.</li>
+<li><code>request_info</code>: A collection of tuples, which first item is a user agent, and which
+second item is an IP address. These user agents and IP addresses are the ones that were
+used during the login process.</li>
+<li><code>auth_provider_id</code>: The identifier of the SSO authentication provider, if any.</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<p><em>Note:</em> This will not be called when a user registers.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements the spam checker callback
 <code>check_event_for_spam</code> to deny any message sent by users whose Matrix user IDs are

@@ -4663,6 +4663,29 @@ on this homeserver.</p>
 <pre><code class="language-yaml">allow_device_name_lookup_over_federation: true
 </code></pre>
 <hr />
+<h3 id="federation-1"><a class="header" href="#federation-1"><code>federation</code></a></h3>
+<p>The federation section defines some sub-options related to federation.</p>
+<p>The following options are related to configuring timeout and retry logic for one request,
+independently of the others.
+Short retry algorithm is used when something or someone will wait for the request to have an
+answer, while long retry is used for requests that happen in the background,
+like sending a federation transaction.</p>
+<ul>
+<li><code>client_timeout</code>: timeout for the federation requests. Default to 60s.</li>
+<li><code>max_short_retry_delay</code>: maximum delay to be used for the short retry algo. Default to 2s.</li>
+<li><code>max_long_retry_delay</code>: maximum delay to be used for the short retry algo. Default to 60s.</li>
+<li><code>max_short_retries</code>: maximum number of retries for the short retry algo. Default to 3 attempts.</li>
+<li><code>max_long_retries</code>: maximum number of retries for the long retry algo. Default to 10 attempts.</li>
+</ul>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">federation:
+  client_timeout: 180s
+  max_short_retry_delay: 7s
+  max_long_retry_delay: 100s
+  max_short_retries: 5
+  max_long_retries: 20
+</code></pre>
+<hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
 <p>Options related to caching.</p>
 <hr />
@@ -9926,6 +9949,33 @@ doing.</strong></p>
 callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
+<h3 id="check_login_for_spam"><a class="header" href="#check_login_for_spam"><code>check_login_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.87.0</em></p>
+<pre><code class="language-python">async def check_login_for_spam(
+    user_id: str,
+    device_id: Optional[str],
+    initial_display_name: Optional[str],
+    request_info: Collection[Tuple[Optional[str], str]],
+    auth_provider_id: Optional[str] = None,
+) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;]
+</code></pre>
+<p>Called when a user logs in.</p>
+<p>The arguments passed to this callback are:</p>
+<ul>
+<li><code>user_id</code>: The user ID the user is logging in with</li>
+<li><code>device_id</code>: The device ID the user is re-logging into.</li>
+<li><code>initial_display_name</code>: The device display name, if any.</li>
+<li><code>request_info</code>: A collection of tuples, which first item is a user agent, and which
+second item is an IP address. These user agents and IP addresses are the ones that were
+used during the login process.</li>
+<li><code>auth_provider_id</code>: The identifier of the SSO authentication provider, if any.</li>
+</ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
+<p><em>Note:</em> This will not be called when a user registers.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements the spam checker callback
 <code>check_event_for_spam</code> to deny any message sent by users whose Matrix user IDs are
@@ -10926,7 +10976,6 @@ information.</p>
 ^/_matrix/client/v1/rooms/.*/hierarchy$
 ^/_matrix/client/(v1|unstable)/rooms/.*/relations/
 ^/_matrix/client/v1/rooms/.*/threads$
-^/_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send$
 ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
 ^/_matrix/client/(r0|v3|unstable)/account/3pid$
 ^/_matrix/client/(r0|v3|unstable)/account/whoami$
@@ -12889,7 +12938,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api/">A
 <ul>
 <li><code>from</code> (required) - The token to start returning events from. This token can be obtained from a prev_batch
 or next_batch token returned by the /sync endpoint, or from an end token returned by a previous request to this endpoint.</li>
-<li><code>to</code> - The token to spot returning events at.</li>
+<li><code>to</code> - The token to stop returning events at.</li>
 <li><code>limit</code> - The maximum number of events to return. Defaults to <code>10</code>.</li>
 <li><code>filter</code> - A JSON RoomEventFilter to filter returned events with.</li>
 <li><code>dir</code> - The direction to return events from. Either <code>f</code> for forwards or <code>b</code> for backwards. Setting
@@ -15381,7 +15430,7 @@ present this information through a series of pretty graphs.</p>
 <p><img src="https://user-images.githubusercontent.com/1342360/82240467-62030100-9932-11ea-8db9-917f2d977fe1.png" alt="image" /></p>
 <p>Still, it's probably worth investigating why we're getting users from the database that often, and whether it's possible to reduce the amount of queries we make by adjusting our cache factor(s).</p>
 <p>The <code>persist_events</code> transaction is responsible for saving new room events to the Synapse database, so can often show a high transaction duration.</p>
-<h2 id="federation-1"><a class="header" href="#federation-1">Federation</a></h2>
+<h2 id="federation-2"><a class="header" href="#federation-2">Federation</a></h2>
 <p>The charts in the &quot;Federation&quot; section show information about incoming and outgoing federation requests. Federation data can be divided into two basic types:</p>
 <ul>
 <li>PDU (Persistent Data Unit) - room events: messages, state events (join/leave), etc. These are permanently stored in the database.</li>
@@ -17986,7 +18035,7 @@ state</li>
 <li>record the rationale behind our choices.</li>
 </ul>
 <p>See also <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3902">MSC3902</a>.</p>
-<p>The key idea is described by <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3902">MSC706</a>. This allows servers to
+<p>The key idea is described by <a href="https://github.com/matrix-org/matrix-spec-proposals/pull/3706">MSC3706</a>. This allows servers to
 request a lightweight response to the federation <code>/send_join</code> endpoint.
 This is called a <strong>faster join</strong>, also known as a <strong>partial join</strong>. In these
 notes we'll usually use the word &quot;partial&quot; as it matches the database schema.</p>
