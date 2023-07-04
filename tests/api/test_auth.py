@@ -69,6 +69,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         self.store.get_user_by_access_token = simple_async_mock(user_info)
         self.store.mark_access_token_as_used = simple_async_mock(None)
+        self.store.get_user_locked_status = simple_async_mock(False)
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
@@ -293,6 +294,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         self.store.insert_client_ip = simple_async_mock(None)
         self.store.mark_access_token_as_used = simple_async_mock(None)
+        self.store.get_user_locked_status = simple_async_mock(False)
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
@@ -311,6 +313,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
                 token_used=True,
             )
         )
+        self.store.get_user_locked_status = simple_async_mock(False)
         self.store.insert_client_ip = simple_async_mock(None)
         self.store.mark_access_token_as_used = simple_async_mock(None)
         request = Mock(args={})

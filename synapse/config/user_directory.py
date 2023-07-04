@@ -35,3 +35,4 @@ class UserDirectoryConfig(Config):
         self.user_directory_search_prefer_local_users = user_directory_config.get(
             "prefer_local_users", False
         )
+        self.show_locked_users = user_directory_config.get("show_locked_users", False)
