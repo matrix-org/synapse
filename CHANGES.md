@@ -2,6 +2,8 @@
 
 Please note that this will be the last release of Synapse that is compatible with
 Python 3.7 and earlier.
+This is due to Python 3.7 now having reached End of Life; see our [deprecation policy](https://matrix-org.github.io/synapse/v1.87/deprecation_policy.html)
+for more details.
 
 ### Bugfixes
 
