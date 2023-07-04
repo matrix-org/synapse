@@ -204,7 +204,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 SELECT
                     name, password_hash, is_guest, admin, consent_version, consent_ts,
                     consent_server_notice_sent, appservice_id, creation_ts, user_type,
-                    deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
+                    deactivated, locked, COALESCE(shadow_banned, FALSE) AS shadow_banned,
                     COALESCE(approved, TRUE) AS approved
                 FROM users
                 WHERE name = ?

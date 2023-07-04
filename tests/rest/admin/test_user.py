@@ -2386,6 +2386,32 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # This key was removed intentionally. Ensure it is not accidentally re-included.
         self.assertNotIn("password_hash", channel.json_body)
 
+    def test_locked_user(self) -> None:
+        # User can sync
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/v3/sync",
+            access_token=self.other_user_token,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        # Lock user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"locked": True},
+        )
+
+        # User is not authorized to sync anymore
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/v3/sync",
+            access_token=self.other_user_token,
+        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.USER_LOCKED, channel.json_body["errcode"])
+
     @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
     def test_change_name_deactivate_user_user_directory(self) -> None:
         """

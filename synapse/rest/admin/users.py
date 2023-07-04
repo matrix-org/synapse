@@ -402,7 +402,7 @@ class UserRestServletV2(RestServlet):
             if "locked" in body:
                 if lock and not user["locked"]:
                     await self.store.set_user_locked_status(user_id, True)
-                elif not lock and user["lock"]:
+                elif not lock and user["locked"]:
                     await self.store.set_user_locked_status(user_id, False)
 
             if "user_type" in body:
