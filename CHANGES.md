@@ -1,3 +1,16 @@
+# Synapse 1.87.0 (2023-07-04)
+
+### Bugfixes
+
+- Pin `pydantic` to `^1.7.4` to avoid backwards-incompatible API changes from the 2.0.0 release.
+  Resolves https://github.com/matrix-org/synapse/issues/15858.
+  Contributed by @PaarthShah. ([\#15862](https://github.com/matrix-org/synapse/issues/15862))
+
+### Internal Changes
+
+- Split out 2022 changes from the changelog so the rendered version in GitHub doesn't timeout as much. ([\#15846](https://github.com/matrix-org/synapse/issues/15846))
+
+
 # Synapse 1.87.0rc1 (2023-06-27)
 
 Please note that this will be the last release of Synapse that is compatible with
