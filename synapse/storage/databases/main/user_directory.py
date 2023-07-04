@@ -1042,7 +1042,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             """
 
         if not show_locked_users:
-            where_clause += " AND u.locked != 1"
+            where_clause += " AND (u.locked IS NULL OR u.locked = 0)"
 
         # We allow manipulating the ranking algorithm by injecting statements
         # based on config options.
@@ -1075,7 +1075,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 SELECT d.user_id AS user_id, display_name, avatar_url
                 FROM matching_users as t
                 INNER JOIN user_directory AS d USING (user_id)
-                INNER JOIN users AS u ON t.user_id = u.name
+                LEFT JOIN users AS u ON t.user_id = u.name
                 WHERE
                     %(where_clause)s
                 ORDER BY
@@ -1131,7 +1131,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 SELECT d.user_id AS user_id, display_name, avatar_url
                 FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
-                INNER JOIN users AS u ON t.user_id = u.name
+                LEFT JOIN users AS u ON t.user_id = u.name
                 WHERE
                     %(where_clause)s
                     AND value MATCH ?
