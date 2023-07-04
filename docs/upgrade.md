@@ -90,14 +90,19 @@ process, for example:
 # Upgrading to v1.88.0
 
 ## Removal of `worker_replication_*` settings
-As mentioned below in [Upgrading to v1.84.0](#upgrading-to-v1840), these settings are deprecated and are being removed. Ensure you
-have migrated to using `main` on your shared configuration `instance_map`(or create one
-if necessary) if you have ***any*** workers at all.
 
-Specifically, to be removed(links for relevant docs attached):
-* [`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host)
-* [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)
-* [`worker_replication_http_tls`](usage/configuration/config_documentation.md#worker_replication_http_tls)
+As mentioned previously in [Upgrading to v1.84.0](#upgrading-to-v1840), the following deprecated settings
+are being removed in this release of Synapse:
+
+* [`worker_replication_host`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_host)
+* [`worker_replication_http_port`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_port)
+* [`worker_replication_http_tls`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_tls)
+
+Please ensure that you have migrated to using `main` on your shared configuration's `instance_map`
+(or create one if necessary). This is required if you have ***any*** workers at all;
+administrators of single-process (monolith) installations don't need to do anything.
+
+For an illustrative example, please see [Upgrading to v1.84.0](#upgrading-to-v1840) below.
 
 
 # Upgrading to v1.86.0
