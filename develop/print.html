@@ -13910,6 +13910,11 @@ which guarantees a stable ordering. Valid values are:</p>
 <p><code>dir</code> - Direction of media order. Either <code>f</code> for forwards or <code>b</code> for backwards.
 Setting this value to <code>b</code> will reverse the above sort order. Defaults to <code>f</code>.</p>
 </li>
+<li>
+<p><code>not_user_type</code> - Exclude certain user types, such as bot users, from the request.
+Can be provided multiple times. Possible values are <code>bot</code>, <code>support</code> or &quot;empty string&quot;.
+&quot;empty string&quot; here means to exclude users without a type.</p>
+</li>
 </ul>
 <p>Caution. The database only has indexes on the columns <code>name</code> and <code>creation_ts</code>.
 This means that if a different sort order is used (<code>is_guest</code>, <code>admin</code>,
