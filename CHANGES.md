@@ -1,5 +1,8 @@
 # Synapse 1.87.0 (2023-07-04)
 
+Please note that this will be the last release of Synapse that is compatible with
+Python 3.7 and earlier.
+
 ### Bugfixes
 
 - Pin `pydantic` to `^1.7.4` to avoid backwards-incompatible API changes from the 2.0.0 release.
@@ -12,9 +15,6 @@
 
 
 # Synapse 1.87.0rc1 (2023-06-27)
-
-Please note that this will be the last release of Synapse that is compatible with
-Python 3.7 and earlier.
 
 ### Features
 
