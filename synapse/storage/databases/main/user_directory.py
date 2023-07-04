@@ -1042,7 +1042,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             """
 
         if not show_locked_users:
-            where_clause += " AND locked != 1"
+            where_clause += " AND u.locked != 1"
 
         # We allow manipulating the ranking algorithm by injecting statements
         # based on config options.
