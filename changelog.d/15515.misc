@@ -1,1 +1,1 @@
-Updated Inline SQL queries using boolean parameters as supported in SQLite 3.27.
+Update SQL queries to inline boolean parameters as supported in SQLite 3.27.
