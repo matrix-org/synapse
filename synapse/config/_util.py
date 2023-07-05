@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, TypeVar
+from typing import Any, Dict, TypeVar, Type
 
 import jsonschema
 from pydantic import BaseModel, ValidationError, parse_obj_as
@@ -75,7 +75,7 @@ Model = TypeVar("Model", bound=BaseModel)
 # for what I suspect is the wrong reason.
 def parse_and_validate_mapping(
     config: Any,
-    model_type: TypeAlias,
+    model_type: Type[Model],
 ) -> Dict[str, Model]:
     """Parse `config` as a mapping from strings to a given `Model` type.
     Args:
@@ -89,7 +89,7 @@ def parse_and_validate_mapping(
     try:
         # type-ignore: mypy doesn't like constructing `Dict[str, model_type]` because
         # `model_type` is a runtime variable. Pydantic is fine with this.
-        instances = parse_obj_as(Dict[str, model_type], config)
+        instances = parse_obj_as(Dict[str, model_type], config)  # type: ignore
     except ValidationError as e:
         raise ConfigError(str(e)) from e
     return instances
