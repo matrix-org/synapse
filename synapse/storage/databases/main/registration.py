@@ -454,7 +454,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         ) -> List[Tuple[str, int]]:
             sql = (
                 "SELECT user_id, expiration_ts_ms FROM account_validity"
-                " WHERE email_sent = False AND (expiration_ts_ms - ?) <= ?"
+                " WHERE email_sent = FALSE AND (expiration_ts_ms - ?) <= ?"
             )
             values = [now_ms, renew_at]
             txn.execute(sql, values)

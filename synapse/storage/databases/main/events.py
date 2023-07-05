@@ -1455,7 +1455,7 @@ class PersistEventsStore:
                     },
                 )
 
-                sql = "UPDATE events SET outlier = False WHERE event_id = ?"
+                sql = "UPDATE events SET outlier = FALSE WHERE event_id = ?"
                 txn.execute(sql, (event.event_id))
 
                 # Update the event_backward_extremities table now that this
@@ -1549,7 +1549,7 @@ class PersistEventsStore:
             for event, _ in events_and_contexts
             if not event.internal_metadata.is_redacted()
         ]
-        sql = "UPDATE redactions SET have_censored = False WHERE "
+        sql = "UPDATE redactions SET have_censored = FALSE WHERE "
         clause, args = make_in_list_sql_clause(
             self.database_engine,
             "redacts",
@@ -2318,7 +2318,7 @@ class PersistEventsStore:
             "   SELECT 1 FROM events"
             "   LEFT JOIN event_edges edge"
             "   ON edge.event_id = events.event_id"
-            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = False OR edge.event_id IS NULL)"
+            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = FALSE OR edge.event_id IS NULL)"
             " )"
         )
 
