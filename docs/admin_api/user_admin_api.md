@@ -242,6 +242,9 @@ The following parameters should be set in the URL:
 
 - `dir` - Direction of media order. Either `f` for forwards or `b` for backwards.
   Setting this value to `b` will reverse the above sort order. Defaults to `f`.
+- `not_user_type` - Exclude certain user types, such as bot users, from the request.
+   Can be provided multiple times. Possible values are `bot`, `support` or "empty string".
+   "empty string" here means to exclude users without a type.
 
 Caution. The database only has indexes on the columns `name` and `creation_ts`.
 This means that if a different sort order is used (`is_guest`, `admin`,

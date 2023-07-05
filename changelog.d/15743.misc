@@ -1,1 +1,0 @@
-Regularly try to send transactions to other servers after they failed instead of waiting for a new event to be available before trying.
