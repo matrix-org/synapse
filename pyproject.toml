@@ -89,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.87.0rc1"
+version = "1.87.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -207,7 +207,8 @@ packaging = ">=16.1"
 # which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
 importlib_metadata = { version = ">=1.4", python = "<3.8" }
 # This is the most recent version of Pydantic with available on common distros.
-pydantic = ">=1.7.4"
+# We are currently incompatible with >=2.0.0: (https://github.com/matrix-org/synapse/issues/15858)
+pydantic = "^1.7.4"
 
 # This is for building the rust components during "poetry install", which
 # currently ignores the `build-system.requires` directive (c.f.
