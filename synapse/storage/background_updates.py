@@ -834,7 +834,9 @@ class BackgroundUpdater:
 
         This only applies on PostgreSQL.
 
-        For SQLite the table gets recreated as part of the schema delta.
+        For SQLite the table gets recreated as part of the schema delta and the
+        data is copied over synchronously (or whatever the correct way to
+        describe it as).
 
         Args:
             update_name: The name of the background update.
