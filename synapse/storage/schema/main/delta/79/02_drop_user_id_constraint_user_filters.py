@@ -22,15 +22,13 @@ def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> 
             full_user_id text NOT NULL,
             user_id text,
             filter_id bigint NOT NULL,
-            filter_json bytea NOT NULL,
-            UNIQUE (full_user_id),
-            UNIQUE (user_id)
+            filter_json bytea NOT NULL
         )
         """
         cur.execute(create_sql)
 
         index_sql = """
-            CREATE UNIQUE INDEX IF NOT EXISTS user_filters_unique ON
+            CREATE UNIQUE INDEX IF NOT EXISTS user_filters_full_user_id_unique ON
             temp_user_filters (full_user_id, filter_id)
         """
         cur.execute(index_sql)
