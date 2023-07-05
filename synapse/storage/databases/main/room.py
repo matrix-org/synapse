@@ -936,7 +936,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             JOIN event_json USING (room_id, event_id)
             WHERE room_id = ?
                 %(where_clause)s
-                AND contains_url = True AND outlier = False
+                AND contains_url = TRUE AND outlier = FALSE
             ORDER BY stream_ordering DESC
             LIMIT ?
         """
@@ -1086,7 +1086,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         # set quarantine
         if quarantined_by is not None:
-            sql += "AND safe_from_quarantine = False"
+            sql += "AND safe_from_quarantine = FALSE"
             txn.executemany(
                 sql, [(quarantined_by, media_id) for media_id in local_mxcs]
             )
