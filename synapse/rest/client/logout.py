@@ -40,7 +40,9 @@ class LogoutRestServlet(RestServlet):
         self._device_handler = handler
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_expired=True)
+        requester = await self.auth.get_user_by_req(
+            request, allow_expired=True, allow_locked=True
+        )
 
         if requester.device_id is None:
             # The access token wasn't associated with a device.
@@ -67,7 +69,9 @@ class LogoutAllRestServlet(RestServlet):
         self._device_handler = handler
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_expired=True)
+        requester = await self.auth.get_user_by_req(
+            request, allow_expired=True, allow_locked=True
+        )
         user_id = requester.user.to_string()
 
         # first delete all of the user's devices

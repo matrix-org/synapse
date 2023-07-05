@@ -60,6 +60,7 @@ class Auth(Protocol):
         request: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
+        allow_locked: bool = False,
     ) -> Requester:
         """Get a registered user's ID.
 
