@@ -51,8 +51,10 @@ logger = logging.getLogger(__name__)
 @implementer(IAgent)
 class MatrixFederationAgent:
     """An Agent-like thing which provides a `request` method which correctly
-    handles resolving matrix server names when using matrix://. Handles standard
-    https URIs as normal.
+    handles resolving matrix server names when using `matrix-federation://`. Handles
+    standard https URIs as normal. The `matrix-federation://` scheme is internal to
+    Synapse and we purposely want to avoid colliding with the `matrix://` URL scheme
+    which is now specced.
 
     Doesn't implement any retries. (Those are done in MatrixFederationHttpClient.)
 
@@ -167,14 +169,14 @@ class MatrixFederationAgent:
         # There must be a valid hostname.
         assert parsed_uri.hostname
 
-        # If this is a matrix:// URI check if the server has delegated matrix
+        # If this is a matrix-federation:// URI check if the server has delegated matrix
         # traffic using well-known delegation.
         #
         # We have to do this here and not in the endpoint as we need to rewrite
         # the host header with the delegated server name.
         delegated_server = None
         if (
-            parsed_uri.scheme == b"matrix"
+            parsed_uri.scheme == b"matrix-federation"
             and not _is_ip_literal(parsed_uri.hostname)
             and not parsed_uri.port
         ):
@@ -250,7 +252,7 @@ class MatrixHostnameEndpointFactory:
 
 @implementer(IStreamClientEndpoint)
 class MatrixHostnameEndpoint:
-    """An endpoint that resolves matrix:// URLs using Matrix server name
+    """An endpoint that resolves matrix-federation:// URLs using Matrix server name
     resolution (i.e. via SRV). Does not check for well-known delegation.
 
     Args:
@@ -379,7 +381,7 @@ class MatrixHostnameEndpoint:
         connect to.
         """
 
-        if self._parsed_uri.scheme != b"matrix":
+        if self._parsed_uri.scheme != b"matrix-federation":
             return [Server(host=self._parsed_uri.host, port=self._parsed_uri.port)]
 
         # Note: We don't do well-known lookup as that needs to have happened

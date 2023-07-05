@@ -1196,6 +1196,32 @@ Example configuration:
 allow_device_name_lookup_over_federation: true
 ```
 ---
+### `federation`
+
+The federation section defines some sub-options related to federation.
+
+The following options are related to configuring timeout and retry logic for one request,
+independently of the others.
+Short retry algorithm is used when something or someone will wait for the request to have an
+answer, while long retry is used for requests that happen in the background,
+like sending a federation transaction.
+
+* `client_timeout`: timeout for the federation requests. Default to 60s.
+* `max_short_retry_delay`: maximum delay to be used for the short retry algo. Default to 2s.
+* `max_long_retry_delay`: maximum delay to be used for the short retry algo. Default to 60s.
+* `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
+* `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
+
+Example configuration:
+```yaml
+federation:
+  client_timeout: 180s
+  max_short_retry_delay: 7s
+  max_long_retry_delay: 100s
+  max_short_retries: 5
+  max_long_retries: 20
+```
+---
 ## Caching
 
 Options related to caching.

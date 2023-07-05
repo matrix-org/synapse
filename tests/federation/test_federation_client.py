@@ -124,7 +124,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
             b"GET",
-            b"matrix://yet.another.server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
+            b"matrix-federation://yet.another.server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
             headers=mock.ANY,
             bodyProducer=None,
         )
@@ -232,7 +232,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
             b"GET",
-            b"matrix://yet.another.server/_matrix/federation/v1/event/event_id",
+            b"matrix-federation://yet.another.server/_matrix/federation/v1/event/event_id",
             headers=mock.ANY,
             bodyProducer=None,
         )

@@ -1,1 +1,0 @@
-Fix joining rooms through aliases where the alias server isn't a real homeserver. Contributed by @tulir @ Beeper.
