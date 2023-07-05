@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, TypeVar, Type
+from typing import Any, Dict, Type, TypeVar
 
 import jsonschema
 from pydantic import BaseModel, ValidationError, parse_obj_as
-from typing_extensions import TypeAlias
 
 from synapse.config._base import ConfigError
 from synapse.types import JsonDict, StrSequence
@@ -71,8 +70,6 @@ def json_error_to_config_error(
 Model = TypeVar("Model", bound=BaseModel)
 
 
-# Here is where I need help with the Type. I put in TypeAlias because I know it works,
-# for what I suspect is the wrong reason.
 def parse_and_validate_mapping(
     config: Any,
     model_type: Type[Model],
