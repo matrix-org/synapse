@@ -28,6 +28,7 @@ from synapse.http.servlet import (
     parse_integer,
     parse_json_object_from_request,
     parse_string,
+    parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
@@ -64,6 +65,9 @@ class UsersRestServletV2(RestServlet):
     The parameter `guests` can be used to exclude guest users.
     The parameter `deactivated` can be used to include deactivated users.
     The parameter `order_by` can be used to order the result.
+    The parameter `not_user_type` can be used to exclude certain user types.
+    Possible values are `bot`, `support` or "empty string".
+    "empty string" here means to exclude users without a type.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -131,6 +135,10 @@ class UsersRestServletV2(RestServlet):
 
         direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
 
+        # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+        not_user_types = parse_strings_from_args(args, "not_user_type")
+
         users, total = await self.store.get_users_paginate(
             start,
             limit,
@@ -141,6 +149,7 @@ class UsersRestServletV2(RestServlet):
             order_by,
             direction,
             approved,
+            not_user_types,
         )
 
         # If support for MSC3866 is not enabled, don't show the approval flag.
