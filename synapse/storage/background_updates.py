@@ -837,11 +837,11 @@ class BackgroundUpdater:
         For SQLite the table gets recreated as part of the schema delta.
 
         Args:
-            update_name: The name of the background update. table: The table
-            with the invalid constraint. constraint_name: The name of the
-            constraint constraint: A `Constraint` object matching the type of
-            constraint. unique_columns: A sequence of columns that form a unique
-            constraint
+            update_name: The name of the background update.
+            table: The table with the invalid constraint.
+            constraint_name: The name of the constraint
+            constraint: A `Constraint` object matching the type of constraint.
+            unique_columns: A sequence of columns that form a unique constraint
               on the table. Used to iterate over the table.
         """
 
