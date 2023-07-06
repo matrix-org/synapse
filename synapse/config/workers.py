@@ -283,7 +283,7 @@ class WorkerConfig(Config):
         self.instance_map: Dict[
             str, InstanceLocationConfig
         ] = parse_and_validate_mapping(
-            instance_map, InstanceLocationConfig  # type: ignore
+            instance_map, InstanceLocationConfig  # type: ignore[arg-type]
         )
 
         # Map from type of streams to source, c.f. WriterLocations.
