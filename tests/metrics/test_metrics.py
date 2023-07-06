@@ -12,19 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from importlib import metadata
 from typing import Dict, Tuple
-
-from typing_extensions import Protocol
-
-try:
-    from importlib import metadata
-except ImportError:
-    import importlib_metadata as metadata  # type: ignore[no-redef]
-
 from unittest.mock import patch
 
 from pkg_resources import parse_version
 from prometheus_client.core import Sample
+from typing_extensions import Protocol
 
 from synapse.app._base import _set_prometheus_client_use_created_metrics
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
