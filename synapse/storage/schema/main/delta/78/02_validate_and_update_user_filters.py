@@ -61,9 +61,7 @@ def run_upgrade(
             full_user_id text NOT NULL,
             user_id text NOT NULL,
             filter_id bigint NOT NULL,
-            filter_json bytea NOT NULL,
-            UNIQUE (full_user_id),
-            UNIQUE (user_id)
+            filter_json bytea NOT NULL
         )
         """
         cur.execute(create_sql)

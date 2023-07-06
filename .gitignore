@@ -34,6 +34,7 @@ __pycache__/
 /logs
 /media_store/
 /uploads
+/homeserver-config-overrides.d
 
 # For direnv users
 /.envrc

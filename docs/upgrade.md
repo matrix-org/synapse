@@ -87,6 +87,18 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+
+# Upgrading to v1.88.0
+
+## Minimum supported Python version
+
+The minimum supported Python version has been increased from v3.7 to v3.8.
+You will need Python 3.8 to run Synapse v1.88.0 (due out July 18th, 2023).
+
+If you use current versions of the Matrix.org-distributed Debian
+packages or Docker images, no action is required.
+
+
 # Upgrading to v1.86.0
 
 ## Minimum supported Rust version
