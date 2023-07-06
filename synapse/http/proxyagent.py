@@ -152,7 +152,7 @@ class ProxyAgent(_AgentBase):
 
                 if federation_proxy.tls:
                     tls_connection_creator = self._policy_for_https.creatorForNetloc(
-                        federation_proxy.host,
+                        federation_proxy.host.encode("utf-8"),
                         federation_proxy.port,
                     )
                     endpoint = wrapClientTLS(tls_connection_creator, endpoint)
