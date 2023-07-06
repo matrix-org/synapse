@@ -38,7 +38,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import NotFoundError
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
-from synapse.logging.opentracing import trace
+from synapse.logging.opentracing import trace, trace_with_opname
 from synapse.util import Clock
 from synapse.util.file_consumer import BackgroundFileConsumer
 
@@ -77,7 +77,7 @@ class MediaStorage:
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.clock = hs.get_clock()
 
-    @trace
+    @trace_with_opname("MediaStorage.store_file")
     async def store_file(self, source: IO, file_info: FileInfo) -> str:
         """Write `source` to the on disk media store, and also any other
         configured storage providers
@@ -91,18 +91,19 @@ class MediaStorage:
         """
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
-            # Write to the main repository
+            # Write to the main media repository
             await self.write_to_file(source, f)
+            # Write to the other storage providers
             await finish_cb()
 
         return fname
 
-    @trace
+    @trace_with_opname("MediaStorage.write_to_file")
     async def write_to_file(self, source: IO, output: IO) -> None:
         """Asynchronously write the `source` to `output`."""
         await defer_to_thread(self.reactor, _write_file_synchronously, source, output)
 
-    @trace
+    @trace_with_opname("MediaStorage.store_into_file")
     @contextlib.contextmanager
     def store_into_file(
         self, file_info: FileInfo
@@ -142,6 +143,7 @@ class MediaStorage:
         try:
             with open(fname, "wb") as f:
 
+                @trace_with_opname("MediaStorage.store_into_file.finish")
                 async def finish() -> None:
                     # Ensure that all writes have been flushed and close the
                     # file.
