@@ -42,7 +42,7 @@ from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS, IResponse
 
-from synapse.config.workers import InstanceLocationConfig
+from synapse.config.workers import InstanceLocationConfig, InstanceTcpLocationConfig
 from synapse.http import redact_uri
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
 from synapse.logging.context import run_in_background
@@ -144,20 +144,23 @@ class ProxyAgent(_AgentBase):
         if federation_proxies:
             endpoints = []
             for federation_proxy in federation_proxies:
-                endpoint = HostnameEndpoint(
-                    self.proxy_reactor,
-                    federation_proxy.host,
-                    federation_proxy.port,
-                )
-
-                if federation_proxy.tls:
-                    tls_connection_creator = self._policy_for_https.creatorForNetloc(
+                if isinstance(federation_proxy, InstanceTcpLocationConfig):
+                    endpoint = HostnameEndpoint(
+                        self.proxy_reactor,
                         federation_proxy.host,
                         federation_proxy.port,
                     )
-                    endpoint = wrapClientTLS(tls_connection_creator, endpoint)
 
-                endpoints.append(endpoint)
+                    if federation_proxy.tls:
+                        tls_connection_creator = (
+                            self._policy_for_https.creatorForNetloc(
+                                federation_proxy.host,
+                                federation_proxy.port,
+                            )
+                        )
+                        endpoint = wrapClientTLS(tls_connection_creator, endpoint)
+
+                    endpoints.append(endpoint)
 
             self._federation_proxy_endpoint = _ProxyEndpoints(endpoints)
 
