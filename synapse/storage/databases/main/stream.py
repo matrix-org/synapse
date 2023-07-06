@@ -1401,7 +1401,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             `to_token`), or `limit` is zero.
         """
 
-        args = [False, room_id]
+        args = [room_id]
 
         order, from_bound, to_bound = generate_pagination_bounds(
             direction, from_token, to_token
