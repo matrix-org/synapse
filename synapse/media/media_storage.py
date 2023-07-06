@@ -38,7 +38,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import NotFoundError
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
-from synapse.logging.opentracing import trace, trace_with_opname
+from synapse.logging.opentracing import start_active_span, trace, trace_with_opname
 from synapse.util import Clock
 from synapse.util.file_consumer import BackgroundFileConsumer
 
@@ -91,10 +91,12 @@ class MediaStorage:
         """
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
-            # Write to the main media repository
-            await self.write_to_file(source, f)
-            # Write to the other storage providers
-            await finish_cb()
+            with start_active_span("writing to main media repo"):
+                # Write to the main media repository
+                await self.write_to_file(source, f)
+            with start_active_span("writing to other storage providers"):
+                # Write to the other storage providers
+                await finish_cb()
 
         return fname
 
