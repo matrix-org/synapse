@@ -38,6 +38,7 @@ from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import NotFoundError
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
+from synapse.logging.opentracing import trace
 from synapse.util import Clock
 from synapse.util.file_consumer import BackgroundFileConsumer
 
@@ -76,6 +77,7 @@ class MediaStorage:
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.clock = hs.get_clock()
 
+    @trace
     async def store_file(self, source: IO, file_info: FileInfo) -> str:
         """Write `source` to the on disk media store, and also any other
         configured storage providers
@@ -95,10 +97,12 @@ class MediaStorage:
 
         return fname
 
+    @trace
     async def write_to_file(self, source: IO, output: IO) -> None:
         """Asynchronously write the `source` to `output`."""
         await defer_to_thread(self.reactor, _write_file_synchronously, source, output)
 
+    @trace
     @contextlib.contextmanager
     def store_into_file(
         self, file_info: FileInfo
@@ -214,6 +218,7 @@ class MediaStorage:
 
         return None
 
+    @trace
     async def ensure_media_is_in_local_cache(self, file_info: FileInfo) -> str:
         """Ensures that the given file is in the local cache. Attempts to
         download it from storage providers if it isn't.
@@ -259,6 +264,7 @@ class MediaStorage:
 
         raise NotFoundError()
 
+    @trace
     def _file_info_to_path(self, file_info: FileInfo) -> str:
         """Converts file_info into a relative path.
 
@@ -301,6 +307,7 @@ class MediaStorage:
         return self.filepaths.local_media_filepath_rel(file_info.file_id)
 
 
+@trace
 def _write_file_synchronously(source: IO, dest: IO) -> None:
     """Write `source` to the file like `dest` synchronously. Should be called
     from a thread.
