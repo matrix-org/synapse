@@ -165,7 +165,8 @@ class MediaStorage:
                         raise SpamMediaException(errcode=spam_check[0])
 
                     for provider in self.storage_providers:
-                        await provider.store_file(path, file_info)
+                        with start_active_span(str(provider)):
+                            await provider.store_file(path, file_info)
 
                     finished_called[0] = True
 
