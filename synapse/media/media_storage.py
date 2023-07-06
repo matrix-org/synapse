@@ -91,12 +91,10 @@ class MediaStorage:
         """
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
-            with start_active_span("writing to main media repo"):
-                # Write to the main media repository
-                await self.write_to_file(source, f)
-            with start_active_span("writing to other storage providers"):
-                # Write to the other storage providers
-                await finish_cb()
+            # Write to the main media repository
+            await self.write_to_file(source, f)
+            # Write to the other storage providers
+            await finish_cb()
 
         return fname
 
@@ -120,9 +118,9 @@ class MediaStorage:
         fname can be used to read the contents from after upload, e.g. to
         generate thumbnails.
 
-        finish_cb must be called and waited on after the file has been
-        successfully been written to. Should not be called if there was an
-        error.
+        finish_cb must be called and waited on after the file has been successfully been
+        written to. Should not be called if there was an error. Checks for spam and
+        stores the file into the configured storage providers.
 
         Args:
             file_info: Info about the file to store
@@ -142,37 +140,48 @@ class MediaStorage:
 
         finished_called = [False]
 
+        main_media_repo_write_trace_scope = start_active_span(
+            "writing to main media repo"
+        )
+        main_media_repo_write_trace_scope.__enter__()
+
         try:
             with open(fname, "wb") as f:
 
-                @trace_with_opname("MediaStorage.store_into_file.finish")
                 async def finish() -> None:
-                    # Ensure that all writes have been flushed and close the
-                    # file.
-                    f.flush()
-                    f.close()
+                    # When someone calls finish, we assume they are done writing to the main media repo
+                    main_media_repo_write_trace_scope.__exit__(None, None, None)
 
-                    spam_check = await self._spam_checker_module_callbacks.check_media_file_for_spam(
-                        ReadableFileWrapper(self.clock, fname), file_info
-                    )
-                    if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
-                        logger.info("Blocking media due to spam checker")
-                        # Note that we'll delete the stored media, due to the
-                        # try/except below. The media also won't be stored in
-                        # the DB.
-                        # We currently ignore any additional field returned by
-                        # the spam-check API.
-                        raise SpamMediaException(errcode=spam_check[0])
+                    with start_active_span("writing to other storage providers"):
+                        # Ensure that all writes have been flushed and close the
+                        # file.
+                        f.flush()
+                        f.close()
 
-                    for provider in self.storage_providers:
-                        with start_active_span(str(provider)):
-                            await provider.store_file(path, file_info)
+                        spam_check = await self._spam_checker_module_callbacks.check_media_file_for_spam(
+                            ReadableFileWrapper(self.clock, fname), file_info
+                        )
+                        if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
+                            logger.info("Blocking media due to spam checker")
+                            # Note that we'll delete the stored media, due to the
+                            # try/except below. The media also won't be stored in
+                            # the DB.
+                            # We currently ignore any additional field returned by
+                            # the spam-check API.
+                            raise SpamMediaException(errcode=spam_check[0])
 
-                    finished_called[0] = True
+                        for provider in self.storage_providers:
+                            with start_active_span(str(provider)):
+                                await provider.store_file(path, file_info)
+
+                        finished_called[0] = True
 
                 yield f, fname, finish
         except Exception as e:
             try:
+                main_media_repo_write_trace_scope.__exit__(
+                    type(e), None, e.__traceback__
+                )
                 os.remove(fname)
             except Exception:
                 pass
@@ -180,7 +189,11 @@ class MediaStorage:
             raise e from None
 
         if not finished_called:
-            raise Exception("Finished callback not called")
+            exc = Exception("Finished callback not called")
+            main_media_repo_write_trace_scope.__exit__(
+                type(exc), None, exc.__traceback__
+            )
+            raise exc
 
     async def fetch_media(self, file_info: FileInfo) -> Optional[Responder]:
         """Attempts to fetch media described by file_info from the local cache
