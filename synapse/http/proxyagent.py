@@ -24,7 +24,11 @@ from urllib.request import (  # type: ignore[attr-defined]
 from zope.interface import implementer
 
 from twisted.internet import defer
-from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
+from twisted.internet.endpoints import (
+    HostnameEndpoint,
+    UNIXClientEndpoint,
+    wrapClientTLS,
+)
 from twisted.internet.interfaces import (
     IProtocol,
     IProtocolFactory,
@@ -42,7 +46,11 @@ from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS, IResponse
 
-from synapse.config.workers import InstanceLocationConfig, InstanceTcpLocationConfig
+from synapse.config.workers import (
+    InstanceLocationConfig,
+    InstanceTcpLocationConfig,
+    InstanceUnixLocationConfig,
+)
 from synapse.http import redact_uri
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
 from synapse.logging.context import run_in_background
@@ -142,8 +150,9 @@ class ProxyAgent(_AgentBase):
 
         self._federation_proxy_endpoint: Optional[IStreamClientEndpoint] = None
         if federation_proxies:
-            endpoints = []
+            endpoints: List[IStreamClientEndpoint] = []
             for federation_proxy in federation_proxies:
+                endpoint: IStreamClientEndpoint
                 if isinstance(federation_proxy, InstanceTcpLocationConfig):
                     endpoint = HostnameEndpoint(
                         self.proxy_reactor,
@@ -160,7 +169,18 @@ class ProxyAgent(_AgentBase):
                         )
                         endpoint = wrapClientTLS(tls_connection_creator, endpoint)
 
-                    endpoints.append(endpoint)
+                elif isinstance(federation_proxy, InstanceUnixLocationConfig):
+                    endpoint = UNIXClientEndpoint(
+                        self.proxy_reactor, federation_proxy.path
+                    )
+
+                else:
+                    # It is supremely unlikely we ever hit this
+                    raise SchemeNotSupported(
+                        f"Unknown type of Endpoint requested, check {federation_proxy}"
+                    )
+
+                endpoints.append(endpoint)
 
             self._federation_proxy_endpoint = _ProxyEndpoints(endpoints)
 
