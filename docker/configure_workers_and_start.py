@@ -136,7 +136,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "federation_sender": {
         "app": "synapse.app.generic_worker",
-        "listener_resources": ["replication"],
+        "listener_resources": [],
         "endpoint_patterns": [],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -409,6 +409,16 @@ def add_worker_roles_to_shared_config(
             worker_name
         )
 
+        # Map of stream writer instance names to host/ports combos
+        if os.environ.get("SYNAPSE_USE_UNIX_SOCKET", False):
+            instance_map[worker_name] = {
+                "path": f"/run/worker.{worker_port}",
+            }
+        else:
+            instance_map[worker_name] = {
+                "host": "localhost",
+                "port": worker_port,
+            }
     # Update the list of stream writers. It's convenient that the name of the worker
     # type is the same as the stream to write. Iterate over the whole list in case there
     # is more than one.
@@ -418,8 +428,6 @@ def add_worker_roles_to_shared_config(
                 worker, []
             ).append(worker_name)
 
-        # Force adding a replication listener if a worker type is defined as having one
-        if "replication" in WORKERS_CONFIG[worker].get("listener_resources", []):
             # Map of stream writer instance names to host/ports combos
             # For now, all stream writers need http replication ports
             if os.environ.get("SYNAPSE_USE_UNIX_SOCKET", False):

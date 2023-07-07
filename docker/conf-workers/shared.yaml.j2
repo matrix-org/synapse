@@ -9,9 +9,6 @@ redis:
     {% if using_unix_sockets %}
     path: /tmp/redis.sock
     {% endif %}
-
-outbound_federation_restricted_to:
-  - federation_sender1
 {% endif %}
 
 {% if appservice_registrations is not none %}
