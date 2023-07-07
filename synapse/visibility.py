@@ -214,6 +214,13 @@ async def filter_event_for_clients_with_state(
         logger.debug("Returning membership event %s", event)
         return {event.state_key}
 
+    # We don't want to show outlier events to the client because
+    # we haven't figured out where they fit into the DAG yet. The
+    # only exception is out-of-band membership events which is
+    # handled above.
+    if event.internal_metadata.outlier:
+        return set()
+
     # First we get just the history visibility in case its shared/world-readable
     # room.
     visibility_state_map = await _get_state_map(
