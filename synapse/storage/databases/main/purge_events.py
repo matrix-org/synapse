@@ -250,7 +250,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         logger.info("[purge] marking remaining events as outliers")
         txn.execute(
             "UPDATE events SET outlier = TRUE"
-            "WHERE event_id IN ("
+            " WHERE event_id IN ("
             "   SELECT event_id FROM events_to_purge "
             "   WHERE NOT should_delete"
             ")"
