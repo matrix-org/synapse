@@ -207,15 +207,12 @@ async def filter_event_for_clients_with_state(
             ):
                 allowed_user_ids.discard(user_id)
 
-    if event.internal_metadata.outlier:
-        # Normally these can't be seen by clients, but we make an exception for
-        # for out-of-band membership events (eg, incoming invites, or rejections of
-        # said invite) for the user themselves.
-        if event.type == EventTypes.Member and event.state_key in allowed_user_ids:
-            logger.debug("Returning out-of-band-membership event %s", event)
-            return {event.state_key}
-
-        return set()
+    # Normally these can't be seen by clients, but we make an exception for
+    # for membership events (eg, incoming invites, or rejections of
+    # said invite) for the user themselves.
+    if event.type == EventTypes.Member and event.state_key in allowed_user_ids:
+        logger.debug("Returning membership event %s", event)
+        return {event.state_key}
 
     # First we get just the history visibility in case its shared/world-readable
     # room.
