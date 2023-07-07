@@ -1,0 +1,1 @@
+Remove outlier check for getting membership events through the `/_matrix/client/r0/rooms/{roomId}/event/{eventId}` endpoint.
