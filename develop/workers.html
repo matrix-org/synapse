@@ -264,9 +264,6 @@ The currently available worker applications are listed <a href="#available-worke
 with an <code>http</code> listener.</li>
 <li><strong>Synapse 1.72 and older:</strong> if handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>). This config option is no longer required and is ignored when running Synapse 1.73 and newer.</li>
-<li><strong>Synapse 1.83 and older:</strong> The HTTP replication endpoint that the worker should talk to on the main synapse process
-(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
-<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>). If using Synapse 1.84 and newer, these are not needed if <code>main</code> is defined on the <a href="#shared-configuration">shared configuration</a> <code>instance_map</code></li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
