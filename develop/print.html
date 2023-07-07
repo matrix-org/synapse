@@ -11172,11 +11172,7 @@ stream_writers:
 </code></pre>
 <p>An example for a stream writer instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
-worker_name: event_persister1 
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
+worker_name: event_persister1
 
 worker_listeners:
   - type: http
@@ -11285,10 +11281,6 @@ to a dedicated worker, the shared configuration would include:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: background_worker
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
 <h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
@@ -11357,10 +11349,6 @@ pusher_instances:
 <pre><code class="language-yaml">worker_app: synapse.app.pusher
 worker_name: pusher_worker1
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/pusher-worker-log.yaml
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
@@ -11393,10 +11381,6 @@ federation_sender_instances:
 <pre><code class="language-yaml">worker_app: synapse.app.federation_sender
 worker_name: federation_sender1
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml
 </code></pre>
 <h3 id="synapseappmedia_repository"><a class="header" href="#synapseappmedia_repository"><code>synapse.app.media_repository</code></a></h3>
@@ -11422,10 +11406,6 @@ able to handle the above endpoints.</p>
 expose the <code>media</code> resource. For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.media_repository
 worker_name: media_worker
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http
