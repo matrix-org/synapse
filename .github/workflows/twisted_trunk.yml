@@ -96,7 +96,7 @@ jobs:
     if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
-      image: matrixdotorg/sytest-synapse:buster
+      image: matrixdotorg/sytest-synapse:focal
       volumes:
         - ${{ github.workspace }}:/src
 
