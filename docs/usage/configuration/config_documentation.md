@@ -3930,13 +3930,14 @@ federation_sender_instances:
 ---
 ### `instance_map`
 
-When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured, and to the main process.
-Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
-a HTTP replication listener, and that listener should be included in the `instance_map`.
-The main process also needs an entry on the `instance_map`, and it should be listed under
-`main` **if even one other worker exists**. Ensure the port matches with what is declared 
-inside the `listener` block for a `replication` listener.
+When using workers this should be a map from [`worker_name`](#worker_name) to the HTTP
+replication listener of the worker, if configured, and to the main process. Each worker
+declared under [`stream_writers`](../../workers.md#stream-writers) and
+[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP replication listener, and that
+listener should be included in the `instance_map`. The main process also needs an entry
+on the `instance_map`, and it should be listed under `main` **if even one other worker
+exists**. Ensure the port matches with what is declared inside the `listener` block for
+a `replication` listener.
 
 
 Example configuration:
@@ -3965,6 +3966,22 @@ stream_writers:
   events: worker1
   typing: worker1
 ```
+---
+### `outbound_federation_restricted_to`
+
+When using workers, you can restrict outbound federation traffic to only go through a
+specific subset of workers. Any worker specified here must also be in the
+[`instance_map`](#instance_map).
+
+```yaml
+outbound_federation_restricted_to:
+  - federation_sender1
+  - federation_sender2
+```
+
+Also see the [worker
+documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
+for more info.
 ---
 ### `run_background_tasks_on`
 
@@ -4088,51 +4105,6 @@ giving each worker a unique `worker_name`.
 Example configuration:
 ```yaml
 worker_name: generic_worker1
-```
----
-### `worker_replication_host`
-*Deprecated as of version 1.84.0. Place `host` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
-
-The HTTP replication endpoint that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_host: 127.0.0.1
-```
----
-### `worker_replication_http_port`
-*Deprecated as of version 1.84.0. Place `port` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
-
-The HTTP replication port that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_http_port: 9093
-```
----
-### `worker_replication_http_tls`
-*Deprecated as of version 1.84.0. Place `tls` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
-
-Whether TLS should be used for talking to the HTTP replication port on the main
-Synapse process.
-The main Synapse process defines this with the `tls` option on its [listener](#listeners) that
-has the `replication` resource enabled.
-
-**Please note:** by default, it is not safe to expose replication ports to the
-public Internet, even with TLS enabled.
-See [`worker_replication_secret`](#worker_replication_secret).
-
-Defaults to `false`.
-
-*Added in Synapse 1.72.0.*
-
-Example configuration:
-```yaml
-worker_replication_http_tls: true
 ```
 ---
 ### `worker_listeners`
