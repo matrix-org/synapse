@@ -70,10 +70,10 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         # Make a new HomeServer object for the worker
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.worker_hs = self.setup_test_homeserver(
+            federation_http_client=None,
             homeserver_to_use=GenericWorkerServer,
             config=self._get_worker_hs_config(),
             reactor=self.reactor,
-            federation_http_client=None,
         )
 
         # Since we use sqlite in memory databases we need to make sure the
@@ -385,7 +385,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             server_version_string="1",
             max_request_body_size=8192,
             reactor=self.reactor,
-            federation_agent=worker_hs.get_federation_http_client().agent,
         )
 
         worker_hs.get_replication_command_handler().start_replication(worker_hs)

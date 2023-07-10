@@ -134,11 +134,6 @@ if not IS_PR:
                 "sytest-tag": "testing",
                 "postgres": "postgres",
             },
-            {
-                "sytest-tag": "buster",
-                "postgres": "multi-postgres",
-                "workers": "workers",
-            },
         ]
     )
 

@@ -40,6 +40,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
         hs = self.setup_test_homeserver(
             "red",
+            federation_http_client=None,
             federation_client=Mock(),
             presence_handler=self.presence_handler,
         )
