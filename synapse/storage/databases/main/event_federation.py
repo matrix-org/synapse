@@ -146,7 +146,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 update_name="event_forward_extremities_event_id_foreign_key_constraint_update",
                 table="event_forward_extremities",
                 constraint_name="event_forward_extremities_event_id",
-                constraint=ForeignKeyConstraint("events", [("event_id", "event_id")]),
+                constraint=ForeignKeyConstraint(
+                    "events", [("event_id", "event_id")], deferred=True
+                ),
                 unique_columns=("event_id", "room_id"),
             )
 

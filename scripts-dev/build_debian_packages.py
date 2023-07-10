@@ -27,7 +27,6 @@ from typing import Collection, Optional, Sequence, Set
 # to remove references to the distibution across Synapse (search for "bullseye" for
 # example)
 DISTS = (
-    "debian:buster",  # oldstable: EOL 2022-08
     "debian:bullseye",  # (EOL ~2024-07) (our EOL forced by Python 3.9 is 2025-10-05)
     "debian:bookworm",  # (EOL not specified yet) (our EOL forced by Python 3.11 is 2027-10-24)
     "debian:sid",  # (EOL not specified yet) (our EOL forced by Python 3.11 is 2027-10-24)

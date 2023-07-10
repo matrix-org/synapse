@@ -41,6 +41,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.appservice_api = mock.Mock()
         hs = self.setup_test_homeserver(
             "server",
+            federation_http_client=None,
             application_service_api=self.appservice_api,
         )
         handler = hs.get_device_handler()
@@ -400,7 +401,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
 class DehydrationTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        hs = self.setup_test_homeserver("server")
+        hs = self.setup_test_homeserver("server", federation_http_client=None)
         handler = hs.get_device_handler()
         assert isinstance(handler, DeviceHandler)
         self.handler = handler

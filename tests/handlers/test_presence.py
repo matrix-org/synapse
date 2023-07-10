@@ -993,6 +993,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver(
             "server",
+            federation_http_client=None,
             federation_sender=Mock(spec=FederationSender),
         )
         return hs

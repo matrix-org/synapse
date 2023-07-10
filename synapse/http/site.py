@@ -21,27 +21,24 @@ from zope.interface import implementer
 
 from twisted.internet.address import UNIXAddress
 from twisted.internet.defer import Deferred
-from twisted.internet.interfaces import IAddress
+from twisted.internet.interfaces import IAddress, IReactorTime
 from twisted.python.failure import Failure
 from twisted.web.http import HTTPChannel
-from twisted.web.iweb import IAgent
 from twisted.web.resource import IResource, Resource
-from twisted.web.server import Request
+from twisted.web.server import Request, Site
 
 from synapse.config.server import ListenerConfig
 from synapse.http import get_request_user_agent, redact_uri
-from synapse.http.proxy import ProxySite
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.logging.context import (
     ContextRequest,
     LoggingContext,
     PreserveLoggingContext,
 )
-from synapse.types import ISynapseReactor, Requester
+from synapse.types import Requester
 
 if TYPE_CHECKING:
     import opentracing
-
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +102,7 @@ class SynapseRequest(Request):
         # A boolean indicating whether `render_deferred` should be cancelled if the
         # client disconnects early. Expected to be set by the coroutine started by
         # `Resource.render`, if rendering is asynchronous.
-        self.is_render_cancellable: bool = False
+        self.is_render_cancellable = False
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -604,7 +601,7 @@ class _XForwardedForAddress:
     host: str
 
 
-class SynapseSite(ProxySite):
+class SynapseSite(Site):
     """
     Synapse-specific twisted http Site
 
@@ -626,8 +623,7 @@ class SynapseSite(ProxySite):
         resource: IResource,
         server_version_string: str,
         max_request_body_size: int,
-        reactor: ISynapseReactor,
-        federation_agent: IAgent,
+        reactor: IReactorTime,
     ):
         """
 
@@ -642,11 +638,7 @@ class SynapseSite(ProxySite):
                 dropping the connection
             reactor: reactor to be used to manage connection timeouts
         """
-        super().__init__(
-            resource=resource,
-            reactor=reactor,
-            federation_agent=federation_agent,
-        )
+        Site.__init__(self, resource, reactor=reactor)
 
         self.site_tag = site_tag
         self.reactor = reactor
@@ -657,9 +649,7 @@ class SynapseSite(ProxySite):
 
         request_id_header = config.http_options.request_id_header
 
-        self.experimental_cors_msc3886: bool = (
-            config.http_options.experimental_cors_msc3886
-        )
+        self.experimental_cors_msc3886 = config.http_options.experimental_cors_msc3886
 
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(
