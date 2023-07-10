@@ -27,9 +27,9 @@ from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
 from synapse.types import (
+    MXID_LOCALPART_ALLOWED_CHARACTERS,
     UserID,
     map_username_to_mxid_localpart,
-    MXID_LOCALPART_ALLOWED_CHARACTERS,
 )
 from synapse.util.iterutils import chunk_seq
 
