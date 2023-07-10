@@ -1,1 +1,1 @@
-Drop debian buster.
+Drop Debian Buster since we no longer support Python 3.7.
