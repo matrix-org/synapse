@@ -586,7 +586,9 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
                 update_name="test_bg_update",
                 table="test_constraint",
                 constraint_name="test_constraint_name",
-                constraint=ForeignKeyConstraint("base_table", [("b", "b")]),
+                constraint=ForeignKeyConstraint(
+                    "base_table", [("b", "b")], deferred=False
+                ),
                 sqlite_table_name="test_constraint2",
                 sqlite_table_schema=table2_sqlite,
             )
@@ -604,7 +606,9 @@ class BackgroundUpdateValidateConstraintTestCase(unittest.HomeserverTestCase):
                 "test_bg_update",
                 table="test_constraint",
                 constraint_name="test_constraint_name",
-                constraint=ForeignKeyConstraint("base_table", [("b", "b")]),
+                constraint=ForeignKeyConstraint(
+                    "base_table", [("b", "b")], deferred=False
+                ),
                 unique_columns=["a"],
             )
 
