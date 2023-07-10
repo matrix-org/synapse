@@ -1,0 +1,1 @@
+Clarified some of the behaviour of the `synapse` vs `root` logger contexts. Contributed by @semiviral.
