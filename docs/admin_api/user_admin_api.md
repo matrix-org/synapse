@@ -242,6 +242,9 @@ The following parameters should be set in the URL:
 
 - `dir` - Direction of media order. Either `f` for forwards or `b` for backwards.
   Setting this value to `b` will reverse the above sort order. Defaults to `f`.
+- `not_user_type` - Exclude certain user types, such as bot users, from the request.
+   Can be provided multiple times. Possible values are `bot`, `support` or "empty string".
+   "empty string" here means to exclude users without a type.
 
 Caution. The database only has indexes on the columns `name` and `creation_ts`.
 This means that if a different sort order is used (`is_guest`, `admin`,
@@ -1180,7 +1183,7 @@ The following parameters should be set in the URL:
 - `user_id` - The fully qualified MXID: for example, `@user:server.com`. The user must
   be local.
 
-### Check username availability
+## Check username availability
 
 Checks to see if a username is available, and valid, for the server. See [the client-server 
 API](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available)
@@ -1198,7 +1201,7 @@ GET /_synapse/admin/v1/username_available?username=$localpart
 The request and response format is the same as the
 [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.
 
-### Find a user based on their ID in an auth provider
+## Find a user based on their ID in an auth provider
 
 The API is:
 
@@ -1237,7 +1240,7 @@ Returns a `404` HTTP status code if no user was found, with a response body like
 _Added in Synapse 1.68.0._
 
 
-### Find a user based on their Third Party ID (ThreePID or 3PID)
+## Find a user based on their Third Party ID (ThreePID or 3PID)
 
 The API is:
 
