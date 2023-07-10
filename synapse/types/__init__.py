@@ -348,7 +348,7 @@ class EventID(DomainSpecificString):
     SIGIL = "$"
 
 
-mxid_localpart_allowed_characters = set(
+MXID_LOCALPART_ALLOWED_CHARACTERS = set(
     "_-./=+" + string.ascii_lowercase + string.digits
 )
 
@@ -367,7 +367,7 @@ def contains_invalid_mxid_characters(localpart: str) -> bool:
     Returns:
         True if there are any naughty characters
     """
-    return any(c not in mxid_localpart_allowed_characters for c in localpart)
+    return any(c not in MXID_LOCALPART_ALLOWED_CHARACTERS for c in localpart)
 
 
 UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
@@ -384,7 +384,7 @@ UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
 #    bytes rather than strings
 #
 NON_MXID_CHARACTER_PATTERN = re.compile(
-    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters - {"="})),)).encode(
+    ("[^%s]" % (re.escape("".join(MXID_LOCALPART_ALLOWED_CHARACTERS - {"="})),)).encode(
         "ascii"
     )
 )
