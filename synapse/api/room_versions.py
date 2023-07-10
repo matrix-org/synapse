@@ -427,10 +427,9 @@ class RoomVersions:
         msc3931_push_features=(),
         msc3989_redaction_rules=True,
     )
-    MSC3820opt2 = RoomVersion(
-        # Based upon v10
-        "org.matrix.msc3820.opt2",
-        RoomDisposition.UNSTABLE,
+    V11 = RoomVersion(
+        "11",
+        RoomDisposition.STABLE,
         EventFormatVersions.ROOM_V4_PLUS,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
@@ -467,7 +466,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.MSC3787,
         RoomVersions.V10,
         RoomVersions.MSC3989,
-        RoomVersions.MSC3820opt2,
+        RoomVersions.V11,
     )
 }
 
