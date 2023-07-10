@@ -108,13 +108,9 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         "origin_server_ts",
     ]
 
-    # Room versions from before MSC2176 had additional allowed keys.
-    if not room_version.msc2176_redaction_rules:
-        allowed_keys.extend(["prev_state", "membership"])
-
-    # Room versions before MSC3989 kept the origin field.
-    if not room_version.msc3989_redaction_rules:
-        allowed_keys.append("origin")
+    # Earlier room versions from had additional allowed keys.
+    if not room_version.updated_redaction_rules:
+        allowed_keys.extend(["prev_state", "membership", "origin"])
 
     event_type = event_dict["type"]
 
@@ -129,7 +125,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         add_fields("membership")
         if room_version.msc3375_redaction_rules:
             add_fields(EventContentFields.AUTHORISING_USER)
-        if room_version.msc3821_redaction_rules:
+        if room_version.updated_redaction_rules:
             # Preserve the signed field under third_party_invite.
             third_party_invite = event_dict["content"].get("third_party_invite")
             if isinstance(third_party_invite, collections.abc.Mapping):
@@ -141,7 +137,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
 
     elif event_type == EventTypes.Create:
         # MSC2176 rules state that create events cannot be redacted.
-        if room_version.msc2176_redaction_rules:
+        if room_version.updated_redaction_rules:
             return event_dict
 
         add_fields("creator")
@@ -161,14 +157,14 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
             "redact",
         )
 
-        if room_version.msc2176_redaction_rules:
+        if room_version.updated_redaction_rules:
             add_fields("invite")
 
     elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
-    elif event_type == EventTypes.Redaction and room_version.msc2176_redaction_rules:
+    elif event_type == EventTypes.Redaction and room_version.updated_redaction_rules:
         add_fields("redacts")
 
     # Protect the rel_type and event_id fields under the m.relates_to field.

@@ -346,7 +346,7 @@ class EventBase(metaclass=abc.ABCMeta):
     @property
     def redacts(self) -> Optional[str]:
         """MSC2176 moved the redacts field into the content."""
-        if self.room_version.msc2176_redaction_rules:
+        if self.room_version.updated_redaction_rules:
             return self.content.get("redacts")
         return self.get("redacts")
 

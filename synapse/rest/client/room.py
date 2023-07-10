@@ -1117,7 +1117,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         # Ensure the redacts property in the content matches the one provided in
         # the URL.
         room_version = await self._store.get_room_version(room_id)
-        if room_version.msc2176_redaction_rules:
+        if room_version.updated_redaction_rules:
             if "redacts" in content and content["redacts"] != event_id:
                 raise SynapseError(
                     400,
@@ -1151,7 +1151,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
                     "sender": requester.user.to_string(),
                 }
                 # Earlier room versions had a top-level redacts property.
-                if not room_version.msc2176_redaction_rules:
+                if not room_version.updated_redaction_rules:
                     event_dict["redacts"] = event_id
 
                 (

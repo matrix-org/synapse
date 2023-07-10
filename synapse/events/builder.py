@@ -175,7 +175,7 @@ class EventBuilder:
 
         # MSC2174 moves the redacts property to the content, it is invalid to
         # provide it as a top-level property.
-        if self._redacts is not None and not self.room_version.msc2176_redaction_rules:
+        if self._redacts is not None and not self.room_version.updated_redaction_rules:
             event_dict["redacts"] = self._redacts
 
         if self._origin_server_ts is not None:
