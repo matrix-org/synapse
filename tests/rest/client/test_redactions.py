@@ -573,7 +573,7 @@ class RedactionsTestCase(HomeserverTestCase):
         room_id = self.helper.create_room_as(
             self.mod_user_id,
             tok=self.mod_access_token,
-            room_version=RoomVersions.MSC2176.identifier,
+            room_version=RoomVersions.V11.identifier,
         )
 
         # Create an event.
