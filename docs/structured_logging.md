@@ -67,14 +67,31 @@ handlers:
         host: 10.1.2.3
         port: 9999
 
+## If using no workers, this configuration will suffice:
 loggers:
     synapse:
         level: INFO
         handlers: [remote]
     synapse.storage.SQL:
         level: WARNING
+
+## However, if utilizing workers, the following configuration
+## will provide much more consistent logging reception:
+# loggers:
+#     synapse.storage.SQL:
+#         level: WARNING
+#
+# root:
+#     level: INFO
+#     handlers: [remote]
 ```
 
 The above logging config will set Synapse as 'INFO' logging level by default,
 with the SQL layer at 'WARNING', and will log JSON formatted messages to a
 remote endpoint at 10.1.2.3:9999.
+
+While a fully-remote logging configuration is possible, it can be prudent to
+also configure a short-term file-based handler as well. For example, one could
+set up a buffered rotating file handler, as well as a remote endpoint handler.
+This ensures that if your remote endpoint ever goes down, you retain the ability
+to easily examine logs.
