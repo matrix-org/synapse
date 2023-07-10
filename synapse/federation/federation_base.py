@@ -231,7 +231,7 @@ async def _check_sigs_on_pdu(
     # If this is a join event for a restricted room it may have been authorised
     # via a different server from the sending server. Check those signatures.
     if (
-        room_version.msc3083_join_rules
+        room_version.restricted_join_rule
         and pdu.type == EventTypes.Member
         and pdu.membership == Membership.JOIN
         and EventContentFields.AUTHORISING_USER in pdu.content

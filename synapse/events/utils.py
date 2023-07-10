@@ -123,7 +123,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
 
     if event_type == EventTypes.Member:
         add_fields("membership")
-        if room_version.msc3375_redaction_rules:
+        if room_version.restricted_join_rule_fix:
             add_fields(EventContentFields.AUTHORISING_USER)
         if room_version.updated_redaction_rules:
             # Preserve the signed field under third_party_invite.
@@ -143,7 +143,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         add_fields("creator")
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             add_fields("allow")
     elif event_type == EventTypes.PowerLevels:
         add_fields(

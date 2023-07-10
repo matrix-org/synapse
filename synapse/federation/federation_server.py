@@ -806,7 +806,7 @@ class FederationServer(FederationBase):
             raise IncompatibleRoomVersionError(room_version=room_version.identifier)
 
         # Check that this room supports knocking as defined by its room version
-        if not room_version.msc2403_knocking:
+        if not room_version.knock_join_rule:
             raise SynapseError(
                 403,
                 "This room version does not support knocking",
@@ -909,7 +909,7 @@ class FederationServer(FederationBase):
                 errcode=Codes.NOT_FOUND,
             )
 
-        if membership_type == Membership.KNOCK and not room_version.msc2403_knocking:
+        if membership_type == Membership.KNOCK and not room_version.knock_join_rule:
             raise SynapseError(
                 403,
                 "This room version does not support knocking",
@@ -933,7 +933,7 @@ class FederationServer(FederationBase):
         # the event is valid to be sent into the room. Currently this is only done
         # if the user is being joined via restricted join rules.
         if (
-            room_version.msc3083_join_rules
+            room_version.restricted_join_rule
             and event.membership == Membership.JOIN
             and EventContentFields.AUTHORISING_USER in event.content
         ):
