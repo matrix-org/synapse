@@ -24,7 +24,8 @@ from typing import Collection, Optional, Sequence, Set
 # e.g. docker.io/library/debian:bullseye
 #
 # If an EOL is forced by a Python version and we're dropping support for it, make sure
-# to remove references to the distibution across Synapse.
+# to remove references to the distibution across Synapse (search for "bullseye" for
+# example)
 DISTS = (
     "debian:buster",  # oldstable: EOL 2022-08
     "debian:bullseye",  # (EOL ~2024-07) (our EOL forced by Python 3.9 is 2025-10-05)
