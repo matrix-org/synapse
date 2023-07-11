@@ -764,6 +764,33 @@ class FederationUserDevicesQueryServlet(BaseFederationServerServlet):
         return await self.handler.on_query_user_devices(origin, user_id)
 
 
+class FederationUnstableUserDeviceQueryServlet(BaseFederationServerServlet):
+    PREFIX = "unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PATH = "/user/(?P<user_id>[^/]*)/device/(?P<device_id>[^/]*)"
+    CATEGORY = "Federation requests"
+
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        user_id: str,
+        device_id: str,
+    ) -> Tuple[int, JsonDict]:
+        # TODO This is not efficient, we should only query the individual device.
+        _, result = await self.handler.on_query_user_devices(origin, user_id)
+
+        # TODO 404 if not a local user or unknown user.
+        devices = result["devices"]
+        if device_id not in devices:
+            return 404, {}
+
+        return 200, {
+            "user_id": user_id,
+            **devices[device_id],
+        }
+
+
 class FederationClientKeysClaimServlet(BaseFederationServerServlet):
     PATH = "/user/keys/claim"
     CATEGORY = "Federation requests"
@@ -1031,4 +1058,5 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationUnstableSendJoinServlet,
     FederationUnstableSendLeaveServlet,
     FederationUnstableSendKnockServlet,
+    FederationUnstableUserDeviceQueryServlet,
 )
