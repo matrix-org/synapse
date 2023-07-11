@@ -38,7 +38,7 @@ from tests.http.server._base import test_disconnect
 from tests.server import (
     FakeChannel,
     FakeSite,
-    get_clock,
+    ThreadedMemoryReactorClock,
     make_request,
     setup_test_homeserver,
 )
@@ -46,11 +46,12 @@ from tests.server import (
 
 class JsonResourceTests(unittest.TestCase):
     def setUp(self) -> None:
-        reactor, clock = get_clock()
-        self.reactor = reactor
+        self.reactor = ThreadedMemoryReactorClock()
+        self.hs_clock = Clock(self.reactor)
         self.homeserver = setup_test_homeserver(
             self.addCleanup,
-            clock=clock,
+            federation_http_client=None,
+            clock=self.hs_clock,
             reactor=self.reactor,
         )
 
@@ -208,13 +209,7 @@ class JsonResourceTests(unittest.TestCase):
 
 class OptionsResourceTests(unittest.TestCase):
     def setUp(self) -> None:
-        reactor, clock = get_clock()
-        self.reactor = reactor
-        self.homeserver = setup_test_homeserver(
-            self.addCleanup,
-            clock=clock,
-            reactor=self.reactor,
-        )
+        self.reactor = ThreadedMemoryReactorClock()
 
         class DummyResource(Resource):
             isLeaf = True
@@ -247,7 +242,6 @@ class OptionsResourceTests(unittest.TestCase):
             "1.0",
             max_request_body_size=4096,
             reactor=self.reactor,
-            federation_agent=self.homeserver.get_federation_http_client().agent,
         )
 
         # render the request and return the channel
@@ -274,7 +268,7 @@ class OptionsResourceTests(unittest.TestCase):
         )
         self.assertEqual(
             channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
-            [b"Synapse-Trace-Id"],
+            [b"Synapse-Trace-Id, Server"],
         )
 
     def _check_cors_msc3886_headers(self, channel: FakeChannel) -> None:
@@ -350,8 +344,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
             await self.callback(request)
 
     def setUp(self) -> None:
-        reactor, _ = get_clock()
-        self.reactor = reactor
+        self.reactor = ThreadedMemoryReactorClock()
 
     def test_good_response(self) -> None:
         async def callback(request: SynapseRequest) -> None:
@@ -469,9 +462,9 @@ class DirectServeJsonResourceCancellationTests(unittest.TestCase):
     """Tests for `DirectServeJsonResource` cancellation."""
 
     def setUp(self) -> None:
-        reactor, clock = get_clock()
-        self.reactor = reactor
-        self.resource = CancellableDirectServeJsonResource(clock)
+        self.reactor = ThreadedMemoryReactorClock()
+        self.clock = Clock(self.reactor)
+        self.resource = CancellableDirectServeJsonResource(self.clock)
         self.site = FakeSite(self.resource, self.reactor)
 
     def test_cancellable_disconnect(self) -> None:
@@ -503,9 +496,9 @@ class DirectServeHtmlResourceCancellationTests(unittest.TestCase):
     """Tests for `DirectServeHtmlResource` cancellation."""
 
     def setUp(self) -> None:
-        reactor, clock = get_clock()
-        self.reactor = reactor
-        self.resource = CancellableDirectServeHtmlResource(clock)
+        self.reactor = ThreadedMemoryReactorClock()
+        self.clock = Clock(self.reactor)
+        self.resource = CancellableDirectServeHtmlResource(self.clock)
         self.site = FakeSite(self.resource, self.reactor)
 
     def test_cancellable_disconnect(self) -> None:

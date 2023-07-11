@@ -17,8 +17,6 @@ import json
 from typing import Dict, List, Set
 from unittest.mock import ANY, Mock, call
 
-from netaddr import IPSet
-
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
@@ -26,7 +24,6 @@ from synapse.api.constants import EduTypes
 from synapse.api.errors import AuthError
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.handlers.typing import TypingWriterHandler
-from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.server import HomeServer
 from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
@@ -79,13 +76,6 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         # we mock out the federation client too
         self.mock_federation_client = Mock(spec=["put_json"])
         self.mock_federation_client.put_json.return_value = make_awaitable((200, "OK"))
-        self.mock_federation_client.agent = MatrixFederationAgent(
-            reactor,
-            tls_client_options_factory=None,
-            user_agent=b"SynapseInTrialTest/0.0.0",
-            ip_allowlist=None,
-            ip_blocklist=IPSet(),
-        )
 
         # the tests assume that we are starting at unix time 1000
         reactor.pump((1000,))
