@@ -348,22 +348,15 @@ class EventID(DomainSpecificString):
     SIGIL = "$"
 
 
-mxid_localpart_allowed_characters = set(
-    "_-./=" + string.ascii_lowercase + string.digits
+MXID_LOCALPART_ALLOWED_CHARACTERS = set(
+    "_-./=+" + string.ascii_lowercase + string.digits
 )
-# MSC4007 adds the + to the allowed characters.
-#
-# TODO If this was accepted, update the SSO code to support this, see the callers
-#      of map_username_to_mxid_localpart.
-extended_mxid_localpart_allowed_characters = mxid_localpart_allowed_characters | {"+"}
 
 # Guest user IDs are purely numeric.
 GUEST_USER_ID_PATTERN = re.compile(r"^\d+$")
 
 
-def contains_invalid_mxid_characters(
-    localpart: str, use_extended_character_set: bool
-) -> bool:
+def contains_invalid_mxid_characters(localpart: str) -> bool:
     """Check for characters not allowed in an mxid or groupid localpart
 
     Args:
@@ -374,12 +367,7 @@ def contains_invalid_mxid_characters(
     Returns:
         True if there are any naughty characters
     """
-    allowed_characters = (
-        extended_mxid_localpart_allowed_characters
-        if use_extended_character_set
-        else mxid_localpart_allowed_characters
-    )
-    return any(c not in allowed_characters for c in localpart)
+    return any(c not in MXID_LOCALPART_ALLOWED_CHARACTERS for c in localpart)
 
 
 UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
@@ -396,7 +384,7 @@ UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
 #    bytes rather than strings
 #
 NON_MXID_CHARACTER_PATTERN = re.compile(
-    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters - {"="})),)).encode(
+    ("[^%s]" % (re.escape("".join(MXID_LOCALPART_ALLOWED_CHARACTERS - {"="})),)).encode(
         "ascii"
     )
 )

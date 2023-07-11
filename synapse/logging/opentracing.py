@@ -1070,7 +1070,7 @@ def trace_servlet(
         tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
         tags.HTTP_METHOD: request.get_method(),
         tags.HTTP_URL: request.get_redacted_uri(),
-        tags.PEER_HOST_IPV6: request.getClientAddress().host,
+        tags.PEER_HOST_IPV6: request.get_client_ip_if_available(),
     }
 
     request_name = request.request_metrics.name
@@ -1091,9 +1091,11 @@ def trace_servlet(
             # with JsonResource).
             scope.span.set_operation_name(request.request_metrics.name)
 
+            # Mypy seems to think that start_context.tag below can be Optional[str], but
+            # that doesn't appear to be correct and works in practice.
             request_tags[
                 SynapseTags.REQUEST_TAG
-            ] = request.request_metrics.start_context.tag
+            ] = request.request_metrics.start_context.tag  # type: ignore[assignment]
 
             # set the tags *after* the servlet completes, in case it decided to
             # prioritise the span (tags will get dropped on unprioritised spans)
