@@ -23,7 +23,6 @@ from typing import Collection, Optional, Sequence, Set
 # These are expanded inside the dockerfile to be a fully qualified image name.
 # e.g. docker.io/library/debian:bullseye
 DISTS = (
-    "debian:buster",  # oldstable: EOL 2022-08
     "debian:bullseye",
     "debian:bookworm",
     "debian:sid",

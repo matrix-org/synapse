@@ -29,11 +29,12 @@ IS_PR = os.environ["GITHUB_REF"].startswith("refs/pull/")
 
 # First calculate the various trial jobs.
 #
-# For each type of test we only run on Py3.7 on PRs
+# For PRs, we only run each type of test with the oldest Python version supported (which
+# is Python 3.8 right now)
 
 trial_sqlite_tests = [
     {
-        "python-version": "3.7",
+        "python-version": "3.8",
         "database": "sqlite",
         "extras": "all",
     }
@@ -46,13 +47,13 @@ if not IS_PR:
             "database": "sqlite",
             "extras": "all",
         }
-        for version in ("3.8", "3.9", "3.10", "3.11")
+        for version in ("3.9", "3.10", "3.11")
     )
 
 
 trial_postgres_tests = [
     {
-        "python-version": "3.7",
+        "python-version": "3.8",
         "database": "postgres",
         "postgres-version": "11",
         "extras": "all",
@@ -71,7 +72,7 @@ if not IS_PR:
 
 trial_no_extra_tests = [
     {
-        "python-version": "3.7",
+        "python-version": "3.8",
         "database": "sqlite",
         "extras": "",
     }
@@ -132,11 +133,6 @@ if not IS_PR:
             {
                 "sytest-tag": "testing",
                 "postgres": "postgres",
-            },
-            {
-                "sytest-tag": "buster",
-                "postgres": "multi-postgres",
-                "workers": "workers",
             },
         ]
     )

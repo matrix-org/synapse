@@ -415,12 +415,6 @@ class PersistEventsStore:
                 backfilled=False,
             )
 
-        self._update_forward_extremities_txn(
-            txn,
-            new_forward_extremities=new_forward_extremities,
-            max_stream_order=max_stream_order,
-        )
-
         # Ensure that we don't have the same event twice.
         events_and_contexts = self._filter_events_and_contexts_for_duplicates(
             events_and_contexts
@@ -438,6 +432,12 @@ class PersistEventsStore:
         # seen before.
 
         self._store_event_txn(txn, events_and_contexts=events_and_contexts)
+
+        self._update_forward_extremities_txn(
+            txn,
+            new_forward_extremities=new_forward_extremities,
+            max_stream_order=max_stream_order,
+        )
 
         self._persist_transaction_ids_txn(txn, events_and_contexts)
 

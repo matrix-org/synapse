@@ -38,6 +38,7 @@ from synapse.events import EventBase, make_event_from_dict
 from synapse.logging.opentracing import tag_args, trace
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
+from synapse.storage.background_updates import ForeignKeyConstraint
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -139,6 +140,17 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
         self._clock.looping_call(self._get_stats_for_federation_staging, 30 * 1000)
+
+        if isinstance(self.database_engine, PostgresEngine):
+            self.db_pool.updates.register_background_validate_constraint_and_delete_rows(
+                update_name="event_forward_extremities_event_id_foreign_key_constraint_update",
+                table="event_forward_extremities",
+                constraint_name="event_forward_extremities_event_id",
+                constraint=ForeignKeyConstraint(
+                    "events", [("event_id", "event_id")], deferred=True
+                ),
+                unique_columns=("event_id", "room_id"),
+            )
 
     async def get_auth_chain(
         self, room_id: str, event_ids: Collection[str], include_given: bool = False

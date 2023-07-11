@@ -1,1 +1,0 @@
-Fix a bug introduced in 1.57.0 where the wrong table would be locked on updating database rows when using SQLite as the database backend.
