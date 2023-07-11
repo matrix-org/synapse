@@ -1,1 +1,0 @@
-Use lower isolation level when cleaning old presence stream data to avoid serialization errors.
