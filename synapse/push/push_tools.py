@@ -54,19 +54,26 @@ async def get_context_for_event(
 
     if ev.internal_metadata.outlier:
         # We don't have state for outliers, so we can't compute the context
-        # except for invites with `invite_room_state` set. (Such events are
-        # known as 'out-of-band memberships' for the user.
-        if (
-            ev.type != EventTypes.Member
-            or ev.content.get("membership") != Membership.INVITE
-        ):
+        # except for invites and knocks. (Such events are known as 'out-of-band
+        # memberships' for the user).
+        if ev.type != EventTypes.Member:
             return ctx
 
-        invite_room_state = ev.unsigned.get("invite_room_state", [])
+        # We might be able to pull out the display name for the sender straight
+        # from the membership event
+        event_display_name = ev.content.get("displayname")
+        if event_display_name and ev.state_key == ev.sender:
+            ctx["sender_display_name"] = event_display_name
+
+        room_state = None
+        if ev.content.get("membership") == Membership.INVITE:
+            room_state = ev.unsigned.get("invite_room_state", [])
+        elif ev.content.get("membership") == Membership.KNOCK:
+            room_state = ev.unsigned.get("knock_room_state", [])
 
         # Ideally we'd reuse the logic in `calculate_room_name`, but that gets
         # complicated to handle partial events vs pulling events from the DB.
-        for state_dict in invite_room_state:
+        for state_dict in room_state:
             type_tuple = (state_dict["type"], state_dict.get("state_key"))
             if type_tuple == (EventTypes.Member, ev.sender):
                 display_name = state_dict["content"].get("displayname")
