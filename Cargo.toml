@@ -3,3 +3,4 @@
 
 [workspace]
 members = ["rust"]
+resolver = "2"

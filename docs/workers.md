@@ -145,9 +145,6 @@ In the config file for each worker, you must specify:
    with an `http` listener.
  * **Synapse 1.72 and older:** if handling the `^/_matrix/client/v3/keys/upload` endpoint, the HTTP URI for
    the main process (`worker_main_http_uri`). This config option is no longer required and is ignored when running Synapse 1.73 and newer.
- * **Synapse 1.83 and older:** The HTTP replication endpoint that the worker should talk to on the main synapse process
-   ([`worker_replication_host`](usage/configuration/config_documentation.md#worker_replication_host) and
-   [`worker_replication_http_port`](usage/configuration/config_documentation.md#worker_replication_http_port)). If using Synapse 1.84 and newer, these are not needed if `main` is defined on the [shared configuration](#shared-configuration) `instance_map`
 
 For example:
 

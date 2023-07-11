@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from synapse.config._base import Config
 from synapse.logging.context import defer_to_thread, run_in_background
+from synapse.logging.opentracing import start_active_span, trace_with_opname
 from synapse.util.async_helpers import maybe_awaitable
 
 from ._base import FileInfo, Responder
@@ -86,6 +87,7 @@ class StorageProviderWrapper(StorageProvider):
     def __str__(self) -> str:
         return "StorageProviderWrapper[%s]" % (self.backend,)
 
+    @trace_with_opname("StorageProviderWrapper.store_file")
     async def store_file(self, path: str, file_info: FileInfo) -> None:
         if not file_info.server_name and not self.store_local:
             return None
@@ -114,6 +116,7 @@ class StorageProviderWrapper(StorageProvider):
 
             run_in_background(store)
 
+    @trace_with_opname("StorageProviderWrapper.fetch")
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         if file_info.url_cache:
             # Files in the URL preview cache definitely aren't stored here,
@@ -141,6 +144,7 @@ class FileStorageProviderBackend(StorageProvider):
     def __str__(self) -> str:
         return "FileStorageProviderBackend[%s]" % (self.base_directory,)
 
+    @trace_with_opname("FileStorageProviderBackend.store_file")
     async def store_file(self, path: str, file_info: FileInfo) -> None:
         """See StorageProvider.store_file"""
 
@@ -152,13 +156,15 @@ class FileStorageProviderBackend(StorageProvider):
 
         # mypy needs help inferring the type of the second parameter, which is generic
         shutil_copyfile: Callable[[str, str], str] = shutil.copyfile
-        await defer_to_thread(
-            self.hs.get_reactor(),
-            shutil_copyfile,
-            primary_fname,
-            backup_fname,
-        )
+        with start_active_span("shutil_copyfile"):
+            await defer_to_thread(
+                self.hs.get_reactor(),
+                shutil_copyfile,
+                primary_fname,
+                backup_fname,
+            )
 
+    @trace_with_opname("FileStorageProviderBackend.fetch")
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         """See StorageProvider.fetch"""
 
