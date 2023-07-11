@@ -389,6 +389,9 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return pdu_json
 
+    def get_linearized_pdu_json(self) -> JsonDict:
+        raise NotImplementedError()
+
     def get_templated_pdu_json(self) -> JsonDict:
         """
         Return a JSON object suitable for a templated event, as used in the
@@ -620,7 +623,8 @@ class FrozenLinearizedEvent(FrozenEventV3):
     def get_linearized_pdu_json(self) -> JsonDict:
         # Get the full PDU and then remove fields from it.
         pdu = self.get_pdu_json()
-        pdu.pop("hashes")
+        # Strip everything except for the lpdu property from the hashes.
+        pdu["hashes"] = {"lpdu": pdu["hashes"]["lpdu"]}
         pdu.pop("auth_events")
         pdu.pop("prev_events")
         return pdu

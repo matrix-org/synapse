@@ -36,31 +36,37 @@ logger = logging.getLogger(__name__)
 Hasher = Callable[[bytes], "hashlib._Hash"]
 
 
-@trace
-def check_event_content_hash(
-    event: EventBase, hash_algorithm: Hasher = hashlib.sha256
+def _check_dict_hash(
+    event_id: str,
+    hash_log: str,
+    hashes: Any,
+    d: JsonDict,
+    hash_algorithm: Hasher = hashlib.sha256,
 ) -> bool:
-    """Check whether the hash for this PDU matches the contents"""
-    name, expected_hash = compute_content_hash(event.get_pdu_json(), hash_algorithm)
+    name, expected_hash = compute_content_hash(d, hash_algorithm)
     logger.debug(
-        "Verifying content hash on %s (expecting: %s)",
-        event.event_id,
+        "Verifying %s hash on %s (expecting: %s)",
+        hash_log,
+        event_id,
         encode_base64(expected_hash),
     )
 
-    # some malformed events lack a 'hashes'. Protect against it being missing
-    # or a weird type by basically treating it the same as an unhashed event.
-    hashes = event.get("hashes")
     # nb it might be a immutabledict or a dict
     if not isinstance(hashes, collections.abc.Mapping):
         raise SynapseError(
-            400, "Malformed 'hashes': %s" % (type(hashes),), Codes.UNAUTHORIZED
+            400,
+            "Malformed %s hashes: %s"
+            % (
+                hash_log,
+                type(hashes),
+            ),
+            Codes.UNAUTHORIZED,
         )
 
     if name not in hashes:
         raise SynapseError(
             400,
-            "Algorithm %s not in hashes %s" % (name, list(hashes)),
+            "Algorithm %s not in %s hashes %s" % (name, hash_log, list(hashes)),
             Codes.UNAUTHORIZED,
         )
     message_hash_base64 = hashes[name]
@@ -71,6 +77,37 @@ def check_event_content_hash(
             400, "Invalid base64: %s" % (message_hash_base64,), Codes.UNAUTHORIZED
         )
     return message_hash_bytes == expected_hash
+
+
+@trace
+def check_event_content_hash(
+    event: EventBase, hash_algorithm: Hasher = hashlib.sha256
+) -> bool:
+    """Check whether the hash for this PDU matches the contents"""
+
+    # some malformed events lack a 'hashes'. Protect against it being missing
+    # or a weird type by basically treating it the same as an unhashed event.
+    hashes = event.get("hashes")
+
+    if not _check_dict_hash(
+        event.event_id, "content", hashes, event.get_pdu_json(), hash_algorithm
+    ):
+        return False
+
+    # Check the content hash of the LPDU, if this was sent via a hub.
+    if event.room_version.linearized_matrix and event.hub_server:
+        # hashes must be a dictionary to have passed _check_dict_hash above.
+        lpdu_hashes = hashes.get("lpdu")
+        return _check_dict_hash(
+            event.event_id,
+            "linearized content",
+            lpdu_hashes,
+            event.get_linearized_pdu_json(),
+            hash_algorithm,
+        )
+
+    # Non-linearized matrix doesn't care about other checks.
+    return True
 
 
 def compute_content_hash(
