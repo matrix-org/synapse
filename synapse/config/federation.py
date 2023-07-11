@@ -76,7 +76,7 @@ class FederationConfig(Config):
             "destination_retry_multiplier", 2
         )
         self.destination_max_retry_interval_ms = Config.parse_duration(
-            federation_config.get("destination_max_retry_interval", "1d")
+            federation_config.get("destination_max_retry_interval", "7d")
         )
 
 

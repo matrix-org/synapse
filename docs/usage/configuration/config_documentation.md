@@ -1218,7 +1218,7 @@ for a given destination and the state of the backoff is stored in the database.
 
 * `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
 * `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
-* `destination_max_retry_interval`: a cap on the backoff. Defaults to one day.
+* `destination_max_retry_interval`: a cap on the backoff. Defaults to a week.
 
 Example configuration:
 ```yaml
