@@ -54,7 +54,8 @@ async def get_context_for_event(
 
     if ev.internal_metadata.outlier:
         # We don't have state for outliers, so we can't compute the context
-        # except for invites with `invite_room_state` set..
+        # except for invites with `invite_room_state` set. (Such events are
+        # known as 'out-of-band memberships' for the user.
         if (
             ev.type != EventTypes.Member
             or ev.content.get("membership") != Membership.INVITE
