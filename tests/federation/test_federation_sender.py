@@ -21,6 +21,7 @@ from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EduTypes, RoomEncryptionAlgorithms
+from synapse.api.errors import HttpResponseException
 from synapse.federation.units import Transaction
 from synapse.handlers.device import DeviceHandler
 from synapse.rest import admin
@@ -274,7 +275,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.federation_transport_client = Mock(
-            spec=["send_transaction", "query_user_devices"]
+            spec=["send_transaction", "send_unstable_transaction", "query_user_devices"]
         )
         return self.setup_test_homeserver(
             federation_transport_client=self.federation_transport_client,
@@ -313,6 +314,11 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # whenever send_transaction is called, record the edu data
         self.edus: List[JsonDict] = []
+        self.federation_transport_client.send_unstable_transaction.side_effect = (
+            HttpResponseException(
+                404, "Unknown", response=b'{"errcode":"M_UNRECOGNIZED"}'
+            )
+        )
         self.federation_transport_client.send_transaction.side_effect = (
             self.record_transaction
         )

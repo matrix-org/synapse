@@ -21,6 +21,7 @@ from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
+from synapse.http.client import is_unknown_endpoint
 from synapse.logging.opentracing import (
     extract_text_map,
     set_tag,
@@ -159,17 +160,46 @@ class TransactionManager:
                             del p["age_ts"]
                 return data
 
+            def json_data_cb_unstable() -> JsonDict:
+                data = {
+                    "pdus": transaction.pdus,
+                }
+                if transaction.edus:
+                    data["edus"] = transaction.edus
+                return data
+
             try:
-                response = await self._transport_layer.send_transaction(
-                    transaction, json_data_cb
+                response = await self._transport_layer.send_unstable_transaction(
+                    transaction, json_data_cb_unstable
                 )
             except HttpResponseException as e:
-                code = e.code
+                # If an error is received that is due to an unrecognised endpoint,
+                # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
+                # and raise.
+                if not is_unknown_endpoint(e):
+                    code = e.code
 
-                set_tag(tags.ERROR, True)
+                    set_tag(tags.ERROR, True)
 
-                logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
-                raise
+                    logger.info(
+                        "TX [%s] {%s} got %d response", destination, txn_id, code
+                    )
+
+                    raise
+
+                try:
+                    response = await self._transport_layer.send_transaction(
+                        transaction, json_data_cb
+                    )
+                except HttpResponseException as e:
+                    code = e.code
+
+                    set_tag(tags.ERROR, True)
+
+                    logger.info(
+                        "TX [%s] {%s} got %d response", destination, txn_id, code
+                    )
+                    raise
 
             logger.info("TX [%s] {%s} got 200 response", destination, txn_id)
 

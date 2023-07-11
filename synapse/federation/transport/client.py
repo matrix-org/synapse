@@ -315,6 +315,51 @@ class TransportLayerClient:
             try_trailing_slash_on_400=True,
         )
 
+    async def send_unstable_transaction(
+        self,
+        transaction: Transaction,
+        json_data_callback: Optional[Callable[[], JsonDict]] = None,
+    ) -> JsonDict:
+        """Sends the given Transaction to its destination
+
+        Args:
+            transaction
+
+        Returns:
+            Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body.
+
+            Fails with ``HTTPRequestException`` if we get an HTTP response
+            code >= 300.
+
+            Fails with ``NotRetryingDestination`` if we are not yet ready
+            to retry this server.
+
+            Fails with ``FederationDeniedError`` if this destination
+            is not on our federation whitelist
+        """
+        logger.debug(
+            "send_data dest=%s, txid=%s",
+            transaction.destination,
+            transaction.transaction_id,
+        )
+
+        if self._is_mine_server_name(transaction.destination):
+            raise RuntimeError("Transport layer cannot send to itself!")
+
+        path = f"/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send/{transaction.transaction_id}"
+
+        result = await self.client.put_json(
+            transaction.destination,
+            path=path,
+            json_data_callback=json_data_callback,
+            long_retries=True,
+            backoff_on_404=True,  # If we get a 404 the other side has gone
+            try_trailing_slash_on_400=True,
+        )
+        # Convert the result to match the v1 result.
+        return {"pdus": result.get("failed_pdus", {})}
+
     async def make_query(
         self,
         destination: str,

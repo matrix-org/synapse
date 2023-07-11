@@ -140,6 +140,46 @@ class FederationSendServlet(BaseFederationServerServlet):
         return code, response
 
 
+class FederationUnstableSendServlet(FederationSendServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+
+    # This is when someone is trying to send us a bunch of data.
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        transaction_id: str,
+    ) -> Tuple[int, JsonDict]:
+        """Called on PUT /send/<transaction_id>/
+
+        Args:
+            transaction_id: The transaction_id associated with this request. This
+                is *not* None.
+
+        Returns:
+            Tuple of `(code, response)`, where
+            `response` is a python dict to be converted into JSON that is
+            used as the response body.
+        """
+
+        # The removed fields (origin and origin_server_ts) are unused, but the
+        # response is slightly different.
+
+        code, response = await super().on_PUT(origin, content, query, transaction_id)
+
+        # The response only includes failed PDUs.
+        response = {
+            "failed_pdus": {
+                event_id: result
+                for event_id, result in response["pdus"].items()
+                if "error" in result
+            }
+        }
+
+        return code, response
+
+
 class FederationEventServlet(BaseFederationServerServlet):
     PATH = "/event/(?P<event_id>[^/]*)/?"
     CATEGORY = "Federation requests"
@@ -984,6 +1024,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationMakeKnockServlet,
     FederationAccountStatusServlet,
     # TODO(LM) Linearized Matrix additions.
+    FederationUnstableSendServlet,
     FederationUnstableEventServlet,
     FederationUnstableBackfillServlet,
     FederationUnstableInviteServlet,
