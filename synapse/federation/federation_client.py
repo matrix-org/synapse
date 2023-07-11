@@ -1332,6 +1332,22 @@ class FederationClient(FederationBase):
         time_now = self._clock.time_msec()
 
         try:
+            return await self.transport_layer.send_invite_unstable(
+                destination=destination,
+                txn_id=pdu.event_id,
+                content={
+                    "event": pdu.get_pdu_json(time_now),
+                    "room_version": room_version.identifier,
+                    "invite_room_state": pdu.unsigned.get("invite_room_state", []),
+                },
+            )
+        except HttpResponseException as e:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v2.
+            if not is_unknown_endpoint(e):
+                raise
+
+        try:
             return await self.transport_layer.send_invite_v2(
                 destination=destination,
                 room_id=pdu.room_id,

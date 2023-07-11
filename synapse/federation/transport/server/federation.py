@@ -651,6 +651,40 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
         return 200, result
 
 
+class FederationUnstableInviteServlet(BaseFederationServerServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PATH = "/invite/(?P<txn_id>[^/]*)"
+    CATEGORY = "Federation requests"
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        txn_id: str,
+    ) -> Tuple[int, JsonDict]:
+        # TODO Use the txn_id for idempotency.
+
+        room_version = content["room_version"]
+        event = content["event"]
+        invite_room_state = content.get("invite_room_state", [])
+
+        # Synapse expects invite_room_state to be in unsigned, as it is in v1
+        # API
+
+        event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
+
+        result = await self.handler.on_invite_request(
+            origin, event, room_version_id=room_version
+        )
+
+        # We only store invite_room_state for internal use, so remove it before
+        # returning the event to the remote homeserver.
+        result["event"].get("unsigned", {}).pop("invite_room_state", None)
+
+        return 200, result
+
+
 class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
     PATH = "/exchange_third_party_invite/(?P<room_id>[^/]*)"
     CATEGORY = "Federation requests"
@@ -952,6 +986,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     # TODO(LM) Linearized Matrix additions.
     FederationUnstableEventServlet,
     FederationUnstableBackfillServlet,
+    FederationUnstableInviteServlet,
     FederationUnstableSendJoinServlet,
     FederationUnstableSendLeaveServlet,
     FederationUnstableSendKnockServlet,

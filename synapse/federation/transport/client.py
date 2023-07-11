@@ -564,6 +564,15 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
+    async def send_invite_unstable(
+        self, destination: str, txn_id: str, content: JsonDict
+    ) -> JsonDict:
+        path = f"/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/invite/{txn_id}"
+
+        return await self.client.post_json(
+            destination=destination, path=path, data=content, ignore_backoff=True
+        )
+
     async def get_public_rooms(
         self,
         remote_server: str,
