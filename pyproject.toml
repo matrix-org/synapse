@@ -373,7 +373,14 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.cibuildwheel]
 # Skip unsupported platforms (by us or by Rust).
-skip = "cp36* *-musllinux_i686 pp*aarch64 *-musllinux_aarch64"
+# See https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip for the list of build targets.
+# We skip:
+#  - CPython 3.6 and 3.7: EOLed
+#  - PyPy 3.7: we only support Python 3.8+
+#  - musllinux i686: TODO why?
+#  - PyPy on Aarch64: TODO why?
+#  - musllinux on aarch64: TODO why?
+skip = "cp36* cp37* pp37* *-musllinux_i686 pp*aarch64 *-musllinux_aarch64"
 
 # We need a rust compiler
 before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
