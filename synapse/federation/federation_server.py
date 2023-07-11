@@ -679,13 +679,14 @@ class FederationServer(FederationBase):
         self,
         origin: str,
         content: JsonDict,
-        room_id: str,
+        expected_room_id: Optional[str] = None,
         caller_supports_partial_state: bool = False,
     ) -> Dict[str, Any]:
         set_tag(
             SynapseTags.SEND_JOIN_RESPONSE_IS_PARTIAL_STATE,
             caller_supports_partial_state,
         )
+        room_id = content["room_id"]
         await self._room_member_handler._join_rate_per_room_limiter.ratelimit(  # type: ignore[has-type]
             requester=None,
             key=room_id,
@@ -693,7 +694,7 @@ class FederationServer(FederationBase):
         )
 
         event, context = await self._on_send_membership_event(
-            origin, content, Membership.JOIN, room_id
+            origin, content, Membership.JOIN, expected_room_id
         )
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -752,10 +753,12 @@ class FederationServer(FederationBase):
         return {"event": pdu.get_templated_pdu_json(), "room_version": room_version}
 
     async def on_send_leave_request(
-        self, origin: str, content: JsonDict, room_id: str
+        self, origin: str, content: JsonDict, expected_room_id: Optional[str] = None
     ) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
-        await self._on_send_membership_event(origin, content, Membership.LEAVE, room_id)
+        await self._on_send_membership_event(
+            origin, content, Membership.LEAVE, expected_room_id
+        )
         return {}
 
     async def on_make_knock_request(
@@ -813,10 +816,7 @@ class FederationServer(FederationBase):
         }
 
     async def on_send_knock_request(
-        self,
-        origin: str,
-        content: JsonDict,
-        room_id: str,
+        self, origin: str, content: JsonDict, expected_room_id: Optional[str] = None
     ) -> Dict[str, List[JsonDict]]:
         """
         We have received a knock event for a room. Verify and send the event into the room
@@ -826,13 +826,13 @@ class FederationServer(FederationBase):
         Args:
             origin: The remote homeserver of the knocking user.
             content: The content of the request.
-            room_id: The ID of the room to knock on.
+            expected_room_id: The room ID included in the request.
 
         Returns:
             The stripped room state.
         """
         _, context = await self._on_send_membership_event(
-            origin, content, Membership.KNOCK, room_id
+            origin, content, Membership.KNOCK, expected_room_id
         )
 
         # Retrieve stripped state events from the room and send them back to the remote
@@ -853,7 +853,11 @@ class FederationServer(FederationBase):
         }
 
     async def _on_send_membership_event(
-        self, origin: str, content: JsonDict, membership_type: str, room_id: str
+        self,
+        origin: str,
+        content: JsonDict,
+        membership_type: str,
+        expected_room_id: Optional[str],
     ) -> Tuple[EventBase, EventContext]:
         """Handle an on_send_{join,leave,knock} request
 
@@ -865,8 +869,8 @@ class FederationServer(FederationBase):
             content: The body of the send_* request - a complete membership event
             membership_type: The expected membership type (join or leave, depending
                 on the endpoint)
-            room_id: The room_id from the request, to be validated against the room_id
-                in the event
+            expected_room_id: The room_id from the request, to be validated against
+                the room_id in the event. None if the request did not include a room ID.
 
         Returns:
             The event and context of the event after inserting it into the room graph.
@@ -876,12 +880,16 @@ class FederationServer(FederationBase):
                the room_id not matching or the event not being authorized.
         """
         assert_params_in_dict(content, ["room_id"])
-        if content["room_id"] != room_id:
+        if expected_room_id is None:
+            room_id = content["room_id"]
+        elif content["room_id"] != expected_room_id:
             raise SynapseError(
                 400,
                 "Room ID in body does not match that in request path",
                 Codes.BAD_JSON,
             )
+        else:
+            room_id = expected_room_id
 
         # Note that get_room_version throws if the room does not exist here.
         room_version = await self.store.get_room_version(room_id)

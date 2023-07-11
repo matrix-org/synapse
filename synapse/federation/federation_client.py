@@ -1248,6 +1248,19 @@ class FederationClient(FederationBase):
         time_now = self._clock.time_msec()
 
         try:
+            return await self.transport_layer.send_join_unstable(
+                room_version=room_version,
+                destination=destination,
+                txn_id=pdu.event_id,
+                content=pdu.get_pdu_json(time_now),
+            )
+        except HttpResponseException as e:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v2 endpoint.
+            if not is_unknown_endpoint(e):
+                raise
+
+        try:
             return await self.transport_layer.send_join_v2(
                 room_version=room_version,
                 destination=destination,
@@ -1385,6 +1398,18 @@ class FederationClient(FederationBase):
         time_now = self._clock.time_msec()
 
         try:
+            return await self.transport_layer.send_leave_unstable(
+                destination=destination,
+                txn_id=pdu.event_id,
+                content=pdu.get_pdu_json(time_now),
+            )
+        except HttpResponseException as e:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v2.
+            if not is_unknown_endpoint(e):
+                raise
+
+        try:
             return await self.transport_layer.send_leave_v2(
                 destination=destination,
                 room_id=pdu.room_id,
@@ -1459,6 +1484,18 @@ class FederationClient(FederationBase):
             The list of state events may be empty.
         """
         time_now = self._clock.time_msec()
+
+        try:
+            return await self.transport_layer.send_knock_unstable(
+                destination=destination,
+                txn_id=pdu.event_id,
+                content=pdu.get_pdu_json(time_now),
+            )
+        except HttpResponseException as e:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v2.
+            if not is_unknown_endpoint(e):
+                raise
 
         return await self.transport_layer.send_knock_v1(
             destination=destination,

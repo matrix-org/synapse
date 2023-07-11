@@ -435,6 +435,22 @@ class TransportLayerClient:
             parser=SendJoinParser(room_version, v1_api=False),
         )
 
+    async def send_join_unstable(
+        self,
+        room_version: RoomVersion,
+        destination: str,
+        txn_id: str,
+        content: JsonDict,
+    ) -> "SendJoinResponse":
+        path = f"/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send_join/{txn_id}"
+
+        return await self.client.post_json(
+            destination=destination,
+            path=path,
+            data=content,
+            parser=SendJoinParser(room_version, v1_api=False),
+        )
+
     async def send_leave_v1(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> Tuple[int, JsonDict]:
@@ -458,6 +474,22 @@ class TransportLayerClient:
         path = _create_v2_path("/send_leave/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
+            destination=destination,
+            path=path,
+            data=content,
+            # we want to do our best to send this through. The problem is
+            # that if it fails, we won't retry it later, so if the remote
+            # server was just having a momentary blip, the room will be out of
+            # sync.
+            ignore_backoff=True,
+        )
+
+    async def send_leave_unstable(
+        self, destination: str, txn_id: str, content: JsonDict
+    ) -> JsonDict:
+        path = f"/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send_leave/{txn_id}"
+
+        return await self.client.post_json(
             destination=destination,
             path=path,
             data=content,
@@ -498,6 +530,15 @@ class TransportLayerClient:
         path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
+            destination=destination, path=path, data=content
+        )
+
+    async def send_knock_unstable(
+        self, destination: str, txn_id: str, content: JsonDict
+    ) -> JsonDict:
+        path = f"/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/send_knock/{txn_id}"
+
+        return await self.client.post_json(
             destination=destination, path=path, data=content
         )
 

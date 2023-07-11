@@ -986,6 +986,7 @@ class MatrixFederationHttpClient:
 
         return body
 
+    @overload
     async def post_json(
         self,
         destination: str,
@@ -995,7 +996,35 @@ class MatrixFederationHttpClient:
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
         args: Optional[QueryParams] = None,
+        parser: Literal[None] = None,
     ) -> JsonDict:
+        ...
+
+    @overload
+    async def post_json(
+        self,
+        destination: str,
+        path: str,
+        data: Optional[JsonDict] = None,
+        long_retries: bool = False,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        args: Optional[QueryParams] = None,
+        parser: Optional[ByteParser[T]] = None,
+    ) -> T:
+        ...
+
+    async def post_json(
+        self,
+        destination: str,
+        path: str,
+        data: Optional[JsonDict] = None,
+        long_retries: bool = False,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        args: Optional[QueryParams] = None,
+        parser: Optional[ByteParser[T]] = None,
+    ) -> Union[JsonDict, T]:
         """Sends the specified json data using POST
 
         Args:
@@ -1021,6 +1050,9 @@ class MatrixFederationHttpClient:
                 try the request anyway.
 
             args: query params
+
+            parser: The parser to use to decode the response. Defaults to
+                parsing as JSON.
         Returns:
             Succeeds when we get a 2xx HTTP response. The result will be the decoded JSON body.
 
@@ -1053,8 +1085,11 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout_seconds
 
+        if parser is None:
+            parser = cast(ByteParser[T], JsonParser())
+
         body = await _handle_response(
-            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
+            self.reactor, _sec_timeout, request, response, start_ms, parser=parser
         )
         return body
 

@@ -436,6 +436,23 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
         return 200, result
 
 
+class FederationUnstableSendLeaveServlet(BaseFederationServerServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PATH = "/send_leave/(?P<txn_id>[^/]*)"
+    CATEGORY = "Federation requests"
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        txn_id: str,
+    ) -> Tuple[int, JsonDict]:
+        # TODO Use the txn_id for idempotency.
+        result = await self.handler.on_send_leave_request(origin, content)
+        return 200, result
+
+
 class FederationMakeKnockServlet(BaseFederationServerServlet):
     PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
     CATEGORY = "Federation requests"
@@ -473,6 +490,23 @@ class FederationV1SendKnockServlet(BaseFederationServerServlet):
     ) -> Tuple[int, JsonDict]:
         result = await self.handler.on_send_knock_request(origin, content, room_id)
         return 200, result
+
+
+class FederationUnstableSendKnockServlet(BaseFederationServerServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PATH = "/send_knock/(?P<txn_id>[^/]*)"
+    CATEGORY = "Federation requests"
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        txn_id: str,
+    ) -> Tuple[int, JsonDict]:
+        # TODO Use the txn_id for idempotency.
+        result = await self.handler.on_send_knock_request(origin, content)
+        return 200, {"stripped_state": result["knock_room_state"]}
 
 
 class FederationEventAuthServlet(BaseFederationServerServlet):
@@ -531,6 +565,28 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
             origin, content, room_id, caller_supports_partial_state=partial_state
         )
         return 200, result
+
+
+class FederationUnstableSendJoinServlet(BaseFederationServerServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PATH = "/send_join/(?P<txn_id>[^/]*)"
+    CATEGORY = "Federation requests"
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        txn_id: str,
+    ) -> Tuple[int, JsonDict]:
+        # TODO Use the txn_id for idempotency.
+
+        result = await self.handler.on_send_join_request(origin, content)
+        return 200, {
+            "event": result["event"],
+            "state": result["state"],
+            "auth_chain": result["auth_chain}"],
+        }
 
 
 class FederationV1InviteServlet(BaseFederationServerServlet):
@@ -896,4 +952,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     # TODO(LM) Linearized Matrix additions.
     FederationUnstableEventServlet,
     FederationUnstableBackfillServlet,
+    FederationUnstableSendJoinServlet,
+    FederationUnstableSendLeaveServlet,
+    FederationUnstableSendKnockServlet,
 )
