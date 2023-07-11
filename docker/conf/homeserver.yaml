@@ -36,12 +36,17 @@ listeners:
 
   # Allow configuring in case we want to reverse proxy 8008
   # using another process in the same container
+{% if SYNAPSE_USE_UNIX_SOCKET %}
+  # Unix sockets don't care about TLS or IP addresses or ports
+  - path: '/run/main_public.sock'
+    type: http
+{% else %}
   - port: {{ SYNAPSE_HTTP_PORT or 8008 }}
     tls: false
     bind_addresses: ['::']
     type: http
     x_forwarded: false
-
+{% endif %}
     resources:
       - names: [client]
         compress: true
@@ -57,8 +62,11 @@ database:
     user: "{{ POSTGRES_USER or "synapse" }}"
     password: "{{ POSTGRES_PASSWORD }}"
     database: "{{ POSTGRES_DB or "synapse" }}"
+{% if not SYNAPSE_USE_UNIX_SOCKET %}
+{# Synapse will use a default unix socket for Postgres when host/port is not specified (behavior from `psycopg2`). #}
     host: "{{ POSTGRES_HOST or "db" }}"
     port: "{{ POSTGRES_PORT or "5432" }}"
+{% endif %}
     cp_min: 5
     cp_max: 10
 {% else %}
