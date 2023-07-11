@@ -218,9 +218,15 @@ for the main process</li>
 <li>Secondly, you need to enable
 <a href="usage/configuration/config_documentation.html#redis">redis-based replication</a></li>
 <li>You will need to add an <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> 
-with the <code>main</code> process defined, as well as the relevant connection information from 
-it's HTTP <code>replication</code> listener (defined in step 1 above). Note that the <code>host</code> defined 
-is the address the worker needs to look for the <code>main</code> process at, not necessarily the same address that is bound to.</li>
+with the <code>main</code> process defined, as well as the relevant connection information from
+it's HTTP <code>replication</code> listener (defined in step 1 above).
+<ul>
+<li>Note that the <code>host</code> defined is the address the worker needs to look for the <code>main</code>
+process at, not necessarily the same address that is bound to.</li>
+<li>If you are using Unix sockets for the <code>replication</code> resource, make sure to
+use a <code>path</code> to the socket file instead of a <code>port</code>.</li>
+</ul>
+</li>
 <li>Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
 can be used to authenticate HTTP traffic between workers. For example:</li>
 </ul>
