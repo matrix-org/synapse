@@ -247,9 +247,6 @@ class ExperimentalConfig(Config):
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
 
-        # MSC2716 (importing historical messages)
-        self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
-
         # MSC3244 (room version capabilities)
         self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
 
@@ -384,9 +381,6 @@ class ExperimentalConfig(Config):
 
         # Check that none of the other config options conflict with MSC3861 when enabled
         self.msc3861.check_config_conflicts(self.root)
-
-        # MSC4009: E.164 Matrix IDs
-        self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)
 
         # MSC4010: Do not allow setting m.push_rules account data.
         self.msc4010_push_rules_account_data = experimental.get(

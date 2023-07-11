@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
       - uses: Swatinem/rust-cache@v2
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -92,6 +92,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.60.0
+      - uses: Swatinem/rust-cache@v2
+
       - name: Setup Poetry
         uses: matrix-org/setup-python-poetry@v1
         with:
@@ -102,10 +106,6 @@ jobs:
           # https://github.com/matrix-org/synapse/pull/15376#issuecomment-1498983775
           # To make CI green, err towards caution and install the project.
           install-project: "true"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
-      - uses: Swatinem/rust-cache@v2
 
       # Cribbed from
       # https://github.com/AustinScola/mypy-cache-github-action/blob/85ea4f2972abed39b33bd02c36e341b28ca59213/src/restore.ts#L10-L17
@@ -150,7 +150,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
       - uses: Swatinem/rust-cache@v2
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -167,7 +167,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
         with:
             components: clippy
       - uses: Swatinem/rust-cache@v2
@@ -268,7 +268,7 @@ jobs:
             postgres:${{ matrix.job.postgres-version }}
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
       - uses: Swatinem/rust-cache@v2
 
       - uses: matrix-org/setup-python-poetry@v1
@@ -308,7 +308,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
       - uses: Swatinem/rust-cache@v2
 
       # There aren't wheels for some of the older deps, so we need to install
@@ -320,7 +320,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.7'
+          python-version: '3.8'
 
       - name: Prepare old deps
         if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
@@ -362,7 +362,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["pypy-3.7"]
+        python-version: ["pypy-3.8"]
         extras: ["all"]
 
     steps:
@@ -399,8 +399,8 @@ jobs:
       env:
         SYTEST_BRANCH: ${{ github.head_ref }}
         POSTGRES: ${{ matrix.job.postgres && 1}}
-        MULTI_POSTGRES: ${{ (matrix.job.postgres == 'multi-postgres') && 1}}
-        ASYNCIO_REACTOR: ${{ (matrix.job.reactor == 'asyncio') && 1 }}
+        MULTI_POSTGRES: ${{ (matrix.job.postgres == 'multi-postgres') || '' }}
+        ASYNCIO_REACTOR: ${{ (matrix.job.reactor == 'asyncio') || '' }}
         WORKERS: ${{ matrix.job.workers && 1 }}
         BLACKLIST: ${{ matrix.job.workers && 'synapse-blacklist-with-workers' }}
         TOP: ${{ github.workspace }}
@@ -416,7 +416,7 @@ jobs:
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
       - uses: Swatinem/rust-cache@v2
 
       - name: Run SyTest
@@ -477,7 +477,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: "3.7"
+          - python-version: "3.8"
             postgres-version: "11"
 
           - python-version: "3.11"
@@ -556,7 +556,7 @@ jobs:
           path: synapse
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
       - uses: Swatinem/rust-cache@v2
 
       - uses: actions/setup-go@v4
@@ -584,7 +584,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.58.1
+        uses: dtolnay/rust-toolchain@1.60.0
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo test

@@ -41,11 +41,17 @@ Synapse version. Please use ``%s: name_of_worker`` instead.
 
 _MISSING_MAIN_PROCESS_INSTANCE_MAP_DATA = """
 Missing data for a worker to connect to main process. Please include '%s' in the
-`instance_map` declared in your shared yaml configuration, or optionally(as a deprecated
-solution) in every worker's yaml as various `worker_replication_*` settings as defined
-in workers documentation here:
+`instance_map` declared in your shared yaml configuration as defined in configuration
+documentation here:
+`https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#instance_map`
+"""
+
+WORKER_REPLICATION_SETTING_DEPRECATED_MESSAGE = """
+'%s' is no longer a supported worker setting, please place '%s' onto your shared
+configuration under `main` inside the `instance_map`. See workers documentation here:
 `https://matrix-org.github.io/synapse/latest/workers.html#worker-configuration`
 """
+
 # This allows for a handy knob when it's time to change from 'master' to
 # something with less 'history'
 MAIN_PROCESS_INSTANCE_NAME = "master"
@@ -88,7 +94,7 @@ class ConfigModel(BaseModel):
         allow_mutation = False
 
 
-class InstanceLocationConfig(ConfigModel):
+class InstanceTcpLocationConfig(ConfigModel):
     """The host and port to talk to an instance via HTTP replication."""
 
     host: StrictStr
@@ -102,6 +108,23 @@ class InstanceLocationConfig(ConfigModel):
     def netloc(self) -> str:
         """Nicely format the network location data"""
         return f"{self.host}:{self.port}"
+
+
+class InstanceUnixLocationConfig(ConfigModel):
+    """The socket file to talk to an instance via HTTP replication."""
+
+    path: StrictStr
+
+    def scheme(self) -> str:
+        """Hardcode a retrievable scheme"""
+        return "unix"
+
+    def netloc(self) -> str:
+        """Nicely format the address location data"""
+        return f"{self.path}"
+
+
+InstanceLocationConfig = Union[InstanceTcpLocationConfig, InstanceUnixLocationConfig]
 
 
 @attr.s
@@ -216,22 +239,37 @@ class WorkerConfig(Config):
         )
 
         # A map from instance name to host/port of their HTTP replication endpoint.
-        # Check if the main process is declared. Inject it into the map if it's not,
-        # based first on if a 'main' block is declared then on 'worker_replication_*'
-        # data. If both are available, default to instance_map. The main process
-        # itself doesn't need this data as it would never have to talk to itself.
+        # Check if the main process is declared. The main process itself doesn't need
+        # this data as it would never have to talk to itself.
         instance_map: Dict[str, Any] = config.get("instance_map", {})
 
         if self.instance_name is not MAIN_PROCESS_INSTANCE_NAME:
+            # TODO: The next 3 condition blocks can be deleted after some time has
+            #  passed and we're ready to stop checking for these settings.
             # The host used to connect to the main synapse
             main_host = config.get("worker_replication_host", None)
+            if main_host:
+                raise ConfigError(
+                    WORKER_REPLICATION_SETTING_DEPRECATED_MESSAGE
+                    % ("worker_replication_host", main_host)
+                )
 
             # The port on the main synapse for HTTP replication endpoint
             main_port = config.get("worker_replication_http_port")
+            if main_port:
+                raise ConfigError(
+                    WORKER_REPLICATION_SETTING_DEPRECATED_MESSAGE
+                    % ("worker_replication_http_port", main_port)
+                )
 
             # The tls mode on the main synapse for HTTP replication endpoint.
             # For backward compatibility this defaults to False.
             main_tls = config.get("worker_replication_http_tls", False)
+            if main_tls:
+                raise ConfigError(
+                    WORKER_REPLICATION_SETTING_DEPRECATED_MESSAGE
+                    % ("worker_replication_http_tls", main_tls)
+                )
 
             # For now, accept 'main' in the instance_map, but the replication system
             # expects 'master', force that into being until it's changed later.
@@ -241,30 +279,20 @@ class WorkerConfig(Config):
                 ]
                 del instance_map[MAIN_PROCESS_INSTANCE_MAP_NAME]
 
-            # This is the backwards compatibility bit that handles the
-            # worker_replication_* bits using setdefault() to not overwrite anything.
-            elif main_host is not None and main_port is not None:
-                instance_map.setdefault(
-                    MAIN_PROCESS_INSTANCE_NAME,
-                    {
-                        "host": main_host,
-                        "port": main_port,
-                        "tls": main_tls,
-                    },
-                )
-
             else:
                 # If we've gotten here, it means that the main process is not on the
-                # instance_map and that not enough worker_replication_* variables
-                # were declared in the worker's yaml.
+                # instance_map.
                 raise ConfigError(
                     _MISSING_MAIN_PROCESS_INSTANCE_MAP_DATA
                     % MAIN_PROCESS_INSTANCE_MAP_NAME
                 )
 
+        # type-ignore: the expression `Union[A, B]` is not a Type[Union[A, B]] currently
         self.instance_map: Dict[
             str, InstanceLocationConfig
-        ] = parse_and_validate_mapping(instance_map, InstanceLocationConfig)
+        ] = parse_and_validate_mapping(
+            instance_map, InstanceLocationConfig  # type: ignore[arg-type]
+        )
 
         # Map from type of streams to source, c.f. WriterLocations.
         writers = config.get("stream_writers") or {}

@@ -35,6 +35,7 @@ from synapse.api.errors import (
 from synapse.config.repository import ThumbnailRequirement
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
+from synapse.logging.opentracing import trace
 from synapse.media._base import (
     FileInfo,
     Responder,
@@ -174,6 +175,7 @@ class MediaRepository:
         else:
             self.recently_accessed_locals.add(media_id)
 
+    @trace
     async def create_content(
         self,
         media_type: str,
@@ -710,6 +712,7 @@ class MediaRepository:
         # Could not generate thumbnail.
         return None
 
+    @trace
     async def _generate_thumbnails(
         self,
         server_name: Optional[str],

@@ -910,7 +910,7 @@ def set_cors_headers(request: SynapseRequest) -> None:
         )
         request.setHeader(
             b"Access-Control-Expose-Headers",
-            b"Synapse-Trace-Id",
+            b"Synapse-Trace-Id, Server",
         )
 
 

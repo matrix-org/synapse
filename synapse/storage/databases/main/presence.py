@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, cast
 
 from synapse.api.presence import PresenceState, UserPresenceState
@@ -24,6 +23,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines._base import IsolationLevel
 from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
@@ -115,11 +115,16 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         )
 
         async with stream_ordering_manager as stream_orderings:
+            # Run the interaction with an isolation level of READ_COMMITTED to avoid
+            # serialization errors(and rollbacks) in the database. This way it will
+            # ignore new rows during the DELETE, but will pick them up the next time
+            # this is run. Currently, that is between 5-60 seconds.
             await self.db_pool.runInteraction(
                 "update_presence",
                 self._update_presence_txn,
                 stream_orderings,
                 presence_states,
+                isolation_level=IsolationLevel.READ_COMMITTED,
             )
 
         return stream_orderings[-1], self._presence_id_gen.get_current_token()

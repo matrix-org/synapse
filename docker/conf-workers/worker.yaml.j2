@@ -8,7 +8,11 @@ worker_name: "{{ name }}"
 
 worker_listeners:
   - type: http
+{% if using_unix_sockets %}
+    path: "/run/worker.{{ port }}"
+{% else %}
     port: {{ port }}
+{% endif %}
 {% if listener_resources %}
     resources:
       - names:

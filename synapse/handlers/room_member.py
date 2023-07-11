@@ -384,7 +384,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         content: Optional[dict] = None,
         require_consent: bool = True,
         outlier: bool = False,
-        historical: bool = False,
         origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """
@@ -400,16 +399,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids: The event IDs to use as the prev events
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is the historical `state_events_at_start`;
-                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
-                have any `state_ids` set and therefore can't derive any state even though the
-                prev_events are set so we need to set them ourself via this argument.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -422,9 +418,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
             origin_server_ts: The origin_server_ts to use if a new event is created. Uses
                 the current timestamp if set to None.
 
@@ -499,7 +492,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     depth=depth,
                     require_consent=require_consent,
                     outlier=outlier,
-                    historical=historical,
                 )
                 context = await unpersisted_context.persist(event)
                 prev_state_ids = await context.get_prev_state_ids(
@@ -607,7 +599,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
-        historical: bool = False,
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
@@ -632,22 +623,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids: The event IDs to use as the prev events
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is the historical `state_events_at_start`;
-                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
-                have any `state_ids` set and therefore can't derive any state even though the
-                prev_events are set so we need to set them ourself via this argument.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -689,7 +674,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         new_room=new_room,
                         require_consent=require_consent,
                         outlier=outlier,
-                        historical=historical,
                         allow_no_prev_events=allow_no_prev_events,
                         prev_event_ids=prev_event_ids,
                         state_event_ids=state_event_ids,
@@ -713,7 +697,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
-        historical: bool = False,
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
@@ -740,22 +723,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids: The event IDs to use as the prev events
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is the historical `state_events_at_start`;
-                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
-                have any `state_ids` set and therefore can't derive any state even though the
-                prev_events are set so we need to set them ourself via this argument.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -899,7 +876,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
-                historical=historical,
                 origin_server_ts=origin_server_ts,
             )
 
@@ -1520,7 +1496,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # put the server which owns the alias at the front of the server list.
         if room_alias.domain in servers:
             servers.remove(room_alias.domain)
-        servers.insert(0, room_alias.domain)
+            servers.insert(0, room_alias.domain)
 
         return RoomID.from_string(room_id), servers
 

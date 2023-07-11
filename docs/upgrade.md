@@ -88,6 +88,41 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.88.0
+
+## Minimum supported Python version
+
+The minimum supported Python version has been increased from v3.7 to v3.8.
+You will need Python 3.8 to run Synapse v1.88.0 (due out July 18th, 2023).
+
+If you use current versions of the Matrix.org-distributed Debian
+packages or Docker images, no action is required.
+
+## Removal of `worker_replication_*` settings
+
+As mentioned previously in [Upgrading to v1.84.0](#upgrading-to-v1840), the following deprecated settings
+are being removed in this release of Synapse:
+
+* [`worker_replication_host`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_host)
+* [`worker_replication_http_port`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_port)
+* [`worker_replication_http_tls`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_tls)
+
+Please ensure that you have migrated to using `main` on your shared configuration's `instance_map`
+(or create one if necessary). This is required if you have ***any*** workers at all;
+administrators of single-process (monolith) installations don't need to do anything.
+
+For an illustrative example, please see [Upgrading to v1.84.0](#upgrading-to-v1840) below.
+
+
+# Upgrading to v1.86.0
+
+## Minimum supported Rust version
+
+The minimum supported Rust version has been increased from v1.58.1 to v1.60.0.
+Users building from source will need to ensure their `rustc` version is up to
+date.
+
+
 # Upgrading to v1.85.0
 
 ## Application service registration with "user" property deprecation
