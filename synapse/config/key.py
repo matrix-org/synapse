@@ -217,7 +217,18 @@ class KeyConfig(Config):
 
         signing_keys = self.read_file(signing_key_path, name)
         try:
-            return read_signing_keys(signing_keys.splitlines(True))
+            loaded_signing_keys = read_signing_keys(
+                [
+                    signing_key_line
+                    for signing_key_line in signing_keys.splitlines(keepends=False)
+                    if signing_key_line.strip()
+                ]
+            )
+
+            if not loaded_signing_keys:
+                raise ConfigError(f"No signing keys in file {signing_key_path}")
+
+            return loaded_signing_keys
         except Exception as e:
             raise ConfigError("Error reading %s: %s" % (name, str(e)))
 

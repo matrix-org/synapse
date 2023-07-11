@@ -1,0 +1,39 @@
+[package]
+# We name the package `synapse` so that things like logging have the right
+# logging target.
+name = "synapse"
+
+# dummy version. See pyproject.toml for the Synapse's version number.
+version = "0.1.0"
+
+edition = "2021"
+rust-version = "1.60.0"
+
+[lib]
+name = "synapse"
+# We generate a `cdylib` for Python and a standard `lib` for running
+# tests/benchmarks.
+crate-type = ["lib", "cdylib"]
+
+[package.metadata.maturin]
+# This is where we tell maturin where to place the built library.
+name = "synapse.synapse_rust"
+
+[dependencies]
+anyhow = "1.0.63"
+lazy_static = "1.4.0"
+log = "0.4.17"
+pyo3 = { version = "0.17.1", features = ["macros", "anyhow", "abi3", "abi3-py37"] }
+pyo3-log = "0.8.1"
+pythonize = "0.17.0"
+regex = "1.6.0"
+serde = { version = "1.0.144", features = ["derive"] }
+serde_json = "1.0.85"
+
+[features]
+extension-module = ["pyo3/extension-module"]
+default = ["extension-module"]
+
+[build-dependencies]
+blake2 = "0.10.4"
+hex = "0.4.3"

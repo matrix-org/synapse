@@ -14,6 +14,8 @@
 from typing import Any, Awaitable, Callable, Dict
 from unittest.mock import Mock
 
+from parameterized import parameterized
+
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.types
@@ -64,9 +66,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.handler = hs.get_profile_handler()
 
     def test_get_my_name(self) -> None:
-        self.get_success(
-            self.store.set_profile_displayname(self.frank.localpart, "Frank")
-        )
+        self.get_success(self.store.set_profile_displayname(self.frank, "Frank"))
 
         displayname = self.get_success(self.handler.get_displayname(self.frank))
 
@@ -80,11 +80,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank Jr.",
         )
 
@@ -96,11 +92,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank",
         )
 
@@ -112,23 +104,17 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            self.get_success(self.store.get_profile_displayname(self.frank.localpart))
+            self.get_success(self.store.get_profile_displayname(self.frank))
         )
 
     def test_set_my_name_if_disabled(self) -> None:
         self.hs.config.registration.enable_set_displayname = False
 
         # Setting displayname for the first time is allowed
-        self.get_success(
-            self.store.set_profile_displayname(self.frank.localpart, "Frank")
-        )
+        self.get_success(self.store.set_profile_displayname(self.frank, "Frank"))
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank",
         )
 
@@ -164,8 +150,14 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_incoming_fed_query(self) -> None:
-        self.get_success(self.store.create_profile("caroline"))
-        self.get_success(self.store.set_profile_displayname("caroline", "Caroline"))
+        self.get_success(
+            self.store.create_profile(UserID.from_string("@caroline:test"))
+        )
+        self.get_success(
+            self.store.set_profile_displayname(
+                UserID.from_string("@caroline:test"), "Caroline"
+            )
+        )
 
         response = self.get_success(
             self.query_handlers["profile"](
@@ -181,9 +173,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_get_my_avatar(self) -> None:
         self.get_success(
-            self.store.set_profile_avatar_url(
-                self.frank.localpart, "http://my.server/me.png"
-            )
+            self.store.set_profile_avatar_url(self.frank, "http://my.server/me.png")
         )
         avatar_url = self.get_success(self.handler.get_avatar_url(self.frank))
 
@@ -199,7 +189,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/pic.gif",
         )
 
@@ -213,7 +203,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/me.png",
         )
 
@@ -227,7 +217,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
         )
 
     def test_set_my_avatar_if_disabled(self) -> None:
@@ -235,13 +225,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         # Setting displayname for the first time is allowed
         self.get_success(
-            self.store.set_profile_avatar_url(
-                self.frank.localpart, "http://my.server/me.png"
-            )
+            self.store.set_profile_avatar_url(self.frank, "http://my.server/me.png")
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/me.png",
         )
 
@@ -327,7 +315,54 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertFalse(res)
 
-    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
+    @unittest.override_config(
+        {"server_name": "test:8888", "allowed_avatar_mimetypes": ["image/png"]}
+    )
+    def test_avatar_constraint_on_local_server_with_port(self) -> None:
+        """Test that avatar metadata is correctly fetched when the media is on a local
+        server and the server has an explicit port.
+
+        (This was previously a bug)
+        """
+        local_server_name = self.hs.config.server.server_name
+        media_id = "local"
+        local_mxc = f"mxc://{local_server_name}/{media_id}"
+
+        # mock up the existence of the avatar file
+        self._setup_local_files({media_id: {"mimetype": "image/png"}})
+
+        # and now check that check_avatar_size_and_mime_type is happy
+        self.assertTrue(
+            self.get_success(self.handler.check_avatar_size_and_mime_type(local_mxc))
+        )
+
+    @parameterized.expand([("remote",), ("remote:1234",)])
+    @unittest.override_config({"allowed_avatar_mimetypes": ["image/png"]})
+    def test_check_avatar_on_remote_server(self, remote_server_name: str) -> None:
+        """Test that avatar metadata is correctly fetched from a remote server"""
+        media_id = "remote"
+        remote_mxc = f"mxc://{remote_server_name}/{media_id}"
+
+        # if the media is remote, check_avatar_size_and_mime_type just checks the
+        # media cache, so we don't need to instantiate a real remote server. It is
+        # sufficient to poke an entry into the db.
+        self.get_success(
+            self.hs.get_datastores().main.store_cached_remote_media(
+                media_id=media_id,
+                media_type="image/png",
+                media_length=50,
+                origin=remote_server_name,
+                time_now_ms=self.clock.time_msec(),
+                upload_name=None,
+                filesystem_id="xyz",
+            )
+        )
+
+        self.assertTrue(
+            self.get_success(self.handler.check_avatar_size_and_mime_type(remote_mxc))
+        )
+
+    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]) -> None:
         """Stores metadata about files in the database.
 
         Args:

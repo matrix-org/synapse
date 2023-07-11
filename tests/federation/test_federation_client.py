@@ -12,26 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from unittest import mock
 
 import twisted.web.client
 from twisted.internet import defer
-from twisted.internet.protocol import Protocol
-from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
+from synapse.rest import admin
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
-from synapse.types import JsonDict
 from synapse.util import Clock
 
+from tests.test_utils import FakeResponse, event_injection
 from tests.unittest import FederatingHomeserverTestCase
 
 
 class FederationClientTest(FederatingHomeserverTestCase):
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         super().prepare(reactor, clock, homeserver)
 
         # mock out the Agent used by the federation client, which is easier than
@@ -46,7 +53,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         self.creator = f"@creator:{self.OTHER_SERVER_NAME}"
         self.test_room_id = "!room_id"
 
-    def test_get_room_state(self):
+    def test_get_room_state(self) -> None:
         # mock up some events to use in the response.
         # In real life, these would have things in `prev_events` and `auth_events`, but that's
         # a bit annoying to mock up, and the code under test doesn't care, so we don't bother.
@@ -89,8 +96,8 @@ class FederationClientTest(FederatingHomeserverTestCase):
 
         # mock up the response, and have the agent return it
         self._mock_agent.request.side_effect = lambda *args, **kwargs: defer.succeed(
-            _mock_response(
-                {
+            FakeResponse.json(
+                payload={
                     "pdus": [
                         create_event_dict,
                         member_event_dict,
@@ -117,7 +124,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
             b"GET",
-            b"matrix://yet.another.server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
+            b"matrix-federation://yet.another.server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
             headers=mock.ANY,
             bodyProducer=None,
         )
@@ -135,22 +142,22 @@ class FederationClientTest(FederatingHomeserverTestCase):
             ["m.room.create", "m.room.member", "m.room.power_levels"],
         )
 
-    def test_get_pdu_returns_nothing_when_event_does_not_exist(self):
+    def test_get_pdu_returns_nothing_when_event_does_not_exist(self) -> None:
         """No event should be returned when the event does not exist"""
-        remote_pdu = self.get_success(
+        pulled_pdu_info = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet.another.server"],
                 "event_should_not_exist",
                 RoomVersions.V9,
             )
         )
-        self.assertEqual(remote_pdu, None)
+        self.assertEqual(pulled_pdu_info, None)
 
-    def test_get_pdu(self):
+    def test_get_pdu(self) -> None:
         """Test to make sure an event is returned by `get_pdu()`"""
         self._get_pdu_once()
 
-    def test_get_pdu_event_from_cache_is_pristine(self):
+    def test_get_pdu_event_from_cache_is_pristine(self) -> None:
         """Test that modifications made to events returned by `get_pdu()`
         do not propagate back to to the internal cache (events returned should
         be a copy).
@@ -164,13 +171,15 @@ class FederationClientTest(FederatingHomeserverTestCase):
         remote_pdu.internal_metadata.outlier = True
 
         # Get the event again. This time it should read it from cache.
-        remote_pdu2 = self.get_success(
+        pulled_pdu_info2 = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet.another.server"],
                 remote_pdu.event_id,
                 RoomVersions.V9,
             )
         )
+        assert pulled_pdu_info2 is not None
+        remote_pdu2 = pulled_pdu_info2.pdu
 
         # Sanity check that we are working against the same event
         self.assertEqual(remote_pdu.event_id, remote_pdu2.event_id)
@@ -199,8 +208,8 @@ class FederationClientTest(FederatingHomeserverTestCase):
 
         # mock up the response, and have the agent return it
         self._mock_agent.request.side_effect = lambda *args, **kwargs: defer.succeed(
-            _mock_response(
-                {
+            FakeResponse.json(
+                payload={
                     "origin": "yet.another.server",
                     "origin_server_ts": 900,
                     "pdus": [
@@ -210,18 +219,20 @@ class FederationClientTest(FederatingHomeserverTestCase):
             )
         )
 
-        remote_pdu = self.get_success(
+        pulled_pdu_info = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet.another.server"],
                 "event_id",
                 RoomVersions.V9,
             )
         )
+        assert pulled_pdu_info is not None
+        remote_pdu = pulled_pdu_info.pdu
 
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
             b"GET",
-            b"matrix://yet.another.server/_matrix/federation/v1/event/event_id",
+            b"matrix-federation://yet.another.server/_matrix/federation/v1/event/event_id",
             headers=mock.ANY,
             bodyProducer=None,
         )
@@ -231,20 +242,68 @@ class FederationClientTest(FederatingHomeserverTestCase):
 
         return remote_pdu
 
+    def test_backfill_invalid_signature_records_failed_pull_attempts(
+        self,
+    ) -> None:
+        """
+        Test to make sure that events from /backfill with invalid signatures get
+        recorded as failed pull attempts.
+        """
+        OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
+        main_store = self.hs.get_datastores().main
 
-def _mock_response(resp: JsonDict):
-    body = json.dumps(resp).encode("utf-8")
+        # Create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
 
-    def deliver_body(p: Protocol):
-        p.dataReceived(body)
-        p.connectionLost(Failure(twisted.web.client.ResponseDone()))
+        # We purposely don't run `add_hashes_and_signatures_from_other_server`
+        # over this because we want the signature check to fail.
+        pulled_event, _ = self.get_success(
+            event_injection.create_event(
+                self.hs,
+                room_id=room_id,
+                sender=OTHER_USER,
+                type="test_event_type",
+                content={"body": "garply"},
+            )
+        )
 
-    response = mock.Mock(
-        code=200,
-        phrase=b"OK",
-        headers=twisted.web.client.Headers({"content-Type": ["application/json"]}),
-        length=len(body),
-        deliverBody=deliver_body,
-    )
-    mock.seal(response)
-    return response
+        # We expect an outbound request to /backfill, so stub that out
+        self._mock_agent.request.side_effect = lambda *args, **kwargs: defer.succeed(
+            FakeResponse.json(
+                payload={
+                    "origin": "yet.another.server",
+                    "origin_server_ts": 900,
+                    # Mimic the other server returning our new `pulled_event`
+                    "pdus": [pulled_event.get_pdu_json()],
+                }
+            )
+        )
+
+        self.get_success(
+            self.hs.get_federation_client().backfill(
+                # We use "yet.another.server" instead of
+                # `self.OTHER_SERVER_NAME` because we want to see the behavior
+                # from `_check_sigs_and_hash_and_fetch_one` where it tries to
+                # fetch the PDU again from the origin server if the signature
+                # fails. Just want to make sure that the failure is counted from
+                # both code paths.
+                dest="yet.another.server",
+                room_id=room_id,
+                limit=1,
+                extremities=[pulled_event.event_id],
+            ),
+        )
+
+        # Make sure our failed pull attempt was recorded
+        backfill_num_attempts = self.get_success(
+            main_store.db_pool.simple_select_one_onecol(
+                table="event_failed_pull_attempts",
+                keyvalues={"event_id": pulled_event.event_id},
+                retcol="num_attempts",
+            )
+        )
+        # This is 2 because it failed once from `self.OTHER_SERVER_NAME` and the
+        # other from "yet.another.server"
+        self.assertEqual(backfill_num_attempts, 2)

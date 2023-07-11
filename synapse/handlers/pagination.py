@@ -13,22 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, List, Optional, Set
 
 import attr
 
 from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.room import ShutdownRoomResponse
 from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.state import StateFilter
+from synapse.rest.admin._base import assert_user_is_admin
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, Requester, StreamKeyType
+from synapse.types import JsonDict, Requester, StrCollection, StreamKeyType
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -38,6 +39,11 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+# How many single event gaps we tolerate returning in a `/messages` response before we
+# backfill and try to fill in the history. This is an arbitrarily picked number so feel
+# free to tune it in the future.
+BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD = 3
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -359,7 +365,7 @@ class PaginationHandler:
         except Exception:
             f = Failure()
             logger.error(
-                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())  # type: ignore
+                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())
             )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
             self._purges_by_id[purge_id].error = f.getErrorMessage()
@@ -390,7 +396,7 @@ class PaginationHandler:
         """
         return self._delete_by_id.get(delete_id)
 
-    def get_delete_ids_by_room(self, room_id: str) -> Optional[Collection[str]]:
+    def get_delete_ids_by_room(self, room_id: str) -> Optional[StrCollection]:
         """Get all active delete ids by room
 
         Args:
@@ -423,6 +429,7 @@ class PaginationHandler:
         pagin_config: PaginationConfig,
         as_client_event: bool = True,
         event_filter: Optional[Filter] = None,
+        use_admin_priviledge: bool = False,
     ) -> JsonDict:
         """Get messages in a room.
 
@@ -432,14 +439,26 @@ class PaginationHandler:
             pagin_config: The pagination config rules to apply, if any.
             as_client_event: True to get events in client-server format.
             event_filter: Filter to apply to results or None
+            use_admin_priviledge: if `True`, return all events, regardless
+                of whether `user` has access to them. To be used **ONLY**
+                from the admin API.
 
         Returns:
             Pagination API results
         """
+        if use_admin_priviledge:
+            await assert_user_is_admin(self.auth, requester)
+
         user_id = requester.user.to_string()
 
         if pagin_config.from_token:
             from_token = pagin_config.from_token
+        elif pagin_config.direction == Direction.FORWARDS:
+            from_token = (
+                await self.hs.get_event_sources().get_start_token_for_pagination(
+                    room_id
+                )
+            )
         else:
             from_token = (
                 await self.hs.get_event_sources().get_current_token_for_pagination(
@@ -450,22 +469,19 @@ class PaginationHandler:
             # `/messages` should still works with live tokens when manually provided.
             assert from_token.room_key.topological is not None
 
-        if pagin_config.limit is None:
-            # This shouldn't happen as we've set a default limit before this
-            # gets called.
-            raise Exception("limit not set")
-
         room_token = from_token.room_key
 
         async with self.pagination_lock.read(room_id):
-            (
-                membership,
-                member_event_id,
-            ) = await self.auth.check_user_in_room_or_world_readable(
-                room_id, requester, allow_departed_users=True
-            )
+            (membership, member_event_id) = (None, None)
+            if not use_admin_priviledge:
+                (
+                    membership,
+                    member_event_id,
+                ) = await self.auth.check_user_in_room_or_world_readable(
+                    room_id, requester, allow_departed_users=True
+                )
 
-            if pagin_config.direction == "b":
+            if pagin_config.direction == Direction.BACKWARDS:
                 # if we're going backwards, we might need to backfill. This
                 # requires that we have a topo token.
                 if room_token.topological:
@@ -475,35 +491,35 @@ class PaginationHandler:
                         room_id, room_token.stream
                     )
 
-                if membership == Membership.LEAVE:
-                    # If they have left the room then clamp the token to be before
-                    # they left the room, to save the effort of loading from the
-                    # database.
+            # If they have left the room then clamp the token to be before
+            # they left the room, to save the effort of loading from the
+            # database.
+            if (
+                pagin_config.direction == Direction.BACKWARDS
+                and not use_admin_priviledge
+                and membership == Membership.LEAVE
+            ):
+                # This is only None if the room is world_readable, in which case
+                # "Membership.JOIN" would have been returned and we should never hit
+                # this branch.
+                assert member_event_id
 
-                    # This is only None if the room is world_readable, in which
-                    # case "JOIN" would have been returned.
-                    assert member_event_id
-
-                    leave_token = await self.store.get_topological_token_for_event(
-                        member_event_id
-                    )
-                    assert leave_token.topological is not None
-
-                    if leave_token.topological < curr_topo:
-                        from_token = from_token.copy_and_replace(
-                            StreamKeyType.ROOM, leave_token
-                        )
-
-                await self.hs.get_federation_handler().maybe_backfill(
-                    room_id,
-                    curr_topo,
-                    limit=pagin_config.limit,
+                leave_token = await self.store.get_topological_token_for_event(
+                    member_event_id
                 )
+                assert leave_token.topological is not None
+
+                if leave_token.topological < curr_topo:
+                    from_token = from_token.copy_and_replace(
+                        StreamKeyType.ROOM, leave_token
+                    )
 
             to_room_key = None
             if pagin_config.to_token:
                 to_room_key = pagin_config.to_token.room_key
 
+            # Initially fetch the events from the database. With any luck, we can return
+            # these without blocking on backfill (handled below).
             events, next_key = await self.store.paginate_room_events(
                 room_id=room_id,
                 from_key=from_token.room_key,
@@ -512,6 +528,94 @@ class PaginationHandler:
                 limit=pagin_config.limit,
                 event_filter=event_filter,
             )
+
+            if pagin_config.direction == Direction.BACKWARDS:
+                # We use a `Set` because there can be multiple events at a given depth
+                # and we only care about looking at the unique continum of depths to
+                # find gaps.
+                event_depths: Set[int] = {event.depth for event in events}
+                sorted_event_depths = sorted(event_depths)
+
+                # Inspect the depths of the returned events to see if there are any gaps
+                found_big_gap = False
+                number_of_gaps = 0
+                previous_event_depth = (
+                    sorted_event_depths[0] if len(sorted_event_depths) > 0 else 0
+                )
+                for event_depth in sorted_event_depths:
+                    # We don't expect a negative depth but we'll just deal with it in
+                    # any case by taking the absolute value to get the true gap between
+                    # any two integers.
+                    depth_gap = abs(event_depth - previous_event_depth)
+                    # A `depth_gap` of 1 is a normal continuous chain to the next event
+                    # (1 <-- 2 <-- 3) so anything larger indicates a missing event (it's
+                    # also possible there is no event at a given depth but we can't ever
+                    # know that for sure)
+                    if depth_gap > 1:
+                        number_of_gaps += 1
+
+                    # We only tolerate a small number single-event long gaps in the
+                    # returned events because those are most likely just events we've
+                    # failed to pull in the past. Anything longer than that is probably
+                    # a sign that we're missing a decent chunk of history and we should
+                    # try to backfill it.
+                    #
+                    # XXX: It's possible we could tolerate longer gaps if we checked
+                    # that a given events `prev_events` is one that has failed pull
+                    # attempts and we could just treat it like a dead branch of history
+                    # for now or at least something that we don't need the block the
+                    # client on to try pulling.
+                    #
+                    # XXX: If we had something like MSC3871 to indicate gaps in the
+                    # timeline to the client, we could also get away with any sized gap
+                    # and just have the client refetch the holes as they see fit.
+                    if depth_gap > 2:
+                        found_big_gap = True
+                        break
+                    previous_event_depth = event_depth
+
+                # Backfill in the foreground if we found a big gap, have too many holes,
+                # or we don't have enough events to fill the limit that the client asked
+                # for.
+                missing_too_many_events = (
+                    number_of_gaps > BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD
+                )
+                not_enough_events_to_fill_response = len(events) < pagin_config.limit
+                if (
+                    found_big_gap
+                    or missing_too_many_events
+                    or not_enough_events_to_fill_response
+                ):
+                    did_backfill = (
+                        await self.hs.get_federation_handler().maybe_backfill(
+                            room_id,
+                            curr_topo,
+                            limit=pagin_config.limit,
+                        )
+                    )
+
+                    # If we did backfill something, refetch the events from the database to
+                    # catch anything new that might have been added since we last fetched.
+                    if did_backfill:
+                        events, next_key = await self.store.paginate_room_events(
+                            room_id=room_id,
+                            from_key=from_token.room_key,
+                            to_key=to_room_key,
+                            direction=pagin_config.direction,
+                            limit=pagin_config.limit,
+                            event_filter=event_filter,
+                        )
+                else:
+                    # Otherwise, we can backfill in the background for eventual
+                    # consistency's sake but we don't need to block the client waiting
+                    # for a costly federation call and processing.
+                    run_as_background_process(
+                        "maybe_backfill_in_the_background",
+                        self.hs.get_federation_handler().maybe_backfill,
+                        room_id,
+                        curr_topo,
+                        limit=pagin_config.limit,
+                    )
 
             next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
 
@@ -528,12 +632,13 @@ class PaginationHandler:
         if event_filter:
             events = await event_filter.filter(events)
 
-        events = await filter_events_for_client(
-            self._storage_controllers,
-            user_id,
-            events,
-            is_peeking=(member_event_id is None),
-        )
+        if not use_admin_priviledge:
+            events = await filter_events_for_client(
+                self._storage_controllers,
+                user_id,
+                events,
+                is_peeking=(member_event_id is None),
+            )
 
         # if after the filter applied there are no more events
         # return immediately - but there might be more in next_token batch
@@ -567,7 +672,9 @@ class PaginationHandler:
 
         time_now = self.clock.time_msec()
 
-        serialize_options = SerializeEventConfig(as_client_event=as_client_event)
+        serialize_options = SerializeEventConfig(
+            as_client_event=as_client_event, requester=requester
+        )
 
         chunk = {
             "chunk": (
@@ -669,13 +776,13 @@ class PaginationHandler:
 
                     await self._storage_controllers.purge_events.purge_room(room_id)
 
-            logger.info("complete")
+            logger.info("purge complete for room_id %s", room_id)
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_COMPLETE
         except Exception:
             f = Failure()
             logger.error(
                 "failed",
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_FAILED
             self._delete_by_id[delete_id].error = f.getErrorMessage()

@@ -307,8 +307,8 @@ _Changed in Synapse v1.62.0: `synapse.module_api.NOT_SPAM` and `synapse.module_a
 
 ```python
 async def check_media_file_for_spam(
-    file_wrapper: "synapse.rest.media.v1.media_storage.ReadableFileWrapper",
-    file_info: "synapse.rest.media.v1._base.FileInfo",
+    file_wrapper: "synapse.media.media_storage.ReadableFileWrapper",
+    file_info: "synapse.media._base.FileInfo",
 ) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
@@ -347,6 +347,42 @@ If multiple modules implement this callback, they will be considered in order. I
 callback returns `False`, Synapse falls through to the next one. The value of the first
 callback that does not return `False` will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.
+
+
+### `check_login_for_spam`
+
+_First introduced in Synapse v1.87.0_
+
+```python
+async def check_login_for_spam(
+    user_id: str,
+    device_id: Optional[str],
+    initial_display_name: Optional[str],
+    request_info: Collection[Tuple[Optional[str], str]],
+    auth_provider_id: Optional[str] = None,
+) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]
+```
+
+Called when a user logs in.
+
+The arguments passed to this callback are:
+
+* `user_id`: The user ID the user is logging in with
+* `device_id`: The device ID the user is re-logging into.
+* `initial_display_name`: The device display name, if any.
+* `request_info`: A collection of tuples, which first item is a user agent, and which
+  second item is an IP address. These user agents and IP addresses are the ones that were
+  used during the login process.
+* `auth_provider_id`: The identifier of the SSO authentication provider, if any.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `synapse.module_api.NOT_SPAM`, Synapse falls through to the next one.
+The value of the first callback that does not return `synapse.module_api.NOT_SPAM` will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.
+
+*Note:* This will not be called when a user registers.
+
 
 ## Example
 

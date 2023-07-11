@@ -15,9 +15,11 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
 
+from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
+from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -26,9 +28,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Cursor
-from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
@@ -44,7 +44,8 @@ from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .events_forward_extremities import EventForwardExtremitiesStore
-from .filtering import FilteringStore
+from .experimental_features import ExperimentalFeaturesStore
+from .filtering import FilteringWorkerStore
 from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
@@ -61,7 +62,6 @@ from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
 from .room import RoomStore
-from .room_batch import RoomBatchStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .session import SessionStore
@@ -83,9 +83,10 @@ logger = logging.getLogger(__name__)
 
 class DataStore(
     EventsBackgroundUpdatesStore,
+    ExperimentalFeaturesStore,
+    DeviceStore,
     RoomMemberStore,
     RoomStore,
-    RoomBatchStore,
     RegistrationStore,
     ProfileStore,
     PresenceStore,
@@ -99,7 +100,7 @@ class DataStore(
     EventFederationStore,
     MediaRepositoryStore,
     RejectionsStore,
-    FilteringStore,
+    FilteringWorkerStore,
     PusherStore,
     PushRuleStore,
     ApplicationServiceTransactionStore,
@@ -114,7 +115,6 @@ class DataStore(
     StreamWorkerStore,
     OpenIdStore,
     ClientIpWorkerStore,
-    DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
     UserErasureStore,
@@ -138,40 +138,7 @@ class DataStore(
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        self._device_list_id_gen = StreamIdGenerator(
-            db_conn,
-            "device_lists_stream",
-            "stream_id",
-            extra_tables=[
-                ("user_signature_stream", "stream_id"),
-                ("device_lists_outbound_pokes", "stream_id"),
-                ("device_lists_changes_in_room", "stream_id"),
-            ],
-        )
-
         super().__init__(database, db_conn, hs)
-
-        events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "current_state_delta_stream",
-            entity_column="room_id",
-            stream_column="stream_id",
-            max_value=events_max,  # As we share the stream id with events token
-            limit=1000,
-        )
-        self._curr_state_delta_stream_cache = StreamChangeCache(
-            "_curr_state_delta_stream_cache",
-            min_curr_state_delta_id,
-            prefilled_cache=curr_state_delta_prefill,
-        )
-
-        self._stream_order_on_start = self.get_room_max_stream_ordering()
-        self._min_stream_order_on_start = self.get_room_min_stream_ordering()
-
-    def get_device_stream_token(self) -> int:
-        # TODO: shouldn't this be moved to `DeviceWorkerStore`?
-        return self._device_list_id_gen.get_current_token()
 
     async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
@@ -201,8 +168,10 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-        order_by: str = UserSortOrder.USER_ID.value,
-        direction: str = "f",
+        order_by: str = UserSortOrder.NAME.value,
+        direction: Direction = Direction.FORWARDS,
+        approved: bool = True,
+        not_user_types: Optional[List[str]] = None,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -217,6 +186,8 @@ class DataStore(
             deactivated: whether to include deactivated users
             order_by: the sort order of the returned list
             direction: sort ascending or descending
+            approved: whether to include approved users
+            not_user_types: list of user types to exclude
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
@@ -225,12 +196,12 @@ class DataStore(
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
             filters = []
-            args = [self.hs.config.server.server_name]
+            args: List[Union[str, int]] = []
 
             # Set ordering
             order_by_column = UserSortOrder(order_by).value
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
@@ -249,11 +220,51 @@ class DataStore(
             if not deactivated:
                 filters.append("deactivated = 0")
 
+            if not approved:
+                # We ignore NULL values for the approved flag because these should only
+                # be already existing users that we consider as already approved.
+                filters.append("approved IS FALSE")
+
+            if not_user_types:
+                if len(not_user_types) == 1 and not_user_types[0] == "":
+                    # Only exclude NULL type users
+                    filters.append("user_type IS NOT NULL")
+                else:
+                    not_user_types_has_empty = False
+                    not_user_types_without_empty = []
+
+                    for not_user_type in not_user_types:
+                        if not_user_type == "":
+                            not_user_types_has_empty = True
+                        else:
+                            not_user_types_without_empty.append(not_user_type)
+
+                    not_user_type_clause, not_user_type_args = make_in_list_sql_clause(
+                        self.database_engine,
+                        "u.user_type",
+                        not_user_types_without_empty,
+                    )
+
+                    if not_user_types_has_empty:
+                        # NULL values should be excluded.
+                        # They evaluate to false > nothing to do here.
+                        filters.append("NOT %s" % (not_user_type_clause))
+                    else:
+                        # NULL values should *not* be excluded.
+                        # Add a special predicate to the query.
+                        filters.append(
+                            "(NOT %s OR %s IS NULL)"
+                            % (not_user_type_clause, "u.user_type")
+                        )
+
+                    args.extend(not_user_type_args)
+
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
             sql_base = f"""
                 FROM users as u
-                LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                LEFT JOIN profiles AS p ON u.name = p.full_user_id
+                LEFT JOIN erased_users AS eu ON u.name = eu.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -262,7 +273,8 @@ class DataStore(
 
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
-                displayname, avatar_url, creation_ts * 1000 as creation_ts
+                displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
+                eu.user_id is not null as erased
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
@@ -270,6 +282,13 @@ class DataStore(
             args += [limit, start]
             txn.execute(sql, args)
             users = self.db_pool.cursor_to_dict(txn)
+
+            # some of those boolean values are returned as integers when we're on SQLite
+            columns_to_boolify = ["erased"]
+            for user in users:
+                for column in columns_to_boolify:
+                    user[column] = bool(user[column])
+
             return users, count
 
         return await self.db_pool.runInteraction(

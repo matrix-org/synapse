@@ -5,7 +5,7 @@ non-interactive way. This is generally used for bootstrapping a Synapse
 instance with administrator accounts.
 
 To authenticate yourself to the server, you will need both the shared secret
-([`registration_shared_secret`](../configuration/config_documentation.md#registration_shared_secret)
+([`registration_shared_secret`](../usage/configuration/config_documentation.md#registration_shared_secret)
 in the homeserver configuration), and a one-time nonce. If the registration
 shared secret is not configured, this API is not enabled.
 

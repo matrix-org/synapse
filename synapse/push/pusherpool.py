@@ -25,7 +25,7 @@ from synapse.metrics.background_process_metrics import (
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.push.pusher import PusherFactory
 from synapse.replication.http.push import ReplicationRemovePusherRestServlet
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StrCollection
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.threepids import canonicalise_email
 
@@ -94,10 +94,9 @@ class PusherPool:
             return
         run_as_background_process("start_pushers", self._start_pushers)
 
-    async def add_pusher(
+    async def add_or_update_pusher(
         self,
         user_id: str,
-        access_token: Optional[int],
         kind: str,
         app_id: str,
         app_display_name: str,
@@ -106,6 +105,8 @@ class PusherPool:
         lang: Optional[str],
         data: JsonDict,
         profile_tag: str = "",
+        enabled: bool = True,
+        device_id: Optional[str] = None,
     ) -> Optional[Pusher]:
         """Creates a new pusher and adds it to the pool
 
@@ -126,6 +127,22 @@ class PusherPool:
         # stream ordering, so it will process pushes from this point onwards.
         last_stream_ordering = self.store.get_room_max_stream_ordering()
 
+        # Before we actually persist the pusher, we check if the user already has one
+        # for this app ID and pushkey. If so, we want to keep the access token and
+        # device ID in place, since this could be one device modifying
+        # (e.g. enabling/disabling) another device's pusher.
+        # XXX(quenting): Even though we're not persisting the access_token_id for new
+        # pushers anymore, we still need to copy existing access_token_ids over when
+        # updating a pusher, in case the "set_device_id_for_pushers" background update
+        # hasn't run yet.
+        access_token_id = None
+        existing_config = await self._get_pusher_config_for_user_by_app_id_and_pushkey(
+            user_id, app_id, pushkey
+        )
+        if existing_config:
+            device_id = existing_config.device_id
+            access_token_id = existing_config.access_token
+
         # we try to create the pusher just to validate the config: it
         # will then get pulled out of the database,
         # recreated, added and started: this means we have only one
@@ -134,7 +151,6 @@ class PusherPool:
             PusherConfig(
                 id=None,
                 user_name=user_id,
-                access_token=access_token,
                 profile_tag=profile_tag,
                 kind=kind,
                 app_id=app_id,
@@ -147,12 +163,14 @@ class PusherPool:
                 last_stream_ordering=last_stream_ordering,
                 last_success=None,
                 failing_since=None,
+                enabled=enabled,
+                device_id=device_id,
+                access_token=access_token_id,
             )
         )
 
         await self.store.add_pusher(
             user_id=user_id,
-            access_token=access_token,
             kind=kind,
             app_id=app_id,
             app_display_name=app_display_name,
@@ -163,8 +181,11 @@ class PusherPool:
             data=data,
             last_stream_ordering=last_stream_ordering,
             profile_tag=profile_tag,
+            enabled=enabled,
+            device_id=device_id,
+            access_token_id=access_token_id,
         )
-        pusher = await self.start_pusher_by_id(app_id, pushkey, user_id)
+        pusher = await self.process_pusher_change_by_id(app_id, pushkey, user_id)
 
         return pusher
 
@@ -182,7 +203,7 @@ class PusherPool:
                 )
                 await self.remove_pusher(p.app_id, p.pushkey, p.user_name)
 
-    async def remove_pushers_by_access_token(
+    async def remove_pushers_by_access_tokens(
         self, user_id: str, access_tokens: Iterable[int]
     ) -> None:
         """Remove the pushers for a given user corresponding to a set of
@@ -192,9 +213,31 @@ class PusherPool:
             user_id: user to remove pushers for
             access_tokens: access token *ids* to remove pushers for
         """
+        # XXX(quenting): This is only needed until the "set_device_id_for_pushers"
+        # background update finishes
         tokens = set(access_tokens)
         for p in await self.store.get_pushers_by_user_id(user_id):
             if p.access_token in tokens:
+                logger.info(
+                    "Removing pusher for app id %s, pushkey %s, user %s",
+                    p.app_id,
+                    p.pushkey,
+                    p.user_name,
+                )
+                await self.remove_pusher(p.app_id, p.pushkey, p.user_name)
+
+    async def remove_pushers_by_devices(
+        self, user_id: str, devices: StrCollection
+    ) -> None:
+        """Remove the pushers for a given user corresponding to a set of devices
+
+        Args:
+            user_id: user to remove pushers for
+            devices: device IDs to remove pushers for
+        """
+        device_ids = set(devices)
+        for p in await self.store.get_pushers_by_user_id(user_id):
+            if p.device_id in device_ids:
                 logger.info(
                     "Removing pusher for app id %s, pushkey %s, user %s",
                     p.app_id,
@@ -276,10 +319,25 @@ class PusherPool:
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 
-    async def start_pusher_by_id(
+    async def _get_pusher_config_for_user_by_app_id_and_pushkey(
+        self, user_id: str, app_id: str, pushkey: str
+    ) -> Optional[PusherConfig]:
+        resultlist = await self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
+
+        pusher_config = None
+        for r in resultlist:
+            if r.user_name == user_id:
+                pusher_config = r
+
+        return pusher_config
+
+    async def process_pusher_change_by_id(
         self, app_id: str, pushkey: str, user_id: str
     ) -> Optional[Pusher]:
-        """Look up the details for the given pusher, and start it
+        """Look up the details for the given pusher, and either start it if its
+        "enabled" flag is True, or try to stop it otherwise.
+
+        If the pusher is new and its "enabled" flag is False, the stop is a noop.
 
         Returns:
             The pusher started, if any
@@ -290,12 +348,13 @@ class PusherPool:
         if not self._pusher_shard_config.should_handle(self._instance_name, user_id):
             return None
 
-        resultlist = await self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
+        pusher_config = await self._get_pusher_config_for_user_by_app_id_and_pushkey(
+            user_id, app_id, pushkey
+        )
 
-        pusher_config = None
-        for r in resultlist:
-            if r.user_name == user_id:
-                pusher_config = r
+        if pusher_config and not pusher_config.enabled:
+            self.maybe_stop_pusher(app_id, pushkey, user_id)
+            return None
 
         pusher = None
         if pusher_config:
@@ -305,7 +364,7 @@ class PusherPool:
 
     async def _start_pushers(self) -> None:
         """Start all the pushers"""
-        pushers = await self.store.get_all_pushers()
+        pushers = await self.store.get_enabled_pushers()
 
         # Stagger starting up the pushers so we don't completely drown the
         # process on start up.
@@ -363,6 +422,8 @@ class PusherPool:
 
         synapse_pushers.labels(type(pusher).__name__, pusher.app_id).inc()
 
+        logger.info("Starting pusher %s / %s", pusher.user_id, appid_pushkey)
+
         # Check if there *may* be push to process. We do this as this check is a
         # lot cheaper to do than actually fetching the exact rows we need to
         # push.
@@ -382,16 +443,7 @@ class PusherPool:
         return pusher
 
     async def remove_pusher(self, app_id: str, pushkey: str, user_id: str) -> None:
-        appid_pushkey = "%s:%s" % (app_id, pushkey)
-
-        byuser = self.pushers.get(user_id, {})
-
-        if appid_pushkey in byuser:
-            logger.info("Stopping pusher %s / %s", user_id, appid_pushkey)
-            pusher = byuser.pop(appid_pushkey)
-            pusher.on_stop()
-
-            synapse_pushers.labels(type(pusher).__name__, pusher.app_id).dec()
+        self.maybe_stop_pusher(app_id, pushkey, user_id)
 
         # We can only delete pushers on master.
         if self._remove_pusher_client:
@@ -402,3 +454,22 @@ class PusherPool:
             await self.store.delete_pusher_by_app_id_pushkey_user_id(
                 app_id, pushkey, user_id
             )
+
+    def maybe_stop_pusher(self, app_id: str, pushkey: str, user_id: str) -> None:
+        """Stops a pusher with the given app ID and push key if one is running.
+
+        Args:
+            app_id: the pusher's app ID.
+            pushkey: the pusher's push key.
+            user_id: the user the pusher belongs to. Only used for logging.
+        """
+        appid_pushkey = "%s:%s" % (app_id, pushkey)
+
+        byuser = self.pushers.get(user_id, {})
+
+        if appid_pushkey in byuser:
+            logger.info("Stopping pusher %s / %s", user_id, appid_pushkey)
+            pusher = byuser.pop(appid_pushkey)
+            pusher.on_stop()
+
+            synapse_pushers.labels(type(pusher).__name__, pusher.app_id).dec()

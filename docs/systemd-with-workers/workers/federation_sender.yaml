@@ -1,0 +1,4 @@
+worker_app: synapse.app.federation_sender
+worker_name: federation_sender1
+
+worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml

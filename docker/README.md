@@ -73,7 +73,8 @@ The following environment variables are supported in `generate` mode:
   will log sensitive information such as access tokens.
   This should not be needed unless you are a developer attempting to debug something
   particularly tricky.
-
+* `SYNAPSE_LOG_TESTING`: if set, Synapse will log additional information useful
+  for testing.
 
 ## Postgres
 
@@ -241,4 +242,4 @@ healthcheck:
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
 You can read about jemalloc by reading the Synapse
-[README](https://github.com/matrix-org/synapse/blob/HEAD/README.rst#help-synapse-is-slow-and-eats-all-my-ram-cpu).
+[Admin FAQ](https://matrix-org.github.io/synapse/latest/usage/administration/admin_faq.html#help-synapse-is-slow-and-eats-all-my-ramcpu).

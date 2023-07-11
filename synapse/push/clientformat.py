@@ -16,25 +16,21 @@ import copy
 from typing import Any, Dict, List, Optional
 
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
+from synapse.synapse_rust.push import FilteredPushRules, PushRule
 from synapse.types import UserID
-
-from .baserules import FilteredPushRules, PushRule
 
 
 def format_push_rules_for_user(
     user: UserID, ruleslist: FilteredPushRules
-) -> Dict[str, Dict[str, list]]:
+) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
-    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
-        "global": {},
-        "device": {},
-    }
+    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {"global": {}}
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 
-    for r, enabled in ruleslist:
+    for r, enabled in ruleslist.rules():
         template_name = _priority_class_to_template_name(r.priority_class)
 
         rulearray = rules["global"][template_name]
@@ -44,6 +40,8 @@ def format_push_rules_for_user(
             continue
 
         rulearray.append(template_rule)
+
+        _convert_type_to_value(template_rule, user)
 
         template_rule["enabled"] = enabled
 
@@ -60,17 +58,18 @@ def format_push_rules_for_user(
         for c in template_rule["conditions"]:
             c.pop("_cache_key", None)
 
-            pattern_type = c.pop("pattern_type", None)
-            if pattern_type == "user_id":
-                c["pattern"] = user.to_string()
-            elif pattern_type == "user_localpart":
-                c["pattern"] = user.localpart
-
-            sender_type = c.pop("sender_type", None)
-            if sender_type == "user_id":
-                c["sender"] = user.to_string()
+            _convert_type_to_value(c, user)
 
     return rules
+
+
+def _convert_type_to_value(rule_or_cond: Dict[str, Any], user: UserID) -> None:
+    for type_key in ("pattern", "value"):
+        type_value = rule_or_cond.pop(f"{type_key}_type", None)
+        if type_value == "user_id":
+            rule_or_cond[type_key] = user.to_string()
+        elif type_value == "user_localpart":
+            rule_or_cond[type_key] = user.localpart
 
 
 def _add_empty_priority_class_arrays(d: Dict[str, list]) -> Dict[str, list]:
@@ -94,19 +93,21 @@ def _rule_to_template(rule: PushRule) -> Optional[Dict[str, Any]]:
         if len(rule.conditions) != 1:
             return None
         thecond = rule.conditions[0]
-        if "pattern" not in thecond:
-            return None
+
         templaterule = {"actions": rule.actions}
-        templaterule["pattern"] = thecond["pattern"]
+        if "pattern" in thecond:
+            templaterule["pattern"] = thecond["pattern"]
+        elif "pattern_type" in thecond:
+            templaterule["pattern_type"] = thecond["pattern_type"]
+        else:
+            return None
     else:
         # This should not be reached unless this function is not kept in sync
         # with PRIORITY_CLASS_INVERSE_MAP.
         raise ValueError("Unexpected template_name: %s" % (template_name,))
 
-    if unscoped_rule_id:
-        templaterule["rule_id"] = unscoped_rule_id
-    if rule.default:
-        templaterule["default"] = True
+    templaterule["rule_id"] = unscoped_rule_id
+    templaterule["default"] = rule.default
     return templaterule
 
 

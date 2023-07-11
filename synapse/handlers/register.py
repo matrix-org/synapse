@@ -38,6 +38,7 @@ from synapse.api.errors import (
 )
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
+from synapse.handlers.device import DeviceHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import (
@@ -45,8 +46,8 @@ from synapse.replication.http.register import (
     ReplicationRegisterServlet,
 )
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.storage.state import StateFilter
-from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types import GUEST_USER_ID_PATTERN, RoomAlias, UserID, create_requester
+from synapse.types.state import StateFilter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -109,7 +110,7 @@ class RegistrationHandler:
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
 
         if hs.config.worker.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
@@ -145,7 +146,7 @@ class RegistrationHandler:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                "User ID can only contain characters a-z, 0-9, or '=_-./'",
+                "User ID can only contain characters a-z, 0-9, or '=_-./+'",
                 Codes.INVALID_USERNAME,
             )
 
@@ -194,16 +195,12 @@ class RegistrationHandler:
                         errcode=Codes.FORBIDDEN,
                     )
 
-        if guest_access_token is None:
-            try:
-                int(localpart)
-                raise SynapseError(
-                    400,
-                    "Numeric user IDs are reserved for guest users.",
-                    errcode=Codes.INVALID_USERNAME,
-                )
-            except ValueError:
-                pass
+        if guest_access_token is None and GUEST_USER_ID_PATTERN.fullmatch(localpart):
+            raise SynapseError(
+                400,
+                "Numeric user IDs are reserved for guest users.",
+                errcode=Codes.INVALID_USERNAME,
+            )
 
     async def register_user(
         self,
@@ -220,6 +217,7 @@ class RegistrationHandler:
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
         auth_provider_id: Optional[str] = None,
+        approved: bool = False,
     ) -> str:
         """Registers a new client on the server.
 
@@ -246,6 +244,8 @@ class RegistrationHandler:
             user_agent_ips: Tuples of user-agents and IP addresses used
                 during the registration process.
             auth_provider_id: The SSO IdP the user used, if any.
+            approved: True if the new user should be considered already
+                approved by an administrator.
         Returns:
             The registered user_id.
         Raises:
@@ -255,7 +255,7 @@ class RegistrationHandler:
 
         await self.check_registration_ratelimit(address)
 
-        result = await self.spam_checker.check_registration_for_spam(
+        result = await self._spam_checker_module_callbacks.check_registration_for_spam(
             threepid,
             localpart,
             user_agent_ips or [],
@@ -307,9 +307,10 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
+                approved=approved,
             )
 
-            profile = await self.store.get_profileinfo(localpart)
+            profile = await self.store.get_profileinfo(user)
             await self.user_directory_handler.handle_local_profile_change(
                 user_id, profile
             )
@@ -471,7 +472,7 @@ class RegistrationHandler:
                     # create room expects the localpart of the room alias
                     config["room_alias_name"] = room_alias.localpart
 
-                    info, _ = await room_creation_handler.create_room(
+                    room_id, _, _ = await room_creation_handler.create_room(
                         fake_requester,
                         config=config,
                         ratelimit=False,
@@ -485,7 +486,7 @@ class RegistrationHandler:
                                 user_id, authenticated_entity=self._server_name
                             ),
                             target=UserID.from_string(user_id),
-                            room_id=info["room_id"],
+                            room_id=room_id,
                             # Since it was just created, there are no remote hosts.
                             remote_room_hosts=[],
                             action="join",
@@ -591,14 +592,20 @@ class RegistrationHandler:
         Args:
             user_id: The user to join
         """
+        # If there are no rooms to auto-join, just bail.
+        if not self.hs.config.registration.auto_join_rooms:
+            return
+
         # auto-join the user to any rooms we're supposed to dump them into
 
         # try to create the room if we're the first real user on the server. Note
         # that an auto-generated support or bot user is not a real user and will never be
         # the user to create the room
         should_auto_create_rooms = False
-        is_real_user = await self.store.is_real_user(user_id)
-        if self.hs.config.registration.autocreate_auto_join_rooms and is_real_user:
+        if (
+            self.hs.config.registration.autocreate_auto_join_rooms
+            and await self.store.is_real_user(user_id)
+        ):
             count = await self.store.count_real_users()
             should_auto_create_rooms = count == 1
 
@@ -695,6 +702,7 @@ class RegistrationHandler:
         user_type: Optional[str] = None,
         address: Optional[str] = None,
         shadow_banned: bool = False,
+        approved: bool = False,
     ) -> None:
         """Register user in the datastore.
 
@@ -713,6 +721,7 @@ class RegistrationHandler:
                 api.constants.UserTypes, or None for a normal user.
             address: the IP address used to perform the registration.
             shadow_banned: Whether to shadow-ban the user
+            approved: Whether to mark the user as approved by an administrator
         """
         if self.hs.config.worker.worker_app:
             await self._register_client(
@@ -726,6 +735,7 @@ class RegistrationHandler:
                 user_type=user_type,
                 address=address,
                 shadow_banned=shadow_banned,
+                approved=approved,
             )
         else:
             await self.store.register_user(
@@ -738,6 +748,7 @@ class RegistrationHandler:
                 admin=admin,
                 user_type=user_type,
                 shadow_banned=shadow_banned,
+                approved=approved,
             )
 
             # Only call the account validity module(s) on the main process, to avoid
@@ -832,6 +843,9 @@ class RegistrationHandler:
 
         refresh_token = None
         refresh_token_id = None
+
+        # This can only run on the main process.
+        assert isinstance(self.device_handler, DeviceHandler)
 
         registered_device_id = await self.device_handler.check_device_registered(
             user_id,
@@ -995,17 +1009,17 @@ class RegistrationHandler:
             user_tuple = await self.store.get_user_by_access_token(token)
             # The token better still exist.
             assert user_tuple
-            token_id = user_tuple.token_id
+            device_id = user_tuple.device_id
 
-            await self.pusher_pool.add_pusher(
+            await self.pusher_pool.add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="email",
                 app_id="m.email",
                 app_display_name="Email Notifications",
                 device_display_name=threepid["address"],
                 pushkey=threepid["address"],
-                lang=None,  # We don't know a user's language here
+                lang=None,
                 data={},
             )
 

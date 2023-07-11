@@ -14,8 +14,8 @@
 import logging
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Any,
-    Awaitable,
     Callable,
     Collection,
     Dict,
@@ -30,12 +30,13 @@ from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
 from synapse.storage.roommember import ProfileInfo
-from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
     PartialStateEventsTracker,
 )
 from synapse.types import MutableStateMap, StateMap
+from synapse.types.state import StateFilter
+from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -65,6 +66,8 @@ class StateStorageController:
         """
         self._partial_state_room_tracker.notify_un_partial_stated(room_id)
 
+    @trace
+    @tag_args
     async def get_state_group_delta(
         self, state_group: int
     ) -> Tuple[Optional[int], Optional[StateMap[str]]]:
@@ -82,6 +85,8 @@ class StateStorageController:
         state_group_delta = await self.stores.state.get_state_group_delta(state_group)
         return state_group_delta.prev_group, state_group_delta.delta_ids
 
+    @trace
+    @tag_args
     async def get_state_groups_ids(
         self, _room_id: str, event_ids: Collection[str], await_full_state: bool = True
     ) -> Dict[int, MutableStateMap[str]]:
@@ -112,6 +117,8 @@ class StateStorageController:
 
         return group_to_state
 
+    @trace
+    @tag_args
     async def get_state_ids_for_group(
         self, state_group: int, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
@@ -128,6 +135,8 @@ class StateStorageController:
 
         return group_to_state[state_group]
 
+    @trace
+    @tag_args
     async def get_state_groups(
         self, room_id: str, event_ids: Collection[str]
     ) -> Dict[int, List[EventBase]]:
@@ -163,9 +172,11 @@ class StateStorageController:
             for group, event_id_map in group_to_ids.items()
         }
 
-    def _get_state_groups_from_groups(
+    @trace
+    @tag_args
+    async def _get_state_groups_from_groups(
         self, groups: List[int], state_filter: StateFilter
-    ) -> Awaitable[Dict[int, StateMap[str]]]:
+    ) -> Dict[int, StateMap[str]]:
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
@@ -178,9 +189,12 @@ class StateStorageController:
             Dict of state group to state map.
         """
 
-        return self.stores.state._get_state_groups_from_groups(groups, state_filter)
+        return await self.stores.state._get_state_groups_from_groups(
+            groups, state_filter
+        )
 
     @trace
+    @tag_args
     async def get_state_for_events(
         self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
@@ -229,6 +243,7 @@ class StateStorageController:
 
     @trace
     @tag_args
+    @cancellable
     async def get_state_ids_for_events(
         self,
         event_ids: Collection[str],
@@ -277,6 +292,8 @@ class StateStorageController:
 
         return {event: event_to_state[event] for event in event_ids}
 
+    @trace
+    @tag_args
     async def get_state_for_event(
         self, event_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[EventBase]:
@@ -300,6 +317,7 @@ class StateStorageController:
         return state_map[event_id]
 
     @trace
+    @tag_args
     async def get_state_ids_for_event(
         self,
         event_id: str,
@@ -330,9 +348,11 @@ class StateStorageController:
         )
         return state_map[event_id]
 
-    def get_state_for_groups(
+    @trace
+    @tag_args
+    async def get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
-    ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
+    ) -> Dict[int, MutableStateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -344,12 +364,13 @@ class StateStorageController:
         Returns:
             Dict of state group to state map.
         """
-        return self.stores.state._get_state_for_groups(
+        return await self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
 
     @trace
     @tag_args
+    @cancellable
     async def get_state_group_for_events(
         self,
         event_ids: Collection[str],
@@ -398,10 +419,14 @@ class StateStorageController:
             event_id, room_id, prev_group, delta_ids, current_state_ids
         )
 
+    @trace
+    @tag_args
+    @cancellable
     async def get_current_state_ids(
         self,
         room_id: str,
         state_filter: Optional[StateFilter] = None,
+        await_full_state: bool = True,
         on_invalidate: Optional[Callable[[], None]] = None,
     ) -> StateMap[str]:
         """Get the current state event ids for a room based on the
@@ -414,13 +439,17 @@ class StateStorageController:
             room_id: The room to get the state IDs of. state_filter: The state
             filter used to fetch state from the
                 database.
+            await_full_state: if true, will block if we do not yet have complete
+               state for the room.
             on_invalidate: Callback for when the `get_current_state_ids` cache
                 for the room gets invalidated.
 
         Returns:
             The current state of the room.
         """
-        if not state_filter or state_filter.must_await_full_state(self._is_mine_id):
+        if await_full_state and (
+            not state_filter or state_filter.must_await_full_state(self._is_mine_id)
+        ):
             await self._partial_state_room_tracker.await_full_state(room_id)
 
         if state_filter and not state_filter.is_full():
@@ -432,6 +461,8 @@ class StateStorageController:
                 room_id, on_invalidate=on_invalidate
             )
 
+    @trace
+    @tag_args
     async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
         """Get canonical alias for room, if any
 
@@ -454,8 +485,10 @@ class StateStorageController:
         if not event:
             return None
 
-        return event.content.get("canonical_alias")
+        return event.content.get("alias")
 
+    @trace
+    @tag_args
     async def get_current_state_deltas(
         self, prev_stream_id: int, max_stream_id: int
     ) -> Tuple[int, List[Dict[str, Any]]]:
@@ -483,8 +516,6 @@ class StateStorageController:
                  up to date.
         """
         # FIXME(faster_joins): what do we do here?
-        #   https://github.com/matrix-org/synapse/issues/12814
-        #   https://github.com/matrix-org/synapse/issues/12815
         #   https://github.com/matrix-org/synapse/issues/13008
 
         return await self.stores.main.get_partial_current_state_deltas(
@@ -492,6 +523,7 @@ class StateStorageController:
         )
 
     @trace
+    @tag_args
     async def get_current_state(
         self, room_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[EventBase]:
@@ -508,6 +540,8 @@ class StateStorageController:
 
         return state_map
 
+    @trace
+    @tag_args
     async def get_current_state_event(
         self, room_id: str, event_type: str, state_key: str
     ) -> Optional[EventBase]:
@@ -519,16 +553,72 @@ class StateStorageController:
         )
         return state_map.get(key)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> List[str]:
-        """Get current hosts in room based on current state."""
+    @trace
+    @tag_args
+    async def get_current_hosts_in_room(self, room_id: str) -> AbstractSet[str]:
+        """Get current hosts in room based on current state.
+
+        Blocks until we have full state for the given room. This only happens for rooms
+        with partial state.
+        """
 
         await self._partial_state_room_tracker.await_full_state(room_id)
 
         return await self.stores.main.get_current_hosts_in_room(room_id)
 
+    @trace
+    @tag_args
+    async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
+        """Get current hosts in room based on current state.
+
+        Blocks until we have full state for the given room. This only happens for rooms
+        with partial state.
+
+        Returns:
+            A list of hosts in the room, sorted by longest in the room first. (aka.
+            sorted by join with the lowest depth first).
+        """
+
+        await self._partial_state_room_tracker.await_full_state(room_id)
+
+        return await self.stores.main.get_current_hosts_in_room_ordered(room_id)
+
+    @trace
+    @tag_args
+    async def get_current_hosts_in_room_or_partial_state_approximation(
+        self, room_id: str
+    ) -> Collection[str]:
+        """Get approximation of current hosts in room based on current state.
+
+        For rooms with full state, this is equivalent to `get_current_hosts_in_room`,
+        with the same order of results.
+
+        For rooms with partial state, no blocking occurs. Instead, the list of hosts
+        in the room at the time of joining is combined with the list of hosts which
+        joined the room afterwards. The returned list may include hosts that are not
+        actually in the room and exclude hosts that are in the room, since we may
+        calculate state incorrectly during the partial state phase. The order of results
+        is arbitrary for rooms with partial state.
+        """
+        # We have to read this list first to mitigate races with un-partial stating.
+        hosts_at_join = await self.stores.main.get_partial_state_servers_at_join(
+            room_id
+        )
+        if hosts_at_join is None:
+            hosts_at_join = frozenset()
+
+        hosts_from_state = await self.stores.main.get_current_hosts_in_room(room_id)
+
+        hosts = set(hosts_at_join)
+        hosts.update(hosts_from_state)
+
+        return hosts
+
+    @trace
+    @tag_args
     async def get_users_in_room_with_profiles(
         self, room_id: str
-    ) -> Dict[str, ProfileInfo]:
+    ) -> Mapping[str, ProfileInfo]:
         """
         Get the current users in the room with their profiles.
         If the room is currently partial-stated, this will block until the room has

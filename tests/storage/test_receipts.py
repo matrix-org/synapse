@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Collection, Optional
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import ReceiptTypes
+from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 
 from tests.test_utils.event_injection import create_event
 from tests.unittest import HomeserverTestCase
@@ -24,15 +29,17 @@ OUR_USER_ID = "@our:test"
 
 
 class ReceiptTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, homeserver) -> None:
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         super().prepare(reactor, clock, homeserver)
 
         self.store = homeserver.get_datastores().main
 
         self.room_creator = homeserver.get_room_creation_handler()
-        self.persist_event_storage_controller = (
-            self.hs.get_storage_controllers().persistence
-        )
+        persist_event_storage_controller = self.hs.get_storage_controllers().persistence
+        assert persist_event_storage_controller is not None
+        self.persist_event_storage_controller = persist_event_storage_controller
 
         # Create a test user
         self.ourUser = UserID.from_string(OUR_USER_ID)
@@ -43,12 +50,14 @@ class ReceiptTestCase(HomeserverTestCase):
         self.otherRequester = create_requester(self.otherUser)
 
         # Create a test room
-        info, _ = self.get_success(self.room_creator.create_room(self.ourRequester, {}))
-        self.room_id1 = info["room_id"]
+        self.room_id1, _, _ = self.get_success(
+            self.room_creator.create_room(self.ourRequester, {})
+        )
 
         # Create a second test room
-        info, _ = self.get_success(self.room_creator.create_room(self.ourRequester, {}))
-        self.room_id2 = info["room_id"]
+        self.room_id2, _, _ = self.get_success(
+            self.room_creator.create_room(self.ourRequester, {})
+        )
 
         # Join the second user to the first room
         memberEvent, memberEventContext = self.get_success(
@@ -84,6 +93,33 @@ class ReceiptTestCase(HomeserverTestCase):
             )
         )
 
+    def get_last_unthreaded_receipt(
+        self, receipt_types: Collection[str], room_id: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Fetch the event ID for the latest unthreaded receipt in the test room for the test user.
+
+        Args:
+            receipt_types: The receipt types to fetch.
+
+        Returns:
+            The latest receipt, if one exists.
+        """
+        result = self.get_success(
+            self.store.db_pool.runInteraction(
+                "get_last_receipt_event_id_for_user",
+                self.store.get_last_unthreaded_receipt_for_user_txn,
+                OUR_USER_ID,
+                room_id or self.room_id1,
+                receipt_types,
+            )
+        )
+        if not result:
+            return None
+
+        event_id, _ = result
+        return event_id
+
     def test_return_empty_with_no_data(self) -> None:
         res = self.get_success(
             self.store.get_receipts_for_user(
@@ -107,17 +143,11 @@ class ReceiptTestCase(HomeserverTestCase):
         )
         self.assertEqual(res, {})
 
-        res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
-                OUR_USER_ID,
-                self.room_id1,
-                [
-                    ReceiptTypes.READ,
-                    ReceiptTypes.READ_PRIVATE,
-                ],
-            )
+        res2 = self.get_last_unthreaded_receipt(
+            [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
         )
-        self.assertEqual(res, None)
+
+        self.assertIsNone(res2)
 
     def test_get_receipts_for_user(self) -> None:
         # Send some events into the first room
@@ -131,13 +161,18 @@ class ReceiptTestCase(HomeserverTestCase):
         # Send public read receipt for the first event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], None, {}
             )
         )
         # Send private read receipt for the second event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event1_2_id],
+                None,
+                {},
             )
         )
 
@@ -164,7 +199,7 @@ class ReceiptTestCase(HomeserverTestCase):
         # Test receipt updating
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], None, {}
             )
         )
         res = self.get_success(
@@ -180,7 +215,12 @@ class ReceiptTestCase(HomeserverTestCase):
         # Test new room is reflected in what the method returns
         self.get_success(
             self.store.insert_receipt(
-                self.room_id2, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event2_1_id], {}
+                self.room_id2,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event2_1_id],
+                None,
+                {},
             )
         )
         res = self.get_success(
@@ -202,53 +242,42 @@ class ReceiptTestCase(HomeserverTestCase):
         # Send public read receipt for the first event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], None, {}
             )
         )
         # Send private read receipt for the second event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event1_2_id],
+                None,
+                {},
             )
         )
 
         # Test we get the latest event when we want both private and public receipts
-        res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
-                OUR_USER_ID,
-                self.room_id1,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
-            )
+        res = self.get_last_unthreaded_receipt(
+            [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
         )
         self.assertEqual(res, event1_2_id)
 
         # Test we get the older event when we want only public receipt
-        res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
-                OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
-            )
-        )
+        res = self.get_last_unthreaded_receipt([ReceiptTypes.READ])
         self.assertEqual(res, event1_1_id)
 
         # Test we get the latest event when we want only the private receipt
-        res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
-                OUR_USER_ID, self.room_id1, [ReceiptTypes.READ_PRIVATE]
-            )
-        )
+        res = self.get_last_unthreaded_receipt([ReceiptTypes.READ_PRIVATE])
         self.assertEqual(res, event1_2_id)
 
         # Test receipt updating
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], None, {}
             )
         )
-        res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
-                OUR_USER_ID, self.room_id1, [ReceiptTypes.READ]
-            )
-        )
+        res = self.get_last_unthreaded_receipt([ReceiptTypes.READ])
         self.assertEqual(res, event1_2_id)
 
         # Send some events into the second room
@@ -259,14 +288,15 @@ class ReceiptTestCase(HomeserverTestCase):
         # Test new room is reflected in what the method returns
         self.get_success(
             self.store.insert_receipt(
-                self.room_id2, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event2_1_id], {}
+                self.room_id2,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event2_1_id],
+                None,
+                {},
             )
         )
-        res = self.get_success(
-            self.store.get_last_receipt_event_id_for_user(
-                OUR_USER_ID,
-                self.room_id2,
-                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
-            )
+        res = self.get_last_unthreaded_receipt(
+            [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE], room_id=self.room_id2
         )
         self.assertEqual(res, event2_1_id)

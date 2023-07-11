@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Tuple
 from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
@@ -19,8 +19,8 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.logging.context import make_deferred_yieldable
-from synapse.push import PusherConfigException
-from synapse.rest.client import login, push_rule, receipts, room
+from synapse.push import PusherConfig, PusherConfigException
+from synapse.rest.client import login, push_rule, pusher, receipts, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -35,28 +35,24 @@ class HTTPPusherTests(HomeserverTestCase):
         login.register_servlets,
         receipts.register_servlets,
         push_rule.register_servlets,
+        pusher.register_servlets,
     ]
     user_id = True
     hijack_auth = False
-
-    def default_config(self) -> Dict[str, Any]:
-        config = super().default_config()
-        config["start_pushers"] = True
-        return config
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.push_attempts: List[Tuple[Deferred, str, dict]] = []
 
         m = Mock()
 
-        def post_json_get_json(url, body):
+        def post_json_get_json(url: str, body: JsonDict) -> Deferred:
             d: Deferred = Deferred()
             self.push_attempts.append((d, url, body))
             return make_deferred_yieldable(d)
 
         m.post_json_get_json = post_json_get_json
 
-        hs = self.setup_test_homeserver(proxied_blacklisted_http_client=m)
+        hs = self.setup_test_homeserver(proxied_blocklisted_http_client=m)
 
         return hs
 
@@ -70,13 +66,14 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
-        def test_data(data: Optional[JsonDict]) -> None:
+        def test_data(data: Any) -> None:
             self.get_failure(
-                self.hs.get_pusherpool().add_pusher(
+                self.hs.get_pusherpool().add_or_update_pusher(
                     user_id=user_id,
-                    access_token=token_id,
+                    device_id=device_id,
                     kind="http",
                     app_id="m.http",
                     app_display_name="HTTP Push Notifications",
@@ -116,12 +113,13 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -143,10 +141,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.helper.send(room, body="There!", tok=other_access_token)
 
         # Get the stream ordering before it gets sent
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         last_stream_ordering = pushers[0].last_stream_ordering
 
@@ -154,10 +153,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.pump()
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual(last_stream_ordering, pushers[0].last_stream_ordering)
 
@@ -175,10 +175,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.pump()
 
         # The stream ordering has increased
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
         last_stream_ordering = pushers[0].last_stream_ordering
@@ -197,10 +198,11 @@ class HTTPPusherTests(HomeserverTestCase):
         self.pump()
 
         # The stream ordering has increased, again
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
 
@@ -232,12 +234,13 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -352,12 +355,13 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -438,12 +442,13 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -515,12 +520,13 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -621,12 +627,13 @@ class HTTPPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -728,20 +735,41 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
-    def _make_user_with_pusher(self, username: str) -> Tuple[str, str]:
+    def _make_user_with_pusher(
+        self, username: str, enabled: bool = True
+    ) -> Tuple[str, str]:
+        """Registers a user and creates a pusher for them.
+
+        Args:
+            username: the localpart of the new user's Matrix ID.
+            enabled: whether to create the pusher in an enabled or disabled state.
+        """
         user_id = self.register_user(username, "pass")
         access_token = self.login(username, "pass")
 
         # Register the pusher
+        self._set_pusher(user_id, access_token, enabled)
+
+        return user_id, access_token
+
+    def _set_pusher(self, user_id: str, access_token: str, enabled: bool) -> None:
+        """Creates or updates the pusher for the given user.
+
+        Args:
+            user_id: the user's Matrix ID.
+            access_token: the access token associated with the pusher.
+            enabled: whether to enable or disable the pusher.
+        """
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
-        token_id = user_tuple.token_id
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
 
         self.get_success(
-            self.hs.get_pusherpool().add_pusher(
+            self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=user_id,
-                access_token=token_id,
+                device_id=device_id,
                 kind="http",
                 app_id="m.http",
                 app_display_name="HTTP Push Notifications",
@@ -749,10 +777,9 @@ class HTTPPusherTests(HomeserverTestCase):
                 pushkey="a@example.com",
                 lang=None,
                 data={"url": "http://example.com/_matrix/push/v1/notify"},
+                enabled=enabled,
             )
         )
-
-        return user_id, access_token
 
     def test_dont_notify_rule_overrides_message(self) -> None:
         """
@@ -791,3 +818,184 @@ class HTTPPusherTests(HomeserverTestCase):
         # The user sends a message back (sends a notification)
         self.helper.send(room, body="Hello", tok=access_token)
         self.assertEqual(len(self.push_attempts), 1)
+
+    @override_config({"experimental_features": {"msc3881_enabled": True}})
+    def test_disable(self) -> None:
+        """Tests that disabling a pusher means it's not pushed to anymore."""
+        user_id, access_token = self._make_user_with_pusher("user")
+        other_user_id, other_access_token = self._make_user_with_pusher("otheruser")
+
+        room = self.helper.create_room_as(user_id, tok=access_token)
+        self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # Send a message and check that it generated a push.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 1)
+
+        # Disable the pusher.
+        self._set_pusher(user_id, access_token, enabled=False)
+
+        # Send another message and check that it did not generate a push.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 1)
+
+        # Get the pushers for the user and check that it is marked as disabled.
+        channel = self.make_request("GET", "/pushers", access_token=access_token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["pushers"]), 1)
+
+        enabled = channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"]
+        self.assertFalse(enabled)
+        self.assertTrue(isinstance(enabled, bool))
+
+    @override_config({"experimental_features": {"msc3881_enabled": True}})
+    def test_enable(self) -> None:
+        """Tests that enabling a disabled pusher means it gets pushed to."""
+        # Create the user with the pusher already disabled.
+        user_id, access_token = self._make_user_with_pusher("user", enabled=False)
+        other_user_id, other_access_token = self._make_user_with_pusher("otheruser")
+
+        room = self.helper.create_room_as(user_id, tok=access_token)
+        self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # Send a message and check that it did not generate a push.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 0)
+
+        # Enable the pusher.
+        self._set_pusher(user_id, access_token, enabled=True)
+
+        # Send another message and check that it did generate a push.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 1)
+
+        # Get the pushers for the user and check that it is marked as enabled.
+        channel = self.make_request("GET", "/pushers", access_token=access_token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["pushers"]), 1)
+
+        enabled = channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"]
+        self.assertTrue(enabled)
+        self.assertTrue(isinstance(enabled, bool))
+
+    @override_config({"experimental_features": {"msc3881_enabled": True}})
+    def test_null_enabled(self) -> None:
+        """Tests that a pusher that has an 'enabled' column set to NULL (eg pushers
+        created before the column was introduced) is considered enabled.
+        """
+        # We intentionally set 'enabled' to None so that it's stored as NULL in the
+        # database.
+        user_id, access_token = self._make_user_with_pusher("user", enabled=None)  # type: ignore[arg-type]
+
+        channel = self.make_request("GET", "/pushers", access_token=access_token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["pushers"]), 1)
+        self.assertTrue(channel.json_body["pushers"][0]["org.matrix.msc3881.enabled"])
+
+    def test_update_different_device_access_token_device_id(self) -> None:
+        """Tests that if we create a pusher from one device, the update it from another
+        device, the device ID associated with the pusher stays the same.
+        """
+        # Create a user with a pusher.
+        user_id, access_token = self._make_user_with_pusher("user")
+
+        # Get the device ID for the current access token, since that's what we store in
+        # the pushers table.
+        user_tuple = self.get_success(
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
+        )
+        assert user_tuple is not None
+        device_id = user_tuple.device_id
+
+        # Generate a new access token, and update the pusher with it.
+        new_token = self.login("user", "pass")
+        self._set_pusher(user_id, new_token, enabled=False)
+
+        # Get the current list of pushers for the user.
+        ret = self.get_success(
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
+        )
+        pushers: List[PusherConfig] = list(ret)
+
+        # Check that we still have one pusher, and that the device ID associated with
+        # it didn't change.
+        self.assertEqual(len(pushers), 1)
+        self.assertEqual(pushers[0].device_id, device_id)
+
+    @override_config({"experimental_features": {"msc3881_enabled": True}})
+    def test_device_id(self) -> None:
+        """Tests that a pusher created with a given device ID shows that device ID in
+        GET /pushers requests.
+        """
+        self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+
+        # We create the pusher with an HTTP request rather than with
+        # _make_user_with_pusher so that we can test the device ID is correctly set when
+        # creating a pusher via an API call.
+        self.make_request(
+            method="POST",
+            path="/pushers/set",
+            content={
+                "kind": "http",
+                "app_id": "m.http",
+                "app_display_name": "HTTP Push Notifications",
+                "device_display_name": "pushy push",
+                "pushkey": "a@example.com",
+                "lang": "en",
+                "data": {"url": "http://example.com/_matrix/push/v1/notify"},
+            },
+            access_token=access_token,
+        )
+
+        # Look up the user info for the access token so we can compare the device ID.
+        lookup_result = self.get_success(
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
+        )
+        assert lookup_result is not None
+
+        # Get the user's devices and check it has the correct device ID.
+        channel = self.make_request("GET", "/pushers", access_token=access_token)
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(len(channel.json_body["pushers"]), 1)
+        self.assertEqual(
+            channel.json_body["pushers"][0]["org.matrix.msc3881.device_id"],
+            lookup_result.device_id,
+        )
+
+    @override_config({"push": {"jitter_delay": "10s"}})
+    def test_jitter(self) -> None:
+        """Tests that enabling jitter actually delays sending push."""
+        user_id, access_token = self._make_user_with_pusher("user")
+        other_user_id, other_access_token = self._make_user_with_pusher("otheruser")
+
+        room = self.helper.create_room_as(user_id, tok=access_token)
+        self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # Send a message and check that it did not generate a push, as it should
+        # be delayed.
+        self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 0)
+
+        # Now advance time past the max jitter, and assert the message was sent.
+        self.reactor.advance(15)
+        self.assertEqual(len(self.push_attempts), 1)
+
+        self.push_attempts[0][0].callback({})
+
+        # Now we send a bunch of messages and assert that they were all sent
+        # within the 10s max delay.
+        for _ in range(10):
+            self.helper.send(room, body="Hi!", tok=other_access_token)
+
+        index = 1
+        for _ in range(11):
+            while len(self.push_attempts) > index:
+                self.push_attempts[index][0].callback({})
+                self.pump()
+                index += 1
+
+            self.reactor.advance(1)
+            self.pump()
+
+        self.assertEqual(len(self.push_attempts), 11)

@@ -1,1 +1,0 @@
-Fix the running of MSC1763 retention purge_jobs in deployments with background jobs running on a worker by forcing them back onto the main worker. Contributed by Brad @ Beeper.

@@ -25,22 +25,24 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
 
     badge = len(invites)
 
-    for room_id in joins:
-        notifs = await (
-            store.get_unread_event_push_actions_by_room_for_user(
-                room_id,
-                user_id,
-            )
-        )
-        if notifs.notify_count == 0:
+    room_to_count = await store.get_unread_counts_by_room_for_user(user_id)
+    for room_id, notify_count in room_to_count.items():
+        # room_to_count may include rooms which the user has left,
+        # ignore those.
+        if room_id not in joins:
+            continue
+
+        if notify_count == 0:
             continue
 
         if group_by_room:
             # return one badge count per conversation
             badge += 1
         else:
-            # increment the badge count by the number of unread messages in the room
-            badge += notifs.notify_count
+            # Increase badge by number of notifications in room
+            # NOTE: this includes threaded and unthreaded notifications.
+            badge += notify_count
+
     return badge
 
 

@@ -27,9 +27,9 @@ from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
 from synapse.types import (
+    MXID_LOCALPART_ALLOWED_CHARACTERS,
     UserID,
     map_username_to_mxid_localpart,
-    mxid_localpart_allowed_characters,
 )
 from synapse.util.iterutils import chunk_seq
 
@@ -371,7 +371,7 @@ class SamlHandler:
 
 
 DOT_REPLACE_PATTERN = re.compile(
-    "[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),)
+    "[^%s]" % (re.escape("".join(MXID_LOCALPART_ALLOWED_CHARACTERS)),)
 )
 
 
@@ -441,7 +441,7 @@ class DefaultSamlMappingProvider:
             client_redirect_url: where the client wants to redirect to
 
         Returns:
-            dict: A dict containing new user attributes. Possible keys:
+            A dict containing new user attributes. Possible keys:
                 * mxid_localpart (str): Required. The localpart of the user's mxid
                 * displayname (str): The displayname of the user
                 * emails (list[str]): Any emails for the user
@@ -483,7 +483,7 @@ class DefaultSamlMappingProvider:
         Args:
             config: A dictionary containing configuration options for this provider
         Returns:
-            SamlConfig: A custom config object for this module
+            A custom config object for this module
         """
         # Parse config options and use defaults where necessary
         mxid_source_attribute = config.get("mxid_source_attribute", "uid")
