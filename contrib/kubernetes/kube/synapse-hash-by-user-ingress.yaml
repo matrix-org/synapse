@@ -1,0 +1,57 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: synapse-hash-by-user-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$mxid_localpart"
+    nginx.ingress.kubernetes.io/http-snippet: |
+      # Extract username from access token passed as URL parameter
+      map $arg_access_token $accesstoken_from_urlparam {
+          # Defaults to just passing back the whole accesstoken
+          default   $arg_access_token;
+          # Try to extract username part from accesstoken URL parameter
+          "~syt_(?<username>.*?)_.*"           $username;
+      }
+
+      # Extract username from access token passed as authorization header
+      map $http_authorization $mxid_localpart {
+          # Defaults to just passing back the whole accesstoken
+          default                              $http_authorization;
+          # Try to extract username part from accesstoken header
+          "~Bearer syt_(?<username>.*?)_.*"    $username;
+          # if no authorization-header exist, try mapper for URL parameter "access_token"
+          ""                                   $accesstoken_from_urlparam;
+      }
+spec:
+  rules:
+  - host: matrix.example.com
+    http:
+      paths:
+      # Sync requests
+      - path: /_matrix/client/(r0|v3)/sync
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker-hash-by-user
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3)/initialSync
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker-hash-by-user
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker-hash-by-user
+            port:
+              name: generic-worker
+  tls:
+  - hosts:
+    - matrix.example.com
+    secretName: matrix.example.com

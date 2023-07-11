@@ -1,0 +1,50 @@
+server_name: example.com
+listeners:
+- port: 8008
+  tls: false
+  type: http
+  x_forwarded: true
+  resources:
+  - names:
+    - client
+    - federation
+    compress: false
+- port: 9093
+  type: http
+  resources:
+  - names:
+    - replication
+worker_replication_secret: <enter your secret here>
+redis:
+  enabled: true
+  host: synapse-database
+  port: 6379
+instance_map:
+  main:
+    host: synapse-main
+    port: 9093
+  event_persister:
+    host: synapse-main
+    port: 8034
+  stream_writer:
+    host: synapse-main
+    port: 8044
+stream_writers:
+  events: event_persister
+  typing: stream_writer
+  to_device: stream_writer
+  account_data: stream_writer
+  receipts: stream_writer
+  presence: stream_writer
+public_baseurl: https://matrix.example.com
+media_store_path: /media_store
+database:
+  name: psycopg2
+  args:
+    user: synapse_user
+    password: <postgres password>
+    database: synapse
+    host: synapse-database
+    cp_min: 5
+    cp_max: 10
+# The rest of your config goes here

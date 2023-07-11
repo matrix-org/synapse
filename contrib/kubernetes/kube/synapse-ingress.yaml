@@ -1,0 +1,581 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: synapse-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    cert-manager.io/cluster-issuer: <your cluster issuer>
+spec:
+  rules:
+  - host: matrix.example.com
+    http:
+      paths:
+      # Sync requests
+      - path: /_matrix/client/(api/v1|r0|v3)/events
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      # Federation requests
+      - path: /_matrix/federation/v1/event/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/state/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/state_ids/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/backfill/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/get_missing_events/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/publicRooms
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/query/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/make_join/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/make_leave/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/(v1|v2)/send_join/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/(v1|v2)/send_leave/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/(v1|v2)/invite/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/event_auth/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/timestamp_to_event/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/exchange_third_party_invite/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/user/devices/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/key/v2/query
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/federation/v1/hierarchy/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      # Client API requests
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/createRoom
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/publicRooms
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/joined_members
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/v1/rooms/.*/hierarchy
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(v1|unstable)/rooms/.*/relations/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/v1/rooms/.*/threads
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/unstable/im.nheko.summary/rooms/.*/summary
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/account/3pid
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/account/whoami
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/devices
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/versions
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/v1/rooms/.*/timestamp_to_event
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable/.*)/rooms/.*/aliases
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/search
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/capabilities
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      # Encryption requests
+      - path: /_matrix/client/(r0|v3|unstable)/keys/query
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/keys/changes
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/keys/claim
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/room_keys/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/keys/upload/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      # Registration/login requests
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/login
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/register
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/register/available
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/v1/register/m.login.registration_token/validity
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(r0|v3|unstable)/password_policy
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      # Event sending requests
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/join/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/knock/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/profile/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      # Account data requests
+      - path: /_matrix/client/(r0|v3|unstable)/.*/tags
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: writer-client
+      - path: /_matrix/client/(r0|v3|unstable)/.*/account_data
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: writer-client
+      # Receipts requests
+      - path: /_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: writer-client
+      - path: /_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: writer-client
+      # Presence requests
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/presence/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: writer-client
+      # Typing stream
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: writer-client
+      # To device stream
+      - path: /_matrix/client/(r0|v3|unstable)/sendToDevice/
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: writer-client
+      # User directory search requests
+      - path: /_matrix/client/(r0|v3|unstable)/user_directory/search
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-worker
+            port:
+              name: generic-worker
+      # Push rules, only for GET requests, disable for now
+      # - path: /_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
+      #   pathType: Prefix
+      #   backend:
+      #     service:
+      #       name: synapse-worker
+      #       port:
+      #         name: generic-worker
+      # for all SSO providers
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/login/sso/redirect
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      - path: /_synapse/client/pick_idp
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      - path: /_synapse/client/pick_username
+        pathType: Prefix
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      - path: /_synapse/client/new_user_consent
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      - path: /_synapse/client/sso_register
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      # OpenID Connect requests.
+      - path: /_synapse/client/oidc/callback
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      # SAML requests.
+      - path: /_synapse/client/saml2/authn_response
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      # CAS requests.
+      - path: /_matrix/client/(api/v1|r0|v3|unstable)/login/cas/ticket
+        pathType: Exact
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+      # Handled by homeserver
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: synapse-main
+            port:
+              name: homeserver
+  tls:
+  - hosts:
+    - matrix.example.com
+    secretName: matrix.example.com

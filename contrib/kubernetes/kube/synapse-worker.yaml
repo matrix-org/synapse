@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: synapse-worker
+spec:
+  selector:
+    app: synapse-worker
+  ports:
+  - name: generic-worker
+    protocol: TCP
+    port: 8083
+    targetPort: 8083
+
+---
+    
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synapse-worker
+  labels:
+    app: synapse-worker
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: synapse-worker
+  template:
+    metadata:
+      labels:
+        app: synapse-worker
+    spec:
+      containers:
+      - name: worker
+        image: matrixdotorg/synapse:v1.82.0
+        env:
+        - name: SYNAPSE_WORKER
+          value: synapse.app.generic_worker
+        - name: SYNAPSE_CONFIG_PATH
+          value: /data
+        ports:
+        - containerPort: 8083
+        volumeMounts:
+        - name: synapse-media-volume
+          mountPath: /media_store
+        - name: worker-config-volume
+          mountPath: /data
+          readOnly: true
+      volumes:
+      - name: synapse-config-volume
+        secret:
+          secretName: synapse-config
+      - name: synapse-media-volume
+        persistentVolumeClaim:
+          claimName: synapse-media-store
+      - name: worker-config-volume
+        projected:
+          sources:
+          - configMap:
+              name: synapse-worker-config
+          - secret:
+              name: synapse-config

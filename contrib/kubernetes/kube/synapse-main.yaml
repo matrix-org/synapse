@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: synapse-main
+spec:
+  selector:
+    app: synapse-main
+  ports:
+  - name: homeserver
+    protocol: TCP
+    port: 8008
+    targetPort: 8008
+  - name: replication
+    protocol: TCP
+    port: 9093
+    targetPort: 9093
+  - name: event-persister
+    protocol: TCP
+    port: 8034
+    targetPort: 8034
+  - name: stream-writer
+    protocol: TCP
+    port: 8044
+    targetPort: 8044
+  - name: writer-client
+    protocol: TCP
+    port: 8045
+    targetPort: 8045
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synapse-main
+  labels:
+    app: synapse-main
+spec:
+  selector:
+    matchLabels:
+      app: synapse-main
+  template:
+    metadata:
+      labels:
+        app: synapse-main
+    spec:
+      containers:
+      - name: homeserver
+        image: matrixdotorg/synapse:v1.82.0
+        ports:
+        - containerPort: 8008
+        - containerPort: 9093
+        volumeMounts:
+        - name: synapse-media-volume
+          mountPath: /media_store
+        - name: synapse-config-volume
+          mountPath: /data
+          readOnly: true
+      - name: event-persister
+        image: matrixdotorg/synapse:v1.82.0
+        env:
+        - name: SYNAPSE_WORKER
+          value: synapse.app.generic_worker
+        - name: SYNAPSE_CONFIG_PATH
+          value: /data
+        ports:
+        - containerPort: 8034
+        volumeMounts:
+        - name: synapse-media-volume
+          mountPath: /media_store
+        - name: event-persister-config-volume
+          mountPath: /data
+          readOnly: true
+      - name: stream-writer
+        image: matrixdotorg/synapse:v1.82.0
+        env:
+        - name: SYNAPSE_WORKER
+          value: synapse.app.generic_worker
+        - name: SYNAPSE_CONFIG_PATH
+          value: /data
+        ports:
+        - containerPort: 8044
+        - containerPort: 8045
+        volumeMounts:
+        - name: synapse-media-volume
+          mountPath: /media_store
+        - name: stream-writer-config-volume
+          mountPath: /data
+          readOnly: true
+      volumes:
+      - name: synapse-config-volume
+        secret:
+          secretName: synapse-config
+      - name: synapse-media-volume
+        persistentVolumeClaim:
+          claimName: synapse-media-store
+      - name: event-persister-config-volume
+        projected:
+          sources:
+          - configMap:
+              name: synapse-event-persister-config
+          - secret:
+              name: synapse-config
+      - name: stream-writer-config-volume
+        projected:
+          sources:
+          - configMap:
+              name: synapse-stream-writer-config
+          - secret:
+              name: synapse-config

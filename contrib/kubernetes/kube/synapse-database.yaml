@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: synapse-database
+spec:
+  selector:
+    app: synapse-database
+  ports:
+  - name: postgres
+    protocol: TCP
+    port: 5432
+    targetPort: 5432
+  - name: redis
+    protocol: TCP
+    port: 6379
+    targetPort: 6379
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synapse-database
+  labels:
+    app: synapse-database
+spec:
+  selector:
+    matchLabels:
+      app: synapse-database
+  template:
+    metadata:
+      labels:
+        app: synapse-database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:13.11-alpine3.18
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - secretRef:
+            name: synapse-postgres-credentials
+        volumeMounts:
+        - name: postgres-data-volume
+          mountPath: /var/lib/postgresql/data
+      - name: redis
+        image: redis:6-alpine3.18
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-data-volume
+          mountPath: /data
+      volumes:
+      - name: postgres-data-volume
+        persistentVolumeClaim:
+          claimName: synapse-postgres-data
+      - name: redis-data-volume
+        persistentVolumeClaim:
+          claimName: synapse-redis-data
