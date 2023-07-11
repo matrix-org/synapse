@@ -1,0 +1,20 @@
+worker_app: synapse.app.generic_worker
+worker_name: event_persister1
+
+worker_listeners:
+  - type: http
+    port: 8034
+    resources:
+      - names: [replication]
+
+  # Enable listener if this stream writer handles endpoints for the `typing` or
+  # `to_device` streams. Uses a different port to the `replication` listener to
+  # avoid exposing the `replication` listener publicly.
+  #
+  #- type: http
+  #  port: 8035
+  #  x_forwarded: true
+  #  resources:
+  #    - names: [client]
+
+worker_log_config: /etc/matrix-synapse/event-persister-log.yaml

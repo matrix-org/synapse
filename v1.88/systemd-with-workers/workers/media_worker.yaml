@@ -1,0 +1,11 @@
+worker_app: synapse.app.media_repository
+worker_name: media_worker
+
+worker_listeners:
+  - type: http
+    port: 8085
+    x_forwarded: true
+    resources:
+      - names: [media]
+
+worker_log_config: /etc/matrix-synapse/media-worker-log.yaml
