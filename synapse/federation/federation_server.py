@@ -26,7 +26,6 @@ from typing import (
     Mapping,
     Optional,
     Tuple,
-    Union,
 )
 
 from matrix_common.regex import glob_to_regex
@@ -213,18 +212,14 @@ class FederationServer(FederationBase):
 
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
-    ) -> Tuple[int, Dict[str, Any]]:
+    ) -> List[EventBase]:
         async with self._server_linearizer.queue((origin, room_id)):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
-            pdus = await self.handler.on_backfill_request(
+            return await self.handler.on_backfill_request(
                 origin, room_id, versions, limit
             )
-
-            res = self._transaction_dict_from_pdus(pdus)
-
-        return 200, res
 
     async def on_timestamp_to_event_request(
         self, origin: str, room_id: str, timestamp: int, direction: Direction
@@ -621,15 +616,8 @@ class FederationServer(FederationBase):
             "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
         }
 
-    async def on_pdu_request(
-        self, origin: str, event_id: str
-    ) -> Tuple[int, Union[JsonDict, str]]:
-        pdu = await self.handler.get_persisted_pdu(origin, event_id)
-
-        if pdu:
-            return 200, self._transaction_dict_from_pdus([pdu])
-        else:
-            return 404, ""
+    async def on_pdu_request(self, origin: str, event_id: str) -> Optional[EventBase]:
+        return await self.handler.get_persisted_pdu(origin, event_id)
 
     async def on_query_request(
         self, query_type: str, args: Dict[str, str]
@@ -1077,21 +1065,6 @@ class FederationServer(FederationBase):
     async def on_openid_userinfo(self, token: str) -> Optional[str]:
         ts_now_ms = self._clock.time_msec()
         return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)
-
-    def _transaction_dict_from_pdus(self, pdu_list: List[EventBase]) -> JsonDict:
-        """Returns a new Transaction containing the given PDUs suitable for
-        transmission.
-        """
-        time_now = self._clock.time_msec()
-        pdus = [p.get_pdu_json(time_now) for p in pdu_list]
-        return Transaction(
-            # Just need a dummy transaction ID and destination since it won't be used.
-            transaction_id="",
-            origin=self.server_name,
-            pdus=pdus,
-            origin_server_ts=int(time_now),
-            destination="",
-        ).get_dict()
 
     async def _handle_received_pdu(self, origin: str, pdu: EventBase) -> None:
         """Process a PDU received in a federation /send/ transaction.

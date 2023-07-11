@@ -134,6 +134,31 @@ class TransportLayerClient:
             destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
         )
 
+    async def get_event_unstable(
+        self, destination: str, event_id: str, timeout: Optional[int] = None
+    ) -> JsonDict:
+        """Requests the pdu with give id and origin from the given server.
+
+        Args:
+            destination: The host name of the remote homeserver we want
+                to get the state from.
+            event_id: The id of the event being requested.
+            timeout: How long to try (in ms) the destination for before
+                giving up. None indicates no timeout.
+
+        Returns:
+            Results in a dict received from the remote homeserver.
+        """
+        logger.debug("get_pdu dest=%s, event_id=%s", destination, event_id)
+
+        path = f"/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/event/{event_id}"
+        result = await self.client.get_json(
+            destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
+        )
+        # Note that this has many callers, convert the result into the v1 response
+        # (i.e. a transaction).
+        return {"pdus": [result]}
+
     async def backfill(
         self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
     ) -> Optional[Union[JsonDict, list]]:
@@ -164,6 +189,43 @@ class TransportLayerClient:
             return None
 
         path = _create_v1_path("/backfill/%s", room_id)
+
+        args = {"v": event_tuples, "limit": [str(limit)]}
+
+        return await self.client.get_json(
+            destination, path=path, args=args, try_trailing_slash_on_400=True
+        )
+
+    async def backfill_unstable(
+        self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
+    ) -> Optional[Union[JsonDict, list]]:
+        """Requests `limit` previous PDUs in a given context before list of
+        PDUs.
+
+        Args:
+            destination
+            room_id
+            event_tuples:
+                Must be a Collection that is falsy when empty.
+                (Iterable is not enough here!)
+            limit
+
+        Returns:
+            Results in a dict received from the remote homeserver.
+        """
+        logger.debug(
+            "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
+            destination,
+            room_id,
+            event_tuples,
+            str(limit),
+        )
+
+        if not event_tuples:
+            # TODO: raise?
+            return None
+
+        path = f"/_matrix/federation/unstable/org.matrix.i-d.ralston-mimi-linearized-matrix.02/backfill/{room_id}"
 
         args = {"v": event_tuples, "limit": [str(limit)]}
 

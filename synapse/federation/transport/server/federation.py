@@ -35,6 +35,7 @@ from synapse.federation.transport.server._base import (
     Authenticator,
     BaseFederationServlet,
 )
+from synapse.federation.units import Transaction
 from synapse.http.servlet import (
     parse_boolean_from_args,
     parse_integer_from_args,
@@ -67,6 +68,7 @@ class BaseFederationServerServlet(BaseFederationServlet):
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
         self.handler = hs.get_federation_server()
+        self._clock = hs.get_clock()
 
 
 class FederationSendServlet(BaseFederationServerServlet):
@@ -150,7 +152,44 @@ class FederationEventServlet(BaseFederationServerServlet):
         query: Dict[bytes, List[bytes]],
         event_id: str,
     ) -> Tuple[int, Union[JsonDict, str]]:
-        return await self.handler.on_pdu_request(origin, event_id)
+        event = await self.handler.on_pdu_request(origin, event_id)
+
+        if event:
+            # Returns a new Transaction containing the given PDUs suitable for transmission.
+            time_now = self._clock.time_msec()
+            pdus = [event.get_pdu_json(time_now)]
+            return (
+                200,
+                Transaction(
+                    # Just need a dummy transaction ID and destination since it won't be used.
+                    transaction_id="",
+                    origin=self.server_name,
+                    pdus=pdus,
+                    origin_server_ts=int(time_now),
+                    destination="",
+                ).get_dict(),
+            )
+
+        return 404, ""
+
+
+class FederationUnstableEventServlet(BaseFederationServerServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PATH = "/event/(?P<event_id>[^/]*)/?"
+    CATEGORY = "Federation requests"
+
+    # This is when someone asks for a data item for a given server data_id pair.
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        event_id: str,
+    ) -> Tuple[int, Union[JsonDict, str]]:
+        event = await self.handler.on_pdu_request(origin, event_id)
+        if event:
+            return 200, event.get_dict()
+        return 404, ""
 
 
 class FederationStateV1Servlet(BaseFederationServerServlet):
@@ -207,7 +246,50 @@ class FederationBackfillServlet(BaseFederationServerServlet):
         if not limit:
             return 400, {"error": "Did not include limit param"}
 
-        return await self.handler.on_backfill_request(origin, room_id, versions, limit)
+        pdu_list = await self.handler.on_backfill_request(
+            origin, room_id, versions, limit
+        )
+
+        # Returns a new Transaction containing the given PDUs suitable for transmission.
+        time_now = self._clock.time_msec()
+        pdus = [p.get_pdu_json(time_now) for p in pdu_list]
+        return (
+            200,
+            Transaction(
+                # Just need a dummy transaction ID and destination since it won't be used.
+                transaction_id="",
+                origin=self.server_name,
+                pdus=pdus,
+                origin_server_ts=int(time_now),
+                destination="",
+            ).get_dict(),
+        )
+
+
+class FederationUnstableBackfillServlet(BaseFederationServerServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PATH = "/backfill/(?P<room_id>[^/]*)/?"
+    CATEGORY = "Federation requests"
+
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        versions = [x.decode("ascii") for x in query[b"v"]]
+        # TODO(LM) Only a single version is allowed for Linearized Matrix.
+        limit = parse_integer_from_args(query, "limit", None)
+
+        if not limit:
+            return 400, {"error": "Did not include limit param"}
+
+        pdu_list = await self.handler.on_backfill_request(
+            origin, room_id, versions, limit
+        )
+
+        return 200, {"pdus": [p.get_pdu_json() for p in pdu_list]}
 
 
 class FederationTimestampLookupServlet(BaseFederationServerServlet):
@@ -811,4 +893,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
     FederationAccountStatusServlet,
+    # TODO(LM) Linearized Matrix additions.
+    FederationUnstableEventServlet,
+    FederationUnstableBackfillServlet,
 )

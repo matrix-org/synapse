@@ -325,9 +325,21 @@ class FederationClient(FederationBase):
         if not extremities:
             return None
 
-        transaction_data = await self.transport_layer.backfill(
-            dest, room_id, extremities, limit
-        )
+        try:
+            # Note that this only returns pdus now, but this is close enough to a transaction.
+            transaction_data = await self.transport_layer.backfill_unstable(
+                dest, room_id, extremities, limit
+            )
+        except HttpResponseException as e:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
+            # and raise.
+            if not is_unknown_endpoint(e):
+                raise
+
+            transaction_data = await self.transport_layer.backfill(
+                dest, room_id, extremities, limit
+            )
 
         logger.debug("backfill transaction_data=%r", transaction_data)
 
@@ -373,45 +385,58 @@ class FederationClient(FederationBase):
         Raises:
             SynapseError, NotRetryingDestination, FederationDeniedError
         """
-        transaction_data = await self.transport_layer.get_event(
-            destination, event_id, timeout=timeout
-        )
+        try:
+            # Note that this only returns pdus now, but this is close enough to a transaction.
+            pdu_json = await self.transport_layer.get_event_unstable(
+                destination, event_id, timeout=timeout
+            )
+
+            pdu = event_from_pdu_json(pdu_json, room_version)
+
+        except HttpResponseException as e:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
+            # and raise.
+            if not is_unknown_endpoint(e):
+                raise
+
+            transaction_data = await self.transport_layer.get_event(
+                destination, event_id, timeout=timeout
+            )
+
+            pdu_list: List[EventBase] = [
+                event_from_pdu_json(p, room_version) for p in transaction_data["pdus"]
+            ]
+
+            if pdu_list and pdu_list[0]:
+                pdu = pdu_list[0]
+            else:
+                return None
 
         logger.debug(
             "get_pdu_from_destination_raw: retrieved event id %s from %s: %r",
             event_id,
             destination,
-            transaction_data,
+            pdu,
         )
 
-        pdu_list: List[EventBase] = [
-            event_from_pdu_json(p, room_version) for p in transaction_data["pdus"]
-        ]
+        # Check signatures are correct.
+        try:
 
-        if pdu_list and pdu_list[0]:
-            pdu = pdu_list[0]
-
-            # Check signatures are correct.
-            try:
-
-                async def _record_failure_callback(
-                    event: EventBase, cause: str
-                ) -> None:
-                    await self.store.record_event_failed_pull_attempt(
-                        event.room_id, event.event_id, cause
-                    )
-
-                signed_pdu = await self._check_sigs_and_hash(
-                    room_version, pdu, _record_failure_callback
+            async def _record_failure_callback(event: EventBase, cause: str) -> None:
+                await self.store.record_event_failed_pull_attempt(
+                    event.room_id, event.event_id, cause
                 )
-            except InvalidEventSignatureError as e:
-                errmsg = f"event id {pdu.event_id}: {e}"
-                logger.warning("%s", errmsg)
-                raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
-            return signed_pdu
+            signed_pdu = await self._check_sigs_and_hash(
+                room_version, pdu, _record_failure_callback
+            )
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {pdu.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
-        return None
+        return signed_pdu
 
     @trace
     @tag_args
