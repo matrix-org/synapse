@@ -396,6 +396,9 @@ class _ProxyEndpoints:
         assert endpoints
         self._endpoints = endpoints
 
+    def __repr__(self) -> str:
+        return f"<_ProxyEndpoints endpoints={self._endpoints}>"
+
     def connect(
         self, protocol_factory: IProtocolFactory
     ) -> "defer.Deferred[IProtocol]":
