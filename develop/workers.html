@@ -299,10 +299,10 @@ recommend the use of <code>systemd</code> where available: for information on se
 <h2 id="start-synapse-with-poetry"><a class="header" href="#start-synapse-with-poetry">Start Synapse with Poetry</a></h2>
 <p>The following applies to Synapse installations that have been installed from source using <code>poetry</code>.</p>
 <p>You can start the main Synapse process with Poetry by running the following command:</p>
-<pre><code class="language-console">poetry run synapse_homeserver -c [your homeserver.yaml]
+<pre><code class="language-console">poetry run synapse_homeserver --config-file [your homeserver.yaml]
 </code></pre>
 <p>For worker setups, you can run the following command</p>
-<pre><code class="language-console">poetry run synapse_worker -c [your worker.yaml]
+<pre><code class="language-console">poetry run synapse_worker --config-file [your homeserver.yaml] --config-file [your worker.yaml]
 </code></pre>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
