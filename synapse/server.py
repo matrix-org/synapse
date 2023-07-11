@@ -141,6 +141,7 @@ from synapse.util.distributor import Distributor
 from synapse.util.macaroons import MacaroonGenerator
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
+from synapse.util.task_scheduler import TaskScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -359,6 +360,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
             getattr(self, "get_" + i + "_handler")()
+        self.get_task_scheduler()
 
     def get_reactor(self) -> ISynapseReactor:
         """
@@ -912,3 +914,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_common_usage_metrics_manager(self) -> CommonUsageMetricsManager:
         """Usage metrics shared between phone home stats and the prometheus exporter."""
         return CommonUsageMetricsManager(self)
+
+    @cache_in_self
+    def get_task_scheduler(self) -> TaskScheduler:
+        return TaskScheduler(self)
