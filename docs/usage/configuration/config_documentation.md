@@ -3963,11 +3963,11 @@ federation_sender_instances:
 When using workers this should be a map from [`worker_name`](#worker_name) to the HTTP
 replication listener of the worker, if configured, and to the main process. Each worker
 declared under [`stream_writers`](../../workers.md#stream-writers) and
-[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP replication listener, and that
-listener should be included in the `instance_map`. The main process also needs an entry
-on the `instance_map`, and it should be listed under `main` **if even one other worker
-exists**. Ensure the port matches with what is declared inside the `listener` block for
-a `replication` listener.
+[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP
+replication listener, and that listener should be included in the `instance_map`. The
+main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is
+declared inside the `listener` block for a `replication` listener.
 
 
 Example configuration:
