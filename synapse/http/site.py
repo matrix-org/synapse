@@ -487,7 +487,9 @@ class SynapseRequest(Request):
             self._opentracing_span.finish()
 
         try:
-            self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
+            self.request_metrics.stop(
+                self.finish_time, self.code, self.sentLength, self._opentracing_span
+            )
         except Exception as e:
             logger.warning("Failed to stop metrics: %r", e)
 

@@ -672,8 +672,12 @@ def active_span() -> Optional["opentracing.Span"]:
     return opentracing.tracer.active_span
 
 
-def get_prometheus_exemplar() -> Optional[Dict[str, str]]:
-    span = active_span()
+def get_prometheus_exemplar(
+    span: Optional["opentracing.Span"] = None,
+) -> Optional[Dict[str, str]]:
+    if not span:
+        span = active_span()
+
     if not span:
         return None
 
