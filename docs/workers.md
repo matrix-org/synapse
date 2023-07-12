@@ -95,9 +95,12 @@ for the main process
 * Secondly, you need to enable
 [redis-based replication](usage/configuration/config_documentation.md#redis)
 * You will need to add an [`instance_map`](usage/configuration/config_documentation.md#instance_map) 
-with the `main` process defined, as well as the relevant connection information from 
-it's HTTP `replication` listener (defined in step 1 above). Note that the `host` defined 
-is the address the worker needs to look for the `main` process at, not necessarily the same address that is bound to.
+with the `main` process defined, as well as the relevant connection information from
+it's HTTP `replication` listener (defined in step 1 above).
+  * Note that the `host` defined is the address the worker needs to look for the `main`
+  process at, not necessarily the same address that is bound to.
+  * If you are using Unix sockets for the `replication` resource, make sure to
+  use a `path` to the socket file instead of a `port`.
 * Optionally, a [shared secret](usage/configuration/config_documentation.md#worker_replication_secret)
 can be used to authenticate HTTP traffic between workers. For example:
 
@@ -174,11 +177,11 @@ The following applies to Synapse installations that have been installed from sou
 
 You can start the main Synapse process with Poetry by running the following command:
 ```console
-poetry run synapse_homeserver -c [your homeserver.yaml]
+poetry run synapse_homeserver --config-file [your homeserver.yaml]
 ```
 For worker setups, you can run the following command
 ```console
-poetry run synapse_worker -c [your worker.yaml]
+poetry run synapse_worker --config-file [your homeserver.yaml] --config-file [your worker.yaml]
 ```
 ## Available worker applications
 

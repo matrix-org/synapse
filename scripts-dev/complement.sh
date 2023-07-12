@@ -253,6 +253,10 @@ if [[ -n "$ASYNCIO_REACTOR" ]]; then
   export PASS_SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=true
 fi
 
+if [[ -n "$UNIX_SOCKETS" ]]; then
+  # Enable full on Unix socket mode for Synapse, Redis and Postgresql
+  export PASS_SYNAPSE_USE_UNIX_SOCKET=1
+fi
 
 if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
   # Set the log level to what is desired

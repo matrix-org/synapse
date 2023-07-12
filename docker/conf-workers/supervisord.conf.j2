@@ -19,7 +19,11 @@ username=www-data
 autorestart=true
 
 [program:redis]
+{% if using_unix_sockets %}
+command=/usr/local/bin/prefix-log /usr/local/bin/redis-server --unixsocket /tmp/redis.sock
+{% else %}
 command=/usr/local/bin/prefix-log /usr/local/bin/redis-server
+{% endif %}
 priority=1
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0

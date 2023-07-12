@@ -1,0 +1,1 @@
+Mark `get_user_in_directory` private since it is only used in tests. Also remove the cache from it.
