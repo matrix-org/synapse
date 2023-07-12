@@ -61,7 +61,7 @@ from synapse.federation.federation_base import (
     event_from_pdu_json,
 )
 from synapse.federation.persistence import TransactionActions
-from synapse.federation.units import Edu, Transaction
+from synapse.federation.units import Transaction
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -531,16 +531,49 @@ class FederationServer(FederationBase):
     async def _handle_edus_in_txn(self, origin: str, transaction: Transaction) -> None:
         """Process the EDUs in a received transaction."""
 
+
         async def _process_edu(edu_dict: JsonDict) -> None:
             received_edus_counter.inc()
 
-            edu = Edu(
-                origin=origin,
-                destination=self.server_name,
-                edu_type=edu_dict["edu_type"],
-                content=edu_dict["content"],
-            )
-            await self.registry.on_edu(edu.edu_type, origin, edu.content)
+            # TODO(LM) Handle this more natively instead of munging to the current form.
+            if "type" in edu_dict:
+                edu_type = edu_dict["type"]
+                content = edu_dict["content"]
+                sender = edu_dict["sender"]
+
+                if edu_type == EduTypes.DEVICE_LIST_UPDATE:
+                    for device_info in content.get("changed", []):
+                        device_info["stream_id"] = 0  # XXX Will this work?
+                        await self.registry.on_edu(edu_type, origin, device_info)
+
+                    for device_id in content.get("removed", []):
+                        new_content = {
+                            "device_id": device_id,
+                            "deleted": True,
+                            "stream_id": 0,  # XXX Will this work?
+                            "user_id": sender,
+                        }
+                        await self.registry.on_edu(edu_type, origin, new_content)
+                elif edu_type == EduTypes.DIRECT_TO_DEVICE:
+                    new_content = {
+                        "message_id": 0,  # XXX Will this work?
+                        "messages": {
+                            content["target"]: {
+                                content["target_device"]: content["message"]
+                            }
+                        },
+                        "sender": sender,
+                        "type": content["message_type"],
+                    }
+                    await self.registry.on_edu(edu_type, origin, new_content)
+                else:
+                    raise ValueError()
+
+            else:
+                edu_type = edu_dict["edu_type"]
+                content = edu_dict["content"]
+
+                await self.registry.on_edu(edu_type, origin, content)
 
         await concurrently_execute(
             _process_edu,
