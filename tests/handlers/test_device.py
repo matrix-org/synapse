@@ -24,9 +24,11 @@ from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN, DeviceHandler
+from synapse.rest import admin
+from synapse.rest.client import devices, login, register
 from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
-from synapse.types import create_requester, JsonDict
+from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -401,11 +403,19 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
 
 class DehydrationTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        register.register_servlets,
+        devices.register_servlets,
+    ]
+
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
         handler = hs.get_device_handler()
         assert isinstance(handler, DeviceHandler)
         self.handler = handler
+        self.message_handler = hs.get_device_message_handler()
         self.registration = hs.get_registration_handler()
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
@@ -501,10 +511,11 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        retrieved_device_id, device_data = self.get_success(
+        device_info = self.get_success(
             self.handler.get_dehydrated_device(user_id=user_id)
         )
-
+        assert device_info is not None
+        retrieved_device_id, device_data = device_info
         self.assertEqual(retrieved_device_id, stored_dehydrated_device_id)
         self.assertEqual(device_data, {"device_data": {"foo": "bar"}})
 
@@ -566,21 +577,20 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertTrue(len(res["next_batch"]) > 1)
         self.assertEqual(len(res["events"]), 0)
 
-        # Fetching messages without since should return nothing, since the messages got deleted
-        res = self.get_success(
+        # Fetching messages again should fail, since the messages and dehydrated device
+        # were deleted
+        self.get_failure(
             self.message_handler.get_events_for_dehydrated_device(
                 requester=requester,
                 device_id=stored_dehydrated_device_id,
                 since_token=None,
                 limit=10,
-            )
+            ),
+            SynapseError,
         )
-        self.assertTrue(len(res["next_batch"]) > 1)
-        self.assertEqual(len(res["events"]), 0)
 
-        # We don't delete the device when fetch messages for now.
-        # # make sure that the device ID that we were initially assigned no longer exists
-        #  self.get_failure(
-        #     self.handler.get_device(user_id, device_id),
-        #     NotFoundError,
-        #  )
+        # make sure that the dehydrated device ID is deleted after fetching messages
+        res2 = self.get_success(
+            self.handler.get_dehydrated_device(requester.user.to_string()),
+        )
+        self.assertEqual(res2, None)
