@@ -413,6 +413,11 @@ class WorkerConfig(Config):
             outbound_federation_restricted_to
         )
         if outbound_federation_restricted_to:
+            if not self.worker_replication_secret:
+                raise ConfigError(
+                    "`worker_replication_secret` must be configured when using `outbound_federation_restricted_to`."
+                )
+
             for instance in outbound_federation_restricted_to:
                 if instance not in self.instance_map:
                     raise ConfigError(

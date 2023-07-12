@@ -29,7 +29,7 @@ from twisted.web.iweb import IResponse
 from twisted.web.resource import IResource
 from twisted.web.server import Request, Site
 
-from synapse.api.errors import Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.server import _AsyncResource
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -113,16 +113,20 @@ class ProxyResource(_AsyncResource):
 
     def _check_auth(self, request: Request) -> None:
         # The `matrix-federation://` proxy functionality can only be used with auth.
-        # Protect from people forgetting to set a secret.
+        # Protect homserver admins forgetting to set a secret.
         assert self._proxy_authorization_secret is not None
 
         # Get the authorization header.
         auth_headers = request.requestHeaders.getRawHeaders(b"Proxy-Authorization")
 
         if not auth_headers:
-            raise RuntimeError("Missing Proxy-Authorization header.")
+            raise SynapseError(
+                401, "Missing Proxy-Authorization header.", Codes.UNAUTHORIZED
+            )
         if len(auth_headers) > 1:
-            raise RuntimeError("Too many Proxy-Authorization headers.")
+            raise SynapseError(
+                400, "Too many Proxy-Authorization headers.", Codes.UNAUTHORIZED
+            )
         parts = auth_headers[0].split(b" ")
         if parts[0] == b"Bearer" and len(parts) == 2:
             received_secret = parts[1].decode("ascii")
