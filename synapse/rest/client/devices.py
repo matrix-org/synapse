@@ -399,12 +399,12 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ):
         DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
-    if hs.config.experimental.msc2697_enabled:
-        DehydratedDeviceServlet(hs, msc2697=True).register(http_server)
-        ClaimDehydratedDeviceServlet(hs).register(http_server)
-    if hs.config.experimental.msc3814_enabled:
-        DehydratedDeviceServlet(hs, msc2697=False).register(http_server)
-        DehydratedDeviceEventsServlet(hs).register(http_server)
 
     if hs.config.worker.worker_app is None:
         DeviceRestServlet(hs).register(http_server)
+        if hs.config.experimental.msc2697_enabled:
+            DehydratedDeviceServlet(hs, msc2697=True).register(http_server)
+            ClaimDehydratedDeviceServlet(hs).register(http_server)
+        if hs.config.experimental.msc3814_enabled:
+            DehydratedDeviceServlet(hs, msc2697=False).register(http_server)
+            DehydratedDeviceEventsServlet(hs).register(http_server)
