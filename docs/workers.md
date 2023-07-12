@@ -533,7 +533,8 @@ the stream writer for the `presence` stream:
 
 #### Restrict outbound federation traffic to a specific set of workers
 
-The [`outbound_federation_restricted_to`](#outbound_federation_restricted_to)
+The
+[`outbound_federation_restricted_to`](usage/configuration/config_documentation.md#outbound_federation_restricted_to)
 configuration is useful to make sure outbound federation traffic only goes through a
 specified subset of workers. This allows you to set more strict access controls (like a
 firewall) for all workers and only allow the `federation_sender`'s to contact the
