@@ -4010,6 +4010,8 @@ stream_writers:
 When using workers, you can restrict outbound federation traffic to only go through a
 specific subset of workers. Any worker specified here must also be in the
 [`instance_map`](#instance_map).
+[`worker_replication_secret`](#worker_replication_secret) must also be configured to
+authorize inter-worker communication.
 
 ```yaml
 outbound_federation_restricted_to:
