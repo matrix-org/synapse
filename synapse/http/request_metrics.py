@@ -21,6 +21,7 @@ from typing import Dict, Mapping, Set, Tuple
 from prometheus_client.core import Counter, Histogram
 
 from synapse.logging.context import current_context
+from synapse.logging.opentracing import get_prometheus_exemplar
 from synapse.metrics import LaterGauge
 
 logger = logging.getLogger(__name__)
@@ -193,7 +194,7 @@ class RequestMetrics:
         response_count.labels(self.method, self.name, tag).inc()
 
         response_timer.labels(self.method, self.name, tag, response_code_str).observe(
-            time_sec - self.start_ts
+            time_sec - self.start_ts, exemplar=get_prometheus_exemplar()
         )
 
         resource_usage = context.get_resource_usage()

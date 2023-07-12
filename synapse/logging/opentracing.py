@@ -672,6 +672,16 @@ def active_span() -> Optional["opentracing.Span"]:
     return opentracing.tracer.active_span
 
 
+def get_prometheus_exemplar() -> Optional[Dict[str, str]]:
+    span = active_span()
+    if not span:
+        return None
+
+    trace_id = getattr(span, "trace_id", None)
+
+    return trace_id
+
+
 @ensure_active_span("set a tag")
 def set_tag(key: str, value: Union[str, bool, int, float]) -> None:
     """Sets a tag on the active span"""
