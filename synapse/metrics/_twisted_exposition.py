@@ -19,7 +19,7 @@ from prometheus_client.openmetrics.exposition import generate_latest
 from twisted.web.resource import Resource
 from twisted.web.server import Request
 
-CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
+CONTENT_TYPE_LATEST = "application/openmetrics-text; version=1.0.0; charset=utf-8"
 
 
 class MetricsResource(Resource):
