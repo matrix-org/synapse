@@ -65,7 +65,7 @@ async def get_context_for_event(
         if event_display_name and ev.state_key == ev.sender:
             ctx["sender_display_name"] = event_display_name
 
-        room_state = None
+        room_state = []
         if ev.content.get("membership") == Membership.INVITE:
             room_state = ev.unsigned.get("invite_room_state", [])
         elif ev.content.get("membership") == Membership.KNOCK:
