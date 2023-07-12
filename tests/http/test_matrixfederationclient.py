@@ -932,6 +932,5 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         mock_agent_on_federation_sender.request.assert_not_called()
 
         failure_res = self.failureResultOf(test_request_from_main_process_d)
-        self.assertIsInstance(failure_res.value, RequestSendFailed)
-        self.assertIsInstance(failure_res.value.inner_exception, HttpResponseException)
-        self.assertEqual(failure_res.value.inner_exception.code, 502)
+        self.assertIsInstance(failure_res.value, HttpResponseException)
+        self.assertEqual(failure_res.value.code, 401)

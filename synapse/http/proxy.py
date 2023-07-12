@@ -29,7 +29,7 @@ from twisted.web.iweb import IResponse
 from twisted.web.resource import IResource
 from twisted.web.server import Request, Site
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, InvalidProxyCredentialsError
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.server import _AsyncResource
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -105,27 +105,23 @@ class ProxyResource(_AsyncResource):
         self.reactor = reactor
         self.agent = hs.get_federation_http_client().agent
 
-        self._proxy_authorization_secret = None
-        if hs.config.worker.worker_replication_secret:
-            self._proxy_authorization_secret = (
-                hs.config.worker.worker_replication_secret
-            )
+        self._proxy_authorization_secret = hs.config.worker.worker_replication_secret
 
     def _check_auth(self, request: Request) -> None:
         # The `matrix-federation://` proxy functionality can only be used with auth.
-        # Protect homserver admins forgetting to set a secret.
+        # Protect homserver admins forgetting to configure a secret.
         assert self._proxy_authorization_secret is not None
 
         # Get the authorization header.
         auth_headers = request.requestHeaders.getRawHeaders(b"Proxy-Authorization")
 
         if not auth_headers:
-            raise SynapseError(
-                401, "Missing Proxy-Authorization header.", Codes.UNAUTHORIZED
+            raise InvalidProxyCredentialsError(
+                "Missing Proxy-Authorization header.", Codes.MISSING_TOKEN
             )
         if len(auth_headers) > 1:
-            raise SynapseError(
-                400, "Too many Proxy-Authorization headers.", Codes.UNAUTHORIZED
+            raise InvalidProxyCredentialsError(
+                "Too many Proxy-Authorization headers.", Codes.UNAUTHORIZED
             )
         parts = auth_headers[0].split(b" ")
         if parts[0] == b"Bearer" and len(parts) == 2:
@@ -134,7 +130,9 @@ class ProxyResource(_AsyncResource):
                 # Success!
                 return
 
-        raise RuntimeError("Invalid Proxy-Authorization header.")
+        raise InvalidProxyCredentialsError(
+            "Invalid Proxy-Authorization header.", Codes.UNAUTHORIZED
+        )
 
     async def _async_render(self, request: "SynapseRequest") -> Tuple[int, Any]:
         uri = urllib.parse.urlparse(request.uri)
@@ -206,23 +204,24 @@ class ProxyResource(_AsyncResource):
         f: failure.Failure,
         request: "SynapseRequest",
     ) -> None:
-        request.setResponseCode(502)
+        if isinstance(f.value, InvalidProxyCredentialsError):
+            error_response_code = f.value.code
+            error_response_json = {"errcode": f.value.errcode, "err": f.value.msg}
+        else:
+            error_response_code = 502
+            error_response_json = {
+                "errcode": Codes.UNKNOWN,
+                "err": "ProxyResource: Error when proxying request: %s %s -> %s"
+                % (
+                    request.method.decode("ascii"),
+                    request.uri.decode("ascii"),
+                    f,
+                ),
+            }
+
+        request.setResponseCode(error_response_code)
         request.setHeader(b"Content-Type", b"application/json")
-        request.write(
-            (
-                json.dumps(
-                    {
-                        "errcode": Codes.UNKNOWN,
-                        "err": "ProxyResource: Error when proxying request: %s %s -> %s"
-                        % (
-                            request.method.decode("ascii"),
-                            request.uri.decode("ascii"),
-                            f,
-                        ),
-                    }
-                )
-            ).encode()
-        )
+        request.write((json.dumps(error_response_json)).encode())
         request.finish()
 
 

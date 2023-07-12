@@ -217,6 +217,13 @@ class InvalidAPICallError(SynapseError):
         super().__init__(HTTPStatus.BAD_REQUEST, msg, Codes.BAD_JSON)
 
 
+class InvalidProxyCredentialsError(SynapseError):
+    """Error raised when the proxy credentials are invalid."""
+
+    def __init__(self, msg: str, errcode: str = Codes.UNKNOWN):
+        super().__init__(401, msg, errcode)
+
+
 class ProxiedRequestError(SynapseError):
     """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
 
