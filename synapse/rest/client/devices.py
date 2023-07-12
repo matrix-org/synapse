@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 from pydantic import Extra, StrictStr
 
 from synapse.api import errors
-
 from synapse.api.errors import NotFoundError, UnrecognizedRequestError
 from synapse.handlers.device import DeviceHandler
 from synapse.http.server import HttpServer
@@ -27,7 +26,6 @@ from synapse.http.servlet import (
     RestServlet,
     parse_and_validate_json_object_from_request,
     parse_integer,
-    parse_string,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
@@ -370,19 +368,24 @@ class DehydratedDeviceEventsServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
 
+    class PostBody(RequestBodyModel):
+        next_batch: Optional[StrictStr]
+
     @cancellable
-    async def on_GET(
+    async def on_POST(
         self, request: SynapseRequest, device_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        from_tok = parse_string(request, "from")
+        next_batch = parse_and_validate_json_object_from_request(
+            request, self.PostBody
+        ).next_batch
         limit = parse_integer(request, "limit", 100)
 
         msgs = await self.message_handler.get_events_for_dehydrated_device(
             requester=requester,
             device_id=device_id,
-            since_token=from_tok,
+            since_token=next_batch,
             limit=limit,
         )
 

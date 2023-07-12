@@ -16,7 +16,6 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-
 from synapse.api.constants import EduTypes, EventContentFields, ToDeviceEventTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
@@ -316,20 +315,28 @@ class DeviceMessageHandler:
         since_token: Optional[str],
         limit: int,
     ) -> JsonDict:
-        """Fetches up to `limit` events sent to `device_id` starting from `since_token` and returns the new since token."""
+        """Fetches up to `limit` events sent to `device_id` starting from `since_token`
+        and returns the new since token. If there are no more messages, returns an empty
+        array and deletes the dehydrated device associated with the user/device_id.
+
+        Args:
+            requester: the user requesting the messages
+            device_id: ID of the dehydrated device
+            since_token: stream id to start from when fetching messages
+            limit: the number of messages to fetch
+        """
 
         user_id = requester.user.to_string()
 
-        # TODO(Nico): Figure out who should be allowed to use that endpoint.
-        # For now we just allow it for yourself and for the dehydrated device.
-        if device_id != requester.device_id:
-            dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
-            if dehydrated_device is not None and device_id != dehydrated_device[0]:
-                raise SynapseError(
-                    HTTPStatus.FORBIDDEN,
-                    "Can only fetch messages for own device or dehydrated devices",
-                    Codes.FORBIDDEN,
-                )
+        # only allow fetching messages for the dehydrated device id currently associated
+        # with the user
+        dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
+        if dehydrated_device is None or device_id != dehydrated_device[0]:
+            raise SynapseError(
+                HTTPStatus.FORBIDDEN,
+                "You may only fetch messages for your dehydrated device",
+                Codes.FORBIDDEN,
+            )
 
         since_stream_id = 0
         if since_token:
@@ -369,7 +376,7 @@ class DeviceMessageHandler:
             # `/sync`
             message_id = message.pop("message_id", None)
             if message_id:
-                set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+                set_tag(SynapseTags.TO_DEVICE_EDU_ID, message_id)
 
         logger.debug(
             "Returning %d to-device messages between %d and %d (current token: %d) for dehydrated device %s",
@@ -379,6 +386,12 @@ class DeviceMessageHandler:
             to_token,
             device_id,
         )
+
+        if messages == []:
+            # we've fetched all the messages, delete the dehydrated device
+            await self.store.remove_dehydrated_device(
+                requester.user.to_string(), device_id
+            )
 
         return {
             "events": messages,
