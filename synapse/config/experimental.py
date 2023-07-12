@@ -247,18 +247,16 @@ class ExperimentalConfig(Config):
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
 
-        # MSC2716 (importing historical messages)
-        self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
-
-        # MSC2285 (unstable private read receipts)
-        self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
-
         # MSC2697 (device dehydration)
         # Enabled by default since this option was added after adding the feature.
+        # It is not recommended that both MSC2697 and MSC3814 both be enabled at
+        # once.
         self.msc2697_enabled: bool = experimental.get("msc2697_enabled", True)
 
         # MSC3814 (dehydrated devices with SSSS)
         # This is an alternative method to achieve the same goals as MSC2697.
+        # It is not recommended that both MSC2697 and MSC3814 both be enabled at
+        # once.
         self.msc3814_enabled: bool = experimental.get("msc3814_enabled", False)
 
         # MSC3244 (room version capabilities)
