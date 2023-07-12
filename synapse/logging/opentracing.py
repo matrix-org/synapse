@@ -683,7 +683,7 @@ def get_prometheus_exemplar(
 
     trace_id = getattr(span, "trace_id", None)
 
-    return trace_id
+    return {"trace_id": trace_id}
 
 
 @ensure_active_span("set a tag")
