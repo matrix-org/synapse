@@ -51,8 +51,8 @@ class WorkerLocksHandler:
         self._reactor = hs.get_reactor()
         self._store = hs.get_datastores().main
         self._clock = hs.get_clock()
-        self._replication_handler = hs.get_replication_command_handler()
         self._notifier = hs.get_notifier()
+        self._instance_name = hs.get_instance_name()
 
         # Map from lock name/key to set of `WaitingLock` that are active for
         # that lock.
@@ -143,10 +143,11 @@ class WorkerLocksHandler:
         Pokes both the notifier and replication.
         """
 
-        self._replication_handler.send_lock_released(lock_name, lock_key)
-        self._notifier.notify_lock_released(lock_name, lock_key)
+        self._notifier.notify_lock_released(self._instance_name, lock_name, lock_key)
 
-    def _on_lock_released(self, lock_name: str, lock_key: str) -> None:
+    def _on_lock_released(
+        self, instance_name: str, lock_name: str, lock_key: str
+    ) -> None:
         """Called when a lock has been released.
 
         Wakes up any locks that might be waiting on this.

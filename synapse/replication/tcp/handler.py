@@ -249,6 +249,8 @@ class ReplicationCommandHandler:
         if self._is_master or self._should_insert_client_ips:
             self.subscribe_to_channel("USER_IP")
 
+        self._notifier.add_lock_released_callback(self.on_lock_released)
+
     def subscribe_to_channel(self, channel_name: str) -> None:
         """
         Indicates that we wish to subscribe to a Redis channel by name.
@@ -653,7 +655,12 @@ class ReplicationCommandHandler:
         self, conn: IReplicationConnection, cmd: LockReleasedCommand
     ) -> None:
         """Called when we get a new LOCK_RELEASED command."""
-        self._notifier.notify_lock_released(cmd.lock_name, cmd.lock_key)
+        if cmd.instance_name == self._instance_name:
+            return
+
+        self._notifier.notify_lock_released(
+            cmd.instance_name, cmd.lock_name, cmd.lock_key
+        )
 
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""
@@ -761,9 +768,12 @@ class ReplicationCommandHandler:
         """
         self.send_command(RdataCommand(stream_name, self._instance_name, token, data))
 
-    def send_lock_released(self, lock_name: str, lock_key: str) -> None:
+    def on_lock_released(
+        self, instance_name: str, lock_name: str, lock_key: str
+    ) -> None:
         """Called when we released a lock and should notify other instances."""
-        self.send_command(LockReleasedCommand(lock_name, lock_key))
+        if instance_name == self._instance_name:
+            self.send_command(LockReleasedCommand(instance_name, lock_name, lock_key))
 
 
 UpdateToken = TypeVar("UpdateToken")

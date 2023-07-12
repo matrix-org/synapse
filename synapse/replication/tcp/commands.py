@@ -427,27 +427,29 @@ class LockReleasedCommand(Command):
 
     Format::
 
-        LOCK_RELEASED ["<lock_name>", "<lock_key>"]
+        LOCK_RELEASED ["<instance_name>", "<lock_name>", "<lock_key>"]
     """
 
     NAME = "LOCK_RELEASED"
 
     def __init__(
         self,
+        instance_name: str,
         lock_name: str,
         lock_key: str,
     ):
+        self.instance_name = instance_name
         self.lock_name = lock_name
         self.lock_key = lock_key
 
     @classmethod
     def from_line(cls: Type["LockReleasedCommand"], line: str) -> "LockReleasedCommand":
-        lock_name, lock_key = json_decoder.decode(line)
+        instance_name, lock_name, lock_key = json_decoder.decode(line)
 
-        return cls(lock_name, lock_key)
+        return cls(instance_name, lock_name, lock_key)
 
     def to_line(self) -> str:
-        return json_encoder.encode([self.lock_name, self.lock_key])
+        return json_encoder.encode([self.instance_name, self.lock_name, self.lock_key])
 
 
 _COMMANDS: Tuple[Type[Command], ...] = (
