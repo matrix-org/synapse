@@ -302,8 +302,6 @@ class ProxyAgent(_AgentBase):
                 self._federation_proxy_credentials.as_proxy_authorization_value(),
             )
 
-            # Cache *all* connections under the same key, since we are only
-            # connecting to a single destination, the proxy:
             endpoint = self._federation_proxy_endpoint
             request_path = uri
         else:
