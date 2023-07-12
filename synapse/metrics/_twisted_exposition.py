@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from prometheus_client import REGISTRY, CollectorRegistry, generate_latest
+from prometheus_client import REGISTRY, CollectorRegistry
+from prometheus_client.openmetrics.exposition import generate_latest
 
 from twisted.web.resource import Resource
 from twisted.web.server import Request
