@@ -247,7 +247,7 @@ class OptionsResourceTests(unittest.TestCase):
             "1.0",
             max_request_body_size=4096,
             reactor=self.reactor,
-            federation_agent=self.homeserver.get_federation_http_client().agent,
+            hs=self.homeserver,
         )
 
         # render the request and return the channel

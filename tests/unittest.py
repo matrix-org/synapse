@@ -358,7 +358,7 @@ class HomeserverTestCase(TestCase):
             server_version_string="1",
             max_request_body_size=4096,
             reactor=self.reactor,
-            federation_agent=self.hs.get_federation_http_client().agent,
+            hs=self.hs,
         )
 
         from tests.rest.client.utils import RestHelper

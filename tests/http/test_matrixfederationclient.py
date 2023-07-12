@@ -672,7 +672,12 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         }
         return conf
 
-    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            "worker_replication_secret": "secret",
+        }
+    )
     def test_proxy_requests_through_federation_sender_worker(self) -> None:
         """
         Test that all outbound federation requests go through the `federation_sender`
@@ -723,7 +728,12 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         res = self.successResultOf(test_request_from_main_process_d)
         self.assertEqual(res, {"foo": "bar"})
 
-    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            "worker_replication_secret": "secret",
+        }
+    )
     def test_proxy_request_with_network_error_through_federation_sender_worker(
         self,
     ) -> None:
@@ -773,7 +783,12 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         self.assertIsInstance(failure_res.value, RequestSendFailed)
         self.assertIsInstance(failure_res.value.inner_exception, HttpResponseException)
 
-    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            "worker_replication_secret": "secret",
+        }
+    )
     def test_proxy_requests_and_discards_hop_by_hop_headers(self) -> None:
         """
         Test to make sure hop-by-hop headers and addional headers defined in the

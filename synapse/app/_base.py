@@ -407,7 +407,7 @@ def listen_http(
         version_string,
         max_request_body_size=max_request_body_size,
         reactor=reactor,
-        federation_agent=hs.get_federation_http_client().agent,
+        hs=hs,
     )
 
     if isinstance(listener_config, TCPListenerConfig):

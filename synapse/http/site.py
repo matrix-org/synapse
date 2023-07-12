@@ -24,7 +24,6 @@ from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IAddress
 from twisted.python.failure import Failure
 from twisted.web.http import HTTPChannel
-from twisted.web.iweb import IAgent
 from twisted.web.resource import IResource, Resource
 from twisted.web.server import Request
 
@@ -41,6 +40,8 @@ from synapse.types import ISynapseReactor, Requester
 
 if TYPE_CHECKING:
     import opentracing
+
+    from synapse.server import HomeServer
 
 
 logger = logging.getLogger(__name__)
@@ -627,7 +628,7 @@ class SynapseSite(ProxySite):
         server_version_string: str,
         max_request_body_size: int,
         reactor: ISynapseReactor,
-        federation_agent: IAgent,
+        hs: "HomeServer",
     ):
         """
 
@@ -645,7 +646,7 @@ class SynapseSite(ProxySite):
         super().__init__(
             resource=resource,
             reactor=reactor,
-            federation_agent=federation_agent,
+            hs=hs,
         )
 
         self.site_tag = site_tag

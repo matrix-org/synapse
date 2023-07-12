@@ -33,7 +33,7 @@ from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.http import HTTPChannel
 
 from synapse.http.client import BlocklistingReactorWrapper
-from synapse.http.connectproxyclient import ProxyCredentials
+from synapse.http.connectproxyclient import BasicProxyCredentials
 from synapse.http.proxyagent import ProxyAgent, parse_proxy
 
 from tests.http import (
@@ -205,7 +205,7 @@ class ProxyParserTests(TestCase):
         """
         proxy_cred = None
         if expected_credentials:
-            proxy_cred = ProxyCredentials(expected_credentials)
+            proxy_cred = BasicProxyCredentials(expected_credentials)
         self.assertEqual(
             (
                 expected_scheme,

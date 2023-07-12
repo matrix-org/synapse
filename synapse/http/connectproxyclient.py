@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import base64
 import logging
 from typing import Optional, Union
@@ -39,8 +40,14 @@ class ProxyConnectError(ConnectError):
     pass
 
 
-@attr.s(auto_attribs=True)
 class ProxyCredentials:
+    @abc.abstractmethod
+    def as_proxy_authorization_value(self) -> bytes:
+        raise NotImplementedError()
+
+
+@attr.s(auto_attribs=True)
+class BasicProxyCredentials(ProxyCredentials):
     username_password: bytes
 
     def as_proxy_authorization_value(self) -> bytes:
@@ -53,6 +60,17 @@ class ProxyCredentials:
         """
         # Encode as base64 and prepend the authorization type
         return b"Basic " + base64.encodebytes(self.username_password)
+
+
+@attr.s(auto_attribs=True)
+class BearerProxyCredentials(ProxyCredentials):
+    access_token: bytes
+
+    def as_proxy_authorization_value(self) -> bytes:
+        """
+        Return the value for a Proxy-Authorization header (i.e. 'Bearer xxx').
+        """
+        return b"Bearer " + self.access_token
 
 
 @implementer(IStreamClientEndpoint)

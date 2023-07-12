@@ -385,7 +385,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             server_version_string="1",
             max_request_body_size=8192,
             reactor=self.reactor,
-            federation_agent=worker_hs.get_federation_http_client().agent,
+            hs=worker_hs,
         )
 
         worker_hs.get_replication_command_handler().start_replication(worker_hs)

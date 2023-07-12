@@ -71,6 +71,7 @@ from synapse.http.client import (
     encode_query_args,
     read_body_with_max_size,
 )
+from synapse.http.connectproxyclient import BearerProxyCredentials
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.http.proxyagent import ProxyAgent
 from synapse.http.types import QueryParams
@@ -407,14 +408,23 @@ class MatrixFederationHttpClient:
                 hs.config.server.federation_ip_range_blocklist,
             )
         else:
+            proxy_authorization_secret = hs.config.worker.worker_replication_secret
+            assert (
+                proxy_authorization_secret is not None
+            ), "`worker_replication_secret` must be set when using `outbound_federation_restricted_to` (used to authenticate requests across workers)"
+            federation_proxy_credentials = BearerProxyCredentials(
+                proxy_authorization_secret.encode("ascii")
+            )
+
             # We need to talk to federation via the proxy via one of the configured
             # locations
-            federation_proxies = outbound_federation_restricted_to.locations
+            federation_proxy_locations = outbound_federation_restricted_to.locations
             federation_agent = ProxyAgent(
                 self.reactor,
                 self.reactor,
                 tls_client_options_factory,
-                federation_proxies=federation_proxies,
+                federation_proxy_locations=federation_proxy_locations,
+                federation_proxy_credentials=federation_proxy_credentials,
             )
 
         # Use a BlocklistingAgentWrapper to prevent circumventing the IP
