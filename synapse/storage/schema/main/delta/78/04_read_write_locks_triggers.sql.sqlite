@@ -91,7 +91,7 @@ BEGIN
     INSERT INTO worker_read_write_locks_mode (lock_name, lock_key, write_lock, token)
         VALUES (NEW.lock_name, NEW.lock_key, NEW.write_lock, NEW.token)
         ON CONFLICT (lock_name, lock_key)
-        DO NOTHING;
+        DO UPDATE SET write_lock = NEW.write_lock, token = NEW.token;
 END;
 
 -- Ensure that we keep `worker_read_write_locks_mode` up to date whenever a lock
@@ -105,6 +105,7 @@ FOR EACH ROW
 BEGIN
     DELETE FROM worker_read_write_locks_mode
         WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key
+            AND token = OLD.token
         AND NOT EXISTS (
             SELECT 1 FROM worker_read_write_locks
             WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key

@@ -108,7 +108,7 @@ BEGIN
     INSERT INTO worker_read_write_locks_mode (lock_name, lock_key, write_lock, token)
         VALUES (NEW.lock_name, NEW.lock_key, NEW.write_lock, NEW.token)
         ON CONFLICT (lock_name, lock_key)
-        DO NOTHING;
+        DO UPDATE SET write_lock = NEW.write_lock, token = NEW.token;
     RETURN NEW;
 END
 $$
@@ -131,11 +131,12 @@ BEGIN
     SELECT token INTO new_token FROM worker_read_write_locks
         WHERE
             lock_name = OLD.lock_name
-            AND lock_key = OLD.lock_key;
+            AND lock_key = OLD.lock_key
+        LIMIT 1 FOR UPDATE;
 
     IF NOT FOUND THEN
         DELETE FROM worker_read_write_locks_mode
-            WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key;
+            WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key AND token = OLD.token;
     ELSE
         UPDATE worker_read_write_locks_mode
             SET token = new_token
