@@ -360,13 +360,6 @@ class RoomBeeperInboxStateServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        if "marked_unread" in body:
-            marked_unread = {"unread": body["marked_unread"], "ts": ts}
-            await self.handler.add_account_data_to_room(
-                user_id, room_id, "m.marked_unread", marked_unread
-            )
-            logger.info(f"SetBeeperMarkedUnread marked_unread={body['marked_unread']}")
-
         if "done" in body:
             delta_ms = body["done"].get("at_delta") or 0
             done = {"updated_ts": ts, "at_ts": ts + delta_ms}
@@ -374,6 +367,13 @@ class RoomBeeperInboxStateServlet(RestServlet):
                 user_id, room_id, "com.beeper.inbox.done", done
             )
             logger.info(f"SetBeeperDone done_delta_ms={delta_ms}")
+
+        if "marked_unread" in body:
+            marked_unread = {"unread": body["marked_unread"], "ts": ts}
+            await self.handler.add_account_data_to_room(
+                user_id, room_id, "m.marked_unread", marked_unread
+            )
+            logger.info(f"SetBeeperMarkedUnread marked_unread={body['marked_unread']}")
 
         if "read_markers" in body:
             await self.read_marker_client.handle_read_marker(
