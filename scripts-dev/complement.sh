@@ -214,7 +214,7 @@ fi
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc3787,msc3874,msc3890,msc3391,msc3930,faster_joins"
+test_tags="synapse_blacklist,msc3874,msc3890,msc3391,msc3930,faster_joins"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
