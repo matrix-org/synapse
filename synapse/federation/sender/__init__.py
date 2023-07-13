@@ -489,10 +489,19 @@ class FederationSender(AbstractFederationSender):
                     break
 
                 async def handle_event(event: EventBase) -> None:
-                    # Only send events for this server.
+                    # Send events which this server is sending on behalf of another,
+                    # e.g. an event due to send_{join,leave,knock}.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
+                    # Send events which originate from this server.
                     is_mine = self.is_mine_id(event.sender)
-                    if not is_mine and send_on_behalf_of is None:
+                    # Finally, if the server is acting as a linearized matrix hub,
+                    # then send to any participating servers off the hub.
+                    is_hub_server = (
+                        event.room_version.linearized_matrix
+                        and event.hub_server
+                        and self.is_mine_server_name(event.hub_server)
+                    )
+                    if not is_mine and send_on_behalf_of is None and not is_hub_server:
                         logger.debug("Not sending remote-origin event %s", event)
                         return
 
@@ -542,6 +551,7 @@ class FederationSender(AbstractFederationSender):
                         )
                         return
 
+                    # TODO(LM): Is the calculation of all destinations correct?
                     destinations: Optional[Collection[str]] = None
                     if not event.prev_event_ids():
                         # If there are no prev event IDs then the state is empty
@@ -614,10 +624,16 @@ class FederationSender(AbstractFederationSender):
                         )
                     }
 
-                    if send_on_behalf_of is not None:
+                    if (
+                        send_on_behalf_of is not None
+                        and not event.room_version.linearized_matrix
+                    ):
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to
                         # send the event to it.
+                        #
+                        # For linearized matrix, send it back to the origin.
+                        # TODO(LM) Do not send back to DAG servers?
                         sharded_destinations.discard(send_on_behalf_of)
 
                     logger.debug("Sending %s to %r", event, sharded_destinations)

@@ -189,6 +189,10 @@ class Keyring:
             valid_until_ts=2**63,  # fake future timestamp
         )
 
+    async def is_server_linearized(self, server_name: str) -> bool:
+        # TODO(LM) Fetch whether the key response of the origin contains m.linearized.
+        return not self._is_mine_server_name(server_name)
+
     async def verify_json_for_server(
         self,
         server_name: str,
