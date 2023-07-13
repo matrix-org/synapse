@@ -629,6 +629,24 @@ class FrozenLinearizedEvent(FrozenEventV3):
         pdu.pop("prev_events")
         return pdu
 
+    def get_templated_pdu_json(self) -> JsonDict:
+        """
+        Return a JSON object suitable for a templated event, as used in the
+        make_{join,leave,knock} workflow.
+        """
+        # By using _dict directly we don't pull in signatures/unsigned.
+        template_json = dict(self._dict)
+        # The hashes (similar to the signature) need to be recalculated by the
+        # joining/leaving/knocking server after (potentially) modifying the
+        # event.
+        template_json.pop("hashes")
+
+        # Linearized Matrix servers don't know about auth/prev events.
+        template_json.pop("auth_events")
+        template_json.pop("prev_events")
+
+        return template_json
+
 
 def _event_type_from_format_version(
     format_version: int,

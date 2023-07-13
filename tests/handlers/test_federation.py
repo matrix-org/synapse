@@ -27,7 +27,7 @@ from synapse.api.errors import (
     NotFoundError,
     SynapseError,
 )
-from synapse.api.room_versions import RoomVersions
+from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.federation_base import event_from_pdu_json
 from synapse.federation.federation_client import SendJoinResult
@@ -124,7 +124,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         room_version = self.get_success(self.store.get_room_version(room_id))
 
         # pretend that another server has joined
-        join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
+        join_event = self._build_and_send_join_event(
+            OTHER_SERVER, OTHER_USER, room_id, room_version
+        )
 
         # check the state group
         sg = self.get_success(
@@ -177,7 +179,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         room_version = self.get_success(self.store.get_room_version(room_id))
 
         # pretend that another server has joined
-        join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
+        join_event = self._build_and_send_join_event(
+            OTHER_SERVER, OTHER_USER, room_id, room_version
+        )
 
         # check the state group
         sg = self.get_success(
@@ -479,10 +483,16 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         )
 
     def _build_and_send_join_event(
-        self, other_server: str, other_user: str, room_id: str
+        self,
+        other_server: str,
+        other_user: str,
+        room_id: str,
+        room_version: RoomVersion,
     ) -> EventBase:
         join_event = self.get_success(
-            self.handler.on_make_join_request(other_server, room_id, other_user)
+            self.handler.on_make_join_request(
+                other_server, room_id, room_version, other_user
+            )
         )
         # the auth code requires that a signature exists, but doesn't check that
         # signature... go figure.

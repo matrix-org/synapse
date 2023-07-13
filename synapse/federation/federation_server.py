@@ -675,12 +675,14 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        if room_version not in supported_versions:
+        # checking the room version will check that we've actually heard of the room
+        # (and return a 404 otherwise)
+        room_version_id = await self.store.get_room_version_id(room_id)
+        if room_version_id not in supported_versions:
             logger.warning(
-                "Room version %s not in %s", room_version, supported_versions
+                "Room version %s not in %s", room_version_id, supported_versions
             )
-            raise IncompatibleRoomVersionError(room_version=room_version)
+            raise IncompatibleRoomVersionError(room_version=room_version_id)
 
         # Refuse the request if that room has seen too many joins recently.
         # This is in addition to the HS-level rate limiting applied by
@@ -691,8 +693,10 @@ class FederationServer(FederationBase):
             key=room_id,
             update=False,
         )
-        pdu = await self.handler.on_make_join_request(origin, room_id, user_id)
-        return {"event": pdu.get_templated_pdu_json(), "room_version": room_version}
+        pdu = await self.handler.on_make_join_request(
+            origin, room_id, KNOWN_ROOM_VERSIONS[room_version_id], user_id
+        )
+        return {"event": pdu.get_templated_pdu_json(), "room_version": room_version_id}
 
     async def on_invite_request(
         self, origin: str, content: JsonDict, room_version_id: str
@@ -960,7 +964,12 @@ class FederationServer(FederationBase):
                 errcode=Codes.FORBIDDEN,
             )
 
-        event = event_from_pdu_json(content, room_version)
+        # Linearized Matrix requires building the event (i.e. adding auth/prev
+        # events). The input content is an LPDU.
+        if room_version.linearized_matrix:
+            event = await self._on_lpdu_event(content, room_version)
+        else:
+            event = event_from_pdu_json(content, room_version)
 
         if event.type != EventTypes.Member or not event.is_state():
             raise SynapseError(400, "Not an m.room.member event", Codes.BAD_JSON)

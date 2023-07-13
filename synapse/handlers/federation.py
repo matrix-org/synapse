@@ -899,7 +899,7 @@ class FederationHandler:
                 )
 
     async def on_make_join_request(
-        self, origin: str, room_id: str, user_id: str
+        self, origin: str, room_id: str, room_version: RoomVersion, user_id: str
     ) -> EventBase:
         """We've received a /make_join/ request, so we create a partial
         join event for the room and return that. We do *not* persist or
@@ -908,6 +908,7 @@ class FederationHandler:
         Args:
             origin: The (verified) server name of the requesting server.
             room_id: Room to create join event in
+            room_version: The room's room version.
             user_id: The user to create the join for
         """
         if get_domain_from_id(user_id) != origin:
@@ -917,10 +918,6 @@ class FederationHandler:
                 origin,
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
-
-        # checking the room version will check that we've actually heard of the room
-        # (and return a 404 otherwise)
-        room_version = await self.store.get_room_version(room_id)
 
         if await self.store.is_partial_state_room(room_id):
             # If our server is still only partially joined, we can't give a complete
@@ -997,16 +994,15 @@ class FederationHandler:
                         state_ids,
                     )
 
-        builder = self.event_builder_factory.for_room_version(
-            room_version,
-            {
-                "type": EventTypes.Member,
-                "content": event_content,
-                "room_id": room_id,
-                "sender": user_id,
-                "state_key": user_id,
-            },
-        )
+        event_dict = {
+            "type": EventTypes.Member,
+            "content": event_content,
+            "room_id": room_id,
+            "sender": user_id,
+            "state_key": user_id,
+        }
+
+        builder = self.event_builder_factory.for_room_version(room_version, event_dict)
 
         try:
             (
