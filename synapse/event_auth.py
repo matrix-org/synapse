@@ -347,12 +347,6 @@ def check_state_dependent_auth_rules(
             logger.debug("Allowing! %s", event)
             return
 
-    # Hub events must be signed by the current hub.
-    if event.type == EventTypes.Hub:
-        current_hub_server = get_hub_server(auth_dict)
-        if not event.signatures.get(current_hub_server):
-            raise AuthError(403, "Unsigned hub event")
-
     _can_send_event(event, auth_dict)
 
     if event.type == EventTypes.PowerLevels:
@@ -1088,13 +1082,9 @@ def _verify_third_party_invite(
 
 
 def get_hub_server(auth_events: StateMap["EventBase"]) -> str:
-    # The current hub is the sender of the current hub event...
-    hub_event = auth_events.get((EventTypes.Hub, ""), None)
-    if not hub_event:
-        # ...or the room creator if there is no hub event.
-        hub_event = auth_events[(EventTypes.Create, "")]
-
-    return get_domain_from_id(hub_event.sender)
+    # The current hub is the sender of the create event.
+    create_event = auth_events[(EventTypes.Create, "")]
+    return get_domain_from_id(create_event.sender)
 
 
 def get_public_keys(invite_event: "EventBase") -> List[Dict[str, Any]]:
@@ -1149,10 +1139,5 @@ def auth_types_for_event(
                     event.content[EventContentFields.AUTHORISING_USER],
                 )
                 auth_types.add(key)
-
-    # Events sent from a hub server must reference the hub state-event, if one
-    # exists.
-    if event.hub_server:
-        auth_types.add((EventTypes.Hub, ""))
 
     return auth_types
