@@ -249,7 +249,8 @@ class ReplicationCommandHandler:
         if self._is_master or self._should_insert_client_ips:
             self.subscribe_to_channel("USER_IP")
 
-        self._notifier.add_lock_released_callback(self.on_lock_released)
+        if hs.config.redis.redis_enabled:
+            self._notifier.add_lock_released_callback(self.on_lock_released)
 
     def subscribe_to_channel(self, channel_name: str) -> None:
         """

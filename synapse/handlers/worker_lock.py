@@ -42,6 +42,9 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
+DELETE_ROOM_LOCK_NAME = "delete_room_lock"
+
+
 class WorkerLocksHandler:
     """A class for waiting on taking out locks, rather than using the storage
     functions directly (which don't support awaiting).

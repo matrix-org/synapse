@@ -48,6 +48,8 @@ BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD = 3
 
 PURGE_HISTORY_LOCK_NAME = "purge_history_lock"
 
+DELETE_ROOM_LOCK_NAME = "delete_room_lock"
+
 
 @attr.s(slots=True, auto_attribs=True)
 class PurgeStatus:
@@ -418,8 +420,9 @@ class PaginationHandler:
             room_id: room to be purged
             force: set true to skip checking for joined users.
         """
-        async with self._worker_locks.acquire_read_write_lock(
-            PURGE_HISTORY_LOCK_NAME, room_id, write=True
+        async with self._worker_locks.acquire_multi_read_write_lock(
+            [(PURGE_HISTORY_LOCK_NAME, room_id), (DELETE_ROOM_LOCK_NAME, room_id)],
+            write=True,
         ):
             # first check that we have no users in this room
             if not force:
