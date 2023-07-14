@@ -259,6 +259,15 @@ class ExperimentalConfig(Config):
         # once.
         self.msc3814_enabled: bool = experimental.get("msc3814_enabled", False)
 
+        if self.msc2697_enabled and self.msc3814_enabled:
+            raise ConfigError(
+                "MSC2697 and MSC3814 should not both be enabled.",
+                (
+                    "experimental_features",
+                    "msc3814_enabled",
+                ),
+            )
+
         # MSC3244 (room version capabilities)
         self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
 

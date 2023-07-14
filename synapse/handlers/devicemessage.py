@@ -331,7 +331,15 @@ class DeviceMessageHandler:
         # only allow fetching messages for the dehydrated device id currently associated
         # with the user
         dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
-        if dehydrated_device is None or device_id != dehydrated_device[0]:
+        if dehydrated_device is None:
+            raise SynapseError(
+                HTTPStatus.FORBIDDEN,
+                "You may only fetch messages for your dehydrated device",
+                Codes.FORBIDDEN,
+            )
+
+        dehydrated_device_id = dehydrated_device[0]
+        if device_id != dehydrated_device_id:
             raise SynapseError(
                 HTTPStatus.FORBIDDEN,
                 "You may only fetch messages for your dehydrated device",

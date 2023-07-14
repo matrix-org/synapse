@@ -231,7 +231,7 @@ class DehydratedDeviceDataModel(RequestBodyModel):
 class DehydratedDeviceServlet(RestServlet):
     """Retrieve or store a dehydrated device.
 
-    Implements both MSC2697 and MSC3814.
+    Implements either MSC2697 and MSC3814.
 
     GET /org.matrix.msc2697.v2/dehydrated_device
 
