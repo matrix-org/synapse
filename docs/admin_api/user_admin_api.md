@@ -732,7 +732,8 @@ POST /_synapse/admin/v1/users/<user_id>/login
 
 An optional `valid_until_ms` field can be specified in the request body as an
 integer timestamp that specifies when the token should expire. By default tokens
-do not expire.
+do not expire. Note that this API does not allow a user to login as themselves
+(to create more tokens).
 
 A response body like the following is returned:
 
