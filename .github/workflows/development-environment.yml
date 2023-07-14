@@ -17,6 +17,8 @@ jobs:
     # Start the development environment.
     - run: nix develop --impure
 
+    - run: env
+
     # Sanity check we can import/run Synapse.
     - run: python -m synapse.app.homeserver --help
 
