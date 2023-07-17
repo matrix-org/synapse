@@ -1,0 +1,1 @@
+Add dic instance check before accessing auth session.
