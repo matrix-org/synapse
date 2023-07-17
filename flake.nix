@@ -46,20 +46,20 @@
     systems.url = "github:nix-systems/default";
     # A development environment manager built on Nix. See https://devenv.sh.
     devenv.url = "github:cachix/devenv/main";
-    # Rust toolchains and rust-analyzer nightly.
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # Rust toolchain.
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = { self, nixpkgs, devenv, systems, ... } @ inputs:
+  outputs = { self, nixpkgs, devenv, systems, rust-overlay, ... } @ inputs:
     let
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
     in {
       devShells = forEachSystem (system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          overlays = [ (import rust-overlay) ];
+          pkgs = import nixpkgs {
+            inherit system overlays;
+          };
         in {
           # Everything is configured via devenv - a Nix module for creating declarative
           # developer environments. See https://devenv.sh/reference/options/ for a list
@@ -76,6 +76,20 @@
                 # Configure packages to install.
                 # Search for package names at https://search.nixos.org/packages?channel=unstable
                 packages = with pkgs; [
+                  # The rust toolchain and related tools.
+                  # This will install the "default" profile of rust components.
+                  # https://rust-lang.github.io/rustup/concepts/profiles.html
+                  #
+                  # NOTE: We currently need to set the Rust version unnecessarily high
+                  # in order to work around https://github.com/matrix-org/synapse/issues/15939
+                  (rust-bin.stable."1.70.0".default.override {
+                    # Additionally install the "rust-src" extension to allow diving into the
+                    # Rust source code in an IDE (rust-analyzer will also make use of it).
+                    extensions = [ "rust-src" ];
+                  })
+                  # The rust-analyzer language server implementation.
+                  rust-analyzer
+
                   # Native dependencies for running Synapse.
                   icu
                   libffi
@@ -124,12 +138,11 @@
                 # Install dependencies for the additional programming languages
                 # involved with Synapse development.
                 #
-                # * Rust is used for developing and running Synapse.
                 # * Golang is needed to run the Complement test suite.
                 # * Perl is needed to run the SyTest test suite.
+                # * Rust is used for developing and running Synapse.
+                #   It is installed manually with `packages` above.
                 languages.go.enable = true;
-                languages.rust.enable = true;
-                languages.rust.version = "stable";
                 languages.perl.enable = true;
 
                 # Postgres is needed to run Synapse with postgres support and
