@@ -14,14 +14,13 @@
 
 """Contains functions for performing actions on rooms."""
 import itertools
-import json
 import logging
 import math
 import random
 import string
 from collections import OrderedDict
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 import attr
 from typing_extensions import TypedDict
@@ -59,6 +58,7 @@ from synapse.rest.admin._base import assert_user_is_admin
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     MutableStateMap,
     Requester,
     RoomAlias,
@@ -1883,10 +1883,12 @@ class RoomShutdownHandler:
     async def shutdown_room(
         self,
         room_id: str,
-        delete_id: str,
-        shutdown_params: ShutdownRoomParams,
-        shutdown_response: Optional[ShutdownRoomResponse] = None,
-    ) -> ShutdownRoomResponse:
+        params: JsonMapping,
+        result: Optional[JsonMapping] = None,
+        update_result_fct: Optional[
+            Callable[[Optional[JsonMapping]], Awaitable[None]]
+        ] = None,
+    ) -> Optional[JsonMapping]:
         """
         Shuts down a room. Moves all local users and room aliases automatically
         to a new room if `new_room_user_id` is set. Otherwise local users only
@@ -1908,21 +1910,16 @@ class RoomShutdownHandler:
 
         Returns: a dict matching `ShutdownRoomResponse`.
         """
-
-        requester_user_id = shutdown_params["requester_user_id"]
-        new_room_user_id = shutdown_params["new_room_user_id"]
-        block = shutdown_params["block"]
+        requester_user_id = params["requester_user_id"]
+        new_room_user_id = params["new_room_user_id"]
+        block = params["block"]
 
         new_room_name = (
-            shutdown_params["new_room_name"]
-            if shutdown_params["new_room_name"]
+            params["new_room_name"]
+            if params["new_room_name"]
             else self.DEFAULT_ROOM_NAME
         )
-        message = (
-            shutdown_params["message"]
-            if shutdown_params["message"]
-            else self.DEFAULT_MESSAGE
-        )
+        message = params["message"] if params["message"] else self.DEFAULT_MESSAGE
 
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
@@ -1934,21 +1931,15 @@ class RoomShutdownHandler:
                 403, "Shutdown of this room is forbidden", Codes.FORBIDDEN
             )
 
-        if not shutdown_response:
-            shutdown_response = {
+        result = (
+            dict(result)
+            if result
+            else {
                 "kicked_users": [],
                 "failed_to_kick_users": [],
                 "local_aliases": [],
                 "new_room_id": None,
             }
-
-        await self.store.upsert_room_to_delete(
-            room_id,
-            delete_id,
-            DeleteStatus.ACTION_SHUTDOWN,
-            DeleteStatus.STATUS_SHUTTING_DOWN,
-            params=json.dumps(shutdown_params),
-            response=json.dumps(shutdown_response),
         )
 
         # Action the block first (even if the room doesn't exist yet)
@@ -1959,9 +1950,9 @@ class RoomShutdownHandler:
 
         if not await self.store.get_room(room_id):
             # if we don't know about the room, there is nothing left to do.
-            return shutdown_response
+            return result
 
-        new_room_id = shutdown_response.get("new_room_id")
+        new_room_id = result.get("new_room_id")
         if new_room_user_id is not None and new_room_id is None:
             if not self.hs.is_mine_id(new_room_user_id):
                 raise SynapseError(
@@ -1982,15 +1973,9 @@ class RoomShutdownHandler:
                 ratelimit=False,
             )
 
-            shutdown_response["new_room_id"] = new_room_id
-            await self.store.upsert_room_to_delete(
-                room_id,
-                delete_id,
-                DeleteStatus.ACTION_SHUTDOWN,
-                DeleteStatus.STATUS_SHUTTING_DOWN,
-                params=json.dumps(shutdown_params),
-                response=json.dumps(shutdown_response),
-            )
+            result["new_room_id"] = new_room_id
+            if update_result_fct:
+                await update_result_fct(result)
 
             logger.info(
                 "Shutting down room %r, joining to new room: %r", room_id, new_room_id
@@ -2053,28 +2038,16 @@ class RoomShutdownHandler:
                         require_consent=False,
                     )
 
-                shutdown_response["kicked_users"].append(user_id)
-                await self.store.upsert_room_to_delete(
-                    room_id,
-                    delete_id,
-                    DeleteStatus.ACTION_SHUTDOWN,
-                    DeleteStatus.STATUS_SHUTTING_DOWN,
-                    params=json.dumps(shutdown_params),
-                    response=json.dumps(shutdown_response),
-                )
+                result["kicked_users"].append(user_id)
+                if update_result_fct:
+                    await update_result_fct(result)
             except Exception:
                 logger.exception(
                     "Failed to leave old room and join new room for %r", user_id
                 )
-                shutdown_response["failed_to_kick_users"].append(user_id)
-                await self.store.upsert_room_to_delete(
-                    room_id,
-                    delete_id,
-                    DeleteStatus.ACTION_SHUTDOWN,
-                    DeleteStatus.STATUS_SHUTTING_DOWN,
-                    params=json.dumps(shutdown_params),
-                    response=json.dumps(shutdown_response),
-                )
+                result["failed_to_kick_users"].append(user_id)
+                if update_result_fct:
+                    await update_result_fct(result)
 
         # Send message in new room and move aliases
         if new_room_user_id:
@@ -2093,7 +2066,7 @@ class RoomShutdownHandler:
                 ratelimit=False,
             )
 
-            shutdown_response["local_aliases"] = list(
+            result["local_aliases"] = list(
                 await self.store.get_aliases_for_room(room_id)
             )
 
@@ -2102,6 +2075,6 @@ class RoomShutdownHandler:
                 room_id, new_room_id, requester_user_id
             )
         else:
-            shutdown_response["local_aliases"] = []
+            result["local_aliases"] = []
 
-        return shutdown_response
+        return result

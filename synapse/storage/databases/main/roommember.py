@@ -17,7 +17,6 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
-    Any,
     Collection,
     Dict,
     FrozenSet,
@@ -1283,113 +1282,6 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         # `count(*)` returns always an integer
         # If any rows still exist it means someone has not forgotten this room yet
         return not rows[0][0]
-
-    async def upsert_room_to_delete(
-        self,
-        room_id: str,
-        delete_id: str,
-        action: str,
-        status: str,
-        timestamp: Optional[int] = None,
-        params: Optional[str] = None,
-        response: Optional[str] = None,
-        error: Optional[str] = None,
-    ) -> None:
-        """Insert or update a room to shutdown/purge.
-
-        Args:
-            room_id: The room ID to shutdown/purge
-            delete_id: The delete ID identifying this action
-            action: the type of job, mainly `shutdown` `purge` or `purge_history`
-            status: Current status of the delete. Cf `DeleteStatus` for possible values
-            timestamp: Time of the last update. If status is `wait_purge`,
-                then it specifies when to do the purge, with an empty value specifying ASAP
-            error: Error message to return, if any
-            params: JSON representation of delete job parameters
-            response: JSON representation of delete current status
-        """
-        await self.db_pool.simple_upsert(
-            "rooms_to_delete",
-            {
-                "room_id": room_id,
-                "delete_id": delete_id,
-            },
-            {
-                "action": action,
-                "status": status,
-                "timestamp": timestamp,
-                "params": params,
-                "response": response,
-                "error": error,
-            },
-            desc="upsert_room_to_delete",
-        )
-
-    async def delete_room_to_delete(self, room_id: str, delete_id: str) -> None:
-        """Remove a room from the list of rooms to purge.
-
-        Args:
-            room_id: The room ID matching the delete to remove
-            delete_id: The delete ID identifying the delete to remove
-        """
-
-        await self.db_pool.simple_delete(
-            "rooms_to_delete",
-            keyvalues={
-                "room_id": room_id,
-                "delete_id": delete_id,
-            },
-            desc="delete_room_to_delete",
-        )
-
-    async def get_rooms_to_delete(
-        self, room_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """Returns all delete jobs. This includes those that have been
-        interrupted by a stop/restart of synapse, but also scheduled ones
-        like locally forgotten rooms.
-
-        Args:
-            room_id: if specified, will only return the delete jobs for a specific room
-
-        """
-        keyvalues = {}
-        if room_id is not None:
-            keyvalues["room_id"] = room_id
-
-        return await self.db_pool.simple_select_list(
-            table="rooms_to_delete",
-            keyvalues=keyvalues,
-            retcols=(
-                "room_id",
-                "delete_id",
-                "action",
-                "status",
-                "timestamp",
-                "params",
-                "response",
-                "error",
-            ),
-            desc="rooms_to_delete_fetch",
-        )
-
-    async def get_room_to_delete(self, delete_id: str) -> Optional[Dict[str, Any]]:
-        """Return the delete job identified by delete_id."""
-        return await self.db_pool.simple_select_one(
-            table="rooms_to_delete",
-            keyvalues={"delete_id": delete_id},
-            retcols=(
-                "room_id",
-                "delete_id",
-                "action",
-                "status",
-                "timestamp",
-                "params",
-                "response",
-                "error",
-            ),
-            desc="rooms_to_delete_fetch",
-        )
 
     async def get_rooms_user_has_been_in(self, user_id: str) -> Set[str]:
         """Get all rooms that the user has ever been in.

@@ -2088,14 +2088,11 @@ class RoomMessageListTestCase(RoomBase):
         self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
 
         # Purge every event before the second event.
-        purge_id = random_string(16)
         self.get_success(
-            pagination_handler._purge_history(
-                purge_id=purge_id,
+            pagination_handler.purge_history(
                 room_id=self.room_id,
                 token=second_token_str,
                 delete_local_events=True,
-                update_rooms_to_delete_table=True,
             )
         )
 

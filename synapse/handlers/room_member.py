@@ -38,7 +38,6 @@ from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
-from synapse.handlers.room import DeleteStatus
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
@@ -57,7 +56,6 @@ from synapse.types import (
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
-from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -96,6 +94,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.task_scheduler = hs.get_task_scheduler()
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
         self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
@@ -318,12 +317,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             and self._purge_retention_period
             and await self.store.is_locally_forgotten_room(room_id)
         ):
-            delete_id = random_string(16)
-            await self.store.upsert_room_to_delete(
-                room_id,
-                delete_id,
-                DeleteStatus.ACTION_PURGE,
-                DeleteStatus.STATUS_SCHEDULED,
+            await self.task_scheduler.schedule_task(
+                "purge_room",
+                resource_id=room_id,
                 timestamp=self.clock.time_msec() + self._purge_retention_period,
             )
 

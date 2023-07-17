@@ -414,13 +414,12 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(messages[0]["content"]["body"], "test msg one")
         self.assertEqual(messages[0]["sender"], "@notices:test")
 
-        delete_id = random_string(16)
+        random_string(16)
 
         # shut down and purge room
         self.get_success(
             self.room_shutdown_handler.shutdown_room(
                 first_room_id,
-                delete_id,
                 {
                     "requester_user_id": self.admin_user,
                     "new_room_user_id": None,
@@ -432,7 +431,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
                 },
             )
         )
-        self.get_success(self.pagination_handler.purge_room(first_room_id, "delete_id"))
+        self.get_success(self.pagination_handler.purge_room(first_room_id, force=False))
 
         # user is not member anymore
         self._check_invite_and_join_status(self.other_user, 0, 0)

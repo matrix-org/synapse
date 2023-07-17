@@ -24,12 +24,11 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
-from synapse.handlers.pagination import DeleteStatus, PaginationHandler
 from synapse.rest.client import directory, events, login, room
 from synapse.server import HomeServer
 from synapse.types import UserID
 from synapse.util import Clock
-from synapse.util.stringutils import random_string
+from synapse.util.task_scheduler import TaskScheduler
 
 from tests import unittest
 
@@ -50,6 +49,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.task_scheduler = hs.get_task_scheduler()
         hs.config.consent.user_consent_version = "1"
 
         consent_uri_builder = Mock()
@@ -480,6 +480,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.task_scheduler = hs.get_task_scheduler()
         hs.config.consent.user_consent_version = "1"
 
         consent_uri_builder = Mock()
@@ -668,7 +669,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         delete_id1 = channel.json_body["delete_id"]
 
         # go ahead
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+        self.reactor.advance(TaskScheduler.KEEP_TASKS_FOR_MS / 1000 / 2)
 
         # second task
         channel = self.make_request(
@@ -700,7 +701,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         # get status after more than clearing time for first task
         # second task is not cleared
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+        self.reactor.advance(TaskScheduler.KEEP_TASKS_FOR_MS / 1000 / 2)
 
         channel = self.make_request(
             "GET",
@@ -714,7 +715,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(delete_id2, channel.json_body["results"][0]["delete_id"])
 
         # get status after more than clearing time for all tasks
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+        self.reactor.advance(TaskScheduler.KEEP_TASKS_FOR_MS / 1000 / 2)
 
         channel = self.make_request(
             "GET",
@@ -724,48 +725,6 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
-
-    def test_delete_same_room_twice(self) -> None:
-        """Test that the call for delete a room at second time gives an exception."""
-
-        body = {"new_room_user_id": self.admin_user}
-
-        # first call to delete room
-        # and do not wait for finish the task
-        first_channel = self.make_request(
-            "DELETE",
-            self.url.encode("ascii"),
-            content=body,
-            access_token=self.admin_user_tok,
-            await_result=False,
-        )
-
-        # second call to delete room
-        second_channel = self.make_request(
-            "DELETE",
-            self.url.encode("ascii"),
-            content=body,
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(400, second_channel.code, msg=second_channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, second_channel.json_body["errcode"])
-        self.assertEqual(
-            f"Purge already in progress for {self.room_id}",
-            second_channel.json_body["error"],
-        )
-
-        # get result of first call
-        first_channel.await_result()
-        self.assertEqual(200, first_channel.code, msg=first_channel.json_body)
-        self.assertIn("delete_id", first_channel.json_body)
-
-        # check status after finish the task
-        self._test_result(
-            first_channel.json_body["delete_id"],
-            self.other_user,
-            expect_new_room=True,
-        )
 
     def test_purge_room_and_block(self) -> None:
         """Test to purge a room and block it.
@@ -1005,7 +964,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         self._is_purged(room_id)
 
-    def test_resume_purge_room(self) -> None:
+    def test_scheduled_purge_room(self) -> None:
         # Create a test room
         room_id = self.helper.create_room_as(
             self.admin_user,
@@ -1013,12 +972,12 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         )
         self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
 
+        # Schedule a purge 10 seconds in the future
         self.get_success(
-            self.store.upsert_room_to_delete(
-                room_id,
-                random_string(16),
-                DeleteStatus.ACTION_PURGE,
-                DeleteStatus.STATUS_PURGING,
+            self.task_scheduler.schedule_task(
+                "purge_room",
+                resource_id=room_id,
+                timestamp=self.clock.time_msec() + 10 * 1000,
             )
         )
 
@@ -1026,38 +985,34 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         with self.assertRaises(AssertionError):
             self._is_purged(room_id)
 
-        # Advance one hour in the future past `PURGE_ROOMS_INTERVAL_MS` so that
-        # the automatic purging takes place and resumes the purge
+        # Advance one hour in the future past `TaskScheduler.SCHEDULE_INTERVAL_MS` so that
+        # the automatic purging takes place and launch the purge
         self.reactor.advance(ONE_HOUR_IN_S)
 
         self._is_purged(room_id)
 
-    def test_resume_shutdown_room(self) -> None:
+    def test_schedule_shutdown_room(self) -> None:
         # Create a test room
         room_id = self.helper.create_room_as(
             self.other_user,
             tok=self.other_user_tok,
         )
 
-        delete_id = random_string(16)
-
-        self.get_success(
-            self.store.upsert_room_to_delete(
-                room_id,
-                delete_id,
-                DeleteStatus.ACTION_SHUTDOWN,
-                DeleteStatus.STATUS_SHUTTING_DOWN,
-                params=json.dumps(
-                    {
-                        "requester_user_id": self.admin_user,
-                        "new_room_user_id": self.admin_user,
-                        "new_room_name": None,
-                        "message": None,
-                        "block": False,
-                        "purge": True,
-                        "force_purge": True,
-                    }
-                ),
+        # Schedule a shutdown 10 seconds in the future
+        delete_id = self.get_success(
+            self.task_scheduler.schedule_task(
+                "shutdown_and_purge_room",
+                resource_id=room_id,
+                params={
+                    "requester_user_id": self.admin_user,
+                    "new_room_user_id": self.admin_user,
+                    "new_room_name": None,
+                    "message": None,
+                    "block": False,
+                    "purge": True,
+                    "force_purge": True,
+                },
+                timestamp=self.clock.time_msec() + 10 * 1000,
             )
         )
 
@@ -1068,7 +1023,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         with self.assertRaises(AssertionError):
             self._is_purged(room_id)
 
-        # Advance one hour in the future past `PURGE_ROOMS_INTERVAL_MS` so that
+        # Advance one hour in the future past `TaskScheduler.SCHEDULE_INTERVAL_MS` so that
         # the automatic purging takes place and resumes the purge
         self.reactor.advance(ONE_HOUR_IN_S)
 
@@ -2081,14 +2036,11 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
 
         # Purge every event before the second event.
-        purge_id = random_string(16)
         self.get_success(
-            pagination_handler._purge_history(
-                purge_id=purge_id,
+            pagination_handler.purge_history(
                 room_id=self.room_id,
                 token=second_token_str,
                 delete_local_events=True,
-                update_rooms_to_delete_table=True,
             )
         )
 

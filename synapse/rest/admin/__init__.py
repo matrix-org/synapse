@@ -93,7 +93,7 @@ from synapse.rest.admin.users import (
     UserTokenRestServlet,
     WhoisRestServlet,
 )
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, TaskStatus
 from synapse.util import SYNAPSE_VERSION
 
 if TYPE_CHECKING:
@@ -215,12 +215,21 @@ class PurgeHistoryStatusRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        purge_status = await self.pagination_handler.get_delete_status(purge_id)
-        if purge_status is None:
+        purge_task = await self.pagination_handler.get_delete_task(purge_id)
+        if purge_task is None or purge_task.action != "purge_history":
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
+        result = {
+            "status": purge_task.status
+            if purge_task.status == TaskStatus.COMPLETE
+            or purge_task.status == TaskStatus.FAILED
+            else "active",
+        }
+        if purge_task.error:
+            result["error"] = purge_task.error
+
         # TODO active vs purging etc
-        return HTTPStatus.OK, purge_status.asdict(use_purge_history_format=True)
+        return HTTPStatus.OK, result
 
 
 ########################################################################################
