@@ -63,22 +63,6 @@ pub const BASE_PREPEND_OVERRIDE_RULES: &[PushRule] = &[PushRule {
 }];
 
 pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
-    // We don't want to notify on edits. Not only can this be confusing in real
-    // time (2 notifications, one message) but it's especially confusing
-    // if a bridge needs to edit a previously backfilled message.
-    PushRule {
-        rule_id: Cow::Borrowed("global/override/.com.beeper.suppress_edits"),
-        priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventMatch(
-            EventMatchCondition {
-                key: Cow::Borrowed("content.m\\.relates_to.rel_type"),
-                pattern: Cow::Borrowed("m.replace"),
-            },
-        ))]),
-        actions: Cow::Borrowed(&[]),
-        default: true,
-        default_enabled: true,
-    },
     PushRule {
         rule_id: Cow::Borrowed("global/override/.m.rule.suppress_notices"),
         priority_class: 5,
@@ -237,6 +221,21 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
                 pattern: Cow::Borrowed(""),
             })),
         ]),
+        actions: Cow::Borrowed(&[]),
+        default: true,
+        default_enabled: true,
+    },
+    // We don't want to notify on edits *unless* the edit directly mentions a
+    // user, which is handled above.
+    PushRule {
+        rule_id: Cow::Borrowed("global/override/.org.matrix.msc3958.suppress_edits"),
+        priority_class: 5,
+        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventPropertyIs(
+            EventPropertyIsCondition {
+                key: Cow::Borrowed("content.m\\.relates_to.rel_type"),
+                value: Cow::Borrowed(&SimpleJsonValue::Str(Cow::Borrowed("m.replace"))),
+            },
+        ))]),
         actions: Cow::Borrowed(&[]),
         default: true,
         default_enabled: true,
