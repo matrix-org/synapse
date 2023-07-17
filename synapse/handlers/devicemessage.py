@@ -324,6 +324,9 @@ class DeviceMessageHandler:
             device_id: ID of the dehydrated device
             since_token: stream id to start from when fetching messages
             limit: the number of messages to fetch
+        Returns:
+            A dict containing the to-device messages, as well as a token that the client
+            can provide in the next call to fetch the next batch of messages
         """
 
         user_id = requester.user.to_string()
@@ -334,11 +337,11 @@ class DeviceMessageHandler:
         if dehydrated_device is None:
             raise SynapseError(
                 HTTPStatus.FORBIDDEN,
-                "You may only fetch messages for your dehydrated device",
+                "No dehydrated device exists",
                 Codes.FORBIDDEN,
             )
 
-        dehydrated_device_id = dehydrated_device[0]
+        dehydrated_device_id, _ = dehydrated_device
         if device_id != dehydrated_device_id:
             raise SynapseError(
                 HTTPStatus.FORBIDDEN,
@@ -380,8 +383,7 @@ class DeviceMessageHandler:
         )
 
         for message in messages:
-            # We pop here as we shouldn't be sending the message ID down
-            # `/sync`
+            # Remove the message id before sending to client
             message_id = message.pop("message_id", None)
             if message_id:
                 set_tag(SynapseTags.TO_DEVICE_EDU_ID, message_id)

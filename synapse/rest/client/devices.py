@@ -32,7 +32,6 @@ from synapse.rest.client._base import client_patterns, interactive_auth_handler
 from synapse.rest.client.models import AuthenticationData
 from synapse.rest.models import RequestBodyModel
 from synapse.types import JsonDict
-from synapse.util.cancellation import cancellable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -371,7 +370,6 @@ class DehydratedDeviceEventsServlet(RestServlet):
     class PostBody(RequestBodyModel):
         next_batch: Optional[StrictStr]
 
-    @cancellable
     async def on_POST(
         self, request: SynapseRequest, device_id: str
     ) -> Tuple[int, JsonDict]:
