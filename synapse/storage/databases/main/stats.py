@@ -697,7 +697,7 @@ class StatsStore(StateDeltasStore):
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
             filters = []
-            args = []
+            args: list = []
 
             if search_term:
                 filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")

@@ -424,8 +424,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 keyvalues={},
             )
             profiles = {
-                row['full_user_id']: _UserDirProfile(
-                    row['full_user_id'],
+                row["full_user_id"]: _UserDirProfile(
+                    row["full_user_id"],
                     row["displayname"],
                     row["avatar_url"],
                 )
