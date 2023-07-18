@@ -1,10 +1,18 @@
-# Synapse 1.88.0rc1 (2023-07-11)
+# Synapse 1.88.0 (2023-07-18)
 
 This release
  - raises the minimum supported version of Python to 3.8, as Python 3.7 is now [end-of-life](https://devguide.python.org/versions/), and
  - removes deprecated config options related to worker deployment.
 
 See [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.88/docs/upgrade.md#upgrading-to-v1880) for more information.
+
+
+### Bugfixes
+
+- Revert "Stop writing to column `user_id` of tables `profiles` and `user_filters`", which was introduced in Synapse 1.88.0rc1. ([\#15953](https://github.com/matrix-org/synapse/issues/15953))
+
+
+# Synapse 1.88.0rc1 (2023-07-11)
 
 ### Features
 
@@ -24,7 +32,7 @@ See [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.88
 ### Deprecations and Removals
 
 - **Remove deprecated `worker_replication_host`, `worker_replication_http_port` and `worker_replication_http_tls` configuration options.** See the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.88/docs/upgrade.md#removal-of-worker_replication_-settings) for more details. ([\#15860](https://github.com/matrix-org/synapse/issues/15860))
-- Remove support for Python 3.7 and hence for Debian Buster. ([\#15851](https://github.com/matrix-org/synapse/issues/15851), [\#15892](https://github.com/matrix-org/synapse/issues/15892), [\#15893](https://github.com/matrix-org/synapse/issues/15893))
+- Remove support for Python 3.7 and hence for Debian Buster. ([\#15851](https://github.com/matrix-org/synapse/issues/15851), [\#15892](https://github.com/matrix-org/synapse/issues/15892), [\#15893](https://github.com/matrix-org/synapse/issues/15893), [\#15917](https://github.com/matrix-org/synapse/pull/15917))
 
 ### Internal Changes
 
