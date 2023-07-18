@@ -3546,13 +3546,14 @@ events may be dropped).</p>
 </code></pre>
 <hr />
 <h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
-<p>When using workers this should be a map from <a href="#worker_name"><code>worker_name</code></a> to the
-HTTP replication listener of the worker, if configured, and to the main process.
-Each worker declared under <a href="../../workers.html#stream-writers"><code>stream_writers</code></a> needs
-a HTTP replication listener, and that listener should be included in the <code>instance_map</code>.
-The main process also needs an entry on the <code>instance_map</code>, and it should be listed under
-<code>main</code> <strong>if even one other worker exists</strong>. Ensure the port matches with what is declared 
-inside the <code>listener</code> block for a <code>replication</code> listener.</p>
+<p>When using workers this should be a map from <a href="#worker_name"><code>worker_name</code></a> to the HTTP
+replication listener of the worker, if configured, and to the main process. Each worker
+declared under <a href="../../workers.html#stream-writers"><code>stream_writers</code></a> and
+<a href="#outbound_federation_restricted_to"><code>outbound_federation_restricted_to</code></a> needs a HTTP
+replication listener, and that listener should be included in the <code>instance_map</code>. The
+main process also needs an entry on the <code>instance_map</code>, and it should be listed under
+<code>main</code> <strong>if even one other worker exists</strong>. Ensure the port matches with what is
+declared inside the <code>listener</code> block for a <code>replication</code> listener.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">instance_map:
   main:
@@ -3582,6 +3583,19 @@ Any worker specified here must also be in the <a href="#instance_map"><code>inst
   typing: worker1
 </code></pre>
 <hr />
+<h3 id="outbound_federation_restricted_to"><a class="header" href="#outbound_federation_restricted_to"><code>outbound_federation_restricted_to</code></a></h3>
+<p>When using workers, you can restrict outbound federation traffic to only go through a
+specific subset of workers. Any worker specified here must also be in the
+<a href="#instance_map"><code>instance_map</code></a>.
+<a href="#worker_replication_secret"><code>worker_replication_secret</code></a> must also be configured to
+authorize inter-worker communication.</p>
+<pre><code class="language-yaml">outbound_federation_restricted_to:
+  - federation_sender1
+  - federation_sender2
+</code></pre>
+<h2>Also see the <a href="../../workers.html#restrict-outbound-federation-traffic-to-a-specific-set-of-workers">worker
+documentation</a>
+for more info.</h2>
 <h3 id="run_background_tasks_on"><a class="header" href="#run_background_tasks_on"><code>run_background_tasks_on</code></a></h3>
 <p>The <a href="../../workers.html#background-tasks">worker</a> that is used to run
 background tasks (e.g. cleaning up expired data). If not provided this
