@@ -89,6 +89,8 @@ class EventBuilder:
 
     # TODO(LM) If Synapse is acting as a hub-server this should be itself.
     hub_server: Optional[str] = None
+    _lpdu_hashes: Optional[str] = None
+    _lpdu_signatures: Optional[str] = None
 
     internal_metadata: _EventInternalMetadata = attr.Factory(
         lambda: _EventInternalMetadata({})
@@ -187,7 +189,7 @@ class EventBuilder:
         if self._origin_server_ts is not None:
             event_dict["origin_server_ts"] = self._origin_server_ts
 
-        return create_local_event_from_event_dict(
+        event = create_local_event_from_event_dict(
             clock=self._clock,
             hostname=self._hostname,
             signing_key=self._signing_key,
@@ -195,6 +197,13 @@ class EventBuilder:
             event_dict=event_dict,
             internal_metadata_dict=self.internal_metadata.get_dict(),
         )
+
+        if self.room_version.linearized_matrix and self._lpdu_hashes:
+            event.hashes["lpdu"] = self._lpdu_hashes
+        if self.room_version.linearized_matrix and self._lpdu_signatures:
+            event.signatures.update(self._lpdu_signatures)
+
+        return event
 
 
 class EventBuilderFactory:
@@ -237,6 +246,8 @@ class EventBuilderFactory:
             redacts=key_values.get("redacts", None),
             origin_server_ts=key_values.get("origin_server_ts", None),
             hub_server=key_values.get("hub_server", None),
+            lpdu_hashes=key_values.get("lpdu_hashes", None),
+            lpdu_signatures=key_values.get("lpdu_signatures", None),
         )
 
 

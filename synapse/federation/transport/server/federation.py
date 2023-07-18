@@ -625,7 +625,7 @@ class FederationUnstableSendJoinServlet(BaseFederationServerServlet):
         return 200, {
             "event": result["event"],
             "state": result["state"],
-            "auth_chain": result["auth_chain}"],
+            "auth_chain": result["auth_chain"],
         }
 
 

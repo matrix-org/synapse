@@ -1060,6 +1060,7 @@ class FederationServer(FederationBase):
                 "origin_server_ts",
                 "content",
                 "hashes",
+                "signatures",
             ),
         )
 
@@ -1069,12 +1070,15 @@ class FederationServer(FederationBase):
                 raise SynapseError(400, f"LPDU contained {field}", Codes.BAD_JSON)
 
         # Hashes must contain (only) "lpdu".
-        if not isinstance(lpdu_json["hashes"], collections.abc.Mapping):
+        hashes = lpdu_json.pop("hashes")
+        if not isinstance(hashes, collections.abc.Mapping):
             raise SynapseError(400, "Invalid hashes", Codes.BAD_JSON)
-        if lpdu_json["hashes"].keys() != {"lpdu"}:
+        if hashes.keys() != {"lpdu"}:
             raise SynapseError(
                 400, "hashes must contain exactly one key: 'lpdu'", Codes.BAD_JSON
             )
+        lpdu_json["lpdu_hashes"] = hashes["lpdu"]
+        lpdu_json["lpdu_signatures"] = lpdu_json.pop("signatures")
 
         # Validate that the JSON conforms to the specification.
         if room_version.strict_canonicaljson:
