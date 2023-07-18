@@ -1375,6 +1375,24 @@ class PresenceHandler(BasePresenceHandler):
                     max_pos
                 )
 
+    async def is_only_one_room_shared(
+        self, current_user_id: str, other_user_id: str
+    ) -> bool:
+        """Check to see if there is more than one shared room between these users"""
+        pair_of_users_to_check = frozenset((current_user_id, other_user_id))
+        # By learning if these two users share any other room, we can tell
+        # if user_id's server needs to receive presence or not
+        rooms_shared = await self.store.get_mutual_rooms_between_users(
+            pair_of_users_to_check
+        )
+
+        # They always share at least one room, the current one. As such this will
+        # never be zero
+        if len(rooms_shared) < 2:
+            return True
+
+        return False
+
     async def _handle_state_delta(self, room_id: str, deltas: List[JsonDict]) -> None:
         """Process current state deltas for the room to find new joins that need
         to be handled.
@@ -1438,24 +1456,6 @@ class PresenceHandler(BasePresenceHandler):
         users = await self.store.get_users_in_room(room_id)
         prev_users = set(users) - newly_joined_users
 
-        async def is_only_one_room_shared(
-            current_user_id: str, other_user_id: str
-        ) -> bool:
-            """Check to see if there is more than one shared room between these users"""
-            pair_of_users_to_check = frozenset((current_user_id, other_user_id))
-            # By learning if these two users share any other room, we can tell
-            # if user_id's server needs to receive presence or not
-            rooms_shared = await self.store.get_mutual_rooms_between_users(
-                pair_of_users_to_check
-            )
-
-            # They always share at least one room, the current one. As such this will
-            # never be zero
-            if len(rooms_shared) < 2:
-                return True
-
-            return False
-
         # Construct sets for all the local users and remote hosts that were
         # already in the room
         prev_local_users = []
@@ -1475,7 +1475,7 @@ class PresenceHandler(BasePresenceHandler):
                 for other_user_id in prev_users_excluding_current_user:
                     # If this host has been seen in a list already, skip it.
                     if host not in prev_remote_hosts:
-                        if await is_only_one_room_shared(user_id, other_user_id):
+                        if await self.is_only_one_room_shared(user_id, other_user_id):
                             prev_remote_hosts.add(host)
                             # Since we are focusing on the host from user_id, break out
                             # of the loop once its found
@@ -1507,7 +1507,7 @@ class PresenceHandler(BasePresenceHandler):
                         host not in prev_remote_hosts
                         and host not in newly_joined_remote_hosts
                     ):
-                        if await is_only_one_room_shared(user_id, other_user_id):
+                        if await self.is_only_one_room_shared(user_id, other_user_id):
                             newly_joined_remote_hosts.add(host)
                             # Since we are focusing on the host from user_id, break out
                             # of the loop once its found
