@@ -3656,39 +3656,6 @@ giving each worker a unique <code>worker_name</code>.</p>
 <pre><code class="language-yaml">worker_name: generic_worker1
 </code></pre>
 <hr />
-<h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
-<p><em>Deprecated as of version 1.84.0. Place <code>host</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
-<p>The HTTP replication endpoint that it should talk to on the main Synapse process.
-The main Synapse process defines this with a <code>replication</code> resource in
-<a href="#listeners"><code>listeners</code> option</a>.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_host: 127.0.0.1
-</code></pre>
-<hr />
-<h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
-<p><em>Deprecated as of version 1.84.0. Place <code>port</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
-<p>The HTTP replication port that it should talk to on the main Synapse process.
-The main Synapse process defines this with a <code>replication</code> resource in
-<a href="#listeners"><code>listeners</code> option</a>.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_http_port: 9093
-</code></pre>
-<hr />
-<h3 id="worker_replication_http_tls"><a class="header" href="#worker_replication_http_tls"><code>worker_replication_http_tls</code></a></h3>
-<p><em>Deprecated as of version 1.84.0. Place <code>tls</code> under <code>main</code> entry on the <a href="#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
-<p>Whether TLS should be used for talking to the HTTP replication port on the main
-Synapse process.
-The main Synapse process defines this with the <code>tls</code> option on its <a href="#listeners">listener</a> that
-has the <code>replication</code> resource enabled.</p>
-<p><strong>Please note:</strong> by default, it is not safe to expose replication ports to the
-public Internet, even with TLS enabled.
-See <a href="#worker_replication_secret"><code>worker_replication_secret</code></a>.</p>
-<p>Defaults to <code>false</code>.</p>
-<p><em>Added in Synapse 1.72.0.</em></p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_http_tls: true
-</code></pre>
-<hr />
 <h3 id="worker_listeners"><a class="header" href="#worker_listeners"><code>worker_listeners</code></a></h3>
 <p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option
 must be declared, in the same way as the <a href="#listeners"><code>listeners</code> option</a>

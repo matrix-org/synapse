@@ -264,9 +264,6 @@ The currently available worker applications are listed <a href="#available-worke
 with an <code>http</code> listener.</li>
 <li><strong>Synapse 1.72 and older:</strong> if handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>). This config option is no longer required and is ignored when running Synapse 1.73 and newer.</li>
-<li><strong>Synapse 1.83 and older:</strong> The HTTP replication endpoint that the worker should talk to on the main synapse process
-(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
-<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>). If using Synapse 1.84 and newer, these are not needed if <code>main</code> is defined on the <a href="#shared-configuration">shared configuration</a> <code>instance_map</code></li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
@@ -549,11 +546,7 @@ stream_writers:
 </code></pre>
 <p>An example for a stream writer instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
-worker_name: event_persister1 
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
+worker_name: event_persister1
 
 worker_listeners:
   - type: http
@@ -646,10 +639,6 @@ to a dedicated worker, the shared configuration would include:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: background_worker
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
 <h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
@@ -718,10 +707,6 @@ pusher_instances:
 <pre><code class="language-yaml">worker_app: synapse.app.pusher
 worker_name: pusher_worker1
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/pusher-worker-log.yaml
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
@@ -754,10 +739,6 @@ federation_sender_instances:
 <pre><code class="language-yaml">worker_app: synapse.app.federation_sender
 worker_name: federation_sender1
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml
 </code></pre>
 <h3 id="synapseappmedia_repository"><a class="header" href="#synapseappmedia_repository"><code>synapse.app.media_repository</code></a></h3>
@@ -783,10 +764,6 @@ able to handle the above endpoints.</p>
 expose the <code>media</code> resource. For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.media_repository
 worker_name: media_worker
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http

@@ -355,7 +355,7 @@ anything was broken. They are slower than the unit tests but will
 typically catch more errors.</p>
 <p>The following command will let you run the integration test with the most common
 configuration:</p>
-<pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
+<pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:focal
 </code></pre>
 <p>(Note that the paths must be full paths! You could also write <code>$(realpath relative/path)</code> if needed.)</p>
 <p>This configuration should generally cover your needs.</p>

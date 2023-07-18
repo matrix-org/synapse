@@ -362,7 +362,7 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 <p>System requirements:</p>
 <ul>
 <li>POSIX-compliant system (tested on Linux &amp; OS X)</li>
-<li>Python 3.7 or later, up to Python 3.11.</li>
+<li>Python 3.8 or later, up to Python 3.11.</li>
 <li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
 </ul>
 <p>If building on an uncommon architecture for which pre-built wheels are
@@ -1779,6 +1779,24 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1880"><a class="header" href="#upgrading-to-v1880">Upgrading to v1.88.0</a></h1>
+<h2 id="minimum-supported-python-version"><a class="header" href="#minimum-supported-python-version">Minimum supported Python version</a></h2>
+<p>The minimum supported Python version has been increased from v3.7 to v3.8.
+You will need Python 3.8 to run Synapse v1.88.0 (due out July 18th, 2023).</p>
+<p>If you use current versions of the Matrix.org-distributed Debian
+packages or Docker images, no action is required.</p>
+<h2 id="removal-of-worker_replication_-settings"><a class="header" href="#removal-of-worker_replication_-settings">Removal of <code>worker_replication_*</code> settings</a></h2>
+<p>As mentioned previously in <a href="upgrade.html#upgrading-to-v1840">Upgrading to v1.84.0</a>, the following deprecated settings
+are being removed in this release of Synapse:</p>
+<ul>
+<li><a href="https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a></li>
+<li><a href="https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a></li>
+<li><a href="https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_tls"><code>worker_replication_http_tls</code></a></li>
+</ul>
+<p>Please ensure that you have migrated to using <code>main</code> on your shared configuration's <code>instance_map</code>
+(or create one if necessary). This is required if you have <em><strong>any</strong></em> workers at all;
+administrators of single-process (monolith) installations don't need to do anything.</p>
+<p>For an illustrative example, please see <a href="upgrade.html#upgrading-to-v1840">Upgrading to v1.84.0</a> below.</p>
 <h1 id="upgrading-to-v1860"><a class="header" href="#upgrading-to-v1860">Upgrading to v1.86.0</a></h1>
 <h2 id="minimum-supported-rust-version"><a class="header" href="#minimum-supported-rust-version">Minimum supported Rust version</a></h2>
 <p>The minimum supported Rust version has been increased from v1.58.1 to v1.60.0.
@@ -7158,39 +7176,6 @@ giving each worker a unique <code>worker_name</code>.</p>
 <pre><code class="language-yaml">worker_name: generic_worker1
 </code></pre>
 <hr />
-<h3 id="worker_replication_host"><a class="header" href="#worker_replication_host"><code>worker_replication_host</code></a></h3>
-<p><em>Deprecated as of version 1.84.0. Place <code>host</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
-<p>The HTTP replication endpoint that it should talk to on the main Synapse process.
-The main Synapse process defines this with a <code>replication</code> resource in
-<a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_host: 127.0.0.1
-</code></pre>
-<hr />
-<h3 id="worker_replication_http_port"><a class="header" href="#worker_replication_http_port"><code>worker_replication_http_port</code></a></h3>
-<p><em>Deprecated as of version 1.84.0. Place <code>port</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
-<p>The HTTP replication port that it should talk to on the main Synapse process.
-The main Synapse process defines this with a <code>replication</code> resource in
-<a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>.</p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_http_port: 9093
-</code></pre>
-<hr />
-<h3 id="worker_replication_http_tls"><a class="header" href="#worker_replication_http_tls"><code>worker_replication_http_tls</code></a></h3>
-<p><em>Deprecated as of version 1.84.0. Place <code>tls</code> under <code>main</code> entry on the <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> in your shared yaml configuration instead.</em></p>
-<p>Whether TLS should be used for talking to the HTTP replication port on the main
-Synapse process.
-The main Synapse process defines this with the <code>tls</code> option on its <a href="usage/configuration/config_documentation.html#listeners">listener</a> that
-has the <code>replication</code> resource enabled.</p>
-<p><strong>Please note:</strong> by default, it is not safe to expose replication ports to the
-public Internet, even with TLS enabled.
-See <a href="usage/configuration/config_documentation.html#worker_replication_secret"><code>worker_replication_secret</code></a>.</p>
-<p>Defaults to <code>false</code>.</p>
-<p><em>Added in Synapse 1.72.0.</em></p>
-<p>Example configuration:</p>
-<pre><code class="language-yaml">worker_replication_http_tls: true
-</code></pre>
-<hr />
 <h3 id="worker_listeners"><a class="header" href="#worker_listeners"><code>worker_listeners</code></a></h3>
 <p>A worker can handle HTTP requests. To do so, a <code>worker_listeners</code> option
 must be declared, in the same way as the <a href="usage/configuration/config_documentation.html#listeners"><code>listeners</code> option</a>
@@ -10893,9 +10878,6 @@ The currently available worker applications are listed <a href="workers.html#ava
 with an <code>http</code> listener.</li>
 <li><strong>Synapse 1.72 and older:</strong> if handling the <code>^/_matrix/client/v3/keys/upload</code> endpoint, the HTTP URI for
 the main process (<code>worker_main_http_uri</code>). This config option is no longer required and is ignored when running Synapse 1.73 and newer.</li>
-<li><strong>Synapse 1.83 and older:</strong> The HTTP replication endpoint that the worker should talk to on the main synapse process
-(<a href="usage/configuration/config_documentation.html#worker_replication_host"><code>worker_replication_host</code></a> and
-<a href="usage/configuration/config_documentation.html#worker_replication_http_port"><code>worker_replication_http_port</code></a>). If using Synapse 1.84 and newer, these are not needed if <code>main</code> is defined on the <a href="workers.html#shared-configuration">shared configuration</a> <code>instance_map</code></li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
@@ -11178,11 +11160,7 @@ stream_writers:
 </code></pre>
 <p>An example for a stream writer instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
-worker_name: event_persister1 
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
+worker_name: event_persister1
 
 worker_listeners:
   - type: http
@@ -11275,10 +11253,6 @@ to a dedicated worker, the shared configuration would include:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
 worker_name: background_worker
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
 <h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
@@ -11347,10 +11321,6 @@ pusher_instances:
 <pre><code class="language-yaml">worker_app: synapse.app.pusher
 worker_name: pusher_worker1
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/pusher-worker-log.yaml
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
@@ -11383,10 +11353,6 @@ federation_sender_instances:
 <pre><code class="language-yaml">worker_app: synapse.app.federation_sender
 worker_name: federation_sender1
 
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
 worker_log_config: /etc/matrix-synapse/federation-sender-log.yaml
 </code></pre>
 <h3 id="synapseappmedia_repository"><a class="header" href="#synapseappmedia_repository"><code>synapse.app.media_repository</code></a></h3>
@@ -11412,10 +11378,6 @@ able to handle the above endpoints.</p>
 expose the <code>media</code> resource. For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.media_repository
 worker_name: media_worker
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
 
 worker_listeners:
   - type: http
@@ -13910,6 +13872,11 @@ which guarantees a stable ordering. Valid values are:</p>
 <p><code>dir</code> - Direction of media order. Either <code>f</code> for forwards or <code>b</code> for backwards.
 Setting this value to <code>b</code> will reverse the above sort order. Defaults to <code>f</code>.</p>
 </li>
+<li>
+<p><code>not_user_type</code> - Exclude certain user types, such as bot users, from the request.
+Can be provided multiple times. Possible values are <code>bot</code>, <code>support</code> or &quot;empty string&quot;.
+&quot;empty string&quot; here means to exclude users without a type.</p>
+</li>
 </ul>
 <p>Caution. The database only has indexes on the columns <code>name</code> and <code>creation_ts</code>.
 This means that if a different sort order is used (<code>is_guest</code>, <code>admin</code>,
@@ -14689,7 +14656,7 @@ being limited.</li>
 <li><code>user_id</code> - The fully qualified MXID: for example, <code>@user:server.com</code>. The user must
 be local.</li>
 </ul>
-<h3 id="check-username-availability"><a class="header" href="#check-username-availability">Check username availability</a></h3>
+<h2 id="check-username-availability"><a class="header" href="#check-username-availability">Check username availability</a></h2>
 <p>Checks to see if a username is available, and valid, for the server. See <a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">the client-server 
 API</a>
 for more information.</p>
@@ -14700,7 +14667,7 @@ for more information.</p>
 </code></pre>
 <p>The request and response format is the same as the
 <a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">/_matrix/client/r0/register/available</a> API.</p>
-<h3 id="find-a-user-based-on-their-id-in-an-auth-provider"><a class="header" href="#find-a-user-based-on-their-id-in-an-auth-provider">Find a user based on their ID in an auth provider</a></h3>
+<h2 id="find-a-user-based-on-their-id-in-an-auth-provider"><a class="header" href="#find-a-user-based-on-their-id-in-an-auth-provider">Find a user based on their ID in an auth provider</a></h2>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/auth_providers/$provider/users/$external_id
 </code></pre>
@@ -14724,7 +14691,7 @@ for more information.</p>
 }
 </code></pre>
 <p><em>Added in Synapse 1.68.0.</em></p>
-<h3 id="find-a-user-based-on-their-third-party-id-threepid-or-3pid"><a class="header" href="#find-a-user-based-on-their-third-party-id-threepid-or-3pid">Find a user based on their Third Party ID (ThreePID or 3PID)</a></h3>
+<h2 id="find-a-user-based-on-their-third-party-id-threepid-or-3pid"><a class="header" href="#find-a-user-based-on-their-third-party-id-threepid-or-3pid">Find a user based on their Third Party ID (ThreePID or 3PID)</a></h2>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/threepid/$medium/users/$address
 </code></pre>
@@ -16107,7 +16074,7 @@ anything was broken. They are slower than the unit tests but will
 typically catch more errors.</p>
 <p>The following command will let you run the integration test with the most common
 configuration:</p>
-<pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
+<pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:focal
 </code></pre>
 <p>(Note that the paths must be full paths! You could also write <code>$(realpath relative/path)</code> if needed.)</p>
 <p>This configuration should generally cover your needs.</p>
@@ -18779,7 +18746,7 @@ the minimum required version may be bumped up to a recent Rust version, and so
 people building from source should ensure they can fetch recent versions of Rust
 (e.g. by using <a href="https://rustup.rs/">rustup</a>).</p>
 <p>The oldest supported version of SQLite is the version
-<a href="https://packages.debian.org/buster/libsqlite3-0">provided</a> by
+<a href="https://packages.debian.org/bullseye/libsqlite3-0">provided</a> by
 <a href="https://wiki.debian.org/DebianOldStable">Debian oldstable</a>.</p>
 <h2 id="context"><a class="header" href="#context">Context</a></h2>
 <p>It is important for system admins to have a clear understanding of the platform
