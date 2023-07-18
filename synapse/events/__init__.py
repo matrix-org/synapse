@@ -627,7 +627,10 @@ class FrozenLinearizedEvent(FrozenEventV3):
     def get_pdu_json(self, time_now: Optional[int] = None) -> JsonDict:
         pdu = super().get_pdu_json()
 
-        # Internally Synapse uses unsigned, but this isn't part of LM.
+        # TODO(LM) Why does this sometimes exist?
+        pdu.pop("depth", None)
+
+        # Internally Synapse uses depth & unsigned, but this isn't part of LM.
         pdu.pop("unsigned")
 
         return pdu
