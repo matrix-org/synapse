@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 
 from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
@@ -196,7 +196,7 @@ class DataStore(
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
             filters = []
-            args: List[Union[str, int]] = []
+            args = [self.hs.config.server.server_name]
 
             # Set ordering
             order_by_column = UserSortOrder(order_by).value
@@ -263,7 +263,7 @@ class DataStore(
 
             sql_base = f"""
                 FROM users as u
-                LEFT JOIN profiles AS p ON u.name = p.full_user_id
+                LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
                 LEFT JOIN erased_users AS eu ON u.name = eu.user_id
                 {where_clause}
                 """

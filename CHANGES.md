@@ -1,10 +1,18 @@
-# Synapse 1.88.0rc1 (2023-07-11)
+# Synapse 1.88.0 (2023-07-18)
 
 This release
  - raises the minimum supported version of Python to 3.8, as Python 3.7 is now [end-of-life](https://devguide.python.org/versions/), and
  - removes deprecated config options related to worker deployment.
 
 See [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.88/docs/upgrade.md#upgrading-to-v1880) for more information.
+
+
+### Bugfixes
+
+- Revert "Stop writing to column `user_id` of tables `profiles` and `user_filters`", which was introduced in Synapse 1.88.0rc1. ([\#15953](https://github.com/matrix-org/synapse/issues/15953))
+
+
+# Synapse 1.88.0rc1 (2023-07-11)
 
 ### Features
 
