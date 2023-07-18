@@ -772,6 +772,14 @@ class FederationServer(FederationBase):
         auth_chain_events = await self.store.get_events_as_list(auth_chain_event_ids)
         state_events = await self.store.get_events_as_list(state_event_ids)
 
+        # TODO(LM) eigen-server wants events in order.
+        auth_chain_events = sorted(
+            auth_chain_events, key=lambda e: e.internal_metadata.stream_ordering
+        )
+        state_events = sorted(
+            state_events, key=lambda e: e.internal_metadata.stream_ordering
+        )
+
         # we try to do all the async stuff before this point, so that time_now is as
         # accurate as possible.
         time_now = self._clock.time_msec()
