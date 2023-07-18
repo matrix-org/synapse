@@ -95,12 +95,11 @@ bump_active_time_counter = Counter("synapse_handler_presence_bump_active_time", 
 get_updates_counter = Counter("synapse_handler_presence_get_updates", "", ["type"])
 
 notify_reason_counter = Counter(
-    "synapse_handler_presence_notify_reason", "", ["reason"]
+    "synapse_handler_presence_notify_reason", "", ["locality", "reason"]
 )
 state_transition_counter = Counter(
-    "synapse_handler_presence_state_transition", "", ["from", "to"]
+    "synapse_handler_presence_state_transition", "", ["locality", "from", "to"]
 )
-
 
 # If a user was last active in the last LAST_ACTIVE_GRANULARITY, consider them
 # "currently_active"
@@ -567,8 +566,8 @@ class WorkerPresenceHandler(BasePresenceHandler):
         for new_state in states:
             old_state = self.user_to_current_state.get(new_state.user_id)
             self.user_to_current_state[new_state.user_id] = new_state
-
-            if not old_state or should_notify(old_state, new_state):
+            is_mine = self.is_mine_id(new_state.user_id)
+            if not old_state or should_notify(old_state, new_state, is_mine):
                 state_to_notify.append(new_state)
 
         stream_id = token
@@ -1499,23 +1498,31 @@ class PresenceHandler(BasePresenceHandler):
             )
 
 
-def should_notify(old_state: UserPresenceState, new_state: UserPresenceState) -> bool:
+def should_notify(
+    old_state: UserPresenceState, new_state: UserPresenceState, is_mine: bool
+) -> bool:
     """Decides if a presence state change should be sent to interested parties."""
+    user_location = "remote"
+    if is_mine:
+        user_location = "local"
+
     if old_state == new_state:
         return False
 
     if old_state.status_msg != new_state.status_msg:
-        notify_reason_counter.labels("status_msg_change").inc()
+        notify_reason_counter.labels(user_location, "status_msg_change").inc()
         return True
 
     if old_state.state != new_state.state:
-        notify_reason_counter.labels("state_change").inc()
-        state_transition_counter.labels(old_state.state, new_state.state).inc()
+        notify_reason_counter.labels(user_location, "state_change").inc()
+        state_transition_counter.labels(
+            user_location, old_state.state, new_state.state
+        ).inc()
         return True
 
     if old_state.state == PresenceState.ONLINE:
         if new_state.currently_active != old_state.currently_active:
-            notify_reason_counter.labels("current_active_change").inc()
+            notify_reason_counter.labels(user_location, "current_active_change").inc()
             return True
 
         if (
@@ -1524,12 +1531,16 @@ def should_notify(old_state: UserPresenceState, new_state: UserPresenceState) ->
         ):
             # Only notify about last active bumps if we're not currently active
             if not new_state.currently_active:
-                notify_reason_counter.labels("last_active_change_online").inc()
+                notify_reason_counter.labels(
+                    user_location, "last_active_change_online"
+                ).inc()
                 return True
 
     elif new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
-        notify_reason_counter.labels("last_active_change_not_online").inc()
+        notify_reason_counter.labels(
+            user_location, "last_active_change_not_online"
+        ).inc()
         return True
 
     return False
@@ -1989,7 +2000,7 @@ def handle_update(
         )
 
     # Check whether the change was something worth notifying about
-    if should_notify(prev_state, new_state):
+    if should_notify(prev_state, new_state, is_mine):
         new_state = new_state.copy_and_replace(last_federation_update_ts=now)
         persist_and_notify = True
 
