@@ -96,6 +96,9 @@ def check_event_content_hash(
 
     # Check the content hash of the LPDU, if this was sent via a hub.
     if event.room_version.linearized_matrix and event.hub_server:
+        # TODO(LM) I don't think this works since _check_dict_hash always strips
+        # all hashes (via compute_content_hash)?
+
         # hashes must be a dictionary to have passed _check_dict_hash above.
         lpdu_hashes = hashes.get("lpdu")
         return _check_dict_hash(
