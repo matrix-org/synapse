@@ -620,6 +620,14 @@ class FrozenLinearizedEvent(FrozenEventV3):
             return self.hub_server
         return super().pdu_domain
 
+    def get_pdu_json(self, time_now: Optional[int] = None) -> JsonDict:
+        pdu = super().get_pdu_json()
+
+        # Internally Synapse uses unsigned, but this isn't part of LM.
+        pdu.pop("unsigned")
+
+        return pdu
+
     def get_linearized_pdu_json(self) -> JsonDict:
         # Get the full PDU and then remove fields from it.
         pdu = self.get_pdu_json()

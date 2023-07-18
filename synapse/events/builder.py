@@ -170,8 +170,9 @@ class EventBuilder:
             "sender": self.sender,
             "content": self.content,
             "unsigned": self.unsigned,
-            "depth": depth,
         }
+        if not self.room_version.linearized_matrix:
+            event_dict["depth"] = depth
 
         if self.is_state():
             event_dict["state_key"] = self._state_key
