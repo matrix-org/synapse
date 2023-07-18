@@ -148,20 +148,6 @@ class EventBuilder:
             auth_events = auth_event_ids
             prev_events = prev_event_ids
 
-        # Otherwise, progress the depth as normal
-        if depth is None:
-            (
-                _,
-                most_recent_prev_event_depth,
-            ) = await self._store.get_max_depth_of(prev_event_ids)
-
-            depth = most_recent_prev_event_depth + 1
-
-        # we cap depth of generated events, to ensure that they are not
-        # rejected by other servers (and so that they can be persisted in
-        # the db)
-        depth = min(depth, MAX_DEPTH)
-
         event_dict: Dict[str, Any] = {
             "auth_events": auth_events,
             "prev_events": prev_events,
@@ -172,7 +158,23 @@ class EventBuilder:
             "unsigned": self.unsigned,
         }
         if not self.room_version.linearized_matrix:
+            # Otherwise, progress the depth as normal
+            if depth is None:
+                (
+                    _,
+                    most_recent_prev_event_depth,
+                ) = await self._store.get_max_depth_of(prev_event_ids)
+
+                depth = most_recent_prev_event_depth + 1
+
+            # we cap depth of generated events, to ensure that they are not
+            # rejected by other servers (and so that they can be persisted in
+            # the db)
+            depth = min(depth, MAX_DEPTH)
+
             event_dict["depth"] = depth
+        elif self.hub_server is not None:
+            event_dict["hub_server"] = self.hub_server
 
         if self.is_state():
             event_dict["state_key"] = self._state_key
@@ -234,6 +236,7 @@ class EventBuilderFactory:
             unsigned=key_values.get("unsigned", {}),
             redacts=key_values.get("redacts", None),
             origin_server_ts=key_values.get("origin_server_ts", None),
+            hub_server=key_values.get("hub_server", None),
         )
 
 

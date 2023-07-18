@@ -1054,9 +1054,8 @@ class FederationServer(FederationBase):
             lpdu_json,
             (
                 "type",
-                "room_Id",
+                "room_id",
                 "sender",
-                "origin",
                 "hub_server",
                 "origin_server_ts",
                 "content",

@@ -612,6 +612,10 @@ class FrozenLinearizedEvent(FrozenEventV3):
     depth = 0  # type: ignore[assignment]
 
     @property
+    def origin(self) -> str:
+        return get_domain_from_id(self.sender)
+
+    @property
     def pdu_domain(self) -> str:
         """The domain which added this event to the DAG.
 
