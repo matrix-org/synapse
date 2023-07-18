@@ -386,6 +386,7 @@ def listen_unix(
 
 
 def listen_http(
+    hs: "HomeServer",
     listener_config: ListenerConfig,
     root_resource: Resource,
     version_string: str,
@@ -406,6 +407,7 @@ def listen_http(
         version_string,
         max_request_body_size=max_request_body_size,
         reactor=reactor,
+        hs=hs,
     )
 
     if isinstance(listener_config, TCPListenerConfig):

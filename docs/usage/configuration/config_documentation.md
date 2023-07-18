@@ -3960,13 +3960,14 @@ federation_sender_instances:
 ---
 ### `instance_map`
 
-When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured, and to the main process.
-Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
-a HTTP replication listener, and that listener should be included in the `instance_map`.
-The main process also needs an entry on the `instance_map`, and it should be listed under
-`main` **if even one other worker exists**. Ensure the port matches with what is declared 
-inside the `listener` block for a `replication` listener.
+When using workers this should be a map from [`worker_name`](#worker_name) to the HTTP
+replication listener of the worker, if configured, and to the main process. Each worker
+declared under [`stream_writers`](../../workers.md#stream-writers) and
+[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP
+replication listener, and that listener should be included in the `instance_map`. The
+main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is
+declared inside the `listener` block for a `replication` listener.
 
 
 Example configuration:
@@ -4003,6 +4004,24 @@ stream_writers:
   events: worker1
   typing: worker1
 ```
+---
+### `outbound_federation_restricted_to`
+
+When using workers, you can restrict outbound federation traffic to only go through a
+specific subset of workers. Any worker specified here must also be in the
+[`instance_map`](#instance_map).
+[`worker_replication_secret`](#worker_replication_secret) must also be configured to
+authorize inter-worker communication.
+
+```yaml
+outbound_federation_restricted_to:
+  - federation_sender1
+  - federation_sender2
+```
+
+Also see the [worker
+documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
+for more info.
 ---
 ### `run_background_tasks_on`
 
