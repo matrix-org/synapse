@@ -141,7 +141,9 @@ class FederationSendServlet(BaseFederationServerServlet):
 
 
 class FederationUnstableSendServlet(FederationSendServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PREFIX = (
+        FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    )
 
     # This is when someone is trying to send us a bunch of data.
     async def on_PUT(
@@ -214,7 +216,9 @@ class FederationEventServlet(BaseFederationServerServlet):
 
 
 class FederationUnstableEventServlet(BaseFederationServerServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PREFIX = (
+        FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    )
     PATH = "/event/(?P<event_id>[^/]*)/?"
     CATEGORY = "Federation requests"
 
@@ -307,7 +311,9 @@ class FederationBackfillServlet(BaseFederationServerServlet):
 
 
 class FederationUnstableBackfillServlet(BaseFederationServerServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PREFIX = (
+        FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    )
     PATH = "/backfill/(?P<room_id>[^/]*)/?"
     CATEGORY = "Federation requests"
 
@@ -477,7 +483,9 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
 
 
 class FederationUnstableSendLeaveServlet(BaseFederationServerServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PREFIX = (
+        FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    )
     PATH = "/send_leave/(?P<txn_id>[^/]*)"
     CATEGORY = "Federation requests"
 
@@ -533,7 +541,9 @@ class FederationV1SendKnockServlet(BaseFederationServerServlet):
 
 
 class FederationUnstableSendKnockServlet(BaseFederationServerServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PREFIX = (
+        FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    )
     PATH = "/send_knock/(?P<txn_id>[^/]*)"
     CATEGORY = "Federation requests"
 
@@ -608,7 +618,9 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 
 
 class FederationUnstableSendJoinServlet(BaseFederationServerServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PREFIX = (
+        FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    )
     PATH = "/send_join/(?P<txn_id>[^/]*)"
     CATEGORY = "Federation requests"
 
@@ -692,7 +704,9 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 
 
 class FederationUnstableInviteServlet(BaseFederationServerServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    PREFIX = (
+        FEDERATION_UNSTABLE_PREFIX + "/org.matrix.i-d.ralston-mimi-linearized-matrix.02"
+    )
     PATH = "/invite/(?P<txn_id>[^/]*)"
     CATEGORY = "Federation requests"
 
