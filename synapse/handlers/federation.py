@@ -957,7 +957,7 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         prev_event_ids = None
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             # Note that the room's state can change out from under us and render our
             # nice join rules-conformant event non-conformant by the time we build the
             # event. When this happens, our validation at the end fails and we respond
