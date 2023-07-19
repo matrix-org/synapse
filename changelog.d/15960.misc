@@ -1,0 +1,1 @@
+Ensure a long state res does not starve CPU by occasionally yielding to the reactor.
