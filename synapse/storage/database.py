@@ -45,6 +45,7 @@ from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.enterprise import adbapi
 from twisted.internet.interfaces import IReactorCore
+from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
@@ -80,7 +81,6 @@ sql_query_timer = Histogram("synapse_storage_query_time", "sec", ["verb"])
 sql_txn_count = Counter("synapse_storage_transaction_time_count", "sec", ["desc"])
 sql_txn_duration = Counter("synapse_storage_transaction_time_sum", "sec", ["desc"])
 
-
 # Unique indexes which have been added in background updates. Maps from table name
 # to the name of the background update which added the unique index to that table.
 #
@@ -110,6 +110,38 @@ class _PoolConnection(Connection):
         ...
 
 
+class ReconnectingConnectionPoolFactory(ReconnectingClientFactory):
+    """
+    A ReconnectingClientFactory, which tries to reconnect if a connection is lost
+    or fails and which exponentially delays repeated reconnect attempts..
+    """
+
+    def __init__(self, db_config, reactor, _on_new_connection, db_args):
+        self.connection_pool = adbapi.ConnectionPool(
+            db_config.config["name"],
+            cp_reactor=reactor,
+            cp_openfun=_on_new_connection,
+            **db_args,
+        )
+
+    def startedConnecting(self, connector):
+        print("Started connecting.")
+
+    def buildProtocol(self, addr=None):
+        print("Connected.")
+        print("Resetting reconnection delay.")
+        self.resetDelay()
+        return self.connection_pool
+
+    def clientConnectionLost(self, connector, reason):
+        print("Lost connection.  Reason:", reason)
+        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+
+    def clientConnectionFailed(self, connector, reason):
+        print("Connection failed. Reason:", reason)
+        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+
+
 def make_pool(
     reactor: IReactorCore,
     db_config: DatabaseConnectionConfig,
@@ -121,6 +153,7 @@ def make_pool(
     # someone has explicitly set `cp_reconnect`.
     db_args = dict(db_config.config.get("args", {}))
     db_args.setdefault("cp_reconnect", True)
+    cp_reconnect = db_args.pop("cp_reconnect", True)
 
     def _on_new_connection(conn: Connection) -> None:
         # Ensure we have a logging context so we can correctly track queries,
@@ -130,12 +163,18 @@ def make_pool(
                 LoggingDatabaseConnection(conn, engine, "on_new_connection")
             )
 
-    connection_pool = adbapi.ConnectionPool(
-        db_config.config["name"],
-        cp_reactor=reactor,
-        cp_openfun=_on_new_connection,
-        **db_args,
-    )
+    if cp_reconnect:
+        factory = ReconnectingConnectionPoolFactory(
+            db_config, reactor, _on_new_connection, db_args
+        )
+        connection_pool = factory.buildProtocol()
+    else:
+        connection_pool = adbapi.ConnectionPool(
+            db_config.config["name"],
+            cp_reactor=reactor,
+            cp_openfun=_on_new_connection,
+            **db_args,
+        )
 
     register_threadpool(f"database-{db_config.name}", connection_pool.threadpool)
 
