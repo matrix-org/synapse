@@ -82,7 +82,6 @@ HOUR_IN_MS = 60 * 60 * 1000
 
 
 APP_SERVICE_PREFIX = "/_matrix/app/v1"
-APP_SERVICE_UNSTABLE_PREFIX = "/_matrix/app/unstable"
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -179,7 +178,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         try:
             response = await self._send_with_fallbacks(
                 service,
-                [APP_SERVICE_PREFIX, ""],
+                [APP_SERVICE_PREFIX],
                 f"/users/{urllib.parse.quote(user_id)}",
                 self.get_json,
                 {"access_token": service.hs_token},
@@ -205,7 +204,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         try:
             response = await self._send_with_fallbacks(
                 service,
-                [APP_SERVICE_PREFIX, ""],
+                [APP_SERVICE_PREFIX],
                 f"/rooms/{urllib.parse.quote(alias)}",
                 self.get_json,
                 {"access_token": service.hs_token},
@@ -247,7 +246,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             }
             response = await self._send_with_fallbacks(
                 service,
-                [APP_SERVICE_PREFIX, APP_SERVICE_UNSTABLE_PREFIX],
+                [APP_SERVICE_PREFIX],
                 f"/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 self.get_json,
                 args=args,
@@ -287,7 +286,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             try:
                 info = await self._send_with_fallbacks(
                     service,
-                    [APP_SERVICE_PREFIX, APP_SERVICE_UNSTABLE_PREFIX],
+                    [APP_SERVICE_PREFIX],
                     f"/thirdparty/protocol/{urllib.parse.quote(protocol)}",
                     self.get_json,
                     {"access_token": service.hs_token},
