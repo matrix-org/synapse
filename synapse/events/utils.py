@@ -145,9 +145,9 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
                     ]
 
     elif event_type == EventTypes.Create:
-        # MSC2176 rules state that create events cannot be redacted.
+        # MSC2176 rules state that create events cannot have their `content` redacted.
         if room_version.msc2176_redaction_rules:
-            return event_dict
+            new_content = event_dict["content"]
 
         add_fields("creator")
     elif event_type == EventTypes.JoinRules:
