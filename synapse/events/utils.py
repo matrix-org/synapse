@@ -149,7 +149,8 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         if room_version.msc2176_redaction_rules:
             new_content = event_dict["content"]
 
-        add_fields("creator")
+        if not room_version.msc2175_implicit_room_creator:
+            add_fields("creator")
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
         if room_version.msc3083_join_rules:
