@@ -1,0 +1,1 @@
+Fix `synapse_port_db` not configuring the `application_services_txns` and `un_partial_stated_event_stream_sequence` sequences. Contributed by @vanguacamolie.

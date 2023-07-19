@@ -770,6 +770,10 @@ class Porter:
             await self._setup_user_id_seq()
             await self._setup_events_stream_seqs()
             await self._setup_sequence(
+                "un_partial_stated_event_stream_sequence",
+                ("un_partial_stated_event_stream",),
+            )
+            await self._setup_sequence(
                 "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
             )
             await self._setup_sequence(
@@ -779,6 +783,7 @@ class Porter:
             await self._setup_sequence("receipts_sequence", ("receipts_linearized",))
             await self._setup_sequence("presence_stream_sequence", ("presence_stream",))
             await self._setup_auth_chain_sequence()
+            await self._setup_application_services_sequence()
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -1130,6 +1135,27 @@ class Porter:
         if curr_chain_id is not None:
             await self.postgres_store.db_pool.runInteraction(
                 "_setup_event_auth_chain_id",
+                r,
+            )
+
+    async def _setup_application_services_sequence(self) -> None:
+        curr_tnx_id: Optional[
+            int
+        ] = await self.sqlite_store.db_pool.simple_select_one_onecol(
+            table="application_services_txns",
+            keyvalues={},
+            retcol="COALESCE(max(txn_id), 0)",
+        )
+
+        def r(txn: LoggingTransaction) -> None:
+            txn.execute(
+                "ALTER SEQUENCE application_services_txn_id_seq RESTART WITH %s",
+                (curr_tnx_id + 1,),
+            )
+
+        if curr_tnx_id is not None:
+            await self.postgres_store.db_pool.runInteraction(
+                "_setup_application_services_sequence",
                 r,
             )
 
