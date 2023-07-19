@@ -277,7 +277,7 @@ class EventAuthHandler:
             True if the proper room version and join rules are set for restricted access.
         """
         # This only applies to room versions which support the new join rule.
-        if not room_version.msc3083_join_rules:
+        if not room_version.restricted_join_rule:
             return False
 
         # If there's no join rule, then it defaults to invite (so this doesn't apply).
@@ -292,7 +292,7 @@ class EventAuthHandler:
             return True
 
         # also check for MSC3787 behaviour
-        if room_version.msc3787_knock_restricted_join_rule:
+        if room_version.knock_restricted_join_rule:
             return content_join_rule == JoinRules.KNOCK_RESTRICTED
 
         return False

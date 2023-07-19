@@ -31,9 +31,7 @@ from tests.unittest import HomeserverTestCase
 
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        hs = self.setup_test_homeserver(
-            federation_http_client=None, homeserver_to_use=GenericWorkerServer
-        )
+        hs = self.setup_test_homeserver(homeserver_to_use=GenericWorkerServer)
         return hs
 
     def default_config(self) -> JsonDict:
@@ -91,9 +89,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
 @patch("synapse.app.homeserver.KeyResource", new=Mock())
 class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        hs = self.setup_test_homeserver(
-            federation_http_client=None, homeserver_to_use=SynapseHomeServer
-        )
+        hs = self.setup_test_homeserver(homeserver_to_use=SynapseHomeServer)
         return hs
 
     @parameterized.expand(

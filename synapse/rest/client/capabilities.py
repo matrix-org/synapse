@@ -65,6 +65,9 @@ class CapabilitiesRestServlet(RestServlet):
                 "m.3pid_changes": {
                     "enabled": self.config.registration.enable_3pid_changes
                 },
+                "m.get_login_token": {
+                    "enabled": self.config.auth.login_via_existing_enabled,
+                },
             }
         }
 

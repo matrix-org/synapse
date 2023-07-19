@@ -138,7 +138,7 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
             for observer in observers:
                 # This is a little bit of magic to correctly propagate stack
                 # traces when we `await` on one of the observer deferreds.
-                f.value.__failure__ = f  # type: ignore[union-attr]
+                f.value.__failure__ = f
                 try:
                     observer.errback(f)
                 except Exception as e:

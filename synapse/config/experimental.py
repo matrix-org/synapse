@@ -192,10 +192,10 @@ class MSC3861:
                 ("captcha", "enable_registration_captcha"),
             )
 
-        if root.experimental.msc3882_enabled:
+        if root.auth.login_via_existing_enabled:
             raise ConfigError(
-                "MSC3882 cannot be enabled when OAuth delegation is enabled",
-                ("experimental_features", "msc3882_enabled"),
+                "Login via existing session cannot be enabled when OAuth delegation is enabled",
+                ("login_via_existing_session", "enabled"),
             )
 
         if root.registration.refresh_token_lifetime:
@@ -246,9 +246,6 @@ class ExperimentalConfig(Config):
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
-
-        # MSC2716 (importing historical messages)
-        self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
         # MSC3244 (room version capabilities)
         self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
@@ -319,13 +316,6 @@ class ExperimentalConfig(Config):
         # MSC3881: Remotely toggle push notifications for another client
         self.msc3881_enabled: bool = experimental.get("msc3881_enabled", False)
 
-        # MSC3882: Allow an existing session to sign in a new session
-        self.msc3882_enabled: bool = experimental.get("msc3882_enabled", False)
-        self.msc3882_ui_auth: bool = experimental.get("msc3882_ui_auth", True)
-        self.msc3882_token_timeout = self.parse_duration(
-            experimental.get("msc3882_token_timeout", "5m")
-        )
-
         # MSC3874: Filtering /messages with rel_types / not_rel_types.
         self.msc3874_enabled: bool = experimental.get("msc3874_enabled", False)
 
@@ -365,11 +355,6 @@ class ExperimentalConfig(Config):
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
-        # MSC3952: Intentional mentions, this depends on MSC3966.
-        self.msc3952_intentional_mentions = experimental.get(
-            "msc3952_intentional_mentions", False
-        )
-
         # MSC3959: Do not generate notifications for edits.
         self.msc3958_supress_edit_notifs = experimental.get(
             "msc3958_supress_edit_notifs", False
@@ -396,9 +381,6 @@ class ExperimentalConfig(Config):
 
         # Check that none of the other config options conflict with MSC3861 when enabled
         self.msc3861.check_config_conflicts(self.root)
-
-        # MSC4009: E.164 Matrix IDs
-        self.msc4009_e164_mxids = experimental.get("msc4009_e164_mxids", False)
 
         # MSC4010: Do not allow setting m.push_rules account data.
         self.msc4010_push_rules_account_data = experimental.get(

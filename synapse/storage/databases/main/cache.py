@@ -46,6 +46,12 @@ logger = logging.getLogger(__name__)
 # based on the current state when notifying workers over replication.
 CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 
+# As above, but for invalidating event caches on history deletion
+PURGE_HISTORY_CACHE_NAME = "ph_cache_fake"
+
+# As above, but for invalidating room caches on room deletion
+DELETE_ROOM_CACHE_NAME = "dr_cache_fake"
+
 
 class CacheInvalidationWorkerStore(SQLBaseStore):
     def __init__(
@@ -175,6 +181,23 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     room_id = row.keys[0]
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)
+                elif row.cache_func == PURGE_HISTORY_CACHE_NAME:
+                    if row.keys is None:
+                        raise Exception(
+                            "Can't send an 'invalidate all' for 'purge history' cache"
+                        )
+
+                    room_id = row.keys[0]
+                    self._invalidate_caches_for_room_events(room_id)
+                elif row.cache_func == DELETE_ROOM_CACHE_NAME:
+                    if row.keys is None:
+                        raise Exception(
+                            "Can't send an 'invalidate all' for 'delete room' cache"
+                        )
+
+                    room_id = row.keys[0]
+                    self._invalidate_caches_for_room_events(room_id)
+                    self._invalidate_caches_for_room(room_id)
                 else:
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
@@ -226,6 +249,9 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         relates_to: Optional[str],
         backfilled: bool,
     ) -> None:
+        # XXX: If you add something to this function make sure you add it to
+        # `_invalidate_caches_for_room_events` as well.
+
         # This invalidates any local in-memory cached event objects, the original
         # process triggering the invalidation is responsible for clearing any external
         # cached objects.
@@ -263,6 +289,17 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             )
             self._attempt_to_invalidate_cache("get_rooms_for_user", (state_key,))
 
+            self._attempt_to_invalidate_cache(
+                "did_forget",
+                (
+                    state_key,
+                    room_id,
+                ),
+            )
+            self._attempt_to_invalidate_cache(
+                "get_forgotten_rooms_for_user", (state_key,)
+            )
+
         if relates_to:
             self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
             self._attempt_to_invalidate_cache("get_references_for_event", (relates_to,))
@@ -270,6 +307,108 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_thread_summary", (relates_to,))
             self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
             self._attempt_to_invalidate_cache("get_threads", (room_id,))
+
+    def _invalidate_caches_for_room_events_and_stream(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> None:
+        """Invalidate caches associated with events in a room, and stream to
+        replication.
+
+        Used when we delete events a room, but don't know which events we've
+        deleted.
+        """
+
+        self._send_invalidation_to_replication(txn, PURGE_HISTORY_CACHE_NAME, [room_id])
+        txn.call_after(self._invalidate_caches_for_room_events, room_id)
+
+    def _invalidate_caches_for_room_events(self, room_id: str) -> None:
+        """Invalidate caches associated with events in a room, and stream to
+        replication.
+
+        Used when we delete events in a room, but don't know which events we've
+        deleted.
+        """
+
+        self._invalidate_local_get_event_cache_all()  # type: ignore[attr-defined]
+
+        self._attempt_to_invalidate_cache("have_seen_event", (room_id,))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
+
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", None)
+        self._attempt_to_invalidate_cache("get_relations_for_event", None)
+        self._attempt_to_invalidate_cache("get_applicable_edit", None)
+        self._attempt_to_invalidate_cache("get_thread_id", None)
+        self._attempt_to_invalidate_cache("get_thread_id_for_receipts", None)
+        self._attempt_to_invalidate_cache("get_invited_rooms_for_local_user", None)
+        self._attempt_to_invalidate_cache(
+            "get_rooms_for_user_with_stream_ordering", None
+        )
+        self._attempt_to_invalidate_cache("get_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("did_forget", None)
+        self._attempt_to_invalidate_cache("get_forgotten_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("get_references_for_event", None)
+        self._attempt_to_invalidate_cache("get_thread_summary", None)
+        self._attempt_to_invalidate_cache("get_thread_participated", None)
+        self._attempt_to_invalidate_cache("get_threads", (room_id,))
+
+        self._attempt_to_invalidate_cache("_get_state_group_for_event", None)
+
+        self._attempt_to_invalidate_cache("get_event_ordering", None)
+        self._attempt_to_invalidate_cache("is_partial_state_event", None)
+        self._attempt_to_invalidate_cache("_get_joined_profile_from_event_id", None)
+
+    def _invalidate_caches_for_room_and_stream(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> None:
+        """Invalidate caches associated with rooms, and stream to replication.
+
+        Used when we delete rooms.
+        """
+
+        self._send_invalidation_to_replication(txn, DELETE_ROOM_CACHE_NAME, [room_id])
+        txn.call_after(self._invalidate_caches_for_room, room_id)
+
+    def _invalidate_caches_for_room(self, room_id: str) -> None:
+        """Invalidate caches associated with rooms.
+
+        Used when we delete rooms.
+        """
+
+        # If we've deleted the room then we also need to purge all event caches.
+        self._invalidate_caches_for_room_events(room_id)
+
+        self._attempt_to_invalidate_cache("get_account_data_for_room", None)
+        self._attempt_to_invalidate_cache("get_account_data_for_room_and_type", None)
+        self._attempt_to_invalidate_cache("get_aliases_for_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("_get_forward_extremeties_for_room", None)
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
+        self._attempt_to_invalidate_cache(
+            "_get_linearized_receipts_for_room", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("is_room_blocked", (room_id,))
+        self._attempt_to_invalidate_cache("get_retention_policy_for_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "_get_partial_state_servers_at_join", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("is_partial_state_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_invited_rooms_for_local_user", None)
+        self._attempt_to_invalidate_cache(
+            "get_current_hosts_in_room_ordered", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("did_forget", None)
+        self._attempt_to_invalidate_cache("get_forgotten_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", None)
+        self._attempt_to_invalidate_cache("get_room_version_id", (room_id,))
+
+        # And delete state caches.
+
+        self._invalidate_state_caches_all(room_id)
 
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]
@@ -376,6 +515,14 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             raise Exception(
                 "Can't stream invalidate all with magic current state cache"
             )
+
+        if cache_name == PURGE_HISTORY_CACHE_NAME and keys is None:
+            raise Exception(
+                "Can't stream invalidate all with magic purge history cache"
+            )
+
+        if cache_name == DELETE_ROOM_CACHE_NAME and keys is None:
+            raise Exception("Can't stream invalidate all with magic delete room cache")
 
         if isinstance(self.database_engine, PostgresEngine):
             assert self._cache_id_gen is not None

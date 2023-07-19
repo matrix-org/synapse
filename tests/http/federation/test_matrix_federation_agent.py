@@ -292,7 +292,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.agent = self._make_agent()
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
-        test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv:8448/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -393,7 +393,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["proxy.com"] = "9.9.9.9"
-        test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv:8448/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -532,7 +532,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.4"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://1.2.3.4/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://1.2.3.4/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -568,7 +568,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
 
-        test_d = self._make_get_request(b"matrix://[::1]/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://[::1]/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -604,7 +604,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
 
-        test_d = self._make_get_request(b"matrix://[::1]:80/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://[::1]:80/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -639,7 +639,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv1"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv1/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv1/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -693,7 +693,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.5"] = "1.2.3.5"
 
-        test_d = self._make_get_request(b"matrix://1.2.3.5/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://1.2.3.5/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -725,7 +725,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -780,7 +780,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -844,7 +844,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -933,7 +933,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1009,7 +1009,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             ),
         )
 
-        test_d = agent.request(b"GET", b"matrix://testserv/foo/bar")
+        test_d = agent.request(b"GET", b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1042,7 +1042,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
         self.reactor.lookups["srvtarget"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1082,7 +1082,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["srvtarget"] = "5.6.7.8"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1143,7 +1143,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.lookups["xn--bcher-kva.com"] = "1.2.3.4"
 
         # this is idna for bücher.com
-        test_d = self._make_get_request(b"matrix://xn--bcher-kva.com/foo/bar")
+        test_d = self._make_get_request(
+            b"matrix-federation://xn--bcher-kva.com/foo/bar"
+        )
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1204,7 +1206,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
         self.reactor.lookups["xn--trget-3qa.com"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://xn--bcher-kva.com/foo/bar")
+        test_d = self._make_get_request(
+            b"matrix-federation://xn--bcher-kva.com/foo/bar"
+        )
 
         # Nothing happened yet
         self.assertNoResult(test_d)
@@ -1411,7 +1415,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
         self.reactor.lookups["target.com"] = "1.2.3.4"
 
-        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+        test_d = self._make_get_request(b"matrix-federation://testserv/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)

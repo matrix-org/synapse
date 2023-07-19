@@ -308,6 +308,8 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         logger.info("[purge] done")
 
+        self._invalidate_caches_for_room_events_and_stream(txn, room_id)
+
         return referenced_state_groups
 
     async def purge_room(self, room_id: str) -> List[int]:
@@ -485,10 +487,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         #       index on them. In any case we should be clearing out 'stream' tables
         #       periodically anyway (#5888)
 
-        # TODO: we could probably usefully do a bunch more cache invalidation here
-
-        # XXX: as with purge_history, this is racy, but no worse than other races
-        #   that already exist.
-        self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
+        self._invalidate_caches_for_room_and_stream(txn, room_id)
 
         return state_groups

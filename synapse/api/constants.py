@@ -123,10 +123,6 @@ class EventTypes:
     SpaceChild: Final = "m.space.child"
     SpaceParent: Final = "m.space.parent"
 
-    MSC2716_INSERTION: Final = "org.matrix.msc2716.insertion"
-    MSC2716_BATCH: Final = "org.matrix.msc2716.batch"
-    MSC2716_MARKER: Final = "org.matrix.msc2716.marker"
-
     Reaction: Final = "m.reaction"
 
 
@@ -222,21 +218,11 @@ class EventContentFields:
     # Used in m.room.guest_access events.
     GUEST_ACCESS: Final = "guest_access"
 
-    # Used on normal messages to indicate they were historically imported after the fact
-    MSC2716_HISTORICAL: Final = "org.matrix.msc2716.historical"
-    # For "insertion" events to indicate what the next batch ID should be in
-    # order to connect to it
-    MSC2716_NEXT_BATCH_ID: Final = "next_batch_id"
-    # Used on "batch" events to indicate which insertion event it connects to
-    MSC2716_BATCH_ID: Final = "batch_id"
-    # For "marker" events
-    MSC2716_INSERTION_EVENT_REFERENCE: Final = "insertion_event_reference"
-
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
 
     # Use for mentioning users.
-    MSC3952_MENTIONS: Final = "org.matrix.msc3952.mentions"
+    MENTIONS: Final = "m.mentions"
 
     # an unspecced field added to to-device messages to identify them uniquely-ish
     TO_DEVICE_MSGID: Final = "org.matrix.msgid"

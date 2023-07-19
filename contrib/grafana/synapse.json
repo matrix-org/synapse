@@ -56,6 +56,17 @@
         "name": "Annotations & Alerts",
         "showIn": 0,
         "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "enable": true,
+        "expr": "changes(process_start_time_seconds{instance=\"matrix.org\",job=~\"synapse\"}[$bucket_size]) * on (instance, job) group_left(version) synapse_build_info{instance=\"matrix.org\",job=\"synapse\"}",
+        "iconColor": "purple",
+        "name": "deploys",
+        "titleFormat": "Deployed {{version}}"
       }
     ]
   },
@@ -671,6 +682,95 @@
       }
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 1,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 10,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 245,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "synapse_build_info{instance=\"$instance\", job=\"synapse\"} - 1",
+          "legendFormat": "version {{version}}",
+          "range": true,
+          "refId": "deployed_synapse_versions"
+        }
+      ],
+      "title": "Deployed Synapse versions over time",
+      "type": "timeseries"
+    },
+    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
@@ -809,6 +909,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -874,11 +975,13 @@
               "datasource": {
                 "uid": "$datasource"
               },
+              "editorMode": "code",
               "expr": "rate(process_cpu_system_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} system ",
               "metric": "",
+              "range": true,
               "refId": "B",
               "step": 20
             },
@@ -1328,6 +1431,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "fieldConfig": {
@@ -1368,7 +1472,15 @@
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
-          "seriesOverrides": [],
+          "seriesOverrides": [
+            {
+              "$$hashKey": "object:116",
+              "alias": "/^version .*/",
+              "lines": true,
+              "linewidth": 6,
+              "points": false
+            }
+          ],
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
@@ -1377,11 +1489,25 @@
               "datasource": {
                 "uid": "$datasource"
               },
+              "editorMode": "code",
               "expr": "min_over_time(up{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}}",
+              "range": true,
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "synapse_build_info{instance=\"$instance\", job=\"synapse\"} - 1",
+              "hide": false,
+              "legendFormat": "version {{version}}",
+              "range": true,
+              "refId": "deployed_synapse_versions"
             }
           ],
           "thresholds": [],
@@ -1788,7 +1914,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 56
+            "y": 28
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -1890,7 +2016,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 56
+            "y": 28
           },
           "hiddenSeries": false,
           "id": 33,
@@ -1982,7 +2108,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 40,
@@ -2070,7 +2196,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 46,
@@ -2161,7 +2287,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 72
+            "y": 44
           },
           "hiddenSeries": false,
           "id": 44,
@@ -2253,7 +2379,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 72
+            "y": 44
           },
           "hiddenSeries": false,
           "id": 45,
@@ -2354,7 +2480,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 79
+            "y": 51
           },
           "hiddenSeries": false,
           "id": 118,
@@ -2547,7 +2673,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 79
+            "y": 51
           },
           "id": 222,
           "options": {
@@ -2646,7 +2772,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 57
+            "y": 29
           },
           "hiddenSeries": false,
           "id": 4,
@@ -2768,7 +2894,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 57
+            "y": 29
           },
           "hiddenSeries": false,
           "id": 32,
@@ -2867,7 +2993,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 139,
@@ -2989,7 +3115,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 65
+            "y": 37
           },
           "hiddenSeries": false,
           "id": 52,
@@ -3111,7 +3237,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 73
+            "y": 45
           },
           "hiddenSeries": false,
           "id": 7,
@@ -3212,7 +3338,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 73
+            "y": 45
           },
           "hiddenSeries": false,
           "id": 47,
@@ -3310,7 +3436,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 81
+            "y": 53
           },
           "hiddenSeries": false,
           "id": 103,
@@ -3445,7 +3571,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 5
+            "y": 30
           },
           "hiddenSeries": false,
           "id": 99,
@@ -3467,7 +3593,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3538,7 +3664,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 5
+            "y": 30
           },
           "hiddenSeries": false,
           "id": 101,
@@ -3560,7 +3686,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3631,7 +3757,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 14
+            "y": 39
           },
           "hiddenSeries": false,
           "id": 138,
@@ -3651,7 +3777,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -3746,7 +3872,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 59
+            "y": 31
           },
           "hiddenSeries": false,
           "id": 79,
@@ -3846,7 +3972,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 59
+            "y": 31
           },
           "hiddenSeries": false,
           "id": 83,
@@ -3934,6 +4060,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "fieldConfig": {
@@ -3948,7 +4075,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 68
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 109,
@@ -3983,11 +4110,13 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations:total_total{instance=\"$instance\"}[$bucket_size]))",
+              "editorMode": "code",
+              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations_count_total{instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
               "legendFormat": "pdus",
+              "range": true,
               "refId": "A"
             },
             {
@@ -4052,7 +4181,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 68
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 111,
@@ -4130,6 +4259,250 @@
           }
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "description": "Triangular growth may indicate a problem with federation sending from the remote host --- but it may also be the case that everyone is asleep and no messages are being sent.\n\nSee https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#federation_metrics_domains",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 60,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 60
+                  }
+                ]
+              },
+              "unit": "m"
+            },
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "libera.chat "
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 49
+          },
+          "id": 243,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "(time() - max without (job, index, host) (avg_over_time(synapse_federation_last_received_pdu_time[10m]))) / 60",
+              "instant": false,
+              "legendFormat": "{{server_name}} ",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Age of last PDU received from nominated hosts",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "description": "Triangular growth may indicate a problem with federation senders on the monitored instance---but it may also be the case that everyone is asleep and no messages are being sent.\n\nSee https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#federation_metrics_domains",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 60,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 60
+                  }
+                ]
+              },
+              "unit": "m"
+            },
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "libera.chat"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 49
+          },
+          "id": 241,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "(time() - max without (job, index, host) (avg_over_time(synapse_federation_last_sent_pdu_time[10m]))) / 60",
+              "instant": false,
+              "legendFormat": "{{server_name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Age of last PDU sent to nominated hosts",
+          "type": "timeseries"
+        },
+        {
           "aliasColors": {},
           "bars": false,
           "dashLength": 10,
@@ -4148,10 +4521,10 @@
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
-            "h": 8,
+            "h": 9,
             "w": 12,
             "x": 0,
-            "y": 77
+            "y": 57
           },
           "hiddenSeries": false,
           "id": 142,
@@ -4259,7 +4632,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 77
+            "y": 57
           },
           "hiddenSeries": false,
           "id": 140,
@@ -4428,7 +4801,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 85
+            "y": 66
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4533,7 +4906,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 86
+            "y": 66
           },
           "hiddenSeries": false,
           "id": 162,
@@ -4745,11 +5118,26 @@
           "datasource": {
             "uid": "$datasource"
           },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 94
+            "y": 75
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4759,6 +5147,48 @@
             "show": false
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": -1,
+            "cellValues": {
+              "decimals": 2
+            },
+            "color": {
+              "exponent": 0.5,
+              "fill": "#b4ff00",
+              "min": 0,
+              "mode": "scheme",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Inferno",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": false
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "s"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
@@ -4798,6 +5228,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -4815,7 +5246,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 95
+            "y": 75
           },
           "hiddenSeries": false,
           "id": 203,
@@ -4837,7 +5268,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4850,11 +5281,13 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "synapse_federation_server_oldest_inbound_pdu_in_staging{job=\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "editorMode": "code",
+              "expr": "synapse_federation_server_oldest_inbound_pdu_in_staging{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "rss {{index}}",
+              "legendFormat": "{{job}}-{{index}}",
+              "range": true,
               "refId": "A",
               "step": 4
             }
@@ -4899,6 +5332,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "editable": true,
@@ -4916,7 +5350,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 103
+            "y": 84
           },
           "hiddenSeries": false,
           "id": 202,
@@ -4938,7 +5372,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4951,11 +5385,13 @@
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "synapse_federation_server_number_inbound_pdu_in_staging{job=\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "editorMode": "code",
+              "expr": "synapse_federation_server_number_inbound_pdu_in_staging{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "rss {{index}}",
+              "legendFormat": "{{job}}-{{index}}",
+              "range": true,
               "refId": "A",
               "step": 4
             }
@@ -5009,7 +5445,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 104
+            "y": 84
           },
           "hiddenSeries": false,
           "id": 205,
@@ -5029,7 +5465,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -5115,6 +5551,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5162,7 +5600,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 1
+            "y": 154
           },
           "id": 239,
           "options": {
@@ -5201,6 +5639,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5248,7 +5688,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 1
+            "y": 154
           },
           "id": 235,
           "options": {
@@ -5288,6 +5728,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5335,7 +5777,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 9
+            "y": 162
           },
           "id": 237,
           "options": {
@@ -5376,6 +5818,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5423,7 +5867,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 9
+            "y": 162
           },
           "id": 233,
           "options": {
@@ -5474,7 +5918,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 17
+            "y": 170
           },
           "hiddenSeries": false,
           "id": 229,
@@ -5497,7 +5941,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -5709,6 +6153,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -5773,7 +6219,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 17
+            "y": 170
           },
           "id": 231,
           "options": {
@@ -5832,65 +6278,96 @@
       "id": 60,
       "panels": [
         {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
-              "links": []
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "hertz"
             },
             "overrides": []
           },
-          "fill": 1,
-          "fillGradient": 0,
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 32
+            "y": 155
           },
-          "hiddenSeries": false,
           "id": 51,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
           "links": [],
-          "nullPointMode": "null",
           "options": {
-            "alertThreshold": true
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
           },
-          "paceLength": 10,
-          "percentage": false,
-          "pluginVersion": "8.4.3",
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
+          "pluginVersion": "9.2.2",
           "targets": [
             {
               "datasource": {
                 "uid": "$datasource"
               },
+              "editorMode": "code",
               "expr": "rate(synapse_http_httppusher_http_pushes_processed_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed_total + synapse_http_httppusher_http_pushes_processed_total) > 0",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
-              "legendFormat": "processed {{job}}",
+              "legendFormat": "processed {{job}}-{{index}}",
+              "range": true,
               "refId": "A",
               "step": 20
             },
@@ -5898,43 +6375,18 @@
               "datasource": {
                 "uid": "$datasource"
               },
+              "editorMode": "code",
               "expr": "rate(synapse_http_httppusher_http_pushes_failed_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed_total + synapse_http_httppusher_http_pushes_processed_total) > 0",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "failed {{job}}",
+              "legendFormat": "failed {{job}}-{{index}}",
+              "range": true,
               "refId": "B",
               "step": 20
             }
           ],
-          "thresholds": [],
-          "timeRegions": [],
           "title": "HTTP Push rate",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "hertz",
-              "logBase": 1,
-              "show": true
-            },
-            {
-              "format": "short",
-              "logBase": 1,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false
-          }
+          "type": "timeseries"
         },
         {
           "aliasColors": {},
@@ -5957,7 +6409,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 32
+            "y": 155
           },
           "hiddenSeries": false,
           "id": 134,
@@ -5978,7 +6430,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "8.4.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -7344,7 +7796,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 158
           },
           "hiddenSeries": false,
           "id": 12,
@@ -7367,7 +7819,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7442,7 +7894,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 35
+            "y": 158
           },
           "hiddenSeries": false,
           "id": 26,
@@ -7465,7 +7917,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7541,7 +7993,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 48
+            "y": 171
           },
           "hiddenSeries": false,
           "id": 13,
@@ -7564,7 +8016,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7645,7 +8097,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 48
+            "y": 171
           },
           "hiddenSeries": false,
           "id": 27,
@@ -7668,7 +8120,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7743,7 +8195,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 184
           },
           "hiddenSeries": false,
           "id": 28,
@@ -7765,7 +8217,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7840,7 +8292,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 61
+            "y": 184
           },
           "hiddenSeries": false,
           "id": 25,
@@ -7862,7 +8314,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -7930,7 +8382,7 @@
             "h": 15,
             "w": 12,
             "x": 0,
-            "y": 74
+            "y": 197
           },
           "hiddenSeries": false,
           "id": 154,
@@ -7951,7 +8403,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -9363,7 +9815,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 40
+            "y": 162
           },
           "hiddenSeries": false,
           "id": 43,
@@ -9385,7 +9837,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -9449,6 +9901,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -9498,7 +9952,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 40
+            "y": 162
           },
           "id": 41,
           "links": [],
@@ -9545,6 +9999,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -9595,7 +10051,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 47
+            "y": 169
           },
           "id": 42,
           "links": [],
@@ -9642,6 +10098,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "axisSoftMin": 1,
@@ -9693,7 +10151,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 47
+            "y": 169
           },
           "id": 220,
           "links": [],
@@ -9751,7 +10209,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 54
+            "y": 176
           },
           "hiddenSeries": false,
           "id": 144,
@@ -9771,7 +10229,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -9844,7 +10302,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 54
+            "y": 176
           },
           "hiddenSeries": false,
           "id": 115,
@@ -9866,7 +10324,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -9938,7 +10396,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 183
           },
           "hiddenSeries": false,
           "id": 113,
@@ -9960,7 +10418,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -10058,7 +10516,6 @@
           },
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10069,7 +10526,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 41
+            "y": 163
           },
           "hiddenSeries": false,
           "id": 67,
@@ -10091,7 +10548,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.3.7",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -10154,7 +10611,6 @@
           },
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10165,7 +10621,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 41
+            "y": 163
           },
           "hiddenSeries": false,
           "id": 71,
@@ -10187,7 +10643,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.3.7",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -10250,7 +10706,6 @@
           },
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10261,7 +10716,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 172
           },
           "hiddenSeries": false,
           "id": 121,
@@ -10284,7 +10739,7 @@
           },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.3.7",
+          "pluginVersion": "9.2.2",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -10383,7 +10838,16 @@
           "description": "Colour reflects the number of rooms with the given number of forward extremities, or fewer.\n\nThis is only updated once an hour.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10401,6 +10865,46 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#B877D9",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
@@ -10442,7 +10946,6 @@
           "description": "Number of rooms with the given number of forward extremities or fewer.\n\nThis is only updated once an hour.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10471,8 +10974,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "connected",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -10543,7 +11049,16 @@
           "description": "Colour reflects the number of events persisted to rooms with the given number of forward extremities, or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10561,6 +11076,46 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#5794F2",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
@@ -10602,7 +11157,6 @@
           "description": "For a given percentage P, the number X where P% of events were persisted to rooms with X forward extremities or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10630,8 +11184,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -10732,7 +11289,16 @@
           "description": "Colour reflects the number of events persisted to rooms with the given number of stale forward extremities, or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10750,6 +11316,46 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#FF9830",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
@@ -10791,7 +11397,6 @@
           "description": "For  given percentage P, the number X where P% of events were persisted to rooms with X stale forward extremities or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -10819,8 +11424,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -10921,7 +11529,16 @@
           "description": "Colour reflects the number of state resolution operations performed over the given number of state groups, or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
             },
             "overrides": []
           },
@@ -10939,6 +11556,46 @@
             "show": true
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": 1,
+            "cellValues": {},
+            "color": {
+              "exponent": 0.5,
+              "fill": "#73BF69",
+              "min": 0,
+              "mode": "opacity",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "short"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
@@ -10976,12 +11633,12 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$datasource"
           },
           "description": "For a given percentage P, the number X where P% of state resolution operations took place over X state groups or fewer.",
           "fieldConfig": {
             "defaults": {
-              "custom": {},
               "links": []
             },
             "overrides": []
@@ -11010,8 +11667,11 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -11024,11 +11684,13 @@
               "datasource": {
                 "uid": "$datasource"
               },
+              "editorMode": "code",
               "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
               "legendFormat": "50%",
+              "range": true,
               "refId": "A"
             },
             {
@@ -11106,12 +11768,6 @@
             "uid": "$datasource"
           },
           "description": "When we do a state res while persisting events we try and see if we can prune any stale extremities.",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -11134,8 +11790,11 @@
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -12218,6 +12877,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -12266,7 +12927,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 47
           },
           "id": 191,
           "options": {
@@ -12314,7 +12975,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 47
           },
           "hiddenSeries": false,
           "id": 193,
@@ -12334,7 +12995,7 @@
             "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "9.0.4",
+          "pluginVersion": "9.2.2",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -12404,11 +13065,26 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 54
+            "y": 55
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -12418,6 +13094,48 @@
             "show": false
           },
           "links": [],
+          "options": {
+            "calculate": false,
+            "calculation": {},
+            "cellGap": -1,
+            "cellValues": {
+              "decimals": 2
+            },
+            "color": {
+              "exponent": 0.5,
+              "fill": "#b4ff00",
+              "min": 0,
+              "mode": "scheme",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Inferno",
+              "steps": 128
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": false
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "showValue": "never",
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "decimals": 0,
+              "reverse": false,
+              "unit": "s"
+            }
+          },
+          "pluginVersion": "9.2.2",
           "reverseYBuckets": false,
           "targets": [
             {
@@ -12463,6 +13181,8 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -12507,7 +13227,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 54
+            "y": 55
           },
           "id": 223,
           "options": {
@@ -12757,6 +13477,6 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 150,
+  "version": 160,
   "weekStart": ""
 }

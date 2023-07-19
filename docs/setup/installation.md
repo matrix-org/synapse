@@ -200,7 +200,7 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.7 or later, up to Python 3.11.
+- Python 3.8 or later, up to Python 3.11.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 If building on an uncommon architecture for which pre-built wheels are

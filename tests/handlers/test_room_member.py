@@ -333,6 +333,27 @@ class RoomMemberMasterHandlerTestCase(HomeserverTestCase):
             self.get_success(self.store.is_locally_forgotten_room(self.room_id))
         )
 
+    def test_leave_and_unforget(self) -> None:
+        """Tests if rejoining a room unforgets the room, so that it shows up in sync again."""
+        self.helper.join(self.room_id, user=self.bob, tok=self.bob_token)
+
+        # alice is not the last room member that leaves and forgets the room
+        self.helper.leave(self.room_id, user=self.alice, tok=self.alice_token)
+        self.get_success(self.handler.forget(self.alice_ID, self.room_id))
+        self.assertTrue(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
+        )
+
+        self.helper.join(self.room_id, user=self.alice, tok=self.alice_token)
+        self.assertFalse(
+            self.get_success(self.store.did_forget(self.alice, self.room_id))
+        )
+
+        # the server has not forgotten the room
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room_id))
+        )
+
     @override_config({"forget_rooms_on_leave": True})
     def test_leave_and_auto_forget(self) -> None:
         """Tests the `forget_rooms_on_leave` config option."""

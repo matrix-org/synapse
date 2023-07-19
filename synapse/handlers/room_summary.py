@@ -564,9 +564,9 @@ class RoomSummaryHandler:
             join_rule = join_rules_event.content.get("join_rule")
             if (
                 join_rule == JoinRules.PUBLIC
-                or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+                or (room_version.knock_join_rule and join_rule == JoinRules.KNOCK)
                 or (
-                    room_version.msc3787_knock_restricted_join_rule
+                    room_version.knock_restricted_join_rule
                     and join_rule == JoinRules.KNOCK_RESTRICTED
                 )
             ):

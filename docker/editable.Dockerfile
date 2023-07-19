@@ -10,7 +10,7 @@ ARG PYTHON_VERSION=3.9
 ###
 # We hardcode the use of Debian bullseye here because this could change upstream
 # and other Dockerfiles used for testing are expecting bullseye.
-FROM docker.io/python:${PYTHON_VERSION}-slim-bullseye
+FROM docker.io/library/python:${PYTHON_VERSION}-slim-bullseye
 
 # Install Rust and other dependencies (stolen from normal Dockerfile)
 # install the OS build deps

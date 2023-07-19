@@ -171,6 +171,7 @@ from functools import wraps
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Collection,
     ContextManager,
@@ -903,6 +904,7 @@ def _custom_sync_async_decorator(
     """
 
     if inspect.iscoroutinefunction(func):
+        # For this branch, we handle async functions like `async def func() -> RInner`.
         # In this branch, R = Awaitable[RInner], for some other type RInner
         @wraps(func)
         async def _wrapper(
@@ -914,15 +916,16 @@ def _custom_sync_async_decorator(
                 return await func(*args, **kwargs)  # type: ignore[misc]
 
     else:
-        # The other case here handles both sync functions and those
-        # decorated with inlineDeferred.
+        # The other case here handles sync functions including those decorated with
+        # `@defer.inlineCallbacks` or that return a `Deferred` or other `Awaitable`.
         @wraps(func)
-        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
             scope = wrapping_logic(func, *args, **kwargs)
             scope.__enter__()
 
             try:
                 result = func(*args, **kwargs)
+
                 if isinstance(result, defer.Deferred):
 
                     def call_back(result: R) -> R:
@@ -930,20 +933,32 @@ def _custom_sync_async_decorator(
                         return result
 
                     def err_back(result: R) -> R:
+                        # TODO: Pass the error details into `scope.__exit__(...)` for
+                        #       consistency with the other paths.
                         scope.__exit__(None, None, None)
                         return result
 
                     result.addCallbacks(call_back, err_back)
 
-                else:
-                    if inspect.isawaitable(result):
-                        logger.error(
-                            "@trace may not have wrapped %s correctly! "
-                            "The function is not async but returned a %s.",
-                            func.__qualname__,
-                            type(result).__name__,
-                        )
+                elif inspect.isawaitable(result):
 
+                    async def wrap_awaitable() -> Any:
+                        try:
+                            assert isinstance(result, Awaitable)
+                            awaited_result = await result
+                            scope.__exit__(None, None, None)
+                            return awaited_result
+                        except Exception as e:
+                            scope.__exit__(type(e), None, e.__traceback__)
+                            raise
+
+                    # The original method returned an awaitable, eg. a coroutine, so we
+                    # create another awaitable wrapping it that calls
+                    # `scope.__exit__(...)`.
+                    return wrap_awaitable()
+                else:
+                    # Just a simple sync function so we can just exit the scope and
+                    # return the result without any fuss.
                     scope.__exit__(None, None, None)
 
                 return result
@@ -1055,7 +1070,7 @@ def trace_servlet(
         tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
         tags.HTTP_METHOD: request.get_method(),
         tags.HTTP_URL: request.get_redacted_uri(),
-        tags.PEER_HOST_IPV6: request.getClientAddress().host,
+        tags.PEER_HOST_IPV6: request.get_client_ip_if_available(),
     }
 
     request_name = request.request_metrics.name
@@ -1076,9 +1091,11 @@ def trace_servlet(
             # with JsonResource).
             scope.span.set_operation_name(request.request_metrics.name)
 
+            # Mypy seems to think that start_context.tag below can be Optional[str], but
+            # that doesn't appear to be correct and works in practice.
             request_tags[
                 SynapseTags.REQUEST_TAG
-            ] = request.request_metrics.start_context.tag
+            ] = request.request_metrics.start_context.tag  # type: ignore[assignment]
 
             # set the tags *after* the servlet completes, in case it decided to
             # prioritise the span (tags will get dropped on unprioritised spans)

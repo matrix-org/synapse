@@ -67,8 +67,6 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.hs = self.setup_test_homeserver(
             "red",
-            federation_http_client=None,
-            federation_client=Mock(),
         )
 
         self.hs.get_federation_handler = Mock()  # type: ignore[assignment]
@@ -1938,6 +1936,43 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
         self.assertEqual(
             "You don't have permission to post that to the room. "
             + "user_level (0) < send_level (50)",
+            channel.json_body["error"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "private_chat": {
+                    "events": {
+                        "m.room.avatar": 50,
+                        "m.room.canonical_alias": 50,
+                        "m.room.encryption": 999,
+                        "m.room.history_visibility": 100,
+                        "m.room.name": 50,
+                        "m.room.power_levels": 100,
+                        "m.room.server_acl": 100,
+                        "m.room.tombstone": 100,
+                    },
+                    "events_default": 0,
+                },
+            }
+        },
+    )
+    def test_config_override_blocks_encrypted_room(self) -> None:
+        # Given the server has config for private_chats,
+
+        # When I attempt to create an encrypted private_chat room
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            '{"creation_content": {"m.federate": false},"name": "Secret Private Room","preset": "private_chat","initial_state": [{"type": "m.room.encryption","state_key": "","content": {"algorithm": "m.megolm.v1.aes-sha2"}}]}',
+        )
+
+        # Then I am not allowed because the required power level is unattainable
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "You cannot create an encrypted room. "
+            + "user_level (100) < send_level (999)",
             channel.json_body["error"],
         )
 

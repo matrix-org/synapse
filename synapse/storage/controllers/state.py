@@ -485,7 +485,7 @@ class StateStorageController:
         if not event:
             return None
 
-        return event.content.get("canonical_alias")
+        return event.content.get("alias")
 
     @trace
     @tag_args

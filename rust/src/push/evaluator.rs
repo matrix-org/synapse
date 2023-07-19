@@ -70,7 +70,9 @@ pub struct PushRuleEvaluator {
     /// The "content.body", if any.
     body: String,
 
-    /// True if the event has a mentions property and MSC3952 support is enabled.
+    /// True if the event has a m.mentions property. (Note that this is a separate
+    /// flag instead of checking flattened_keys since the m.mentions property
+    /// might be an empty map and not appear in flattened_keys.
     has_mentions: bool,
 
     /// The number of users in the room.
@@ -155,9 +157,7 @@ impl PushRuleEvaluator {
             let rule_id = &push_rule.rule_id().to_string();
 
             // For backwards-compatibility the legacy mention rules are disabled
-            // if the event contains the 'm.mentions' property (and if the
-            // experimental feature is enabled, both of these are represented
-            // by the has_mentions flag).
+            // if the event contains the 'm.mentions' property.
             if self.has_mentions
                 && (rule_id == "global/override/.m.rule.contains_display_name"
                     || rule_id == "global/content/.m.rule.contains_user_name"
@@ -562,7 +562,7 @@ fn test_requires_room_version_supports_condition() {
     };
     let rules = PushRules::new(vec![custom_rule]);
     result = evaluator.run(
-        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true, false, false),
+        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true, false),
         None,
         None,
     );

@@ -80,11 +80,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank Jr.",
         )
 
@@ -96,11 +92,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank",
         )
 
@@ -112,7 +104,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            self.get_success(self.store.get_profile_displayname(self.frank.localpart))
+            self.get_success(self.store.get_profile_displayname(self.frank))
         )
 
     def test_set_my_name_if_disabled(self) -> None:
@@ -122,11 +114,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.set_profile_displayname(self.frank, "Frank"))
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank",
         )
 
@@ -201,7 +189,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/pic.gif",
         )
 
@@ -215,7 +203,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/me.png",
         )
 
@@ -229,7 +217,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
         )
 
     def test_set_my_avatar_if_disabled(self) -> None:
@@ -241,7 +229,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/me.png",
         )
 

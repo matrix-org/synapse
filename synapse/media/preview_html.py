@@ -24,6 +24,7 @@ from typing import (
     Optional,
     Set,
     Union,
+    cast,
 )
 
 if TYPE_CHECKING:
@@ -115,7 +116,7 @@ def _get_html_media_encodings(
 
 def decode_body(
     body: bytes, uri: str, content_type: Optional[str] = None
-) -> Optional["etree.Element"]:
+) -> Optional["etree._Element"]:
     """
     This uses lxml to parse the HTML document.
 
@@ -152,11 +153,12 @@ def decode_body(
 
     # Attempt to parse the body. Returns None if the body was successfully
     # parsed, but no tree was found.
-    return etree.fromstring(body, parser)
+    # TODO Develop of lxml-stubs has this correct.
+    return etree.fromstring(body, parser)  # type: ignore[arg-type]
 
 
 def _get_meta_tags(
-    tree: "etree.Element",
+    tree: "etree._Element",
     property: str,
     prefix: str,
     property_mapper: Optional[Callable[[str], Optional[str]]] = None,
@@ -175,9 +177,15 @@ def _get_meta_tags(
     Returns:
         A map of tag name to value.
     """
+    # This actually returns Dict[str, str], but the caller sets this as a variable
+    # which is Dict[str, Optional[str]].
     results: Dict[str, Optional[str]] = {}
-    for tag in tree.xpath(
-        f"//*/meta[starts-with(@{property}, '{prefix}:')][@content][not(@content='')]"
+    # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+    for tag in cast(
+        List["etree._Element"],
+        tree.xpath(
+            f"//*/meta[starts-with(@{property}, '{prefix}:')][@content][not(@content='')]"
+        ),
     ):
         # if we've got more than 50 tags, someone is taking the piss
         if len(results) >= 50:
@@ -187,14 +195,15 @@ def _get_meta_tags(
             )
             return {}
 
-        key = tag.attrib[property]
+        key = cast(str, tag.attrib[property])
         if property_mapper:
-            key = property_mapper(key)
+            new_key = property_mapper(key)
             # None is a special value used to ignore a value.
-            if key is None:
+            if new_key is None:
                 continue
+            key = new_key
 
-        results[key] = tag.attrib["content"]
+        results[key] = cast(str, tag.attrib["content"])
 
     return results
 
@@ -219,7 +228,7 @@ def _map_twitter_to_open_graph(key: str) -> Optional[str]:
     return "og" + key[7:]
 
 
-def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
+def parse_html_to_open_graph(tree: "etree._Element") -> Dict[str, Optional[str]]:
     """
     Parse the HTML document into an Open Graph response.
 
@@ -276,24 +285,36 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
 
     if "og:title" not in og:
         # Attempt to find a title from the title tag, or the biggest header on the page.
-        title = tree.xpath("((//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1])/text()")
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+        title = cast(
+            List["etree._ElementUnicodeResult"],
+            tree.xpath("((//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1])/text()"),
+        )
         if title:
             og["og:title"] = title[0].strip()
         else:
             og["og:title"] = None
 
     if "og:image" not in og:
-        meta_image = tree.xpath(
-            "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image'][not(@content='')]/@content[1]"
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+        meta_image = cast(
+            List["etree._ElementUnicodeResult"],
+            tree.xpath(
+                "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image'][not(@content='')]/@content[1]"
+            ),
         )
         # If a meta image is found, use it.
         if meta_image:
             og["og:image"] = meta_image[0]
         else:
             # Try to find images which are larger than 10px by 10px.
+            # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
             #
             # TODO: consider inlined CSS styles as well as width & height attribs
-            images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
+            images = cast(
+                List["etree._Element"],
+                tree.xpath("//img[@src][number(@width)>10][number(@height)>10]"),
+            )
             images = sorted(
                 images,
                 key=lambda i: (
@@ -302,20 +323,29 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
             )
             # If no images were found, try to find *any* images.
             if not images:
-                images = tree.xpath("//img[@src][1]")
+                # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+                images = cast(List["etree._Element"], tree.xpath("//img[@src][1]"))
             if images:
-                og["og:image"] = images[0].attrib["src"]
+                og["og:image"] = cast(str, images[0].attrib["src"])
 
             # Finally, fallback to the favicon if nothing else.
             else:
-                favicons = tree.xpath("//link[@href][contains(@rel, 'icon')]/@href[1]")
+                # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+                favicons = cast(
+                    List["etree._ElementUnicodeResult"],
+                    tree.xpath("//link[@href][contains(@rel, 'icon')]/@href[1]"),
+                )
                 if favicons:
                     og["og:image"] = favicons[0]
 
     if "og:description" not in og:
         # Check the first meta description tag for content.
-        meta_description = tree.xpath(
-            "//*/meta[translate(@name, 'DESCRIPTION', 'description')='description'][not(@content='')]/@content[1]"
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+        meta_description = cast(
+            List["etree._ElementUnicodeResult"],
+            tree.xpath(
+                "//*/meta[translate(@name, 'DESCRIPTION', 'description')='description'][not(@content='')]/@content[1]"
+            ),
         )
         # If a meta description is found with content, use it.
         if meta_description:
@@ -332,7 +362,7 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     return og
 
 
-def parse_html_description(tree: "etree.Element") -> Optional[str]:
+def parse_html_description(tree: "etree._Element") -> Optional[str]:
     """
     Calculate a text description based on an HTML document.
 
@@ -368,6 +398,9 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
         "canvas",
         "img",
         "picture",
+        # etree.Comment is a function which creates an etree._Comment element.
+        # The "tag" attribute of an etree._Comment instance is confusingly the
+        # etree.Comment function instead of a string.
         etree.Comment,
     }
 
@@ -381,8 +414,8 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
 
 def _iterate_over_text(
-    tree: Optional["etree.Element"],
-    tags_to_ignore: Set[Union[str, "etree.Comment"]],
+    tree: Optional["etree._Element"],
+    tags_to_ignore: Set[object],
     stack_limit: int = 1024,
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
@@ -402,7 +435,7 @@ def _iterate_over_text(
 
     # This is a stack whose items are elements to iterate over *or* strings
     # to be returned.
-    elements: List[Union[str, "etree.Element"]] = [tree]
+    elements: List[Union[str, "etree._Element"]] = [tree]
     while elements:
         el = elements.pop()
 

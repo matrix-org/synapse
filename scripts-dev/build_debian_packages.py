@@ -20,15 +20,20 @@ from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
 from typing import Collection, Optional, Sequence, Set
 
+# These are expanded inside the dockerfile to be a fully qualified image name.
+# e.g. docker.io/library/debian:bullseye
+#
+# If an EOL is forced by a Python version and we're dropping support for it, make sure
+# to remove references to the distibution across Synapse (search for "bullseye" for
+# example)
 DISTS = (
-    "debian:buster",  # oldstable: EOL 2022-08
-    "debian:bullseye",
-    "debian:bookworm",
-    "debian:sid",
-    "ubuntu:focal",  # 20.04 LTS (our EOL forced by Py38 on 2024-10-14)
-    "ubuntu:jammy",  # 22.04 LTS (EOL 2027-04)
-    "ubuntu:kinetic",  # 22.10 (EOL 2023-07-20)
-    "ubuntu:lunar",  # 23.04 (EOL 2024-01)
+    "debian:bullseye",  # (EOL ~2024-07) (our EOL forced by Python 3.9 is 2025-10-05)
+    "debian:bookworm",  # (EOL not specified yet) (our EOL forced by Python 3.11 is 2027-10-24)
+    "debian:sid",  # (EOL not specified yet) (our EOL forced by Python 3.11 is 2027-10-24)
+    "ubuntu:focal",  # 20.04 LTS (EOL 2025-04) (our EOL forced by Python 3.8 is 2024-10-14)
+    "ubuntu:jammy",  # 22.04 LTS (EOL 2027-04) (our EOL forced by Python 3.10 is 2026-10-04)
+    "ubuntu:kinetic",  # 22.10 (EOL 2023-07-20) (our EOL forced by Python 3.10 is 2026-10-04)
+    "ubuntu:lunar",  # 23.04 (EOL 2024-01) (our EOL forced by Python 3.11 is 2027-10-24)
 )
 
 DESC = """\

@@ -205,16 +205,22 @@ class RelationsHandler:
             event_id: The event IDs to look and redact relations of.
             initial_redaction_event: The redaction for the event referred to by
                 event_id.
-            relation_types: The types of relations to look for.
+            relation_types: The types of relations to look for. If "*" is in the list,
+                all related events will be redacted regardless of the type.
 
         Raises:
             ShadowBanError if the requester is shadow-banned
         """
-        related_event_ids = (
-            await self._main_store.get_all_relations_for_event_with_types(
-                event_id, relation_types
+        if "*" in relation_types:
+            related_event_ids = await self._main_store.get_all_relations_for_event(
+                event_id
             )
-        )
+        else:
+            related_event_ids = (
+                await self._main_store.get_all_relations_for_event_with_types(
+                    event_id, relation_types
+                )
+            )
 
         for related_event_id in related_event_ids:
             try:
