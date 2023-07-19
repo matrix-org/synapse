@@ -62,7 +62,6 @@ from synapse.types import (
     get_domain_from_id,
     get_localpart_from_id,
 )
-from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -771,9 +770,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
-        for p in profiles:
-            txn.call_after(self.get_user_in_directory.invalidate, (p.user_id,))
-
     async def add_users_who_share_private_room(
         self, room_id: str, user_id_tuples: Iterable[Tuple[str, str]]
     ) -> None:
@@ -831,14 +827,12 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             txn.execute(f"{truncate} user_directory_search")
             txn.execute(f"{truncate} users_in_public_rooms")
             txn.execute(f"{truncate} users_who_share_private_rooms")
-            txn.call_after(self.get_user_in_directory.invalidate_all)
 
         await self.db_pool.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
         )
 
-    @cached()
-    async def get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
+    async def _get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
         return await self.db_pool.simple_select_one(
             table="user_directory",
             keyvalues={"user_id": user_id},
@@ -900,7 +894,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 table="users_who_share_private_rooms",
                 keyvalues={"other_user_id": user_id},
             )
-            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
         await self.db_pool.runInteraction(
             "remove_from_user_dir", _remove_from_user_dir_txn
@@ -1061,12 +1054,15 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             # The array of numbers are the weights for the various part of the
             # search: (domain, _, display name, localpart)
             sql = """
+                WITH matching_users AS (
+                    SELECT user_id, vector FROM user_directory_search WHERE vector @@ to_tsquery('simple', ?)
+                    LIMIT 10000
+                )
                 SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search as t
+                FROM matching_users as t
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
                     %(where_clause)s
-                    AND vector @@ to_tsquery('simple', ?)
                 ORDER BY
                     (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
@@ -1095,8 +1091,9 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 "order_case_statements": " ".join(additional_ordering_statements),
             }
             args = (
-                join_args
-                + (full_query, exact_query, prefix_query)
+                (full_query,)
+                + join_args
+                + (exact_query, prefix_query)
                 + ordering_arguments
                 + (limit + 1,)
             )

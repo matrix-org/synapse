@@ -601,18 +601,6 @@ class FederationEventHandler:
                 room_id, [(event, context)]
             )
 
-            # If we're joining the room again, check if there is new marker
-            # state indicating that there is new history imported somewhere in
-            # the DAG. Multiple markers can exist in the current state with
-            # unique state_keys.
-            #
-            # Do this after the state from the remote join was persisted (via
-            # `persist_events_and_notify`). Otherwise we can run into a
-            # situation where the create event doesn't exist yet in the
-            # `current_state_events`
-            for e in state:
-                await self._handle_marker_event(origin, e)
-
             return stream_id_after_persist
 
     async def update_state_for_partial_state_event(
@@ -915,13 +903,6 @@ class FederationEventHandler:
             )
         )
 
-        # We construct the event lists in source order from `/backfill` response because
-        # it's a) easiest, but also b) the order in which we process things matters for
-        # MSC2716 historical batches because many historical events are all at the same
-        # `depth` and we rely on the tenuous sort that the other server gave us and hope
-        # they're doing their best. The brittle nature of this ordering for historical
-        # messages over federation is one of the reasons why we don't want to continue
-        # on MSC2716 until we have online topological ordering.
         events_with_failed_pull_attempts, fresh_events = partition(
             new_events, lambda e: e.event_id in event_ids_with_failed_pull_attempts
         )
@@ -1460,8 +1441,6 @@ class FederationEventHandler:
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
 
-        await self._handle_marker_event(origin, event)
-
         if backfilled or context.rejected:
             return
 
@@ -1558,94 +1537,6 @@ class FederationEventHandler:
                 )
         except Exception:
             logger.exception("Failed to resync device for %s", sender)
-
-    @trace
-    async def _handle_marker_event(self, origin: str, marker_event: EventBase) -> None:
-        """Handles backfilling the insertion event when we receive a marker
-        event that points to one.
-
-        Args:
-            origin: Origin of the event. Will be called to get the insertion event
-            marker_event: The event to process
-        """
-
-        if marker_event.type != EventTypes.MSC2716_MARKER:
-            # Not a marker event
-            return
-
-        if marker_event.rejected_reason is not None:
-            # Rejected event
-            return
-
-        # Skip processing a marker event if the room version doesn't
-        # support it or the event is not from the room creator.
-        room_version = await self._store.get_room_version(marker_event.room_id)
-        create_event = await self._store.get_create_event_for_room(marker_event.room_id)
-        if not room_version.msc2175_implicit_room_creator:
-            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
-        else:
-            room_creator = create_event.sender
-        if not room_version.msc2716_historical and (
-            not self._config.experimental.msc2716_enabled
-            or marker_event.sender != room_creator
-        ):
-            return
-
-        logger.debug("_handle_marker_event: received %s", marker_event)
-
-        insertion_event_id = marker_event.content.get(
-            EventContentFields.MSC2716_INSERTION_EVENT_REFERENCE
-        )
-
-        if insertion_event_id is None:
-            # Nothing to retrieve then (invalid marker)
-            return
-
-        already_seen_insertion_event = await self._store.have_seen_event(
-            marker_event.room_id, insertion_event_id
-        )
-        if already_seen_insertion_event:
-            # No need to process a marker again if we have already seen the
-            # insertion event that it was pointing to
-            return
-
-        logger.debug(
-            "_handle_marker_event: backfilling insertion event %s", insertion_event_id
-        )
-
-        await self._get_events_and_persist(
-            origin,
-            marker_event.room_id,
-            [insertion_event_id],
-        )
-
-        insertion_event = await self._store.get_event(
-            insertion_event_id, allow_none=True
-        )
-        if insertion_event is None:
-            logger.warning(
-                "_handle_marker_event: server %s didn't return insertion event %s for marker %s",
-                origin,
-                insertion_event_id,
-                marker_event.event_id,
-            )
-            return
-
-        logger.debug(
-            "_handle_marker_event: succesfully backfilled insertion event %s from marker event %s",
-            insertion_event,
-            marker_event,
-        )
-
-        await self._store.insert_insertion_extremity(
-            insertion_event_id, marker_event.room_id
-        )
-
-        logger.debug(
-            "_handle_marker_event: insertion extremity added for %s from marker event %s",
-            insertion_event,
-            marker_event,
-        )
 
     async def backfill_event_id(
         self, destinations: List[str], room_id: str, event_id: str

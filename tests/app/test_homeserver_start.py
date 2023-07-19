@@ -25,9 +25,9 @@ class HomeserverAppStartTestCase(ConfigFileTestCase):
         # Add a blank line as otherwise the next addition ends up on a line with a comment
         self.add_lines_to_config(["  "])
         self.add_lines_to_config(["worker_app: test_worker_app"])
-        self.add_lines_to_config(["worker_replication_host: 127.0.0.1"])
-        self.add_lines_to_config(["worker_replication_http_port: 0"])
-
+        self.add_lines_to_config(["worker_log_config: /data/logconfig.config"])
+        self.add_lines_to_config(["instance_map:"])
+        self.add_lines_to_config(["  main:", "    host: 127.0.0.1", "    port: 1234"])
         # Ensure that starting master process with worker config raises an exception
         with self.assertRaises(ConfigError):
             synapse.app.homeserver.setup(["-c", self.config_file])

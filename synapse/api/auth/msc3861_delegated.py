@@ -59,7 +59,7 @@ def scope_to_list(scope: str) -> List[str]:
     return scope.strip().split(" ")
 
 
-class PrivateKeyJWTWithKid(PrivateKeyJWT):
+class PrivateKeyJWTWithKid(PrivateKeyJWT):  # type: ignore[misc]
     """An implementation of the private_key_jwt client auth method that includes a kid header.
 
     This is needed because some providers (Keycloak) require the kid header to figure

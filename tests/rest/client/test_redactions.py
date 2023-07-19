@@ -20,6 +20,8 @@ from synapse.api.room_versions import RoomVersions
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
 from synapse.server import HomeServer
+from synapse.storage._base import db_to_json
+from synapse.storage.database import LoggingTransaction
 from synapse.types import JsonDict
 from synapse.util import Clock
 
@@ -217,9 +219,9 @@ class RedactionsTestCase(HomeserverTestCase):
             self._redact_event(self.mod_access_token, self.room_id, msg_id)
 
     @override_config({"experimental_features": {"msc3912_enabled": True}})
-    def test_redact_relations(self) -> None:
-        """Tests that we can redact the relations of an event at the same time as the
-        event itself.
+    def test_redact_relations_with_types(self) -> None:
+        """Tests that we can redact the relations of an event of specific types
+        at the same time as the event itself.
         """
         # Send a root event.
         res = self.helper.send_event(
@@ -316,6 +318,104 @@ class RedactionsTestCase(HomeserverTestCase):
             self.room_id, reaction_event_id, self.mod_access_token
         )
         self.assertNotIn("redacted_because", event_dict, event_dict)
+
+    @override_config({"experimental_features": {"msc3912_enabled": True}})
+    def test_redact_all_relations(self) -> None:
+        """Tests that we can redact all the relations of an event at the same time as the
+        event itself.
+        """
+        # Send a root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "hello"},
+            tok=self.mod_access_token,
+        )
+        root_event_id = res["event_id"]
+
+        # Send an edit to this root event.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "body": " * hello world",
+                "m.new_content": {
+                    "body": "hello world",
+                    "msgtype": "m.text",
+                },
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.REPLACE,
+                },
+                "msgtype": "m.text",
+            },
+            tok=self.mod_access_token,
+        )
+        edit_event_id = res["event_id"]
+
+        # Also send a threaded message whose root is the same as the edit's.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "message 1",
+                "m.relates_to": {
+                    "event_id": root_event_id,
+                    "rel_type": RelationTypes.THREAD,
+                },
+            },
+            tok=self.mod_access_token,
+        )
+        threaded_event_id = res["event_id"]
+
+        # Also send a reaction, again with the same root.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Reaction,
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": root_event_id,
+                    "key": "👍",
+                }
+            },
+            tok=self.mod_access_token,
+        )
+        reaction_event_id = res["event_id"]
+
+        # Redact the root event, specifying that we also want to delete all events that
+        # relate to it.
+        self._redact_event(
+            self.mod_access_token,
+            self.room_id,
+            root_event_id,
+            with_relations=["*"],
+        )
+
+        # Check that the root event got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, root_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the edit got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, edit_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the threaded message got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, threaded_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
+
+        # Check that the reaction got redacted.
+        event_dict = self.helper.get_event(
+            self.room_id, reaction_event_id, self.mod_access_token
+        )
+        self.assertIn("redacted_because", event_dict, event_dict)
 
     @override_config({"experimental_features": {"msc3912_enabled": True}})
     def test_redact_relations_no_perms(self) -> None:
@@ -475,7 +575,7 @@ class RedactionsTestCase(HomeserverTestCase):
         room_id = self.helper.create_room_as(
             self.mod_user_id,
             tok=self.mod_access_token,
-            room_version=RoomVersions.MSC2176.identifier,
+            room_version=RoomVersions.V11.identifier,
         )
 
         # Create an event.
@@ -499,5 +599,20 @@ class RedactionsTestCase(HomeserverTestCase):
         redact_event = timeline[-1]
         self.assertEqual(redact_event["type"], EventTypes.Redaction)
         # The redacts key should be in the content.
-        self.assertNotIn("redacts", redact_event)
         self.assertEquals(redact_event["content"]["redacts"], event_id)
+
+        # It should also be copied as the top-level redacts field for backwards
+        # compatibility.
+        self.assertEquals(redact_event["redacts"], event_id)
+
+        # But it isn't actually part of the event.
+        def get_event(txn: LoggingTransaction) -> JsonDict:
+            return db_to_json(
+                main_datastore._fetch_event_rows(txn, [event_id])[event_id].json
+            )
+
+        main_datastore = self.hs.get_datastores().main
+        event_json = self.get_success(
+            main_datastore.db_pool.runInteraction("get_event", get_event)
+        )
+        self.assertNotIn("redacts", event_json)

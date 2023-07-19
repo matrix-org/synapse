@@ -933,6 +933,84 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(1, len(non_admin_user_ids), non_admin_user_ids)
         self.assertEqual(not_approved_user, non_admin_user_ids[0])
 
+    def test_filter_not_user_types(self) -> None:
+        """Tests that the endpoint handles the not_user_types param"""
+
+        regular_user_id = self.register_user("normalo", "secret")
+
+        bot_user_id = self.register_user("robo", "secret")
+        self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/" + urllib.parse.quote(bot_user_id),
+            {"user_type": UserTypes.BOT},
+            access_token=self.admin_user_tok,
+        )
+
+        support_user_id = self.register_user("foo", "secret")
+        self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/" + urllib.parse.quote(support_user_id),
+            {"user_type": UserTypes.SUPPORT},
+            access_token=self.admin_user_tok,
+        )
+
+        def test_user_type(
+            expected_user_ids: List[str], not_user_types: Optional[List[str]] = None
+        ) -> None:
+            """Runs a test for the not_user_types param
+            Args:
+                expected_user_ids: Ids of the users that are expected to be returned
+                not_user_types: List of values for the not_user_types param
+            """
+
+            user_type_query = ""
+
+            if not_user_types is not None:
+                user_type_query = "&".join(
+                    [f"not_user_type={u}" for u in not_user_types]
+                )
+
+            test_url = f"{self.url}?{user_type_query}"
+            channel = self.make_request(
+                "GET",
+                test_url,
+                access_token=self.admin_user_tok,
+            )
+
+            self.assertEqual(200, channel.code)
+            self.assertEqual(channel.json_body["total"], len(expected_user_ids))
+            self.assertEqual(
+                expected_user_ids,
+                [u["name"] for u in channel.json_body["users"]],
+            )
+
+        # Request without user_types →  all users expected
+        test_user_type([self.admin_user, support_user_id, regular_user_id, bot_user_id])
+
+        # Request and exclude bot users
+        test_user_type(
+            [self.admin_user, support_user_id, regular_user_id],
+            not_user_types=[UserTypes.BOT],
+        )
+
+        # Request and exclude bot and support users
+        test_user_type(
+            [self.admin_user, regular_user_id],
+            not_user_types=[UserTypes.BOT, UserTypes.SUPPORT],
+        )
+
+        # Request and exclude empty user types →  only expected the bot and support user
+        test_user_type([support_user_id, bot_user_id], not_user_types=[""])
+
+        # Request and exclude empty user types and bots →  only expected the support user
+        test_user_type([support_user_id], not_user_types=["", UserTypes.BOT])
+
+        # Request and exclude a custom type (neither service nor bot) →  expect all users
+        test_user_type(
+            [self.admin_user, support_user_id, regular_user_id, bot_user_id],
+            not_user_types=["custom"],
+        )
+
     def test_erasure_status(self) -> None:
         # Create a new user.
         user_id = self.register_user("eraseme", "eraseme")
@@ -2394,7 +2472,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # is in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         assert profile is not None
         self.assertTrue(profile["display_name"] == "User")
 
@@ -2411,7 +2489,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertTrue(channel.json_body["deactivated"])
 
         # is not in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         self.assertIsNone(profile)
 
         # Set new displayname user
@@ -2428,7 +2506,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Foobar", channel.json_body["displayname"])
 
         # is not in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         self.assertIsNone(profile)
 
     def test_reactivate_user(self) -> None:

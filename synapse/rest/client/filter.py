@@ -58,7 +58,7 @@ class GetFilterRestServlet(RestServlet):
 
         try:
             filter_collection = await self.filtering.get_user_filter(
-                user_localpart=target_user.localpart, filter_id=filter_id_int
+                user_id=target_user, filter_id=filter_id_int
             )
         except StoreError as e:
             if e.code != 404:

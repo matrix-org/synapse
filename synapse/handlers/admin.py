@@ -89,7 +89,7 @@ class AdminHandler:
         }
 
         # Add additional user metadata
-        profile = await self._store.get_profileinfo(user.localpart)
+        profile = await self._store.get_profileinfo(user)
         threepids = await self._store.user_get_threepids(user.to_string())
         external_ids = [
             ({"auth_provider": auth_provider, "external_id": external_id})

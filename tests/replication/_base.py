@@ -22,6 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 from synapse.app.generic_worker import GenericWorkerServer
+from synapse.config.workers import InstanceTcpLocationConfig, InstanceUnixLocationConfig
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -69,10 +70,10 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         # Make a new HomeServer object for the worker
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.worker_hs = self.setup_test_homeserver(
-            federation_http_client=None,
             homeserver_to_use=GenericWorkerServer,
             config=self._get_worker_hs_config(),
             reactor=self.reactor,
+            federation_http_client=None,
         )
 
         # Since we use sqlite in memory databases we need to make sure the
@@ -339,7 +340,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # `_handle_http_replication_attempt` like we do with the master HS.
         instance_name = worker_hs.get_instance_name()
         instance_loc = worker_hs.config.worker.instance_map.get(instance_name)
-        if instance_loc:
+        if instance_loc and isinstance(instance_loc, InstanceTcpLocationConfig):
             # Ensure the host is one that has a fake DNS entry.
             if instance_loc.host not in self.reactor.lookups:
                 raise Exception(
@@ -359,6 +360,10 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 self.reactor.lookups[instance_loc.host],
                 instance_loc.port,
                 lambda: self._handle_http_replication_attempt(worker_hs, port),
+            )
+        elif instance_loc and isinstance(instance_loc, InstanceUnixLocationConfig):
+            raise Exception(
+                "Unix sockets are not supported for unit tests at this time."
             )
 
         store = worker_hs.get_datastores().main
@@ -380,6 +385,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             server_version_string="1",
             max_request_body_size=8192,
             reactor=self.reactor,
+            hs=worker_hs,
         )
 
         worker_hs.get_replication_command_handler().start_replication(worker_hs)

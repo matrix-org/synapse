@@ -927,11 +927,10 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             raise Exception("Invalid host name")
 
         sql = """
-            SELECT state_key FROM current_state_events AS c
-            INNER JOIN room_memberships AS m USING (event_id)
-            WHERE m.membership = ?
+            SELECT state_key FROM current_state_events
+            WHERE membership = ?
                 AND type = 'm.room.member'
-                AND c.room_id = ?
+                AND room_id = ?
                 AND state_key LIKE ?
             LIMIT 1
         """
@@ -1461,7 +1460,6 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
                 SELECT stream_ordering, event_id, events.room_id, event_json.json
                 FROM events
                 INNER JOIN event_json USING (event_id)
-                INNER JOIN room_memberships USING (event_id)
                 WHERE ? <= stream_ordering AND stream_ordering < ?
                 AND type = 'm.room.member'
                 ORDER BY stream_ordering DESC

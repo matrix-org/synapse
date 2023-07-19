@@ -76,7 +76,7 @@ def unwrapFirstError(failure: Failure) -> Failure:
     # the subFailure's value, which will do a better job of preserving stacktraces.
     # (actually, you probably want to use yieldable_gather_results anyway)
     failure.trap(defer.FirstError)
-    return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
+    return failure.value.subFailure
 
 
 P = ParamSpec("P")
@@ -115,6 +115,11 @@ class Clock:
         """Call a function repeatedly.
 
         Waits `msec` initially before calling `f` for the first time.
+
+        If the function given to `looping_call` returns an awaitable/deferred, the next
+        call isn't scheduled until after the returned awaitable has finished. We get
+        this functionality thanks to this function being a thin wrapper around
+        `twisted.internet.task.LoopingCall`.
 
         Note that the function will be called with no logcontext, so if it is anything
         other than trivial, you probably want to wrap it in run_as_background_process.
@@ -178,7 +183,7 @@ def log_failure(
     """
 
     logger.error(
-        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())  # type: ignore[arg-type]
+        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())
     )
 
     if not consumeErrors:

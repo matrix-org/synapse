@@ -34,6 +34,7 @@ jobs:
       - id: set-distros
         run: |
           # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
+          # NOTE: inside the actual Dockerfile-dhvirtualenv, the image name is expanded into its full image path
           dists='["debian:sid"]'
           if [[ $GITHUB_REF == refs/tags/* ]]; then
               dists=$(scripts-dev/build_debian_packages.py --show-dists-json)
@@ -143,7 +144,7 @@ jobs:
 
       - name: Only build a single wheel on PR
         if: startsWith(github.ref, 'refs/pull/')
-        run: echo "CIBW_BUILD="cp37-manylinux_${{ matrix.arch }}"" >> $GITHUB_ENV
+        run: echo "CIBW_BUILD="cp38-manylinux_${{ matrix.arch }}"" >> $GITHUB_ENV
 
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse

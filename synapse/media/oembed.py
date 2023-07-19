@@ -14,7 +14,7 @@
 import html
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, cast
 
 import attr
 
@@ -98,7 +98,7 @@ class OEmbedProvider:
         # No match.
         return None
 
-    def autodiscover_from_html(self, tree: "etree.Element") -> Optional[str]:
+    def autodiscover_from_html(self, tree: "etree._Element") -> Optional[str]:
         """
         Search an HTML document for oEmbed autodiscovery information.
 
@@ -109,18 +109,22 @@ class OEmbedProvider:
             The URL to use for oEmbed information, or None if no URL was found.
         """
         # Search for link elements with the proper rel and type attributes.
-        for tag in tree.xpath(
-            "//link[@rel='alternate'][@type='application/json+oembed']"
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+        for tag in cast(
+            List["etree._Element"],
+            tree.xpath("//link[@rel='alternate'][@type='application/json+oembed']"),
         ):
             if "href" in tag.attrib:
-                return tag.attrib["href"]
+                return cast(str, tag.attrib["href"])
 
         # Some providers (e.g. Flickr) use alternative instead of alternate.
-        for tag in tree.xpath(
-            "//link[@rel='alternative'][@type='application/json+oembed']"
+        # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+        for tag in cast(
+            List["etree._Element"],
+            tree.xpath("//link[@rel='alternative'][@type='application/json+oembed']"),
         ):
             if "href" in tag.attrib:
-                return tag.attrib["href"]
+                return cast(str, tag.attrib["href"])
 
         return None
 
@@ -212,11 +216,12 @@ class OEmbedProvider:
         return OEmbedResult(open_graph_response, author_name, cache_age)
 
 
-def _fetch_urls(tree: "etree.Element", tag_name: str) -> List[str]:
+def _fetch_urls(tree: "etree._Element", tag_name: str) -> List[str]:
     results = []
-    for tag in tree.xpath("//*/" + tag_name):
+    # Cast: the type returned by xpath depends on the xpath expression: mypy can't deduce this.
+    for tag in cast(List["etree._Element"], tree.xpath("//*/" + tag_name)):
         if "src" in tag.attrib:
-            results.append(tag.attrib["src"])
+            results.append(cast(str, tag.attrib["src"]))
     return results
 
 
@@ -244,11 +249,12 @@ def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> 
     parser = etree.HTMLParser(recover=True, encoding="utf-8")
 
     # Attempt to parse the body. If this fails, log and return no metadata.
-    tree = etree.fromstring(html_body, parser)
+    # TODO Develop of lxml-stubs has this correct.
+    tree = etree.fromstring(html_body, parser)  # type: ignore[arg-type]
 
     # The data was successfully parsed, but no tree was found.
     if tree is None:
-        return
+        return  # type: ignore[unreachable]
 
     # Attempt to find interesting URLs (images, videos, embeds).
     if "og:image" not in open_graph_response:

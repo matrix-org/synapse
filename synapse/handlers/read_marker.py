@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 class ReadMarkerHandler:
     def __init__(self, hs: "HomeServer"):
-        self.server_name = hs.config.server.server_name
         self.store = hs.get_datastores().main
         self.account_data_handler = hs.get_account_data_handler()
         self.read_marker_linearizer = Linearizer(name="read_marker")

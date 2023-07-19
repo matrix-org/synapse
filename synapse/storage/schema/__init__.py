@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 77  # remember to update the list below when updating
+SCHEMA_VERSION = 78  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -103,6 +103,9 @@ Changes in SCHEMA_VERSION = 76:
 
 Changes in SCHEMA_VERSION = 77
     - (Postgres) Add NOT VALID CHECK (full_user_id IS NOT NULL) to tables profiles and user_filters
+
+Changes in SCHEMA_VERSION = 78
+    - Validate check (full_user_id IS NOT NULL) on tables profiles and user_filters
 """
 
 

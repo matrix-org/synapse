@@ -53,6 +53,7 @@ from twisted.internet.interfaces import (
     IConnector,
     IConsumer,
     IHostnameResolver,
+    IListeningPort,
     IProducer,
     IProtocol,
     IPullProducer,
@@ -62,7 +63,7 @@ from twisted.internet.interfaces import (
     IResolverSimple,
     ITransport,
 )
-from twisted.internet.protocol import ClientFactory, DatagramProtocol
+from twisted.internet.protocol import ClientFactory, DatagramProtocol, Factory
 from twisted.python import threadpool
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
@@ -523,6 +524,35 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         """
         self._tcp_callbacks[(host, port)] = callback
 
+    def connectUNIX(
+        self,
+        address: str,
+        factory: ClientFactory,
+        timeout: float = 30,
+        checkPID: int = 0,
+    ) -> IConnector:
+        """
+        Unix sockets aren't supported for unit tests yet. Make it obvious to any
+        developer trying it out that they will need to do some work before being able
+        to use it in tests.
+        """
+        raise Exception("Unix sockets are not implemented for tests yet, sorry.")
+
+    def listenUNIX(
+        self,
+        address: str,
+        factory: Factory,
+        backlog: int = 50,
+        mode: int = 0o666,
+        wantPID: int = 0,
+    ) -> IListeningPort:
+        """
+        Unix sockets aren't supported for unit tests yet. Make it obvious to any
+        developer trying it out that they will need to do some work before being able
+        to use it in tests.
+        """
+        raise Exception("Unix sockets are not implemented for tests, sorry")
+
     def connectTCP(
         self,
         host: str,
@@ -642,7 +672,7 @@ def _make_test_homeserver_synchronous(server: HomeServer) -> None:
         pool.runWithConnection = runWithConnection  # type: ignore[assignment]
         pool.runInteraction = runInteraction  # type: ignore[assignment]
         # Replace the thread pool with a threadless 'thread' pool
-        pool.threadpool = ThreadPool(clock._reactor)  # type: ignore[assignment]
+        pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
 
     # We've just changed the Databases to run DB transactions on the same

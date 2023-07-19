@@ -28,7 +28,7 @@ from tests.unittest import HomeserverTestCase
 try:
     import lxml
 except ImportError:
-    lxml = None
+    lxml = None  # type: ignore[assignment]
 
 
 class OEmbedTests(HomeserverTestCase):

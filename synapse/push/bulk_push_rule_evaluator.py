@@ -120,9 +120,6 @@ class BulkPushRuleEvaluator:
         self.should_calculate_push_rules = self.hs.config.push.enable_push
 
         self._related_event_match_enabled = self.hs.config.experimental.msc3664_enabled
-        self._intentional_mentions_enabled = (
-            self.hs.config.experimental.msc3952_intentional_mentions
-        )
 
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
@@ -325,7 +322,6 @@ class BulkPushRuleEvaluator:
     ) -> None:
         if (
             not event.internal_metadata.is_notifiable()
-            or event.internal_metadata.is_historical()
             or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync
         ):
             # Push rules for events that aren't notifiable can't be processed by this and
@@ -379,7 +375,7 @@ class BulkPushRuleEvaluator:
         # _get_power_levels_and_sender_level in its call to get_user_power_level
         # (even for room V10.)
         notification_levels = power_levels.get("notifications", {})
-        if not event.room_version.msc3667_int_only_power_levels:
+        if not event.room_version.enforce_int_power_levels:
             keys = list(notification_levels.keys())
             for key in keys:
                 level = notification_levels.get(key, SENTINEL)
@@ -390,10 +386,7 @@ class BulkPushRuleEvaluator:
                         del notification_levels[key]
 
         # Pull out any user and room mentions.
-        has_mentions = (
-            self._intentional_mentions_enabled
-            and EventContentFields.MSC3952_MENTIONS in event.content
-        )
+        has_mentions = EventContentFields.MENTIONS in event.content
 
         evaluator = PushRuleEvaluator(
             _flatten_dict(event),

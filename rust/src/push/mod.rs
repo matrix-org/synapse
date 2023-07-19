@@ -527,7 +527,6 @@ pub struct FilteredPushRules {
     msc1767_enabled: bool,
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
-    msc3952_intentional_mentions: bool,
     msc3958_suppress_edits_enabled: bool,
 }
 
@@ -540,7 +539,6 @@ impl FilteredPushRules {
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
-        msc3952_intentional_mentions: bool,
         msc3958_suppress_edits_enabled: bool,
     ) -> Self {
         Self {
@@ -549,7 +547,6 @@ impl FilteredPushRules {
             msc1767_enabled,
             msc3381_polls_enabled,
             msc3664_enabled,
-            msc3952_intentional_mentions,
             msc3958_suppress_edits_enabled,
         }
     }
@@ -587,10 +584,6 @@ impl FilteredPushRules {
                     return false;
                 }
 
-                if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
-                {
-                    return false;
-                }
                 if !self.msc3958_suppress_edits_enabled
                     && rule.rule_id == "global/override/.com.beeper.suppress_edits"
                 {
