@@ -276,8 +276,9 @@ def create_local_event_from_event_dict(
     if format_version == EventFormatVersions.ROOM_V1_V2:
         event_dict["event_id"] = _create_event_id(clock, hostname)
 
-    if "hub_server" not in event_dict:
-        # Do not add "origin" field to LPDUs.
+    if not room_version.linearized_matrix:
+        # Do not add "origin" field to events (LPDUs and PDUs) sent in
+        # rooms that are meant to be compatible with linearized matrix.
         event_dict["origin"] = hostname
 
     event_dict.setdefault("origin_server_ts", time_now)

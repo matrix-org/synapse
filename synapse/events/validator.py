@@ -66,8 +66,9 @@ class EventValidator:
             "type",
         ]
 
-        if event.hub_server is not None:
-            # Do not add the "origin" field to LPDUs.
+        if event.room_version.linearized_matrix:
+            # Do not add "origin" field to events (LPDUs and PDUs) sent in
+            # rooms that are meant to be compatible with linearized matrix.
             required.remove("origin")
 
         for k in required:
