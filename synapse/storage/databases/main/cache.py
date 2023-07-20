@@ -618,7 +618,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self, delete_up_to_millisec: int
     ) -> bool:
         """
-        Cleans up a batch of old cache invalidations.
+        Remove old rows from the `cache_invalidation_stream_by_instance` table automatically (this table is unused in SQLite).
 
         Up to `CLEAN_UP_BATCH_SIZE` rows will be deleted at once.
 
