@@ -57,7 +57,6 @@ from synapse.types import (
     StrCollection,
     get_domain_from_id,
 )
-from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList

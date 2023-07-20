@@ -19,7 +19,6 @@ from typing import (
     Callable,
     Collection,
     Dict,
-    FrozenSet,
     Iterable,
     List,
     Mapping,
@@ -654,7 +653,7 @@ class StateStorageController:
         if not changed_users:
             return known_joined_hosts
 
-        potentially_changed_hosts = set(get_domain_from_id(u) for u in changed_users)
+        potentially_changed_hosts = {get_domain_from_id(u) for u in changed_users}
 
         if not potentially_changed_hosts - known_joined_hosts:
             return known_joined_hosts
