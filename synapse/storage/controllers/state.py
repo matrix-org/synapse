@@ -643,7 +643,7 @@ class StateStorageController:
         return await self.stores.main.get_users_in_room_with_profiles(room_id)
 
     async def get_joined_hosts(
-        self, room_id: str, state: StateMap[str], state_entry: "_StateCacheEntry"
+        self, room_id: str, state_entry: "_StateCacheEntry"
     ) -> FrozenSet[str]:
         state_group: Union[object, int] = state_entry.state_group
         if not state_group:
@@ -656,7 +656,7 @@ class StateStorageController:
         assert state_group is not None
         with Measure(self._clock, "get_joined_hosts"):
             return await self._get_joined_hosts(
-                room_id, state_group, state, state_entry=state_entry
+                room_id, state_group, state_entry=state_entry
             )
 
     @cached(num_args=2, max_entries=10000, iterable=True)
@@ -664,7 +664,6 @@ class StateStorageController:
         self,
         room_id: str,
         state_group: Union[object, int],
-        state: StateMap[str],
         state_entry: "_StateCacheEntry",
     ) -> FrozenSet[str]:
         # We don't use `state_group`, it's there so that we can cache based on
@@ -735,6 +734,10 @@ class StateStorageController:
                 )
                 unknown_state_events = {}
                 joined_users_in_current_state = []
+
+                state = await state_entry.get_state(
+                    self, StateFilter.from_types([(EventTypes.Member, None)])
+                )
 
                 for (type, state_key), event_id in state.items():
                     if event_id not in current_memberships:
