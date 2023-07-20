@@ -20,6 +20,8 @@ from synapse.api.room_versions import RoomVersions
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
 from synapse.server import HomeServer
+from synapse.storage._base import db_to_json
+from synapse.storage.database import LoggingTransaction
 from synapse.types import JsonDict
 from synapse.util import Clock
 
@@ -573,7 +575,7 @@ class RedactionsTestCase(HomeserverTestCase):
         room_id = self.helper.create_room_as(
             self.mod_user_id,
             tok=self.mod_access_token,
-            room_version=RoomVersions.MSC2176.identifier,
+            room_version=RoomVersions.V11.identifier,
         )
 
         # Create an event.
@@ -597,5 +599,20 @@ class RedactionsTestCase(HomeserverTestCase):
         redact_event = timeline[-1]
         self.assertEqual(redact_event["type"], EventTypes.Redaction)
         # The redacts key should be in the content.
-        self.assertNotIn("redacts", redact_event)
         self.assertEquals(redact_event["content"]["redacts"], event_id)
+
+        # It should also be copied as the top-level redacts field for backwards
+        # compatibility.
+        self.assertEquals(redact_event["redacts"], event_id)
+
+        # But it isn't actually part of the event.
+        def get_event(txn: LoggingTransaction) -> JsonDict:
+            return db_to_json(
+                main_datastore._fetch_event_rows(txn, [event_id])[event_id].json
+            )
+
+        main_datastore = self.hs.get_datastores().main
+        event_json = self.get_success(
+            main_datastore.db_pool.runInteraction("get_event", get_event)
+        )
+        self.assertNotIn("redacts", event_json)

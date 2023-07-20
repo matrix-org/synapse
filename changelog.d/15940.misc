@@ -1,0 +1,1 @@
+Unbreak the nix development environment by pinning the Rust version to 1.70.0.

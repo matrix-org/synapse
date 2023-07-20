@@ -462,6 +462,20 @@ See the docs [request log format](../administration/request_log.md).
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
 
+Unix socket support (_Added in Synapse 1.89.0_):
+* `path`: A path and filename for a Unix socket. Make sure it is located in a
+  directory with read and write permissions, and that it already exists (the directory
+  will not be created). Defaults to `None`.
+  * **Note**: The use of both `path` and `port` options for the same `listener` is not
+    compatible.
+  * The `x_forwarded` option defaults to true  when using Unix sockets and can be omitted.
+  * Other options that would not make sense to use with a UNIX socket, such as 
+    `bind_addresses` and `tls` will be ignored and can be removed.
+* `mode`: The file permissions to set on the UNIX socket. Defaults to `666`
+* **Note:** Must be set as `type: http` (does not support `metrics` and `manhole`). 
+  Also make sure that `metrics` is not included in `resources` -> `names`
+
+
 Valid resource names are:
 
 * `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies `media` and `static`.
@@ -474,7 +488,7 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See [here](../../metrics-howto.md).
+* `metrics`: the metrics interface. See [here](../../metrics-howto.md). (Not compatible with Unix sockets)
 
 * `openid`: OpenID authentication. See [here](../../openid.md).
 
@@ -533,6 +547,22 @@ listeners:
     bind_addresses: ['::1', '127.0.0.1']
     type: manhole
 ```
+Example configuration #3:
+```yaml
+listeners:
+  # Unix socket listener: Ideal for Synapse deployments behind a reverse proxy, offering
+  # lightweight interprocess communication without TCP/IP overhead, avoid port
+  # conflicts, and providing enhanced security through system file permissions.
+  #
+  # Note that x_forwarded will default to true, when using a UNIX socket. Please see
+  # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
+  #
+  - path: /var/run/synapse/main_public.sock
+    type: http
+    resources:
+      - names: [client, federation]
+```
+
 ---
 ### `manhole_settings`
 
@@ -3930,13 +3960,14 @@ federation_sender_instances:
 ---
 ### `instance_map`
 
-When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured, and to the main process.
-Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
-a HTTP replication listener, and that listener should be included in the `instance_map`.
-The main process also needs an entry on the `instance_map`, and it should be listed under
-`main` **if even one other worker exists**. Ensure the port matches with what is declared 
-inside the `listener` block for a `replication` listener.
+When using workers this should be a map from [`worker_name`](#worker_name) to the HTTP
+replication listener of the worker, if configured, and to the main process. Each worker
+declared under [`stream_writers`](../../workers.md#stream-writers) and
+[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP
+replication listener, and that listener should be included in the `instance_map`. The
+main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is
+declared inside the `listener` block for a `replication` listener.
 
 
 Example configuration:
@@ -3948,6 +3979,14 @@ instance_map:
   worker1:
     host: localhost
     port: 8034
+```
+Example configuration(#2, for UNIX sockets):
+```yaml
+instance_map:
+  main:
+    path: /var/run/synapse/main_replication.sock
+  worker1:
+    path: /var/run/synapse/worker1_replication.sock
 ```
 ---
 ### `stream_writers`
@@ -3965,6 +4004,24 @@ stream_writers:
   events: worker1
   typing: worker1
 ```
+---
+### `outbound_federation_restricted_to`
+
+When using workers, you can restrict outbound federation traffic to only go through a
+specific subset of workers. Any worker specified here must also be in the
+[`instance_map`](#instance_map).
+[`worker_replication_secret`](#worker_replication_secret) must also be configured to
+authorize inter-worker communication.
+
+```yaml
+outbound_federation_restricted_to:
+  - federation_sender1
+  - federation_sender2
+```
+
+Also see the [worker
+documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
+for more info.
 ---
 ### `run_background_tasks_on`
 
@@ -4107,6 +4164,18 @@ worker_listeners:
     port: 8083
     resources:
       - names: [client, federation]
+```
+Example configuration(#2, using UNIX sockets with a `replication` listener):
+```yaml
+worker_listeners:
+  - type: http
+    path: /var/run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
+  - type: http
+    path: /var/run/synapse/worker_replication.sock
+    resources:
+      - names: [replication]
 ```
 ---
 ### `worker_manhole`

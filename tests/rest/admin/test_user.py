@@ -2472,7 +2472,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # is in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         assert profile is not None
         self.assertTrue(profile["display_name"] == "User")
 
@@ -2489,7 +2489,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertTrue(channel.json_body["deactivated"])
 
         # is not in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         self.assertIsNone(profile)
 
         # Set new displayname user
@@ -2506,7 +2506,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Foobar", channel.json_body["displayname"])
 
         # is not in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         self.assertIsNone(profile)
 
     def test_reactivate_user(self) -> None:
