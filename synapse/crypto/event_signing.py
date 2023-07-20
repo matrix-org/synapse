@@ -96,9 +96,6 @@ def check_event_content_hash(
 
     # Check the content hash of the LPDU, if this was sent via a hub.
     if event.room_version.linearized_matrix and event.hub_server:
-        # TODO(LM) I don't think this works since _check_dict_hash always strips
-        # all hashes (via compute_content_hash)?
-
         # hashes must be a dictionary to have passed _check_dict_hash above.
         lpdu_hashes = hashes.get("lpdu")
         return _check_dict_hash(
@@ -131,7 +128,19 @@ def compute_content_hash(
     event_dict.pop("age_ts", None)
     event_dict.pop("unsigned", None)
     event_dict.pop("signatures", None)
-    event_dict.pop("hashes", None)
+
+    hashes = event_dict.pop("hashes", {})
+
+    # If we are calculating the content hash of an LPDU, `hashes`
+    # should be removed entirely.
+    if "hub_server" not in event_dict:
+        # Otherwise, we are calculating the content hash of a PDU. In that
+        # case, we keep the "lpdu" field inside "hashes", if it exists.
+        sha256_lpdu_hash = hashes.get("lpdu", {}).get("sha256")
+        if sha256_lpdu_hash is not None:
+            lpdu_dict = event_dict.setdefault("hashes", {}).setdefault("lpdu", {})
+            lpdu_dict["sha256"] = sha256_lpdu_hash
+
     event_dict.pop("outlier", None)
     event_dict.pop("destinations", None)
 
