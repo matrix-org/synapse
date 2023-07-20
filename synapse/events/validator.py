@@ -66,6 +66,10 @@ class EventValidator:
             "type",
         ]
 
+        if event.hub_server is not None:
+            # Do not add the "origin" field to LPDUs.
+            required.remove("origin")
+
         for k in required:
             if k not in event:
                 raise SynapseError(400, "Event does not have key %s" % (k,))
