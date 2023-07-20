@@ -327,10 +327,6 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             # of our stack, and thus gives us a sensible stack
             # trace.
             f = failure.Failure()
-            logger.exception(
-                "Error handling request",
-                exc_info=(f.type, f.value, f.getTracebackObject()),
-            )
             self._send_error_response(f, request)
 
     async def _async_render(
