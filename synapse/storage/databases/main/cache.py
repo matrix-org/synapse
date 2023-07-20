@@ -632,7 +632,8 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             txn.execute(
                 """
                 SELECT stream_id FROM cache_invalidation_stream_by_instance
-                ORDER BY stream_id LIMIT 1
+                ORDER BY stream_id ASC
+                LIMIT 1
                 """
             )
             row = txn.fetchone()
