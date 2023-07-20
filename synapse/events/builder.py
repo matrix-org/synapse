@@ -89,8 +89,8 @@ class EventBuilder:
 
     # TODO(LM) If Synapse is acting as a hub-server this should be itself.
     hub_server: Optional[str] = None
-    _lpdu_hashes: Optional[str] = None
-    _lpdu_signatures: Optional[str] = None
+    _lpdu_hashes: Optional[Dict[str, str]] = None
+    _lpdu_signatures: Optional[Dict[str, Dict[str, str]]] = None
 
     internal_metadata: _EventInternalMetadata = attr.Factory(
         lambda: _EventInternalMetadata({})
