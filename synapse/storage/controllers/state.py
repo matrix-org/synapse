@@ -19,14 +19,16 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    FrozenSet,
     Iterable,
     List,
     Mapping,
     Optional,
+    Set,
     Tuple,
 )
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.logging.opentracing import tag_args, trace
 from synapse.storage.roommember import ProfileInfo
@@ -34,7 +36,7 @@ from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
     PartialStateEventsTracker,
 )
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateMap, get_domain_from_id
 from synapse.types.state import StateFilter
 from synapse.util.cancellation import cancellable
 
@@ -627,3 +629,56 @@ class StateStorageController:
         await self._partial_state_room_tracker.await_full_state(room_id)
 
         return await self.stores.main.get_users_in_room_with_profiles(room_id)
+
+    async def get_joined_remote_hosts_for_event(
+        self,
+        room_id: str,
+        event_id: str,
+        stream_ordering: int,
+    ) -> Set[str]:
+        """Get the remote hosts that are in the room at the given event / stream ordering"""
+        joined_users = set(await self.stores.main.get_users_in_room(room_id))
+
+        changed_users: AbstractSet[
+            str
+        ] = await self.stores.main.get_changed_remote_users_after_event(
+            room_id, stream_ordering
+        )
+
+        known_joined_hosts = {
+            get_domain_from_id(u)
+            for u in joined_users - changed_users
+            if not self._is_mine_id(u)
+        }
+
+        if not changed_users:
+            return known_joined_hosts
+
+        potentially_changed_hosts = set(get_domain_from_id(u) for u in changed_users)
+
+        if not potentially_changed_hosts - known_joined_hosts:
+            return known_joined_hosts
+
+        changed_users = {
+            user_id
+            for user_id in changed_users
+            if get_domain_from_id(user_id) not in known_joined_hosts
+        }
+
+        state_ids = await self.get_state_ids_for_event(
+            event_id,
+            StateFilter.from_types(
+                [(EventTypes.Member, user_id) for user_id in changed_users]
+            ),
+        )
+
+        membership_map = await self.stores.main.get_membership_from_event_ids(
+            state_ids.values()
+        )
+        known_joined_hosts.update(
+            user_id
+            for user_id, membership in membership_map.items()
+            if membership and membership.membership == Membership.JOIN
+        )
+
+        return known_joined_hosts

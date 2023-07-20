@@ -57,6 +57,7 @@ from synapse.types import (
     StrCollection,
     get_domain_from_id,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
@@ -1056,6 +1057,32 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         return await self.db_pool.runInteraction(
             "get_current_hosts_in_room_ordered", get_current_hosts_in_room_ordered_txn
         )
+
+    async def get_changed_remote_users_after_event(
+        self, room_id: str, stream_ordering: int
+    ) -> FrozenSet[str]:
+        """Get the users in the room that may have changed since the stream
+        ordering."""
+        return await self.db_pool.runInteraction(
+            "get_changed_remote_users_after_event",
+            self._get_changed_remote_users_after_event_txn,
+            room_id,
+            stream_ordering,
+        )
+
+    def _get_changed_remote_users_after_event_txn(
+        self, txn: LoggingTransaction, room_id: str, stream_ordering: int
+    ) -> FrozenSet[str]:
+        sql = """
+            SELECT state_key
+            FROM current_state_delta_stream
+            WHERE room_id = ? AND stream_ordering >= ? AND type = ?
+            GROUP BY state_key
+        """
+
+        txn.execute(sql, (room_id, stream_ordering, EventTypes.Member))
+
+        return frozenset(user_id for user_id, in txn if not self.hs.is_mine_id(user_id))
 
     async def get_joined_hosts(
         self, room_id: str, state: StateMap[str], state_entry: "_StateCacheEntry"

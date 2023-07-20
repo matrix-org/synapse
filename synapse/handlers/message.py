@@ -1569,8 +1569,10 @@ class EventCreationHandler:
                     self._storage_controllers.state, StateFilter.all()
                 )
                 with opentracing.start_active_span("get_joined_hosts"):
-                    joined_hosts = await self.store.get_joined_hosts(
-                        event.room_id, state, state_entry
+                    stream_ordering = event.internal_metadata.stream_ordering
+                    assert stream_ordering is not None
+                    joined_hosts = await self._storage_controllers.state.get_joined_remote_hosts_for_event(
+                        event.room_id, event.event_id, stream_ordering
                     )
 
                 # Note that the expiry times must be larger than the expiry time in
