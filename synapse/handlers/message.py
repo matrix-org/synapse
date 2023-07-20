@@ -738,7 +738,7 @@ class EventCreationHandler:
                 prev_event_id = state_map.get((EventTypes.Member, event.sender))
             else:
                 prev_state_ids = await unpersisted_context.get_prev_state_ids(
-                    StateFilter.from_types([(EventTypes.Member, None)])
+                    StateFilter.from_types([(EventTypes.Member, event.sender)])
                 )
                 prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
@@ -860,7 +860,7 @@ class EventCreationHandler:
             return None
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(event.type, None)])
+            StateFilter.from_types([(event.type, event.state_key)])
         )
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
