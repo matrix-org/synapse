@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Tuple
 
 from synapse.api.constants import EventTypes
+from synapse.config._base import Config
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.streams import BackfillStream, CachesStream
 from synapse.replication.tcp.streams.events import (
@@ -55,18 +56,18 @@ DELETE_ROOM_CACHE_NAME = "dr_cache_fake"
 
 # How long between cache invalidation table cleanups, once we have caught up
 # with the backlog.
-REGULAR_CLEANUP_INTERVAL_MILLISEC = 60 * 60 * 1000
+REGULAR_CLEANUP_INTERVAL_MS = Config.parse_duration("1h")
 
 # How long between cache invalidation table cleanups, before we have caught
 # up with the backlog.
-CATCH_UP_CLEANUP_INTERVAL_MILLISEC = 60 * 1000
+CATCH_UP_CLEANUP_INTERVAL_MS = Config.parse_duration("1m")
 
 # Maximum number of cache invalidation rows to delete at once.
 CLEAN_UP_MAX_BATCH_SIZE = 20_000
 
 # Keep cache invalidations for 7 days
 # (This is likely to be quite excessive.)
-RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MILLISEC = 7 * 24 * 60 * 60 * 1000
+RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MS = Config.parse_duration("7d")
 
 
 class CacheInvalidationWorkerStore(SQLBaseStore):
@@ -121,7 +122,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             # This is only applicable if we are on Postgres and therefore populate
             # those tables.
             self.hs.get_clock().call_later(
-                CATCH_UP_CLEANUP_INTERVAL_MILLISEC / 1000,
+                CATCH_UP_CLEANUP_INTERVAL_MS / 1000,
                 self._clean_up_cache_invalidation_wrapper,
             )
 
@@ -592,7 +593,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             """
             delete_up_to: int = (
                 self.hs.get_clock().time_msec()
-                - RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MILLISEC
+                - RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MS
             )
 
             in_backlog = await self._clean_up_batch_of_old_cache_invalidations(
@@ -602,9 +603,9 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             # Vary how long we wait before calling again depending on whether we
             # are still sifting through backlog or we have caught up.
             if in_backlog:
-                next_interval = CATCH_UP_CLEANUP_INTERVAL_MILLISEC
+                next_interval = CATCH_UP_CLEANUP_INTERVAL_MS
             else:
-                next_interval = REGULAR_CLEANUP_INTERVAL_MILLISEC
+                next_interval = REGULAR_CLEANUP_INTERVAL_MS
 
             self.hs.get_clock().call_later(
                 next_interval / 1000, self._clean_up_cache_invalidation_wrapper
