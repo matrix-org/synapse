@@ -623,7 +623,8 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
         Up to `CLEAN_UP_BATCH_SIZE` rows will be deleted at once.
 
-        Returns true iff we were limited by batch size (i.e. we are in backlog).
+        Returns true if and only if we were limited by batch size (i.e. we are in backlog:
+        there are more things to clean up).
         """
 
         def _clean_up_batch_of_old_cache_invalidations_txn(
