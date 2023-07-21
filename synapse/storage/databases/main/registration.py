@@ -2616,6 +2616,67 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
         return await self.db_pool.runInteraction("user_delete_access_tokens", f)
 
+    async def user_set_account_tokens_validity(
+        self,
+        user_id: str,
+        validity_until_ms: int = 0,
+        except_token_id: Optional[int] = None,
+        device_id: Optional[str] = None,
+    ) -> List[Tuple[str, int, Optional[str]]]:
+        """
+        Set access tokens' validi_until_ms belonging to a user
+        Sets the same value for all of the concerned tokens
+
+        Args:
+            user_id: ID of user the tokens belong to
+            validity_until_ms: New validity_until value for all considered tokens
+            except_token_id: access_tokens ID which should *not* be updated
+            device_id: ID of device the tokens are associated with.
+                If None, tokens associated with any device (or no device) will
+                be updated
+        Returns:
+            A tuple of (token, token id, device id) for each of the updated tokens
+        """
+        assert validity_until_ms >= 0
+
+        def f(txn: LoggingTransaction) -> List[Tuple[str, int, Optional[str]]]:
+            keyvalues = {"user_id": user_id}
+            if device_id is not None:
+                keyvalues["device_id"] = device_id
+
+            items = keyvalues.items()
+            where_clause = " AND ".join(k + " = ?" for k, _ in items)
+            values: List[Union[str, int]] = [v for _, v in items]
+
+            values.copy()
+            if except_token_id:
+                where_clause += " AND id != ?"
+                values.append(except_token_id)
+
+            txn.execute(
+                "SELECT token, id, device_id FROM access_tokens WHERE %s"
+                % where_clause,
+                values,
+            )
+            tokens_and_devices = [(r[0], r[1], r[2]) for r in txn]
+
+            for token, token_id, _ in tokens_and_devices:
+                self.db_pool.simple_update_txn(
+                    txn,
+                    table="access_tokens",
+                    keyvalues={"id": token_id},
+                    updatevalues={"valid_until_ms": validity_until_ms},
+                )
+                self._invalidate_cache_and_stream(
+                    txn, self.get_user_by_access_token, (token,)
+                )
+
+            self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+
+            return tokens_and_devices
+
+        return await self.db_pool.runInteraction("user_set_account_tokens_validity", f)
+
     async def delete_access_token(self, access_token: str) -> None:
         def f(txn: LoggingTransaction) -> None:
             self.db_pool.simple_delete_one_txn(
