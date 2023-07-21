@@ -115,12 +115,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         else:
             self._cache_id_gen = None
 
+        # Occasionally clean up the cache invalidations stream table by deleting
+        # old rows.
+        # This is only applicable when Postgres is in use; this table is unused
+        # and not populated at all when SQLite is the active database engine.
         if hs.config.worker.run_background_tasks and isinstance(
             self.database_engine, PostgresEngine
         ):
-            # Occasionally clean up the cache invalidations stream table.
-            # This is only applicable if we are on Postgres and therefore populate
-            # those tables.
             self.hs.get_clock().call_later(
                 CATCH_UP_CLEANUP_INTERVAL_MS / 1000,
                 self._clean_up_cache_invalidation_wrapper,
