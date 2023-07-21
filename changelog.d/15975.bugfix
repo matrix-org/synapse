@@ -1,0 +1,1 @@
+Fix bug where resyncing stale device lists could block responding to federation transactions, and thus delay receiving new data from the remote server.
