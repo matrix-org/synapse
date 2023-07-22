@@ -551,6 +551,9 @@ class FederationHandler:
             )
         except RequestSendFailed:
             raise SynapseError(502, f"Can't connect to server {target_host}")
+        except HttpResponseException as e:
+            logger.error(f"Error sending invite to '{target_host}'", e.response)
+            raise e
 
         return pdu
 
