@@ -94,8 +94,6 @@ class ReceiptRestServlet(RestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
-
         if receipt_type == ReceiptTypes.FULLY_READ:
             await self.read_marker_handler.received_client_read_marker(
                 room_id,
