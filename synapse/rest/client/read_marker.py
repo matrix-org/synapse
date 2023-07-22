@@ -52,8 +52,6 @@ class ReadMarkerRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
-
         body = parse_json_object_from_request(request)
 
         unrecognized_types = set(body.keys()) - self._known_receipt_types
