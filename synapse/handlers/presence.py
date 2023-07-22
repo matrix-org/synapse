@@ -34,6 +34,7 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    FrozenSet,
     Generator,
     Iterable,
     List,
@@ -1375,23 +1376,30 @@ class PresenceHandler(BasePresenceHandler):
                     max_pos
                 )
 
-    async def is_only_one_room_shared(
-        self, current_user_id: str, other_user_id: str
-    ) -> bool:
-        """Check to see if there is more than one shared room between these users"""
-        pair_of_users_to_check = frozenset((current_user_id, other_user_id))
-        # By learning if these two users share any other room, we can tell
-        # if user_id's server needs to receive presence or not
-        rooms_shared = await self.store.get_mutual_rooms_between_users(
-            pair_of_users_to_check
-        )
-
-        # They always share at least one room, the current one. As such this will
-        # never be zero
-        if len(rooms_shared) < 2:
-            return True
-
-        return False
+    @staticmethod
+    def filter_hosts_by_mutual_room(
+        user_room_dict_priority: Dict[str, FrozenSet],
+        user_room_dict_secondary: Dict[str, FrozenSet],
+    ) -> Set[str]:
+        """
+        Filter hosts by number of room_ids. Prioritize the first dict, as those are the
+        ones we care about now. Returns a set of hosts(extracted from user_id) that are
+        safe to remove from outgoing presence.
+        """
+        # The premise for our filtering is simple, if two users share any other room
+        # (that we know about), then they don't require presence sent in this initial
+        # batch. So, if any given set of users share a room_id(disregarding the
+        # immediate room we just joined), then that host is eligible to be removed.
+        set_of_hosts_to_remove: Set[str] = set()
+        for user_primary, rooms_primary in user_room_dict_priority.items():
+            for _user_secondary, rooms_secondary in user_room_dict_secondary.items():
+                if get_domain_from_id(user_primary) in set_of_hosts_to_remove:
+                    # Shortcut if this host is already in our returning set
+                    continue
+                if len(rooms_primary.intersection(rooms_secondary)) > 1:
+                    # This will always be at least one(because we just joined this room)
+                    set_of_hosts_to_remove.add(get_domain_from_id(user_primary))
+        return set_of_hosts_to_remove
 
     async def _handle_state_delta(self, room_id: str, deltas: List[JsonDict]) -> None:
         """Process current state deltas for the room to find new joins that need
@@ -1445,11 +1453,9 @@ class PresenceHandler(BasePresenceHandler):
         # We want to send:
         #   1. presence states of all local users in the room to newly joined
         #      remote servers
-        #   2. presence states of newly joined users to all remote servers in
-        #      the room.
-        #
-        # However, only send presence states to remote hosts that don't already
-        # have them (because they already share rooms).
+        #   2. presence states of newly joined local users to all remote servers in
+        #      the room, if they aren't already receiving it because of an already
+        #      shared room.
 
         # Get all the users who were already in the room, by fetching the
         # current users in the room and removing the newly joined users.
@@ -1459,64 +1465,67 @@ class PresenceHandler(BasePresenceHandler):
         # Construct sets for all the local users and remote hosts that were
         # already in the room
         prev_local_users = []
-        prev_remote_hosts: Set[str] = set()
+        prev_all_remote_hosts: Set[str] = set()
 
         for user_id in prev_users:
             if self.is_mine_id(user_id):
                 prev_local_users.append(user_id)
             else:
-                # Only save a host to send presence to if this user shares no other
-                # rooms with other users this server knows about
-                host = get_domain_from_id(user_id)
+                prev_all_remote_hosts.add(get_domain_from_id(user_id))
 
-                # Remove current user_id from the set to check against
-                prev_users_excluding_current_user = prev_users.copy() - {user_id}
-
-                for other_user_id in prev_users_excluding_current_user:
-                    # If this host has been seen in a list already, skip it.
-                    if host not in prev_remote_hosts:
-                        if await self.is_only_one_room_shared(user_id, other_user_id):
-                            prev_remote_hosts.add(host)
-                            # Since we are focusing on the host from user_id, break out
-                            # of the loop once its found
-                            break
+        # Extract user_id -> room_id(s) information from the database. We use this
+        # directly against newly_joined_users later to remove hosts from the list to
+        # send presence data to. It is correct to not only pull remote users here,
+        # as we need the local to differentiate later.
+        prev_users_dict_to_rooms = await self.store.get_rooms_for_users(prev_users)
 
         # Similarly, construct sets for all the local users and remote hosts
         # that were *not* already in the room. Care needs to be taken with the
         # calculating the remote hosts, as a host may have already been in the
         # room even if there is a newly joined user from that host.
         newly_joined_local_users = []
-        newly_joined_remote_hosts: Set[str] = set()
+        newly_joined_all_remote_hosts: Set[str] = set()
 
         for user_id in newly_joined_users:
             if self.is_mine_id(user_id):
                 newly_joined_local_users.append(user_id)
             else:
                 host = get_domain_from_id(user_id)
-                # To filter out hosts that are already in other rooms shared with
-                # this user, use the set constructed to get the full list of users as
-                # we need to check not just prev_users but newly joined as well
-                #
-                # We still remove the current user, as checking yourself is redundant
-                users_excluding_current_user_id = set(users) - {user_id}
-                for other_user_id in users_excluding_current_user_id:
-                    # If a host is present in either of these lists, there is no point
-                    # looking for it again. This is the key difference from the
-                    # 'previous users' section above.
-                    if (
-                        host not in prev_remote_hosts
-                        and host not in newly_joined_remote_hosts
-                    ):
-                        if await self.is_only_one_room_shared(user_id, other_user_id):
-                            newly_joined_remote_hosts.add(host)
-                            # Since we are focusing on the host from user_id, break out
-                            # of the loop once its found
-                            break
+                # This set:
+                #   * will be large if a local user is joining a new room
+                #   * will be small if a remote user is joining this room
+                #   * is used to send local presence states
+                if host not in prev_all_remote_hosts:
+                    newly_joined_all_remote_hosts.add(host)
+
+        # Just as above, collect all user_id -> room_id(s) from the database. Then we
+        # can compare them both ways, and matched hosts can be removed from the list of
+        # servers that presence will be sent to
+        newly_joined_users_dict_to_rooms = await self.store.get_rooms_for_users(
+            newly_joined_users
+        )
+
+        # Here we do the heavy processing of compiling the list of hosts we *don't* want
+        # in both final lists of servers.
+        prev_remote_hosts_to_be_removed = self.filter_hosts_by_mutual_room(
+            prev_users_dict_to_rooms, newly_joined_users_dict_to_rooms
+        )
+        newly_joined_hosts_to_be_removed = self.filter_hosts_by_mutual_room(
+            newly_joined_users_dict_to_rooms, prev_users_dict_to_rooms
+        )
+
+        # And the list is ready. Ideally, it should now be as small as possible.
+        prev_remote_hosts_stripped = (
+            prev_all_remote_hosts - prev_remote_hosts_to_be_removed
+        )
+        newly_joined_remote_hosts_stripped = (
+            newly_joined_all_remote_hosts - newly_joined_hosts_to_be_removed
+        )
 
         # Send presence states of all local users in the room to newly joined
         # remote servers. (We actually only send states for local users already
         # in the room, as we'll send states for newly joined local users below.)
-        if prev_local_users and newly_joined_remote_hosts:
+        if prev_local_users and newly_joined_remote_hosts_stripped:
             local_states = await self.current_state_for_users(prev_local_users)
 
             # Filter out old presence, i.e. offline presence states where
@@ -1534,18 +1543,19 @@ class PresenceHandler(BasePresenceHandler):
             ]
 
             self._federation_queue.send_presence_to_destinations(
-                destinations=newly_joined_remote_hosts,
+                destinations=newly_joined_remote_hosts_stripped,
                 states=states,
             )
 
         # Send presence states of newly joined users to all remote servers in
         # the room
         if newly_joined_local_users and (
-            prev_remote_hosts or newly_joined_remote_hosts
+            prev_remote_hosts_stripped or newly_joined_remote_hosts_stripped
         ):
             local_states = await self.current_state_for_users(newly_joined_local_users)
             self._federation_queue.send_presence_to_destinations(
-                destinations=prev_remote_hosts | newly_joined_remote_hosts,
+                destinations=prev_remote_hosts_stripped
+                | newly_joined_remote_hosts_stripped,
                 states=list(local_states.values()),
             )
 
