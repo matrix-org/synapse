@@ -430,6 +430,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         stored_dehydrated_device_id = self.get_success(
             self.handler.store_dehydrated_device(
                 user_id=user_id,
+                device_id=None,
                 device_data={"device_data": {"foo": "bar"}},
                 initial_device_display_name="dehydrated device",
             )
@@ -506,6 +507,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         stored_dehydrated_device_id = self.get_success(
             self.handler.store_dehydrated_device(
                 user_id=user_id,
+                device_id=None,
                 device_data={"device_data": {"foo": "bar"}},
                 initial_device_display_name="dehydrated device",
             )
@@ -530,7 +532,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
 
         requester = create_requester(user_id, device_id=device_id)
 
-        # Fetching messages for a non existing device should return an error
+        # Fetching messages for a non-existing device should return an error
         self.get_failure(
             self.message_handler.get_events_for_dehydrated_device(
                 requester=requester,
@@ -565,7 +567,8 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(res["events"]), 1)
         self.assertEqual(res["events"][0]["content"]["body"], "foo")
 
-        # Fetch the message of the dehydrated device again, which should return nothing and delete the old messages
+        # Fetch the message of the dehydrated device again, which should return nothing
+        # and delete the old messages
         res = self.get_success(
             self.message_handler.get_events_for_dehydrated_device(
                 requester=requester,
@@ -576,21 +579,3 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         )
         self.assertTrue(len(res["next_batch"]) > 1)
         self.assertEqual(len(res["events"]), 0)
-
-        # Fetching messages again should fail, since the messages and dehydrated device
-        # were deleted
-        self.get_failure(
-            self.message_handler.get_events_for_dehydrated_device(
-                requester=requester,
-                device_id=stored_dehydrated_device_id,
-                since_token=None,
-                limit=10,
-            ),
-            SynapseError,
-        )
-
-        # make sure that the dehydrated device ID is deleted after fetching messages
-        res2 = self.get_success(
-            self.handler.get_dehydrated_device(requester.user.to_string()),
-        )
-        self.assertEqual(res2, None)

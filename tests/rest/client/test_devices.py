@@ -233,7 +233,21 @@ class DehydratedDeviceTestCase(unittest.HomeserverTestCase):
                 "device_data": {
                     "algorithm": "org.matrix.msc2697.v1.dehydration.v1.olm",
                     "account": "dehydrated_device",
-                }
+                },
+                "device_keys": {
+                    "user_id": "@alice:test",
+                    "device_id": "device1",
+                    "valid_until_ts": "80",
+                    "algorithms": [
+                        "m.olm.curve25519-aes-sha2",
+                    ],
+                    "keys": {
+                        "<algorithm>:<device_id>": "<key_base64>",
+                    },
+                    "signatures": {
+                        "<user_id>": {"<algorithm>:<device_id>": "<signature_base64>"}
+                    },
+                },
             },
             access_token=token,
             shorthand=False,
@@ -252,7 +266,22 @@ class DehydratedDeviceTestCase(unittest.HomeserverTestCase):
             "device_data": {
                 "algorithm": "m.dehydration.v1.olm",
             },
+            "device_id": "device1",
             "initial_device_display_name": "foo bar",
+            "device_keys": {
+                "user_id": "@mikey:test",
+                "device_id": "device1",
+                "valid_until_ts": "80",
+                "algorithms": [
+                    "m.olm.curve25519-aes-sha2",
+                ],
+                "keys": {
+                    "<algorithm>:<device_id>": "<key_base64>",
+                },
+                "signatures": {
+                    "<user_id>": {"<algorithm>:<device_id>": "<signature_base64>"}
+                },
+            },
         }
         channel = self.make_request(
             "PUT",
@@ -265,31 +294,7 @@ class DehydratedDeviceTestCase(unittest.HomeserverTestCase):
         device_id = channel.json_body.get("device_id")
         assert device_id is not None
         self.assertIsInstance(device_id, str)
-
-        # test that you can upload keys for this device
-        content = {
-            "device_keys": {
-                "algorithms": ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
-                "device_id": f"{device_id}",
-                "keys": {
-                    "curve25519:JLAFKJWSCS": "3C5BFWi2Y8MaVvjM8M22DBmh24PmgR0nPvJOIArzgyI",
-                    "ed25519:JLAFKJWSCS": "lEuiRJBit0IG6nUf5pUzWTUEsRVVe/HJkoKuEww9ULI",
-                },
-                "signatures": {
-                    "@alice:example.com": {
-                        "ed25519:JLAFKJWSCS": "dSO80A01XiigH3uBiDVx/EjzaoycHcjq9lfQX0uWsqxl2giMIiSPR8a4d291W1ihKJL/a+myXS367WT6NAIcBA"
-                    }
-                },
-                "user_id": f"{user}",
-            },
-        }
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/r0/keys/upload/{device_id}",
-            content=content,
-            access_token=token,
-        )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual("device1", device_id)
 
         # test that we can now GET the dehydrated device info
         channel = self.make_request(
@@ -358,7 +363,16 @@ class DehydratedDeviceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["events"], [])
 
-        # make sure that the dehydrated device id is deleted after we received the messages
+        # make sure we can delete the dehydrated device
+        channel = self.make_request(
+            "DELETE",
+            "_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            access_token=token,
+            shorthand=False,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # ...and after deleting it is no longer available
         channel = self.make_request(
             "GET",
             "_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",

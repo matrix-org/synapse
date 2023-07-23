@@ -317,7 +317,7 @@ class DeviceMessageHandler:
     ) -> JsonDict:
         """Fetches up to `limit` events sent to `device_id` starting from `since_token`
         and returns the new since token. If there are no more messages, returns an empty
-        array and deletes the dehydrated device associated with the user/device_id.
+        array.
 
         Args:
             requester: the user requesting the messages
@@ -373,7 +373,11 @@ class DeviceMessageHandler:
                 user_id, device_id, since_stream_id
             )
             logger.debug(
-                "Deleted %d to-device messages up to %d", deleted, since_stream_id
+                "Deleted %d to-device messages up to %d for user_id %s device_id %s",
+                deleted,
+                since_stream_id,
+                user_id,
+                device_id,
             )
 
         to_token = self.event_sources.get_current_token().to_device_key
@@ -389,19 +393,15 @@ class DeviceMessageHandler:
                 set_tag(SynapseTags.TO_DEVICE_EDU_ID, message_id)
 
         logger.debug(
-            "Returning %d to-device messages between %d and %d (current token: %d) for dehydrated device %s",
+            "Returning %d to-device messages between %d and %d (current token: %d) for "
+            "dehydrated device %s, user_id %s",
             len(messages),
             since_stream_id,
             stream_id,
             to_token,
             device_id,
+            user_id,
         )
-
-        if messages == []:
-            # we've fetched all the messages, delete the dehydrated device
-            await self.store.remove_dehydrated_device(
-                requester.user.to_string(), device_id
-            )
 
         return {
             "events": messages,
