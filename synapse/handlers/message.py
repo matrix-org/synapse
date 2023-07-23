@@ -738,7 +738,7 @@ class EventCreationHandler:
                 prev_event_id = state_map.get((EventTypes.Member, event.sender))
             else:
                 prev_state_ids = await unpersisted_context.get_prev_state_ids(
-                    StateFilter.from_types([(EventTypes.Member, None)])
+                    StateFilter.from_types([(EventTypes.Member, event.sender)])
                 )
                 prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
@@ -860,7 +860,7 @@ class EventCreationHandler:
             return None
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(event.type, None)])
+            StateFilter.from_types([(event.type, event.state_key)])
         )
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
@@ -1565,12 +1565,11 @@ class EventCreationHandler:
                 if state_entry.state_group in self._external_cache_joined_hosts_updates:
                     return
 
-                state = await state_entry.get_state(
-                    self._storage_controllers.state, StateFilter.all()
-                )
                 with opentracing.start_active_span("get_joined_hosts"):
-                    joined_hosts = await self.store.get_joined_hosts(
-                        event.room_id, state, state_entry
+                    joined_hosts = (
+                        await self._storage_controllers.state.get_joined_hosts(
+                            event.room_id, state_entry
+                        )
                     )
 
                 # Note that the expiry times must be larger than the expiry time in

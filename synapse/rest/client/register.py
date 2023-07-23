@@ -462,9 +462,9 @@ class RegisterRestServlet(RestServlet):
         # the auth layer will store these in sessions.
         desired_username = None
         if "username" in body:
-            if not isinstance(body["username"], str) or len(body["username"]) > 512:
-                raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
+            if not isinstance(desired_username, str) or len(desired_username) > 512:
+                raise SynapseError(400, "Invalid username")
 
         # fork off as soon as possible for ASes which have completely
         # different registration flows to normal users
@@ -477,11 +477,6 @@ class RegisterRestServlet(RestServlet):
                     "Appservice token must be provided when using a type of m.login.application_service",
                 )
 
-            # Set the desired user according to the AS API (which uses the
-            # 'user' key not 'username'). Since this is a new addition, we'll
-            # fallback to 'username' if they gave one.
-            desired_username = body.get("user", desired_username)
-
             # XXX we should check that desired_username is valid. Currently
             # we give appservices carte blanche for any insanity in mxids,
             # because the IRC bridges rely on being able to register stupid
@@ -489,7 +484,8 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if not isinstance(desired_username, str):
+            # Desired username is either a string or None.
+            if desired_username is None:
                 raise SynapseError(400, "Desired Username is missing or not a string")
 
             result = await self._do_appservice_registration(

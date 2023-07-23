@@ -1,1 +1,0 @@
-Remove deprecated `worker_replication_host`, `worker_replication_http_port` and `worker_replication_http_tls` configuration options.

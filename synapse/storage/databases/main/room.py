@@ -2136,7 +2136,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             raise StoreError(400, "No create event in state")
 
         # Before MSC2175, the room creator was a separate field.
-        if not room_version.msc2175_implicit_room_creator:
+        if not room_version.implicit_room_creator:
             room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
 
             if not isinstance(room_creator, str):

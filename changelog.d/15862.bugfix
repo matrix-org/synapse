@@ -1,3 +1,0 @@
-Pin `pydantic` to ^=1.7.4 to avoid backwards-incompatible API changes from the 2.0.0 release.
-Resolves https://github.com/matrix-org/synapse/issues/15858.
-Contributed by @PaarthShah.

@@ -89,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.87.0"
+version = "1.88.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -373,7 +373,15 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.cibuildwheel]
 # Skip unsupported platforms (by us or by Rust).
-skip = "cp36* *-musllinux_i686 pp*aarch64 *-musllinux_aarch64"
+# See https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip for the list of build targets.
+# We skip:
+#  - CPython 3.6 and 3.7: EOLed
+#  - PyPy 3.7: we only support Python 3.8+
+#  - musllinux i686: excluded to reduce number of wheels we build.
+#    c.f. https://github.com/matrix-org/synapse/pull/12595#discussion_r963107677
+#  - PyPy on Aarch64 and musllinux on aarch64: too slow to build.
+#    c.f. https://github.com/matrix-org/synapse/pull/14259
+skip = "cp36* cp37* pp37* *-musllinux_i686 pp*aarch64 *-musllinux_aarch64"
 
 # We need a rust compiler
 before-all =  "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y --profile minimal"
