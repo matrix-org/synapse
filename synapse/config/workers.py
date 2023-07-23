@@ -18,7 +18,7 @@ import logging
 from typing import Any, Dict, List, Optional, Union
 
 import attr
-from pydantic import BaseModel, Extra, StrictBool, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr
 
 from synapse.config._base import (
     Config,
@@ -87,11 +87,7 @@ class ConfigModel(BaseModel):
     https://pydantic-docs.helpmanual.io/usage/model_config/#change-behaviour-globally
     """
 
-    class Config:
-        # By default, ignore fields that we don't recognise.
-        extra = Extra.ignore
-        # By default, don't allow fields to be reassigned after parsing.
-        allow_mutation = False
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
 
 class InstanceTcpLocationConfig(ConfigModel):

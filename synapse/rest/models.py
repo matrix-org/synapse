@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict
 
 
 class RequestBodyModel(BaseModel):
@@ -16,8 +16,4 @@ class RequestBodyModel(BaseModel):
     https://pydantic-docs.helpmanual.io/usage/model_config/#change-behaviour-globally
     """
 
-    class Config:
-        # By default, ignore fields that we don't recognise.
-        extra = Extra.ignore
-        # By default, don't allow fields to be reassigned after parsing.
-        allow_mutation = False
+    model_config = ConfigDict(extra="ignore", frozen=True)
