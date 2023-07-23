@@ -560,13 +560,13 @@ class PushRuleStore(PushRulesWorkerStore):
         if isinstance(self.database_engine, PostgresEngine):
             sql = """
                 INSERT INTO push_rules_enable (id, user_name, rule_id, enabled)
-                VALUES (?, ?, ?, TRUE)
+                VALUES (?, ?, ?, 1)
                 ON CONFLICT DO NOTHING
             """
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = """
                 INSERT OR IGNORE INTO push_rules_enable (id, user_name, rule_id, enabled)
-                VALUES (?, ?, ?, TRUE)
+                VALUES (?, ?, ?, 1)
             """
         else:
             raise RuntimeError("Unknown database engine")
