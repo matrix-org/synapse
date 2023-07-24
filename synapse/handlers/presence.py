@@ -445,20 +445,18 @@ class WorkerPresenceHandler(BasePresenceHandler):
             )
 
     def mark_as_coming_online(self, user_id: str) -> None:
-        """A user has started syncing. Send a UserSync to the presence writer,
-        unless they had recently stopped syncing.
-        """
-        going_offline = self.users_going_offline.pop(user_id, None)
-        if not going_offline:
-            # Safe to skip because we haven't yet told the presence writer they
-            # were offline
-            self.send_user_sync(user_id, True, self.clock.time_msec())
+        """A user has started syncing. Send a UserSync to the presence writer."""
+        # Need to remove the user_id from users_going_offline or the looping call will
+        # tell the presence writer that the user went offline.
+        self.users_going_offline.pop(user_id, None)
+        self.send_user_sync(user_id, True, self.clock.time_msec())
 
     def mark_as_going_offline(self, user_id: str) -> None:
-        """A user has stopped syncing. We wait before notifying the presence
-        writer as its likely they'll come back soon. This allows us to avoid
-        sending a stopped syncing immediately followed by a started syncing
-        notification to the presence writer
+        """A user has stopped syncing. We allow the timeout(UPDATE_SYNCING_USERS_MS)
+        to expire and the looping_call to handle notifying the presence writer as its
+        likely they'll come back soon. This allows us to avoid sending a stopped
+        syncing immediately followed by a started syncing notification to the
+        presence writer
         """
         self.users_going_offline[user_id] = self.clock.time_msec()
 
