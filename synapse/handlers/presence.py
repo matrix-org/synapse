@@ -19,6 +19,7 @@ and remote users.
 The methods that define policy are:
     - PresenceHandler._update_states
     - PresenceHandler._handle_timeouts
+    - PresenceHandler.set_state
     - should_notify
 """
 import abc
@@ -486,11 +487,12 @@ class WorkerPresenceHandler(BasePresenceHandler):
         if prev_state.state != PresenceState.BUSY:
             # We set state here but pass ignore_status_msg = True as we don't want to
             # cause the status message to be cleared.
-            # Note that this causes last_active_ts to be incremented which is not
-            # what the spec wants: see comment in the BasePresenceHandler version
-            # of this function.
+            # Note that this causes last_active_ts to be incremented only if changing
+            # state to 'online' from 'offline'.
             await self.set_state(
-                UserID.from_string(user_id), {"presence": presence_state}, True
+                UserID.from_string(user_id),
+                {"presence": presence_state},
+                ignore_status_msg=True,
             )
 
         curr_sync = self._user_to_num_current_syncs.get(user_id, 0)
@@ -1004,13 +1006,12 @@ class PresenceHandler(BasePresenceHandler):
             # If they're busy then they don't stop being busy just by syncing,
             # so just update the last sync time.
             if prev_state.state != PresenceState.BUSY:
-                # XXX: We set_state separately here and just update the last_active_ts above
                 # This keeps the logic as similar as possible between the worker and single
-                # process modes. Using set_state will actually cause last_active_ts to be
-                # updated always, which is not what the spec calls for, but synapse has done
-                # this for... forever, I think.
+                # process modes.
                 await self.set_state(
-                    UserID.from_string(user_id), {"presence": presence_state}, True
+                    UserID.from_string(user_id),
+                    {"presence": presence_state},
+                    ignore_status_msg=True,
                 )
                 # Retrieve the new state for the logic below. This should come from the
                 # in-memory cache.
@@ -1254,9 +1255,12 @@ class PresenceHandler(BasePresenceHandler):
         if not ignore_status_msg:
             new_fields["status_msg"] = status_msg
 
-        if presence == PresenceState.ONLINE or (
-            presence == PresenceState.BUSY and self._busy_presence_enabled
-        ):
+        if (
+            prev_state.state == PresenceState.OFFLINE
+            and presence == PresenceState.ONLINE
+        ) or (presence == PresenceState.BUSY and self._busy_presence_enabled):
+            # By updating last_active_ts in this way, currently_active will be triggered
+            # in handle_update()
             new_fields["last_active_ts"] = self.clock.time_msec()
 
         await self._update_states(
@@ -1954,6 +1958,9 @@ def handle_update(
             - persist_and_notify: whether to persist and notify people
             - federation_ping: whether we should send a ping over federation
     """
+    # Note: if the previous state was OFFLINE and we are now ONLINE, this is most likely
+    # caused by a call to the /sync endpoint. If that is the case, last_active_ts would
+    # have been set in PresenceHandler.set_state()
     user_id = new_state.user_id
 
     persist_and_notify = False
