@@ -56,8 +56,7 @@ INLINE_CONTENT_TYPES = [
     "text/plain",
     "text/csv",
     "application/json",
-    "application/ld+json",
-    "text/xml",
+    "application/ld+json"
 ]
 
 
