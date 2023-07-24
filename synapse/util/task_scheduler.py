@@ -31,6 +31,7 @@ class TaskScheduler:
     # Precision of the scheduler, evaluation of tasks to run will only happen
     # every `SCHEDULE_INTERVAL_MS` ms
     SCHEDULE_INTERVAL_MS = 5 * 60 * 1000  # 5mn
+    CLEAN_INTERVAL_MS = 60 * 60 * 1000  # 1hr
     # Time before a complete or failed task is deleted from the DB
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
 
@@ -51,8 +52,14 @@ class TaskScheduler:
             self.clock.looping_call(
                 run_as_background_process,
                 TaskScheduler.SCHEDULE_INTERVAL_MS,
-                "scheduled_tasks_loop",
-                self._scheduled_tasks_loop,
+                "run_scheduled_tasks",
+                self._run_scheduled_tasks,
+            )
+            self.clock.looping_call(
+                run_as_background_process,
+                TaskScheduler.CLEAN_INTERVAL_MS,
+                "clean_scheduled_tasks",
+                self._clean_scheduled_tasks,
             )
 
     def register_action(
@@ -135,10 +142,11 @@ class TaskScheduler:
         self,
         id: str,
         *,
+        timestamp: Optional[int] = None,
         status: Optional[TaskStatus] = None,
         result: Optional[JsonMapping] = None,
         error: Optional[str] = None,
-    ) -> None:
+    ) -> bool:
         """Update some task associated values.
 
         This is used internally, and also exposed publically so it can be used inside task functions.
@@ -150,9 +158,11 @@ class TaskScheduler:
             result: the new result of the task
             error: the new error of the task
         """
-        await self.store.update_scheduled_task(
+        if timestamp is None:
+            timestamp = self.clock.time_msec()
+        return await self.store.update_scheduled_task(
             id,
-            timestamp=self.clock.time_msec(),
+            timestamp=timestamp,
             status=status,
             result=result,
             error=error,
@@ -170,10 +180,13 @@ class TaskScheduler:
         return await self.store.get_scheduled_task(id)
 
     async def get_tasks(
-        self, action: str, resource_id: Optional[str]
+        self,
+        actions: Optional[List[str]] = None,
+        resource_ids: Optional[List[str]] = None,
+        statuses: Optional[List[TaskStatus]] = None,
     ) -> List[ScheduledTask]:
-        """Get a list of tasks associated with an action name, and
-        optionally with a resource id.
+        """Get a list of tasks associated with some action name(s) and/or
+        with some resource id(s).
 
         Args:
             action: the action name of the tasks to retrieve
@@ -182,11 +195,13 @@ class TaskScheduler:
 
         Returns: a list of `ScheduledTask`
         """
-        return await self.store.get_scheduled_tasks(action, resource_id)
+        return await self.store.get_scheduled_tasks(actions, resource_ids, statuses)
 
-    async def _scheduled_tasks_loop(self) -> None:
+    async def _run_scheduled_tasks(self) -> None:
         """Main loop taking care of launching the scheduled tasks when needed."""
-        for task in await self.store.get_scheduled_tasks():
+        for task in await self.store.get_scheduled_tasks(
+            statuses=[TaskStatus.SCHEDULED, TaskStatus.ACTIVE]
+        ):
             if task.id not in self.running_tasks:
                 if (
                     task.status == TaskStatus.SCHEDULED
@@ -195,7 +210,14 @@ class TaskScheduler:
                     await self._launch_task(task, True)
                 elif task.status == TaskStatus.ACTIVE:
                     await self._launch_task(task, False)
-                elif (
+
+    async def _clean_scheduled_tasks(self) -> None:
+        """Clean loop taking care of removing old complete or failed jobs to avoid clutter the DB."""
+        for task in await self.store.get_scheduled_tasks(
+            statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
+        ):
+            if task.id not in self.running_tasks:
+                if (
                     task.status == TaskStatus.COMPLETE
                     or task.status == TaskStatus.FAILED
                 ) and self.clock.time_msec() > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS:
