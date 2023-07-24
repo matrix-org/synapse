@@ -1,0 +1,1 @@
+Render plain, CSS, CSV, JSON and XML media content in the browser (inline) when requested through the /download endpoint.
