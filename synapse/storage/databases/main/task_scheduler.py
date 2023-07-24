@@ -16,7 +16,12 @@ import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+    make_in_list_sql_clause,
+)
 from synapse.types import JsonDict, JsonMapping, ScheduledTask, TaskStatus
 
 if TYPE_CHECKING:
@@ -42,40 +47,56 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         return ScheduledTask(**row)
 
     async def get_scheduled_tasks(
-        self, action: Optional[str] = None, resource_id: Optional[str] = None
+        self,
+        actions: Optional[List[str]] = None,
+        resource_ids: Optional[List[str]] = None,
+        statuses: Optional[List[TaskStatus]] = None,
     ) -> List[ScheduledTask]:
         """Get a list of scheduled tasks from the DB.
 
-        If the parameters are `None` all the tasks are returned.
+        If an arg is `None` all tasks matching the other args will be selected.
+        If an arg is an empty list, the value needs to be NULL in DB to be selected.
 
         Args:
-            action: Limit the returned tasks to this specific action name
-            resource_id: Limit the returned tasks to this specific resource id
+            actions: Limit the returned tasks to those specific action names
+            resource_ids: Limit the returned tasks to thoe specific resource ids
+            statuses: Limit the returned tasks to thoe specific statuses
 
         Returns: a list of `ScheduledTask`
         """
-        keyvalues = {}
-        if action:
-            keyvalues["action"] = action
-        if resource_id:
-            keyvalues["resource_id"] = resource_id
 
-        rows = await self.db_pool.simple_select_list(
-            table="scheduled_tasks",
-            keyvalues=keyvalues,
-            retcols=(
-                "id",
-                "action",
-                "status",
-                "timestamp",
-                "resource_id",
-                "params",
-                "result",
-                "error",
-            ),
-            desc="get_scheduled_tasks",
+        def get_scheduled_tasks_txn(txn: LoggingTransaction) -> List[Dict[str, Any]]:
+            clauses = []
+            args = []
+            if actions is not None:
+                clause, temp_args = make_in_list_sql_clause(
+                    txn.database_engine, "action", actions
+                )
+                clauses.append(clause)
+                args.extend(temp_args)
+            if resource_ids is not None:
+                clause, temp_args = make_in_list_sql_clause(
+                    txn.database_engine, "resource_id", resource_ids
+                )
+                clauses.append(clause)
+                args.extend(temp_args)
+            if statuses is not None:
+                clause, temp_args = make_in_list_sql_clause(
+                    txn.database_engine, "status", statuses
+                )
+                clauses.append(clause)
+                args.extend(temp_args)
+
+            sql = "SELECT * FROM scheduled_tasks"
+            if clauses:
+                sql = sql + " WHERE " + " AND ".join(clauses)
+
+            txn.execute(sql, args)
+            return self.db_pool.cursor_to_dict(txn)
+
+        rows = await self.db_pool.runInteraction(
+            "get_scheduled_tasks", get_scheduled_tasks_txn
         )
-
         return [TaskSchedulerWorkerStore._convert_row_to_task(row) for row in rows]
 
     async def upsert_scheduled_task(self, task: ScheduledTask) -> None:
@@ -107,7 +128,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         status: Optional[TaskStatus] = None,
         result: Optional[JsonMapping] = None,
         error: Optional[str] = None,
-    ) -> None:
+    ) -> bool:
         """Update a scheduled task in the DB with some new value(s).
 
         Args:
@@ -126,12 +147,13 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             updatevalues["result"] = json.dumps(result)
         if error is not None:
             updatevalues["error"] = error
-        await self.db_pool.simple_update(
+        nb_rows = await self.db_pool.simple_update(
             "scheduled_tasks",
             {"id": id},
             updatevalues,
             desc="update_scheduled_task",
         )
+        return nb_rows > 0
 
     async def get_scheduled_task(self, id: str) -> Optional[ScheduledTask]:
         """Get a specific `ScheduledTask` from its id.
