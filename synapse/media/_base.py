@@ -56,7 +56,16 @@ INLINE_CONTENT_TYPES = [
     "text/plain",
     "text/csv",
     "application/json",
-    "application/ld+json"
+    "application/ld+json",
+    # We allow images listed under the common image list
+    # https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types#common_image_file_types
+    # except SVGs
+    "image/apng",
+    "image/avif",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
 ]
 
 
