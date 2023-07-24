@@ -409,23 +409,22 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 txn, users_to_work_on
             )
 
-            # Next fetch their profiles. Note that the `user_id` here is the
-            # *localpart*, and that not all users have profiles.
+            # Next fetch their profiles. Note that not all users have profiles.
             profile_rows = self.db_pool.simple_select_many_txn(
                 txn,
                 table="profiles",
-                column="user_id",
-                iterable=[get_localpart_from_id(u) for u in users_to_insert],
+                column="full_user_id",
+                iterable=list(users_to_insert),
                 retcols=(
-                    "user_id",
+                    "full_user_id",
                     "displayname",
                     "avatar_url",
                 ),
                 keyvalues={},
             )
             profiles = {
-                f"@{row['user_id']}:{self.server_name}": _UserDirProfile(
-                    f"@{row['user_id']}:{self.server_name}",
+                row["full_user_id"]: _UserDirProfile(
+                    row["full_user_id"],
                     row["displayname"],
                     row["avatar_url"],
                 )

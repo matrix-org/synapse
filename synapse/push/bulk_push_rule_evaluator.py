@@ -375,7 +375,7 @@ class BulkPushRuleEvaluator:
         # _get_power_levels_and_sender_level in its call to get_user_power_level
         # (even for room V10.)
         notification_levels = power_levels.get("notifications", {})
-        if not event.room_version.msc3667_int_only_power_levels:
+        if not event.room_version.enforce_int_power_levels:
             keys = list(notification_levels.keys())
             for key in keys:
                 level = notification_levels.get(key, SENTINEL)
