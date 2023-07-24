@@ -67,7 +67,7 @@ jobs:
           push: true
           labels: |
             gitsha1=${{ github.sha }}
-            version=${{ env.SYNAPSE_VERSION }}
+            org.opencontainers.image.version=${{ env.SYNAPSE_VERSION }}
           tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
           platforms: linux/amd64,linux/arm64
