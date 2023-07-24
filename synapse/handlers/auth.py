@@ -483,7 +483,11 @@ class AuthHandler:
 
         sid: Optional[str] = None
         authdict = clientdict.pop("auth", {})
-        if isinstance(authdict, dict) and "session" in authdict:
+        if not isinstance(authdict, dict):
+            raise SynapseError(400, "Interactive auth not yet complete. Client data is "
+                                    "not dictionary.")
+
+        if "session" in authdict:
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
