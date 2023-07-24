@@ -44,7 +44,7 @@ class AddFileHeadersTests(unittest.TestCase):
     TEST_CASES = {
         "text/plain": b"inline",
         "text/csv": b"inline",
-        "text/png": b"inline",
+        "image/png": b"inline",
         "text/html": b"attachment; filename=file.name",
         "any/thing": b"attachment; filename=file.name",
     }
