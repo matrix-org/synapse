@@ -26,6 +26,7 @@ from twisted.web.http import HTTPChannel
 from twisted.web.http_headers import Headers
 
 from synapse.api.errors import HttpResponseException, RequestSendFailed
+from synapse.config._base import ConfigError
 from synapse.http.matrixfederationclient import (
     ByteParser,
     MatrixFederationHttpClient,
@@ -672,7 +673,12 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         }
         return conf
 
-    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            "worker_replication_secret": "secret",
+        }
+    )
     def test_proxy_requests_through_federation_sender_worker(self) -> None:
         """
         Test that all outbound federation requests go through the `federation_sender`
@@ -685,7 +691,7 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
 
         # Create the `federation_sender` worker
-        self.federation_sender = self.make_worker_hs(
+        self.make_worker_hs(
             "synapse.app.generic_worker",
             {"worker_name": "federation_sender"},
             federation_http_client=mock_client_on_federation_sender,
@@ -723,7 +729,12 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         res = self.successResultOf(test_request_from_main_process_d)
         self.assertEqual(res, {"foo": "bar"})
 
-    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            "worker_replication_secret": "secret",
+        }
+    )
     def test_proxy_request_with_network_error_through_federation_sender_worker(
         self,
     ) -> None:
@@ -738,7 +749,7 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
 
         # Create the `federation_sender` worker
-        self.federation_sender = self.make_worker_hs(
+        self.make_worker_hs(
             "synapse.app.generic_worker",
             {"worker_name": "federation_sender"},
             federation_http_client=mock_client_on_federation_sender,
@@ -772,8 +783,14 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         failure_res = self.failureResultOf(test_request_from_main_process_d)
         self.assertIsInstance(failure_res.value, RequestSendFailed)
         self.assertIsInstance(failure_res.value.inner_exception, HttpResponseException)
+        self.assertEqual(failure_res.value.inner_exception.code, 502)
 
-    @override_config({"outbound_federation_restricted_to": ["federation_sender"]})
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            "worker_replication_secret": "secret",
+        }
+    )
     def test_proxy_requests_and_discards_hop_by_hop_headers(self) -> None:
         """
         Test to make sure hop-by-hop headers and addional headers defined in the
@@ -786,7 +803,7 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
 
         # Create the `federation_sender` worker
-        self.federation_sender = self.make_worker_hs(
+        self.make_worker_hs(
             "synapse.app.generic_worker",
             {"worker_name": "federation_sender"},
             federation_http_client=mock_client_on_federation_sender,
@@ -839,3 +856,81 @@ class FederationClientProxyTests(BaseMultiWorkerStreamTestCase):
         self.assertNotIn(b"Proxy-Authorization", header_names)
         # Make sure the response is as expected back on the main worker
         self.assertEqual(res, {"foo": "bar"})
+
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            # `worker_replication_secret` is set here so that the test setup is able to pass
+            # but the actual homserver creation test is in the test body below
+            "worker_replication_secret": "secret",
+        }
+    )
+    def test_not_able_to_proxy_requests_through_federation_sender_worker_when_no_secret_configured(
+        self,
+    ) -> None:
+        """
+        Test that we aren't able to proxy any outbound federation requests when
+        `worker_replication_secret` is not configured.
+        """
+        with self.assertRaises(ConfigError):
+            # Create the `federation_sender` worker
+            self.make_worker_hs(
+                "synapse.app.generic_worker",
+                {
+                    "worker_name": "federation_sender",
+                    # Test that we aren't able to proxy any outbound federation requests
+                    # when `worker_replication_secret` is not configured.
+                    "worker_replication_secret": None,
+                },
+            )
+
+    @override_config(
+        {
+            "outbound_federation_restricted_to": ["federation_sender"],
+            "worker_replication_secret": "secret",
+        }
+    )
+    def test_not_able_to_proxy_requests_through_federation_sender_worker_when_wrong_auth_given(
+        self,
+    ) -> None:
+        """
+        Test that we aren't able to proxy any outbound federation requests when the
+        wrong authorization is given.
+        """
+        # Mock out the `MatrixFederationHttpClient` of the `federation_sender` instance
+        # so we can act like some remote server responding to requests
+        mock_client_on_federation_sender = Mock()
+        mock_agent_on_federation_sender = create_autospec(Agent, spec_set=True)
+        mock_client_on_federation_sender.agent = mock_agent_on_federation_sender
+
+        # Create the `federation_sender` worker
+        self.make_worker_hs(
+            "synapse.app.generic_worker",
+            {
+                "worker_name": "federation_sender",
+                # Test that we aren't able to proxy any outbound federation requests
+                # when `worker_replication_secret` is wrong.
+                "worker_replication_secret": "wrong",
+            },
+            federation_http_client=mock_client_on_federation_sender,
+        )
+
+        # This federation request from the main process should be proxied through the
+        # `federation_sender` worker off but will fail here because it's using the wrong
+        # authorization.
+        test_request_from_main_process_d = defer.ensureDeferred(
+            self.hs.get_federation_http_client().get_json("remoteserv:8008", "foo/bar")
+        )
+
+        # Pump the reactor so our deferred goes through the motions. We pump with 10
+        # seconds (0.1 * 100) so the `MatrixFederationHttpClient` runs out of retries
+        # and finally passes along the error response.
+        self.pump(0.1)
+
+        # Make sure that the request was *NOT* proxied through the `federation_sender`
+        # worker
+        mock_agent_on_federation_sender.request.assert_not_called()
+
+        failure_res = self.failureResultOf(test_request_from_main_process_d)
+        self.assertIsInstance(failure_res.value, HttpResponseException)
+        self.assertEqual(failure_res.value.code, 401)

@@ -957,7 +957,7 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         prev_event_ids = None
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             # Note that the room's state can change out from under us and render our
             # nice join rules-conformant event non-conformant by the time we build the
             # event. When this happens, our validation at the end fails and we respond
@@ -1581,9 +1581,7 @@ class FederationHandler:
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
-        )
+        prev_state_ids = await context.get_prev_state_ids(StateFilter.from_types([key]))
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
             original_invite = await self.store.get_event(
@@ -1636,7 +1634,7 @@ class FederationHandler:
         token = signed["token"]
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, token)])
         )
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 

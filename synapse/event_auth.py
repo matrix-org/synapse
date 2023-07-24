@@ -126,7 +126,7 @@ def validate_event_for_room_version(event: "EventBase") -> None:
             raise AuthError(403, "Event not signed by sending server")
 
     is_invite_via_allow_rule = (
-        event.room_version.msc3083_join_rules
+        event.room_version.restricted_join_rule
         and event.type == EventTypes.Member
         and event.membership == Membership.JOIN
         and EventContentFields.AUTHORISING_USER in event.content
@@ -352,11 +352,9 @@ LENIENT_EVENT_BYTE_LIMITS_ROOM_VERSIONS = {
     RoomVersions.V4,
     RoomVersions.V5,
     RoomVersions.V6,
-    RoomVersions.MSC2176,
     RoomVersions.V7,
     RoomVersions.V8,
     RoomVersions.V9,
-    RoomVersions.MSC3787,
     RoomVersions.V10,
     RoomVersions.MSC1767v10,
 }
@@ -449,7 +447,7 @@ def _check_create(event: "EventBase") -> None:
 
     # 1.4 If content has no creator field, reject if the room version requires it.
     if (
-        not event.room_version.msc2175_implicit_room_creator
+        not event.room_version.implicit_room_creator
         and EventContentFields.ROOM_CREATOR not in event.content
     ):
         raise AuthError(403, "Create event lacks a 'creator' property")
@@ -486,7 +484,7 @@ def _is_membership_change_allowed(
         key = (EventTypes.Create, "")
         create = auth_events.get(key)
         if create and event.prev_event_ids()[0] == create.event_id:
-            if room_version.msc2175_implicit_room_creator:
+            if room_version.implicit_room_creator:
                 creator = create.sender
             else:
                 creator = create.content[EventContentFields.ROOM_CREATOR]
@@ -509,7 +507,7 @@ def _is_membership_change_allowed(
     caller_invited = caller and caller.membership == Membership.INVITE
     caller_knocked = (
         caller
-        and room_version.msc2403_knocking
+        and room_version.knock_join_rule
         and caller.membership == Membership.KNOCK
     )
 
@@ -609,9 +607,9 @@ def _is_membership_change_allowed(
         elif join_rule == JoinRules.PUBLIC:
             pass
         elif (
-            room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED
+            room_version.restricted_join_rule and join_rule == JoinRules.RESTRICTED
         ) or (
-            room_version.msc3787_knock_restricted_join_rule
+            room_version.knock_restricted_join_rule
             and join_rule == JoinRules.KNOCK_RESTRICTED
         ):
             # This is the same as public, but the event must contain a reference
@@ -641,9 +639,9 @@ def _is_membership_change_allowed(
 
         elif (
             join_rule == JoinRules.INVITE
-            or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+            or (room_version.knock_join_rule and join_rule == JoinRules.KNOCK)
             or (
-                room_version.msc3787_knock_restricted_join_rule
+                room_version.knock_restricted_join_rule
                 and join_rule == JoinRules.KNOCK_RESTRICTED
             )
         ):
@@ -677,9 +675,9 @@ def _is_membership_change_allowed(
                 "You don't have permission to ban",
                 errcode=Codes.INSUFFICIENT_POWER,
             )
-    elif room_version.msc2403_knocking and Membership.KNOCK == membership:
+    elif room_version.knock_join_rule and Membership.KNOCK == membership:
         if join_rule != JoinRules.KNOCK and (
-            not room_version.msc3787_knock_restricted_join_rule
+            not room_version.knock_restricted_join_rule
             or join_rule != JoinRules.KNOCK_RESTRICTED
         ):
             raise AuthError(403, "You don't have permission to knock")
@@ -836,7 +834,7 @@ def _check_power_levels(
     # Reject events with stringy power levels if required by room version
     if (
         event.type == EventTypes.PowerLevels
-        and room_version_obj.msc3667_int_only_power_levels
+        and room_version_obj.enforce_int_power_levels
     ):
         for k, v in event.content.items():
             if k in {
@@ -972,7 +970,7 @@ def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> in
         key = (EventTypes.Create, "")
         create_event = auth_events.get(key)
         if create_event is not None:
-            if create_event.room_version.msc2175_implicit_room_creator:
+            if create_event.room_version.implicit_room_creator:
                 creator = create_event.sender
             else:
                 creator = create_event.content[EventContentFields.ROOM_CREATOR]
@@ -1110,7 +1108,7 @@ def auth_types_for_event(
                 )
                 auth_types.add(key)
 
-        if room_version.msc3083_join_rules and membership == Membership.JOIN:
+        if room_version.restricted_join_rule and membership == Membership.JOIN:
             if EventContentFields.AUTHORISING_USER in event.content:
                 key = (
                     EventTypes.Member,

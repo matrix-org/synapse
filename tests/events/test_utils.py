@@ -140,18 +140,16 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-        # As of MSC2176 we now redact the membership and prev_states keys.
+        # As of room versions we now redact the membership, prev_states, and origin keys.
         self.run_test(
-            {"type": "A", "prev_state": "prev_state", "membership": "join"},
+            {
+                "type": "A",
+                "prev_state": "prev_state",
+                "membership": "join",
+                "origin": "example.com",
+            },
             {"type": "A", "content": {}, "signatures": {}, "unsigned": {}},
-            room_version=RoomVersions.MSC2176,
-        )
-
-        # As of MSC3989 we now redact the origin key.
-        self.run_test(
-            {"type": "A", "origin": "example.com"},
-            {"type": "A", "content": {}, "signatures": {}, "unsigned": {}},
-            room_version=RoomVersions.MSC3989,
+            room_version=RoomVersions.V11,
         )
 
     def test_unsigned(self) -> None:
@@ -227,16 +225,21 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-        # After MSC2176, create events get nothing redacted.
+        # After MSC2176, create events should preserve field `content`
         self.run_test(
-            {"type": "m.room.create", "content": {"not_a_real_key": True}},
+            {
+                "type": "m.room.create",
+                "content": {"not_a_real_key": True},
+                "origin": "some_homeserver",
+                "nonsense_field": "some_random_garbage",
+            },
             {
                 "type": "m.room.create",
                 "content": {"not_a_real_key": True},
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC2176,
+            room_version=RoomVersions.V11,
         )
 
     def test_power_levels(self) -> None:
@@ -286,7 +289,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC2176,
+            room_version=RoomVersions.V11,
         )
 
     def test_alias_event(self) -> None:
@@ -349,7 +352,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC2176,
+            room_version=RoomVersions.V11,
         )
 
     def test_join_rules(self) -> None:
@@ -472,7 +475,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC3821,
+            room_version=RoomVersions.V11,
         )
 
         # Ensure this doesn't break if an invalid field is sent.
@@ -491,7 +494,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC3821,
+            room_version=RoomVersions.V11,
         )
 
         self.run_test(
@@ -509,7 +512,7 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC3821,
+            room_version=RoomVersions.V11,
         )
 
     def test_relations(self) -> None:

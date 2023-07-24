@@ -27,9 +27,9 @@ from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
 from synapse.types import (
+    MXID_LOCALPART_ALLOWED_CHARACTERS,
     UserID,
     map_username_to_mxid_localpart,
-    mxid_localpart_allowed_characters,
 )
 from synapse.util.iterutils import chunk_seq
 
@@ -371,7 +371,7 @@ class SamlHandler:
 
 
 DOT_REPLACE_PATTERN = re.compile(
-    "[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),)
+    "[^%s]" % (re.escape("".join(MXID_LOCALPART_ALLOWED_CHARACTERS)),)
 )
 
 

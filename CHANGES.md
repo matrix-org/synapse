@@ -1,3 +1,64 @@
+# Synapse 1.88.0 (2023-07-18)
+
+This release
+ - raises the minimum supported version of Python to 3.8, as Python 3.7 is now [end-of-life](https://devguide.python.org/versions/), and
+ - removes deprecated config options related to worker deployment.
+
+See [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.88/docs/upgrade.md#upgrading-to-v1880) for more information.
+
+
+### Bugfixes
+
+- Revert "Stop writing to column `user_id` of tables `profiles` and `user_filters`", which was introduced in Synapse 1.88.0rc1. ([\#15953](https://github.com/matrix-org/synapse/issues/15953))
+
+
+# Synapse 1.88.0rc1 (2023-07-11)
+
+### Features
+
+- Add `not_user_type` param to the [list accounts admin API](https://matrix-org.github.io/synapse/v1.88/admin_api/user_admin_api.html#list-accounts). ([\#15844](https://github.com/matrix-org/synapse/issues/15844))
+
+### Bugfixes
+
+- Pin `pydantic` to `^=1.7.4` to avoid backwards-incompatible API changes from the 2.0.0 release.
+  Contributed by @PaarthShah. ([\#15862](https://github.com/matrix-org/synapse/issues/15862))
+- Correctly resize thumbnails with pillow version >=10. ([\#15876](https://github.com/matrix-org/synapse/issues/15876))
+
+### Improved Documentation
+
+- Fixed header levels on the [Admin API "Users"](https://matrix-org.github.io/synapse/v1.87/admin_api/user_admin_api.html) documentation page. Contributed by @sumnerevans at @beeper. ([\#15852](https://github.com/matrix-org/synapse/issues/15852))
+- Remove deprecated `worker_replication_host`, `worker_replication_http_port` and `worker_replication_http_tls` configuration options. ([\#15872](https://github.com/matrix-org/synapse/issues/15872))
+
+### Deprecations and Removals
+
+- **Remove deprecated `worker_replication_host`, `worker_replication_http_port` and `worker_replication_http_tls` configuration options.** See the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.88/docs/upgrade.md#removal-of-worker_replication_-settings) for more details. ([\#15860](https://github.com/matrix-org/synapse/issues/15860))
+- Remove support for Python 3.7 and hence for Debian Buster. ([\#15851](https://github.com/matrix-org/synapse/issues/15851), [\#15892](https://github.com/matrix-org/synapse/issues/15892), [\#15893](https://github.com/matrix-org/synapse/issues/15893), [\#15917](https://github.com/matrix-org/synapse/pull/15917))
+
+### Internal Changes
+
+- Add foreign key constraint to `event_forward_extremities`. ([\#15751](https://github.com/matrix-org/synapse/issues/15751), [\#15907](https://github.com/matrix-org/synapse/issues/15907))
+- Add read/write style cross-worker locks. ([\#15782](https://github.com/matrix-org/synapse/issues/15782))
+- Stop writing to column `user_id` of tables `profiles` and `user_filters`. ([\#15787](https://github.com/matrix-org/synapse/issues/15787))
+- Use lower isolation level when cleaning old presence stream data to avoid serialization errors. ([\#15826](https://github.com/matrix-org/synapse/issues/15826))
+- Add tracing to media `/upload` code paths. ([\#15850](https://github.com/matrix-org/synapse/issues/15850), [\#15888](https://github.com/matrix-org/synapse/issues/15888))
+- Add a timeout that aborts any Postgres statement taking more than 1 hour. ([\#15853](https://github.com/matrix-org/synapse/issues/15853))
+- Fix the `devenv up` configuration which was ignoring the config overrides. ([\#15854](https://github.com/matrix-org/synapse/issues/15854))
+- Optimised cleanup of old entries in `device_lists_stream`. ([\#15861](https://github.com/matrix-org/synapse/issues/15861))
+- Update the Matrix clients link in the _It works! Synapse is running_ landing page. ([\#15874](https://github.com/matrix-org/synapse/issues/15874))
+- Fix building Synapse with the nightly Rust compiler. ([\#15906](https://github.com/matrix-org/synapse/issues/15906))
+- Add `Server` to Access-Control-Expose-Headers header. ([\#15908](https://github.com/matrix-org/synapse/issues/15908))
+
+### Updates to locked dependencies
+
+* Bump authlib from 1.2.0 to 1.2.1. ([\#15864](https://github.com/matrix-org/synapse/issues/15864))
+* Bump importlib-metadata from 6.6.0 to 6.7.0. ([\#15865](https://github.com/matrix-org/synapse/issues/15865))
+* Bump lxml from 4.9.2 to 4.9.3. ([\#15897](https://github.com/matrix-org/synapse/issues/15897))
+* Bump regex from 1.8.4 to 1.9.1. ([\#15902](https://github.com/matrix-org/synapse/issues/15902))
+* Bump ruff from 0.0.275 to 0.0.277. ([\#15900](https://github.com/matrix-org/synapse/issues/15900))
+* Bump sentry-sdk from 1.25.1 to 1.26.0. ([\#15867](https://github.com/matrix-org/synapse/issues/15867))
+* Bump serde_json from 1.0.99 to 1.0.100. ([\#15901](https://github.com/matrix-org/synapse/issues/15901))
+* Bump types-pyopenssl from 23.2.0.0 to 23.2.0.1. ([\#15866](https://github.com/matrix-org/synapse/issues/15866))
+
 # Synapse 1.87.0 (2023-07-04)
 
 Please note that this will be the last release of Synapse that is compatible with

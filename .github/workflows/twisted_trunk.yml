@@ -96,7 +96,11 @@ jobs:
     if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
-      image: matrixdotorg/sytest-synapse:buster
+      # We're using ubuntu:focal because it uses Python 3.8 which is our minimum supported Python version.
+      # This job is a canary to warn us about unreleased twisted changes that would cause problems for us if
+      # they were to be released immediately. For simplicity's sake (and to save CI runners) we use the oldest
+      # version, assuming that any incompatibilities on newer versions would also be present on the oldest.
+      image: matrixdotorg/sytest-synapse:focal
       volumes:
         - ${{ github.workspace }}:/src
 
