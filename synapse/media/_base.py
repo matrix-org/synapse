@@ -50,6 +50,16 @@ TEXT_CONTENT_TYPES = [
     "text/xml",
 ]
 
+# A list of all content types that are "safe" to be rendered inline in a browser.
+INLINE_CONTENT_TYPES = [
+    "text/css",
+    "text/plain",
+    "text/csv",
+    "application/json",
+    "application/ld+json",
+    "text/xml",
+]
+
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     """Parses the server name, media ID and optional file name from the request URI
@@ -155,7 +165,12 @@ def add_file_headers(
 
     # Use a Content-Disposition of attachment to force download of media.
     disposition = "attachment"
-    if upload_name:
+
+    # We allow a strict subset of content types to be inlined
+    # so that they may be viewed directly in a browser.
+    if media_type.lower() in INLINE_CONTENT_TYPES:
+        disposition = "inline"
+    elif upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
         # `filename` is defined to be a `value`, which is defined by RFC2616
