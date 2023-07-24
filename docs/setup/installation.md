@@ -135,7 +135,7 @@ Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 reposi
 
 #### ArchLinux
 
-The quickest way to get up and running with ArchLinux is probably with the community package
+The quickest way to get up and running with ArchLinux is probably with the package provided by ArchLinux
 <https://archlinux.org/packages/extra/x86_64/matrix-synapse/>, which should pull in most of
 the necessary dependencies.
 
