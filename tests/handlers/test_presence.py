@@ -306,6 +306,37 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
             any_order=True,
         )
 
+    def test_idle_while_syncing_stays_idle(self) -> None:
+        """Test that syncing alone doesn't affect unavailable state"""
+        wheel_timer = Mock()
+        user_id = "@foo:bar"
+        now = 5000000
+        time_went_idle = now - IDLE_TIMER - 1
+
+        prev_state = UserPresenceState.default(user_id)
+        prev_state = prev_state.copy_and_replace(
+            state=PresenceState.UNAVAILABLE,
+            last_active_ts=time_went_idle,
+            currently_active=False,
+        )
+
+        # The key to the test here is that while syncing, we are being told we are
+        # 'online'. But if the last_active_ts hasn't moved, then we are actually still
+        # idle.
+        new_state = prev_state.copy_and_replace(state=PresenceState.ONLINE)
+
+        state, persist_and_notify, federation_ping = handle_update(
+            prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
+        )
+
+        self.assertFalse(persist_and_notify)
+        self.assertEqual(prev_state.state, state.state)
+        self.assertEqual(state.last_federation_update_ts, now)
+        self.assertEqual(prev_state.state, state.state)
+        self.assertEqual(prev_state.status_msg, state.status_msg)
+
+        self.assertEqual(wheel_timer.insert.call_count, 2)
+
     def test_persisting_presence_updates(self) -> None:
         """Tests that the latest presence state for each user is persisted correctly"""
         # Create some test users and presence states for them
