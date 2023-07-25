@@ -429,12 +429,17 @@ class ThirdPartyEventRulesModuleApiCallbacks:
                     "Failed to run module API callback %s: %s", callback, e
                 )
 
-    async def check_can_shutdown_room(self, user_id: str, room_id: str) -> bool:
+    async def check_can_shutdown_room(
+        self, user_id: Optional[str], room_id: str
+    ) -> bool:
         """Intercept requests to shutdown a room. If `False` is returned, the
          room must not be shut down.
 
         Args:
-            requester: The ID of the user requesting the shutdown.
+            user_id: The ID of the user requesting the shutdown.
+                If no user ID is supplied, then the room is being shut down through
+                some mechanism other than a user's request, e.g. through a module's
+                request.
             room_id: The ID of the room.
         """
         for callback in self._check_can_shutdown_room_callbacks:

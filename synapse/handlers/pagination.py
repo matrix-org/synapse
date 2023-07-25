@@ -700,7 +700,7 @@ class PaginationHandler:
         self,
         delete_id: str,
         room_id: str,
-        requester_user_id: str,
+        requester_user_id: Optional[str],
         new_room_user_id: Optional[str] = None,
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
@@ -719,6 +719,9 @@ class PaginationHandler:
             requester_user_id:
                 User who requested the action. Will be recorded as putting the room on the
                 blocking list.
+                If None, the action was not manually requested but instead
+                triggered automatically, e.g. through a Synapse module
+                or some other policy.
             new_room_user_id:
                 If set, a new room will be created with this user ID
                 as the creator and admin, and all users in the old room will be
@@ -803,7 +806,7 @@ class PaginationHandler:
     def start_shutdown_and_purge_room(
         self,
         room_id: str,
-        requester_user_id: str,
+        requester_user_id: Optional[str],
         new_room_user_id: Optional[str] = None,
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
@@ -818,6 +821,9 @@ class PaginationHandler:
             requester_user_id:
                 User who requested the action and put the room on the
                 blocking list.
+                If None, the action was not manually requested but instead
+                triggered automatically, e.g. through a Synapse module
+                or some other policy.
             new_room_user_id:
                 If set, a new room will be created with this user ID
                 as the creator and admin, and all users in the old room will be
