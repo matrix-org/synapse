@@ -41,9 +41,10 @@ def _check_dict_hash(
     hash_log: str,
     hashes: Any,
     d: JsonDict,
-    hash_algorithm: Hasher = hashlib.sha256,
+    hash_algorithm: Hasher,
+    lpdu_hash: bool,
 ) -> bool:
-    name, expected_hash = compute_content_hash(d, hash_algorithm)
+    name, expected_hash = compute_content_hash(d, hash_algorithm, lpdu_hash)
     logger.debug(
         "Verifying %s hash on %s (expecting: %s)",
         hash_log,
@@ -90,7 +91,12 @@ def check_event_content_hash(
     hashes = event.get("hashes")
 
     if not _check_dict_hash(
-        event.event_id, "content", hashes, event.get_pdu_json(), hash_algorithm
+        event.event_id,
+        "content",
+        hashes,
+        event.get_pdu_json(),
+        hash_algorithm,
+        lpdu_hash=False,
     ):
         return False
 
@@ -104,6 +110,7 @@ def check_event_content_hash(
             lpdu_hashes,
             event.get_linearized_pdu_json(),
             hash_algorithm,
+            lpdu_hash=True,
         )
 
     # Non-linearized matrix doesn't care about other checks.
@@ -111,7 +118,7 @@ def check_event_content_hash(
 
 
 def compute_content_hash(
-    event_dict: Dict[str, Any], hash_algorithm: Hasher
+    event_dict: Dict[str, Any], hash_algorithm: Hasher, lpdu_hash: False
 ) -> Tuple[str, bytes]:
     """Compute the content hash of an event, which is the hash of the
     unredacted event.
@@ -120,6 +127,7 @@ def compute_content_hash(
         event_dict: The unredacted event as a dict
         hash_algorithm: A hasher from `hashlib`, e.g. hashlib.sha256, to use
             to hash the event
+        lpdu_hash: True if the LPDU hash is being calculated.
 
     Returns:
         A tuple of the name of hash and the hash as raw bytes.
@@ -131,15 +139,13 @@ def compute_content_hash(
 
     hashes = event_dict.pop("hashes", {})
 
-    # If we are calculating the content hash of an LPDU, `hashes`
-    # should be removed entirely.
-    if "hub_server" not in event_dict:
-        # Otherwise, we are calculating the content hash of a PDU. In that
-        # case, we keep the "lpdu" field inside "hashes", if it exists.
-        sha256_lpdu_hash = hashes.get("lpdu", {}).get("sha256")
-        if sha256_lpdu_hash is not None:
-            lpdu_dict = event_dict.setdefault("hashes", {}).setdefault("lpdu", {})
-            lpdu_dict["sha256"] = sha256_lpdu_hash
+    # If we are calculating the content hash of a PDU sent on behalf of another
+    # server, hashes only`contains the lpdu hash.
+    #
+    # TODO(LM) This is wrong in that an incorrectly formatted event could have
+    # bad content hashes from this.
+    if not lpdu_hash and "lpdu" in hashes:
+        event_dict["hashes"] = {"lpdu": hashes["lpdu"]}
 
     event_dict.pop("outlier", None)
     event_dict.pop("destinations", None)
@@ -225,7 +231,10 @@ def add_hashes_and_signatures(
         signing_key: The key to sign with
     """
 
-    name, digest = compute_content_hash(event_dict, hash_algorithm=hashlib.sha256)
+    # Synapse only ever generates PDUs, not LPDUs.
+    name, digest = compute_content_hash(
+        event_dict, hash_algorithm=hashlib.sha256, lpdu_hash=False
+    )
 
     event_dict.setdefault("hashes", {})[name] = encode_base64(digest)
 

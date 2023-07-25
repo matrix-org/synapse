@@ -189,6 +189,11 @@ class EventBuilder:
         if self._origin_server_ts is not None:
             event_dict["origin_server_ts"] = self._origin_server_ts
 
+        if self.room_version.linearized_matrix and self._lpdu_hashes:
+            event_dict.setdefault("hashes", {})["lpdu"] = self._lpdu_hashes
+        if self.room_version.linearized_matrix and self._lpdu_signatures:
+            event_dict.setdefault("signatures", {}).update(self._lpdu_signatures)
+
         event = create_local_event_from_event_dict(
             clock=self._clock,
             hostname=self._hostname,
@@ -197,11 +202,6 @@ class EventBuilder:
             event_dict=event_dict,
             internal_metadata_dict=self.internal_metadata.get_dict(),
         )
-
-        if self.room_version.linearized_matrix and self._lpdu_hashes:
-            event.hashes["lpdu"] = self._lpdu_hashes
-        if self.room_version.linearized_matrix and self._lpdu_signatures:
-            event.signatures.update(self._lpdu_signatures)
 
         return event
 
