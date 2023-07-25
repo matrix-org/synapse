@@ -1418,7 +1418,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         # To test deactivation for users without a profile, we delete the profile information for our user.
         self.get_success(
             self.store.db_pool.simple_delete_one(
-                table="profiles", keyvalues={"user_id": "user"}
+                table="profiles", keyvalues={"full_user_id": "@user:test"}
             )
         )
 

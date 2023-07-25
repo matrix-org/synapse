@@ -135,8 +135,8 @@ Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 reposi
 
 #### ArchLinux
 
-The quickest way to get up and running with ArchLinux is probably with the community package
-<https://archlinux.org/packages/community/x86_64/matrix-synapse/>, which should pull in most of
+The quickest way to get up and running with ArchLinux is probably with the package provided by ArchLinux
+<https://archlinux.org/packages/extra/x86_64/matrix-synapse/>, which should pull in most of
 the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
