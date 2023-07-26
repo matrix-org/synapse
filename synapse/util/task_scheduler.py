@@ -114,7 +114,7 @@ class TaskScheduler:
         """
         if action not in self._actions:
             raise Exception(
-                f"No function associated with the action {action} of the scheduled task"
+                f"No function associated with action {action} of the scheduled task"
             )
 
         launch_now = False
@@ -238,9 +238,10 @@ class TaskScheduler:
             first_launch: `True` if it's the first time is launched, `False` otherwise
         """
         if task.action not in self._actions:
-            raise Exception(
-                f"No function associated with the action {task.action} of the scheduled task"
+            logger.warn(
+                f"Can't launch task {task.id} since no function associated with action {action}"
             )
+            return
 
         function = self._actions[task.action]
 
