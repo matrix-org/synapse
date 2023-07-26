@@ -37,17 +37,17 @@ def run_create(
         # after the background update has finished
         if res:
             drop_cse_sql = """
-            ALTER TABLE current_state_events DROP CONSTRAINT event_stream_ordering_fkey
+            ALTER TABLE current_state_events DROP CONSTRAINT IF EXISTS event_stream_ordering_fkey
             """
             cur.execute(drop_cse_sql)
 
             drop_lcm_sql = """
-            ALTER TABLE local_current_membership DROP CONSTRAINT event_stream_ordering_fkey
+            ALTER TABLE local_current_membership DROP CONSTRAINT IF EXISTS event_stream_ordering_fkey
             """
             cur.execute(drop_lcm_sql)
 
             drop_rm_sql = """
-            ALTER TABLE room_memberships DROP CONSTRAINT event_stream_ordering_fkey
+            ALTER TABLE room_memberships DROP CONSTRAINT IF EXISTS event_stream_ordering_fkey
             """
             cur.execute(drop_rm_sql)
 
