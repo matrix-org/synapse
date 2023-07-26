@@ -185,7 +185,7 @@ class TaskScheduler:
         actions: Optional[List[str]] = None,
         resource_ids: Optional[List[str]] = None,
         statuses: Optional[List[TaskStatus]] = None,
-        maximum_timestamp: Optional[int] = None,
+        max_timestamp: Optional[int] = None,
     ) -> List[ScheduledTask]:
         """Get a list of tasks associated with some action name(s) and/or
         with some resource id(s).
@@ -201,16 +201,16 @@ class TaskScheduler:
             actions=actions,
             resource_ids=resource_ids,
             statuses=statuses,
-            maximum_timestamp=maximum_timestamp,
+            max_timestamp=max_timestamp,
         )
 
     async def _run_scheduled_tasks(self) -> None:
         """Main loop taking care of launching the scheduled tasks when needed."""
-        for task in await self.store.get_scheduled_tasks(statuses=[TaskStatus.ACTIVE]):
+        for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
             if task.id not in self.running_tasks:
                 await self._launch_task(task, first_launch=False)
-        for task in await self.store.get_scheduled_tasks(
-            statuses=[TaskStatus.SCHEDULED], maximum_timestamp=self.clock.time_msec()
+        for task in await self.get_tasks(
+            statuses=[TaskStatus.SCHEDULED], max_timestamp=self.clock.time_msec()
         ):
             if task.id not in self.running_tasks:
                 await self._launch_task(task, first_launch=True)
