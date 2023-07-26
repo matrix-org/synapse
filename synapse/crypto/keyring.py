@@ -49,6 +49,7 @@ from synapse.types import JsonDict
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import yieldable_gather_results
 from synapse.util.batching_queue import BatchingQueue
+from synapse.util.caches.descriptors import cached
 from synapse.util.retryutils import NotRetryingDestination
 
 if TYPE_CHECKING:
@@ -189,9 +190,38 @@ class Keyring:
             valid_until_ts=2**63,  # fake future timestamp
         )
 
+        self._client = hs.get_federation_http_client()
+
+    @cached()
     async def is_server_linearized(self, server_name: str) -> bool:
-        # TODO(LM) Fetch whether the key response of the origin contains m.linearized.
-        return not self._is_mine_server_name(server_name)
+        # TODO(LM) Cache this in the database.
+        # TODO(LM) Support perspectives server.
+        try:
+            response = await self._client.get_json(
+                destination=server_name,
+                path="/_matrix/key/v2/server",
+                ignore_backoff=True,
+                # we only give the remote server 10s to respond. It should be an
+                # easy request to handle, so if it doesn't reply within 10s, it's
+                # probably not going to.
+                #
+                # Furthermore, when we are acting as a notary server, we cannot
+                # wait all day for all of the origin servers, as the requesting
+                # server will otherwise time out before we can respond.
+                #
+                # (Note that get_json may make 4 attempts, so this can still take
+                # almost 45 seconds to fetch the headers, plus up to another 60s to
+                # read the response).
+                timeout=10000,
+            )
+        except (NotRetryingDestination, RequestSendFailed) as e:
+            # these both have str() representations which we can't really improve
+            # upon
+            raise KeyLookupError(str(e))
+        except HttpResponseException as e:
+            raise KeyLookupError("Remote server returned an error: %s" % (e,))
+
+        return response.get("m.linearized", False)
 
     async def verify_json_for_server(
         self,
