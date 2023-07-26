@@ -109,7 +109,7 @@ class TaskScheduler:
             params: a set of parameters that can be easily accessed from inside the
                 executed function
 
-        Returns: 
+        Returns:
             The id of the scheduled task
         """
         if action not in self._actions:
