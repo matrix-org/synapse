@@ -122,7 +122,7 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
         self.assertEqual(task.status, TaskStatus.ACTIVE)
 
         # Simulate a synapse restart by emptying the list of running tasks
-        self.task_scheduler.running_tasks = set()
+        self.task_scheduler._running_tasks = set()
         self.reactor.advance((TaskScheduler.SCHEDULE_INTERVAL_MS / 1000) + 1)
 
         task = self.get_success(self.task_scheduler.get_task(task_id))

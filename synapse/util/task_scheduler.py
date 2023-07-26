@@ -36,26 +36,26 @@ class TaskScheduler:
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastores().main
-        self.clock = hs.get_clock()
-        self.running_tasks: Set[str] = set()
-        self.actions: Dict[
+        self._store = hs.get_datastores().main
+        self._clock = hs.get_clock()
+        self._running_tasks: Set[str] = set()
+        self._actions: Dict[
             str,
             Callable[
                 [ScheduledTask, bool],
                 Awaitable[Tuple[TaskStatus, Optional[JsonMapping], Optional[str]]],
             ],
         ] = {}
-        self.run_background_tasks = hs.config.worker.run_background_tasks
+        self._run_background_tasks = hs.config.worker.run_background_tasks
 
-        if self.run_background_tasks:
-            self.clock.looping_call(
+        if self._run_background_tasks:
+            self._clock.looping_call(
                 run_as_background_process,
                 TaskScheduler.SCHEDULE_INTERVAL_MS,
                 "run_scheduled_tasks",
                 self._run_scheduled_tasks,
             )
-            self.clock.looping_call(
+            self._clock.looping_call(
                 run_as_background_process,
                 TaskScheduler.CLEAN_INTERVAL_MS,
                 "clean_scheduled_tasks",
@@ -85,7 +85,7 @@ class TaskScheduler:
                 and `error` as specified in `ScheduledTask`.
             action_name: The name of the action to be associated with the function
         """
-        self.actions[action_name] = function
+        self._actions[action_name] = function
 
     async def schedule_task(
         self,
@@ -109,16 +109,17 @@ class TaskScheduler:
             params: a set of parameters that can be easily accessed from inside the
                 executed function
 
-        Returns: the id of the scheduled task
+        Returns: 
+            The id of the scheduled task
         """
-        if action not in self.actions:
+        if action not in self._actions:
             raise Exception(
                 f"No function associated with the action {action} of the scheduled task"
             )
 
         launch_now = False
-        if timestamp is None or timestamp < self.clock.time_msec():
-            timestamp = self.clock.time_msec()
+        if timestamp is None or timestamp < self._clock.time_msec():
+            timestamp = self._clock.time_msec()
             launch_now = True
 
         task = ScheduledTask(
@@ -131,9 +132,9 @@ class TaskScheduler:
             None,
             None,
         )
-        await self.store.upsert_scheduled_task(task)
+        await self._store.upsert_scheduled_task(task)
 
-        if launch_now and self.run_background_tasks:
+        if launch_now and self._run_background_tasks:
             await self._launch_task(task, True)
 
         return task.id
@@ -159,8 +160,8 @@ class TaskScheduler:
             error: the new error of the task
         """
         if timestamp is None:
-            timestamp = self.clock.time_msec()
-        return await self.store.update_scheduled_task(
+            timestamp = self._clock.time_msec()
+        return await self._store.update_scheduled_task(
             id,
             timestamp=timestamp,
             status=status,
@@ -177,7 +178,7 @@ class TaskScheduler:
         Returns: the task description or `None` if it doesn't exist
             or it has already been cleaned
         """
-        return await self.store.get_scheduled_task(id)
+        return await self._store.get_scheduled_task(id)
 
     async def get_tasks(
         self,
@@ -198,7 +199,7 @@ class TaskScheduler:
         Returns
             A list of `ScheduledTask`
         """
-        return await self.store.get_scheduled_tasks(
+        return await self._store.get_scheduled_tasks(
             actions=actions,
             resource_ids=resource_ids,
             statuses=statuses,
@@ -208,25 +209,25 @@ class TaskScheduler:
     async def _run_scheduled_tasks(self) -> None:
         """Main loop taking care of launching the scheduled tasks when needed."""
         for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
-            if task.id not in self.running_tasks:
+            if task.id not in self._running_tasks:
                 await self._launch_task(task, first_launch=False)
         for task in await self.get_tasks(
-            statuses=[TaskStatus.SCHEDULED], max_timestamp=self.clock.time_msec()
+            statuses=[TaskStatus.SCHEDULED], max_timestamp=self._clock.time_msec()
         ):
-            if task.id not in self.running_tasks:
+            if task.id not in self._running_tasks:
                 await self._launch_task(task, first_launch=True)
 
     async def _clean_scheduled_tasks(self) -> None:
         """Clean loop taking care of removing old complete or failed jobs to avoid clutter the DB."""
-        for task in await self.store.get_scheduled_tasks(
+        for task in await self._store.get_scheduled_tasks(
             statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
         ):
-            if task.id not in self.running_tasks:
+            if task.id not in self._running_tasks:
                 if (
-                    self.clock.time_msec()
+                    self._clock.time_msec()
                     > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
                 ):
-                    await self.store.delete_scheduled_task(task.id)
+                    await self._store.delete_scheduled_task(task.id)
 
     async def _launch_task(self, task: ScheduledTask, first_launch: bool) -> None:
         """Launch a scheduled task now.
@@ -235,12 +236,12 @@ class TaskScheduler:
             task: the task to launch
             first_launch: `True` if it's the first time is launched, `False` otherwise
         """
-        if task.action not in self.actions:
+        if task.action not in self._actions:
             raise Exception(
                 f"No function associated with the action {task.action} of the scheduled task"
             )
 
-        function = self.actions[task.action]
+        function = self._actions[task.action]
 
         async def wrapper() -> None:
             try:
@@ -261,10 +262,10 @@ class TaskScheduler:
                 result=result,
                 error=error,
             )
-            self.running_tasks.remove(task.id)
+            self._running_tasks.remove(task.id)
 
         await self.update_task(task.id, status=TaskStatus.ACTIVE)
-        self.running_tasks.add(task.id)
+        self._running_tasks.add(task.id)
         description = task.action
         if task.resource_id:
             description += f"-{task.resource_id}"
