@@ -175,8 +175,9 @@ class TaskScheduler:
         Args:
             id: the id of the task to retrieve
 
-        Returns: the task description or `None` if it doesn't exist
-            or it has already been cleaned
+        Returns:
+            The task description or `None` if it doesn't exis or it has
+            already been cleaned
         """
         return await self._store.get_scheduled_task(id)
 
@@ -266,7 +267,5 @@ class TaskScheduler:
 
         await self.update_task(task.id, status=TaskStatus.ACTIVE)
         self._running_tasks.add(task.id)
-        description = task.action
-        if task.resource_id:
-            description += f"-{task.resource_id}"
+        description = f"{task.id}-{task.action}"
         run_as_background_process(description, wrapper)
