@@ -78,6 +78,8 @@ sent_todevice_counter = Counter(
 
 HOUR_IN_MS = 60 * 60 * 1000
 
+APP_SERVICE_PREFIX = "/_matrix/app/v1"
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -131,7 +133,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         try:
             response = await self.get_json(
-                f"{service.url}/_matrix/app/v1/users/{urllib.parse.quote(user_id)}",
+                f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
                 {"access_token": service.hs_token},
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
@@ -154,7 +156,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         try:
             response = await self.get_json(
-                f"{service.url}/_matrix/app/v1/rooms/{urllib.parse.quote(alias)}",
+                f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
                 {"access_token": service.hs_token},
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
@@ -193,7 +195,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 b"access_token": service.hs_token,
             }
             response = await self.get_json(
-                f"{service.url}/_matrix/app/v1/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
+                f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 args=args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
@@ -230,7 +232,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             assert service.hs_token is not None
             try:
                 info = await self.get_json(
-                    f"{service.url}/_matrix/app/v1/thirdparty/protocol/{urllib.parse.quote(protocol)}",
+                    f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
                     {"access_token": service.hs_token},
                     headers={"Authorization": [f"Bearer {service.hs_token}"]},
                 )
@@ -267,7 +269,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         await self.post_json_get_json(
-            uri=f"{service.url}/_matrix/app/v1/ping",
+            uri=f"{service.url}{APP_SERVICE_PREFIX}/ping",
             post_json={"transaction_id": txn_id},
             headers={"Authorization": [f"Bearer {service.hs_token}"]},
         )
@@ -343,7 +345,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         try:
             await self.put_json(
-                f"{service.url}/_matrix/app/v1/transactions/{urllib.parse.quote(str(txn_id))}",
+                f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
                 json_body=body,
                 args={"access_token": service.hs_token},
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
