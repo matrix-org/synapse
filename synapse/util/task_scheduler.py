@@ -79,10 +79,10 @@ class TaskScheduler:
 
         Args:
             function: The function to be executed for this action. The parameters
-            passed to the function when launched are the `ScheduledTask` being run,
-            and a `first_launch` boolean to signal if it's a resumed task or the first
-            launch of it. The function should return a tuple of new `status`, `result`
-            and `error` as specified in `ScheduledTask`.
+                passed to the function when launched are the `ScheduledTask` being run,
+                and a `first_launch` boolean to signal if it's a resumed task or the first
+                launch of it. The function should return a tuple of new `status`, `result`
+                and `error` as specified in `ScheduledTask`.
             action_name: The name of the action to be associated with the function
         """
         self.actions[action_name] = function
