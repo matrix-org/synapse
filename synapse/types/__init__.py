@@ -988,14 +988,15 @@ class TaskStatus(str, Enum):
 class ScheduledTask:
     """Description of a scheduled task"""
 
-    # id used to identify the task
+    # Id used to identify the task
     id: str
-    # name of the action to be run by this task
+    # Name of the action to be run by this task
     action: str
-    # current status of this task
+    # Current status of this task
     status: TaskStatus
-    # if the status is SCHEDULED then this represents when it should be launched,
-    # otherwise it represents the last time this task got a change of state
+    # If the status is SCHEDULED then this represents when it should be launched,
+    # otherwise it represents the last time this task got a change of state.
+    # In milliseconds since epoch in system time timezone, usually UTC.
     timestamp: int
     # Optionally bind a task to some resource id for easy retrieval
     resource_id: Optional[str]
