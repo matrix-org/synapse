@@ -976,7 +976,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             txn.execute(
                 sql % {"where_clause": "AND stream_ordering < ?"},
-                (room_id, next_token, True, False, 100),
+                (room_id, next_token, 100),
             )
 
         return local_media_mxcs, remote_media_mxcs
