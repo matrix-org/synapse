@@ -15,7 +15,7 @@
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -23,6 +23,7 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.types import JsonDict, JsonMapping, ScheduledTask, TaskStatus
+from synapse.util import json_encoder
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -41,9 +42,9 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
     def _convert_row_to_task(row: Dict[str, Any]) -> ScheduledTask:
         row["status"] = TaskStatus(row["status"])
         if row["params"] is not None:
-            row["params"] = json.loads(row["params"])
+            row["params"] = db_to_json(row["params"])
         if row["result"] is not None:
-            row["result"] = json.loads(row["result"])
+            row["result"] = db_to_json(row["result"])
         return ScheduledTask(**row)
 
     async def get_scheduled_tasks(
@@ -118,8 +119,12 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
                 "status": task.status,
                 "timestamp": task.timestamp,
                 "resource_id": task.resource_id,
-                "params": None if task.params is None else json.dumps(task.params),
-                "result": None if task.result is None else json.dumps(task.result),
+                "params": None
+                if task.params is None
+                else json_encoder.encode(task.params),
+                "result": None
+                if task.result is None
+                else json_encoder.encode(task.result),
                 "error": task.error,
             },
             desc="upsert_scheduled_task",

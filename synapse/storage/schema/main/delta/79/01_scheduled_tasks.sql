@@ -15,12 +15,12 @@
 
 -- cf ScheduledTask docstring for the meaning of the fields.
 CREATE TABLE IF NOT EXISTS scheduled_tasks(
-    id text PRIMARY KEY,
-    action text NOT NULL,
-    status text NOT NULL,
-    timestamp bigint NOT NULL,
-    resource_id text,
-    params text,
-    result text,
-    error text
+    id TEXT PRIMARY KEY,
+    action TEXT NOT NULL,
+    status TEXT NOT NULL,
+    timestamp BIGINT NOT NULL,
+    resource_id TEXT,
+    params TEXT,
+    result TEXT,
+    error TEXT
 );
