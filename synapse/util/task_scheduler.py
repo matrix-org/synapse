@@ -195,7 +195,8 @@ class TaskScheduler:
             resource_id: if `None`, returns all associated tasks for
                 the specified action name, regardless of the resource id
 
-        Returns: a list of `ScheduledTask`
+        Returns
+            A list of `ScheduledTask`
         """
         return await self.store.get_scheduled_tasks(
             actions=actions,
