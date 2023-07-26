@@ -696,7 +696,18 @@ class FederationServer(FederationBase):
         pdu = await self.handler.on_make_join_request(
             origin, room_id, KNOWN_ROOM_VERSIONS[room_version_id], user_id
         )
-        return {"event": pdu.get_templated_pdu_json(), "room_version": room_version_id}
+
+        # For a linearized matrix server return a templated LPDU, otherwise a templated PDU.
+        # TODO(LM) Is it an error for a LM server to not be on a LM room version?
+        if (
+            pdu.room_version.linearized_matrix
+            and await self.keyring.is_server_linearized(origin)
+        ):
+            event_json = pdu.get_templated_linearized_pdu_json()
+        else:
+            event_json = pdu.get_templated_pdu_json()
+
+        return {"event": event_json, "room_version": room_version_id}
 
     async def on_invite_request(
         self, origin: str, content: JsonDict, room_version_id: str
@@ -805,7 +816,17 @@ class FederationServer(FederationBase):
 
         room_version = await self.store.get_room_version_id(room_id)
 
-        return {"event": pdu.get_templated_pdu_json(), "room_version": room_version}
+        # For a linearized matrix server return a templated LPDU, otherwise a templated PDU.
+        # TODO(LM) Is it an error for a LM server to not be on a LM room version?
+        if (
+            pdu.room_version.linearized_matrix
+            and await self.keyring.is_server_linearized(origin)
+        ):
+            event_json = pdu.get_templated_linearized_pdu_json()
+        else:
+            event_json = pdu.get_templated_pdu_json()
+
+        return {"event": event_json, "room_version": room_version}
 
     async def on_send_leave_request(
         self, origin: str, content: JsonDict, expected_room_id: Optional[str] = None
@@ -865,8 +886,19 @@ class FederationServer(FederationBase):
             )
 
         pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
+
+        # For a linearized matrix server return a templated LPDU, otherwise a templated PDU.
+        # TODO(LM) Is it an error for a LM server to not be on a LM room version?
+        if (
+            pdu.room_version.linearized_matrix
+            and await self.keyring.is_server_linearized(origin)
+        ):
+            event_json = pdu.get_templated_linearized_pdu_json()
+        else:
+            event_json = pdu.get_templated_pdu_json()
+
         return {
-            "event": pdu.get_templated_pdu_json(),
+            "event": event_json,
             "room_version": room_version.identifier,
         }
 
@@ -974,7 +1006,9 @@ class FederationServer(FederationBase):
 
         # Linearized Matrix requires building the event (i.e. adding auth/prev
         # events). The input content is an LPDU.
-        if room_version.linearized_matrix:
+        if room_version.linearized_matrix and await self.keyring.is_server_linearized(
+            origin
+        ):
             event = await self._on_lpdu_event(content, room_version)
         else:
             event = event_from_pdu_json(content, room_version)

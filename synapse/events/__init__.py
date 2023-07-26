@@ -406,6 +406,9 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return template_json
 
+    def get_templated_linearized_pdu_json(self) -> JsonDict:
+        raise NotImplementedError()
+
     def __getitem__(self, field: str) -> Optional[Any]:
         return self._dict[field]
 
@@ -644,7 +647,7 @@ class FrozenLinearizedEvent(FrozenEventV3):
         pdu.pop("prev_events")
         return pdu
 
-    def get_templated_pdu_json(self) -> JsonDict:
+    def get_templated_linearized_pdu_json(self) -> JsonDict:
         """
         Return a JSON object suitable for a templated event, as used in the
         make_{join,leave,knock} workflow.
