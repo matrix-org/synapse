@@ -176,8 +176,8 @@ class TaskScheduler:
             id: the id of the task to retrieve
 
         Returns:
-            The task description or `None` if it doesn't exis or it has
-            already been cleaned
+            The task information or `None` if it doesn't exist or it has
+            already been removed because it's too old.
         """
         return await self._store.get_scheduled_task(id)
 
