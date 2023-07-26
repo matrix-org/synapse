@@ -188,13 +188,14 @@ class FilteringWorkerStore(SQLBaseStore):
                 filter_id = max_id + 1
 
             sql = (
-                "INSERT INTO user_filters (full_user_id, filter_id, filter_json)"
-                "VALUES(?, ?, ?)"
+                "INSERT INTO user_filters (full_user_id, user_id, filter_id, filter_json)"
+                "VALUES(?, ?, ?, ?)"
             )
             txn.execute(
                 sql,
                 (
                     user_id.to_string(),
+                    user_id.localpart,
                     filter_id,
                     bytearray(def_json),
                 ),

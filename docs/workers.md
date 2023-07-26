@@ -531,6 +531,30 @@ the stream writer for the `presence` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
+#### Restrict outbound federation traffic to a specific set of workers
+
+The
+[`outbound_federation_restricted_to`](usage/configuration/config_documentation.md#outbound_federation_restricted_to)
+configuration is useful to make sure outbound federation traffic only goes through a
+specified subset of workers. This allows you to set more strict access controls (like a
+firewall) for all workers and only allow the `federation_sender`'s to contact the
+outside world.
+
+```yaml
+instance_map:
+    main:
+        host: localhost
+        port: 8030
+    federation_sender1:
+        host: localhost
+        port: 8034
+
+outbound_federation_restricted_to:
+  - federation_sender1
+
+worker_replication_secret: "secret_secret"
+```
+
 #### Background tasks
 
 There is also support for moving background tasks to a separate

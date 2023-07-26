@@ -268,8 +268,7 @@ class StateHandler:
             The hosts in the room at the given events
         """
         entry = await self.resolve_state_groups_for_events(room_id, event_ids)
-        state = await entry.get_state(self._state_storage_controller, StateFilter.all())
-        return await self.store.get_joined_hosts(room_id, state, entry)
+        return await self._state_storage_controller.get_joined_hosts(room_id, entry)
 
     @trace
     @tag_args

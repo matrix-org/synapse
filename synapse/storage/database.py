@@ -98,8 +98,6 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "event_push_summary": "event_push_summary_unique_index2",
     "receipts_linearized": "receipts_linearized_unique_index",
     "receipts_graph": "receipts_graph_unique_index",
-    "profiles": "profiles_full_user_id_key_idx",
-    "user_filters": "full_users_filters_unique_idx",
 }
 
 

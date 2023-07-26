@@ -63,7 +63,7 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "enable": true,
-        "expr": "changes(process_start_time_seconds{instance=\"matrix.org\",job=~\"synapse\"}[$bucket_size]) * on (instance, job) group_left(version) synapse_build_info{instance=\"matrix.org\",job=\"synapse\"}",
+        "expr": "changes(process_start_time_seconds{instance=\"$instance\",job=~\"synapse\"}[$bucket_size]) * on (instance, job) group_left(version) synapse_build_info{instance=\"$instance\",job=\"synapse\"}",
         "iconColor": "purple",
         "name": "deploys",
         "titleFormat": "Deployed {{version}}"

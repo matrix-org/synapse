@@ -173,9 +173,10 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def create_profile(self, user_id: UserID) -> None:
+        user_localpart = user_id.localpart
         await self.db_pool.simple_insert(
             table="profiles",
-            values={"full_user_id": user_id.to_string()},
+            values={"user_id": user_localpart, "full_user_id": user_id.to_string()},
             desc="create_profile",
         )
 
@@ -190,11 +191,13 @@ class ProfileWorkerStore(SQLBaseStore):
             new_displayname: The new display name. If this is None, the user's display
                 name is removed.
         """
+        user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",
-            keyvalues={"full_user_id": user_id.to_string()},
+            keyvalues={"user_id": user_localpart},
             values={
                 "displayname": new_displayname,
+                "full_user_id": user_id.to_string(),
             },
             desc="set_profile_displayname",
         )
@@ -210,10 +213,11 @@ class ProfileWorkerStore(SQLBaseStore):
             new_avatar_url: The new avatar URL. If this is None, the user's avatar is
                 removed.
         """
+        user_localpart = user_id.localpart
         await self.db_pool.simple_upsert(
             table="profiles",
-            keyvalues={"full_user_id": user_id.to_string()},
-            values={"avatar_url": new_avatar_url},
+            keyvalues={"user_id": user_localpart},
+            values={"avatar_url": new_avatar_url, "full_user_id": user_id.to_string()},
             desc="set_profile_avatar_url",
         )
 

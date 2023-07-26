@@ -473,7 +473,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 )
                 context = await unpersisted_context.persist(event)
                 prev_state_ids = await context.get_prev_state_ids(
-                    StateFilter.from_types([(EventTypes.Member, None)])
+                    StateFilter.from_types([(EventTypes.Member, user_id)])
                 )
 
                 prev_member_event_id = prev_state_ids.get(
@@ -1340,7 +1340,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             requester = types.create_requester(target_user)
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.GuestAccess, None)])
+            StateFilter.from_types([(EventTypes.GuestAccess, "")])
         )
         if event.membership == Membership.JOIN:
             if requester.is_guest:
@@ -1362,11 +1362,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ratelimit=ratelimit,
         )
 
-        prev_member_event_id = prev_state_ids.get(
-            (EventTypes.Member, event.state_key), None
-        )
-
         if event.membership == Membership.LEAVE:
+            prev_state_ids = await context.get_prev_state_ids(
+                StateFilter.from_types([(EventTypes.Member, event.state_key)])
+            )
+            prev_member_event_id = prev_state_ids.get(
+                (EventTypes.Member, event.state_key), None
+            )
+
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:

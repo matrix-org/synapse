@@ -108,18 +108,15 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         "origin_server_ts",
     ]
 
-    # Room versions from before MSC2176 had additional allowed keys.
-    if not room_version.msc2176_redaction_rules:
-        allowed_keys.extend(["prev_state", "membership"])
+    # Earlier room versions from had additional allowed keys.
+    if not room_version.updated_redaction_rules:
+        allowed_keys.extend(["prev_state", "membership", "origin"])
+
     # The hub server should not be redacted for linear matrix.
     if room_version.linearized_matrix:
         allowed_keys.append("hub_server")
     else:
         allowed_keys.append("depth")
-
-    # Room versions before MSC3989 kept the origin field.
-    if not room_version.msc3989_redaction_rules:
-        allowed_keys.append("origin")
 
     event_type = event_dict["type"]
 
@@ -132,9 +129,9 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
 
     if event_type == EventTypes.Member:
         add_fields("membership")
-        if room_version.msc3375_redaction_rules:
+        if room_version.restricted_join_rule_fix:
             add_fields(EventContentFields.AUTHORISING_USER)
-        if room_version.msc3821_redaction_rules:
+        if room_version.updated_redaction_rules:
             # Preserve the signed field under third_party_invite.
             third_party_invite = event_dict["content"].get("third_party_invite")
             if isinstance(third_party_invite, collections.abc.Mapping):
@@ -145,15 +142,16 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
                     ]
 
     elif event_type == EventTypes.Create:
-        # MSC2176 rules state that create events cannot have their `content` redacted.
-        if room_version.msc2176_redaction_rules:
+        if room_version.updated_redaction_rules:
+            # MSC2176 rules state that create events cannot have their `content` redacted.
             new_content = event_dict["content"]
-
-        if not room_version.msc2175_implicit_room_creator:
+        elif not room_version.implicit_room_creator:
+            # Some room versions give meaning to `creator`
             add_fields("creator")
+
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             add_fields("allow")
     elif event_type == EventTypes.PowerLevels:
         add_fields(
@@ -167,14 +165,14 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
             "redact",
         )
 
-        if room_version.msc2176_redaction_rules:
+        if room_version.updated_redaction_rules:
             add_fields("invite")
 
     elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
-    elif event_type == EventTypes.Redaction and room_version.msc2176_redaction_rules:
+    elif event_type == EventTypes.Redaction and room_version.updated_redaction_rules:
         add_fields("redacts")
 
     # Protect the rel_type and event_id fields under the m.relates_to field.
@@ -482,6 +480,15 @@ def serialize_event(
 
     if config.as_client_event:
         d = config.event_format(d)
+
+    # If the event is a redaction, copy the redacts field from the content to
+    # top-level for backwards compatibility.
+    if (
+        e.type == EventTypes.Redaction
+        and e.room_version.updated_redaction_rules
+        and e.redacts is not None
+    ):
+        d["redacts"] = e.redacts
 
     only_event_fields = config.only_event_fields
     if only_event_fields:
