@@ -48,9 +48,11 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
 
     async def get_scheduled_tasks(
         self,
+        *,
         actions: Optional[List[str]] = None,
         resource_ids: Optional[List[str]] = None,
         statuses: Optional[List[TaskStatus]] = None,
+        maximum_timestamp: Optional[int] = None,
     ) -> List[ScheduledTask]:
         """Get a list of scheduled tasks from the DB.
 
@@ -86,6 +88,9 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
                 )
                 clauses.append(clause)
                 args.extend(temp_args)
+            if maximum_timestamp is not None:
+                clauses.append("timestamp <= ?")
+                args.append(maximum_timestamp)
 
             sql = "SELECT * FROM scheduled_tasks"
             if clauses:

@@ -181,9 +181,11 @@ class TaskScheduler:
 
     async def get_tasks(
         self,
+        *,
         actions: Optional[List[str]] = None,
         resource_ids: Optional[List[str]] = None,
         statuses: Optional[List[TaskStatus]] = None,
+        maximum_timestamp: Optional[int] = None,
     ) -> List[ScheduledTask]:
         """Get a list of tasks associated with some action name(s) and/or
         with some resource id(s).
@@ -195,21 +197,23 @@ class TaskScheduler:
 
         Returns: a list of `ScheduledTask`
         """
-        return await self.store.get_scheduled_tasks(actions, resource_ids, statuses)
+        return await self.store.get_scheduled_tasks(
+            actions=actions,
+            resource_ids=resource_ids,
+            statuses=statuses,
+            maximum_timestamp=maximum_timestamp,
+        )
 
     async def _run_scheduled_tasks(self) -> None:
         """Main loop taking care of launching the scheduled tasks when needed."""
+        for task in await self.store.get_scheduled_tasks(statuses=[TaskStatus.ACTIVE]):
+            if task.id not in self.running_tasks:
+                await self._launch_task(task, first_launch=False)
         for task in await self.store.get_scheduled_tasks(
-            statuses=[TaskStatus.SCHEDULED, TaskStatus.ACTIVE]
+            statuses=[TaskStatus.SCHEDULED], maximum_timestamp=self.clock.time_msec()
         ):
             if task.id not in self.running_tasks:
-                if (
-                    task.status == TaskStatus.SCHEDULED
-                    and task.timestamp < self.clock.time_msec()
-                ):
-                    await self._launch_task(task, True)
-                elif task.status == TaskStatus.ACTIVE:
-                    await self._launch_task(task, False)
+                await self._launch_task(task, first_launch=True)
 
     async def _clean_scheduled_tasks(self) -> None:
         """Clean loop taking care of removing old complete or failed jobs to avoid clutter the DB."""
@@ -218,9 +222,9 @@ class TaskScheduler:
         ):
             if task.id not in self.running_tasks:
                 if (
-                    task.status == TaskStatus.COMPLETE
-                    or task.status == TaskStatus.FAILED
-                ) and self.clock.time_msec() > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS:
+                    self.clock.time_msec()
+                    > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
+                ):
                     await self.store.delete_scheduled_task(task.id)
 
     async def _launch_task(self, task: ScheduledTask, first_launch: bool) -> None:
