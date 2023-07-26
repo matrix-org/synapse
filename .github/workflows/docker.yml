@@ -28,6 +28,10 @@ jobs:
 
       - name: Inspect builder
         run: docker buildx inspect
+      
+      - name: Extract version from pyproject.toml
+        run: |
+          echo "SYNAPSE_VERSION=$(grep "^version" pyproject.toml | sed -E 's/version\s*=\s*["]([^"]*)["]/\1/')" >> $GITHUB_ENV
 
       - name: Log in to DockerHub
         uses: docker/login-action@v2
@@ -61,7 +65,9 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: true
-          labels: "gitsha1=${{ github.sha }}"
+          labels: |
+            gitsha1=${{ github.sha }}
+            org.opencontainers.image.version=${{ env.SYNAPSE_VERSION }}
           tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
           platforms: linux/amd64,linux/arm64
