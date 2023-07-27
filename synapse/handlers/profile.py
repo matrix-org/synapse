@@ -68,7 +68,7 @@ class ProfileHandler:
 
         if self.hs.is_mine(target_user):
             profileinfo = await self.store.get_profileinfo(target_user)
-            if profileinfo.display_name is None:
+            if profileinfo.display_name is None and profileinfo.avatar_url is None:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
 
             return {
