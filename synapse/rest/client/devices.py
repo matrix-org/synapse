@@ -536,7 +536,6 @@ class DehydratedDeviceV2Servlet(RestServlet):
     async def on_PUT(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         submission = parse_and_validate_json_object_from_request(request, self.PutBody)
         requester = await self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
 
         device_info = submission.dict()
         if "device_keys" not in device_info.keys():
@@ -545,18 +544,12 @@ class DehydratedDeviceV2Servlet(RestServlet):
                 "Device key(s) not found, these must be provided.",
             )
 
-        # TODO: Those two operations, creating a device and storing the
-        # device's keys should be atomic.
         device_id = await self.device_handler.store_dehydrated_device(
             requester.user.to_string(),
             submission.device_id,
             submission.device_data.dict(),
             submission.initial_device_display_name,
-        )
-
-        # TODO: Do we need to do something with the result here?
-        await self.key_uploader(
-            user_id=user_id, device_id=submission.device_id, keys=submission.dict()
+            device_info,
         )
 
         return 200, {"device_id": device_id}

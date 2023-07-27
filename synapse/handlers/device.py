@@ -41,6 +41,7 @@ from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
 )
+from synapse.replication.http.devices import ReplicationUploadKeysForUserRestServlet
 from synapse.types import (
     JsonDict,
     StrCollection,
@@ -656,15 +657,17 @@ class DeviceHandler(DeviceWorkerHandler):
         device_id: Optional[str],
         device_data: JsonDict,
         initial_device_display_name: Optional[str] = None,
+        device_keys: Optional[JsonDict] = None,
     ) -> str:
-        """Store a dehydrated device for a user.  If the user had a previous
-        dehydrated device, it is removed.
+        """Store a dehydrated device for a user, optionally storing the keys associated with
+        it as well.  If the user had a previous dehydrated device, it is removed.
 
         Args:
             user_id: the user that we are storing the device for
             device_id: device id supplied by client
             device_data: the dehydrated device information
             initial_device_display_name: The display name to use for the device
+            device_keys: keys for the dehydrated device
         Returns:
             device id of the dehydrated device
         """
@@ -678,6 +681,18 @@ class DeviceHandler(DeviceWorkerHandler):
         )
         if old_device_id is not None:
             await self.delete_devices(user_id, [old_device_id])
+
+        # we do this here to avoid a circular import
+        if self.hs.config.worker.worker_app is None:
+            # if main process
+            key_uploader = self.hs.get_e2e_keys_handler().upload_keys_for_user
+        else:
+            # if worker process
+            key_uploader = ReplicationUploadKeysForUserRestServlet.make_client(self.hs)
+
+        # if keys are provided store them
+        if device_keys:
+            await key_uploader(user_id=user_id, device_id=device_id, keys=device_keys)
         return device_id
 
     async def rehydrate_device(
