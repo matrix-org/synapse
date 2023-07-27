@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.89.0 where the `redacts` property was not properly added to the `content` for forwards-compatibility with room versions 1 through 10.
