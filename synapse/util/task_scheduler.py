@@ -239,7 +239,7 @@ class TaskScheduler:
         """
         if task.action not in self._actions:
             logger.warn(
-                f"Can't launch task {task.id} since no function associated with action {action}"
+                f"Can't launch task {task.id} since no function associated with action {task.action}"
             )
             return
 
