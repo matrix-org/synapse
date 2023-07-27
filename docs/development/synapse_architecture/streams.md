@@ -14,13 +14,13 @@ Only "writers" can add facts to a stream, and there may be multiple writers.
 Each fact has an ID, called its "stream ID".
 Readers should only process facts in ascending stream ID order.
 
-Roughly speaking\[*\], each stream is backed by a database table.
+Roughly speaking, each stream is backed by a database table.
 It should have a `stream_id` column holding stream IDs, plus additional columns
 as necessary to describe the fact.
 (Note that it may take multiple rows (with the same `stream_id`) to describe that fact.)
 Stream IDs are globally unique (enforced by Postgres sequences).
 
->\[*\]: Some additional notes on streams' backing tables.
+> _Aside_. Less roughly speaking, here are some additional notes on streams' backing tables.
 >
 > 1. Rich would like to [ditch the backing tables](https://github.com/matrix-org/synapse/issues/13456).
 > 2. The backing tables may have other uses.
