@@ -2838,6 +2838,17 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
+### `use_appservice_legacy_authorization`
+
+Whether to send the application service access token via the `access_token` query parameter.
+Defaults to false. This option is considered insecure and is not recommended. 
+
+Example configuration:
+```yaml
+"use_appservice_legacy_authorization": True 
+```
+
+---
 ### `macaroon_secret_key`
 
 A secret which is used to sign

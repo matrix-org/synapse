@@ -43,6 +43,14 @@ class AppServiceConfig(Config):
             )
 
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
+        self.use_appservice_legacy_authorization = config.get(
+            "use_appservice_legacy_authorization", False
+        )
+        if self.use_appservice_legacy_authorization:
+            logger.warning(
+                "The use of appservice legacy authorization via query params is deprecated"
+                " and should be considered insecure."
+            )
 
 
 def load_appservices(
