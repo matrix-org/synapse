@@ -482,6 +482,7 @@ def serialize_event(
         if e.room_version.updated_redaction_rules:
             d["redacts"] = e.redacts
         else:
+            d["content"] = dict(d["content"])
             d["content"]["redacts"] = e.redacts
 
     only_event_fields = config.only_event_fields
