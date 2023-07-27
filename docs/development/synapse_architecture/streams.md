@@ -42,7 +42,7 @@ We may define a per-writer notion of the "current" stream ID:
 > The current stream ID _for a writer W_ is the largest stream ID such that
 > all transactions added by W with equal or smaller ID have completed.
 
-Similarly, there is a global notation of current stream ID:
+Similarly, there is a global notion of current stream ID:
 
 > The current stream ID is the largest stream ID such that
 > all facts (added by any writer) with equal or smaller ID have completed.
