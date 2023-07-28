@@ -28,7 +28,7 @@ from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login, notifications, presence, profile, room
 from synapse.server import HomeServer
-from synapse.types import JsonDict, create_requester
+from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
@@ -103,7 +103,9 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertEqual(email["added_at"], 0)
 
         # Check that the displayname was assigned
-        displayname = self.get_success(self.store.get_profile_displayname("bob"))
+        displayname = self.get_success(
+            self.store.get_profile_displayname(UserID.from_string("@bob:test"))
+        )
         self.assertEqual(displayname, "Bobberino")
 
     def test_can_register_admin_user(self) -> None:

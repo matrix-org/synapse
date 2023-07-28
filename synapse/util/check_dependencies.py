@@ -21,16 +21,13 @@ require. But this is probably just symptomatic of Python's package management.
 """
 
 import logging
+from importlib import metadata
 from typing import Iterable, NamedTuple, Optional
 
 from packaging.requirements import Requirement
 
 DISTRIBUTION_NAME = "matrix-synapse"
 
-try:
-    from importlib import metadata
-except ImportError:
-    import importlib_metadata as metadata  # type: ignore[no-redef]
 
 __all__ = ["check_requirements"]
 

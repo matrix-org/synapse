@@ -105,13 +105,11 @@ backfill_processing_before_timer = Histogram(
 )
 
 
+# TODO: We can refactor this away now that there is only one backfill point again
 class _BackfillPointType(Enum):
     # a regular backwards extremity (ie, an event which we don't yet have, but which
     # is referred to by other events in the DAG)
     BACKWARDS_EXTREMITY = enum.auto()
-
-    # an MSC2716 "insertion event"
-    INSERTION_PONT = enum.auto()
 
 
 @attr.s(slots=True, auto_attribs=True, frozen=True)
@@ -200,6 +198,7 @@ class FederationHandler:
             )
 
     @trace
+    @tag_args
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
@@ -214,6 +213,9 @@ class FederationHandler:
             limit: The number of events that the pagination request will
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
+
+        Returns:
+            True if we actually tried to backfill something, otherwise False.
         """
         # Starting the processing time here so we can include the room backfill
         # linearizer lock queue in the timing
@@ -227,6 +229,8 @@ class FederationHandler:
                 processing_start_time=processing_start_time,
             )
 
+    @trace
+    @tag_args
     async def _maybe_backfill_inner(
         self,
         room_id: str,
@@ -247,6 +251,9 @@ class FederationHandler:
             limit: The max number of events to request from the remote federated server.
             processing_start_time: The time when `maybe_backfill` started processing.
                 Only used for timing. If `None`, no timing observation will be made.
+
+        Returns:
+            True if we actually tried to backfill something, otherwise False.
         """
         backwards_extremities = [
             _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
@@ -264,32 +271,10 @@ class FederationHandler:
             )
         ]
 
-        insertion_events_to_be_backfilled: List[_BackfillPoint] = []
-        if self.hs.config.experimental.msc2716_enabled:
-            insertion_events_to_be_backfilled = [
-                _BackfillPoint(event_id, depth, _BackfillPointType.INSERTION_PONT)
-                for event_id, depth in await self.store.get_insertion_event_backward_extremities_in_room(
-                    room_id=room_id,
-                    current_depth=current_depth,
-                    # We only need to end up with 5 extremities combined with
-                    # the backfill points to make the `/backfill` request ...
-                    # (see the other comment above for more context).
-                    limit=50,
-                )
-            ]
-        logger.debug(
-            "_maybe_backfill_inner: backwards_extremities=%s insertion_events_to_be_backfilled=%s",
-            backwards_extremities,
-            insertion_events_to_be_backfilled,
-        )
-
         # we now have a list of potential places to backpaginate from. We prefer to
         # start with the most recent (ie, max depth), so let's sort the list.
         sorted_backfill_points: List[_BackfillPoint] = sorted(
-            itertools.chain(
-                backwards_extremities,
-                insertion_events_to_be_backfilled,
-            ),
+            backwards_extremities,
             key=lambda e: -int(e.depth),
         )
 
@@ -302,15 +287,30 @@ class FederationHandler:
             len(sorted_backfill_points),
             sorted_backfill_points,
         )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points",
+            str(sorted_backfill_points),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "sorted_backfill_points.length",
+            str(len(sorted_backfill_points)),
+        )
 
-        # If we have no backfill points lower than the `current_depth` then
-        # either we can a) bail or b) still attempt to backfill. We opt to try
-        # backfilling anyway just in case we do get relevant events.
+        # If we have no backfill points lower than the `current_depth` then either we
+        # can a) bail or b) still attempt to backfill. We opt to try backfilling anyway
+        # just in case we do get relevant events. This is good for eventual consistency
+        # sake but we don't need to block the client for something that is just as
+        # likely not to return anything relevant so we backfill in the background. The
+        # only way, this could return something relevant is if we discover a new branch
+        # of history that extends all the way back to where we are currently paginating
+        # and it's within the 100 events that are returned from `/backfill`.
         if not sorted_backfill_points and current_depth != MAX_DEPTH:
             logger.debug(
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Trying again with later backfill points."
             )
-            return await self._maybe_backfill_inner(
+            run_as_background_process(
+                "_maybe_backfill_inner_anyway_with_max_depth",
+                self._maybe_backfill_inner,
                 room_id=room_id,
                 # We use `MAX_DEPTH` so that we find all backfill points next
                 # time (all events are below the `MAX_DEPTH`)
@@ -321,6 +321,9 @@ class FederationHandler:
                 # overall otherwise the smaller one will throw off the results.
                 processing_start_time=None,
             )
+            # We return `False` because we're backfilling in the background and there is
+            # no new events immediately for the caller to know about yet.
+            return False
 
         # Even after recursing with `MAX_DEPTH`, we didn't find any
         # backward extremities to backfill from.
@@ -384,10 +387,7 @@ class FederationHandler:
             #   event but not anything before it. This would require looking at the
             #   state *before* the event, ignoring the special casing certain event
             #   types have.
-            if bp.type == _BackfillPointType.INSERTION_PONT:
-                event_ids_to_check = [bp.event_id]
-            else:
-                event_ids_to_check = await self.store.get_successor_events(bp.event_id)
+            event_ids_to_check = await self.store.get_successor_events(bp.event_id)
 
             events_to_check = await self.store.get_events_as_list(
                 event_ids_to_check,
@@ -957,7 +957,7 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         prev_event_ids = None
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             # Note that the room's state can change out from under us and render our
             # nice join rules-conformant event non-conformant by the time we build the
             # event. When this happens, our validation at the end fails and we respond
@@ -1581,9 +1581,7 @@ class FederationHandler:
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
-        )
+        prev_state_ids = await context.get_prev_state_ids(StateFilter.from_types([key]))
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
             original_invite = await self.store.get_event(
@@ -1636,7 +1634,7 @@ class FederationHandler:
         token = signed["token"]
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, token)])
         )
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 

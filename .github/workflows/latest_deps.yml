@@ -22,7 +22,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_repo:
+    # Prevent this workflow from running on any fork of Synapse other than matrix-org/synapse, as it is
+    # only useful to the Synapse core team.
+    # All other workflow steps depend on this one, thus if 'should_run_workflow' is not 'true', the rest
+    # of the workflow will be skipped as well.
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_workflow: ${{ steps.check_condition.outputs.should_run_workflow }}
+    steps:
+      - id: check_condition
+        run: echo "should_run_workflow=${{ github.repository == 'matrix-org/synapse' }}" >> "$GITHUB_OUTPUT"
+
   mypy:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -47,6 +61,8 @@ jobs:
         run: sed '/warn_unused_ignores = True/d' -i mypy.ini
       - run: poetry run mypy
   trial:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -105,6 +121,8 @@ jobs:
 
 
   sytest:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:testing
@@ -156,7 +174,8 @@ jobs:
 
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
+    needs: check_repo
+    if: "!failure() && !cancelled() && needs.check_repo.outputs.should_run_workflow == 'true'"
     runs-on: ubuntu-latest
 
     strategy:
@@ -192,7 +211,7 @@ jobs:
   # Open an issue if the build fails, so we know about it.
   # Only do this if we're not experimenting with this action in a PR.
   open-issue:
-    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request'"
+    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request' && needs.check_repo.outputs.should_run_workflow == 'true'"
     needs:
       # TODO: should mypy be included here? It feels more brittle than the others.
       - mypy

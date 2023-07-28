@@ -7,7 +7,7 @@ name = "synapse"
 version = "0.1.0"
 
 edition = "2021"
-rust-version = "1.58.1"
+rust-version = "1.60.0"
 
 [lib]
 name = "synapse"

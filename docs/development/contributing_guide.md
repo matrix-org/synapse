@@ -322,7 +322,7 @@ The following command will let you run the integration test with the most common
 configuration:
 
 ```sh
-$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
+$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:focal
 ```
 (Note that the paths must be full paths! You could also write `$(realpath relative/path)` if needed.)
 
@@ -370,6 +370,7 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
     See the [worker documentation](../workers.md) for additional information on workers.
 - Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
 - Passing `PODMAN=1` will use the [podman](https://podman.io/) container runtime, instead of docker.
+- Passing `UNIX_SOCKETS=1` will utilise Unix socket functionality for Synapse, Redis, and Postgres(when applicable).
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh

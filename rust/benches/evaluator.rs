@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #![feature(test)]
-use std::collections::BTreeSet;
-
 use synapse::push::{
     evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, JsonValue,
     PushRules, SimpleJsonValue,
@@ -193,7 +191,6 @@ fn bench_eval_message(b: &mut Bencher) {
     let rules = FilteredPushRules::py_new(
         PushRules::new(Vec::new()),
         Default::default(),
-        false,
         false,
         false,
         false,

@@ -18,7 +18,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_repo:
+    # Prevent this workflow from running on any fork of Synapse other than matrix-org/synapse, as it is
+    # only useful to the Synapse core team.
+    # All other workflow steps depend on this one, thus if 'should_run_workflow' is not 'true', the rest
+    # of the workflow will be skipped as well.
+    if: github.repository == 'matrix-org/synapse'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_workflow: ${{ steps.check_condition.outputs.should_run_workflow }}
+    steps:
+      - id: check_condition
+        run: echo "should_run_workflow=${{ github.repository == 'matrix-org/synapse' }}" >> "$GITHUB_OUTPUT"
+
   mypy:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -41,6 +56,8 @@ jobs:
       - run: poetry run mypy
 
   trial:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -75,9 +92,15 @@ jobs:
           || true
 
   sytest:
+    needs: check_repo
+    if: needs.check_repo.outputs.should_run_workflow == 'true'
     runs-on: ubuntu-latest
     container:
-      image: matrixdotorg/sytest-synapse:buster
+      # We're using ubuntu:focal because it uses Python 3.8 which is our minimum supported Python version.
+      # This job is a canary to warn us about unreleased twisted changes that would cause problems for us if
+      # they were to be released immediately. For simplicity's sake (and to save CI runners) we use the oldest
+      # version, assuming that any incompatibilities on newer versions would also be present on the oldest.
+      image: matrixdotorg/sytest-synapse:focal
       volumes:
         - ${{ github.workspace }}:/src
 
@@ -119,7 +142,8 @@ jobs:
             /logs/**/*.log*
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
+    needs: check_repo
+    if: "!failure() && !cancelled() && needs.check_repo.outputs.should_run_workflow == 'true'"
     runs-on: ubuntu-latest
 
     strategy:
@@ -166,7 +190,7 @@ jobs:
 
   # open an issue if the build fails, so we know about it.
   open-issue:
-    if: failure()
+    if: failure() && needs.check_repo.outputs.should_run_workflow == 'true'
     needs:
       - mypy
       - trial

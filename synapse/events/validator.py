@@ -134,13 +134,8 @@ class EventValidator:
                 )
 
         # If the event contains a mentions key, validate it.
-        if (
-            EventContentFields.MSC3952_MENTIONS in event.content
-            and config.experimental.msc3952_intentional_mentions
-        ):
-            validate_json_object(
-                event.content[EventContentFields.MSC3952_MENTIONS], Mentions
-            )
+        if EventContentFields.MENTIONS in event.content:
+            validate_json_object(event.content[EventContentFields.MENTIONS], Mentions)
 
     def _validate_retention(self, event: EventBase) -> None:
         """Checks that an event that defines the retention policy for a room respects the

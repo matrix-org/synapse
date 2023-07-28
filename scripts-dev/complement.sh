@@ -214,7 +214,7 @@ fi
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc3787,msc3874,msc3890,msc3391,msc3930,faster_joins"
+test_tags="synapse_blacklist,msc3874,msc3890,msc3391,msc3930,faster_joins"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
@@ -246,10 +246,6 @@ else
   else
     export PASS_SYNAPSE_COMPLEMENT_DATABASE=sqlite
   fi
-
-  # The tests for importing historical messages (MSC2716)
-  # only pass with monoliths, currently.
-  test_tags="$test_tags,msc2716"
 fi
 
 if [[ -n "$ASYNCIO_REACTOR" ]]; then
@@ -257,6 +253,10 @@ if [[ -n "$ASYNCIO_REACTOR" ]]; then
   export PASS_SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=true
 fi
 
+if [[ -n "$UNIX_SOCKETS" ]]; then
+  # Enable full on Unix socket mode for Synapse, Redis and Postgresql
+  export PASS_SYNAPSE_USE_UNIX_SOCKET=1
+fi
 
 if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
   # Set the log level to what is desired
@@ -268,6 +268,10 @@ if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
   # personal information
   export PASS_SYNAPSE_LOG_SENSITIVE=1
 fi
+
+# Log a few more useful things for a developer attempting to debug something
+# particularly tricky.
+export PASS_SYNAPSE_LOG_TESTING=1
 
 # Run the tests!
 echo "Images built; running complement"

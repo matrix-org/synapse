@@ -842,7 +842,13 @@ class AsyncLruCache(Generic[KT, VT]):
         return self._lru_cache.get(key, update_metrics=update_metrics)
 
     async def set(self, key: KT, value: VT) -> None:
-        self._lru_cache.set(key, value)
+        # This will add the entries in the correct order, local first external second
+        self.set_local(key, value)
+        await self.set_external(key, value)
+
+    async def set_external(self, key: KT, value: VT) -> None:
+        # This method should add an entry to any configured external cache, in this case noop.
+        pass
 
     def set_local(self, key: KT, value: VT) -> None:
         self._lru_cache.set(key, value)
@@ -862,5 +868,5 @@ class AsyncLruCache(Generic[KT, VT]):
     async def contains(self, key: KT) -> bool:
         return self._lru_cache.contains(key)
 
-    async def clear(self) -> None:
+    def clear(self) -> None:
         self._lru_cache.clear()

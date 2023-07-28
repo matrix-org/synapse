@@ -50,7 +50,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.http.site import SynapseRequest
+from synapse.http.site import RequestInfo, SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
@@ -114,6 +114,7 @@ class LoginRestServlet(RestServlet):
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self._sso_handler = hs.get_sso_handler()
+        self._spam_checker = hs.get_module_api_callbacks().spam_checker
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
@@ -197,6 +198,8 @@ class LoginRestServlet(RestServlet):
             self._refresh_tokens_enabled and client_requested_refresh_token
         )
 
+        request_info = request.request_info()
+
         try:
             if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
                 requester = await self.auth.get_user_by_req(request)
@@ -216,6 +219,7 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     appservice,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
             elif (
                 self.jwt_enabled
@@ -227,6 +231,7 @@ class LoginRestServlet(RestServlet):
                 result = await self._do_jwt_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
                 await self._address_ratelimiter.ratelimit(
@@ -235,6 +240,7 @@ class LoginRestServlet(RestServlet):
                 result = await self._do_token_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
             else:
                 await self._address_ratelimiter.ratelimit(
@@ -243,6 +249,7 @@ class LoginRestServlet(RestServlet):
                 result = await self._do_other_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
@@ -265,6 +272,8 @@ class LoginRestServlet(RestServlet):
         login_submission: JsonDict,
         appservice: ApplicationService,
         should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         identifier = login_submission.get("identifier")
         logger.info("Got appservice login request with identifier: %r", identifier)
@@ -300,10 +309,15 @@ class LoginRestServlet(RestServlet):
             # The user represented by an appservice's configured sender_localpart
             # is not actually created in Synapse.
             should_check_deactivated=qualified_user_id != appservice.sender,
+            request_info=request_info,
         )
 
     async def _do_other_login(
-        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+        self,
+        login_submission: JsonDict,
+        should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """Handle non-token/saml/jwt logins
 
@@ -333,6 +347,7 @@ class LoginRestServlet(RestServlet):
             login_submission,
             callback,
             should_issue_refresh_token=should_issue_refresh_token,
+            request_info=request_info,
         )
         return result
 
@@ -347,6 +362,8 @@ class LoginRestServlet(RestServlet):
         should_issue_refresh_token: bool = False,
         auth_provider_session_id: Optional[str] = None,
         should_check_deactivated: bool = True,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -371,6 +388,7 @@ class LoginRestServlet(RestServlet):
 
                 This exists purely for appservice's configured sender_localpart
                 which doesn't have an associated user in the database.
+            request_info: The user agent/IP address of the user.
 
         Returns:
             Dictionary of account information after successful login.
@@ -417,6 +435,22 @@ class LoginRestServlet(RestServlet):
                 )
 
         initial_display_name = login_submission.get("initial_device_display_name")
+        spam_check = await self._spam_checker.check_login_for_spam(
+            user_id,
+            device_id=device_id,
+            initial_display_name=initial_display_name,
+            request_info=[(request_info.user_agent, request_info.ip)],
+            auth_provider_id=auth_provider_id,
+        )
+        if spam_check != self._spam_checker.NOT_SPAM:
+            logger.info("Blocking login due to spam checker")
+            raise SynapseError(
+                403,
+                msg="Login was blocked by the server",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
+            )
+
         (
             device_id,
             access_token,
@@ -451,7 +485,11 @@ class LoginRestServlet(RestServlet):
         return result
 
     async def _do_token_login(
-        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+        self,
+        login_submission: JsonDict,
+        should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """
         Handle token login.
@@ -474,10 +512,15 @@ class LoginRestServlet(RestServlet):
             auth_provider_id=res.auth_provider_id,
             should_issue_refresh_token=should_issue_refresh_token,
             auth_provider_session_id=res.auth_provider_session_id,
+            request_info=request_info,
         )
 
     async def _do_jwt_login(
-        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+        self,
+        login_submission: JsonDict,
+        should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """
         Handle the custom JWT login.
@@ -496,6 +539,7 @@ class LoginRestServlet(RestServlet):
             login_submission,
             create_non_existent_users=True,
             should_issue_refresh_token=should_issue_refresh_token,
+            request_info=request_info,
         )
 
 

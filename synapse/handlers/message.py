@@ -60,7 +60,6 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.replication.http.send_events import ReplicationSendEventsRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
-    MutableStateMap,
     PersistedEventPosition,
     Requester,
     RoomAlias,
@@ -571,7 +570,6 @@ class EventCreationHandler:
         state_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
-        historical: bool = False,
         depth: Optional[int] = None,
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
@@ -597,7 +595,7 @@ class EventCreationHandler:
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids:
                 the forward extremities to use as the prev_events for the
                 new event.
@@ -612,13 +610,10 @@ class EventCreationHandler:
                 If non-None, prev_event_ids must also be provided.
 
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is with insertion events which float at
-                the beginning of a historical batch and don't have any `prev_events` to
-                derive from; we add all of these state events as the explicit state so the
-                rest of the historical batch can inherit the same state and state_group.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
 
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
@@ -626,10 +621,6 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
 
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
@@ -715,8 +706,6 @@ class EventCreationHandler:
 
         builder.internal_metadata.outlier = outlier
 
-        builder.internal_metadata.historical = historical
-
         event, unpersisted_context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
@@ -747,7 +736,7 @@ class EventCreationHandler:
                 prev_event_id = state_map.get((EventTypes.Member, event.sender))
             else:
                 prev_state_ids = await unpersisted_context.get_prev_state_ids(
-                    StateFilter.from_types([(EventTypes.Member, None)])
+                    StateFilter.from_types([(EventTypes.Member, event.sender)])
                 )
                 prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
@@ -869,7 +858,7 @@ class EventCreationHandler:
             return None
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(event.type, None)])
+            StateFilter.from_types([(event.type, event.state_key)])
         )
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
@@ -968,7 +957,6 @@ class EventCreationHandler:
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
         outlier: bool = False,
-        historical: bool = False,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
         """
@@ -982,19 +970,16 @@ class EventCreationHandler:
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids:
                 The event IDs to use as the prev events.
                 Should normally be left as None to automatically request them
                 from the database.
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is with insertion events which float at
-                the beginning of a historical batch and don't have any `prev_events` to
-                derive from; we add all of these state events as the explicit state so the
-                rest of the historical batch can inherit the same state and state_group.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -1002,9 +987,6 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -1074,7 +1056,6 @@ class EventCreationHandler:
                     prev_event_ids=prev_event_ids,
                     state_event_ids=state_event_ids,
                     outlier=outlier,
-                    historical=historical,
                     depth=depth,
                 )
                 context = await unpersisted_context.persist(event)
@@ -1166,7 +1147,7 @@ class EventCreationHandler:
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids:
                 the forward extremities to use as the prev_events for the
                 new event.
@@ -1179,13 +1160,10 @@ class EventCreationHandler:
                 based on the room state at the prev_events.
 
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is with insertion events which float at
-                the beginning of a historical batch and don't have any `prev_events` to
-                derive from; we add all of these state events as the explicit state so the
-                rest of the historical batch can inherit the same state and state_group.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
 
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
@@ -1282,52 +1260,6 @@ class EventCreationHandler:
             if builder.internal_metadata.outlier:
                 event.internal_metadata.outlier = True
                 context = EventContext.for_outlier(self._storage_controllers)
-            elif (
-                event.type == EventTypes.MSC2716_INSERTION
-                and state_event_ids
-                and builder.internal_metadata.is_historical()
-            ):
-                # Add explicit state to the insertion event so it has state to derive
-                # from even though it's floating with no `prev_events`. The rest of
-                # the batch can derive from this state and state_group.
-                #
-                # TODO(faster_joins): figure out how this works, and make sure that the
-                #   old state is complete.
-                #   https://github.com/matrix-org/synapse/issues/13003
-                metadata = await self.store.get_metadata_for_events(state_event_ids)
-
-                state_map_for_event: MutableStateMap[str] = {}
-                for state_id in state_event_ids:
-                    data = metadata.get(state_id)
-                    if data is None:
-                        # We're trying to persist a new historical batch of events
-                        # with the given state, e.g. via
-                        # `RoomBatchSendEventRestServlet`. The state can be inferred
-                        # by Synapse or set directly by the client.
-                        #
-                        # Either way, we should have persisted all the state before
-                        # getting here.
-                        raise Exception(
-                            f"State event {state_id} not found in DB,"
-                            " Synapse should have persisted it before using it."
-                        )
-
-                    if data.state_key is None:
-                        raise Exception(
-                            f"Trying to set non-state event {state_id} as state"
-                        )
-
-                    state_map_for_event[(data.event_type, data.state_key)] = state_id
-
-                # TODO(faster_joins): check how MSC2716 works and whether we can have
-                #   partial state here
-                #   https://github.com/matrix-org/synapse/issues/13003
-                context = await self.state.calculate_context_info(
-                    event,
-                    state_ids_before_event=state_map_for_event,
-                    partial_state=False,
-                )
-
             else:
                 context = await self.state.calculate_context_info(event)
 
@@ -1654,12 +1586,11 @@ class EventCreationHandler:
                 if state_entry.state_group in self._external_cache_joined_hosts_updates:
                     return
 
-                state = await state_entry.get_state(
-                    self._storage_controllers.state, StateFilter.all()
-                )
                 with opentracing.start_active_span("get_joined_hosts"):
-                    joined_hosts = await self.store.get_joined_hosts(
-                        event.room_id, state, state_entry
+                    joined_hosts = (
+                        await self._storage_controllers.state.get_joined_hosts(
+                            event.room_id, state_entry
+                        )
                     )
 
                 # Note that the expiry times must be larger than the expiry time in
@@ -1897,28 +1828,6 @@ class EventCreationHandler:
                             403, "Redacting server ACL events is not permitted"
                         )
 
-                    # Add a little safety stop-gap to prevent people from trying to
-                    # redact MSC2716 related events when they're in a room version
-                    # which does not support it yet. We allow people to use MSC2716
-                    # events in existing room versions but only from the room
-                    # creator since it does not require any changes to the auth
-                    # rules and in effect, the redaction algorithm . In the
-                    # supported room version, we add the `historical` power level to
-                    # auth the MSC2716 related events and adjust the redaction
-                    # algorthim to keep the `historical` field around (redacting an
-                    # event should only strip fields which don't affect the
-                    # structural protocol level).
-                    is_msc2716_event = (
-                        original_event.type == EventTypes.MSC2716_INSERTION
-                        or original_event.type == EventTypes.MSC2716_BATCH
-                        or original_event.type == EventTypes.MSC2716_MARKER
-                    )
-                    if not room_version_obj.msc2716_historical and is_msc2716_event:
-                        raise AuthError(
-                            403,
-                            "Redacting MSC2716 events is not supported in this room version",
-                        )
-
                 event_types = event_auth.auth_types_for_event(event.room_version, event)
                 prev_state_ids = await context.get_prev_state_ids(
                     StateFilter.from_types(event_types)
@@ -1956,58 +1865,12 @@ class EventCreationHandler:
                 if prev_state_ids:
                     raise AuthError(403, "Changing the room create event is forbidden")
 
-            if event.type == EventTypes.MSC2716_INSERTION:
-                room_version = await self.store.get_room_version_id(event.room_id)
-                room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
-                create_event = await self.store.get_create_event_for_room(event.room_id)
-                if not room_version_obj.msc2175_implicit_room_creator:
-                    room_creator = create_event.content.get(
-                        EventContentFields.ROOM_CREATOR
-                    )
-                else:
-                    room_creator = create_event.sender
-
-                # Only check an insertion event if the room version
-                # supports it or the event is from the room creator.
-                if room_version_obj.msc2716_historical or (
-                    self.config.experimental.msc2716_enabled
-                    and event.sender == room_creator
-                ):
-                    next_batch_id = event.content.get(
-                        EventContentFields.MSC2716_NEXT_BATCH_ID
-                    )
-                    conflicting_insertion_event_id = None
-                    if next_batch_id:
-                        conflicting_insertion_event_id = (
-                            await self.store.get_insertion_event_id_by_batch_id(
-                                event.room_id, next_batch_id
-                            )
-                        )
-                    if conflicting_insertion_event_id is not None:
-                        # The current insertion event that we're processing is invalid
-                        # because an insertion event already exists in the room with the
-                        # same next_batch_id. We can't allow multiple because the batch
-                        # pointing will get weird, e.g. we can't determine which insertion
-                        # event the batch event is pointing to.
-                        raise SynapseError(
-                            HTTPStatus.BAD_REQUEST,
-                            "Another insertion event already exists with the same next_batch_id",
-                            errcode=Codes.INVALID_PARAM,
-                        )
-
-            # Mark any `m.historical` messages as backfilled so they don't appear
-            # in `/sync` and have the proper decrementing `stream_ordering` as we import
-            backfilled = False
-            if event.internal_metadata.is_historical():
-                backfilled = True
-
         assert self._storage_controllers.persistence is not None
         (
             persisted_events,
             max_stream_token,
         ) = await self._storage_controllers.persistence.persist_events(
-            events_and_context, backfilled=backfilled
+            events_and_context,
         )
 
         events_and_pos = []
