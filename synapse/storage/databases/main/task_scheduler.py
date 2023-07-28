@@ -67,7 +67,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             max_timestamp: Limit the returned tasks to the ones that have
                 a timestamp inferior to the specified one
 
-        Returns: a list of `ScheduledTask`
+        Returns: a list of `ScheduledTask`, ordered by increasing timestamps
         """
 
         def get_scheduled_tasks_txn(txn: LoggingTransaction) -> List[Dict[str, Any]]:
@@ -98,6 +98,8 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             sql = "SELECT * FROM scheduled_tasks"
             if clauses:
                 sql = sql + " WHERE " + " AND ".join(clauses)
+
+            sql = sql + "ORDER BY timestamp"
 
             txn.execute(sql, args)
             return self.db_pool.cursor_to_dict(txn)

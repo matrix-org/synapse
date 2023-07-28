@@ -29,6 +29,7 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.task_scheduler = hs.get_task_scheduler()
         self.task_scheduler.register_action(self._test_task, "_test_task")
+        self.task_scheduler.register_action(self._sleeping_task, "_sleeping_task")
         self.task_scheduler.register_action(self._raising_task, "_raising_task")
         self.task_scheduler.register_action(self._resumable_task, "_resumable_task")
 
@@ -74,6 +75,67 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
 
         task = self.get_success(self.task_scheduler.get_task(task_id))
         self.assertIsNone(task)
+
+    async def _sleeping_task(
+        self, task: ScheduledTask, first_launch: bool
+    ) -> Tuple[TaskStatus, Optional[JsonMapping], Optional[str]]:
+        # Sleep for a second
+        await deferLater(self.reactor, 1, None)
+        return TaskStatus.COMPLETE, None, None
+
+    def test_schedule_lot_of_tasks(self) -> None:
+        """Schedule more than `TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS` tasks and check the behavior."""
+        timestamp = self.clock.time_msec() + 2 * 60 * 1000
+        task_ids = []
+        for i in range(TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS + 1):
+            task_ids.append(
+                self.get_success(
+                    self.task_scheduler.schedule_task(
+                        "_sleeping_task",
+                        timestamp=timestamp,
+                        params={"val": i},
+                    )
+                )
+            )
+
+        # The timestamp being 2mn after now the task should been executed
+        # after the first scheduling loop is run
+        self.reactor.advance((TaskScheduler.SCHEDULE_INTERVAL_MS / 1000))
+
+        # This is to give the time to the sleeping tasks to finish
+        self.reactor.advance(1)
+
+        # Check that only MAX_CONCURRENT_RUNNING_TASKS tasks has run and that one
+        # is still scheduled.
+        tasks = [
+            self.get_success(self.task_scheduler.get_task(task_id))
+            for task_id in task_ids
+        ]
+
+        self.assertEquals(
+            len(
+                [t for t in tasks if t is not None and t.status == TaskStatus.COMPLETE]
+            ),
+            TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS,
+        )
+
+        scheduled_tasks = [
+            t for t in tasks if t is not None and t.status == TaskStatus.SCHEDULED
+        ]
+        self.assertEquals(len(scheduled_tasks), 1)
+
+        self.reactor.advance((TaskScheduler.SCHEDULE_INTERVAL_MS / 1000))
+        self.reactor.advance(1)
+
+        # Check that the last task has been properly executed after the next scheduler loop run
+        prev_scheduled_task = self.get_success(
+            self.task_scheduler.get_task(scheduled_tasks[0].id)
+        )
+        assert prev_scheduled_task is not None
+        self.assertEquals(
+            prev_scheduled_task.status,
+            TaskStatus.COMPLETE,
+        )
 
     def test_schedule_task_now(self) -> None:
         """Schedule a task now and check it runs fine to completion."""

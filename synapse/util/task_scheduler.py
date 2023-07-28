@@ -34,6 +34,8 @@ class TaskScheduler:
     CLEAN_INTERVAL_MS = 60 * 60 * 1000  # 1hr
     # Time before a complete or failed task is deleted from the DB
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
+    # Maximum number of tasks that can run at the same time
+    MAX_CONCURRENT_RUNNING_TASKS = 2
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
@@ -203,7 +205,7 @@ class TaskScheduler:
                 a timestamp inferior to the specified one
 
         Returns
-            A list of `ScheduledTask`
+            A list of `ScheduledTask`, ordered by increasing timestamps
         """
         return await self._store.get_scheduled_tasks(
             actions=actions,
@@ -215,12 +217,20 @@ class TaskScheduler:
     async def _run_scheduled_tasks(self) -> None:
         """Main loop taking care of launching the scheduled tasks when needed."""
         for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
-            if task.id not in self._running_tasks:
+            if (
+                task.id not in self._running_tasks
+                and len(self._running_tasks)
+                < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
+            ):
                 await self._launch_task(task, first_launch=False)
         for task in await self.get_tasks(
             statuses=[TaskStatus.SCHEDULED], max_timestamp=self._clock.time_msec()
         ):
-            if task.id not in self._running_tasks:
+            if (
+                task.id not in self._running_tasks
+                and len(self._running_tasks)
+                < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
+            ):
                 await self._launch_task(task, first_launch=True)
 
     async def _clean_scheduled_tasks(self) -> None:
@@ -271,7 +281,7 @@ class TaskScheduler:
             )
             self._running_tasks.remove(task.id)
 
-        await self.update_task(task.id, status=TaskStatus.ACTIVE)
         self._running_tasks.add(task.id)
+        await self.update_task(task.id, status=TaskStatus.ACTIVE)
         description = f"{task.id}-{task.action}"
         run_as_background_process(description, wrapper)
