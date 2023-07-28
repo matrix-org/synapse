@@ -1,1 +1,0 @@
-Fix background schema updates failing over a large upgrade gap.
