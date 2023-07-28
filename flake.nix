@@ -39,8 +39,8 @@
 
 {
   inputs = {
-    # Use the master/unstable branch of nixpkgs. The latest stable, 22.11,
-    # does not contain 'perl536Packages.NetAsyncHTTP', needed by Sytest.
+    # Use the master/unstable branch of nixpkgs. Used to fetch the latest
+    # available versions of packages.
     nixpkgs.url = "github:NixOS/nixpkgs/master";
     # Output a development shell for x86_64/aarch64 Linux/Darwin (MacOS).
     systems.url = "github:nix-systems/default";
