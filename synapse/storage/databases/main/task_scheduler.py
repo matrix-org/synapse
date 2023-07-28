@@ -62,8 +62,10 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
 
         Args:
             actions: Limit the returned tasks to those specific action names
-            resource_ids: Limit the returned tasks to thoe specific resource ids
-            statuses: Limit the returned tasks to thoe specific statuses
+            resource_ids: Limit the returned tasks to the specific resource ids
+            statuses: Limit the returned tasks to the specific statuses
+            max_timestamp: Limit the returned tasks to the ones that have
+                a timestamp inferior to the specified one
 
         Returns: a list of `ScheduledTask`
         """

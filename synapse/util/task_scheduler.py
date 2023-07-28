@@ -189,13 +189,18 @@ class TaskScheduler:
         statuses: Optional[List[TaskStatus]] = None,
         max_timestamp: Optional[int] = None,
     ) -> List[ScheduledTask]:
-        """Get a list of tasks associated with some action name(s) and/or
-        with some resource id(s).
+        """Get a list of tasks. Returns all the tasks if no args is provided.
+
+        If an arg is `None` all tasks matching the other args will be selected.
+        If an arg is an empty list, the corresponding value of the task needs
+        to be `None` to be selected.
 
         Args:
-            action: the action name of the tasks to retrieve
-            resource_id: if `None`, returns all associated tasks for
-                the specified action name, regardless of the resource id
+            actions: Limit the returned tasks to those specific action names
+            resource_ids: Limit the returned tasks to the specific resource ids
+            statuses: Limit the returned tasks to the specific statuses
+            max_timestamp: Limit the returned tasks to the ones that have
+                a timestamp inferior to the specified one
 
         Returns
             A list of `ScheduledTask`
