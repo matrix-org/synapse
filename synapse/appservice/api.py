@@ -133,16 +133,14 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
+            args = None
             if self.config.use_appservice_legacy_authorization:
-                response = await self.get_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
-                    {"access_token": service.hs_token},
-                )
-            else:
-                response = await self.get_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
-                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
-                )
+                args = {"access_token": service.hs_token}
+            response = await self.get_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
+                args,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -161,16 +159,14 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
+            args = None
             if self.config.use_appservice_legacy_authorization:
-                response = await self.get_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
-                    {"access_token": service.hs_token},
-                )
-            else:
-                response = await self.get_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
-                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
-                )
+                args = {"access_token": service.hs_token}
+            response = await self.get_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
+                args,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
@@ -205,18 +201,13 @@ class ApplicationServiceApi(SimpleHttpClient):
                 **fields,
                 b"access_token": service.hs_token,
             }
-            if self.config.use_appservice_legacy_authorization:
-                response = await self.get_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
-                    args=args,
-                )
-            else:
+            if not self.config.use_appservice_legacy_authorization:
                 args.pop(b"access_token", None)
-                response = await self.get_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
-                    args=args,
-                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
-                )
+            response = await self.get_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
+                args=args,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if not isinstance(response, list):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r",
@@ -249,16 +240,14 @@ class ApplicationServiceApi(SimpleHttpClient):
             # This is required by the configuration.
             assert service.hs_token is not None
             try:
+                args = None
                 if self.config.use_appservice_legacy_authorization:
-                    info = await self.get_json(
-                        f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
-                        {"access_token": service.hs_token},
-                    )
-                else:
-                    info = await self.get_json(
-                        f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
-                        headers={"Authorization": [f"Bearer {service.hs_token}"]},
-                    )
+                    args = {"access_token": service.hs_token}
+                info = await self.get_json(
+                    f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
+                    args,
+                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                )
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -367,18 +356,16 @@ class ApplicationServiceApi(SimpleHttpClient):
                 }
 
         try:
+            args = None
             if self.config.use_appservice_legacy_authorization:
-                await self.put_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
-                    json_body=body,
-                    args={"access_token": service.hs_token},
-                )
-            else:
-                await self.put_json(
-                    f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
-                    json_body=body,
-                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
-                )
+                args = {"access_token": service.hs_token}
+
+            await self.put_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
+                json_body=body,
+                args=args,
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
                     "push_bulk to %s succeeded! events=%s",

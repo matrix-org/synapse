@@ -99,7 +99,7 @@ query parameter authorization redundant. Since removing the ability to continue 
 backwards compatibility it has now been put behind a configuration option, `use_appservice_legacy_authorization`.  
 This option defaults to false, but can be activated by adding 
 ```yaml
-"use_appservice_legacy_authorization": True 
+use_appservice_legacy_authorization: true 
 ```
 to your configuration.
 

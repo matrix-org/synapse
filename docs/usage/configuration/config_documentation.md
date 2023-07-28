@@ -2845,7 +2845,7 @@ Defaults to false. This option is considered insecure and is not recommended.
 
 Example configuration:
 ```yaml
-"use_appservice_legacy_authorization": True 
+use_appservice_legacy_authorization: true 
 ```
 
 ---
