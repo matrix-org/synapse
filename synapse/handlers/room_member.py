@@ -174,8 +174,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.request_ratelimiter = hs.get_request_ratelimiter()
         hs.get_notifier().add_new_join_in_room_callback(self._on_user_joined_room)
 
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
-
     def _on_user_joined_room(self, event_id: str, room_id: str) -> None:
         """Notify the rate limiter that a room join has occurred.
 
@@ -416,29 +414,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # do this check just before we persist an event as well, but may as well
         # do it up front for efficiency.)
         if txn_id:
-            existing_event_id = None
-            if self._msc3970_enabled and requester.device_id:
-                # When MSC3970 is enabled, we lookup for events sent by the same device
-                # first, and fallback to the old behaviour if none were found.
-                existing_event_id = (
-                    await self.store.get_event_id_from_transaction_id_and_device_id(
-                        room_id,
-                        requester.user.to_string(),
-                        requester.device_id,
-                        txn_id,
-                    )
+            existing_event_id = (
+                await self.event_creation_handler.get_event_id_from_transaction(
+                    requester, txn_id, room_id
                 )
-
-            if requester.access_token_id and not existing_event_id:
-                existing_event_id = (
-                    await self.store.get_event_id_from_transaction_id_and_token_id(
-                        room_id,
-                        requester.user.to_string(),
-                        requester.access_token_id,
-                        txn_id,
-                    )
-                )
-
+            )
             if existing_event_id:
                 event_pos = await self.store.get_position_for_event(existing_event_id)
                 return existing_event_id, event_pos.stream

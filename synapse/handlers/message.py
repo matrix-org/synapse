@@ -876,6 +876,53 @@ class EventCreationHandler:
                 return prev_event
         return None
 
+    async def get_event_id_from_transaction(
+        self,
+        requester: Requester,
+        txn_id: str,
+        room_id: str,
+    ) -> Optional[str]:
+        """For the given transaction ID and room ID, check if there is a matching event ID.
+
+        Args:
+            requester: The requester making the request in the context of which we want
+                to fetch the event.
+            txn_id: The transaction ID.
+            room_id: The room ID.
+
+        Returns:
+            An event ID if one could be found, None otherwise.
+        """
+        existing_event_id = None
+
+        if self._msc3970_enabled and requester.device_id:
+            # When MSC3970 is enabled, we lookup for events sent by the same device first,
+            # and fallback to the old behaviour if none were found.
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_device_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.device_id,
+                    txn_id,
+                )
+            )
+            if existing_event_id:
+                return existing_event_id
+
+        # Pre-MSC3970, we looked up for events that were sent by the same session by
+        # using the access token ID.
+        if requester.access_token_id:
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_token_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.access_token_id,
+                    txn_id,
+                )
+            )
+
+        return existing_event_id
+
     async def get_event_from_transaction(
         self,
         requester: Requester,
@@ -894,35 +941,11 @@ class EventCreationHandler:
         Returns:
             An event if one could be found, None otherwise.
         """
-
-        if self._msc3970_enabled and requester.device_id:
-            # When MSC3970 is enabled, we lookup for events sent by the same device first,
-            # and fallback to the old behaviour if none were found.
-            existing_event_id = (
-                await self.store.get_event_id_from_transaction_id_and_device_id(
-                    room_id,
-                    requester.user.to_string(),
-                    requester.device_id,
-                    txn_id,
-                )
-            )
-            if existing_event_id:
-                return await self.store.get_event(existing_event_id)
-
-        # Pre-MSC3970, we looked up for events that were sent by the same session by
-        # using the access token ID.
-        if requester.access_token_id:
-            existing_event_id = (
-                await self.store.get_event_id_from_transaction_id_and_token_id(
-                    room_id,
-                    requester.user.to_string(),
-                    requester.access_token_id,
-                    txn_id,
-                )
-            )
-            if existing_event_id:
-                return await self.store.get_event(existing_event_id)
-
+        existing_event_id = await self.get_event_id_from_transaction(
+            requester, txn_id, room_id
+        )
+        if existing_event_id:
+            return await self.store.get_event(existing_event_id)
         return None
 
     async def create_and_send_nonmember_event(
