@@ -137,26 +137,16 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
             TaskStatus.COMPLETE,
         )
 
-    def test_schedule_task_now(self) -> None:
-        """Schedule a task now and check it runs fine to completion."""
-        task_id = self.get_success(
-            self.task_scheduler.schedule_task("_test_task", params={"val": 1})
-        )
-
-        task = self.get_success(self.task_scheduler.get_task(task_id))
-        assert task is not None
-        self.assertEqual(task.status, TaskStatus.COMPLETE)
-        assert task.result is not None
-        self.assertTrue(task.result.get("val") == 1)
-
     async def _raising_task(
         self, task: ScheduledTask, first_launch: bool
     ) -> Tuple[TaskStatus, Optional[JsonMapping], Optional[str]]:
         raise Exception("raising")
 
-    def test_schedule_raising_task_now(self) -> None:
+    def test_schedule_raising_task(self) -> None:
         """Schedule a task raising an exception and check it runs to failure and report exception content."""
         task_id = self.get_success(self.task_scheduler.schedule_task("_raising_task"))
+
+        self.reactor.advance((TaskScheduler.SCHEDULE_INTERVAL_MS / 1000))
 
         task = self.get_success(self.task_scheduler.get_task(task_id))
         assert task is not None
@@ -175,9 +165,11 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
             # This should never been called
             return TaskStatus.ACTIVE, None, None
 
-    def test_schedule_resumable_task_now(self) -> None:
+    def test_schedule_resumable_task(self) -> None:
         """Schedule a resumable task and check that it gets properly resumed and complete after simulating a synapse restart."""
         task_id = self.get_success(self.task_scheduler.schedule_task("_resumable_task"))
+
+        self.reactor.advance((TaskScheduler.SCHEDULE_INTERVAL_MS / 1000))
 
         task = self.get_success(self.task_scheduler.get_task(task_id))
         assert task is not None
