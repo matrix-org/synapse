@@ -35,7 +35,7 @@ class TaskScheduler:
     # Time before a complete or failed task is deleted from the DB
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
     # Maximum number of tasks that can run at the same time
-    MAX_CONCURRENT_RUNNING_TASKS = 2
+    MAX_CONCURRENT_RUNNING_TASKS = 10
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
@@ -104,10 +104,10 @@ class TaskScheduler:
             action: the name of a previously registered action
             resource_id: a task can be associated with a resource id to facilitate
                 getting all tasks associated with a specific resource
-            timestamp: if `None`, the task will be launched immediately, otherwise it
-                will be launch after the `timestamp` value. Note that this scheduler
-                is not meant to be precise, and the scheduling could be delayed if
-                too many tasks are already running
+            timestamp: if `None`, the task will be launched as soon as possible, otherwise it
+                will be launch as soon as possible after the `timestamp` value.
+                Note that this scheduler is not meant to be precise, and the scheduling
+                could be delayed if too many tasks are already running
             params: a set of parameters that can be easily accessed from inside the
                 executed function
 
@@ -119,10 +119,8 @@ class TaskScheduler:
                 f"No function associated with action {action} of the scheduled task"
             )
 
-        launch_now = False
         if timestamp is None or timestamp < self._clock.time_msec():
             timestamp = self._clock.time_msec()
-            launch_now = True
 
         task = ScheduledTask(
             random_string(16),
@@ -135,9 +133,6 @@ class TaskScheduler:
             None,
         )
         await self._store.upsert_scheduled_task(task)
-
-        if launch_now and self._run_background_tasks:
-            await self._launch_task(task, True)
 
         return task.id
 
