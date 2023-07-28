@@ -106,6 +106,10 @@ Changes in SCHEMA_VERSION = 77
 
 Changes in SCHEMA_VERSION = 78
     - Validate check (full_user_id IS NOT NULL) on tables profiles and user_filters
+
+Changes in SCHEMA_VERSION = 79
+    - Add tables to handle in DB read-write locks.
+    - Add some mitigations for a painful race between foreground and background updates, cf #15677.
 """
 
 
