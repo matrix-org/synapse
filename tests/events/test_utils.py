@@ -225,9 +225,14 @@ class PruneEventTestCase(stdlib_unittest.TestCase):
             },
         )
 
-        # After MSC2176, create events get nothing redacted.
+        # After MSC2176, create events should preserve field `content`
         self.run_test(
-            {"type": "m.room.create", "content": {"not_a_real_key": True}},
+            {
+                "type": "m.room.create",
+                "content": {"not_a_real_key": True},
+                "origin": "some_homeserver",
+                "nonsense_field": "some_random_garbage",
+            },
             {
                 "type": "m.room.create",
                 "content": {"not_a_real_key": True},

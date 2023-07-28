@@ -1581,9 +1581,7 @@ class FederationHandler:
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
-        )
+        prev_state_ids = await context.get_prev_state_ids(StateFilter.from_types([key]))
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
             original_invite = await self.store.get_event(
@@ -1636,7 +1634,7 @@ class FederationHandler:
         token = signed["token"]
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, token)])
         )
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 
