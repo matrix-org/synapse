@@ -1015,7 +1015,7 @@ class EventCreationHandler:
         async with self._worker_lock_handler.acquire_read_write_lock(
             DELETE_ROOM_LOCK_NAME, room_id, write=False
         ):
-            return await self._create_and_send_nonmember_event(
+            return await self._create_and_send_nonmember_event_locked(
                 requester=requester,
                 event_dict=event_dict,
                 allow_no_prev_events=allow_no_prev_events,
@@ -1028,7 +1028,7 @@ class EventCreationHandler:
                 depth=depth,
             )
 
-    async def _create_and_send_nonmember_event(
+    async def _create_and_send_nonmember_event_locked(
         self,
         requester: Requester,
         event_dict: dict,

@@ -71,6 +71,9 @@ class WorkerLocksHandler:
         """Acquire a standard lock, returns a context manager that will block
         until the lock is acquired.
 
+        Note: Care must be taken to avoid deadlocks. In particular, this
+        function does *not* timeout.
+
         Usage:
             async with handler.acquire_lock(name, key):
                 # Do work while holding the lock...
@@ -99,6 +102,9 @@ class WorkerLocksHandler:
         """Acquire a read/write lock, returns a context manager that will block
         until the lock is acquired.
 
+        Note: Care must be taken to avoid deadlocks. In particular, this
+        function does *not* timeout.
+
         Usage:
             async with handler.acquire_read_write_lock(name, key, write=True):
                 # Do work while holding the lock...
@@ -125,6 +131,12 @@ class WorkerLocksHandler:
     ) -> "WaitingMultiLock":
         """Acquires multi read/write locks at once, returns a context manager
         that will block until all the locks are acquired.
+
+        This will try and acquire all locks at once, and will never hold on to a
+        subset of the locks. (This avoids accidentally creating deadlocks).
+
+        Note: Care must be taken to avoid deadlocks. In particular, this
+        function does *not* timeout.
         """
 
         lock = WaitingMultiLock(
@@ -208,6 +220,10 @@ class WaitingLock:
                     break
 
                 try:
+                    # Wait until the we get notified the lock might have been
+                    # released (by the deferred being resolved). We also
+                    # periodically wake up in case the lock was released but we
+                    # weren't notified.
                     with PreserveLoggingContext():
                         await timeout_deferred(
                             deferred=self.deferred,
@@ -276,6 +292,10 @@ class WaitingMultiLock:
                     break
 
                 try:
+                    # Wait until the we get notified the lock might have been
+                    # released (by the deferred being resolved). We also
+                    # periodically wake up in case the lock was released but we
+                    # weren't notified.
                     with PreserveLoggingContext():
                         await timeout_deferred(
                             deferred=self.deferred,

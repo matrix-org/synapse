@@ -311,9 +311,12 @@ class LockStore(SQLBaseStore):
         lock_names: Collection[Tuple[str, str]],
         write: bool,
     ) -> Optional[AsyncExitStack]:
-        """Try to acquire a lock for the given name/key. Will return an async
-        context manager if the lock is successfully acquired, which *must* be
-        used (otherwise the lock will leak).
+        """Try to acquire multiple locks for the given names/keys. Will return
+        an async context manager if the locks are successfully acquired, which
+        *must* be used (otherwise the lock will leak).
+
+        If only a subset of the locks can be acquired then it will immediately
+        drop them and return `None`.
         """
         try:
             locks = await self.db_pool.runInteraction(
