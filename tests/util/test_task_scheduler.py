@@ -80,7 +80,7 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
         self, task: ScheduledTask, first_launch: bool
     ) -> Tuple[TaskStatus, Optional[JsonMapping], Optional[str]]:
         # Sleep for a second
-        await deferLater(self.reactor, 1, None)
+        await deferLater(self.reactor, 1, lambda: None)
         return TaskStatus.COMPLETE, None, None
 
     def test_schedule_lot_of_tasks(self) -> None:
@@ -161,7 +161,7 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
         else:
             await self.task_scheduler.update_task(task.id, result={"in_progress": True})
             # Await forever to simulate an aborted task because of a restart
-            await deferLater(self.reactor, 2**16, None)
+            await deferLater(self.reactor, 2**16, lambda: None)
             # This should never been called
             return TaskStatus.ACTIVE, None, None
 
