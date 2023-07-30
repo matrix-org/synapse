@@ -163,7 +163,7 @@ class ProfileHandler:
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
             )
 
-        displayname_to_set: Optional[str] = new_displayname
+        displayname_to_set: Optional[str] = new_displayname.strip()
         if new_displayname == "":
             displayname_to_set = None
 
