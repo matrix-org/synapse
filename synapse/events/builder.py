@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, cmp=False, frozen=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventBuilder:
     """A format independent event builder used to build up the event content
     before signing the event.

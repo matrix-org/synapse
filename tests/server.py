@@ -687,7 +687,7 @@ def get_clock() -> Tuple[ThreadedMemoryReactorClock, Clock]:
 
 
 @implementer(ITransport)
-@attr.s(cmp=False, auto_attribs=True)
+@attr.s(auto_attribs=True)
 class FakeTransport:
     """
     A twisted.internet.interfaces.ITransport implementation which sends all its data
