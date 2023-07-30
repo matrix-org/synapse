@@ -3170,6 +3170,10 @@ Options for each entry include:
 * `client_secret`: oauth2 client secret to use. May be omitted if
   `client_secret_jwt_key` is given, or if `client_auth_method` is 'none'.
 
+* `client_secret_path`: path to the oauth2 client secret to use. With that
+   it's not necessary to leak secrets into the config file itself.
+   Mutually exclusive with `client_secret`.
+
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
    given, must be a dictionary with the following properties:
