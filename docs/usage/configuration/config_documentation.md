@@ -2840,8 +2840,11 @@ track_appservice_user_ips: true
 ---
 ### `use_appservice_legacy_authorization`
 
-Whether to send the application service access token via the `access_token` query parameter.
-Defaults to false. This option is considered insecure and is not recommended. 
+Whether to send the application service access tokens via the `access_token` query parameter
+per older versions of the Matrix specification. Defaults to false. Set to true to enable sending
+access tokens via a query parameter.
+
+**Enabling this option is considered insecure and is not recommended. **
 
 Example configuration:
 ```yaml
