@@ -422,6 +422,36 @@ class RemoteServerUpCommand(_SimpleCommand):
     NAME = "REMOTE_SERVER_UP"
 
 
+class LockReleasedCommand(Command):
+    """Sent to inform other instances that a given lock has been dropped.
+
+    Format::
+
+        LOCK_RELEASED ["<instance_name>", "<lock_name>", "<lock_key>"]
+    """
+
+    NAME = "LOCK_RELEASED"
+
+    def __init__(
+        self,
+        instance_name: str,
+        lock_name: str,
+        lock_key: str,
+    ):
+        self.instance_name = instance_name
+        self.lock_name = lock_name
+        self.lock_key = lock_key
+
+    @classmethod
+    def from_line(cls: Type["LockReleasedCommand"], line: str) -> "LockReleasedCommand":
+        instance_name, lock_name, lock_key = json_decoder.decode(line)
+
+        return cls(instance_name, lock_name, lock_key)
+
+    def to_line(self) -> str:
+        return json_encoder.encode([self.instance_name, self.lock_name, self.lock_key])
+
+
 _COMMANDS: Tuple[Type[Command], ...] = (
     ServerCommand,
     RdataCommand,
@@ -435,6 +465,7 @@ _COMMANDS: Tuple[Type[Command], ...] = (
     UserIpCommand,
     RemoteServerUpCommand,
     ClearUserSyncsCommand,
+    LockReleasedCommand,
 )
 
 # Map of command name to command type.
@@ -448,6 +479,7 @@ VALID_SERVER_COMMANDS = (
     ErrorCommand.NAME,
     PingCommand.NAME,
     RemoteServerUpCommand.NAME,
+    LockReleasedCommand.NAME,
 )
 
 # The commands the client is allowed to send
@@ -461,6 +493,7 @@ VALID_CLIENT_COMMANDS = (
     UserIpCommand.NAME,
     ErrorCommand.NAME,
     RemoteServerUpCommand.NAME,
+    LockReleasedCommand.NAME,
 )
 
 

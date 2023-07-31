@@ -2947,35 +2947,35 @@ files = [
 
 [[package]]
 name = "types-commonmark"
-version = "0.9.2.3"
+version = "0.9.2.4"
 description = "Typing stubs for commonmark"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-commonmark-0.9.2.3.tar.gz", hash = "sha256:42769a2c194fd5b49fd9eedfd4a83cd1d2514c6d0a36f00f5c5ffe0b6a2d2fcf"},
-    {file = "types_commonmark-0.9.2.3-py3-none-any.whl", hash = "sha256:b575156e1b8a292d43acb36f861110b85c4bc7aa53bbfb5ac64addec15d18cfa"},
+    {file = "types-commonmark-0.9.2.4.tar.gz", hash = "sha256:2c6486f65735cf18215cca3e962b17787fa545be279306f79b801f64a5319959"},
+    {file = "types_commonmark-0.9.2.4-py3-none-any.whl", hash = "sha256:d5090fa685c3e3c0ec3a5973ff842000baef6d86f762d52209b3c5e9fbd0b555"},
 ]
 
 [[package]]
 name = "types-jsonschema"
-version = "4.17.0.8"
+version = "4.17.0.10"
 description = "Typing stubs for jsonschema"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-jsonschema-4.17.0.8.tar.gz", hash = "sha256:96a56990910f405e62de58862c0bbb3ac29ee6dba6d3d99aa0ba7f874cc547de"},
-    {file = "types_jsonschema-4.17.0.8-py3-none-any.whl", hash = "sha256:f5958eb7b53217dfb5125f0412aeaef226a8a9013eac95816c95b5b523f6796b"},
+    {file = "types-jsonschema-4.17.0.10.tar.gz", hash = "sha256:8e979db34d69bc9f9b3d6e8b89bdbc60b3a41cfce4e1fb87bf191d205c7f5098"},
+    {file = "types_jsonschema-4.17.0.10-py3-none-any.whl", hash = "sha256:3aa2a89afbd9eaa6ce0c15618b36f02692a621433889ce73014656f7d8caf971"},
 ]
 
 [[package]]
 name = "types-netaddr"
-version = "0.8.0.8"
+version = "0.8.0.9"
 description = "Typing stubs for netaddr"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-netaddr-0.8.0.8.tar.gz", hash = "sha256:db7e8cd16b1244e7c4541edd0df99d1039fc05fd5387c21840f0b958fc52aabc"},
-    {file = "types_netaddr-0.8.0.8-py3-none-any.whl", hash = "sha256:6741b3824e2ec3f7a74842b394439b71107c7675f8ae42bb2b5e7a8ebfe8cf18"},
+    {file = "types-netaddr-0.8.0.9.tar.gz", hash = "sha256:68900c267fd31627c1721c5c52b32a257657ac2777457dca49b6b096ba2faf74"},
+    {file = "types_netaddr-0.8.0.9-py3-none-any.whl", hash = "sha256:63e871f064cd59473cec1177f372526f0fa3d565050247d5305bdc325be5c3f6"},
 ]
 
 [[package]]

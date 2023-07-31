@@ -39,6 +39,7 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
+from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -94,6 +95,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
+        self._worker_lock_handler = hs.get_worker_locks_handler()
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
         self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
@@ -638,26 +640,29 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # by application services), and then by room ID.
         async with self.member_as_limiter.queue(as_id):
             async with self.member_linearizer.queue(key):
-                with opentracing.start_active_span("update_membership_locked"):
-                    result = await self.update_membership_locked(
-                        requester,
-                        target,
-                        room_id,
-                        action,
-                        txn_id=txn_id,
-                        remote_room_hosts=remote_room_hosts,
-                        third_party_signed=third_party_signed,
-                        ratelimit=ratelimit,
-                        content=content,
-                        new_room=new_room,
-                        require_consent=require_consent,
-                        outlier=outlier,
-                        allow_no_prev_events=allow_no_prev_events,
-                        prev_event_ids=prev_event_ids,
-                        state_event_ids=state_event_ids,
-                        depth=depth,
-                        origin_server_ts=origin_server_ts,
-                    )
+                async with self._worker_lock_handler.acquire_read_write_lock(
+                    DELETE_ROOM_LOCK_NAME, room_id, write=False
+                ):
+                    with opentracing.start_active_span("update_membership_locked"):
+                        result = await self.update_membership_locked(
+                            requester,
+                            target,
+                            room_id,
+                            action,
+                            txn_id=txn_id,
+                            remote_room_hosts=remote_room_hosts,
+                            third_party_signed=third_party_signed,
+                            ratelimit=ratelimit,
+                            content=content,
+                            new_room=new_room,
+                            require_consent=require_consent,
+                            outlier=outlier,
+                            allow_no_prev_events=allow_no_prev_events,
+                            prev_event_ids=prev_event_ids,
+                            state_event_ids=state_event_ids,
+                            depth=depth,
+                            origin_server_ts=origin_server_ts,
+                        )
 
         return result
 
