@@ -14,13 +14,13 @@
 # limitations under the License.
 import logging
 import urllib.parse
+from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
     Iterable,
     List,
-    MutableMapping,
     Optional,
     Sequence,
     Tuple,
@@ -197,12 +197,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
-            args: MutableMapping[Any, Any] = {
-                **fields,
-                b"access_token": service.hs_token,
-            }
-            if not self.config.use_appservice_legacy_authorization:
-                args.pop(b"access_token", None)
+            args: Mapping[Any, Any] = fields
+            if self.config.use_appservice_legacy_authorization:
+                args = {
+                    **fields,
+                    b"access_token": service.hs_token,
+                }
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 args=args,
