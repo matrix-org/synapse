@@ -432,7 +432,11 @@ def serialize_event(
     # unsigned section of the event if it was sent by the same session as the one
     # requesting the event.
     txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
-    if txn_id is not None and config.requester is not None:
+    if (
+        txn_id is not None
+        and config.requester is not None
+        and config.requester.user.to_string() == e.sender
+    ):
         # Some events do not have the device ID stored in the internal metadata,
         # this includes old events as well as those created by appservice, guests,
         # or with tokens minted with the admin API. For those events, fallback
@@ -449,17 +453,12 @@ def serialize_event(
             # For regular users, the access token ID can be used to determine this.
             # This includes access tokens minted with the admin API.
             #
-            # For guests, we can't check the access token ID, but since each guest
-            # only has one access token, just check the event was sent by the same
-            # user as the one requesting the event.
-            #
-            # For appservice users, we can't check the access token ID, just
-            # check the event was sent by the same user as the one requesting
-            # the event.
+            # For guests and appservice users, we can't check the access token ID
+            # so assume it is the same session.
             event_token_id: Optional[int] = getattr(
                 e.internal_metadata, "token_id", None
             )
-            if config.requester.user.to_string() == e.sender and (
+            if (
                 (
                     event_token_id is not None
                     and config.requester.access_token_id is not None
