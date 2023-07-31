@@ -2969,13 +2969,13 @@ files = [
 
 [[package]]
 name = "types-netaddr"
-version = "0.8.0.8"
+version = "0.8.0.9"
 description = "Typing stubs for netaddr"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-netaddr-0.8.0.8.tar.gz", hash = "sha256:db7e8cd16b1244e7c4541edd0df99d1039fc05fd5387c21840f0b958fc52aabc"},
-    {file = "types_netaddr-0.8.0.8-py3-none-any.whl", hash = "sha256:6741b3824e2ec3f7a74842b394439b71107c7675f8ae42bb2b5e7a8ebfe8cf18"},
+    {file = "types-netaddr-0.8.0.9.tar.gz", hash = "sha256:68900c267fd31627c1721c5c52b32a257657ac2777457dca49b6b096ba2faf74"},
+    {file = "types_netaddr-0.8.0.9-py3-none-any.whl", hash = "sha256:63e871f064cd59473cec1177f372526f0fa3d565050247d5305bdc325be5c3f6"},
 ]
 
 [[package]]
