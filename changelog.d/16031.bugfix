@@ -1,1 +1,1 @@
-Trim any white space when setting display names.
+Remove leading and trailing spaces when setting a display name.
