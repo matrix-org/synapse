@@ -167,7 +167,7 @@ class ResponseCache(Generic[KV]):
             # the should_cache bit, we leave it in the cache for now and schedule
             # its removal later.
             if self.timeout_sec and context.should_cache:
-                self.clock.call_later(self.timeout_sec, self.entry_timeout, key)
+                self.clock.call_later(self.timeout_sec, self._entry_timeout, key)
             else:
                 # otherwise, remove the result immediately.
                 self.unset(key)
@@ -185,17 +185,13 @@ class ResponseCache(Generic[KV]):
         Args:
             key: key used to remove the cached value
         """
+        self._metrics.inc_evictions(EvictionReason.invalidation)
         self._result_cache.pop(key, None)
 
-    def evict_because(self, key: KV, reason: EvictionReason) -> None:
-        """Basically the same as unset, but update reason why evicting for metrics"""
-        self._metrics.inc_evictions(reason)
-        self.unset(key)
-
-    def entry_timeout(self, key: KV) -> None:
+    def _entry_timeout(self, key: KV) -> None:
         """For the call_later to remove from the cache"""
-        logger.debug(f"Expiring from [{self._name}] - {key}")
-        self.evict_because(key, EvictionReason.time)
+        self._metrics.inc_evictions(EvictionReason.time)
+        self._result_cache.pop(key, None)
 
     async def wrap(
         self,
