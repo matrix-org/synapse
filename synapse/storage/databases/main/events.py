@@ -1013,6 +1013,8 @@ class PersistEventsStore:
         # Synapse usually relies on the device_id to scope transactions for events,
         # except for users without device IDs (appservice, guests, and access
         # tokens minted with the admin API) which use the access token ID instead.
+        #
+        # TODO https://github.com/matrix-org/synapse/issues/16042
         if to_insert_token_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
