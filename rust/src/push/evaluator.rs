@@ -312,7 +312,7 @@ impl PushRuleEvaluator {
                     return Ok(false);
                 };
 
-                let pattern = match &*exact_event_match.value_type {
+                let pattern = match &*exact_event_match.value {
                     EventMatchPatternType::UserId => user_id,
                     EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
                 };

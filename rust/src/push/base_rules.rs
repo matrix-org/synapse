@@ -147,7 +147,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         conditions: Cow::Borrowed(&[Condition::Known(
             KnownCondition::ExactEventPropertyContainsType(EventPropertyIsTypeCondition {
                 key: Cow::Borrowed("content.m\\.mentions.user_ids"),
-                value_type: Cow::Borrowed(&EventMatchPatternType::UserId),
+                value: Cow::Borrowed(&EventMatchPatternType::UserId),
             }),
         )]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),

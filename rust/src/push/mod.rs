@@ -405,7 +405,7 @@ pub struct EventPropertyIsTypeCondition {
     pub key: Cow<'static, str>,
     // During serialization, the pattern_type property gets replaced with a
     // pattern property of the correct value in synapse.push.clientformat.format_push_rules_for_user.
-    pub value_type: Cow<'static, EventMatchPatternType>,
+    pub value: Cow<'static, EventMatchPatternType>,
 }
 
 /// The body of a [`Condition::RelatedEventMatch`]
