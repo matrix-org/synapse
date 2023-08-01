@@ -14,17 +14,17 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
-    Any,
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
 from prometheus_client import Counter
@@ -197,7 +197,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
-            args: Mapping[Any, Any] = fields
+            args: Mapping[bytes, Union[List[bytes], str]] = fields
             if self.config.use_appservice_legacy_authorization:
                 args = {
                     **fields,

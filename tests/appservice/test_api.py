@@ -79,7 +79,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             if not headers or not headers.get("Authorization"):
                 raise RuntimeError("Access token not provided")
             # ... and not as a query param
-            if args and args.get(b"access_token"):
+            if b"access_token" in args:
                 raise RuntimeError(
                     "Access token should not be passed as a query param."
                 )
@@ -150,12 +150,13 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             ] = None,
         ) -> List[JsonDict]:
             # Ensure the access token is passed as a both a query param and in the headers.
-            if not args or not args.get(b"access_token"):
+            if not args.get(b"access_token"):
                 raise RuntimeError("Access token should be provided in query params.")
             if not headers or not headers.get("Authorization"):
                 raise RuntimeError("Access token should be provided in auth headers.")
 
             self.assertEqual(args.get(b"access_token"), TOKEN)
+            self.assertEqual(headers.get("Authorization"), [f"Bearer {TOKEN}"])
             self.request_url = url
             if url == URL_USER:
                 return SUCCESS_RESULT_USER
