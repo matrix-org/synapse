@@ -813,7 +813,8 @@ when admins wish to do actions on behalf of a user.</p>
 </code></pre>
 <p>An optional <code>valid_until_ms</code> field can be specified in the request body as an
 integer timestamp that specifies when the token should expire. By default tokens
-do not expire.</p>
+do not expire. Note that this API does not allow a user to login as themselves
+(to create more tokens).</p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;access_token&quot;: &quot;&lt;opaque_access_token_string&gt;&quot;

@@ -392,6 +392,7 @@ See the <a href="../workers.html">worker documentation</a> for additional inform
 </li>
 <li>Passing <code>ASYNCIO_REACTOR=1</code> as an environment variable to use the Twisted asyncio reactor instead of the default one.</li>
 <li>Passing <code>PODMAN=1</code> will use the <a href="https://podman.io/">podman</a> container runtime, instead of docker.</li>
+<li>Passing <code>UNIX_SOCKETS=1</code> will utilise Unix socket functionality for Synapse, Redis, and Postgres(when applicable).</li>
 </ul>
 <p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>, e.g:</p>
 <pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages

@@ -231,6 +231,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1890"><a class="header" href="#upgrading-to-v1890">Upgrading to v1.89.0</a></h1>
+<h2 id="removal-of-unspecced-user-property-for-register"><a class="header" href="#removal-of-unspecced-user-property-for-register">Removal of unspecced <code>user</code> property for <code>/register</code></a></h2>
+<p>Application services can no longer call <code>/register</code> with a <code>user</code> property to create new users.
+The standard <code>username</code> property should be used instead. See the
+<a href="https://spec.matrix.org/v1.7/application-service-api/#server-admin-style-permissions">Application Service specification</a>
+for more information.</p>
 <h1 id="upgrading-to-v1880"><a class="header" href="#upgrading-to-v1880">Upgrading to v1.88.0</a></h1>
 <h2 id="minimum-supported-python-version"><a class="header" href="#minimum-supported-python-version">Minimum supported Python version</a></h2>
 <p>The minimum supported Python version has been increased from v3.7 to v3.8.

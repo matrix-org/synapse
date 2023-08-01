@@ -218,9 +218,15 @@ for the main process</li>
 <li>Secondly, you need to enable
 <a href="usage/configuration/config_documentation.html#redis">redis-based replication</a></li>
 <li>You will need to add an <a href="usage/configuration/config_documentation.html#instance_map"><code>instance_map</code></a> 
-with the <code>main</code> process defined, as well as the relevant connection information from 
-it's HTTP <code>replication</code> listener (defined in step 1 above). Note that the <code>host</code> defined 
-is the address the worker needs to look for the <code>main</code> process at, not necessarily the same address that is bound to.</li>
+with the <code>main</code> process defined, as well as the relevant connection information from
+it's HTTP <code>replication</code> listener (defined in step 1 above).
+<ul>
+<li>Note that the <code>host</code> defined is the address the worker needs to look for the <code>main</code>
+process at, not necessarily the same address that is bound to.</li>
+<li>If you are using Unix sockets for the <code>replication</code> resource, make sure to
+use a <code>path</code> to the socket file instead of a <code>port</code>.</li>
+</ul>
+</li>
 <li>Optionally, a <a href="usage/configuration/config_documentation.html#worker_replication_secret">shared secret</a>
 can be used to authenticate HTTP traffic between workers. For example:</li>
 </ul>
@@ -293,10 +299,10 @@ recommend the use of <code>systemd</code> where available: for information on se
 <h2 id="start-synapse-with-poetry"><a class="header" href="#start-synapse-with-poetry">Start Synapse with Poetry</a></h2>
 <p>The following applies to Synapse installations that have been installed from source using <code>poetry</code>.</p>
 <p>You can start the main Synapse process with Poetry by running the following command:</p>
-<pre><code class="language-console">poetry run synapse_homeserver -c [your homeserver.yaml]
+<pre><code class="language-console">poetry run synapse_homeserver --config-file [your homeserver.yaml]
 </code></pre>
 <p>For worker setups, you can run the following command</p>
-<pre><code class="language-console">poetry run synapse_worker -c [your worker.yaml]
+<pre><code class="language-console">poetry run synapse_worker --config-file [your homeserver.yaml] --config-file [your worker.yaml]
 </code></pre>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
@@ -620,6 +626,26 @@ the stream writer for the <code>receipts</code> stream:</p>
 <p>The following endpoints should be routed directly to the worker configured as
 the stream writer for the <code>presence</code> stream:</p>
 <pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
+</code></pre>
+<h4 id="restrict-outbound-federation-traffic-to-a-specific-set-of-workers"><a class="header" href="#restrict-outbound-federation-traffic-to-a-specific-set-of-workers">Restrict outbound federation traffic to a specific set of workers</a></h4>
+<p>The
+<a href="usage/configuration/config_documentation.html#outbound_federation_restricted_to"><code>outbound_federation_restricted_to</code></a>
+configuration is useful to make sure outbound federation traffic only goes through a
+specified subset of workers. This allows you to set more strict access controls (like a
+firewall) for all workers and only allow the <code>federation_sender</code>'s to contact the
+outside world.</p>
+<pre><code class="language-yaml">instance_map:
+    main:
+        host: localhost
+        port: 8030
+    federation_sender1:
+        host: localhost
+        port: 8034
+
+outbound_federation_restricted_to:
+  - federation_sender1
+
+worker_replication_secret: &quot;secret_secret&quot;
 </code></pre>
 <h4 id="background-tasks"><a class="header" href="#background-tasks">Background tasks</a></h4>
 <p>There is also support for moving background tasks to a separate
