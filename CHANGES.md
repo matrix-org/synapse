@@ -1,3 +1,8 @@
+# Synapse 1.89.0 (2023-08-01)
+
+No significant changes since 1.89.0rc1.
+
+
 # Synapse 1.89.0rc1 (2023-07-25)
 
 ### Features
