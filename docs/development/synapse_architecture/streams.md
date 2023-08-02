@@ -20,7 +20,7 @@ as necessary to describe the fact.
 (Note that it may take multiple rows (with the same `stream_id`) to describe that fact.)
 Stream IDs are globally unique (enforced by Postgres sequences).
 
-> _Aside_. Less roughly speaking, here are some additional notes on streams' backing tables.
+> _Aside_. Some additional notes on streams' backing tables.
 >
 > 1. Rich would like to [ditch the backing tables](https://github.com/matrix-org/synapse/issues/13456).
 > 2. The backing tables may have other uses.
