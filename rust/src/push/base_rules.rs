@@ -130,7 +130,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(
             KnownCondition::ExactEventPropertyContainsType(EventPropertyIsTypeCondition {
-                key: Cow::Borrowed("content.m\\.mentions.user_ids"),
+                key: Cow::Borrowed(r"content.m\.mentions.user_ids"),
                 value_type: Cow::Borrowed(&EventMatchPatternType::UserId),
             }),
         )]),
@@ -151,7 +151,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         priority_class: 5,
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::EventPropertyIs(EventPropertyIsCondition {
-                key: Cow::Borrowed("content.m\\.mentions.room"),
+                key: Cow::Borrowed(r"content.m\.mentions.room"),
                 value: Cow::Borrowed(&SimpleJsonValue::Bool(true)),
             })),
             Condition::Known(KnownCondition::SenderNotificationPermission {
@@ -232,7 +232,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventPropertyIs(
             EventPropertyIsCondition {
-                key: Cow::Borrowed("content.m\\.relates_to.rel_type"),
+                key: Cow::Borrowed(r"content.m\.relates_to.rel_type"),
                 value: Cow::Borrowed(&SimpleJsonValue::Str(Cow::Borrowed("m.replace"))),
             },
         ))]),
