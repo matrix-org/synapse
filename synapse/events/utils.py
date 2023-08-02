@@ -475,14 +475,16 @@ def serialize_event(
     if config.as_client_event:
         d = config.event_format(d)
 
-    # If the event is a redaction, copy the redacts field from the content to
-    # top-level for backwards compatibility.
-    if (
-        e.type == EventTypes.Redaction
-        and e.room_version.updated_redaction_rules
-        and e.redacts is not None
-    ):
-        d["redacts"] = e.redacts
+    # If the event is a redaction, the field with the redacted event ID appears
+    # in a different location depending on the room version. e.redacts handles
+    # fetching from the proper location; copy it to the other location for forwards-
+    # and backwards-compatibility with clients.
+    if e.type == EventTypes.Redaction and e.redacts is not None:
+        if e.room_version.updated_redaction_rules:
+            d["redacts"] = e.redacts
+        else:
+            d["content"] = dict(d["content"])
+            d["content"]["redacts"] = e.redacts
 
     only_event_fields = config.only_event_fields
     if only_event_fields:
