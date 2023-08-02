@@ -117,7 +117,7 @@ impl PushRuleEvaluator {
         msc3931_enabled: bool,
     ) -> Result<Self, Error> {
         let body = match flattened_keys.get("content.body") {
-            Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone().to_string(),
+            Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone().into_owned(),
             _ => String::new(),
         };
 
