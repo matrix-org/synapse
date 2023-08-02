@@ -85,7 +85,7 @@ However, it requires each reader to know about the entire set of writers, to ens
 In contrast, multiple parallel streams (option 1) are more complex, requiring more state to represent (map from writer to stream id).
 The payoff for doing so is that readers can "peek" ahead to facts that completed on one writer no matter the state of the others, reducing latency.
 
-Note that a single multi-writer stream can be viewed in both ways.
+Note that a multi-writer stream can be viewed in both ways.
 For example, the events stream is treated as multiple single-writer streams (option 1) by the sync handler, so that events are sent to clients as soon as possible.
 But the background process that works through events treats them as a single linear stream.
 
