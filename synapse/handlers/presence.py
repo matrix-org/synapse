@@ -1254,7 +1254,7 @@ class PresenceHandler(BasePresenceHandler):
             new_fields["status_msg"] = status_msg
 
         if (
-            prev_state.state == PresenceState.OFFLINE
+            prev_state.state != PresenceState.ONLINE
             and presence == PresenceState.ONLINE
         ) or (presence == PresenceState.BUSY and self._busy_presence_enabled):
             # By updating last_active_ts in this way, currently_active will be triggered
@@ -1982,14 +1982,6 @@ def handle_update(
                     obj=user_id,
                     then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY,
                 )
-            if prev_state.state == PresenceState.UNAVAILABLE:
-                # If we had idled out, but are still syncing, then new state will look
-                # like it's online. Verify with last_active_ts, as that is a sign of a
-                # pro-active event. Override that we are online when we probably aren't.
-                if now - new_state.last_active_ts > IDLE_TIMER:
-                    new_state = new_state.copy_and_replace(
-                        state=PresenceState.UNAVAILABLE
-                    )
 
         if new_state.state != PresenceState.OFFLINE:
             # User has stopped syncing
