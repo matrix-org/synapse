@@ -1004,16 +1004,18 @@ templates:
 This option and the associated options determine message retention policy at the
 server level.
 
-#### ⚠️  WARNING
+> #### ⚠️  WARNING
+> 
+> The message retention policies feature is disabled by default. Please be advised
+> that enabling this feature carries some risk. **There are known bugs with the implementation
+> which [*can cause database corruption*](https://github.com/matrix-org/synapse/issues/13476)**. 
+> Setting retention to delete older history is less risky than deleting newer history,
+> but in general caution is strongly advised when enabling this
+> experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
 
-The message retention policies feature is disabled by default. Please be advised
-that enabling this feature carries some risk. **There are known bugs with the implementation
-which [*can cause database corruption*](https://github.com/matrix-org/synapse/issues/13476)**. 
-Setting retention to delete older history is less risky than deleting newer history,
-but in general caution is strongly advised when enabling this
-experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
+<details>
+<summary>I understand I risk corrupting my homeserver, show me the details</summary>
 
-#### Details
 
 Room admins and mods can define a retention period for their rooms using the
 `m.room.retention` state event, and server admins can cap this period by setting
@@ -1081,6 +1083,7 @@ retention:
     - shortest_max_lifetime: 3d
       interval: 1d
 ```
+</details>
 ---
 ## TLS
 
