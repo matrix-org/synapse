@@ -1278,8 +1278,9 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             user_id: the user that we are storing the device for
             device_id: the ID of the dehydrated device
             device_data: the dehydrated device information
-            time_now: current time at the request
+            time_now: current time at the request in milliseconds
             keys: keys for the dehydrated device
+
         Returns:
             device id of the user's previous dehydrated device, if any
         """
