@@ -685,13 +685,11 @@ class DeviceHandler(DeviceWorkerHandler):
             keys = await self._check_and_prepare_keys_for_dehydrated_device(
                 user_id, device_id, keys_for_device
             )
-            old_device_id = await self.store.store_dehydrated_device(
-                user_id, device_id, device_data, time_now, keys
-            )
         else:
-            old_device_id = await self.store.store_dehydrated_device(
-                user_id, device_id, device_data, time_now
-            )
+            keys = None
+        old_device_id = await self.store.store_dehydrated_device(
+            user_id, device_id, device_data, time_now, key
+        )
 
         if old_device_id is not None:
             await self.delete_devices(user_id, [old_device_id])
