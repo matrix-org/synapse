@@ -31,7 +31,6 @@ class TaskScheduler:
     # Precision of the scheduler, evaluation of tasks to run will only happen
     # every `SCHEDULE_INTERVAL_MS` ms
     SCHEDULE_INTERVAL_MS = 5 * 60 * 1000  # 5mn
-    CLEAN_INTERVAL_MS = 60 * 60 * 1000  # 1hr
     # Time before a complete or failed task is deleted from the DB
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
     # Maximum number of tasks that can run at the same time
@@ -41,6 +40,7 @@ class TaskScheduler:
         self._store = hs.get_datastores().main
         self._clock = hs.get_clock()
         self._running_tasks: Set[str] = set()
+        # A map between action names and their registered function
         self._actions: Dict[
             str,
             Callable[
@@ -54,14 +54,8 @@ class TaskScheduler:
             self._clock.looping_call(
                 run_as_background_process,
                 TaskScheduler.SCHEDULE_INTERVAL_MS,
-                "run_scheduled_tasks",
-                self._run_scheduled_tasks,
-            )
-            self._clock.looping_call(
-                run_as_background_process,
-                TaskScheduler.CLEAN_INTERVAL_MS,
-                "clean_scheduled_tasks",
-                self._clean_scheduled_tasks,
+                "handle_scheduled_tasks",
+                self._handle_scheduled_tasks,
             )
 
     def register_action(
@@ -209,8 +203,13 @@ class TaskScheduler:
             max_timestamp=max_timestamp,
         )
 
-    async def _run_scheduled_tasks(self) -> None:
-        """Main loop taking care of launching the scheduled tasks when needed."""
+    async def _handle_scheduled_tasks(self) -> None:
+        """Main loop taking care of launching tasks and cleaning up old ones."""
+        await self._launch_scheduled_tasks()
+        await self._clean_scheduled_tasks()
+
+    async def _launch_scheduled_tasks(self) -> None:
+        """Retrieve and launch scheduled tasks that should be running at that time."""
         for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
             if (
                 task.id not in self._running_tasks
@@ -229,7 +228,7 @@ class TaskScheduler:
                 await self._launch_task(task, first_launch=True)
 
     async def _clean_scheduled_tasks(self) -> None:
-        """Clean loop taking care of removing old complete or failed jobs to avoid clutter the DB."""
+        """Clean old complete or failed jobs to avoid clutter the DB."""
         for task in await self._store.get_scheduled_tasks(
             statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
         ):
