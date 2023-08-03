@@ -687,8 +687,9 @@ class DeviceHandler(DeviceWorkerHandler):
             )
         else:
             keys = None
+
         old_device_id = await self.store.store_dehydrated_device(
-            user_id, device_id, device_data, time_now, key
+            user_id, device_id, device_data, time_now, keys
         )
 
         if old_device_id is not None:
@@ -705,12 +706,15 @@ class DeviceHandler(DeviceWorkerHandler):
 
         Args:
             user_id: user to store keys for
-            device_id: the dehydrated device to store keys for
-            keys: the keys - device_keys, onetime_keys, or fallback keys to store
+            device_id: the device_id of the dehydrated device to store keys for
+            keys: a dict of device_keys, onetime_keys, or fallback keys provided by the client
+                  to store associated with the dehydrated device id. Consists of pairs where
+                  the key is the key type (i.e. device_key, onetime_key or fallback_key)
+                  and the value is the key of that respective type.
 
         Returns:
-            keys that have been checked for duplicates and are ready to be inserted into
-            DB
+            A dict where the keys are key type (i.e. device_key, onetime_key or fallback_key)
+            and values are the respective keys of that type
         """
         keys_to_return: dict = {}
         device_keys = keys.get("device_keys", None)
