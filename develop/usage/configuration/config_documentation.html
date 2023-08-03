@@ -2504,6 +2504,15 @@ Implicitly enables MAU tracking for application service users.</p>
 <pre><code class="language-yaml">track_appservice_user_ips: true
 </code></pre>
 <hr />
+<h3 id="use_appservice_legacy_authorization"><a class="header" href="#use_appservice_legacy_authorization"><code>use_appservice_legacy_authorization</code></a></h3>
+<p>Whether to send the application service access tokens via the <code>access_token</code> query parameter
+per older versions of the Matrix specification. Defaults to false. Set to true to enable sending
+access tokens via a query parameter.</p>
+<p>**Enabling this option is considered insecure and is not recommended. **</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">use_appservice_legacy_authorization: true 
+</code></pre>
+<hr />
 <h3 id="macaroon_secret_key"><a class="header" href="#macaroon_secret_key"><code>macaroon_secret_key</code></a></h3>
 <p>A secret which is used to sign</p>
 <ul>

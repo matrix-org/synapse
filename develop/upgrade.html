@@ -231,6 +231,17 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1900"><a class="header" href="#upgrading-to-v1900">Upgrading to v1.90.0</a></h1>
+<h2 id="app-service-query-parameter-authorization-is-now-a-configuration-option"><a class="header" href="#app-service-query-parameter-authorization-is-now-a-configuration-option">App service query parameter authorization is now a configuration option</a></h2>
+<p>Synapse v1.81.0 deprecated application service authorization via query parameters as this is
+considered insecure - and from Synapse v1.71.0 forwards the application service token has also been sent via 
+<a href="https://spec.matrix.org/v1.6/application-service-api/#authorization">the <code>Authorization</code> header</a>], making the insecure
+query parameter authorization redundant. Since removing the ability to continue to use query parameters could break 
+backwards compatibility it has now been put behind a configuration option, <code>use_appservice_legacy_authorization</code>.<br />
+This option defaults to false, but can be activated by adding </p>
+<pre><code class="language-yaml">use_appservice_legacy_authorization: true 
+</code></pre>
+<p>to your configuration.</p>
 <h1 id="upgrading-to-v1890"><a class="header" href="#upgrading-to-v1890">Upgrading to v1.89.0</a></h1>
 <h2 id="removal-of-unspecced-user-property-for-register"><a class="header" href="#removal-of-unspecced-user-property-for-register">Removal of unspecced <code>user</code> property for <code>/register</code></a></h2>
 <p>Application services can no longer call <code>/register</code> with a <code>user</code> property to create new users.
