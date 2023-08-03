@@ -1,0 +1,1 @@
+Add configuration option to disable sending and receiving presence over federation. Local presence is unaffected.
