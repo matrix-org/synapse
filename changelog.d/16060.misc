@@ -1,0 +1,1 @@
+Add logging of invalid mxids when persisting events.
