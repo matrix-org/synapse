@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+import logging
 import re
 import string
 from typing import (
@@ -61,6 +62,9 @@ if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationService
     from synapse.storage.databases.main import DataStore, PurgeEventsStore
     from synapse.storage.databases.main.appservice import ApplicationServiceWorkerStore
+
+logger = logging.getLogger(__name__)
+
 
 # Define a state map type from type/state_key to T (usually an event ID or
 # event)
@@ -326,6 +330,20 @@ class UserID(DomainSpecificString):
 
     SIGIL = "@"
 
+    def validate(self, allow_historical_mxids: Optional[bool] = False) -> bool:
+        is_valid = True
+        if len(self.to_string().encode("utf-8")) > 255:
+            logger.warn(
+                f"User ID {self.to_string()} has more than 255 bytes and is invalid per the spec"
+            )
+            is_valid = False
+        if contains_invalid_mxid_characters(self.localpart, allow_historical_mxids):
+            logger.warn(
+                f"localpart of User ID {self.to_string()} contains invalid characters per the spec"
+            )
+            is_valid = False
+        return is_valid
+
 
 @attr.s(slots=True, frozen=True, repr=False)
 class RoomAlias(DomainSpecificString):
@@ -352,22 +370,31 @@ MXID_LOCALPART_ALLOWED_CHARACTERS = set(
     "_-./=+" + string.ascii_lowercase + string.digits
 )
 
+ASCII_PRINTABLE_CHARACTERS = set(string.printable)
+
 # Guest user IDs are purely numeric.
 GUEST_USER_ID_PATTERN = re.compile(r"^\d+$")
 
 
-def contains_invalid_mxid_characters(localpart: str) -> bool:
+def contains_invalid_mxid_characters(
+    localpart: str, allow_historical_mxids: Optional[bool] = False
+) -> bool:
     """Check for characters not allowed in an mxid or groupid localpart
 
     Args:
         localpart: the localpart to be checked
-        use_extended_character_set: True to use the extended allowed characters
+        allow_legacy_mxids: True to use the extended allowed characters
             from MSC4009.
 
     Returns:
         True if there are any naughty characters
     """
-    return any(c not in MXID_LOCALPART_ALLOWED_CHARACTERS for c in localpart)
+
+    if allow_historical_mxids:
+        allowed_characters = ASCII_PRINTABLE_CHARACTERS
+    else:
+        allowed_characters = MXID_LOCALPART_ALLOWED_CHARACTERS
+    return any(c not in allowed_characters for c in localpart)
 
 
 UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")

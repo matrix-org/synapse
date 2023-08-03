@@ -51,7 +51,7 @@ from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
-from synapse.types import JsonDict, StateMap, StrCollection, get_domain_from_id
+from synapse.types import JsonDict, StateMap, StrCollection, UserID, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter, sorted_topologically
 from synapse.util.stringutils import non_null_str_or_none
@@ -393,6 +393,10 @@ class PersistEventsStore:
         # Once the txn completes, invalidate all of the relevant caches. Note that we do this
         # up here because it captures all the events_and_contexts before any are removed.
         for event, _ in events_and_contexts:
+            sender = UserID.from_string(event.sender)
+            # The result of `validate` is not used yet because for now we only want to
+            # log invalid mxids in the wild.
+            sender.validate(allow_historical_mxids=True)
             self.store.invalidate_get_event_cache_after_txn(txn, event.event_id)
             if event.redacts:
                 self.store.invalidate_get_event_cache_after_txn(txn, event.redacts)
