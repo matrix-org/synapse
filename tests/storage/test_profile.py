@@ -15,6 +15,8 @@
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.server import HomeServer
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import PostgresEngine
 from synapse.types import UserID
 from synapse.util import Clock
 
@@ -62,3 +64,64 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(
             self.get_success(self.store.get_profile_avatar_url(self.u_frank))
         )
+
+    def test_profiles_bg_migration(self) -> None:
+        """
+        Test background job that copies entries from column user_id to full_user_id, adding
+        the hostname in the process.
+        """
+        updater = self.hs.get_datastores().main.db_pool.updates
+
+        # drop the constraint so we can insert nulls in full_user_id to populate the test
+        if isinstance(self.store.database_engine, PostgresEngine):
+
+            def f(txn: LoggingTransaction) -> None:
+                txn.execute(
+                    "ALTER TABLE profiles DROP CONSTRAINT full_user_id_not_null"
+                )
+
+            self.get_success(self.store.db_pool.runInteraction("", f))
+
+        for i in range(0, 70):
+            self.get_success(
+                self.store.db_pool.simple_insert(
+                    "profiles",
+                    {"user_id": f"hello{i:02}"},
+                )
+            )
+
+        # re-add the constraint so that when it's validated it actually exists
+        if isinstance(self.store.database_engine, PostgresEngine):
+
+            def f(txn: LoggingTransaction) -> None:
+                txn.execute(
+                    "ALTER TABLE profiles ADD CONSTRAINT full_user_id_not_null CHECK (full_user_id IS NOT NULL) NOT VALID"
+                )
+
+            self.get_success(self.store.db_pool.runInteraction("", f))
+
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                values={
+                    "update_name": "populate_full_user_id_profiles",
+                    "progress_json": "{}",
+                },
+            )
+        )
+
+        self.get_success(
+            updater.run_background_updates(False),
+        )
+
+        expected_values = []
+        for i in range(0, 70):
+            expected_values.append((f"@hello{i:02}:{self.hs.hostname}",))
+
+        res = self.get_success(
+            self.store.db_pool.execute(
+                "", None, "SELECT full_user_id from profiles ORDER BY full_user_id"
+            )
+        )
+        self.assertEqual(len(res), len(expected_values))
+        self.assertEqual(res, expected_values)

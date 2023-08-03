@@ -80,10 +80,14 @@ class ForeignKeyConstraint(Constraint):
     Attributes:
         referenced_table: The "parent" table name.
         columns: The list of mappings of columns from table to referenced table
+        deferred: Whether to defer checking of the constraint to the end of the
+            transaction. This is useful for e.g. backwards compatibility where
+            an older version inserted data in the wrong order.
     """
 
     referenced_table: str
     columns: Sequence[Tuple[str, str]]
+    deferred: bool
 
     def make_check_clause(self, table: str) -> str:
         join_clause = " AND ".join(
@@ -94,7 +98,8 @@ class ForeignKeyConstraint(Constraint):
     def make_constraint_clause_postgres(self) -> str:
         column1_list = ", ".join(col1 for col1, col2 in self.columns)
         column2_list = ", ".join(col2 for col1, col2 in self.columns)
-        return f"FOREIGN KEY ({column1_list}) REFERENCES {self.referenced_table} ({column2_list})"
+        defer_clause = " DEFERRABLE INITIALLY DEFERRED" if self.deferred else ""
+        return f"FOREIGN KEY ({column1_list}) REFERENCES {self.referenced_table} ({column2_list}) {defer_clause}"
 
 
 @attr.s(auto_attribs=True)

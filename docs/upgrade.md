@@ -88,6 +88,16 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.89.0
+
+## Removal of unspecced `user` property for `/register`
+
+Application services can no longer call `/register` with a `user` property to create new users.
+The standard `username` property should be used instead. See the
+[Application Service specification](https://spec.matrix.org/v1.7/application-service-api/#server-admin-style-permissions)
+for more information.
+
+
 # Upgrading to v1.88.0
 
 ## Minimum supported Python version

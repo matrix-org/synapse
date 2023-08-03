@@ -146,7 +146,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 update_name="event_forward_extremities_event_id_foreign_key_constraint_update",
                 table="event_forward_extremities",
                 constraint_name="event_forward_extremities_event_id",
-                constraint=ForeignKeyConstraint("events", [("event_id", "event_id")]),
+                constraint=ForeignKeyConstraint(
+                    "events", [("event_id", "event_id")], deferred=True
+                ),
                 unique_columns=("event_id", "room_id"),
             )
 
@@ -841,7 +843,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * because the schema change is in a background update, it's not
                      * necessarily safe to assume that it will have been completed.
                      */
-                    AND edge.is_state is ? /* False */
+                    AND edge.is_state is FALSE
                     /**
                      * We only want backwards extremities that are older than or at
                      * the same position of the given `current_depth` (where older
@@ -884,7 +886,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 sql,
                 (
                     room_id,
-                    False,
                     current_depth,
                     self._clock.time_msec(),
                     BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,

@@ -108,7 +108,8 @@ Changes in SCHEMA_VERSION = 78
     - Validate check (full_user_id IS NOT NULL) on tables profiles and user_filters
 
 Changes in SCHEMA_VERSION = 79
-    - We no longer write to column user_id of tables profiles and user_filters
+    - Add tables to handle in DB read-write locks.
+    - Add some mitigations for a painful race between foreground and background updates, cf #15677.
 """
 
 
@@ -121,9 +122,7 @@ SCHEMA_COMPAT_VERSION = (
     #
     # insertions to the column `full_user_id` of tables profiles and user_filters can no
     # longer be null
-    #
-    # we no longer write to column `full_user_id` of tables profiles and user_filters
-    78
+    76
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

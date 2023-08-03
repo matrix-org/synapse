@@ -31,7 +31,7 @@ class AuthConfig(Config):
 
         # The default value of password_config.enabled is True, unless msc3861 is enabled.
         msc3861_enabled = (
-            config.get("experimental_features", {})
+            (config.get("experimental_features") or {})
             .get("msc3861", {})
             .get("enabled", False)
         )

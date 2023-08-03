@@ -1401,7 +1401,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             `to_token`), or `limit` is zero.
         """
 
-        args = [False, room_id]
+        args: List[Any] = [room_id]
 
         order, from_bound, to_bound = generate_pagination_bounds(
             direction, from_token, to_token
@@ -1475,7 +1475,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 event.topological_ordering, event.stream_ordering
             FROM events AS event
             %(join_clause)s
-            WHERE event.outlier = ? AND event.room_id = ? AND %(bounds)s
+            WHERE event.outlier = FALSE AND event.room_id = ? AND %(bounds)s
             ORDER BY event.topological_ordering %(order)s,
             event.stream_ordering %(order)s LIMIT ?
         """ % {

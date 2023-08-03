@@ -247,7 +247,7 @@ class OptionsResourceTests(unittest.TestCase):
             "1.0",
             max_request_body_size=4096,
             reactor=self.reactor,
-            federation_agent=self.homeserver.get_federation_http_client().agent,
+            hs=self.homeserver,
         )
 
         # render the request and return the channel
@@ -274,7 +274,7 @@ class OptionsResourceTests(unittest.TestCase):
         )
         self.assertEqual(
             channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
-            [b"Synapse-Trace-Id"],
+            [b"Synapse-Trace-Id, Server"],
         )
 
     def _check_cors_msc3886_headers(self, channel: FakeChannel) -> None:

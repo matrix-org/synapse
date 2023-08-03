@@ -24,7 +24,11 @@ from urllib.request import (  # type: ignore[attr-defined]
 from zope.interface import implementer
 
 from twisted.internet import defer
-from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
+from twisted.internet.endpoints import (
+    HostnameEndpoint,
+    UNIXClientEndpoint,
+    wrapClientTLS,
+)
 from twisted.internet.interfaces import (
     IProtocol,
     IProtocolFactory,
@@ -42,9 +46,17 @@ from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS, IResponse
 
-from synapse.config.workers import InstanceLocationConfig
+from synapse.config.workers import (
+    InstanceLocationConfig,
+    InstanceTcpLocationConfig,
+    InstanceUnixLocationConfig,
+)
 from synapse.http import redact_uri
-from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
+from synapse.http.connectproxyclient import (
+    BasicProxyCredentials,
+    HTTPConnectProxyEndpoint,
+    ProxyCredentials,
+)
 from synapse.logging.context import run_in_background
 
 logger = logging.getLogger(__name__)
@@ -82,9 +94,13 @@ class ProxyAgent(_AgentBase):
         use_proxy: Whether proxy settings should be discovered and used
             from conventional environment variables.
 
-        federation_proxies: An optional list of locations to proxy outbound federation
+        federation_proxy_locations: An optional list of locations to proxy outbound federation
             traffic through (only requests that use the `matrix-federation://` scheme
             will be proxied).
+
+        federation_proxy_credentials: Required if `federation_proxy_locations` is set. The
+            credentials to use when proxying outbound federation traffic through another
+            worker.
 
     Raises:
         ValueError if use_proxy is set and the environment variables
@@ -101,7 +117,8 @@ class ProxyAgent(_AgentBase):
         bindAddress: Optional[bytes] = None,
         pool: Optional[HTTPConnectionPool] = None,
         use_proxy: bool = False,
-        federation_proxies: Collection[InstanceLocationConfig] = (),
+        federation_proxy_locations: Collection[InstanceLocationConfig] = (),
+        federation_proxy_credentials: Optional[ProxyCredentials] = None,
     ):
         contextFactory = contextFactory or BrowserLikePolicyForHTTPS()
 
@@ -141,25 +158,45 @@ class ProxyAgent(_AgentBase):
         self._reactor = reactor
 
         self._federation_proxy_endpoint: Optional[IStreamClientEndpoint] = None
-        if federation_proxies:
-            endpoints = []
-            for federation_proxy in federation_proxies:
-                endpoint = HostnameEndpoint(
-                    self.proxy_reactor,
-                    federation_proxy.host,
-                    federation_proxy.port,
-                )
+        self._federation_proxy_credentials: Optional[ProxyCredentials] = None
+        if federation_proxy_locations:
+            assert (
+                federation_proxy_credentials is not None
+            ), "`federation_proxy_credentials` are required when using `federation_proxy_locations`"
 
-                if federation_proxy.tls:
-                    tls_connection_creator = self._policy_for_https.creatorForNetloc(
-                        federation_proxy.host,
-                        federation_proxy.port,
+            endpoints: List[IStreamClientEndpoint] = []
+            for federation_proxy_location in federation_proxy_locations:
+                endpoint: IStreamClientEndpoint
+                if isinstance(federation_proxy_location, InstanceTcpLocationConfig):
+                    endpoint = HostnameEndpoint(
+                        self.proxy_reactor,
+                        federation_proxy_location.host,
+                        federation_proxy_location.port,
                     )
-                    endpoint = wrapClientTLS(tls_connection_creator, endpoint)
+                    if federation_proxy_location.tls:
+                        tls_connection_creator = (
+                            self._policy_for_https.creatorForNetloc(
+                                federation_proxy_location.host.encode("utf-8"),
+                                federation_proxy_location.port,
+                            )
+                        )
+                        endpoint = wrapClientTLS(tls_connection_creator, endpoint)
+
+                elif isinstance(federation_proxy_location, InstanceUnixLocationConfig):
+                    endpoint = UNIXClientEndpoint(
+                        self.proxy_reactor, federation_proxy_location.path
+                    )
+
+                else:
+                    # It is supremely unlikely we ever hit this
+                    raise SchemeNotSupported(
+                        f"Unknown type of Endpoint requested, check {federation_proxy_location}"
+                    )
 
                 endpoints.append(endpoint)
 
-            self._federation_proxy_endpoint = _ProxyEndpoints(endpoints)
+            self._federation_proxy_endpoint = _RandomSampleEndpoints(endpoints)
+            self._federation_proxy_credentials = federation_proxy_credentials
 
     def request(
         self,
@@ -252,8 +289,19 @@ class ProxyAgent(_AgentBase):
             parsed_uri.scheme == b"matrix-federation"
             and self._federation_proxy_endpoint
         ):
-            # Cache *all* connections under the same key, since we are only
-            # connecting to a single destination, the proxy:
+            assert (
+                self._federation_proxy_credentials is not None
+            ), "`federation_proxy_credentials` are required when using `federation_proxy_locations`"
+
+            # Set a Proxy-Authorization header
+            if headers is None:
+                headers = Headers()
+            # We always need authentication for the outbound federation proxy
+            headers.addRawHeader(
+                b"Proxy-Authorization",
+                self._federation_proxy_credentials.as_proxy_authorization_value(),
+            )
+
             endpoint = self._federation_proxy_endpoint
             request_path = uri
         else:
@@ -381,20 +429,28 @@ def parse_proxy(
 
     credentials = None
     if url.username and url.password:
-        credentials = ProxyCredentials(b"".join([url.username, b":", url.password]))
+        credentials = BasicProxyCredentials(
+            b"".join([url.username, b":", url.password])
+        )
 
     return url.scheme, url.hostname, url.port or default_port, credentials
 
 
 @implementer(IStreamClientEndpoint)
-class _ProxyEndpoints:
+class _RandomSampleEndpoints:
     """An endpoint that randomly iterates through a given list of endpoints at
     each connection attempt.
     """
 
-    def __init__(self, endpoints: Sequence[IStreamClientEndpoint]) -> None:
+    def __init__(
+        self,
+        endpoints: Sequence[IStreamClientEndpoint],
+    ) -> None:
         assert endpoints
         self._endpoints = endpoints
+
+    def __repr__(self) -> str:
+        return f"<_RandomSampleEndpoints endpoints={self._endpoints}>"
 
     def connect(
         self, protocol_factory: IProtocolFactory

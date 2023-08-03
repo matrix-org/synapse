@@ -983,7 +983,7 @@ class FederationClient(FederationBase):
             if not room_version:
                 raise UnsupportedRoomVersionError()
 
-            if not room_version.msc2403_knocking and membership == Membership.KNOCK:
+            if not room_version.knock_join_rule and membership == Membership.KNOCK:
                 raise SynapseError(
                     400,
                     "This room version does not support knocking",
@@ -1069,7 +1069,7 @@ class FederationClient(FederationBase):
             # * Ensure the signatures are good.
             #
             # Otherwise, fallback to the provided event.
-            if room_version.msc3083_join_rules and response.event:
+            if room_version.restricted_join_rule and response.event:
                 event = response.event
 
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
@@ -1195,7 +1195,7 @@ class FederationClient(FederationBase):
 
         # MSC3083 defines additional error codes for room joins.
         failover_errcodes = None
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             failover_errcodes = (
                 Codes.UNABLE_AUTHORISE_JOIN,
                 Codes.UNABLE_TO_GRANT_JOIN,

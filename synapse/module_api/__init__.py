@@ -1230,6 +1230,18 @@ class ModuleApi:
                 f,
             )
 
+    def should_run_background_tasks(self) -> bool:
+        """
+        Return true if and only if the current worker is configured to run
+        background tasks.
+        There should only be one worker configured to run background tasks, so
+        this is helpful when you need to only run a task on one worker but don't
+        have any other good way to choose which one.
+
+        Added in Synapse v1.89.0.
+        """
+        return self._hs.config.worker.run_background_tasks
+
     async def sleep(self, seconds: float) -> None:
         """Sleeps for the given number of seconds.
 
