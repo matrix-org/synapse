@@ -1004,6 +1004,17 @@ templates:
 This option and the associated options determine message retention policy at the
 server level.
 
+#### ⚠️  WARNING
+
+The message retention policies feature is disabled by default. Please be advised
+that enabling this feature carries some risk. **There are known bugs with the implementation
+which [*can cause database corruption*](https://github.com/matrix-org/synapse/issues/13476)**. 
+Setting retention to delete older history is less risky than deleting newer history,
+but in general caution is strongly advised when enabling this
+experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
+
+#### Details
+
 Room admins and mods can define a retention period for their rooms using the
 `m.room.retention` state event, and server admins can cap this period by setting
 the `allowed_lifetime_min` and `allowed_lifetime_max` config options.
@@ -1012,12 +1023,6 @@ If this feature is enabled, Synapse will regularly look for and purge events
 which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
-
-The message retention policies feature is disabled by default. Please be advised
-that enabling this feature carries some risk. There are known bugs with the implementation
-which can cause database corruption. Setting retention to delete older history
-is less risky than deleting newer history but in general caution is advised when enabling this
-experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
