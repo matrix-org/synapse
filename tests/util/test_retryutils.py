@@ -11,12 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.util.retryutils import (
-    MIN_RETRY_INTERVAL,
-    RETRY_MULTIPLIER,
-    NotRetryingDestination,
-    get_retry_limiter,
-)
+from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 
 from tests.unittest import HomeserverTestCase
 
@@ -42,6 +37,11 @@ class RetryLimiterTestCase(HomeserverTestCase):
 
         limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
+        min_retry_interval_ms = (
+            self.hs.config.federation.destination_min_retry_interval_ms
+        )
+        retry_multiplier = self.hs.config.federation.destination_retry_multiplier
+
         self.pump(1)
         try:
             with limiter:
@@ -57,7 +57,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         assert new_timings is not None
         self.assertEqual(new_timings.failure_ts, failure_ts)
         self.assertEqual(new_timings.retry_last_ts, failure_ts)
-        self.assertEqual(new_timings.retry_interval, MIN_RETRY_INTERVAL)
+        self.assertEqual(new_timings.retry_interval, min_retry_interval_ms)
 
         # now if we try again we should get a failure
         self.get_failure(
@@ -68,7 +68,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         # advance the clock and try again
         #
 
-        self.pump(MIN_RETRY_INTERVAL)
+        self.pump(min_retry_interval_ms)
         limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
         self.pump(1)
@@ -87,16 +87,16 @@ class RetryLimiterTestCase(HomeserverTestCase):
         self.assertEqual(new_timings.failure_ts, failure_ts)
         self.assertEqual(new_timings.retry_last_ts, retry_ts)
         self.assertGreaterEqual(
-            new_timings.retry_interval, MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 0.5
+            new_timings.retry_interval, min_retry_interval_ms * retry_multiplier * 0.5
         )
         self.assertLessEqual(
-            new_timings.retry_interval, MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0
+            new_timings.retry_interval, min_retry_interval_ms * retry_multiplier * 2.0
         )
 
         #
         # one more go, with success
         #
-        self.reactor.advance(MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0)
+        self.reactor.advance(min_retry_interval_ms * retry_multiplier * 2.0)
         limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
         self.pump(1)
