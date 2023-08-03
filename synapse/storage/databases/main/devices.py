@@ -1188,8 +1188,66 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         )
 
     def _store_dehydrated_device_txn(
-        self, txn: LoggingTransaction, user_id: str, device_id: str, device_data: str
+        self,
+        txn: LoggingTransaction,
+        user_id: str,
+        device_id: str,
+        device_data: str,
+        time: int,
+        keys: Optional[JsonDict] = None,
     ) -> Optional[str]:
+        # TODO: make keys non-optional once support for msc2697 is dropped
+        if keys:
+            device_keys = keys.get("device_keys", None)
+            if device_keys:
+                self.db_pool.simple_upsert_txn(
+                    txn,
+                    table="e2e_device_keys_json",
+                    keyvalues={"user_id": user_id, "device_id": device_id},
+                    values={"ts_added_ms": time, "key_json": device_keys},
+                )
+
+            one_time_keys = keys.get("one_time_keys", None)
+            if one_time_keys:
+                self.db_pool.simple_insert_many_txn(
+                    txn,
+                    table="e2e_one_time_keys_json",
+                    keys=(
+                        "user_id",
+                        "device_id",
+                        "algorithm",
+                        "key_id",
+                        "ts_added_ms",
+                        "key_json",
+                    ),
+                    values=[
+                        (user_id, device_id, algorithm, key_id, time, json_bytes)
+                        for algorithm, key_id, json_bytes in one_time_keys
+                    ],
+                )
+                self._invalidate_cache_and_stream(
+                    txn, self.count_e2e_one_time_keys, (user_id, device_id)
+                )
+
+            fallback_keys = keys.get("fallback_keys", None)
+            if fallback_keys:
+                for key_id, fallback_key in fallback_keys.items():
+                    algorithm, key_id = key_id.split(":", 1)
+                    self.db_pool.simple_upsert_txn(
+                        txn,
+                        table="e2e_fallback_keys_json",
+                        keyvalues={
+                            "user_id": user_id,
+                            "device_id": device_id,
+                            "algorithm": algorithm,
+                        },
+                        values={
+                            "key_id": key_id,
+                            "key_json": json_encoder.encode(fallback_key),
+                            "used": False,
+                        },
+                    )
+
         old_device_id = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="dehydrated_devices",
@@ -1203,10 +1261,16 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             keyvalues={"user_id": user_id},
             values={"device_id": device_id, "device_data": device_data},
         )
+
         return old_device_id
 
     async def store_dehydrated_device(
-        self, user_id: str, device_id: str, device_data: JsonDict
+        self,
+        user_id: str,
+        device_id: str,
+        device_data: JsonDict,
+        time_now: int,
+        keys: Optional[dict] = None,
     ) -> Optional[str]:
         """Store a dehydrated device for a user.
 
@@ -1214,15 +1278,20 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             user_id: the user that we are storing the device for
             device_id: the ID of the dehydrated device
             device_data: the dehydrated device information
+            time_now: current time at the request
+            keys: keys for the dehydrated device
         Returns:
             device id of the user's previous dehydrated device, if any
         """
+
         return await self.db_pool.runInteraction(
             "store_dehydrated_device_txn",
             self._store_dehydrated_device_txn,
             user_id,
             device_id,
             json_encoder.encode(device_data),
+            time_now,
+            keys,
         )
 
     async def remove_dehydrated_device(self, user_id: str, device_id: str) -> bool:
