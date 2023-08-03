@@ -1206,6 +1206,14 @@ like sending a federation transaction.</p>
 <li><code>max_short_retries</code>: maximum number of retries for the short retry algo. Default to 3 attempts.</li>
 <li><code>max_long_retries</code>: maximum number of retries for the long retry algo. Default to 10 attempts.</li>
 </ul>
+<p>The following options control the retry logic when communicating with a specific homeserver destination.
+Unlike the previous configuration options, these values apply across all requests
+for a given destination and the state of the backoff is stored in the database.</p>
+<ul>
+<li><code>destination_min_retry_interval</code>: the initial backoff, after the first request fails. Defaults to 10m.</li>
+<li><code>destination_retry_multiplier</code>: how much we multiply the backoff by after each subsequent fail. Defaults to 2.</li>
+<li><code>destination_max_retry_interval</code>: a cap on the backoff. Defaults to a week.</li>
+</ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">federation:
   client_timeout: 180s
@@ -1213,6 +1221,9 @@ like sending a federation transaction.</p>
   max_long_retry_delay: 100s
   max_short_retries: 5
   max_long_retries: 20
+  destination_min_retry_interval: 30s
+  destination_retry_multiplier: 5
+  destination_max_retry_interval: 12h
 </code></pre>
 <hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
