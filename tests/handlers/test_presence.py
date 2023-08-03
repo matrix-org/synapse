@@ -1117,6 +1117,113 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations={"server2", "server3"}, states=[expected_state]
         )
 
+    @unittest.override_config(
+        {
+            "presence": {
+                "enabled": True,
+                "disable_federation_presence": True,
+            },
+        }
+    )
+    def test_federation_presence_disabled_new_remote_user_does_not_get_any_presence_when_they_join(
+        self,
+    ) -> None:
+        # With federated presence turned off,
+        # no server should get presence when they join
+
+        # We advance time to something that isn't 0, as we use 0 as a special
+        # value.
+        self.reactor.advance(1000000000000)
+
+        # Create a room with two local users
+        room_id = self.helper.create_room_as(self.user_id)
+        self.helper.join(room_id, "@test2:server")
+
+        # Mark test2 as online, test will be offline with a last_active of 0
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
+        )
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        #
+        # Test that a new server gets no info about existing presence
+        #
+
+        self.federation_sender.reset_mock()
+
+        # Add a new remote server to the room
+        self._add_new_user(room_id, "@alice:server2")
+
+        # When new server is joined we normally send it the local users presence states.
+        # With federated presence disabled, they should get nothing.
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test2:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
+
+    @unittest.override_config(
+        {
+            "presence": {
+                "enabled": True,
+                "disable_federation_presence": True,
+            },
+        }
+    )
+    def test_federation_presence_disabled_remote_does_not_get_presence_when_local_user_joins(
+        self,
+    ) -> None:
+        # With federated presence disabled,
+        # our local user joining a room should not send presence.
+
+        # We advance time to something that isn't 0, as we use 0 as a special
+        # value.
+        self.reactor.advance(1000000000000)
+
+        # Create a room with one local users
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # Mark test as online
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
+            )
+        )
+
+        # Mark test2 as online, test will be offline with a last_active of 0.
+        # Note we don't join them to the room yet
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
+        )
+
+        # Add servers to the room
+        self._add_new_user(room_id, "@alice:server2")
+        self._add_new_user(room_id, "@bob:server3")
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        #
+        # Test that when a local join happens remote servers do not get told about it
+        #
+
+        self.federation_sender.reset_mock()
+
+        # Join local user to room
+        self.helper.join(room_id, "@test2:server")
+
+        self.reactor.pump([0])  # Wait for presence updates to be handled
+
+        # We expect to only send test2 presence to server2 and server3
+        expected_state = self.get_success(
+            self.presence_handler.current_state_for_user("@test2:server")
+        )
+        self.assertEqual(expected_state.state, PresenceState.ONLINE)
+        self.federation_sender.send_presence_to_destinations.assert_not_called()
+
     def _add_new_user(self, room_id: str, user_id: str) -> None:
         """Add new user to the room by creating an event and poking the federation API."""
 
