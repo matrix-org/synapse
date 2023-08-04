@@ -331,6 +331,14 @@ class UserID(DomainSpecificString):
     SIGIL = "@"
 
     def validate(self, allow_historical_mxids: Optional[bool] = False) -> bool:
+        """Validate an user ID against the spec.
+
+        Args:
+            allow_historical_mxids: True to allow historical mxids, which can
+            include all printable ASCII chars minus `:`
+        Returns:
+            True if the user ID is invalid per the spec
+        """
         is_valid = True
         if len(self.to_string().encode("utf-8")) > 255:
             logger.warn(
@@ -383,9 +391,8 @@ def contains_invalid_mxid_characters(
 
     Args:
         localpart: the localpart to be checked
-        allow_legacy_mxids: True to use the extended allowed characters
-            from MSC4009.
-
+        allow_historical_mxids: True to allow historical mxids, which can
+        include all printable ASCII chars minus `:`
     Returns:
         True if there are any naughty characters
     """
