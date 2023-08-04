@@ -266,6 +266,11 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
+    PATTERNS = client_patterns(
+        "/org.matrix.msc2697.v2/dehydrated_device$",
+        releases=(),
+    )
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
@@ -273,11 +278,6 @@ class DehydratedDeviceServlet(RestServlet):
         handler = hs.get_device_handler()
         assert isinstance(handler, DeviceHandler)
         self.device_handler = handler
-
-        self.PATTERNS = client_patterns(
-            "/org.matrix.msc2697.v2/dehydrated_device$",
-            releases=(),
-        )
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
