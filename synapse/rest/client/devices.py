@@ -513,10 +513,8 @@ class DehydratedDeviceV2Servlet(RestServlet):
         if dehydrated_device is not None:
             (device_id, device_data) = dehydrated_device
 
-            result = await self.device_handler.rehydrate_device(
-                requester.user.to_string(),
-                self.auth.get_access_token_from_request(request),
-                device_id,
+            await self.device_handler.delete_dehydrated_device(
+                requester.user.to_string(), device_id
             )
 
             result = {"device_id": device_id}
@@ -537,6 +535,14 @@ class DehydratedDeviceV2Servlet(RestServlet):
         submission = parse_and_validate_json_object_from_request(request, self.PutBody)
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
+
+        old_dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
+
+        # if an old device exists, delete it before creating a new one
+        if old_dehydrated_device:
+            await self.device_handler.delete_dehydrated_device(
+                user_id, old_dehydrated_device[0]
+            )
 
         device_info = submission.dict()
         if "device_keys" not in device_info.keys():
