@@ -117,6 +117,10 @@ class ReceiptsHandler:
         max_batch_id: Optional[int] = None
 
         for receipt in receipts:
+            # The result of `validate` is not used yet because for now we only want to
+            # log invalid mxids in the wild.
+            UserID.from_string(receipt.user_id).validate(allow_historical_mxids=True)
+
             res = await self.store.insert_receipt(
                 receipt.room_id,
                 receipt.receipt_type,

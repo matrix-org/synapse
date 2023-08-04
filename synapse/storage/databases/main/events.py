@@ -393,10 +393,6 @@ class PersistEventsStore:
         # Once the txn completes, invalidate all of the relevant caches. Note that we do this
         # up here because it captures all the events_and_contexts before any are removed.
         for event, _ in events_and_contexts:
-            sender = UserID.from_string(event.sender)
-            # The result of `validate` is not used yet because for now we only want to
-            # log invalid mxids in the wild.
-            sender.validate(allow_historical_mxids=True)
             self.store.invalidate_get_event_cache_after_txn(txn, event.event_id)
             if event.redacts:
                 self.store.invalidate_get_event_cache_after_txn(txn, event.redacts)
