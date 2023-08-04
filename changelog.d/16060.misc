@@ -1,1 +1,1 @@
-Add logging of invalid mxids when persisting events.
+Add logging of sender invalid mxids when persisting events and receiving EDUs.
