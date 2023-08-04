@@ -90,6 +90,9 @@
                   # The rust-analyzer language server implementation.
                   rust-analyzer
 
+		  # For building any Python bindings to C or Rust code.
+		  gcc
+
                   # Native dependencies for running Synapse.
                   icu
                   libffi
@@ -122,7 +125,7 @@
                 languages.python.poetry.activate.enable = true;
                 # Install all extra Python dependencies; this is needed to run the unit
                 # tests and utilitise all Synapse features.
-                languages.python.poetry.install.arguments = ["-vvv" "--extras all"];
+                languages.python.poetry.install.arguments = ["-v" "--extras all"];
                 # Install the 'matrix-synapse' package from the local checkout.
                 languages.python.poetry.install.installRootPackage = true;
 
