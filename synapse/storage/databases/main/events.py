@@ -127,8 +127,6 @@ class PersistEventsStore:
         self._backfill_id_gen: AbstractStreamIdGenerator = self.store._backfill_id_gen
         self._stream_id_gen: AbstractStreamIdGenerator = self.store._stream_id_gen
 
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
-
     @trace
     async def _persist_events_and_state_updates(
         self,
@@ -1012,9 +1010,11 @@ class PersistEventsStore:
                         )
                     )
 
-        # Pre-MSC3970, we rely on the access_token_id to scope the txn_id for events.
-        # Since this is an experimental flag, we still store the mapping even if the
-        # flag is disabled.
+        # Synapse usually relies on the device_id to scope transactions for events,
+        # except for users without device IDs (appservice, guests, and access
+        # tokens minted with the admin API) which use the access token ID instead.
+        #
+        # TODO https://github.com/matrix-org/synapse/issues/16042
         if to_insert_token_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
@@ -1030,10 +1030,7 @@ class PersistEventsStore:
                 values=to_insert_token_id,
             )
 
-        # With MSC3970, we rely on the device_id instead to scope the txn_id for events.
-        # We're only inserting if MSC3970 is *enabled*, because else the pre-MSC3970
-        # behaviour would allow for a UNIQUE constraint violation on this table
-        if to_insert_device_id and self._msc3970_enabled:
+        if to_insert_device_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="event_txn_id_device_id",
