@@ -370,7 +370,7 @@ MXID_LOCALPART_ALLOWED_CHARACTERS = set(
     "_-./=+" + string.ascii_lowercase + string.digits
 )
 
-ASCII_PRINTABLE_CHARACTERS = set(string.printable)
+MXID_HISTORICAL_LOCALPART_ALLOWED_CHARACTERS = set(string.printable.replace(":", ""))
 
 # Guest user IDs are purely numeric.
 GUEST_USER_ID_PATTERN = re.compile(r"^\d+$")
@@ -391,7 +391,7 @@ def contains_invalid_mxid_characters(
     """
 
     if allow_historical_mxids:
-        allowed_characters = ASCII_PRINTABLE_CHARACTERS
+        allowed_characters = MXID_HISTORICAL_LOCALPART_ALLOWED_CHARACTERS
     else:
         allowed_characters = MXID_LOCALPART_ALLOWED_CHARACTERS
     return any(c not in allowed_characters for c in localpart)
