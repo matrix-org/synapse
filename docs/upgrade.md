@@ -88,6 +88,21 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.90.0
+
+## App service query parameter authorization is now a configuration option
+
+Synapse v1.81.0 deprecated application service authorization via query parameters as this is
+considered insecure - and from Synapse v1.71.0 forwards the application service token has also been sent via 
+[the `Authorization` header](https://spec.matrix.org/v1.6/application-service-api/#authorization)], making the insecure
+query parameter authorization redundant. Since removing the ability to continue to use query parameters could break 
+backwards compatibility it has now been put behind a configuration option, `use_appservice_legacy_authorization`.  
+This option defaults to false, but can be activated by adding 
+```yaml
+use_appservice_legacy_authorization: true 
+```
+to your configuration.
+
 # Upgrading to v1.89.0
 
 ## Removal of unspecced `user` property for `/register`
@@ -96,7 +111,6 @@ Application services can no longer call `/register` with a `user` property to cr
 The standard `username` property should be used instead. See the
 [Application Service specification](https://spec.matrix.org/v1.7/application-service-api/#server-admin-style-permissions)
 for more information.
-
 
 # Upgrading to v1.88.0
 
