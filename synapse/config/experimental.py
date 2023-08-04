@@ -216,12 +216,6 @@ class MSC3861:
                 ("session_lifetime",),
             )
 
-        if not root.experimental.msc3970_enabled:
-            raise ConfigError(
-                "experimental_features.msc3970_enabled must be 'true' when OAuth delegation is enabled",
-                ("experimental_features", "msc3970_enabled"),
-            )
-
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
 class MSC3866Config:
@@ -396,9 +390,6 @@ class ExperimentalConfig(Config):
             raise ConfigError(
                 "Invalid MSC3861 configuration", ("experimental", "msc3861")
             ) from exc
-
-        # MSC3970: Scope transaction IDs to devices
-        self.msc3970_enabled = experimental.get("msc3970_enabled", self.msc3861.enabled)
 
         # Check that none of the other config options conflict with MSC3861 when enabled
         self.msc3861.check_config_conflicts(self.root)
