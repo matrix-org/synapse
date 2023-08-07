@@ -379,4 +379,141 @@ class DehydratedDeviceTestCase(unittest.HomeserverTestCase):
             access_token=token,
             shorthand=False,
         )
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 401)
+
+    @unittest.override_config(
+        {"experimental_features": {"msc2697_enabled": False, "msc3814_enabled": True}}
+    )
+    def test_msc3814_dehydrated_device_delete_works(self) -> None:
+        user = self.register_user("mikey", "pass")
+        token = self.login(user, "pass", device_id="device1")
+        content: JsonDict = {
+            "device_data": {
+                "algorithm": "m.dehydration.v1.olm",
+            },
+            "device_id": "device2",
+            "initial_device_display_name": "foo bar",
+            "device_keys": {
+                "user_id": "@mikey:test",
+                "device_id": "device2",
+                "valid_until_ts": "80",
+                "algorithms": [
+                    "m.olm.curve25519-aes-sha2",
+                ],
+                "keys": {
+                    "<algorithm>:<device_id>": "<key_base64>",
+                },
+                "signatures": {
+                    "<user_id>": {"<algorithm>:<device_id>": "<signature_base64>"}
+                },
+            },
+        }
+        channel = self.make_request(
+            "PUT",
+            "_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            content=content,
+            access_token=token,
+            shorthand=False,
+        )
+        self.assertEqual(channel.code, 200)
+        device_id = channel.json_body.get("device_id")
+        assert device_id is not None
+        self.assertIsInstance(device_id, str)
+        self.assertEqual("device2", device_id)
+
+        # ensure that keys were uploaded and available
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/keys/query",
+            {
+                "device_keys": {
+                    user: ["device2"],
+                },
+            },
+            token,
+        )
+        self.assertEqual(
+            channel.json_body["device_keys"][user]["device2"]["keys"],
+            {
+                "<algorithm>:<device_id>": "<key_base64>",
+            },
+        )
+
+        # delete the dehydrated device
+        channel = self.make_request(
+            "DELETE",
+            "_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            access_token=token,
+            shorthand=False,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # ensure that keys are no longer available for deleted device
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/keys/query",
+            {
+                "device_keys": {
+                    user: ["device2"],
+                },
+            },
+            token,
+        )
+        self.assertEqual(channel.json_body["device_keys"], {"@mikey:test": {}})
+
+        # check that an old device is deleted when user PUTs a new device
+        # First, create a device
+        content["device_id"] = "device3"
+        content["device_keys"]["device_id"] = "device3"
+        channel = self.make_request(
+            "PUT",
+            "_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            content=content,
+            access_token=token,
+            shorthand=False,
+        )
+        self.assertEqual(channel.code, 200)
+        device_id = channel.json_body.get("device_id")
+        assert device_id is not None
+        self.assertIsInstance(device_id, str)
+        self.assertEqual("device3", device_id)
+
+        # create a second device without deleting first device
+        content["device_id"] = "device4"
+        content["device_keys"]["device_id"] = "device4"
+        channel = self.make_request(
+            "PUT",
+            "_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            content=content,
+            access_token=token,
+            shorthand=False,
+        )
+        self.assertEqual(channel.code, 200)
+        device_id = channel.json_body.get("device_id")
+        assert device_id is not None
+        self.assertIsInstance(device_id, str)
+        self.assertEqual("device4", device_id)
+
+        # check that the second device that was created is what is returned when we GET
+        channel = self.make_request(
+            "GET",
+            "_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            access_token=token,
+            shorthand=False,
+        )
+        self.assertEqual(channel.code, 200)
+        returned_device_id = channel.json_body["device_id"]
+        self.assertEqual(returned_device_id, "device4")
+
+        # and that if we query the keys for the first device they are not there
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/keys/query",
+            {
+                "device_keys": {
+                    user: ["device3"],
+                },
+            },
+            token,
+        )
+        self.assertEqual(channel.json_body["device_keys"], {"@mikey:test": {}})
