@@ -123,7 +123,7 @@ BOOLEAN_COLUMNS = {
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
     "rooms": ["is_public", "has_auth_chain_index"],
-    "users": ["shadow_banned", "approved"],
+    "users": ["shadow_banned", "approved", "locked"],
     "un_partial_stated_event_stream": ["rejection_status_changed"],
     "users_who_share_rooms": ["share_private"],
     "per_user_experimental_features": ["enabled"],
