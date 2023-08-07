@@ -28,8 +28,14 @@ jobs:
 
       - name: Inspect builder
         run: docker buildx inspect
-      
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Extract version from pyproject.toml
+        # Note: explicitly requesting bash will mean bash is invoked with `-eo pipefail`, see
+        # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsshell
+        shell: bash
         run: |
           echo "SYNAPSE_VERSION=$(grep "^version" pyproject.toml | sed -E 's/version\s*=\s*["]([^"]*)["]/\1/')" >> $GITHUB_ENV
 
