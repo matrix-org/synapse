@@ -1241,6 +1241,9 @@ class ModuleApi:
     ) -> IDelayedCall:
         """Wraps a function as a background process and calls it in a given number of milliseconds.
 
+        The scheduled call is not persistent: if the current Synapse instance is
+        restarted before the call is made, the call will not be made.
+
         Added in Synapse v1.89.0.
 
         Args:
@@ -1261,6 +1264,7 @@ class ModuleApi:
             desc = f.__name__
 
         return self._clock.call_later(
+            # convert ms to seconds as needed by call_later.
             msec * 0.001,
             run_as_background_process,
             desc,
