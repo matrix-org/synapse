@@ -232,7 +232,7 @@ class DehydratedDeviceDataModel(RequestBodyModel):
 class DehydratedDeviceServlet(RestServlet):
     """Retrieve or store a dehydrated device.
 
-    Implements either MSC2697 or MSC3814.
+    Implements MSC2697.
 
     GET /org.matrix.msc2697.v2/dehydrated_device
 
@@ -266,20 +266,18 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
-    def __init__(self, hs: "HomeServer", msc2697: bool = True):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc2697.v2/dehydrated_device$",
+        releases=(),
+    )
+
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         handler = hs.get_device_handler()
         assert isinstance(handler, DeviceHandler)
         self.device_handler = handler
-
-        self.PATTERNS = client_patterns(
-            "/org.matrix.msc2697.v2/dehydrated_device$"
-            if msc2697
-            else "/org.matrix.msc3814.v1/dehydrated_device$",
-            releases=(),
-        )
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -579,7 +577,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.worker.worker_app is None:
         DeviceRestServlet(hs).register(http_server)
         if hs.config.experimental.msc2697_enabled:
-            DehydratedDeviceServlet(hs, msc2697=True).register(http_server)
+            DehydratedDeviceServlet(hs).register(http_server)
             ClaimDehydratedDeviceServlet(hs).register(http_server)
         if hs.config.experimental.msc3814_enabled:
             DehydratedDeviceV2Servlet(hs).register(http_server)
