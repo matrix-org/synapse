@@ -230,7 +230,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             # want to make sure we're returning the right type of data.
             # Note: when adding a column name to this list, be wary of NULLable columns,
             # since NULL values will be turned into False.
-            boolean_columns = ["admin", "deactivated", "shadow_banned", "approved", "locked"]
+            boolean_columns = [
+                "admin",
+                "deactivated",
+                "shadow_banned",
+                "approved",
+                "locked",
+            ]
             for column in boolean_columns:
                 if not isinstance(row[column], bool):
                     row[column] = bool(row[column])
