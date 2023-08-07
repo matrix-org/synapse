@@ -532,6 +532,7 @@ class DehydratedDeviceV2Servlet(RestServlet):
     async def on_PUT(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         submission = parse_and_validate_json_object_from_request(request, self.PutBody)
         requester = await self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
 
         old_dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
 
