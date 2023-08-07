@@ -3,22 +3,41 @@
 Synapse has a concept of "streams", which are roughly described in [`id_generators.py`](
     https://github.com/matrix-org/synapse/blob/develop/synapse/storage/util/id_generators.py
 ).
-It is important to understand this, so let's describe them formally.
-We paraphrase from the docstring of [`AbstractStreamIdGenerator`](
+Generally speaking, streams are a series of notifications that something in Synapse's database has changed that the application might need to respond to.
+For example:
+
+- The events stream reports new events (PDUs) that Synapse creates, or that Synapse accepts from another homeserver.
+- The account data stream reports changes to users' [account data](https://spec.matrix.org/v1.7/client-server-api/#client-config).
+- The to-device stream reports when a device has a new [to-device message](https://spec.matrix.org/v1.7/client-server-api/#send-to-device-messaging).
+
+See [`synapse.replication.tcp.streams`](
+    https://github.com/matrix-org/synapse/blob/develop/synapse/replication/tcp/streams/__init__.py
+) for the full list of streams.
+
+It is very helpful to understand the streams mechanism when working on any part of Synapse that needs to respond to changes—especially if those changes are made by different workers.
+To that end, let's describe streams formally, paraphrasing from the docstring of [`AbstractStreamIdGenerator`](
     https://github.com/matrix-org/synapse/blob/a719b703d9bd0dade2565ddcad0e2f3a7a9d4c37/synapse/storage/util/id_generators.py#L96
 ).
 
-A stream is an append-only log `T1, T2, ..., Tn, ...` of facts which grows over time.
+### Definition
+
+A stream is an append-only log `T1, T2, ..., Tn, ...` of facts[^1] which grows over time.
 Only "writers" can add facts to a stream, and there may be multiple writers.
+
+[^1]: we use the word _fact_ here for two reasons.
+      Firstly, the word "event" is already heavily overloaded (PDUs, EDUs, account data, ...) and we don't need to make that worse.
+      Secondly, "fact" emphasises that the things we append to a stream cannot change after the fact.
 
 Each fact has an ID, called its "stream ID".
 Readers should only process facts in ascending stream ID order.
 
 Roughly speaking, each stream is backed by a database table.
-It should have a `stream_id` column holding stream IDs, plus additional columns
-as necessary to describe the fact.
-(Note that it may take multiple rows (with the same `stream_id`) to describe that fact.)
-Stream IDs are globally unique (enforced by Postgres sequences).
+It should have a `stream_id` (or similar) bigint column holding stream IDs, plus additional columns as necessary to describe the fact.
+Typically, a fact is expressed with a single row in its backing table.[^2]
+Within a stream, no two facts may have the same stream_id.
+
+[^2]: A fact might be expressed with 0 rows, e.g. if we opened a transaction to persist an event, but failed and rolled the transaction back before marking the fact as completed.
+      In principle a fact might be expressed with 2 or more rows; if so, each of those rows should share the fact's stream ID.
 
 > _Aside_. Some additional notes on streams' backing tables.
 >
@@ -37,22 +56,24 @@ will be inserted with that ID.
 
 ### Current stream ID
 
-We may define a per-writer notion of the "current" stream ID:
+For any given stream reader (including writers themselves), we may define a per-writer current stream ID:
 
 > The current stream ID _for a writer W_ is the largest stream ID such that
 > all transactions added by W with equal or smaller ID have completed.
 
-Similarly, there is a global notion of current stream ID:
+Similarly, there is a "linear" notion of current stream ID:
 
-> The current stream ID is the largest stream ID such that
+> The "linear" current stream ID is the largest stream ID such that
 > all facts (added by any writer) with equal or smaller ID have completed.
 
-NB. This means that if a writer opens a transaction that never completes, the current stream ID will never advance beyond that writer's last written stream ID.
+Because different stream readers A and B learn about new facts at different times, A and B may disagree about current stream IDs.
+Put differently: we should think of stream readers as being independent of each other, proceeding through a stream of facts at different rates.
 
-For single-writer streams, the per-writer current ID and the global current ID
-are the same.
-Both senses of current ID are monotonic, but they may "skip" or jump over IDs
-because facts complete out of order.
+**NB.** For both senses of "current", that if a writer opens a transaction that never completes, the current stream ID will never advance beyond that writer's last written stream ID.
+
+For single-writer streams, the per-writer current ID and the linear current ID are the same.
+Both senses of current ID are monotonic, but they may "skip" or jump over IDs because facts complete out of order.
+
 
 _Example_.
 Consider a single-writer stream which is initially at ID 1.
@@ -94,12 +115,40 @@ The facts this stream holds are instructions to "you should now invalidate these
 We only ever treat this as a multiple single-writer streams as there is no important ordering between cache invalidations.
 (Invalidations are self-contained facts; and the invalidations commute/are idempotent).
 
+### Writing to streams
+
+Writers need to track:
+ - track their current position.
+ - their facts currently awaiting completion.
+
+At startup, 
+ - the current position of that writer can be found by querying the database (which suggests that facts need to be written to the database atomically, in a transaction); and
+ - there are no facts awaiting completion.
+
+To reserve a stream ID:
+
+
+To write a fact to the stream:
+
+
+To complete a fact:
+
+When writing a fact has completed and no earlier fact is awaiting completion, the writer can advance its current position in that stream.
+Upon doing so it emits an `RDATA` message, once for every fact between the old and the new stream ID.
+
 ### Subscribing to streams
 
-We have described streams as a data structure, but not how to listen to them for changes.
+Readers need to track:
 
-Writers track their current position.
-At startup, they can find this by querying the database (which suggests that facts need to be written to the database atomically, in a transaction).
+
+At startup:
+
+
+To learn about new facts:
+
+
+
+
 
 Readers need to track the current position of every writer.
 At startup, they can find this by contacting each writer with a `REPLICATE` message,
@@ -111,10 +160,6 @@ nowadays it's done via Redis's Pubsub.
 > _Aside._
 > We also use Redis as an external, non-persistent key-value store.
 
-The only thing remaining is how to persist facts and advance streams.
-Writers need to track the facts currently awaiting completion.
-When writing a fact has completed and no earlier fact is awaiting completion, the writer can advance its current position in that stream.
-Upon doing to it emits an `RDATA` message, once for every fact between the old and the new stream ID.
 
 Readers listen for `RDATA` messages and process them to respond to the new fact.
 The `RDATA` itself is not a self-contained representation of the fact;
