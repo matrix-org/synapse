@@ -394,7 +394,6 @@ def serialize_event(
     time_now_ms: int,
     *,
     config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
-    msc3970_enabled: bool = False,
 ) -> JsonDict:
     """Serialize event for clients
 
@@ -402,8 +401,6 @@ def serialize_event(
         e
         time_now_ms
         config: Event serialization config
-        msc3970_enabled: Whether MSC3970 is enabled. It changes whether we should
-            include the `transaction_id` in the event's `unsigned` section.
 
     Returns:
         The serialized event dictionary.
@@ -429,38 +426,46 @@ def serialize_event(
             e.unsigned["redacted_because"],
             time_now_ms,
             config=config,
-            msc3970_enabled=msc3970_enabled,
         )
 
     # If we have a txn_id saved in the internal_metadata, we should include it in the
     # unsigned section of the event if it was sent by the same session as the one
     # requesting the event.
     txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
-    if txn_id is not None and config.requester is not None:
-        # For the MSC3970 rules to be applied, we *need* to have the device ID in the
-        # event internal metadata. Since we were not recording them before, if it hasn't
-        # been recorded, we fallback to the old behaviour.
+    if (
+        txn_id is not None
+        and config.requester is not None
+        and config.requester.user.to_string() == e.sender
+    ):
+        # Some events do not have the device ID stored in the internal metadata,
+        # this includes old events as well as those created by appservice, guests,
+        # or with tokens minted with the admin API. For those events, fallback
+        # to using the access token instead.
         event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
-        if msc3970_enabled and event_device_id is not None:
+        if event_device_id is not None:
             if event_device_id == config.requester.device_id:
                 d["unsigned"]["transaction_id"] = txn_id
 
         else:
-            # The pre-MSC3970 behaviour is to only include the transaction ID if the
-            # event was sent from the same access token. For regular users, we can use
-            # the access token ID to determine this. For guests, we can't, but since
-            # each guest only has one access token, we can just check that the event was
-            # sent by the same user as the one requesting the event.
+            # Fallback behaviour: only include the transaction ID if the event
+            # was sent from the same access token.
+            #
+            # For regular users, the access token ID can be used to determine this.
+            # This includes access tokens minted with the admin API.
+            #
+            # For guests and appservice users, we can't check the access token ID
+            # so assume it is the same session.
             event_token_id: Optional[int] = getattr(
                 e.internal_metadata, "token_id", None
             )
-            if config.requester.user.to_string() == e.sender and (
+            if (
                 (
                     event_token_id is not None
                     and config.requester.access_token_id is not None
                     and event_token_id == config.requester.access_token_id
                 )
                 or config.requester.is_guest
+                or config.requester.app_service
             ):
                 d["unsigned"]["transaction_id"] = txn_id
 
@@ -475,14 +480,16 @@ def serialize_event(
     if config.as_client_event:
         d = config.event_format(d)
 
-    # If the event is a redaction, copy the redacts field from the content to
-    # top-level for backwards compatibility.
-    if (
-        e.type == EventTypes.Redaction
-        and e.room_version.updated_redaction_rules
-        and e.redacts is not None
-    ):
-        d["redacts"] = e.redacts
+    # If the event is a redaction, the field with the redacted event ID appears
+    # in a different location depending on the room version. e.redacts handles
+    # fetching from the proper location; copy it to the other location for forwards-
+    # and backwards-compatibility with clients.
+    if e.type == EventTypes.Redaction and e.redacts is not None:
+        if e.room_version.updated_redaction_rules:
+            d["redacts"] = e.redacts
+        else:
+            d["content"] = dict(d["content"])
+            d["content"]["redacts"] = e.redacts
 
     only_event_fields = config.only_event_fields
     if only_event_fields:
@@ -501,9 +508,6 @@ class EventClientSerializer:
     This is used for bundling extra information with any events to be sent to
     clients.
     """
-
-    def __init__(self, *, msc3970_enabled: bool = False):
-        self._msc3970_enabled = msc3970_enabled
 
     def serialize_event(
         self,
@@ -529,9 +533,7 @@ class EventClientSerializer:
         if not isinstance(event, EventBase):
             return event
 
-        serialized_event = serialize_event(
-            event, time_now, config=config, msc3970_enabled=self._msc3970_enabled
-        )
+        serialized_event = serialize_event(event, time_now, config=config)
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:

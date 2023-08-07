@@ -95,7 +95,7 @@ matrix.example.com {
 }
 
 example.com:8448 {
-  reverse_proxy localhost:8008
+  reverse_proxy /_matrix/* localhost:8008
 }
 ```
 
