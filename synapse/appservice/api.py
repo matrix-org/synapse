@@ -16,7 +16,6 @@ import logging
 import urllib.parse
 from typing import (
     TYPE_CHECKING,
-    Any,
     Dict,
     Iterable,
     List,
@@ -25,6 +24,7 @@ from typing import (
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
 from prometheus_client import Counter
@@ -119,6 +119,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.clock = hs.get_clock()
+        self.config = hs.config.appservice
 
         self.protocol_meta_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
@@ -132,9 +133,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
-                {"access_token": service.hs_token},
+                args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if response is not None:  # just an empty json object
@@ -155,9 +159,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
-                {"access_token": service.hs_token},
+                args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if response is not None:  # just an empty json object
@@ -190,10 +197,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
-            args: Mapping[Any, Any] = {
-                **fields,
-                b"access_token": service.hs_token,
-            }
+            args: Mapping[bytes, Union[List[bytes], str]] = fields
+            if self.config.use_appservice_legacy_authorization:
+                args = {
+                    **fields,
+                    b"access_token": service.hs_token,
+                }
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 args=args,
@@ -231,9 +240,12 @@ class ApplicationServiceApi(SimpleHttpClient):
             # This is required by the configuration.
             assert service.hs_token is not None
             try:
+                args = None
+                if self.config.use_appservice_legacy_authorization:
+                    args = {"access_token": service.hs_token}
                 info = await self.get_json(
                     f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
-                    {"access_token": service.hs_token},
+                    args,
                     headers={"Authorization": [f"Bearer {service.hs_token}"]},
                 )
 
@@ -344,10 +356,14 @@ class ApplicationServiceApi(SimpleHttpClient):
                 }
 
         try:
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
+
             await self.put_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
                 json_body=body,
-                args={"access_token": service.hs_token},
+                args=args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if logger.isEnabledFor(logging.DEBUG):

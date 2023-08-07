@@ -63,6 +63,7 @@ from synapse.federation.federation_base import (
 )
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
+from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -137,6 +138,7 @@ class FederationServer(FederationBase):
         self._event_auth_handler = hs.get_event_auth_handler()
         self._room_member_handler = hs.get_room_member_handler()
         self._e2e_keys_handler = hs.get_e2e_keys_handler()
+        self._worker_lock_handler = hs.get_worker_locks_handler()
 
         self._state_storage_controller = hs.get_storage_controllers().state
 
@@ -1236,9 +1238,18 @@ class FederationServer(FederationBase):
                 logger.info("handling received PDU in room %s: %s", room_id, event)
                 try:
                     with nested_logging_context(event.event_id):
-                        await self._federation_event_handler.on_receive_pdu(
-                            origin, event
-                        )
+                        # We're taking out a lock within a lock, which could
+                        # lead to deadlocks if we're not careful. However, it is
+                        # safe on this occasion as we only ever take a write
+                        # lock when deleting a room, which we would never do
+                        # while holding the `_INBOUND_EVENT_HANDLING_LOCK_NAME`
+                        # lock.
+                        async with self._worker_lock_handler.acquire_read_write_lock(
+                            DELETE_ROOM_LOCK_NAME, room_id, write=False
+                        ):
+                            await self._federation_event_handler.on_receive_pdu(
+                                origin, event
+                            )
                 except FederationError as e:
                     # XXX: Ideally we'd inform the remote we failed to process
                     # the event, but we can't return an error in the transaction
