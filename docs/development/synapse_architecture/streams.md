@@ -24,10 +24,6 @@ To that end, let's describe streams formally, paraphrasing from the docstring of
 A stream is an append-only log `T1, T2, ..., Tn, ...` of facts[^1] which grows over time.
 Only "writers" can add facts to a stream, and there may be multiple writers.
 
-[^1]: we use the word _fact_ here for two reasons.
-      Firstly, the word "event" is already heavily overloaded (PDUs, EDUs, account data, ...) and we don't need to make that worse.
-      Secondly, "fact" emphasises that the things we append to a stream cannot change after the fact.
-
 Each fact has an ID, called its "stream ID".
 Readers should only process facts in ascending stream ID order.
 
@@ -35,9 +31,6 @@ Roughly speaking, each stream is backed by a database table.
 It should have a `stream_id` (or similar) bigint column holding stream IDs, plus additional columns as necessary to describe the fact.
 Typically, a fact is expressed with a single row in its backing table.[^2]
 Within a stream, no two facts may have the same stream_id.
-
-[^2]: A fact might be expressed with 0 rows, e.g. if we opened a transaction to persist an event, but failed and rolled the transaction back before marking the fact as completed.
-      In principle a fact might be expressed with 2 or more rows; if so, each of those rows should share the fact's stream ID.
 
 > _Aside_. Some additional notes on streams' backing tables.
 >
@@ -118,50 +111,30 @@ We only ever treat this as a multiple single-writer streams as there is no impor
 ### Writing to streams
 
 Writers need to track:
- - track their current position.
+ - track their current position (i.e. its own per-writer stream ID).
  - their facts currently awaiting completion.
 
 At startup, 
  - the current position of that writer can be found by querying the database (which suggests that facts need to be written to the database atomically, in a transaction); and
  - there are no facts awaiting completion.
 
-To reserve a stream ID:
+To reserve a stream ID, call [`nextval`](https://www.postgresql.org/docs/current/functions-sequence.html) on the appropriate postgres sequence.
 
+To write a fact to the stream: insert the appropriate rows to the appropriate backing table.
 
-To write a fact to the stream:
-
-
-To complete a fact:
-
-When writing a fact has completed and no earlier fact is awaiting completion, the writer can advance its current position in that stream.
-Upon doing so it emits an `RDATA` message, once for every fact between the old and the new stream ID.
+To complete a fact, first remove it from your map of facts currently awaiting completion.
+Then, if no earlier fact is awaiting completion, the writer can advance its current position in that stream.
+Upon doing so it should emit an `RDATA` message[^3], once for every fact between the old and the new stream ID.
 
 ### Subscribing to streams
 
-Readers need to track:
-
-
-At startup:
-
-
-To learn about new facts:
-
-
-
-
-
 Readers need to track the current position of every writer.
+
 At startup, they can find this by contacting each writer with a `REPLICATE` message,
 requesting that all writers reply describing their current position in their streams.
-This is done with a `POSITION` message.
-This communication used to happen directly with the writers [over TCP](../../tcp_replication.md);
-nowadays it's done via Redis's Pubsub.
+Writers reply with a `POSITION` message.
 
-> _Aside._
-> We also use Redis as an external, non-persistent key-value store.
-
-
-Readers listen for `RDATA` messages and process them to respond to the new fact.
+To learn about new facts, readers should listen for `RDATA` messages and process them to respond to the new fact.
 The `RDATA` itself is not a self-contained representation of the fact;
 readers will have to query the stream tables for the full details.
 Readers must also advance their record of the writer's current position for that stream.
@@ -169,3 +142,16 @@ Readers must also advance their record of the writer's current position for that
 # Summary
 
 In a nutshell: we have an append-only log with a "buffer/scratchpad" at the end where we have to wait for the sequence to be linear and contiguous.
+
+
+---
+
+[^1]: we use the word _fact_ here for two reasons.
+Firstly, the word "event" is already heavily overloaded (PDUs, EDUs, account data, ...) and we don't need to make that worse.
+Secondly, "fact" emphasises that the things we append to a stream cannot change after the fact.
+
+[^2]: A fact might be expressed with 0 rows, e.g. if we opened a transaction to persist an event, but failed and rolled the transaction back before marking the fact as completed.
+In principle a fact might be expressed with 2 or more rows; if so, each of those rows should share the fact's stream ID.
+
+[^3]: This communication used to happen directly with the writers [over TCP](../../tcp_replication.md);
+nowadays it's done via Redis's Pubsub.
