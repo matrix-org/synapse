@@ -13,4 +13,4 @@
  * limitations under the License.
  */
 
-ALTER TABLE users ADD locked SMALLINT DEFAULT 0 NOT NULL;
+ALTER TABLE users ADD locked BOOLEAN DEFAULT FALSE NOT NULL;

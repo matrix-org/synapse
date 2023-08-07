@@ -2158,8 +2158,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         )
         self._invalidate_cache_and_stream(txn, self.get_user_locked_status, (user_id,))
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
-        # TODO is it useful ?
-        txn.call_after(self.is_guest.invalidate, (user_id,))
 
     def update_user_approval_status_txn(
         self, txn: LoggingTransaction, user_id: str, approved: bool
