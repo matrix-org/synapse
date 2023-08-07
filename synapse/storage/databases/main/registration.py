@@ -230,7 +230,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             # want to make sure we're returning the right type of data.
             # Note: when adding a column name to this list, be wary of NULLable columns,
             # since NULL values will be turned into False.
-            boolean_columns = ["admin", "deactivated", "shadow_banned", "approved"]
+            boolean_columns = ["admin", "deactivated", "shadow_banned", "approved", "locked"]
             for column in boolean_columns:
                 if not isinstance(row[column], bool):
                     row[column] = bool(row[column])
@@ -1135,7 +1135,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
 
         # Convert the integer into a boolean.
-        return res == 1
+        if not isinstance(res, bool):
+            res = bool(res)
+        return res
 
     async def get_threepid_validation_session(
         self,
@@ -2154,7 +2156,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             txn=txn,
             table="users",
             keyvalues={"name": user_id},
-            updatevalues={"locked": 1 if locked else 0},
+            updatevalues={"locked": locked},
         )
         self._invalidate_cache_and_stream(txn, self.get_user_locked_status, (user_id,))
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
