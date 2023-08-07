@@ -61,6 +61,7 @@ from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpda
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyBackgroundStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
+from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
 from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
@@ -196,6 +197,11 @@ IGNORED_TABLES = {
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
     "ui_auth_sessions_ips",
+    # Ignore the worker locks table, as a) there shouldn't be any acquired locks
+    # after porting, and b) the circular foreign key constraints make it hard to
+    # port.
+    "worker_read_write_locks_mode",
+    "worker_read_write_locks",
 }
 
 
@@ -239,6 +245,7 @@ class Store(
     PresenceBackgroundUpdateStore,
     ReceiptsBackgroundUpdateStore,
     RelationsWorkerStore,
+    EventFederationWorkerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -754,7 +761,7 @@ class Porter:
 
             # Step 2. Set up sequences
             #
-            # We do this before porting the tables so that event if we fail half
+            # We do this before porting the tables so that even if we fail half
             # way through the postgres DB always have sequences that are greater
             # than their respective tables. If we don't then creating the
             # `DataStore` object will fail due to the inconsistency.
@@ -762,6 +769,10 @@ class Porter:
             await self._setup_state_group_id_seq()
             await self._setup_user_id_seq()
             await self._setup_events_stream_seqs()
+            await self._setup_sequence(
+                "un_partial_stated_event_stream_sequence",
+                ("un_partial_stated_event_stream",),
+            )
             await self._setup_sequence(
                 "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
             )
@@ -772,6 +783,11 @@ class Porter:
             await self._setup_sequence("receipts_sequence", ("receipts_linearized",))
             await self._setup_sequence("presence_stream_sequence", ("presence_stream",))
             await self._setup_auth_chain_sequence()
+            await self._setup_sequence(
+                "application_services_txn_id_seq",
+                ("application_services_txns",),
+                "txn_id",
+            )
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -803,7 +819,9 @@ class Porter:
             )
             # Map from table name to args passed to `handle_table`, i.e. a tuple
             # of: `postgres_size`, `table_size`, `forward_chunk`, `backward_chunk`.
-            tables_to_port_info_map = {r[0]: r[1:] for r in setup_res}
+            tables_to_port_info_map = {
+                r[0]: r[1:] for r in setup_res if r[0] not in IGNORED_TABLES
+            }
 
             # Step 5. Do the copying.
             #
@@ -1074,7 +1092,10 @@ class Porter:
         )
 
     async def _setup_sequence(
-        self, sequence_name: str, stream_id_tables: Iterable[str]
+        self,
+        sequence_name: str,
+        stream_id_tables: Iterable[str],
+        column_name: str = "stream_id",
     ) -> None:
         """Set a sequence to the correct value."""
         current_stream_ids = []
@@ -1084,7 +1105,7 @@ class Porter:
                 await self.sqlite_store.db_pool.simple_select_one_onecol(
                     table=stream_id_table,
                     keyvalues={},
-                    retcol="COALESCE(MAX(stream_id), 1)",
+                    retcol=f"COALESCE(MAX({column_name}), 1)",
                     allow_none=True,
                 ),
             )

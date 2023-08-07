@@ -788,6 +788,7 @@ class SpamCheckerModuleApiCallbacks:
 
         return RegistrationBehaviour.ALLOW
 
+    @trace
     async def check_media_file_for_spam(
         self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
     ) -> Union[Tuple[Codes, dict], Literal["NOT_SPAM"]]:

@@ -27,15 +27,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# the initial backoff, after the first transaction fails
-MIN_RETRY_INTERVAL = 10 * 60 * 1000
-
-# how much we multiply the backoff by after each subsequent fail
-RETRY_MULTIPLIER = 5
-
-# a cap on the backoff. (Essentially none)
-MAX_RETRY_INTERVAL = 2**62
-
 
 class NotRetryingDestination(Exception):
     def __init__(self, retry_last_ts: int, retry_interval: int, destination: str):
@@ -169,6 +160,16 @@ class RetryDestinationLimiter:
         self.notifier = notifier
         self.replication_client = replication_client
 
+        self.destination_min_retry_interval_ms = (
+            self.store.hs.config.federation.destination_min_retry_interval_ms
+        )
+        self.destination_retry_multiplier = (
+            self.store.hs.config.federation.destination_retry_multiplier
+        )
+        self.destination_max_retry_interval_ms = (
+            self.store.hs.config.federation.destination_max_retry_interval_ms
+        )
+
     def __enter__(self) -> None:
         pass
 
@@ -220,13 +221,15 @@ class RetryDestinationLimiter:
             # We couldn't connect.
             if self.retry_interval:
                 self.retry_interval = int(
-                    self.retry_interval * RETRY_MULTIPLIER * random.uniform(0.8, 1.4)
+                    self.retry_interval
+                    * self.destination_retry_multiplier
+                    * random.uniform(0.8, 1.4)
                 )
 
-                if self.retry_interval >= MAX_RETRY_INTERVAL:
-                    self.retry_interval = MAX_RETRY_INTERVAL
+                if self.retry_interval >= self.destination_max_retry_interval_ms:
+                    self.retry_interval = self.destination_max_retry_interval_ms
             else:
-                self.retry_interval = MIN_RETRY_INTERVAL
+                self.retry_interval = self.destination_min_retry_interval_ms
 
             logger.info(
                 "Connection to %s was unsuccessful (%s(%s)); backoff now %i",

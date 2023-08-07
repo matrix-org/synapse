@@ -462,6 +462,20 @@ See the docs [request log format](../administration/request_log.md).
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
 
+Unix socket support (_Added in Synapse 1.89.0_):
+* `path`: A path and filename for a Unix socket. Make sure it is located in a
+  directory with read and write permissions, and that it already exists (the directory
+  will not be created). Defaults to `None`.
+  * **Note**: The use of both `path` and `port` options for the same `listener` is not
+    compatible.
+  * The `x_forwarded` option defaults to true  when using Unix sockets and can be omitted.
+  * Other options that would not make sense to use with a UNIX socket, such as 
+    `bind_addresses` and `tls` will be ignored and can be removed.
+* `mode`: The file permissions to set on the UNIX socket. Defaults to `666`
+* **Note:** Must be set as `type: http` (does not support `metrics` and `manhole`). 
+  Also make sure that `metrics` is not included in `resources` -> `names`
+
+
 Valid resource names are:
 
 * `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies `media` and `static`.
@@ -474,7 +488,7 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See [here](../../metrics-howto.md).
+* `metrics`: the metrics interface. See [here](../../metrics-howto.md). (Not compatible with Unix sockets)
 
 * `openid`: OpenID authentication. See [here](../../openid.md).
 
@@ -533,6 +547,22 @@ listeners:
     bind_addresses: ['::1', '127.0.0.1']
     type: manhole
 ```
+Example configuration #3:
+```yaml
+listeners:
+  # Unix socket listener: Ideal for Synapse deployments behind a reverse proxy, offering
+  # lightweight interprocess communication without TCP/IP overhead, avoid port
+  # conflicts, and providing enhanced security through system file permissions.
+  #
+  # Note that x_forwarded will default to true, when using a UNIX socket. Please see
+  # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
+  #
+  - path: /var/run/synapse/main_public.sock
+    type: http
+    resources:
+      - names: [client, federation]
+```
+
 ---
 ### `manhole_settings`
 
@@ -1212,6 +1242,14 @@ like sending a federation transaction.
 * `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
 * `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
 
+The following options control the retry logic when communicating with a specific homeserver destination.
+Unlike the previous configuration options, these values apply across all requests
+for a given destination and the state of the backoff is stored in the database.
+
+* `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
+* `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
+* `destination_max_retry_interval`: a cap on the backoff. Defaults to a week.
+
 Example configuration:
 ```yaml
 federation:
@@ -1220,6 +1258,9 @@ federation:
   max_long_retry_delay: 100s
   max_short_retries: 5
   max_long_retries: 20
+  destination_min_retry_interval: 30s
+  destination_retry_multiplier: 5
+  destination_max_retry_interval: 12h
 ```
 ---
 ## Caching
@@ -2808,6 +2849,20 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
+### `use_appservice_legacy_authorization`
+
+Whether to send the application service access tokens via the `access_token` query parameter
+per older versions of the Matrix specification. Defaults to false. Set to true to enable sending
+access tokens via a query parameter.
+
+**Enabling this option is considered insecure and is not recommended. **
+
+Example configuration:
+```yaml
+use_appservice_legacy_authorization: true 
+```
+
+---
 ### `macaroon_secret_key`
 
 A secret which is used to sign
@@ -3932,13 +3987,14 @@ federation_sender_instances:
 ---
 ### `instance_map`
 
-When using workers this should be a map from [`worker_name`](#worker_name) to the
-HTTP replication listener of the worker, if configured, and to the main process.
-Each worker declared under [`stream_writers`](../../workers.md#stream-writers) needs
-a HTTP replication listener, and that listener should be included in the `instance_map`.
-The main process also needs an entry on the `instance_map`, and it should be listed under
-`main` **if even one other worker exists**. Ensure the port matches with what is declared 
-inside the `listener` block for a `replication` listener.
+When using workers this should be a map from [`worker_name`](#worker_name) to the HTTP
+replication listener of the worker, if configured, and to the main process. Each worker
+declared under [`stream_writers`](../../workers.md#stream-writers) and
+[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP
+replication listener, and that listener should be included in the `instance_map`. The
+main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is
+declared inside the `listener` block for a `replication` listener.
 
 
 Example configuration:
@@ -3950,6 +4006,14 @@ instance_map:
   worker1:
     host: localhost
     port: 8034
+```
+Example configuration(#2, for UNIX sockets):
+```yaml
+instance_map:
+  main:
+    path: /var/run/synapse/main_replication.sock
+  worker1:
+    path: /var/run/synapse/worker1_replication.sock
 ```
 ---
 ### `stream_writers`
@@ -3967,6 +4031,24 @@ stream_writers:
   events: worker1
   typing: worker1
 ```
+---
+### `outbound_federation_restricted_to`
+
+When using workers, you can restrict outbound federation traffic to only go through a
+specific subset of workers. Any worker specified here must also be in the
+[`instance_map`](#instance_map).
+[`worker_replication_secret`](#worker_replication_secret) must also be configured to
+authorize inter-worker communication.
+
+```yaml
+outbound_federation_restricted_to:
+  - federation_sender1
+  - federation_sender2
+```
+
+Also see the [worker
+documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
+for more info.
 ---
 ### `run_background_tasks_on`
 
@@ -4092,51 +4174,6 @@ Example configuration:
 worker_name: generic_worker1
 ```
 ---
-### `worker_replication_host`
-*Deprecated as of version 1.84.0. Place `host` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
-
-The HTTP replication endpoint that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_host: 127.0.0.1
-```
----
-### `worker_replication_http_port`
-*Deprecated as of version 1.84.0. Place `port` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
-
-The HTTP replication port that it should talk to on the main Synapse process.
-The main Synapse process defines this with a `replication` resource in
-[`listeners` option](#listeners).
-
-Example configuration:
-```yaml
-worker_replication_http_port: 9093
-```
----
-### `worker_replication_http_tls`
-*Deprecated as of version 1.84.0. Place `tls` under `main` entry on the [`instance_map`](#instance_map) in your shared yaml configuration instead.*
-
-Whether TLS should be used for talking to the HTTP replication port on the main
-Synapse process.
-The main Synapse process defines this with the `tls` option on its [listener](#listeners) that
-has the `replication` resource enabled.
-
-**Please note:** by default, it is not safe to expose replication ports to the
-public Internet, even with TLS enabled.
-See [`worker_replication_secret`](#worker_replication_secret).
-
-Defaults to `false`.
-
-*Added in Synapse 1.72.0.*
-
-Example configuration:
-```yaml
-worker_replication_http_tls: true
-```
----
 ### `worker_listeners`
 
 A worker can handle HTTP requests. To do so, a `worker_listeners` option
@@ -4154,6 +4191,18 @@ worker_listeners:
     port: 8083
     resources:
       - names: [client, federation]
+```
+Example configuration(#2, using UNIX sockets with a `replication` listener):
+```yaml
+worker_listeners:
+  - type: http
+    path: /var/run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
+  - type: http
+    path: /var/run/synapse/worker_replication.sock
+    resources:
+      - names: [replication]
 ```
 ---
 ### `worker_manhole`

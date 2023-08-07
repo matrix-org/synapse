@@ -25,8 +25,8 @@ from synapse.util.rust import check_rust_lib_up_to_date
 from synapse.util.stringutils import strtobool
 
 # Check that we're not running on an unsupported Python version.
-if sys.version_info < (3, 7):
-    print("Synapse requires Python 3.7 or above.")
+if sys.version_info < (3, 8):
+    print("Synapse requires Python 3.8 or above.")
     sys.exit(1)
 
 # Allow using the asyncio reactor via env var.

@@ -20,6 +20,7 @@ from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import EventTypes
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
@@ -98,8 +99,32 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         room2 = "#room2"
         room3 = "#room3"
 
-        def insert_event(txn: Cursor, i: int, room_id: str) -> None:
+        def insert_event(txn: LoggingTransaction, i: int, room_id: str) -> None:
             event_id = "$event_%i:local" % i
+
+            # We need to insert into events table to get around the foreign key constraint.
+            self.store.db_pool.simple_insert_txn(
+                txn,
+                table="events",
+                values={
+                    "instance_name": "master",
+                    "stream_ordering": self.store._stream_id_gen.get_next_txn(txn),
+                    "topological_ordering": 1,
+                    "depth": 1,
+                    "event_id": event_id,
+                    "room_id": room_id,
+                    "type": EventTypes.Message,
+                    "processed": True,
+                    "outlier": False,
+                    "origin_server_ts": 0,
+                    "received_ts": 0,
+                    "sender": "@user:local",
+                    "contains_url": False,
+                    "state_key": None,
+                    "rejection_reason": None,
+                },
+            )
+
             txn.execute(
                 (
                     "INSERT INTO event_forward_extremities (room_id, event_id) "
@@ -113,10 +138,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 self.store.db_pool.runInteraction("insert", insert_event, i, room1)
             )
             self.get_success(
-                self.store.db_pool.runInteraction("insert", insert_event, i, room2)
+                self.store.db_pool.runInteraction(
+                    "insert", insert_event, i + 100, room2
+                )
             )
             self.get_success(
-                self.store.db_pool.runInteraction("insert", insert_event, i, room3)
+                self.store.db_pool.runInteraction(
+                    "insert", insert_event, i + 200, room3
+                )
             )
 
         # Test simple case

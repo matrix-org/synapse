@@ -225,8 +225,6 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
-        self._e164_mxids = hs.config.experimental.msc4009_e164_mxids
-
     def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
         assert p_id not in self._identity_providers
@@ -713,7 +711,7 @@ class SsoHandler:
         # Since the localpart is provided via a potentially untrusted module,
         # ensure the MXID is valid before registering.
         if not attributes.localpart or contains_invalid_mxid_characters(
-            attributes.localpart, self._e164_mxids
+            attributes.localpart
         ):
             raise MappingException("localpart is invalid: %s" % (attributes.localpart,))
 
@@ -946,7 +944,7 @@ class SsoHandler:
             localpart,
         )
 
-        if contains_invalid_mxid_characters(localpart, self._e164_mxids):
+        if contains_invalid_mxid_characters(localpart):
             raise SynapseError(400, "localpart is invalid: %s" % (localpart,))
         user_id = UserID(localpart, self._server_name).to_string()
         user_infos = await self._store.get_users_by_id_case_insensitive(user_id)

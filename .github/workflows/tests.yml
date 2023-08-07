@@ -320,7 +320,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.7'
+          python-version: '3.8'
 
       - name: Prepare old deps
         if: steps.cache-poetry-old-deps.outputs.cache-hit != 'true'
@@ -362,7 +362,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["pypy-3.7"]
+        python-version: ["pypy-3.8"]
         extras: ["all"]
 
     steps:
@@ -477,7 +477,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: "3.7"
+          - python-version: "3.8"
             postgres-version: "11"
 
           - python-version: "3.11"

@@ -1950,12 +1950,16 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         # Delete older entries in the table, as we really only care about
         # when the latest change happened.
-        txn.execute_batch(
-            """
+        cleanup_obsolete_stmt = """
             DELETE FROM device_lists_stream
-            WHERE user_id = ? AND device_id = ? AND stream_id < ?
-            """,
-            [(user_id, device_id, min_stream_id) for device_id in device_ids],
+            WHERE user_id = ? AND stream_id < ? AND %s
+        """
+        device_ids_clause, device_ids_args = make_in_list_sql_clause(
+            txn.database_engine, "device_id", device_ids
+        )
+        txn.execute(
+            cleanup_obsolete_stmt % (device_ids_clause,),
+            [user_id, min_stream_id] + device_ids_args,
         )
 
         self.db_pool.simple_insert_many_txn(

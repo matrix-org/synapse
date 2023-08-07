@@ -27,6 +27,7 @@ from typing import (
 )
 
 from synapse.api.constants import Direction
+from synapse.logging.opentracing import trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -328,6 +329,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             "get_local_media_ids", _get_local_media_ids_txn
         )
 
+    @trace
     async def store_local_media(
         self,
         media_id: str,
@@ -447,6 +449,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_local_media_thumbnails",
         )
 
+    @trace
     async def store_local_thumbnail(
         self,
         media_id: str,
@@ -568,6 +571,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_remote_media_thumbnails",
         )
 
+    @trace
     async def get_remote_media_thumbnail(
         self,
         origin: str,
@@ -599,6 +603,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_remote_media_thumbnail",
         )
 
+    @trace
     async def store_remote_media_thumbnail(
         self,
         origin: str,

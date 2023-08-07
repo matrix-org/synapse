@@ -179,6 +179,16 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual("http://my.server/me.png", avatar_url)
 
+    def test_get_profile_empty_displayname(self) -> None:
+        self.get_success(self.store.set_profile_displayname(self.frank, None))
+        self.get_success(
+            self.store.set_profile_avatar_url(self.frank, "http://my.server/me.png")
+        )
+
+        profile = self.get_success(self.handler.get_profile(self.frank.to_string()))
+
+        self.assertEqual("http://my.server/me.png", profile["avatar_url"])
+
     def test_set_my_avatar(self) -> None:
         self.get_success(
             self.handler.set_avatar_url(

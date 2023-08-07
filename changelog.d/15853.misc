@@ -1,1 +1,0 @@
-Add a timeout that aborts any Postgres statement taking more than 1 hour.

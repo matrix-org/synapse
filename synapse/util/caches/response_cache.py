@@ -36,7 +36,7 @@ from synapse.logging.opentracing import (
 )
 from synapse.util import Clock
 from synapse.util.async_helpers import AbstractObservableDeferred, ObservableDeferred
-from synapse.util.caches import register_cache
+from synapse.util.caches import EvictionReason, register_cache
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ class ResponseCache(Generic[KV]):
             # the should_cache bit, we leave it in the cache for now and schedule
             # its removal later.
             if self.timeout_sec and context.should_cache:
-                self.clock.call_later(self.timeout_sec, self.unset, key)
+                self.clock.call_later(self.timeout_sec, self._entry_timeout, key)
             else:
                 # otherwise, remove the result immediately.
                 self.unset(key)
@@ -185,6 +185,12 @@ class ResponseCache(Generic[KV]):
         Args:
             key: key used to remove the cached value
         """
+        self._metrics.inc_evictions(EvictionReason.invalidation)
+        self._result_cache.pop(key, None)
+
+    def _entry_timeout(self, key: KV) -> None:
+        """For the call_later to remove from the cache"""
+        self._metrics.inc_evictions(EvictionReason.time)
         self._result_cache.pop(key, None)
 
     async def wrap(
