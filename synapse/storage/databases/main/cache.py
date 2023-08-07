@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Tup
 
 from synapse.api.constants import EventTypes
 from synapse.config._base import Config
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.tcp.streams import BackfillStream, CachesStream
 from synapse.replication.tcp.streams.events import (
     EventsStream,
@@ -584,36 +584,29 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         else:
             return 0
 
-    def _clean_up_cache_invalidation_wrapper(self) -> None:
-        async def _clean_up_cache_invalidation_background() -> None:
-            """
-            Clean up cache invalidation stream table entries occasionally.
-            If we are behind (i.e. there are entries old enough to
-            be deleted but too many of them to be deleted in one go),
-            then we run slightly more frequently.
-            """
-            delete_up_to: int = (
-                self.hs.get_clock().time_msec()
-                - RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MS
-            )
+    @wrap_as_background_process("clean_up_old_cache_invalidations")
+    async def _clean_up_cache_invalidation_wrapper(self) -> None:
+        """
+        Clean up cache invalidation stream table entries occasionally.
+        If we are behind (i.e. there are entries old enough to
+        be deleted but too many of them to be deleted in one go),
+        then we run slightly more frequently.
+        """
+        delete_up_to: int = (
+            self.hs.get_clock().time_msec() - RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MS
+        )
 
-            in_backlog = await self._clean_up_batch_of_old_cache_invalidations(
-                delete_up_to
-            )
+        in_backlog = await self._clean_up_batch_of_old_cache_invalidations(delete_up_to)
 
-            # Vary how long we wait before calling again depending on whether we
-            # are still sifting through backlog or we have caught up.
-            if in_backlog:
-                next_interval = CATCH_UP_CLEANUP_INTERVAL_MS
-            else:
-                next_interval = REGULAR_CLEANUP_INTERVAL_MS
+        # Vary how long we wait before calling again depending on whether we
+        # are still sifting through backlog or we have caught up.
+        if in_backlog:
+            next_interval = CATCH_UP_CLEANUP_INTERVAL_MS
+        else:
+            next_interval = REGULAR_CLEANUP_INTERVAL_MS
 
-            self.hs.get_clock().call_later(
-                next_interval / 1000, self._clean_up_cache_invalidation_wrapper
-            )
-
-        run_as_background_process(
-            "clean_up_old_cache_invalidations", _clean_up_cache_invalidation_background
+        self.hs.get_clock().call_later(
+            next_interval / 1000, self._clean_up_cache_invalidation_wrapper
         )
 
     async def _clean_up_batch_of_old_cache_invalidations(
