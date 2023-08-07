@@ -2980,13 +2980,13 @@ files = [
 
 [[package]]
 name = "types-opentracing"
-version = "2.4.10.5"
+version = "2.4.10.6"
 description = "Typing stubs for opentracing"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-opentracing-2.4.10.5.tar.gz", hash = "sha256:852d13ab1324832835d50c00cfd58b9267f0e79ec3189e5664c2a90c26880fd4"},
-    {file = "types_opentracing-2.4.10.5-py3-none-any.whl", hash = "sha256:8f12ab4dce3e298a8e6655da9a6d52171e7a275357eae4cec22a1663d94023a7"},
+    {file = "types-opentracing-2.4.10.6.tar.gz", hash = "sha256:87a1bdfce9de5e555e30497663583b9b9c3bb494d029ef9806aa1f137c19e744"},
+    {file = "types_opentracing-2.4.10.6-py3-none-any.whl", hash = "sha256:25914c834db033a4a38fc322df0b5e5e14503b0ac97f78304ae180d721555e97"},
 ]
 
 [[package]]
