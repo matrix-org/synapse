@@ -26,8 +26,6 @@ from typing import (
     Tuple,
 )
 
-from canonicaljson import encode_canonical_json
-
 from synapse.api import errors
 from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import (
@@ -681,133 +679,14 @@ class DeviceHandler(DeviceWorkerHandler):
 
         time_now = self.clock.time_msec()
 
-        if keys_for_device:
-            keys = await self._check_and_prepare_keys_for_dehydrated_device(
-                user_id, device_id, keys_for_device
-            )
-        else:
-            keys = None
-
         old_device_id = await self.store.store_dehydrated_device(
-            user_id, device_id, device_data, time_now, keys
+            user_id, device_id, device_data, time_now, keys_for_device
         )
 
         if old_device_id is not None:
             await self.delete_devices(user_id, [old_device_id])
 
         return device_id
-
-    async def _check_and_prepare_keys_for_dehydrated_device(
-        self, user_id: str, device_id: str, keys: JsonDict
-    ) -> dict:
-        """
-        Check if any of the provided keys are duplicate and raise if they are,
-        prepare keys for insertion in DB
-
-        Args:
-            user_id: user to store keys for
-            device_id: the device_id of the dehydrated device to store keys for
-            keys: a dict of device_keys, onetime_keys, or fallback keys provided by the client
-                  to store associated with the dehydrated device id. Consists of pairs where
-                  the key is the key type (i.e. device_key, onetime_key or fallback_key)
-                  and the value is the key of that respective type.
-
-        Returns:
-            A dict where the keys are key type (i.e. device_key, onetime_key or fallback_key)
-            and values are the respective keys of that type
-        """
-        keys_to_return: dict = {}
-        device_keys = keys.get("device_keys", None)
-        if device_keys:
-            old_key_json = await self.db_pool.simple_select_one_onecol(
-                table="e2e_device_keys_json",
-                keyvalues={"user_id": user_id, "device_id": device_id},
-                retcol="key_json",
-                allow_none=True,
-            )
-
-            # In py3 we need old_key_json to match new_key_json type. The DB
-            # returns unicode while encode_canonical_json returns bytes.
-            new_device_key_json = encode_canonical_json(device_keys).decode("utf-8")
-
-            if old_key_json == new_device_key_json:
-                raise SynapseError(
-                    400,
-                    f"Device key for user_id: {user_id}, device_id {device_id} already stored.",
-                )
-
-            keys_to_return["device_keys"] = new_device_key_json
-
-        one_time_keys = keys.get("one_time_keys", None)
-        if one_time_keys:
-            # import this here to avoid a circular import
-            from synapse.handlers.e2e_keys import _one_time_keys_match
-
-            # make a list of (alg, id, key) tuples
-            key_list = []
-            for key_id, key_obj in one_time_keys.items():
-                algorithm, key_id = key_id.split(":")
-                key_list.append((algorithm, key_id, key_obj))
-
-            # First we check if we have already persisted any of the keys.
-            existing_key_map = await self.store.get_e2e_one_time_keys(
-                user_id, device_id, [k_id for _, k_id, _ in key_list]
-            )
-
-            new_one_time_keys = (
-                []
-            )  # Keys that we need to insert. (alg, id, json) tuples.
-            for algorithm, key_id, key in key_list:
-                ex_json = existing_key_map.get((algorithm, key_id), None)
-                if ex_json:
-                    if not _one_time_keys_match(ex_json, key):
-                        raise SynapseError(
-                            400,
-                            (
-                                "One time key %s:%s already exists. "
-                                "Old key: %s; new key: %r"
-                            )
-                            % (algorithm, key_id, ex_json, key),
-                        )
-                else:
-                    new_one_time_keys.append(
-                        (algorithm, key_id, encode_canonical_json(key).decode("ascii"))
-                    )
-            keys_to_return["one_time_keys"] = new_one_time_keys
-
-        fallback_keys = keys.get("fallback_keys", None)
-        if fallback_keys:
-            new_fallback_keys = {}
-            # there should actually only be one item in the dict but we iterate nevertheless -
-            # see _set_e2e_fallback_keys_txn
-            for key_id, fallback_key in fallback_keys.items():
-                algorithm, key_id = key_id.split(":", 1)
-                old_key_json = await self.db_pool.simple_select_one_onecol(
-                    table="e2e_fallback_keys_json",
-                    keyvalues={
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "algorithm": algorithm,
-                    },
-                    retcol="key_json",
-                    allow_none=True,
-                )
-
-                new_fallback_key_json = encode_canonical_json(fallback_key).decode(
-                    "utf-8"
-                )
-
-                # If the uploaded key is the same as the current fallback key,
-                # don't do anything.  This prevents marking the key as unused if it
-                # was already used.
-                if old_key_json == new_fallback_key_json:
-                    raise SynapseError(
-                        400, f"Fallback key {old_key_json} already exists."
-                    )
-                # TODO: should this be an update? it assumes that there will only be one fallback key
-                new_fallback_keys[f"{algorithm}:{key_id}"] = fallback_key
-                keys_to_return["fallback_keys"] = new_fallback_keys
-        return keys_to_return
 
     async def rehydrate_device(
         self, user_id: str, access_token: str, device_id: str

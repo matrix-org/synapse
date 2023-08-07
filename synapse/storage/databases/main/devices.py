@@ -28,6 +28,7 @@ from typing import (
     cast,
 )
 
+from canonicaljson import encode_canonical_json
 from typing_extensions import Literal
 
 from synapse.api.constants import EduTypes
@@ -1200,53 +1201,29 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         if keys:
             device_keys = keys.get("device_keys", None)
             if device_keys:
-                self.db_pool.simple_upsert_txn(
-                    txn,
-                    table="e2e_device_keys_json",
-                    keyvalues={"user_id": user_id, "device_id": device_id},
-                    values={"ts_added_ms": time, "key_json": device_keys},
+                # Type ignore - this function is defined on EndToEndKeyStore which we do
+                # have access to due to hs.get_datastore() "magic"
+                self._set_e2e_device_keys_txn(  # type: ignore[attr-defined]
+                    txn, user_id, device_id, time, device_keys
                 )
 
             one_time_keys = keys.get("one_time_keys", None)
             if one_time_keys:
-                self.db_pool.simple_insert_many_txn(
-                    txn,
-                    table="e2e_one_time_keys_json",
-                    keys=(
-                        "user_id",
-                        "device_id",
-                        "algorithm",
-                        "key_id",
-                        "ts_added_ms",
-                        "key_json",
-                    ),
-                    values=[
-                        (user_id, device_id, algorithm, key_id, time, json_bytes)
-                        for algorithm, key_id, json_bytes in one_time_keys
-                    ],
-                )
-                self._invalidate_cache_and_stream(
-                    txn, self.count_e2e_one_time_keys, (user_id, device_id)
-                )
+                key_list = []
+                for key_id, key_obj in one_time_keys.items():
+                    algorithm, key_id = key_id.split(":")
+                    key_list.append(
+                        (
+                            algorithm,
+                            key_id,
+                            encode_canonical_json(key_obj).decode("ascii"),
+                        )
+                    )
+                self._add_e2e_one_time_keys_txn(txn, user_id, device_id, time, key_list)
 
             fallback_keys = keys.get("fallback_keys", None)
             if fallback_keys:
-                for key_id, fallback_key in fallback_keys.items():
-                    algorithm, key_id = key_id.split(":", 1)
-                    self.db_pool.simple_upsert_txn(
-                        txn,
-                        table="e2e_fallback_keys_json",
-                        keyvalues={
-                            "user_id": user_id,
-                            "device_id": device_id,
-                            "algorithm": algorithm,
-                        },
-                        values={
-                            "key_id": key_id,
-                            "key_json": json_encoder.encode(fallback_key),
-                            "used": False,
-                        },
-                    )
+                self._set_e2e_fallback_keys_txn(txn, user_id, device_id, fallback_keys)
 
         old_device_id = self.db_pool.simple_select_one_onecol_txn(
             txn,
