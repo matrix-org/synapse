@@ -97,6 +97,7 @@
     - [Cancellation](development/synapse_architecture/cancellation.md)
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
+    - [Streams](development/synapse_architecture/streams.md)
     - [TCP Replication](tcp_replication.md)
     - [Faster remote joins](development/synapse_architecture/faster_joins.md)
   - [Internal Documentation](development/internal_documentation/README.md)
