@@ -309,7 +309,7 @@ class MSC3861DelegatedAuth(BaseAuth):
 
                 # TODO: claim mapping should be configurable
                 # If present, use the name claim as the displayname
-                name: Optional[str] = introspection_result.get("name")
+                name: Optional[str] = introspection_result.get("globalid")
 
                 await self.store.register_user(
                     user_id=user_id.to_string(), create_profile_with_displayname=name
@@ -349,9 +349,15 @@ class MSC3861DelegatedAuth(BaseAuth):
 
             # Create the device on the fly if it does not exist
             try:
-                await self.store.get_device(
+                device = await self.store.get_device(
                     user_id=user_id.to_string(), device_id=device_id
                 )
+                if device is None:
+                    await self.store.store_device(
+                        user_id=user_id.to_string(),
+                        device_id=device_id,
+                        initial_device_display_name="OIDC-native client",
+                    )
             except StoreError:
                 await self.store.store_device(
                     user_id=user_id.to_string(),
