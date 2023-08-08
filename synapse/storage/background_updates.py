@@ -758,6 +758,11 @@ class BackgroundUpdater:
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
 
+                # override the global statement timeout to avoid accidentally squashing
+                # a long-running index creation process
+                timeout_sql = "SET LOCAL statement timeout = 0"
+                c.execute(timeout_sql)
+
                 sql = (
                     "CREATE %(unique)s INDEX CONCURRENTLY %(name)s"
                     " ON %(table)s"
