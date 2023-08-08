@@ -2497,8 +2497,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/v3/sync",
             access_token=self.other_user_token,
         )
-        self.assertEqual(403, channel.code, msg=channel.json_body)
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.USER_LOCKED, channel.json_body["errcode"])
+        self.assertTrue(channel.json_body["soft_logout"])
 
     @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
     def test_locked_user_not_in_user_dir(self) -> None:
