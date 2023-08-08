@@ -760,7 +760,7 @@ class BackgroundUpdater:
 
                 # override the global statement timeout to avoid accidentally squashing
                 # a long-running index creation process
-                timeout_sql = "SET LOCAL statement timeout = 0"
+                timeout_sql = "SET LOCAL statement_timeout = 0"
                 c.execute(timeout_sql)
 
                 sql = (
