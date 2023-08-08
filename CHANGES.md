@@ -9,7 +9,6 @@
 
 - Fix bug where purging history and paginating simultaneously could lead to database corruption when using workers. ([\#15791](https://github.com/matrix-org/synapse/issues/15791))
 - Fix 404 not found code returned on profile endpoint when the display name is empty but not the avatar URL. ([\#16012](https://github.com/matrix-org/synapse/issues/16012))
-- Remove leading and trailing spaces when setting a display name. ([\#16031](https://github.com/matrix-org/synapse/issues/16031))
 - Fix a long-standing bug where the `synapse_port_db` failed to configure sequences for application services and partial stated rooms. ([\#16043](https://github.com/matrix-org/synapse/issues/16043))
 - Fix deletion in dehydrated devices v2. ([\#16046](https://github.com/matrix-org/synapse/issues/16046))
 
@@ -35,20 +34,21 @@
 - Allow modules to check whether the current worker is configured to run background tasks. ([\#15991](https://github.com/matrix-org/synapse/issues/15991))
 - Update support for [MSC3958](https://github.com/matrix-org/matrix-spec-proposals/pull/3958) to match the latest revision of the MSC. ([\#15992](https://github.com/matrix-org/synapse/issues/15992))
 - Allow modules to schedule delayed background calls. ([\#15993](https://github.com/matrix-org/synapse/issues/15993))
-- Update PyYAML to 6.0.1. ([\#16011](https://github.com/matrix-org/synapse/issues/16011))
 - Properly overwrite the `redacts` content-property for forwards-compatibility with room versions 1 through 10. ([\#16013](https://github.com/matrix-org/synapse/issues/16013))
 - Fix building the nix development environment on MacOS systems. ([\#16019](https://github.com/matrix-org/synapse/issues/16019))
+- Remove leading and trailing spaces when setting a display name. ([\#16031](https://github.com/matrix-org/synapse/issues/16031))
 - Combine duplicated code. ([\#16023](https://github.com/matrix-org/synapse/issues/16023))
 - Collect additional metrics from `ResponseCache` for eviction. ([\#16028](https://github.com/matrix-org/synapse/issues/16028))
-- Update certifi to 2023.7.22 and pygments to 2.15.1. ([\#16044](https://github.com/matrix-org/synapse/issues/16044))
 - Fix endpoint improperly declaring support for MSC3814. ([\#16068](https://github.com/matrix-org/synapse/issues/16068))
 - Drop backwards compat hack for event serialization. ([\#16069](https://github.com/matrix-org/synapse/issues/16069))
 
 ### Updates to locked dependencies
 
+* Update PyYAML to 6.0.1. ([\#16011](https://github.com/matrix-org/synapse/issues/16011))
 * Bump cryptography from 41.0.2 to 41.0.3. ([\#16048](https://github.com/matrix-org/synapse/issues/16048))
 * Bump furo from 2023.5.20 to 2023.7.26. ([\#16077](https://github.com/matrix-org/synapse/issues/16077))
 * Bump immutabledict from 2.2.4 to 3.0.0. ([\#16034](https://github.com/matrix-org/synapse/issues/16034))
+* Update certifi to 2023.7.22 and pygments to 2.15.1. ([\#16044](https://github.com/matrix-org/synapse/issues/16044))
 * Bump jsonschema from 4.18.3 to 4.19.0. ([\#16081](https://github.com/matrix-org/synapse/issues/16081))
 * Bump phonenumbers from 8.13.14 to 8.13.18. ([\#16076](https://github.com/matrix-org/synapse/issues/16076))
 * Bump regex from 1.9.1 to 1.9.3. ([\#16073](https://github.com/matrix-org/synapse/issues/16073))
