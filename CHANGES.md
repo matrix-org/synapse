@@ -7,10 +7,10 @@
 
 ### Bugfixes
 
-- Fix bug where purging history and paginating simultaneously could lead to database corruption when using workers. ([\#15791](https://github.com/matrix-org/synapse/issues/15791))
-- Fix 404 not found code returned on profile endpoint when the display name is empty but not the avatar URL. ([\#16012](https://github.com/matrix-org/synapse/issues/16012))
+- Fix a long-standing bug where purging history and paginating simultaneously could lead to database corruption when using workers. ([\#15791](https://github.com/matrix-org/synapse/issues/15791))
+- Fix a long-standing bug where profile endpoint returned a 404 when the user's display name was empty. ([\#16012](https://github.com/matrix-org/synapse/issues/16012))
 - Fix a long-standing bug where the `synapse_port_db` failed to configure sequences for application services and partial stated rooms. ([\#16043](https://github.com/matrix-org/synapse/issues/16043))
-- Fix deletion in dehydrated devices v2. ([\#16046](https://github.com/matrix-org/synapse/issues/16046))
+- Fix long-standing bug with deletion in dehydrated devices v2. ([\#16046](https://github.com/matrix-org/synapse/issues/16046))
 
 ### Updates to the Docker image
 
