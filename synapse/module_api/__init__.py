@@ -34,6 +34,7 @@ import jinja2
 from typing_extensions import ParamSpec
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IDelayedCall
 from twisted.web.resource import Resource
 
 from synapse.api import errors
@@ -1241,6 +1242,46 @@ class ModuleApi:
         Added in Synapse v1.89.0.
         """
         return self._hs.config.worker.run_background_tasks
+
+    def delayed_background_call(
+        self,
+        msec: float,
+        f: Callable,
+        *args: object,
+        desc: Optional[str] = None,
+        **kwargs: object,
+    ) -> IDelayedCall:
+        """Wraps a function as a background process and calls it in a given number of milliseconds.
+
+        The scheduled call is not persistent: if the current Synapse instance is
+        restarted before the call is made, the call will not be made.
+
+        Added in Synapse v1.90.0.
+
+        Args:
+            msec: How long to wait before calling, in milliseconds.
+            f: The function to call once. f can be either synchronous or
+                asynchronous, and must follow Synapse's logcontext rules.
+                More info about logcontexts is available at
+                https://matrix-org.github.io/synapse/latest/log_contexts.html
+            *args: Positional arguments to pass to function.
+            desc: The background task's description. Default to the function's name.
+            **kwargs: Keyword arguments to pass to function.
+
+        Returns:
+            IDelayedCall handle from twisted, which allows to cancel the delayed call if desired.
+        """
+
+        if desc is None:
+            desc = f.__name__
+
+        return self._clock.call_later(
+            # convert ms to seconds as needed by call_later.
+            msec * 0.001,
+            run_as_background_process,
+            desc,
+            lambda: maybe_awaitable(f(*args, **kwargs)),
+        )
 
     async def sleep(self, seconds: float) -> None:
         """Sleeps for the given number of seconds.
