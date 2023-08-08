@@ -545,7 +545,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
              user_id: id of user to get keys for
              device_id: id of device to get keys for
              time_now: insertion time to record (ms since epoch)
-             new_keys: keys to add - each a tuple of (algorithm, key_id, key json)
+             new_keys: keys to add - each a tuple of (algorithm, key_id, key json) - note
+             that the key JSON must be in canonical JSON form
         """
         set_tag("user_id", user_id)
         set_tag("device_id", device_id)

@@ -29,7 +29,6 @@ from synapse.http.servlet import (
     parse_integer,
 )
 from synapse.http.site import SynapseRequest
-from synapse.replication.http.devices import ReplicationUploadKeysForUserRestServlet
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
 from synapse.rest.client.models import AuthenticationData
 from synapse.rest.models import RequestBodyModel
@@ -479,13 +478,6 @@ class DehydratedDeviceV2Servlet(RestServlet):
         assert isinstance(handler, DeviceHandler)
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
         self.device_handler = handler
-
-        if hs.config.worker.worker_app is None:
-            # if main process
-            self.key_uploader = self.e2e_keys_handler.upload_keys_for_user
-        else:
-            # then a worker
-            self.key_uploader = ReplicationUploadKeysForUserRestServlet.make_client(hs)
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
