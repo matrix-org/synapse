@@ -66,12 +66,10 @@ INLINE_CONTENT_TYPES = [
     "image/apng",
     "image/webp",
     "image/avif",
-
     "video/mp4",
     "video/webm",
     "video/ogg",
     "video/quicktime",
-
     "audio/mp4",
     "audio/webm",
     "audio/aac",
