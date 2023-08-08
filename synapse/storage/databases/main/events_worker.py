@@ -2072,29 +2072,29 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         mapping = {}
-        txn_id_to_event: Dict[Tuple[str, int, str], str] = {}
+        txn_id_to_event: Dict[Tuple[str, str, str], str] = {}
 
         for event in events:
-            token_id = getattr(event.internal_metadata, "token_id", None)
+            device_id = getattr(event.internal_metadata, "device_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
 
-            if token_id and txn_id:
+            if device_id and txn_id:
                 # Check if this is a duplicate of an event in the given events.
-                existing = txn_id_to_event.get((event.room_id, token_id, txn_id))
+                existing = txn_id_to_event.get((event.room_id, device_id, txn_id))
                 if existing:
                     mapping[event.event_id] = existing
                     continue
 
                 # Check if this is a duplicate of an event we've already
                 # persisted.
-                existing = await self.get_event_id_from_transaction_id_and_token_id(
-                    event.room_id, event.sender, token_id, txn_id
+                existing = await self.get_event_id_from_transaction_id_and_device_id(
+                    event.room_id, event.sender, device_id, txn_id
                 )
                 if existing:
                     mapping[event.event_id] = existing
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = existing
+                    txn_id_to_event[(event.room_id, device_id, txn_id)] = existing
                 else:
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = event.event_id
+                    txn_id_to_event[(event.room_id, device_id, txn_id)] = event.event_id
 
         return mapping
 
