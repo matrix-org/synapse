@@ -44,7 +44,7 @@
 
 -- A table to track whether a lock is currently acquired, and if so whether its
 -- in read or write mode.
-CREATE TABLE worker_read_write_locks_mode (
+CREATE TABLE IF NOT EXISTS worker_read_write_locks_mode (
     lock_name TEXT NOT NULL,
     lock_key TEXT NOT NULL,
     -- Whether this lock is in read (false) or write (true) mode
@@ -55,14 +55,14 @@ CREATE TABLE worker_read_write_locks_mode (
 );
 
 -- Ensure that we can only have one row per lock
-CREATE UNIQUE INDEX worker_read_write_locks_mode_key ON worker_read_write_locks_mode (lock_name, lock_key);
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_mode_key ON worker_read_write_locks_mode (lock_name, lock_key);
 -- We need this (redundant) constraint so that we can have a foreign key
 -- constraint against this table.
-CREATE UNIQUE INDEX worker_read_write_locks_mode_type ON worker_read_write_locks_mode (lock_name, lock_key, write_lock);
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_mode_type ON worker_read_write_locks_mode (lock_name, lock_key, write_lock);
 
 
 -- A table to track who has currently acquired a given lock.
-CREATE TABLE worker_read_write_locks (
+CREATE TABLE IF NOT EXISTS worker_read_write_locks (
     lock_name TEXT NOT NULL,
     lock_key TEXT NOT NULL,
     -- We write the instance name to ease manual debugging, we don't ever read
@@ -84,9 +84,9 @@ CREATE TABLE worker_read_write_locks (
     FOREIGN KEY (lock_name, lock_key, write_lock) REFERENCES worker_read_write_locks_mode (lock_name, lock_key, write_lock)
 );
 
-CREATE UNIQUE INDEX worker_read_write_locks_key ON worker_read_write_locks (lock_name, lock_key, token);
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_key ON worker_read_write_locks (lock_name, lock_key, token);
 -- Ensures that only one instance can acquire a lock in write mode at a time.
-CREATE UNIQUE INDEX worker_read_write_locks_write ON worker_read_write_locks (lock_name, lock_key) WHERE write_lock;
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_write ON worker_read_write_locks (lock_name, lock_key) WHERE write_lock;
 
 
 -- Add a foreign key constraint to ensure that if a lock is in
@@ -97,5 +97,6 @@ CREATE UNIQUE INDEX worker_read_write_locks_write ON worker_read_write_locks (lo
 -- We only add to PostgreSQL as SQLite does not support adding constraints
 -- after table creation, and so doesn't support "circular" foreign key
 -- constraints.
+ALTER TABLE worker_read_write_locks_mode DROP CONSTRAINT IF EXISTS worker_read_write_locks_mode_foreign;
 ALTER TABLE worker_read_write_locks_mode ADD CONSTRAINT worker_read_write_locks_mode_foreign
     FOREIGN KEY (lock_name, lock_key, token) REFERENCES worker_read_write_locks(lock_name, lock_key, token) DEFERRABLE INITIALLY DEFERRED;
