@@ -57,15 +57,32 @@ INLINE_CONTENT_TYPES = [
     "text/csv",
     "application/json",
     "application/ld+json",
-    # We allow images listed under the common image list
-    # https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types#common_image_file_types
-    # except SVGs
-    "image/apng",
-    "image/avif",
-    "image/gif",
+    # We allow some media files deemed as safe, which comes from the matrix-react-sdk.
+    # https://github.com/matrix-org/matrix-react-sdk/blob/a70fcfd0bcf7f8c85986da18001ea11597989a7c/src/utils/blobs.ts#L51
+    # SVGs are *intentionally* omitted.
     "image/jpeg",
+    "image/gif",
     "image/png",
+    "image/apng",
     "image/webp",
+    "image/avif",
+
+    "video/mp4",
+    "video/webm",
+    "video/ogg",
+    "video/quicktime",
+
+    "audio/mp4",
+    "audio/webm",
+    "audio/aac",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/wave",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/x-pn-wav",
+    "audio/flac",
+    "audio/x-flac",
 ]
 
 
