@@ -367,19 +367,6 @@ class DeviceMessageHandler:
                     errcode=Codes.INVALID_PARAM,
                 )
 
-            # if we have a since token, delete any to-device messages before that token
-            # (since we now know that the device has received them)
-            deleted = await self.store.delete_messages_for_device(
-                user_id, device_id, since_stream_id
-            )
-            logger.debug(
-                "Deleted %d to-device messages up to %d for user_id %s device_id %s",
-                deleted,
-                since_stream_id,
-                user_id,
-                device_id,
-            )
-
         to_token = self.event_sources.get_current_token().to_device_key
 
         messages, stream_id = await self.store.get_messages_for_device(
