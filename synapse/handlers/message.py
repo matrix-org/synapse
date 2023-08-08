@@ -908,19 +908,6 @@ class EventCreationHandler:
             if existing_event_id:
                 return existing_event_id
 
-        # Some requsters don't have device IDs (appservice, guests, and access
-        # tokens minted with the admin API), fallback to checking the access token
-        # ID, which should be close enough.
-        if requester.access_token_id:
-            existing_event_id = (
-                await self.store.get_event_id_from_transaction_id_and_token_id(
-                    room_id,
-                    requester.user.to_string(),
-                    requester.access_token_id,
-                    txn_id,
-                )
-            )
-
         return existing_event_id
 
     async def get_event_from_transaction(

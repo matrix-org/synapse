@@ -2022,25 +2022,6 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
-    async def get_event_id_from_transaction_id_and_token_id(
-        self, room_id: str, user_id: str, token_id: int, txn_id: str
-    ) -> Optional[str]:
-        """Look up if we have already persisted an event for the transaction ID,
-        returning the event ID if so.
-        """
-        return await self.db_pool.simple_select_one_onecol(
-            table="event_txn_id",
-            keyvalues={
-                "room_id": room_id,
-                "user_id": user_id,
-                "token_id": token_id,
-                "txn_id": txn_id,
-            },
-            retcol="event_id",
-            allow_none=True,
-            desc="get_event_id_from_transaction_id_and_token_id",
-        )
-
     async def get_event_id_from_transaction_id_and_device_id(
         self, room_id: str, user_id: str, device_id: str, txn_id: str
     ) -> Optional[str]:
