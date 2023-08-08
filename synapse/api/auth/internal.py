@@ -133,9 +133,10 @@ class InternalAuth(BaseAuth):
                     requester.user.to_string()
                 ):
                     raise AuthError(
-                        403,
+                        401,
                         "User account has been locked",
                         errcode=Codes.USER_LOCKED,
+                        additional_fields={"soft_logout": True},
                     )
 
                 # Deny the request if the user account has expired.

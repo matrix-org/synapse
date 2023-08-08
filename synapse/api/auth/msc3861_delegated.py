@@ -212,9 +212,10 @@ class MSC3861DelegatedAuth(BaseAuth):
                 requester.user.to_string()
             ):
                 raise AuthError(
-                    403,
+                    401,
                     "User account has been locked",
                     errcode=Codes.USER_LOCKED,
+                    additional_fields={"soft_logout": True},
                 )
 
         if not allow_guest and requester.is_guest:
