@@ -1256,7 +1256,7 @@ class ModuleApi:
         The scheduled call is not persistent: if the current Synapse instance is
         restarted before the call is made, the call will not be made.
 
-        Added in Synapse v1.89.0.
+        Added in Synapse v1.90.0.
 
         Args:
             msec: How long to wait before calling, in milliseconds.
