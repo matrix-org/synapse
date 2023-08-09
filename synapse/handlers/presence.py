@@ -141,6 +141,8 @@ class BasePresenceHandler(abc.ABC):
         self.state = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
 
+        self._presence_enabled = hs.config.server.use_presence
+
         self._federation = None
         if hs.should_send_federation():
             self._federation = hs.get_federation_sender()
@@ -404,8 +406,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         self._presence_writer_instance = hs.config.worker.writers.presence[0]
 
-        self._presence_enabled = hs.config.server.use_presence
-
         # Route presence EDUs to the right worker
         hs.get_federation_registry().register_instances_for_edu(
             EduTypes.PRESENCE,
@@ -616,7 +616,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         user_id = target_user.to_string()
 
         # If presence is disabled, no-op
-        if not self.hs.config.server.use_presence:
+        if not self._presence_enabled:
             return
 
         # Proxy request to instance that writes presence
@@ -633,7 +633,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         with the app.
         """
         # If presence is disabled, no-op
-        if not self.hs.config.server.use_presence:
+        if not self._presence_enabled:
             return
 
         # Proxy request to instance that writes presence
@@ -649,7 +649,6 @@ class PresenceHandler(BasePresenceHandler):
         self.hs = hs
         self.wheel_timer: WheelTimer[str] = WheelTimer()
         self.notifier = hs.get_notifier()
-        self._presence_enabled = hs.config.server.use_presence
 
         federation_registry = hs.get_federation_registry()
 
@@ -955,7 +954,7 @@ class PresenceHandler(BasePresenceHandler):
         with the app.
         """
         # If presence is disabled, no-op
-        if not self.hs.config.server.use_presence:
+        if not self._presence_enabled:
             return
 
         user_id = user.to_string()
@@ -1227,7 +1226,7 @@ class PresenceHandler(BasePresenceHandler):
             raise SynapseError(400, "Invalid presence state")
 
         # If presence is disabled, no-op
-        if not self.hs.config.server.use_presence:
+        if not self._presence_enabled:
             return
 
         user_id = target_user.to_string()
