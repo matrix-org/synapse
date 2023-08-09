@@ -149,6 +149,15 @@ class BasePresenceHandler(abc.ABC):
 
         self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
+        self.VALID_PRESENCE = (
+            PresenceState.ONLINE,
+            PresenceState.UNAVAILABLE,
+            PresenceState.OFFLINE,
+        )
+
+        if self._busy_presence_enabled:
+            self.VALID_PRESENCE += (PresenceState.BUSY,)
+
         active_presence = self.store.take_presence_startup_info()
         self.user_to_current_state = {state.user_id: state for state in active_presence}
 
@@ -421,8 +430,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
 
-        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
-
         hs.get_reactor().addSystemEventTrigger(
             "before",
             "shutdown",
@@ -603,16 +610,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         """
         presence = state["presence"]
 
-        valid_presence = (
-            PresenceState.ONLINE,
-            PresenceState.UNAVAILABLE,
-            PresenceState.OFFLINE,
-            PresenceState.BUSY,
-        )
-
-        if presence not in valid_presence or (
-            presence == PresenceState.BUSY and not self._busy_presence_enabled
-        ):
+        if presence not in self.VALID_PRESENCE:
             raise SynapseError(400, "Invalid presence state")
 
         user_id = target_user.to_string()
@@ -1225,16 +1223,7 @@ class PresenceHandler(BasePresenceHandler):
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
 
-        valid_presence = (
-            PresenceState.ONLINE,
-            PresenceState.UNAVAILABLE,
-            PresenceState.OFFLINE,
-            PresenceState.BUSY,
-        )
-
-        if presence not in valid_presence or (
-            presence == PresenceState.BUSY and not self._busy_presence_enabled
-        ):
+        if presence not in self.VALID_PRESENCE:
             raise SynapseError(400, "Invalid presence state")
 
         # If presence is disabled, no-op
