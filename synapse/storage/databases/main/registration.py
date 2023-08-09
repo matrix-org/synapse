@@ -239,8 +239,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "locked",
             ]
             for column in boolean_columns:
-                if not isinstance(row[column], bool):
-                    row[column] = bool(row[column])
+                row[column] = bool(row[column])
 
         return row
 
@@ -1141,10 +1140,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="get_user_locked_status",
         )
 
-        # Convert the integer into a boolean.
-        if not isinstance(res, bool):
-            res = bool(res)
-        return res
+        # Convert the potential integer into a boolean.
+        return bool(res)
 
     async def get_threepid_validation_session(
         self,
