@@ -145,5 +145,5 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
 
         This is not provided by DBAPI2, and so needs engine-specific support.
         """
-        with open(filepath, "rt") as f:
+        with open(filepath) as f:
             cls.executescript(cursor, f.read())

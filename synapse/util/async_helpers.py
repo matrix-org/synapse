@@ -22,6 +22,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import (
     Any,
+    AsyncContextManager,
     AsyncIterator,
     Awaitable,
     Callable,
@@ -42,7 +43,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import AsyncContextManager, Concatenate, Literal, ParamSpec
+from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError

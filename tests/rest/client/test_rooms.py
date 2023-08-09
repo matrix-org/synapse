@@ -1362,7 +1362,7 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
 
         # Ensure the event was persisted with the correct timestamp.
         res = self.get_success(self.main_store.get_event(event_id))
-        self.assertEquals(ts, res.origin_server_ts)
+        self.assertEqual(ts, res.origin_server_ts)
 
     def test_send_state_event_ts(self) -> None:
         """Test sending a state event with a custom timestamp."""
@@ -1384,7 +1384,7 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
 
         # Ensure the event was persisted with the correct timestamp.
         res = self.get_success(self.main_store.get_event(event_id))
-        self.assertEquals(ts, res.origin_server_ts)
+        self.assertEqual(ts, res.origin_server_ts)
 
     def test_send_membership_event_ts(self) -> None:
         """Test sending a membership event with a custom timestamp."""
@@ -1406,7 +1406,7 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
 
         # Ensure the event was persisted with the correct timestamp.
         res = self.get_success(self.main_store.get_event(event_id))
-        self.assertEquals(ts, res.origin_server_ts)
+        self.assertEqual(ts, res.origin_server_ts)
 
 
 class RoomJoinRatelimitTestCase(RoomBase):

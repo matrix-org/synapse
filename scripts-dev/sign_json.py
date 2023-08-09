@@ -145,7 +145,7 @@ Example usage:
 
 
 def read_args_from_config(args: argparse.Namespace) -> None:
-    with open(args.config, "r") as fh:
+    with open(args.config) as fh:
         config = yaml.safe_load(fh)
         if not args.server_name:
             args.server_name = config["server_name"]

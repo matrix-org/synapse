@@ -312,7 +312,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
             [("server9", get_key_id(key1))]
         )
         result = self.get_success(d)
-        self.assertEquals(result[("server9", get_key_id(key1))].valid_until_ts, 0)
+        self.assertEqual(result[("server9", get_key_id(key1))].valid_until_ts, 0)
 
     def test_verify_json_dedupes_key_requests(self) -> None:
         """Two requests for the same key should be deduped."""

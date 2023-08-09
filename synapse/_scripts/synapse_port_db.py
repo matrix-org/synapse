@@ -1205,10 +1205,10 @@ class CursesProgress(Progress):
         self.total_processed = 0
         self.total_remaining = 0
 
-        super(CursesProgress, self).__init__()
+        super().__init__()
 
     def update(self, table: str, num_done: int) -> None:
-        super(CursesProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         self.total_processed = 0
         self.total_remaining = 0
@@ -1304,7 +1304,7 @@ class TerminalProgress(Progress):
     """Just prints progress to the terminal"""
 
     def update(self, table: str, num_done: int) -> None:
-        super(TerminalProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         data = self.tables[table]
 

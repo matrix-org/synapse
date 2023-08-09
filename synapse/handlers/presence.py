@@ -32,6 +32,7 @@ from typing import (
     Any,
     Callable,
     Collection,
+    ContextManager,
     Dict,
     Generator,
     Iterable,
@@ -43,7 +44,6 @@ from typing import (
 )
 
 from prometheus_client import Counter
-from typing_extensions import ContextManager
 
 import synapse.metrics
 from synapse.api.constants import EduTypes, EventTypes, Membership, PresenceState

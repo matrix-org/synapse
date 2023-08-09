@@ -1442,11 +1442,9 @@ class SyncHandler:
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
-            (
-                room_id
-                for room_id in mutable_joined_room_ids
-                if room_id not in mutable_rooms_to_exclude
-            )
+            room_id
+            for room_id in mutable_joined_room_ids
+            if room_id not in mutable_rooms_to_exclude
         )
 
         logger.debug(
