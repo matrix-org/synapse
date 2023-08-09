@@ -186,9 +186,6 @@ class EventContext(UnpersistedEventContextBase):
             ),
             "app_service_id": self.app_service.id if self.app_service else None,
             "partial_state": self.partial_state,
-            # add dummy delta_ids and prev_group for backwards compatibility
-            "delta_ids": None,
-            "prev_group": None,
         }
 
     @staticmethod
@@ -203,13 +200,6 @@ class EventContext(UnpersistedEventContextBase):
         Returns:
             The event context.
         """
-        # workaround for backwards/forwards compatibility: if the input doesn't have a value
-        # for "state_group_deltas" just assign an empty dict
-        state_group_deltas = input.get("state_group_deltas", None)
-        if state_group_deltas:
-            state_group_deltas = _decode_state_group_delta(state_group_deltas)
-        else:
-            state_group_deltas = {}
 
         context = EventContext(
             # We use the state_group and prev_state_id stuff to pull the
@@ -217,7 +207,7 @@ class EventContext(UnpersistedEventContextBase):
             storage=storage,
             state_group=input["state_group"],
             state_group_before_event=input["state_group_before_event"],
-            state_group_deltas=state_group_deltas,
+            state_group_deltas=_decode_state_group_delta(input["state_group_deltas"]),
             state_delta_due_to_event=_decode_state_dict(
                 input["state_delta_due_to_event"]
             ),

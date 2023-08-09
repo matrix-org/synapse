@@ -107,8 +107,7 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
     Calls to e2e_keys_handler.upload_keys_for_user(user_id, device_id, keys) on
     the main process to accomplish this.
 
-    Defined in https://spec.matrix.org/v1.4/client-server-api/#post_matrixclientv3keysupload
-    Request format(borrowed and expanded from KeyUploadServlet):
+    Request format for this endpoint (borrowed and expanded from KeyUploadServlet):
 
         POST /_synapse/replication/upload_keys_for_user
 
@@ -117,6 +116,7 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
         "device_id": "<device_id>",
         "keys": {
             ....this part can be found in KeyUploadServlet in rest/client/keys.py....
+            or as defined in https://spec.matrix.org/v1.4/client-server-api/#post_matrixclientv3keysupload
         }
     }
 

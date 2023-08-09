@@ -39,6 +39,7 @@ from synapse.replication.tcp.commands import (
     ClearUserSyncsCommand,
     Command,
     FederationAckCommand,
+    LockReleasedCommand,
     PositionCommand,
     RdataCommand,
     RemoteServerUpCommand,
@@ -247,6 +248,9 @@ class ReplicationCommandHandler:
 
         if self._is_master or self._should_insert_client_ips:
             self.subscribe_to_channel("USER_IP")
+
+        if hs.config.redis.redis_enabled:
+            self._notifier.add_lock_released_callback(self.on_lock_released)
 
     def subscribe_to_channel(self, channel_name: str) -> None:
         """
@@ -648,6 +652,17 @@ class ReplicationCommandHandler:
 
         self._notifier.notify_remote_server_up(cmd.data)
 
+    def on_LOCK_RELEASED(
+        self, conn: IReplicationConnection, cmd: LockReleasedCommand
+    ) -> None:
+        """Called when we get a new LOCK_RELEASED command."""
+        if cmd.instance_name == self._instance_name:
+            return
+
+        self._notifier.notify_lock_released(
+            cmd.instance_name, cmd.lock_name, cmd.lock_key
+        )
+
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""
         self._connections.append(connection)
@@ -753,6 +768,13 @@ class ReplicationCommandHandler:
         We need to check if the client is interested in the stream or not
         """
         self.send_command(RdataCommand(stream_name, self._instance_name, token, data))
+
+    def on_lock_released(
+        self, instance_name: str, lock_name: str, lock_key: str
+    ) -> None:
+        """Called when we released a lock and should notify other instances."""
+        if instance_name == self._instance_name:
+            self.send_command(LockReleasedCommand(instance_name, lock_name, lock_key))
 
 
 UpdateToken = TypeVar("UpdateToken")
