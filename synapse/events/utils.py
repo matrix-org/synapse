@@ -702,7 +702,7 @@ def _copy_power_level_value_as_integer(
     :raises TypeError: if `old_value` is neither an integer nor a base-10 string
         representation of an integer.
     """
-    if type(old_value) is int:
+    if type(old_value) is int:  # noqa: E721
         power_levels[key] = old_value
         return
 
@@ -730,7 +730,7 @@ def validate_canonicaljson(value: Any) -> None:
     * Floats
     * NaN, Infinity, -Infinity
     """
-    if type(value) is int:
+    if type(value) is int:  # noqa: E721
         if value < CANONICALJSON_MIN_INT or CANONICALJSON_MAX_INT < value:
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 

@@ -186,9 +186,9 @@ class Config:
             TypeError, if given something other than an integer or a string
             ValueError: if given a string not of the form described above.
         """
-        if type(value) is int:
+        if type(value) is int:  # noqa: E721
             return value
-        elif type(value) is str:
+        elif isinstance(value, str):
             sizes = {"K": 1024, "M": 1024 * 1024}
             size = 1
             suffix = value[-1]
@@ -218,9 +218,9 @@ class Config:
             TypeError, if given something other than an integer or a string
             ValueError: if given a string not of the form described above.
         """
-        if type(value) is int:
+        if type(value) is int:  # noqa: E721
             return value
-        elif type(value) is str:
+        elif isinstance(value, str):
             second = 1000
             minute = 60 * second
             hour = 60 * minute

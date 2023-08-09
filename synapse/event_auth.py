@@ -846,11 +846,11 @@ def _check_power_levels(
                 "kick",
                 "invite",
             }:
-                if type(v) is not int:
+                if type(v) is not int:  # noqa: E721
                     raise SynapseError(400, f"{v!r} must be an integer.")
             if k in {"events", "notifications", "users"}:
                 if not isinstance(v, collections.abc.Mapping) or not all(
-                    type(v) is int for v in v.values()
+                    type(v) is int for v in v.values()  # noqa: E721
                 ):
                     raise SynapseError(
                         400,
