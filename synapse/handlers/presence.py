@@ -699,8 +699,6 @@ class PresenceHandler(BasePresenceHandler):
             self._on_shutdown,
         )
 
-        self._next_serial = 1
-
         # Keeps track of the number of *ongoing* syncs on this process. While
         # this is non zero a user will never go offline.
         self.user_to_num_current_syncs: Dict[str, int] = {}
