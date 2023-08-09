@@ -153,7 +153,7 @@ class BasePresenceHandler(abc.ABC):
 
         self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
-        self.VALID_PRESENCE = (
+        self.VALID_PRESENCE: Tuple[str, ...] = (
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
