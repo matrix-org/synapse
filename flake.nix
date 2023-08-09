@@ -89,6 +89,10 @@
                   })
                   # The rust-analyzer language server implementation.
                   rust-analyzer
+                  # GCC includes a linker; needed for building `ruff`
+                  gcc
+                  # Needed for building `ruff`
+                  gnumake
 
                   # Native dependencies for running Synapse.
                   icu
