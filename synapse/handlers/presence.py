@@ -54,7 +54,10 @@ from synapse.appservice import ApplicationService
 from synapse.events.presence_router import PresenceRouter
 from synapse.logging.context import run_in_background
 from synapse.metrics import LaterGauge
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.replication.http.presence import (
     ReplicationBumpPresenceActiveTime,
     ReplicationPresenceSetState,
@@ -720,21 +723,16 @@ class PresenceHandler(BasePresenceHandler):
             # Start a LoopingCall in 30s that fires every 5s.
             # The initial delay is to allow disconnected clients a chance to
             # reconnect before we treat them as offline.
-            def run_timeout_handler() -> Awaitable[None]:
-                return run_as_background_process(
-                    "handle_presence_timeouts", self._handle_timeouts
-                )
-
             self.clock.call_later(
-                30, self.clock.looping_call, run_timeout_handler, 5000
+                30, self.clock.looping_call, self._handle_timeouts, 5000
             )
 
-            def run_persister() -> Awaitable[None]:
-                return run_as_background_process(
-                    "persist_presence_changes", self._persist_unpersisted_changes
-                )
-
-            self.clock.call_later(60, self.clock.looping_call, run_persister, 60 * 1000)
+            self.clock.call_later(
+                60,
+                self.clock.looping_call,
+                self._persist_unpersisted_changes,
+                60 * 1000,
+            )
 
         LaterGauge(
             "synapse_handlers_presence_wheel_timer_size",
@@ -780,6 +778,7 @@ class PresenceHandler(BasePresenceHandler):
             )
         logger.info("Finished _on_shutdown")
 
+    @wrap_as_background_process("persist_presence_changes")
     async def _persist_unpersisted_changes(self) -> None:
         """We periodically persist the unpersisted changes, as otherwise they
         may stack up and slow down shutdown times.
@@ -895,6 +894,7 @@ class PresenceHandler(BasePresenceHandler):
                         states, [destination]
                     )
 
+    @wrap_as_background_process("handle_presence_timeouts")
     async def _handle_timeouts(self) -> None:
         """Checks the presence of users that have timed out and updates as
         appropriate.
