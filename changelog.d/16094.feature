@@ -1,0 +1,1 @@
+SSO: Allow customizing the IdP display name and icon (and brand) for SAML and CAS, and not just OIDC.
