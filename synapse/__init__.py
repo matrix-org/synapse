@@ -25,7 +25,11 @@ from synapse.util.rust import check_rust_lib_up_to_date
 from synapse.util.stringutils import strtobool
 
 # Check that we're not running on an unsupported Python version.
-if sys.version_info < (3, 8):
+#
+# Note that we use an (unneeded) variable here so that pyupgrade doesn't nuke the
+# if-statement completely.
+py_version = sys.version_info
+if py_version < (3, 8):
     print("Synapse requires Python 3.8 or above.")
     sys.exit(1)
 
