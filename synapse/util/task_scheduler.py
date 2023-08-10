@@ -126,7 +126,7 @@ class TaskScheduler:
             None,
             None,
         )
-        await self._store.upsert_scheduled_task(task)
+        await self._store.insert_scheduled_task(task)
 
         return task.id
 
@@ -139,22 +139,33 @@ class TaskScheduler:
         result: Optional[JsonMapping] = None,
         error: Optional[str] = None,
     ) -> bool:
-        """Update some task associated values.
+        """Update some task associated values. This is exposed publically so it can
+        be used inside task functions, mainly to update the result and be able to
+        resume a task at a specific step after a restart of synapse.
 
-        This is used internally, and also exposed publically so it can be used inside task functions.
-        This allows to store in DB the progress of a task so it can be resumed properly after a restart of synapse.
+        It can also be used to stage a task, by setting the `status` to `SCHEDULED` with
+        a new timestamp.
+
+        The `status` can only be set to `ACTIVE` or `SCHEDULED`, `COMPLETE` and `FAILED`
+        are terminal status and can only be set by returning it in the function.
 
         Args:
             id: the id of the task to update
+            timestamp: useful to schedule a new stage of the task at a later date
             status: the new `TaskStatus` of the task
             result: the new result of the task
             error: the new error of the task
         """
+        if status == TaskStatus.COMPLETE or status == TaskStatus.FAILED:
+            raise Exception(
+                "update_task can't be called with a FAILED or COMPLETE status"
+            )
+
         if timestamp is None:
             timestamp = self._clock.time_msec()
         return await self._store.update_scheduled_task(
             id,
-            timestamp=timestamp,
+            timestamp,
             status=status,
             result=result,
             error=error,
@@ -232,12 +243,13 @@ class TaskScheduler:
         for task in await self._store.get_scheduled_tasks(
             statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
         ):
-            if task.id not in self._running_tasks:
-                if (
-                    self._clock.time_msec()
-                    > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
-                ):
-                    await self._store.delete_scheduled_task(task.id)
+            # FAILED and COMPLETE tasks should never be running
+            assert task.id not in self._running_tasks
+            if (
+                self._clock.time_msec()
+                > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
+            ):
+                await self._store.delete_scheduled_task(task.id)
 
     async def _launch_task(self, task: ScheduledTask, first_launch: bool) -> None:
         """Launch a scheduled task now.
@@ -267,8 +279,9 @@ class TaskScheduler:
                 result = None
                 error = f.getErrorMessage()
 
-            await self.update_task(
+            await self._store.update_scheduled_task(
                 task.id,
+                self._clock.time_msec(),
                 status=status,
                 result=result,
                 error=error,

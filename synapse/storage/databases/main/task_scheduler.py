@@ -109,16 +109,16 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         )
         return [TaskSchedulerWorkerStore._convert_row_to_task(row) for row in rows]
 
-    async def upsert_scheduled_task(self, task: ScheduledTask) -> None:
-        """Upsert a specified `ScheduledTask` in the DB.
+    async def insert_scheduled_task(self, task: ScheduledTask) -> None:
+        """Insert a specified `ScheduledTask` in the DB.
 
         Args:
-            task: the `ScheduledTask` to upsert
+            task: the `ScheduledTask` to insert
         """
-        await self.db_pool.simple_upsert(
+        await self.db_pool.simple_insert(
             "scheduled_tasks",
-            {"id": task.id},
             {
+                "id": task.id,
                 "action": task.action,
                 "status": task.status,
                 "timestamp": task.timestamp,
@@ -131,14 +131,14 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
                 else json_encoder.encode(task.result),
                 "error": task.error,
             },
-            desc="upsert_scheduled_task",
+            desc="insert_scheduled_task",
         )
 
     async def update_scheduled_task(
         self,
         id: str,
+        timestamp: int,
         *,
-        timestamp: Optional[int] = None,
         status: Optional[TaskStatus] = None,
         result: Optional[JsonMapping] = None,
         error: Optional[str] = None,
@@ -152,9 +152,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             result: new result of the task
             error: new error of the task
         """
-        updatevalues: JsonDict = {}
-        if timestamp is not None:
-            updatevalues["timestamp"] = timestamp
+        updatevalues: JsonDict = {"timestamp": timestamp}
         if status is not None:
             updatevalues["status"] = status
         if result is not None:
