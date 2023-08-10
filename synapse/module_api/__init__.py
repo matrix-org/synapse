@@ -31,7 +31,7 @@ from typing import (
 
 import attr
 import jinja2
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.interfaces import IDelayedCall
@@ -885,7 +885,7 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[P, T],
+        func: Callable[Concatenate[LoggingTransaction, P], T],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
