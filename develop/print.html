@@ -6802,12 +6802,16 @@ user does not share a room with the requester.</p>
 If set to true, local users are more likely to appear above remote users when searching the
 user directory. Defaults to false.</p>
 </li>
+<li>
+<p><code>show_locked_users</code>: Defines whether to show locked users in search query results. Defaults to false.</p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 </code></pre>
 <hr />
 <h3 id="user_consent"><a class="header" href="#user_consent"><code>user_consent</code></a></h3>
@@ -13893,6 +13897,9 @@ granting them access to the Admin API, among other things.</p>
 </li>
 <li>
 <p><code>deactivated</code> - <strong>bool</strong>, optional. If unspecified, deactivation state will be left unchanged.</p>
+</li>
+<li>
+<p><code>locked</code> - <strong>bool</strong>, optional. If unspecified, locked state will be left unchanged.</p>
 <p>Note: the <code>password</code> field must also be set if both of the following are true:</p>
 <ul>
 <li><code>deactivated</code> is set to <code>false</code> and the user was previously deactivated (you are reactivating this user)</li>

@@ -3265,12 +3265,16 @@ user does not share a room with the requester.</p>
 If set to true, local users are more likely to appear above remote users when searching the
 user directory. Defaults to false.</p>
 </li>
+<li>
+<p><code>show_locked_users</code>: Defines whether to show locked users in search query results. Defaults to false.</p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 </code></pre>
 <hr />
 <h3 id="user_consent"><a class="header" href="#user_consent"><code>user_consent</code></a></h3>
