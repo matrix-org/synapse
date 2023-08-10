@@ -372,6 +372,10 @@ class ServerConfig(Config):
         if self.use_presence is None:
             self.use_presence = config.get("use_presence", True)
 
+        self.presence_federation_disabled: bool = presence_config.get(
+            "disable_federation_presence", False
+        )
+
         # Custom presence router module
         # This is the legacy way of configuring it (the config should now be put in the modules section)
         self.presence_router_module_class = None

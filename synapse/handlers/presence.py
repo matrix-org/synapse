@@ -396,6 +396,9 @@ class WorkerPresenceHandler(BasePresenceHandler):
         self._presence_writer_instance = hs.config.worker.writers.presence[0]
 
         self._presence_enabled = hs.config.server.use_presence
+        self._federated_presence_disabled = (
+            hs.config.server.presence_federation_disabled
+        )
 
         # Route presence EDUs to the right worker
         hs.get_federation_registry().register_instances_for_edu(
@@ -573,8 +576,10 @@ class WorkerPresenceHandler(BasePresenceHandler):
         stream_id = token
         await self.notify_from_replication(state_to_notify, stream_id)
 
-        # If this is a federation sender, notify about presence updates.
-        await self.maybe_send_presence_to_interested_destinations(state_to_notify)
+        # If this is a federation sender, notify about presence updates, unless sending
+        # presence over federation is disabled.
+        if not self._federated_presence_disabled:
+            await self.maybe_send_presence_to_interested_destinations(state_to_notify)
 
     def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
         return [
@@ -650,6 +655,10 @@ class PresenceHandler(BasePresenceHandler):
         self.wheel_timer: WheelTimer[str] = WheelTimer()
         self.notifier = hs.get_notifier()
         self._presence_enabled = hs.config.server.use_presence
+        # This is only for sending presence, receiving is handled elsewhere
+        self._federated_presence_disabled = (
+            hs.config.server.presence_federation_disabled
+        )
 
         federation_registry = hs.get_federation_registry()
 
@@ -675,18 +684,20 @@ class PresenceHandler(BasePresenceHandler):
                     obj=state.user_id,
                     then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
                 )
-                if self.is_mine_id(state.user_id):
-                    self.wheel_timer.insert(
-                        now=now,
-                        obj=state.user_id,
-                        then=state.last_federation_update_ts + FEDERATION_PING_INTERVAL,
-                    )
-                else:
-                    self.wheel_timer.insert(
-                        now=now,
-                        obj=state.user_id,
-                        then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
-                    )
+                if not self._federated_presence_disabled:
+                    if self.is_mine_id(state.user_id):
+                        self.wheel_timer.insert(
+                            now=now,
+                            obj=state.user_id,
+                            then=state.last_federation_update_ts
+                            + FEDERATION_PING_INTERVAL,
+                        )
+                    else:
+                        self.wheel_timer.insert(
+                            now=now,
+                            obj=state.user_id,
+                            then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
+                        )
 
         # Set of users who have presence in the `user_to_current_state` that
         # have not yet been persisted
@@ -849,6 +860,7 @@ class PresenceHandler(BasePresenceHandler):
                     is_mine=self.is_mine_id(user_id),
                     wheel_timer=self.wheel_timer,
                     now=now,
+                    disable_sending=self._federated_presence_disabled,
                 )
 
                 if force_notify:
@@ -859,6 +871,8 @@ class PresenceHandler(BasePresenceHandler):
                 if should_notify:
                     to_notify[user_id] = new_state
                 elif should_ping:
+                    # If sending presence over federation is disabled, this should
+                    # always be false and nothing will be added to the outgoing queue
                     to_federation_ping[user_id] = new_state
 
             # TODO: We should probably ensure there are no races hereafter
@@ -946,6 +960,7 @@ class PresenceHandler(BasePresenceHandler):
             is_mine_fn=self.is_mine_id,
             syncing_user_ids=syncing_user_ids,
             now=now,
+            disable_sending=self._federated_presence_disabled,
         )
 
         return await self._update_states(changes)
@@ -1158,11 +1173,13 @@ class PresenceHandler(BasePresenceHandler):
         # We only want to poke the local federation sender, if any, as other
         # workers will receive the presence updates via the presence replication
         # stream (which is updated by `store.update_presence`).
-        await self.maybe_send_presence_to_interested_destinations(states)
+        if not self._federated_presence_disabled:
+            await self.maybe_send_presence_to_interested_destinations(states)
 
     async def incoming_presence(self, origin: str, content: JsonDict) -> None:
         """Called when we receive a `m.presence` EDU from a remote server."""
-        if not self._presence_enabled:
+        # No-op handling any presence received from federation right up front.
+        if not self._presence_enabled or self._federated_presence_disabled:
             return
 
         now = self.clock.time_msec()
@@ -1378,6 +1395,13 @@ class PresenceHandler(BasePresenceHandler):
         """Process current state deltas for the room to find new joins that need
         to be handled.
         """
+        # The context of this function is when joining a remote room, from either a
+        # local user joining it or a new remote user joining in. If sending presence
+        # over federation is disabled, then this can no-op. Local users joining local
+        # rooms are not handled here, but as part of the sync handler context manager
+        # and stream token updates.
+        if self._federated_presence_disabled:
+            return
 
         # Sets of newly joined users. Note that if the local server is
         # joining a remote room for the first time we'll see both the joining
@@ -1499,7 +1523,9 @@ class PresenceHandler(BasePresenceHandler):
 
 
 def should_notify(
-    old_state: UserPresenceState, new_state: UserPresenceState, is_mine: bool
+    old_state: UserPresenceState,
+    new_state: UserPresenceState,
+    is_mine: bool,
 ) -> bool:
     """Decides if a presence state change should be sent to interested parties."""
     user_location = "remote"
@@ -1846,6 +1872,7 @@ def handle_timeouts(
     is_mine_fn: Callable[[str], bool],
     syncing_user_ids: Set[str],
     now: int,
+    disable_sending: bool = False,
 ) -> List[UserPresenceState]:
     """Checks the presence of users that have timed out and updates as
     appropriate.
@@ -1855,6 +1882,7 @@ def handle_timeouts(
         is_mine_fn: Function that returns if a user_id is ours
         syncing_user_ids: Set of user_ids with active syncs.
         now: Current time in ms.
+        disable_sending: if sending presence over federation is disabled
 
     Returns:
         List of UserPresenceState updates
@@ -1864,7 +1892,9 @@ def handle_timeouts(
     for state in user_states:
         is_mine = is_mine_fn(state.user_id)
 
-        new_state = handle_timeout(state, is_mine, syncing_user_ids, now)
+        new_state = handle_timeout(
+            state, is_mine, syncing_user_ids, now, disable_sending=disable_sending
+        )
         if new_state:
             changes[state.user_id] = new_state
 
@@ -1872,7 +1902,11 @@ def handle_timeouts(
 
 
 def handle_timeout(
-    state: UserPresenceState, is_mine: bool, syncing_user_ids: Set[str], now: int
+    state: UserPresenceState,
+    is_mine: bool,
+    syncing_user_ids: Set[str],
+    now: int,
+    disable_sending: bool = False,
 ) -> Optional[UserPresenceState]:
     """Checks the presence of the user to see if any of the timers have elapsed
 
@@ -1881,6 +1915,7 @@ def handle_timeout(
         is_mine: Whether the user is ours
         syncing_user_ids: Set of user_ids with active syncs.
         now: Current time in ms.
+        disable_sending: if sending presence over federation is disabled
 
     Returns:
         A UserPresenceState update or None if no update.
@@ -1904,9 +1939,13 @@ def handle_timeout(
                 # stopped updating.
                 changed = True
 
-        if now - state.last_federation_update_ts > FEDERATION_PING_INTERVAL:
+        if (
+            now - state.last_federation_update_ts > FEDERATION_PING_INTERVAL
+            and not disable_sending
+        ):
             # Need to send ping to other servers to ensure they don't
-            # timeout and set us to offline
+            # timeout and set us to offline, unless sending presence over federation is
+            # disabled
             changed = True
 
         # If there are have been no sync for a while (and none ongoing),
@@ -1921,7 +1960,9 @@ def handle_timeout(
     else:
         # We expect to be poked occasionally by the other side.
         # This is to protect against forgetful/buggy servers, so that
-        # no one gets stuck online forever.
+        # no one gets stuck online forever. This will be always OFFLINE if sending
+        # presence over federation is disabled.
+        # TODO: can I get another pair of eyes on this to verify
         if now - state.last_federation_update_ts > FEDERATION_TIMEOUT:
             # The other side seems to have disappeared.
             state = state.copy_and_replace(state=PresenceState.OFFLINE)
@@ -1936,6 +1977,7 @@ def handle_update(
     is_mine: bool,
     wheel_timer: WheelTimer,
     now: int,
+    disable_sending: bool = False,
 ) -> Tuple[UserPresenceState, bool, bool]:
     """Given a presence update:
         1. Add any appropriate timers.
@@ -1947,6 +1989,7 @@ def handle_update(
         is_mine: Whether the user is ours
         wheel_timer
         now: Time now in ms
+        disable_sending: True if sending presence over federation is disabled
 
     Returns:
         3-tuple: `(new_state, persist_and_notify, federation_ping)` where:
@@ -1986,23 +2029,31 @@ def handle_update(
                 then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
             )
 
-            last_federate = new_state.last_federation_update_ts
-            if now - last_federate > FEDERATION_PING_INTERVAL:
-                # Been a while since we've poked remote servers
-                new_state = new_state.copy_and_replace(last_federation_update_ts=now)
-                federation_ping = True
+            if not disable_sending:
+                # There is no sense setting this timer if federated presence is disabled
+                last_federate = new_state.last_federation_update_ts
+                if now - last_federate > FEDERATION_PING_INTERVAL:
+                    # Been a while since we've poked remote servers
+                    new_state = new_state.copy_and_replace(
+                        last_federation_update_ts=now
+                    )
+                    federation_ping = True
 
     else:
-        wheel_timer.insert(
-            now=now,
-            obj=user_id,
-            then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT,
-        )
+        if not disable_sending:
+            # Same story, if federate presence is disabled, don't bother
+            wheel_timer.insert(
+                now=now,
+                obj=user_id,
+                then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT,
+            )
 
     # Check whether the change was something worth notifying about
     if should_notify(prev_state, new_state, is_mine):
         new_state = new_state.copy_and_replace(last_federation_update_ts=now)
         persist_and_notify = True
+        if not disable_sending:
+            new_state = new_state.copy_and_replace(last_federation_update_ts=now)
 
     return new_state, persist_and_notify, federation_ping
 
