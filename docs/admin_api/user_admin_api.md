@@ -146,6 +146,7 @@ Body parameters:
 - `admin` - **bool**, optional, defaults to `false`. Whether the user is a homeserver administrator,
   granting them access to the Admin API, among other things.
 - `deactivated` - **bool**, optional. If unspecified, deactivation state will be left unchanged.
+- `locked` - **bool**, optional. If unspecified, locked state will be left unchanged.
 
   Note: the `password` field must also be set if both of the following are true:
   - `deactivated` is set to `false` and the user was previously deactivated (you are reactivating this user)
