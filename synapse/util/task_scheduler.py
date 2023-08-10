@@ -258,11 +258,7 @@ class TaskScheduler:
             task: the task to launch
             first_launch: `True` if it's the first time is launched, `False` otherwise
         """
-        if task.action not in self._actions:
-            logger.warn(
-                f"Can't launch task {task.id} since no function associated with action {task.action}"
-            )
-            return
+        assert task.action in self._actions
 
         function = self._actions[task.action]
 

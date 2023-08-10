@@ -151,6 +151,8 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             status: new status of the task
             result: new result of the task
             error: new error of the task
+
+        Returns: `False` if no matching row was found, `True` otherwise
         """
         updatevalues: JsonDict = {"timestamp": timestamp}
         if status is not None:
