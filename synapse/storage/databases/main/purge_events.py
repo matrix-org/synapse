@@ -15,6 +15,7 @@
 import logging
 from typing import Any, List, Set, Tuple, cast
 
+from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
@@ -368,6 +369,19 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         state_groups = [row[0] for row in txn]
 
+        # Delete tables that don't have an index on `room_id` but do on
+        # `user_id`, so we use `current_state_events` table to find all users
+        # that were in the room and delete those keys.
+        for table in ("e2e_room_keys", "room_account_data"):
+            txn.execute(
+                f"""
+                    DELETE FROM {table}
+                    WHERE room_id = ?
+                        AND user_id IN (SELECT state_key FROM current_state_events WHERE room_id = ? AND type = ?)
+                """,
+                (room_id, room_id, EventTypes.Member),
+            )
+
         # Get all the auth chains that are referenced by events that are to be
         # deleted.
         txn.execute(
@@ -447,14 +461,12 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "users_who_share_private_rooms",
             # no useful index, but let's clear them anyway
             "appservice_room_list",
-            "e2e_room_keys",
             "event_push_summary",
             "pusher_throttle",
             "insertion_events",
             "insertion_event_extremities",
             "insertion_event_edges",
             "batch_events",
-            "room_account_data",
             "room_tags",
             # "rooms" happens last, to keep the foreign keys in the other tables
             # happy
