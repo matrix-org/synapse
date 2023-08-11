@@ -256,7 +256,7 @@ impl<'de> Deserialize<'de> for Action {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SimpleJsonValue {
-    Str(String),
+    Str(Cow<'static, str>),
     Int(i64),
     Bool(bool),
     Null,
@@ -265,7 +265,7 @@ pub enum SimpleJsonValue {
 impl<'source> FromPyObject<'source> for SimpleJsonValue {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         if let Ok(s) = <PyString as pyo3::PyTryFrom>::try_from(ob) {
-            Ok(SimpleJsonValue::Str(s.to_string()))
+            Ok(SimpleJsonValue::Str(Cow::Owned(s.to_string())))
         // A bool *is* an int, ensure we try bool first.
         } else if let Ok(b) = <PyBool as pyo3::PyTryFrom>::try_from(ob) {
             Ok(SimpleJsonValue::Bool(b.extract()?))
@@ -585,7 +585,7 @@ impl FilteredPushRules {
                 }
 
                 if !self.msc3958_suppress_edits_enabled
-                    && rule.rule_id == "global/override/.com.beeper.suppress_edits"
+                    && rule.rule_id == "global/override/.org.matrix.msc3958.suppress_edits"
                 {
                     return false;
                 }

@@ -1,0 +1,1 @@
+Fix the type annotation on `run_db_interaction` in the Module API.

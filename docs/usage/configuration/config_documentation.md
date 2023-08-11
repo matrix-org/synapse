@@ -1242,6 +1242,14 @@ like sending a federation transaction.
 * `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
 * `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
 
+The following options control the retry logic when communicating with a specific homeserver destination.
+Unlike the previous configuration options, these values apply across all requests
+for a given destination and the state of the backoff is stored in the database.
+
+* `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
+* `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
+* `destination_max_retry_interval`: a cap on the backoff. Defaults to a week.
+
 Example configuration:
 ```yaml
 federation:
@@ -1250,6 +1258,9 @@ federation:
   max_long_retry_delay: 100s
   max_short_retries: 5
   max_long_retries: 20
+  destination_min_retry_interval: 30s
+  destination_retry_multiplier: 5
+  destination_max_retry_interval: 12h
 ```
 ---
 ## Caching
@@ -2838,6 +2849,20 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
+### `use_appservice_legacy_authorization`
+
+Whether to send the application service access tokens via the `access_token` query parameter
+per older versions of the Matrix specification. Defaults to false. Set to true to enable sending
+access tokens via a query parameter.
+
+**Enabling this option is considered insecure and is not recommended. **
+
+Example configuration:
+```yaml
+use_appservice_legacy_authorization: true 
+```
+
+---
 ### `macaroon_secret_key`
 
 A secret which is used to sign
@@ -3606,6 +3631,7 @@ This option has the following sub-options:
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
    user directory. Defaults to false.
+* `show_locked_users`: Defines whether to show locked users in search query results. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -3613,6 +3639,7 @@ user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 ```
 ---
 ### `user_consent`

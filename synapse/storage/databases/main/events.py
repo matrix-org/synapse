@@ -127,8 +127,6 @@ class PersistEventsStore:
         self._backfill_id_gen: AbstractStreamIdGenerator = self.store._backfill_id_gen
         self._stream_id_gen: AbstractStreamIdGenerator = self.store._stream_id_gen
 
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
-
     @trace
     async def _persist_events_and_state_updates(
         self,
@@ -1012,9 +1010,11 @@ class PersistEventsStore:
                         )
                     )
 
-        # Pre-MSC3970, we rely on the access_token_id to scope the txn_id for events.
-        # Since this is an experimental flag, we still store the mapping even if the
-        # flag is disabled.
+        # Synapse usually relies on the device_id to scope transactions for events,
+        # except for users without device IDs (appservice, guests, and access
+        # tokens minted with the admin API) which use the access token ID instead.
+        #
+        # TODO https://github.com/matrix-org/synapse/issues/16042
         if to_insert_token_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
@@ -1030,10 +1030,7 @@ class PersistEventsStore:
                 values=to_insert_token_id,
             )
 
-        # With MSC3970, we rely on the device_id instead to scope the txn_id for events.
-        # We're only inserting if MSC3970 is *enabled*, because else the pre-MSC3970
-        # behaviour would allow for a UNIQUE constraint violation on this table
-        if to_insert_device_id and self._msc3970_enabled:
+        if to_insert_device_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="event_txn_id_device_id",
@@ -1455,8 +1452,8 @@ class PersistEventsStore:
                     },
                 )
 
-                sql = "UPDATE events SET outlier = ? WHERE event_id = ?"
-                txn.execute(sql, (False, event.event_id))
+                sql = "UPDATE events SET outlier = FALSE WHERE event_id = ?"
+                txn.execute(sql, (event.event_id,))
 
                 # Update the event_backward_extremities table now that this
                 # event isn't an outlier any more.
@@ -1549,13 +1546,13 @@ class PersistEventsStore:
             for event, _ in events_and_contexts
             if not event.internal_metadata.is_redacted()
         ]
-        sql = "UPDATE redactions SET have_censored = ? WHERE "
+        sql = "UPDATE redactions SET have_censored = FALSE WHERE "
         clause, args = make_in_list_sql_clause(
             self.database_engine,
             "redacts",
             unredacted_events,
         )
-        txn.execute(sql + clause, [False] + args)
+        txn.execute(sql + clause, args)
 
         self.db_pool.simple_insert_many_txn(
             txn,
@@ -2318,14 +2315,14 @@ class PersistEventsStore:
             "   SELECT 1 FROM events"
             "   LEFT JOIN event_edges edge"
             "   ON edge.event_id = events.event_id"
-            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = ? OR edge.event_id IS NULL)"
+            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = FALSE OR edge.event_id IS NULL)"
             " )"
         )
 
         txn.execute_batch(
             query,
             [
-                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
+                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id)
                 for ev in events
                 for e_id in ev.prev_event_ids()
                 if not ev.internal_metadata.is_outlier()

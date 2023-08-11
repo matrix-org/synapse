@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #![feature(test)]
+
+use std::borrow::Cow;
+
 use synapse::push::{
     evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, JsonValue,
     PushRules, SimpleJsonValue,
@@ -26,15 +29,15 @@ fn bench_match_exact(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
         ),
         (
             "room_id".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
         ),
         (
             "content.body".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
         ),
     ]
     .into_iter()
@@ -71,15 +74,15 @@ fn bench_match_word(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
         ),
         (
             "room_id".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
         ),
         (
             "content.body".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
         ),
     ]
     .into_iter()
@@ -116,15 +119,15 @@ fn bench_match_word_miss(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
         ),
         (
             "room_id".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
         ),
         (
             "content.body".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
         ),
     ]
     .into_iter()
@@ -161,15 +164,15 @@ fn bench_eval_message(b: &mut Bencher) {
     let flattened_keys = [
         (
             "type".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("m.text".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
         ),
         (
             "room_id".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("!room:server".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
         ),
         (
             "content.body".to_string(),
-            JsonValue::Value(SimpleJsonValue::Str("test message".to_string())),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
         ),
     ]
     .into_iter()
