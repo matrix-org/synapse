@@ -6177,6 +6177,16 @@ enable SAML login. You can either put your entire pysaml config inline using the
 option, or you can specify a path to a psyaml config file with the sub-option <code>config_path</code>.
 This setting has the following sub-options:</p>
 <ul>
+<li><code>idp_name</code>: A user-facing name for this identity provider, which is used to
+offer the user a choice of login mechanisms.</li>
+<li><code>idp_icon</code>: An optional icon for this identity provider, which is presented
+by clients and Synapse's own IdP picker page. If given, must be an
+MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
+obtain such an MXC URI is to upload an image to an (unencrypted) room
+and then copy the &quot;url&quot; from the source of the event.)</li>
+<li><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
+to style the login flow according to the identity provider in question.
+See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
 <li><code>sp_config</code>: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
 Default values will be used for the <code>entityid</code> and <code>service</code> settings,
 so it is not normally necessary to specify them unless you need to
@@ -6335,7 +6345,7 @@ offer the user a choice of login mechanisms.</p>
 <li>
 <p><code>idp_icon</code>: An optional icon for this identity provider, which is presented
 by clients and Synapse's own IdP picker page. If given, must be an
-MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
 obtain such an MXC URI is to upload an image to an (unencrypted) room
 and then copy the &quot;url&quot; from the source of the event.)</p>
 </li>
@@ -6579,6 +6589,16 @@ Has the following sub-options:</p>
 <ul>
 <li><code>enabled</code>: Set this to true to enable authorization against a CAS server.
 Defaults to false.</li>
+<li><code>idp_name</code>: A user-facing name for this identity provider, which is used to
+offer the user a choice of login mechanisms.</li>
+<li><code>idp_icon</code>: An optional icon for this identity provider, which is presented
+by clients and Synapse's own IdP picker page. If given, must be an
+MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
+obtain such an MXC URI is to upload an image to an (unencrypted) room
+and then copy the &quot;url&quot; from the source of the event.)</li>
+<li><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
+to style the login flow according to the identity provider in question.
+See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
 <li><code>server_url</code>: The URL of the CAS authorization endpoint.</li>
 <li><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
 If no name is given here, no displayname will be set.</li>
