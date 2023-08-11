@@ -32,6 +32,7 @@ from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.types import JsonDict
+from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -53,25 +54,31 @@ class PushRuleRestServlet(RestServlet):
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker.worker_app is not None
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._push_rule_linearizer = Linearizer(name="push_rules")
 
     async def on_PUT(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         if self._is_worker:
             raise Exception("Cannot handle PUT /push_rules on worker")
 
+        requester = await self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        async with self._push_rule_linearizer.queue(user_id):
+            return await self.handle_put(request, path, user_id)
+
+    async def handle_put(
+        self, request: SynapseRequest, path: str, user_id: str
+    ) -> Tuple[int, JsonDict]:
         spec = _rule_spec_from_path(path.split("/"))
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
             raise SynapseError(400, str(e))
 
-        requester = await self.auth.get_user_by_req(request)
-
         if "/" in spec.rule_id or "\\" in spec.rule_id:
             raise SynapseError(400, "rule_id may not contain slashes")
 
         content = parse_json_value_from_request(request)
-
-        user_id = requester.user.to_string()
 
         if spec.attr:
             try:
@@ -126,10 +133,19 @@ class PushRuleRestServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle DELETE /push_rules on worker")
 
-        spec = _rule_spec_from_path(path.split("/"))
-
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
+
+        async with self._push_rule_linearizer.queue(user_id):
+            return await self.handle_delete(request, path, user_id)
+
+    async def handle_delete(
+        self,
+        request: SynapseRequest,
+        path: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
+        spec = _rule_spec_from_path(path.split("/"))
 
         namespaced_rule_id = f"global/{spec.template}/{spec.rule_id}"
 
