@@ -3029,7 +3029,7 @@ This setting has the following sub-options:
    offer the user a choice of login mechanisms.
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 * `idp_brand`: An optional brand for this identity provider, allowing clients
@@ -3186,7 +3186,7 @@ Options for each entry include:
 
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 
@@ -3405,7 +3405,7 @@ Has the following sub-options:
    offer the user a choice of login mechanisms.
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 * `idp_brand`: An optional brand for this identity provider, allowing clients
