@@ -214,6 +214,25 @@ class TaskScheduler:
             max_timestamp=max_timestamp,
         )
 
+    async def delete_task(self, id: str) -> None:
+        """Delete a task. Running tasks can't be deleted.
+
+        Args:
+            id: id of the task to delete
+        """
+
+        if self.task_is_running(id):
+            raise Exception(f"Task {id} is currently running and can't be deleted")
+        await self._store.delete_scheduled_task(id)
+
+    def task_is_running(self, id: str) -> bool:
+        """Check if a task is currently running.
+
+        Args:
+            id: id of the task to check
+        """
+        return id in self._running_tasks
+
     async def _handle_scheduled_tasks(self) -> None:
         """Main loop taking care of launching tasks and cleaning up old ones."""
         await self._launch_scheduled_tasks()
@@ -223,7 +242,7 @@ class TaskScheduler:
         """Retrieve and launch scheduled tasks that should be running at that time."""
         for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
             if (
-                task.id not in self._running_tasks
+                not self.task_is_running(task.id)
                 and len(self._running_tasks)
                 < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
             ):
@@ -232,7 +251,7 @@ class TaskScheduler:
             statuses=[TaskStatus.SCHEDULED], max_timestamp=self._clock.time_msec()
         ):
             if (
-                task.id not in self._running_tasks
+                not self.task_is_running(task.id)
                 and len(self._running_tasks)
                 < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
             ):
@@ -244,7 +263,7 @@ class TaskScheduler:
             statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
         ):
             # FAILED and COMPLETE tasks should never be running
-            assert task.id not in self._running_tasks
+            assert not self.task_is_running(task.id)
             if (
                 self._clock.time_msec()
                 > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
