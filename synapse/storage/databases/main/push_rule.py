@@ -398,21 +398,24 @@ class PushRuleStore(PushRulesWorkerStore):
     ) -> None:
         relative_to_rule = before or after
 
-        res = self.db_pool.simple_select_one_txn(
-            txn,
-            table="push_rules",
-            keyvalues={"user_name": user_id, "rule_id": relative_to_rule},
-            retcols=["priority_class", "priority"],
-            allow_none=True,
+        txn.execute(
+            """
+            SELECT priority, priority_class FROM push_rules FOR SHARE
+            WHERE user_name = ? AND rule_id = ?
+            """,
+            (
+                user_id,
+                relative_to_rule,
+            ),
         )
+        row = txn.fetchone()
 
-        if not res:
+        if row is None:
             raise RuleNotFoundException(
                 "before/after rule not found: %s" % (relative_to_rule,)
             )
 
-        base_priority_class = res["priority_class"]
-        base_rule_priority = res["priority"]
+        base_rule_priority, base_priority_class = row
 
         if base_priority_class != priority_class:
             raise InconsistentRuleException(
