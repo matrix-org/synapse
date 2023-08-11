@@ -1814,6 +1814,7 @@ class RoomShutdownHandler:
                 If None, the action was not manually requested but instead
                 triggered automatically, e.g. through a Synapse module
                 or some other policy.
+                MUST NOT be None if block=True.
             new_room_user_id:
                 If set, a new room will be created with this user ID
                 as the creator and admin, and all users in the old room will be
@@ -1866,6 +1867,10 @@ class RoomShutdownHandler:
 
         # Action the block first (even if the room doesn't exist yet)
         if block:
+            if requester_user_id is None:
+                raise ValueError(
+                    "shutdown_room: block=True not allowed when requester_user_id is None."
+                )
             # This will work even if the room is already blocked, but that is
             # desirable in case the first attempt at blocking the room failed below.
             await self.store.block_room(room_id, requester_user_id)

@@ -735,6 +735,7 @@ class PaginationHandler:
                 If None, the action was not manually requested but instead
                 triggered automatically, e.g. through a Synapse module
                 or some other policy.
+                MUST NOT be None if block=True.
             new_room_user_id:
                 If set, a new room will be created with this user ID
                 as the creator and admin, and all users in the old room will be
@@ -839,6 +840,7 @@ class PaginationHandler:
                 If None, the action was not manually requested but instead
                 triggered automatically, e.g. through a Synapse module
                 or some other policy.
+                MUST NOT be None if block=True.
             new_room_user_id:
                 If set, a new room will be created with this user ID
                 as the creator and admin, and all users in the old room will be

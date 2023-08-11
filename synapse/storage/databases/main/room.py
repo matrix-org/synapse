@@ -2373,7 +2373,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         )
         return next_id
 
-    async def block_room(self, room_id: str, user_id: Optional[str]) -> None:
+    async def block_room(self, room_id: str, user_id: str) -> None:
         """Marks the room as blocked.
 
         Can be called multiple times (though we'll only track the last user to
@@ -2389,7 +2389,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
             values={},
-            insertion_values={"user_id": user_id or ""},
+            insertion_values={"user_id": user_id},
             desc="block_room",
         )
         await self.db_pool.runInteraction(
