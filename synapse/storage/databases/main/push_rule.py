@@ -398,16 +398,18 @@ class PushRuleStore(PushRulesWorkerStore):
     ) -> None:
         relative_to_rule = before or after
 
-        txn.execute(
-            """
-            SELECT priority, priority_class FROM push_rules FOR SHARE
+        sql = """
+            SELECT priority, priority_class FROM push_rules
             WHERE user_name = ? AND rule_id = ?
-            """,
-            (
-                user_id,
-                relative_to_rule,
-            ),
-        )
+        """
+
+        if isinstance(self.database_engine, PostgresEngine):
+            sql += " FOR SHARE"
+        else:
+            # Annoyingly SQLite doesn't support row level locking, so lock the whole table
+            self.database_engine.lock_table(txn, "push_rules")
+
+        txn.execute(sql, (user_id, relative_to_rule))
         row = txn.fetchone()
 
         if row is None:
@@ -463,6 +465,18 @@ class PushRuleStore(PushRulesWorkerStore):
         conditions_json: str,
         actions_json: str,
     ) -> None:
+        if isinstance(self.database_engine, PostgresEngine):
+            # Postgres doesn't do FOR SHARE on aggregate functions, so select the rows first
+            # then re-select the count/max below.
+            sql = """
+                SELECT * FROM push_rules
+                WHERE user_name = ? and priority_class = ?
+                FOR SHARE
+            """
+        else:
+            # Annoyingly SQLite doesn't support row level locking, so lock the whole table
+            self.database_engine.lock_table(txn, "push_rules")
+
         # find the highest priority rule in that class
         sql = (
             "SELECT COUNT(*), MAX(priority) FROM push_rules"
