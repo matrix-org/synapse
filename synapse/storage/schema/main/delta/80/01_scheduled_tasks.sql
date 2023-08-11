@@ -24,3 +24,5 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks(
     result TEXT,
     error TEXT
 );
+
+CREATE INDEX IF NOT EXISTS scheduled_tasks_status ON scheduled_tasks(status);
