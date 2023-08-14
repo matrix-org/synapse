@@ -15,6 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
+from prometheus_client import Gauge
+
 from twisted.python.failure import Failure
 
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -25,6 +27,12 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+running_tasks_gauge = Gauge(
+    "synapse_scheduler_running_tasks",
+    "The number of concurrent running tasks handled by the TaskScheduler",
+)
 
 
 class TaskScheduler:
@@ -61,11 +69,13 @@ class TaskScheduler:
 
     # Precision of the scheduler, evaluation of tasks to run will only happen
     # every `SCHEDULE_INTERVAL_MS` ms
-    SCHEDULE_INTERVAL_MS = 5 * 60 * 1000  # 5mn
+    SCHEDULE_INTERVAL_MS = 5 * 60 * 1000  # 5mns
     # Time before a complete or failed task is deleted from the DB
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
     # Maximum number of tasks that can run at the same time
     MAX_CONCURRENT_RUNNING_TASKS = 10
+    # Time from the last task update after which we will log a warning
+    LAST_UPDATE_BEFORE_WARNING_MS = 24 * 60 * 60 * 1000  # 24hrs
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
@@ -272,12 +282,20 @@ class TaskScheduler:
     async def _launch_scheduled_tasks(self) -> None:
         """Retrieve and launch scheduled tasks that should be running at that time."""
         for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
-            if (
-                not self.task_is_running(task.id)
-                and len(self._running_tasks)
-                < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
-            ):
-                await self._launch_task(task, first_launch=False)
+            if not self.task_is_running(task.id):
+                if (
+                    len(self._running_tasks)
+                    < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
+                ):
+                    await self._launch_task(task, first_launch=False)
+            else:
+                if (
+                    self._clock.time_msec()
+                    > task.timestamp + TaskScheduler.LAST_UPDATE_BEFORE_WARNING_MS
+                ):
+                    logger.warn(
+                        f"Task {task.id} (action {task.action}) has seen no update for more than 24h and may be stuck"
+                    )
         for task in await self.get_tasks(
             statuses=[TaskStatus.SCHEDULED], max_timestamp=self._clock.time_msec()
         ):
@@ -287,6 +305,8 @@ class TaskScheduler:
                 < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
             ):
                 await self._launch_task(task, first_launch=True)
+
+        running_tasks_gauge.set(len(self._running_tasks))
 
     async def _clean_scheduled_tasks(self) -> None:
         """Clean old complete or failed jobs to avoid clutter the DB."""
