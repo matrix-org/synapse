@@ -28,6 +28,37 @@ logger = logging.getLogger(__name__)
 
 
 class TaskScheduler:
+    """
+    This is a simple task sheduler aimed at resumable tasks: usually we use `run_in_background`
+    to launch a background task, or Twisted `deferLater` if we want to do so later on.
+
+    The problem with that is that the tasks will just stop and never be resumed if synapse
+    is stopped for whatever reason.
+
+    How this works:
+    - A function mapped to a named action should first be registered with `register_action`.
+    This function will be called when trying to resuming tasks after a synapse shutdown,
+    so this registration should happen when synapse is initialised, NOT right before scheduling
+    a task.
+    - A task can then be launched using this named action with `schedule_task`. A `params` dict
+    can be passed, and it will be available to the registered function when launched. This task
+    can be launch either now-ish, or later on by giving a `timestamp` parameter.
+
+    The function may call `update_task` at any time to update the `result` of the task,
+    and this can be used to resume the task at a specific point and/or to convey a result to
+    the code launching the task.
+    You can also specify the `result` (and/or an `error`) when returning from the function.
+
+    The reconciliation loop runs every 5 mns, so this is not a precise scheduler. When wanting
+    to launch now, the launch will still not happen before the next loop run.
+
+    Tasks will be run on the worker specified with `run_background_tasks_on` config,
+    or the main one by default.
+    There is a limit of 10 concurrent tasks, so tasks may be delayed if the pool is already
+    full. In this regard, please take great care that scheduled tasks can actually finished.
+    For now there is no mechanism to stop a running task if it is stuck.
+    """
+
     # Precision of the scheduler, evaluation of tasks to run will only happen
     # every `SCHEDULE_INTERVAL_MS` ms
     SCHEDULE_INTERVAL_MS = 5 * 60 * 1000  # 5mn
