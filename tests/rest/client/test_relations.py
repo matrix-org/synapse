@@ -71,6 +71,38 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
 
         return user_id, access_token
 
+    def _send_content(
+        self,
+        content: dict,
+        event_type: str,
+        access_token: Optional[str] = None,
+        parent_id: Optional[str] = None,
+        expected_response_code: int = 200,
+    ) -> FakeChannel:
+        """Helper function to send an event
+
+        Args:
+            content: The content of the created event.
+            event_type: The type of the event to create
+            access_token: The access token used to send the relation, defaults
+                to `self.user_token`
+            parent_id: The event_id this relation relates to. If None, then self.parent_id
+
+        Returns:
+            FakeChannel
+        """
+        if not access_token:
+            access_token = self.user_token
+
+        channel = self.make_request(
+            "POST",
+            f"/_matrix/client/v3/rooms/{self.room}/send/{event_type}",
+            content,
+            access_token=access_token,
+        )
+        self.assertEqual(expected_response_code, channel.code, channel.json_body)
+        return channel
+
     def _send_relation(
         self,
         relation_type: str,
@@ -96,11 +128,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
         Returns:
             FakeChannel
         """
-        if not access_token:
-            access_token = self.user_token
-
         original_id = parent_id if parent_id else self.parent_id
-
         if content is None:
             content = {}
         content["m.relates_to"] = {
@@ -109,15 +137,9 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
         }
         if key is not None:
             content["m.relates_to"]["key"] = key
-
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/v3/rooms/{self.room}/send/{event_type}",
-            content,
-            access_token=access_token,
+        return self._send_content(
+            content, event_type, access_token, parent_id, expected_response_code
         )
-        self.assertEqual(expected_response_code, channel.code, channel.json_body)
-        return channel
 
     def _get_related_events(self) -> List[str]:
         """
@@ -184,6 +206,56 @@ class RelationsTestCase(BaseRelationsTestCase):
             channel.json_body,
         )
 
+    def test_send_multiple_relations(self) -> None:
+        """Tests that sending multiple relations works."""
+        channel = self._send_content(
+            {
+                "m.relations": [
+                    {
+                        "event_id": self.parent_id,
+                        "key": "👍",
+                        "rel_type": "m.reaction",
+                    },
+                    {
+                        "event_id": self.parent_id,
+                        "key": "👎",
+                        "rel_type": "m.reaction",
+                    },
+                ],
+            },
+            "m.reaction",
+        )
+        event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{event_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        self.assert_dict(
+            {
+                "type": "m.reaction",
+                "sender": self.user_id,
+                "content": {
+                    "m.relations": [
+                        {
+                            "event_id": self.parent_id,
+                            "key": "👍",
+                            "rel_type": "m.reaction",
+                        },
+                        {
+                            "event_id": self.parent_id,
+                            "key": "👎",
+                            "rel_type": "m.reaction",
+                        },
+                    ],
+                },
+            },
+            channel.json_body,
+        )
+
     def test_deny_invalid_event(self) -> None:
         """Test that we deny relations on non-existant events"""
         self._send_relation(
@@ -238,6 +310,7 @@ class RelationsTestCase(BaseRelationsTestCase):
 
     def test_deny_forked_thread(self) -> None:
         """It is invalid to start a thread off a thread."""
+        # XXX: is it valid with m.relations?
         channel = self._send_relation(
             RelationTypes.THREAD,
             "m.room.message",

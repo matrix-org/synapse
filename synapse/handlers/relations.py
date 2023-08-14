@@ -19,7 +19,7 @@ import attr
 
 from synapse.api.constants import Direction, EventTypes, RelationTypes
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase, relation_from_event
+from synapse.events import EventBase, relations_from_event
 from synapse.events.utils import SerializeEventConfig
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import trace
@@ -286,7 +286,7 @@ class RelationsHandler:
     async def _get_threads_for_events(
         self,
         events_by_id: Dict[str, EventBase],
-        relations_by_id: Dict[str, str],
+        relations_by_id: Dict[str, List[str]],
         user_id: str,
         ignored_users: FrozenSet[str],
     ) -> Dict[str, _ThreadAggregation]:
@@ -294,7 +294,7 @@ class RelationsHandler:
 
         Args:
             events_by_id: A map of event_id to events to get aggregations for threads.
-            relations_by_id: A map of event_id to the relation type, if one exists
+            relations_by_id: A map of event_id to the relation types, if any exist
                 for that event.
             user_id: The user requesting the bundled aggregations.
             ignored_users: The users ignored by the requesting user.
@@ -432,28 +432,34 @@ class RelationsHandler:
         """
         # De-duplicated events by ID to handle the same event requested multiple times.
         events_by_id = {}
-        # A map of event ID to the relation in that event, if there is one.
-        relations_by_id: Dict[str, str] = {}
+        # A map of event ID to the relations in that event, if there are any.
+        relations_by_id: Dict[str, List[str]] = {}
         for event in events:
             # State events do not get bundled aggregations.
             if event.is_state():
                 continue
 
-            relates_to = relation_from_event(event)
-            if relates_to:
+            valid = True
+
+            for relates_to in relations_from_event(event):
                 # An event which is a replacement (ie edit) or annotation (ie,
                 # reaction) may not have any other event related to it.
+                # XXX: should this be removed alongside multiple relations being introduced?
                 if relates_to.rel_type in (
                     RelationTypes.ANNOTATION,
                     RelationTypes.REPLACE,
                 ):
-                    continue
+                    valid = False
+                    break
 
                 # Track the event's relation information for later.
-                relations_by_id[event.event_id] = relates_to.rel_type
+                if event.event_id not in relations_by_id.keys():
+                    relations_by_id[event.event_id] = []
+                relations_by_id[event.event_id].append(relates_to.rel_type)
 
-            # The event should get bundled aggregations.
-            events_by_id[event.event_id] = event
+            if valid:
+                # The event should get bundled aggregations.
+                events_by_id[event.event_id] = event
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
@@ -484,7 +490,11 @@ class RelationsHandler:
                 #
                 # We know that the latest event in a thread has a thread relation
                 # (as that is what makes it part of the thread).
-                relations_by_id[latest_thread_event.event_id] = RelationTypes.THREAD
+                if latest_thread_event.event_id not in relations_by_id.keys():
+                    relations_by_id[latest_thread_event.event_id] = []
+                relations_by_id[latest_thread_event.event_id].append(
+                    RelationTypes.THREAD
+                )
 
         async def _fetch_references() -> None:
             """Fetch any references to bundle with this event."""
