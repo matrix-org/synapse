@@ -82,7 +82,7 @@ try:
 except ImportError:
     pass
 
-import synapse.util
+import synapse.util  # noqa: E402
 
 __version__ = synapse.util.SYNAPSE_VERSION
 
