@@ -3025,6 +3025,16 @@ enable SAML login. You can either put your entire pysaml config inline using the
 option, or you can specify a path to a psyaml config file with the sub-option `config_path`.
 This setting has the following sub-options:
 
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `sp_config`: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
    Default values will be used for the `entityid` and `service` settings,
    so it is not normally necessary to specify them unless you need to
@@ -3176,7 +3186,7 @@ Options for each entry include:
 
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 
@@ -3391,6 +3401,16 @@ Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:
 * `enabled`: Set this to true to enable authorization against a CAS server.
    Defaults to false.
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
@@ -3631,6 +3651,7 @@ This option has the following sub-options:
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
    user directory. Defaults to false.
+* `show_locked_users`: Defines whether to show locked users in search query results. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -3638,6 +3659,7 @@ user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 ```
 ---
 ### `user_consent`

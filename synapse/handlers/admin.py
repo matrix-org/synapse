@@ -67,6 +67,7 @@ class AdminHandler:
             "name",
             "admin",
             "deactivated",
+            "locked",
             "shadow_banned",
             "creation_ts",
             "appservice_id",

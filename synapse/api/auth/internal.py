@@ -58,6 +58,7 @@ class InternalAuth(BaseAuth):
         request: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
+        allow_locked: bool = False,
     ) -> Requester:
         """Get a registered user's ID.
 
@@ -79,7 +80,7 @@ class InternalAuth(BaseAuth):
         parent_span = active_span()
         with start_active_span("get_user_by_req"):
             requester = await self._wrapped_get_user_by_req(
-                request, allow_guest, allow_expired
+                request, allow_guest, allow_expired, allow_locked
             )
 
             if parent_span:
@@ -107,6 +108,7 @@ class InternalAuth(BaseAuth):
         request: SynapseRequest,
         allow_guest: bool,
         allow_expired: bool,
+        allow_locked: bool,
     ) -> Requester:
         """Helper for get_user_by_req
 
@@ -125,6 +127,17 @@ class InternalAuth(BaseAuth):
                 requester = await self.get_user_by_access_token(
                     access_token, allow_expired=allow_expired
                 )
+
+                # Deny the request if the user account is locked.
+                if not allow_locked and await self.store.get_user_locked_status(
+                    requester.user.to_string()
+                ):
+                    raise AuthError(
+                        401,
+                        "User account has been locked",
+                        errcode=Codes.USER_LOCKED,
+                        additional_fields={"soft_logout": True},
+                    )
 
                 # Deny the request if the user account has expired.
                 # This check is only done for regular users, not appservice ones.

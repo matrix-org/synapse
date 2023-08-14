@@ -1,1 +1,0 @@
-Properly overwrite the `redacts` content-property for forwards-compatibility with room versions 1 through 10.
