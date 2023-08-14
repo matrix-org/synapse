@@ -1173,6 +1173,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         def assert_bundle(event_json: JsonDict) -> None:
             """Assert the expected values of the bundled aggregations."""
+            print(event_json)
             relations_dict = event_json["unsigned"].get("m.relations")
 
             # Ensure the fields are as expected.
@@ -1243,6 +1244,44 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         reply_1 = channel.json_body["event_id"]
 
         channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
+        reply_2 = channel.json_body["event_id"]
+
+        def assert_annotations(bundled_aggregations: JsonDict) -> None:
+            self.assertEqual(
+                {"chunk": [{"event_id": reply_1}, {"event_id": reply_2}]},
+                bundled_aggregations,
+            )
+
+        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 6)
+
+    def test_msc3051_references(self) -> None:
+        """
+        Test that messages with multiple events and references get correctly bundled.
+        """
+        channel = self._send_content(
+            {
+                "m.relations": [
+                    {
+                        "event_id": self.parent_id,
+                        "rel_type": RelationTypes.REFERENCE,
+                    },
+                ],
+            },
+            "m.room.test",
+        )
+        reply_1 = channel.json_body["event_id"]
+
+        channel = self._send_content(
+            {
+                "m.relations": [
+                    {
+                        "event_id": self.parent_id,
+                        "rel_type": RelationTypes.REFERENCE,
+                    },
+                ],
+            },
+            "m.room.test",
+        )
         reply_2 = channel.json_body["event_id"]
 
         def assert_annotations(bundled_aggregations: JsonDict) -> None:
