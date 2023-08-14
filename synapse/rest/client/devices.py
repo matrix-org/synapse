@@ -29,7 +29,6 @@ from synapse.http.servlet import (
     parse_integer,
 )
 from synapse.http.site import SynapseRequest
-from synapse.replication.http.devices import ReplicationUploadKeysForUserRestServlet
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
 from synapse.rest.client.models import AuthenticationData
 from synapse.rest.models import RequestBodyModel
@@ -480,13 +479,6 @@ class DehydratedDeviceV2Servlet(RestServlet):
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
         self.device_handler = handler
 
-        if hs.config.worker.worker_app is None:
-            # if main process
-            self.key_uploader = self.e2e_keys_handler.upload_keys_for_user
-        else:
-            # then a worker
-            self.key_uploader = ReplicationUploadKeysForUserRestServlet.make_client(hs)
-
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
@@ -549,18 +541,12 @@ class DehydratedDeviceV2Servlet(RestServlet):
                 "Device key(s) not found, these must be provided.",
             )
 
-        # TODO: Those two operations, creating a device and storing the
-        # device's keys should be atomic.
         device_id = await self.device_handler.store_dehydrated_device(
             requester.user.to_string(),
             submission.device_id,
             submission.device_data.dict(),
             submission.initial_device_display_name,
-        )
-
-        # TODO: Do we need to do something with the result here?
-        await self.key_uploader(
-            user_id=user_id, device_id=submission.device_id, keys=submission.dict()
+            device_info,
         )
 
         return 200, {"device_id": device_id}
