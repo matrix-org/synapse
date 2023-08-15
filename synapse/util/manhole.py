@@ -98,7 +98,9 @@ def manhole(settings: ManholeConfig, globals: Dict[str, Any]) -> ServerFactory:
         SynapseManhole, dict(globals, __name__="__console__")
     )
 
-    factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
+    # type-ignore: This is an error in Twisted's annotations. See
+    # https://github.com/twisted/twisted/issues/11812 and /11813 .
+    factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))  # type: ignore[arg-type]
 
     # conch has the wrong type on these dicts (says bytes to bytes,
     # should be bytes to Keys judging by how it's used).
