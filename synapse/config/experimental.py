@@ -370,11 +370,6 @@ class ExperimentalConfig(Config):
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
 
-        # MSC3959: Do not generate notifications for edits.
-        self.msc3958_supress_edit_notifs = experimental.get(
-            "msc3958_supress_edit_notifs", False
-        )
-
         # MSC3967: Do not require UIA when first uploading cross signing keys
         self.msc3967_enabled = experimental.get("msc3967_enabled", False)
 
