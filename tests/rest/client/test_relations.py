@@ -129,7 +129,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         return [ev["event_id"] for ev in channel.json_body["chunk"]]
 
     def _get_bundled_aggregations(self) -> JsonDict:
@@ -142,7 +142,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
             f"/_matrix/client/v3/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         return channel.json_body["unsigned"].get("m.relations", {})
 
     def _find_event_in_chunk(self, events: List[JsonDict]) -> JsonDict:
@@ -1602,7 +1602,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         threads = channel.json_body["chunk"]
         return [
             (
@@ -1634,7 +1634,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         ##################################################
         # Check the test data is configured as expected. #
         ##################################################
-        self.assertEquals(self._get_related_events(), list(reversed(thread_replies)))
+        self.assertEqual(self._get_related_events(), list(reversed(thread_replies)))
         relations = self._get_bundled_aggregations()
         self.assertDictContainsSubset(
             {"count": 3, "current_user_participated": True},
@@ -1655,7 +1655,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self._redact(thread_replies.pop())
 
         # The thread should still exist, but the latest event should be updated.
-        self.assertEquals(self._get_related_events(), list(reversed(thread_replies)))
+        self.assertEqual(self._get_related_events(), list(reversed(thread_replies)))
         relations = self._get_bundled_aggregations()
         self.assertDictContainsSubset(
             {"count": 2, "current_user_participated": True},
@@ -1674,7 +1674,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self._redact(thread_replies.pop(0))
 
         # Nothing should have changed (except the thread count).
-        self.assertEquals(self._get_related_events(), thread_replies)
+        self.assertEqual(self._get_related_events(), thread_replies)
         relations = self._get_bundled_aggregations()
         self.assertDictContainsSubset(
             {"count": 1, "current_user_participated": True},
@@ -1691,11 +1691,11 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # Redact the last remaining event. #
         ####################################
         self._redact(thread_replies.pop(0))
-        self.assertEquals(thread_replies, [])
+        self.assertEqual(thread_replies, [])
 
         # The event should no longer be considered a thread.
-        self.assertEquals(self._get_related_events(), [])
-        self.assertEquals(self._get_bundled_aggregations(), {})
+        self.assertEqual(self._get_related_events(), [])
+        self.assertEqual(self._get_bundled_aggregations(), {})
         self.assertEqual(self._get_threads(), [])
 
     def test_redact_parent_edit(self) -> None:
@@ -1749,8 +1749,8 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # The relations are returned.
         event_ids = self._get_related_events()
         relations = self._get_bundled_aggregations()
-        self.assertEquals(event_ids, [related_event_id])
-        self.assertEquals(
+        self.assertEqual(event_ids, [related_event_id])
+        self.assertEqual(
             relations[RelationTypes.REFERENCE],
             {"chunk": [{"event_id": related_event_id}]},
         )
@@ -1772,7 +1772,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # The unredacted relation should still exist.
         event_ids = self._get_related_events()
         relations = self._get_bundled_aggregations()
-        self.assertEquals(len(event_ids), 1)
+        self.assertEqual(len(event_ids), 1)
         self.assertDictContainsSubset(
             {
                 "count": 1,
@@ -1816,7 +1816,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         threads = self._get_threads(channel.json_body)
         self.assertEqual(threads, [(thread_2, reply_2), (thread_1, reply_1)])
 
@@ -1829,7 +1829,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         # Tuple of (thread ID, latest event ID) for each thread.
         threads = self._get_threads(channel.json_body)
         self.assertEqual(threads, [(thread_1, reply_3), (thread_2, reply_2)])
@@ -1850,7 +1850,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
         self.assertEqual(thread_roots, [thread_2])
 
@@ -1864,7 +1864,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1&from={next_batch}",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
         self.assertEqual(thread_roots, [thread_1], channel.json_body)
 
@@ -1899,7 +1899,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
         self.assertEqual(
             thread_roots, [thread_3, thread_2, thread_1], channel.json_body
@@ -1911,7 +1911,7 @@ class ThreadsTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads?include=participated",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
         self.assertEqual(thread_roots, [thread_2, thread_1], channel.json_body)
 
@@ -1943,6 +1943,6 @@ class ThreadsTestCase(BaseRelationsTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/threads",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
         self.assertEqual(thread_roots, [thread_1], channel.json_body)

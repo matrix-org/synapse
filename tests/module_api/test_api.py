@@ -757,7 +757,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertEqual(channel.json_body["creator"], user_id)
 
         # Check room alias.
-        self.assertEquals(room_alias, f"#foo-bar:{self.module_api.server_name}")
+        self.assertEqual(room_alias, f"#foo-bar:{self.module_api.server_name}")
 
         # Let's try a room with no alias.
         room_id, room_alias = self.get_success(

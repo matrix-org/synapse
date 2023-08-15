@@ -40,7 +40,7 @@ from tests.test_utils import make_awaitable
 
 class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(ApplicationServiceStoreTestCase, self).setUp()
+        super().setUp()
 
         self.as_yaml_files: List[str] = []
 
@@ -71,7 +71,7 @@ class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
             except Exception:
                 pass
 
-        super(ApplicationServiceStoreTestCase, self).tearDown()
+        super().tearDown()
 
     def _add_appservice(
         self, as_token: str, id: str, url: str, hs_token: str, sender: str
@@ -110,7 +110,7 @@ class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
 
 class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(ApplicationServiceTransactionStoreTestCase, self).setUp()
+        super().setUp()
         self.as_yaml_files: List[str] = []
 
         self.hs.config.appservice.app_service_config_files = self.as_yaml_files
