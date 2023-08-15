@@ -238,6 +238,7 @@ class BackgroundUpdater:
     def __init__(self, hs: "HomeServer", database: "DatabasePool"):
         self._clock = hs.get_clock()
         self.db_pool = database
+        self.hs = hs
 
         self._database_name = database.name()
 
@@ -760,7 +761,7 @@ class BackgroundUpdater:
 
                 # override the global statement timeout to avoid accidentally squashing
                 # a long-running index creation process
-                timeout_sql = "SET LOCAL statement_timeout = 0"
+                timeout_sql = "SET SESSION statement_timeout = 0"
                 c.execute(timeout_sql)
 
                 sql = (
@@ -776,6 +777,11 @@ class BackgroundUpdater:
                 }
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
+
+                # mypy ignore - `statement_timeout` is defined on PostgresEngine
+                default_timeout = self.db_pool.engine.statement_timeout  # type: ignore[attr-defined]
+                undo_timeout_sql = f"SET statement_timeout = {default_timeout}"
+                c.execute(undo_timeout_sql)
 
                 if replaces_index is not None:
                     # We drop the old index as the new index has now been created.
