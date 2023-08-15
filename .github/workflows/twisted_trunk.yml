@@ -15,9 +15,6 @@ on:
         default: 'trunk'
         type: string
 
-  push:
-    branches:
-      - dmr/fix-twisted-trunk
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
