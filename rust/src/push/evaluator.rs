@@ -564,7 +564,7 @@ fn test_requires_room_version_supports_condition() {
     };
     let rules = PushRules::new(vec![custom_rule]);
     result = evaluator.run(
-        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true, false),
+        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true),
         None,
         None,
     );
