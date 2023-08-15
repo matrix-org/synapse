@@ -5,6 +5,9 @@ on:
     - cron: 0 8 * * *
 
   workflow_dispatch:
+    # NB: inputs are only present when this workflow is dispatched manually.
+    # (The default below is the default field value in the form to trigger
+    # a manual dispatch). Otherwise the inputs will evaluate to null.
     inputs:
       twisted_ref:
         description: Commit, branch or tag to checkout from upstream Twisted.
@@ -49,7 +52,7 @@ jobs:
           extras: "all"
       - run: |
           poetry remove twisted
-          poetry add --extras tls git+https://github.com/twisted/twisted.git#${{ inputs.twisted_ref }}
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#${{ inputs.twisted_ref || 'trunk' }}
           poetry install --no-interaction --extras "all test"
       - name: Remove warn_unused_ignores from mypy config
         run: sed '/warn_unused_ignores = True/d' -i mypy.ini
