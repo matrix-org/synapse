@@ -109,6 +109,8 @@ class UsersRestServletV2(RestServlet):
             )
         deactivated = parse_boolean(request, "deactivated", default=False)
 
+        admins = parse_boolean(request, "admins")
+
         # If support for MSC3866 is not enabled, apply no filtering based on the
         # `approved` column.
         if self._msc3866_enabled:
@@ -146,6 +148,7 @@ class UsersRestServletV2(RestServlet):
             name,
             guests,
             deactivated,
+            admins,
             order_by,
             direction,
             approved,
