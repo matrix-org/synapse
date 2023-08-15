@@ -218,7 +218,7 @@ class MacaroonGenerator:
         # to avoid validating those as guest tokens, we explicitely verify if
         # the macaroon includes the "guest = true" caveat.
         is_guest = any(
-            (caveat.caveat_id == "guest = true" for caveat in macaroon.caveats)
+            caveat.caveat_id == "guest = true" for caveat in macaroon.caveats
         )
 
         if not is_guest:

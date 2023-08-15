@@ -19,6 +19,7 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
+    Counter,
     Dict,
     Iterable,
     List,
@@ -27,8 +28,6 @@ from typing import (
     Union,
     cast,
 )
-
-from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 

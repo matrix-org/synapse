@@ -82,7 +82,7 @@ def generate_config_from_template(
                 with open(filename) as handle:
                     value = handle.read()
             else:
-                log("Generating a random secret for {}".format(secret))
+                log(f"Generating a random secret for {secret}")
                 value = codecs.encode(os.urandom(32), "hex").decode()
                 with open(filename, "w") as handle:
                     handle.write(value)
