@@ -263,7 +263,6 @@ class TaskScheduler:
         Args:
             id: id of the task to delete
         """
-        assert self._run_background_tasks
         if self.task_is_running(id):
             raise Exception(f"Task {id} is currently running and can't be deleted")
         await self._store.delete_scheduled_task(id)
@@ -271,9 +270,12 @@ class TaskScheduler:
     def task_is_running(self, id: str) -> bool:
         """Check if a task is currently running.
 
+        Can only be called from the worker handling the task scheduling.
+
         Args:
             id: id of the task to check
         """
+        assert self._run_background_tasks
         return id in self._running_tasks
 
     async def _handle_scheduled_tasks(self) -> None:
