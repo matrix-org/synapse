@@ -455,14 +455,13 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(k.verify_key.alg, "ed25519")
         self.assertEqual(k.verify_key.version, "ver1")
 
-        # check that the perspectives store is correctly updated
-        lookup_tuple = (SERVER_NAME, testverifykey_id)
+        # check that the perspectives store is correctly updated=
         key_json = self.get_success(
             self.hs.get_datastores().main.get_server_keys_json_for_remote(
-                [lookup_tuple]
+                SERVER_NAME, [testverifykey_id]
             )
         )
-        res = key_json[lookup_tuple]
+        res = key_json[testverifykey_id]
         self.assertIsNotNone(res)
         assert res is not None
         self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
@@ -572,13 +571,12 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(k.verify_key.version, "ver1")
 
         # check that the perspectives store is correctly updated
-        lookup_tuple = (SERVER_NAME, testverifykey_id)
         key_json = self.get_success(
             self.hs.get_datastores().main.get_server_keys_json_for_remote(
-                [lookup_tuple]
+                SERVER_NAME, [testverifykey_id]
             )
         )
-        res = key_json[lookup_tuple]
+        res = key_json[testverifykey_id]
         self.assertIsNotNone(res)
         assert res is not None
         self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
@@ -691,13 +689,12 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(k.verify_key.version, "ver1")
 
         # check that the perspectives store is correctly updated
-        lookup_tuple = (SERVER_NAME, testverifykey_id)
         key_json = self.get_success(
             self.hs.get_datastores().main.get_server_keys_json_for_remote(
-                [lookup_tuple]
+                SERVER_NAME, [testverifykey_id]
             )
         )
-        res = key_json[lookup_tuple]
+        res = key_json[testverifykey_id]
         self.assertIsNotNone(res)
         assert res is not None
         self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)

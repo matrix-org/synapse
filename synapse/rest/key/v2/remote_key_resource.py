@@ -14,7 +14,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Mapping, Optional, Set, Tuple
 
 from signedjson.sign import sign_json
 
@@ -27,6 +27,7 @@ from synapse.http.servlet import (
     parse_integer,
     parse_json_object_from_request,
 )
+from synapse.storage.keys import FetchKeyResultForRemote
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import yieldable_gather_results
@@ -157,14 +158,22 @@ class RemoteKey(RestServlet):
     ) -> JsonDict:
         logger.info("Handling query for keys %r", query)
 
-        store_queries = []
+        cached: Dict[Tuple[str, str], Optional[FetchKeyResultForRemote]] = {}
         for server_name, key_ids in query.items():
-            if not key_ids:
-                key_ids = (None,)
-            for key_id in key_ids:
-                store_queries.append((server_name, key_id))
+            if key_ids:
+                results: Mapping[
+                    str, Optional[FetchKeyResultForRemote]
+                ] = await self.store.get_server_keys_json_for_remote(
+                    server_name, key_ids
+                )
+            else:
+                results = await self.store.get_all_server_keys_json_for_remote(
+                    server_name
+                )
 
-        cached = await self.store.get_server_keys_json_for_remote(store_queries)
+            cached.update(
+                ((server_name, key_id), res) for key_id, res in results.items()
+            )
 
         json_results: Set[bytes] = set()
 

@@ -22,7 +22,6 @@ from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import LoggingTransaction
 from synapse.storage.keys import FetchKeyResult, FetchKeyResultForRemote
 from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList
@@ -254,55 +253,74 @@ class KeyStore(SQLBaseStore):
         return await self.db_pool.runInteraction("get_server_keys_json", _txn)
 
     async def get_server_keys_json_for_remote(
-        self, server_keys: Iterable[Tuple[str, Optional[str]]]
-    ) -> Dict[Tuple[str, str], Optional[FetchKeyResultForRemote]]:
-        """Retrieve the key json for a list of server_keys and key ids.
+        self, server_name: str, key_ids: Iterable[str]
+    ) -> Dict[str, Optional[FetchKeyResultForRemote]]:
+        """Fetch the cached keys for the given server/key IDs.
 
-        Args:
-            server_keys: List of (server_name, key_id) tuples. If `key_id` is
-                None, returns all keys that are in the DB.
-
-        Returns:
-            A mapping from (server_name, key_id) tuples to the key data, or
-            None if we don't have that key_id stored
+        If we have multiple entries for a given key ID, returns the most recent.
         """
-
-        def _get_server_keys_json_txn(
-            txn: LoggingTransaction,
-        ) -> Dict[Tuple[str, str], Optional[FetchKeyResultForRemote]]:
-            results: Dict[Tuple[str, str], Optional[FetchKeyResultForRemote]] = {}
-            for server_name, key_id in server_keys:
-                keyvalues = {"server_name": server_name}
-                if key_id is not None:
-                    keyvalues["key_id"] = key_id
-
-                rows = self.db_pool.simple_select_list_txn(
-                    txn,
-                    "server_keys_json",
-                    keyvalues=keyvalues,
-                    retcols=(
-                        "key_id",
-                        "from_server",
-                        "ts_added_ms",
-                        "ts_valid_until_ms",
-                        "key_json",
-                    ),
-                )
-
-                if not rows:
-                    continue
-
-                row = max(rows, key=lambda r: r["ts_added_ms"])
-
-                results[(server_name, row["key_id"])] = FetchKeyResultForRemote(
-                    # Cast to bytes since postgresql returns a memoryview.
-                    key_json=bytes(row["key_json"]),
-                    valid_until_ts=row["ts_valid_until_ms"],
-                    added_ts=row["ts_added_ms"],
-                )
-
-            return results
-
-        return await self.db_pool.runInteraction(
-            "get_server_keys_json_for_remote", _get_server_keys_json_txn
+        rows = await self.db_pool.simple_select_many_batch(
+            table="server_keys_json",
+            column="key_id",
+            iterable=key_ids,
+            keyvalues={"server_name": server_name},
+            retcols=(
+                "key_id",
+                "from_server",
+                "ts_added_ms",
+                "ts_valid_until_ms",
+                "key_json",
+            ),
+            desc="get_server_keys_json_for_remote",
         )
+
+        if not rows:
+            return {}
+
+        rows.sort(key=lambda r: r["ts_added_ms"])
+
+        return {
+            row["key_id"]: FetchKeyResultForRemote(
+                # Cast to bytes since postgresql returns a memoryview.
+                key_json=bytes(row["key_json"]),
+                valid_until_ts=row["ts_valid_until_ms"],
+                added_ts=row["ts_added_ms"],
+            )
+            for row in rows
+        }
+
+    async def get_all_server_keys_json_for_remote(
+        self,
+        server_name: str,
+    ) -> Dict[str, FetchKeyResultForRemote]:
+        """Fetch the cached keys for the given server.
+
+        If we have multiple entries for a given key ID, returns the most recent.
+        """
+        rows = await self.db_pool.simple_select_list(
+            table="server_keys_json",
+            keyvalues={"server_name": server_name},
+            retcols=(
+                "key_id",
+                "from_server",
+                "ts_added_ms",
+                "ts_valid_until_ms",
+                "key_json",
+            ),
+            desc="get_server_keys_json_for_remote",
+        )
+
+        if not rows:
+            return {}
+
+        rows.sort(key=lambda r: r["ts_added_ms"])
+
+        return {
+            row["key_id"]: FetchKeyResultForRemote(
+                # Cast to bytes since postgresql returns a memoryview.
+                key_json=bytes(row["key_json"]),
+                valid_until_ts=row["ts_valid_until_ms"],
+                added_ts=row["ts_added_ms"],
+            )
+            for row in rows
+        }
