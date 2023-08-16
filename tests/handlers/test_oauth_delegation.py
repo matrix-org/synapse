@@ -500,7 +500,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             )
         )
 
-        # first call should cache response - check cache
+        # first call should cache response
         # Mpyp ignores below are due to mypy not understanding the dynamic substitution of msc3861 auth code
         # for regular auth code via the config
         self.get_success(
@@ -531,7 +531,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
                     "active": "true",
                     "scope": "guest",
                     "jti": "stale",
-                    "exp": self.clock.time_msec() + 100,
+                    "exp": self.clock.time() + 100,
                 },
             )
         )
@@ -543,7 +543,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.assertEqual(self.http_client.request.call_count, 1)
 
         # advance the reactor past the token expiry but less than the cache expiry
-        self.reactor.advance(30)
+        self.reactor.advance(120)
         self.assertEqual(self.auth._token_cache.get("stale"), introspection_token)  # type: ignore[attr-defined]
 
         # check that the next call causes another http request (which will fail because the token is technically expired

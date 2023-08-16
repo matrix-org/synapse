@@ -156,70 +156,72 @@ class MSC3861DelegatedAuth(BaseAuth):
         # check the cache before doing a request
         introspection_token = self._token_cache.get(token, None)
 
-        expired = False
         if introspection_token:
             # check the expiration field of the token (if it exists)
             exp = introspection_token.get("exp", None)
             if exp:
-                time_now = self._clock.time_msec()
+                time_now = self._clock.time()
                 expired = time_now > exp
+                if not expired:
+                    return introspection_token
+            else:
+                return introspection_token
 
-        if not introspection_token or expired:
-            metadata = await self._issuer_metadata.get()
-            introspection_endpoint = metadata.get("introspection_endpoint")
-            raw_headers: Dict[str, str] = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": str(self._http_client.user_agent, "utf-8"),
-                "Accept": "application/json",
-            }
+        metadata = await self._issuer_metadata.get()
+        introspection_endpoint = metadata.get("introspection_endpoint")
+        raw_headers: Dict[str, str] = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": str(self._http_client.user_agent, "utf-8"),
+            "Accept": "application/json",
+        }
 
-            args = {"token": token, "token_type_hint": "access_token"}
-            body = urlencode(args, True)
+        args = {"token": token, "token_type_hint": "access_token"}
+        body = urlencode(args, True)
 
-            # Fill the body/headers with credentials
-            uri, raw_headers, body = self._client_auth.prepare(
-                method="POST",
-                uri=introspection_endpoint,
-                headers=raw_headers,
-                body=body,
+        # Fill the body/headers with credentials
+        uri, raw_headers, body = self._client_auth.prepare(
+            method="POST",
+            uri=introspection_endpoint,
+            headers=raw_headers,
+            body=body,
+        )
+        headers = Headers({k: [v] for (k, v) in raw_headers.items()})
+
+        # Do the actual request
+        # We're not using the SimpleHttpClient util methods as we don't want to
+        # check the HTTP status code, and we do the body encoding ourselves.
+        response = await self._http_client.request(
+            method="POST",
+            uri=uri,
+            data=body.encode("utf-8"),
+            headers=headers,
+        )
+
+        resp_body = await make_deferred_yieldable(readBody(response))
+
+        if response.code < 200 or response.code >= 300:
+            raise HttpResponseException(
+                response.code,
+                response.phrase.decode("ascii", errors="replace"),
+                resp_body,
             )
-            headers = Headers({k: [v] for (k, v) in raw_headers.items()})
 
-            # Do the actual request
-            # We're not using the SimpleHttpClient util methods as we don't want to
-            # check the HTTP status code, and we do the body encoding ourselves.
-            response = await self._http_client.request(
-                method="POST",
-                uri=uri,
-                data=body.encode("utf-8"),
-                headers=headers,
+        resp = json_decoder.decode(resp_body.decode("utf-8"))
+
+        if not isinstance(resp, dict):
+            raise ValueError(
+                "The introspection endpoint returned an invalid JSON response."
             )
 
-            resp_body = await make_deferred_yieldable(readBody(response))
+        expiration = resp.get("exp", None)
+        if expiration:
+            if self._clock.time() > expiration:
+                raise InvalidClientTokenError("Token is expired.")
 
-            if response.code < 200 or response.code >= 300:
-                raise HttpResponseException(
-                    response.code,
-                    response.phrase.decode("ascii", errors="replace"),
-                    resp_body,
-                )
+        introspection_token = IntrospectionToken(**resp)
 
-            resp = json_decoder.decode(resp_body.decode("utf-8"))
-
-            if not isinstance(resp, dict):
-                raise ValueError(
-                    "The introspection endpoint returned an invalid JSON response."
-                )
-
-            expiration = resp.get("exp", None)
-            if expiration:
-                if self._clock.time_msec() > expiration:
-                    raise InvalidClientTokenError("Token is expired.")
-
-            introspection_token = IntrospectionToken(**resp)
-
-            # add token to cache
-            self._token_cache[token] = introspection_token
+        # add token to cache
+        self._token_cache[token] = introspection_token
 
         return introspection_token
 
