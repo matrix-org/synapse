@@ -20,6 +20,7 @@ import typing
 from typing import (
     Any,
     Callable,
+    ContextManager,
     DefaultDict,
     Dict,
     Iterator,
@@ -33,7 +34,6 @@ from typing import (
 from weakref import WeakSet
 
 from prometheus_client.core import Counter
-from typing_extensions import ContextManager
 
 from twisted.internet import defer
 

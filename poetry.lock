@@ -558,13 +558,13 @@ dev = ["Sphinx", "coverage", "flake8", "lxml", "lxml-stubs", "memory-profiler", 
 
 [[package]]
 name = "furo"
-version = "2023.5.20"
+version = "2023.7.26"
 description = "A clean customisable Sphinx documentation theme."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "furo-2023.5.20-py3-none-any.whl", hash = "sha256:594a8436ddfe0c071f3a9e9a209c314a219d8341f3f1af33fdf7c69544fab9e6"},
-    {file = "furo-2023.5.20.tar.gz", hash = "sha256:40e09fa17c6f4b22419d122e933089226dcdb59747b5b6c79363089827dea16f"},
+    {file = "furo-2023.7.26-py3-none-any.whl", hash = "sha256:1c7936929ec57c5ddecc7c85f07fa8b2ce536b5c89137764cca508be90e11efd"},
+    {file = "furo-2023.7.26.tar.gz", hash = "sha256:257f63bab97aa85213a1fa24303837a3c3f30be92901ec732fea74290800f59e"},
 ]
 
 [package.dependencies]
@@ -589,13 +589,13 @@ smmap = ">=3.0.1,<6"
 
 [[package]]
 name = "gitpython"
-version = "3.1.31"
+version = "3.1.32"
 description = "GitPython is a Python library used to interact with Git repositories"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "GitPython-3.1.31-py3-none-any.whl", hash = "sha256:f04893614f6aa713a60cbbe1e6a97403ef633103cdd0ef5eb6efe0deb98dbe8d"},
-    {file = "GitPython-3.1.31.tar.gz", hash = "sha256:8ce3bcf69adfdf7c7d503e78fd3b1c492af782d58893b650adb2ac8912ddd573"},
+    {file = "GitPython-3.1.32-py3-none-any.whl", hash = "sha256:e3d59b1c2c6ebb9dfa7a184daf3b6dd4914237e7488a1730a6d8f6f5d0b4187f"},
+    {file = "GitPython-3.1.32.tar.gz", hash = "sha256:8d9b8cb1e80b9735e8717c9362079d3ce4c6e5ddeebedd0361b228c3a67a62f6"},
 ]
 
 [package.dependencies]
@@ -887,17 +887,17 @@ scripts = ["click (>=6.0)", "twisted (>=16.4.0)"]
 
 [[package]]
 name = "isort"
-version = "5.11.5"
+version = "5.12.0"
 description = "A Python utility / library to sort Python imports."
 optional = false
-python-versions = ">=3.7.0"
+python-versions = ">=3.8.0"
 files = [
-    {file = "isort-5.11.5-py3-none-any.whl", hash = "sha256:ba1d72fb2595a01c7895a5128f9585a5cc4b6d395f1c8d514989b9a7eb2a8746"},
-    {file = "isort-5.11.5.tar.gz", hash = "sha256:6be1f76a507cb2ecf16c7cf14a37e41609ca082330be4e3436a18ef74add55db"},
+    {file = "isort-5.12.0-py3-none-any.whl", hash = "sha256:f84c2818376e66cf843d497486ea8fed8700b340f308f076c6fb1229dff318b6"},
+    {file = "isort-5.12.0.tar.gz", hash = "sha256:8bef7dde241278824a6d83f44a544709b065191b95b6e50894bdc722fcba0504"},
 ]
 
 [package.extras]
-colors = ["colorama (>=0.4.3,<0.5.0)"]
+colors = ["colorama (>=0.4.3)"]
 pipfile-deprecated-finder = ["pip-shims (>=0.5.2)", "pipreqs", "requirementslib"]
 plugins = ["setuptools"]
 requirements-deprecated-finder = ["pip-api", "pipreqs"]
@@ -973,13 +973,13 @@ i18n = ["Babel (>=2.7)"]
 
 [[package]]
 name = "jsonschema"
-version = "4.18.3"
+version = "4.19.0"
 description = "An implementation of JSON Schema validation for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "jsonschema-4.18.3-py3-none-any.whl", hash = "sha256:aab78b34c2de001c6b692232f08c21a97b436fe18e0b817bf0511046924fceef"},
-    {file = "jsonschema-4.18.3.tar.gz", hash = "sha256:64b7104d72efe856bea49ca4af37a14a9eba31b40bb7238179f3803130fd34d9"},
+    {file = "jsonschema-4.19.0-py3-none-any.whl", hash = "sha256:043dc26a3845ff09d20e4420d6012a9c91c9aa8999fa184e7efcfeccb41e32cb"},
+    {file = "jsonschema-4.19.0.tar.gz", hash = "sha256:6e1e7569ac13be8139b2dd2c21a55d350066ee3f80df06c608b398cdc6f30e8f"},
 ]
 
 [package.dependencies]
@@ -1610,13 +1610,13 @@ files = [
 
 [[package]]
 name = "phonenumbers"
-version = "8.13.14"
+version = "8.13.18"
 description = "Python version of Google's common library for parsing, formatting, storing and validating international phone numbers."
 optional = false
 python-versions = "*"
 files = [
-    {file = "phonenumbers-8.13.14-py2.py3-none-any.whl", hash = "sha256:a4b20b6ba7dd402728f5cc8e86e1f29b1a873af45f5381dbee7e3083af497ff6"},
-    {file = "phonenumbers-8.13.14.tar.gz", hash = "sha256:5fa952b4abf9fccdaf1f130d96114a520c48890d4091b50a064e22c0fdc12dec"},
+    {file = "phonenumbers-8.13.18-py2.py3-none-any.whl", hash = "sha256:3d802739a22592e4127139349937753dee9b6a20bdd5d56847cd885bdc766b1f"},
+    {file = "phonenumbers-8.13.18.tar.gz", hash = "sha256:b360c756252805d44b447b5bca6d250cf6bd6c69b6f0f4258f3bfe5ab81bef69"},
 ]
 
 [[package]]
@@ -2921,13 +2921,13 @@ files = [
 
 [[package]]
 name = "txredisapi"
-version = "1.4.9"
+version = "1.4.10"
 description = "non-blocking redis client for python"
 optional = true
 python-versions = "*"
 files = [
-    {file = "txredisapi-1.4.9-py3-none-any.whl", hash = "sha256:72e6ad09cc5fffe3bec2e55e5bfb74407bd357565fc212e6003f7e26ef7d8f78"},
-    {file = "txredisapi-1.4.9.tar.gz", hash = "sha256:c9607062d05e4d0b8ef84719eb76a3fe7d5ccd606a2acf024429da51d6e84559"},
+    {file = "txredisapi-1.4.10-py3-none-any.whl", hash = "sha256:0a6ea77f27f8cf092f907654f08302a97b48fa35f24e0ad99dfb74115f018161"},
+    {file = "txredisapi-1.4.10.tar.gz", hash = "sha256:7609a6af6ff4619a3189c0adfb86aeda789afba69eb59fc1e19ac0199e725395"},
 ]
 
 [package.dependencies]
@@ -2936,13 +2936,13 @@ twisted = "*"
 
 [[package]]
 name = "types-bleach"
-version = "6.0.0.3"
+version = "6.0.0.4"
 description = "Typing stubs for bleach"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-bleach-6.0.0.3.tar.gz", hash = "sha256:8ce7896d4f658c562768674ffcf07492c7730e128018f03edd163ff912bfadee"},
-    {file = "types_bleach-6.0.0.3-py3-none-any.whl", hash = "sha256:d43eaf30a643ca824e16e2dcdb0c87ef9226237e2fa3ac4732a50cb3f32e145f"},
+    {file = "types-bleach-6.0.0.4.tar.gz", hash = "sha256:357b0226f65c4f20ab3b13ca8d78a6b91c78aad256d8ec168d4e90fc3303ebd4"},
+    {file = "types_bleach-6.0.0.4-py3-none-any.whl", hash = "sha256:2b8767eb407c286b7f02803678732e522e04db8d56cbc9f1270bee49627eae92"},
 ]
 
 [[package]]
@@ -2980,24 +2980,24 @@ files = [
 
 [[package]]
 name = "types-opentracing"
-version = "2.4.10.5"
+version = "2.4.10.6"
 description = "Typing stubs for opentracing"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-opentracing-2.4.10.5.tar.gz", hash = "sha256:852d13ab1324832835d50c00cfd58b9267f0e79ec3189e5664c2a90c26880fd4"},
-    {file = "types_opentracing-2.4.10.5-py3-none-any.whl", hash = "sha256:8f12ab4dce3e298a8e6655da9a6d52171e7a275357eae4cec22a1663d94023a7"},
+    {file = "types-opentracing-2.4.10.6.tar.gz", hash = "sha256:87a1bdfce9de5e555e30497663583b9b9c3bb494d029ef9806aa1f137c19e744"},
+    {file = "types_opentracing-2.4.10.6-py3-none-any.whl", hash = "sha256:25914c834db033a4a38fc322df0b5e5e14503b0ac97f78304ae180d721555e97"},
 ]
 
 [[package]]
 name = "types-pillow"
-version = "10.0.0.1"
+version = "10.0.0.2"
 description = "Typing stubs for Pillow"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-Pillow-10.0.0.1.tar.gz", hash = "sha256:834a07a04504f8bf37936679bc6a5802945e7644d0727460c0c4d4307967e2a3"},
-    {file = "types_Pillow-10.0.0.1-py3-none-any.whl", hash = "sha256:be576b67418f1cb3b93794cf7946581be1009a33a10085b3c132eb0875a819b4"},
+    {file = "types-Pillow-10.0.0.2.tar.gz", hash = "sha256:fe09380ab22d412ced989a067e9ee4af719fa3a47ba1b53b232b46514a871042"},
+    {file = "types_Pillow-10.0.0.2-py3-none-any.whl", hash = "sha256:29d51a3ce6ef51fabf728a504d33b4836187ff14256b2e86996d55c91ab214b1"},
 ]
 
 [[package]]
@@ -3052,13 +3052,13 @@ types-urllib3 = "*"
 
 [[package]]
 name = "types-setuptools"
-version = "68.0.0.0"
+version = "68.0.0.3"
 description = "Typing stubs for setuptools"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-setuptools-68.0.0.0.tar.gz", hash = "sha256:fc958b4123b155ffc069a66d3af5fe6c1f9d0600c35c0c8444b2ab4147112641"},
-    {file = "types_setuptools-68.0.0.0-py3-none-any.whl", hash = "sha256:cc00e09ba8f535362cbe1ea8b8407d15d14b59c57f4190cceaf61a9e57616446"},
+    {file = "types-setuptools-68.0.0.3.tar.gz", hash = "sha256:d57ae6076100b5704b3cc869fdefc671e1baf4c2cd6643f84265dfc0b955bf05"},
+    {file = "types_setuptools-68.0.0.3-py3-none-any.whl", hash = "sha256:fec09e5c18264c5c09351c00be01a34456fb7a88e457abe97401325f84ad9d36"},
 ]
 
 [[package]]

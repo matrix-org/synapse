@@ -1,1 +1,0 @@
-Allow modules to check whether the current worker is configured to run background tasks.

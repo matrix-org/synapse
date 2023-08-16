@@ -27,6 +27,7 @@ from twisted.web.http_headers import Headers
 from synapse.api.auth.base import BaseAuth
 from synapse.api.errors import (
     AuthError,
+    Codes,
     HttpResponseException,
     InvalidClientTokenError,
     OAuthInsufficientScopeError,
@@ -196,6 +197,7 @@ class MSC3861DelegatedAuth(BaseAuth):
         request: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
+        allow_locked: bool = False,
     ) -> Requester:
         access_token = self.get_access_token_from_request(request)
 
@@ -204,6 +206,17 @@ class MSC3861DelegatedAuth(BaseAuth):
             # TODO: we probably want to assert the allow_guest inside this call
             # so that we don't provision the user if they don't have enough permission:
             requester = await self.get_user_by_access_token(access_token, allow_expired)
+
+            # Deny the request if the user account is locked.
+            if not allow_locked and await self.store.get_user_locked_status(
+                requester.user.to_string()
+            ):
+                raise AuthError(
+                    401,
+                    "User account has been locked",
+                    errcode=Codes.USER_LOCKED,
+                    additional_fields={"soft_logout": True},
+                )
 
         if not allow_guest and requester.is_guest:
             raise OAuthInsufficientScopeError([SCOPE_MATRIX_API])

@@ -280,6 +280,17 @@ class UserRestServletV2(RestServlet):
                 HTTPStatus.BAD_REQUEST, "'deactivated' parameter is not of type boolean"
             )
 
+        lock = body.get("locked", False)
+        if not isinstance(lock, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "'locked' parameter is not of type boolean"
+            )
+
+        if deactivate and lock:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "An user can't be deactivated and locked"
+            )
+
         approved: Optional[bool] = None
         if "approved" in body and self._msc3866_enabled:
             approved = body["approved"]
@@ -396,6 +407,12 @@ class UserRestServletV2(RestServlet):
                     await self.deactivate_account_handler.activate_account(
                         target_user.to_string()
                     )
+
+            if "locked" in body:
+                if lock and not user["locked"]:
+                    await self.store.set_user_locked_status(user_id, True)
+                elif not lock and user["locked"]:
+                    await self.store.set_user_locked_status(user_id, False)
 
             if "user_type" in body:
                 await self.store.set_user_type(target_user, user_type)

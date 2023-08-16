@@ -385,6 +385,7 @@ class DeviceHandler(DeviceWorkerHandler):
         self.federation_sender = hs.get_federation_sender()
         self._account_data_handler = hs.get_account_data_handler()
         self._storage_controllers = hs.get_storage_controllers()
+        self.db_pool = hs.get_datastores().main.db_pool
 
         self.device_list_updater = DeviceListUpdater(hs, self)
 
@@ -656,15 +657,17 @@ class DeviceHandler(DeviceWorkerHandler):
         device_id: Optional[str],
         device_data: JsonDict,
         initial_device_display_name: Optional[str] = None,
+        keys_for_device: Optional[JsonDict] = None,
     ) -> str:
-        """Store a dehydrated device for a user.  If the user had a previous
-        dehydrated device, it is removed.
+        """Store a dehydrated device for a user, optionally storing the keys associated with
+        it as well.  If the user had a previous dehydrated device, it is removed.
 
         Args:
             user_id: the user that we are storing the device for
             device_id: device id supplied by client
             device_data: the dehydrated device information
             initial_device_display_name: The display name to use for the device
+            keys_for_device: keys for the dehydrated device
         Returns:
             device id of the dehydrated device
         """
@@ -673,11 +676,16 @@ class DeviceHandler(DeviceWorkerHandler):
             device_id,
             initial_device_display_name,
         )
+
+        time_now = self.clock.time_msec()
+
         old_device_id = await self.store.store_dehydrated_device(
-            user_id, device_id, device_data
+            user_id, device_id, device_data, time_now, keys_for_device
         )
+
         if old_device_id is not None:
             await self.delete_devices(user_id, [old_device_id])
+
         return device_id
 
     async def rehydrate_device(

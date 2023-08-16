@@ -188,7 +188,7 @@ class KeyStore(SQLBaseStore):
         # invalidate takes a tuple corresponding to the params of
         # _get_server_keys_json. _get_server_keys_json only takes one
         # param, which is itself the 2-tuple (server_name, key_id).
-        self._get_server_keys_json.invalidate((((server_name, key_id),)))
+        self._get_server_keys_json.invalidate(((server_name, key_id),))
 
     @cached()
     def _get_server_keys_json(

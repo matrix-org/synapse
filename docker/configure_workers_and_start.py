@@ -861,7 +861,7 @@ def generate_worker_files(
         # Then a worker config file
         convert(
             "/conf/worker.yaml.j2",
-            "/conf/workers/{name}.yaml".format(name=worker_name),
+            f"/conf/workers/{worker_name}.yaml",
             **worker_config,
             worker_log_config_filepath=log_config_filepath,
             using_unix_sockets=using_unix_sockets,
