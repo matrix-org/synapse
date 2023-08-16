@@ -173,22 +173,20 @@ class RemoteKey(RestServlet):
         # Map server_name->key_id->int. Note that the value of the int is unused.
         # XXX: why don't we just use a set?
         cache_misses: Dict[str, Dict[str, int]] = {}
-        for (server_name, key_id), key_results in cached.items():
-            results = [(result.added_ts, result) for result in key_results]
-
-            if key_id is None:
+        for (server_name, key_id), key_result in cached.items():
+            if not query[server_name]:
                 # all keys were requested. Just return what we have without worrying
                 # about validity
-                for _, result in results:
-                    json_results.add(result.key_json)
+                if key_result:
+                    json_results.add(key_result.key_json)
                 continue
 
             miss = False
-            if not results:
+            if key_result is None:
                 miss = True
             else:
-                ts_added_ms, most_recent_result = max(results)
-                ts_valid_until_ms = most_recent_result.valid_until_ts
+                ts_added_ms = key_result.added_ts
+                ts_valid_until_ms = key_result.valid_until_ts
                 req_key = query.get(server_name, {}).get(key_id, {})
                 req_valid_until = req_key.get("minimum_valid_until_ts")
                 if req_valid_until is not None:
@@ -235,7 +233,7 @@ class RemoteKey(RestServlet):
                         time_now_ms,
                     )
 
-                json_results.add(most_recent_result.key_json)
+                json_results.add(key_result.key_json)
 
             if miss and query_remote_on_cache_miss:
                 # only bother attempting to fetch keys from servers on our whitelist

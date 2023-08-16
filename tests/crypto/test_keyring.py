@@ -462,9 +462,9 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
                 [lookup_tuple]
             )
         )
-        res_keys = key_json[lookup_tuple]
-        self.assertEqual(len(res_keys), 1)
-        res = res_keys[0]
+        res = key_json[lookup_tuple]
+        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
         self.assertEqual(res.valid_until_ts, VALID_UNTIL_TS)
 
@@ -578,9 +578,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
                 [lookup_tuple]
             )
         )
-        res_keys = key_json[lookup_tuple]
-        self.assertEqual(len(res_keys), 1)
-        res = res_keys[0]
+        res = key_json[lookup_tuple]
+        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
         self.assertEqual(res.valid_until_ts, VALID_UNTIL_TS)
 
@@ -697,9 +697,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
                 [lookup_tuple]
             )
         )
-        res_keys = key_json[lookup_tuple]
-        self.assertEqual(len(res_keys), 1)
-        res = res_keys[0]
+        res = key_json[lookup_tuple]
+        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
         self.assertEqual(res.valid_until_ts, VALID_UNTIL_TS)
 
