@@ -456,13 +456,13 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(k.verify_key.version, "ver1")
 
         # check that the perspectives store is correctly updated
-        lookup_triplet = (SERVER_NAME, testverifykey_id, None)
+        lookup_tuple = (SERVER_NAME, testverifykey_id)
         key_json = self.get_success(
             self.hs.get_datastores().main.get_server_keys_json_for_remote(
-                [lookup_triplet]
+                [lookup_tuple]
             )
         )
-        res_keys = key_json[lookup_triplet]
+        res_keys = key_json[lookup_tuple]
         self.assertEqual(len(res_keys), 1)
         res = res_keys[0]
         self.assertEqual(res["key_id"], testverifykey_id)
@@ -576,13 +576,13 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(k.verify_key.version, "ver1")
 
         # check that the perspectives store is correctly updated
-        lookup_triplet = (SERVER_NAME, testverifykey_id, None)
+        lookup_tuple = (SERVER_NAME, testverifykey_id)
         key_json = self.get_success(
             self.hs.get_datastores().main.get_server_keys_json_for_remote(
-                [lookup_triplet]
+                [lookup_tuple]
             )
         )
-        res_keys = key_json[lookup_triplet]
+        res_keys = key_json[lookup_tuple]
         self.assertEqual(len(res_keys), 1)
         res = res_keys[0]
         self.assertEqual(res["key_id"], testverifykey_id)
@@ -699,13 +699,13 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(k.verify_key.version, "ver1")
 
         # check that the perspectives store is correctly updated
-        lookup_triplet = (SERVER_NAME, testverifykey_id, None)
+        lookup_tuple = (SERVER_NAME, testverifykey_id)
         key_json = self.get_success(
             self.hs.get_datastores().main.get_server_keys_json_for_remote(
-                [lookup_triplet]
+                [lookup_tuple]
             )
         )
-        res_keys = key_json[lookup_triplet]
+        res_keys = key_json[lookup_tuple]
         self.assertEqual(len(res_keys), 1)
         res = res_keys[0]
         self.assertEqual(res["key_id"], testverifykey_id)

@@ -254,31 +254,28 @@ class KeyStore(SQLBaseStore):
         return await self.db_pool.runInteraction("get_server_keys_json", _txn)
 
     async def get_server_keys_json_for_remote(
-        self, server_keys: Iterable[Tuple[str, Optional[str], Optional[str]]]
-    ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[Dict[str, Any]]]:
+        self, server_keys: Iterable[Tuple[str, Optional[str]]]
+    ) -> Dict[Tuple[str, Optional[str]], List[Dict[str, Any]]]:
         """Retrieve the key json for a list of server_keys and key ids.
-        If no keys are found for a given server, key_id and source then
-        that server, key_id, and source triplet entry will be an empty list.
-        The JSON is returned as a byte array so that it can be efficiently
-        used in an HTTP response.
+        If no keys are found for a given server and key_id then that server and
+        key_id tuple entry will be an empty list. The JSON is returned as a byte
+        array so that it can be efficiently used in an HTTP response.
 
         Args:
-            server_keys: List of (server_name, key_id, source) triplets.
+            server_keys: List of (server_name, key_id) tuples.
 
         Returns:
-            A mapping from (server_name, key_id, source) triplets to a list of dicts
+            A mapping from (server_name, key_id) tuples to a list of dicts
         """
 
         def _get_server_keys_json_txn(
             txn: LoggingTransaction,
-        ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[Dict[str, Any]]]:
+        ) -> Dict[Tuple[str, Optional[str]], List[Dict[str, Any]]]:
             results = {}
-            for server_name, key_id, from_server in server_keys:
+            for server_name, key_id in server_keys:
                 keyvalues = {"server_name": server_name}
                 if key_id is not None:
                     keyvalues["key_id"] = key_id
-                if from_server is not None:
-                    keyvalues["from_server"] = from_server
                 rows = self.db_pool.simple_select_list_txn(
                     txn,
                     "server_keys_json",
@@ -291,7 +288,7 @@ class KeyStore(SQLBaseStore):
                         "key_json",
                     ),
                 )
-                results[(server_name, key_id, from_server)] = rows
+                results[(server_name, key_id)] = rows
             return results
 
         return await self.db_pool.runInteraction(

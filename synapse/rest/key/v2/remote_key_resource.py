@@ -162,7 +162,7 @@ class RemoteKey(RestServlet):
             if not key_ids:
                 key_ids = (None,)
             for key_id in key_ids:
-                store_queries.append((server_name, key_id, None))
+                store_queries.append((server_name, key_id))
 
         cached = await self.store.get_server_keys_json_for_remote(store_queries)
 
@@ -173,7 +173,7 @@ class RemoteKey(RestServlet):
         # Map server_name->key_id->int. Note that the value of the int is unused.
         # XXX: why don't we just use a set?
         cache_misses: Dict[str, Dict[str, int]] = {}
-        for (server_name, key_id, _), key_results in cached.items():
+        for (server_name, key_id), key_results in cached.items():
             results = [(result["ts_added_ms"], result) for result in key_results]
 
             if key_id is None:
