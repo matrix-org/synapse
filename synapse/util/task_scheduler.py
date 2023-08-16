@@ -258,10 +258,12 @@ class TaskScheduler:
     async def delete_task(self, id: str) -> None:
         """Delete a task. Running tasks can't be deleted.
 
+        Can only be called from the worker handling the task scheduling.
+
         Args:
             id: id of the task to delete
         """
-
+        assert self._run_background_tasks
         if self.task_is_running(id):
             raise Exception(f"Task {id} is currently running and can't be deleted")
         await self._store.delete_scheduled_task(id)
