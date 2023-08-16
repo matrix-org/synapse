@@ -16,14 +16,14 @@
 import itertools
 import json
 import logging
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction
-from synapse.storage.keys import FetchKeyResult
+from synapse.storage.keys import FetchKeyResult, FetchKeyResultForRemote
 from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
@@ -255,7 +255,7 @@ class KeyStore(SQLBaseStore):
 
     async def get_server_keys_json_for_remote(
         self, server_keys: Iterable[Tuple[str, Optional[str]]]
-    ) -> Dict[Tuple[str, Optional[str]], List[Dict[str, Any]]]:
+    ) -> Dict[Tuple[str, Optional[str]], List[FetchKeyResultForRemote]]:
         """Retrieve the key json for a list of server_keys and key ids.
         If no keys are found for a given server and key_id then that server and
         key_id tuple entry will be an empty list. The JSON is returned as a byte
@@ -270,12 +270,13 @@ class KeyStore(SQLBaseStore):
 
         def _get_server_keys_json_txn(
             txn: LoggingTransaction,
-        ) -> Dict[Tuple[str, Optional[str]], List[Dict[str, Any]]]:
+        ) -> Dict[Tuple[str, Optional[str]], List[FetchKeyResultForRemote]]:
             results = {}
             for server_name, key_id in server_keys:
                 keyvalues = {"server_name": server_name}
                 if key_id is not None:
                     keyvalues["key_id"] = key_id
+
                 rows = self.db_pool.simple_select_list_txn(
                     txn,
                     "server_keys_json",
@@ -288,7 +289,15 @@ class KeyStore(SQLBaseStore):
                         "key_json",
                     ),
                 )
-                results[(server_name, key_id)] = rows
+                results[(server_name, key_id)] = [
+                    FetchKeyResultForRemote(
+                        # Cast to bytes since postgresql returns a memoryview.
+                        key_json=bytes(row["key_json"]),
+                        valid_until_ts=row["ts_valid_until_ms"],
+                        added_ts=row["ts_added_ms"],
+                    )
+                    for row in rows
+                ]
             return results
 
         return await self.db_pool.runInteraction(

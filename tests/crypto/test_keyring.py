@@ -465,15 +465,11 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
         res_keys = key_json[lookup_tuple]
         self.assertEqual(len(res_keys), 1)
         res = res_keys[0]
-        self.assertEqual(res["key_id"], testverifykey_id)
-        self.assertEqual(res["from_server"], SERVER_NAME)
-        self.assertEqual(res["ts_added_ms"], self.reactor.seconds() * 1000)
-        self.assertEqual(res["ts_valid_until_ms"], VALID_UNTIL_TS)
+        self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
+        self.assertEqual(res.valid_until_ts, VALID_UNTIL_TS)
 
         # we expect it to be encoded as canonical json *before* it hits the db
-        self.assertEqual(
-            bytes(res["key_json"]), canonicaljson.encode_canonical_json(response)
-        )
+        self.assertEqual(res.key_json, canonicaljson.encode_canonical_json(response))
 
         # change the server name: the result should be ignored
         response["server_name"] = "OTHER_SERVER"
@@ -585,14 +581,10 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         res_keys = key_json[lookup_tuple]
         self.assertEqual(len(res_keys), 1)
         res = res_keys[0]
-        self.assertEqual(res["key_id"], testverifykey_id)
-        self.assertEqual(res["from_server"], self.mock_perspective_server.server_name)
-        self.assertEqual(res["ts_added_ms"], self.reactor.seconds() * 1000)
-        self.assertEqual(res["ts_valid_until_ms"], VALID_UNTIL_TS)
+        self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
+        self.assertEqual(res.valid_until_ts, VALID_UNTIL_TS)
 
-        self.assertEqual(
-            bytes(res["key_json"]), canonicaljson.encode_canonical_json(response)
-        )
+        self.assertEqual(res.key_json, canonicaljson.encode_canonical_json(response))
 
     def test_get_multiple_keys_from_perspectives(self) -> None:
         """Check that we can correctly request multiple keys for the same server"""
@@ -708,14 +700,10 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         res_keys = key_json[lookup_tuple]
         self.assertEqual(len(res_keys), 1)
         res = res_keys[0]
-        self.assertEqual(res["key_id"], testverifykey_id)
-        self.assertEqual(res["from_server"], self.mock_perspective_server.server_name)
-        self.assertEqual(res["ts_added_ms"], self.reactor.seconds() * 1000)
-        self.assertEqual(res["ts_valid_until_ms"], VALID_UNTIL_TS)
+        self.assertEqual(res.added_ts, self.reactor.seconds() * 1000)
+        self.assertEqual(res.valid_until_ts, VALID_UNTIL_TS)
 
-        self.assertEqual(
-            bytes(res["key_json"]), canonicaljson.encode_canonical_json(response)
-        )
+        self.assertEqual(res.key_json, canonicaljson.encode_canonical_json(response))
 
     def test_invalid_perspectives_responses(self) -> None:
         """Check that invalid responses from the perspectives server are rejected"""
