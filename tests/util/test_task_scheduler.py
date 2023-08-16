@@ -45,7 +45,7 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
     def test_schedule_task(self) -> None:
         """Schedule a task in the future with some parameters to be copied as a result and check it executed correctly.
         Also check that it get removed after `KEEP_TASKS_FOR_MS`."""
-        timestamp = self.clock.time_msec() + 2 * 60 * 1000
+        timestamp = self.clock.time_msec() + 30 * 1000
         task_id = self.get_success(
             self.task_scheduler.schedule_task(
                 "_test_task",
@@ -59,9 +59,9 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
         self.assertEqual(task.status, TaskStatus.SCHEDULED)
         self.assertIsNone(task.result)
 
-        # The timestamp being 2mn after now the task should been executed
+        # The timestamp being 30s after now the task should been executed
         # after the first scheduling loop is run
-        self.reactor.advance((TaskScheduler.SCHEDULE_INTERVAL_MS / 1000) + 1)
+        self.reactor.advance(TaskScheduler.SCHEDULE_INTERVAL_MS / 1000)
 
         task = self.get_success(self.task_scheduler.get_task(task_id))
         assert task is not None
@@ -85,7 +85,7 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
 
     def test_schedule_lot_of_tasks(self) -> None:
         """Schedule more than `TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS` tasks and check the behavior."""
-        timestamp = self.clock.time_msec() + 2 * 60 * 1000
+        timestamp = self.clock.time_msec() + 30 * 1000
         task_ids = []
         for i in range(TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS + 1):
             task_ids.append(
@@ -98,7 +98,7 @@ class TestTaskScheduler(unittest.HomeserverTestCase):
                 )
             )
 
-        # The timestamp being 2mn after now the task should been executed
+        # The timestamp being 30s after now the task should been executed
         # after the first scheduling loop is run
         self.reactor.advance((TaskScheduler.SCHEDULE_INTERVAL_MS / 1000))
 

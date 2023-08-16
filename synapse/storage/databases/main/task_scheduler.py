@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -51,18 +50,15 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         self,
         *,
         actions: Optional[List[str]] = None,
-        resource_ids: Optional[List[str]] = None,
+        resource_id: Optional[str] = None,
         statuses: Optional[List[TaskStatus]] = None,
         max_timestamp: Optional[int] = None,
     ) -> List[ScheduledTask]:
         """Get a list of scheduled tasks from the DB.
 
-        If an arg is `None` all tasks matching the other args will be selected.
-        If an arg is an empty list, the value needs to be NULL in DB to be selected.
-
         Args:
             actions: Limit the returned tasks to those specific action names
-            resource_ids: Limit the returned tasks to the specific resource ids
+            resource_id: Limit the returned tasks to the specific resource id, if specified
             statuses: Limit the returned tasks to the specific statuses
             max_timestamp: Limit the returned tasks to the ones that have
                 a timestamp inferior to the specified one
@@ -71,21 +67,18 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         """
 
         def get_scheduled_tasks_txn(txn: LoggingTransaction) -> List[Dict[str, Any]]:
-            clauses = []
-            args = []
-            if actions is not None:
+            clauses: List[str] = []
+            args: List[Any] = []
+            if resource_id:
+                clauses.append("resource_id = ?")
+                args.append(resource_id)
+            if actions:
                 clause, temp_args = make_in_list_sql_clause(
                     txn.database_engine, "action", actions
                 )
                 clauses.append(clause)
                 args.extend(temp_args)
-            if resource_ids is not None:
-                clause, temp_args = make_in_list_sql_clause(
-                    txn.database_engine, "resource_id", resource_ids
-                )
-                clauses.append(clause)
-                args.extend(temp_args)
-            if statuses is not None:
+            if statuses:
                 clause, temp_args = make_in_list_sql_clause(
                     txn.database_engine, "status", statuses
                 )
@@ -158,7 +151,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         if status is not None:
             updatevalues["status"] = status
         if result is not None:
-            updatevalues["result"] = json.dumps(result)
+            updatevalues["result"] = json_encoder.encode(result)
         if error is not None:
             updatevalues["error"] = error
         nb_rows = await self.db_pool.simple_update(

@@ -69,7 +69,7 @@ class TaskScheduler:
 
     # Precision of the scheduler, evaluation of tasks to run will only happen
     # every `SCHEDULE_INTERVAL_MS` ms
-    SCHEDULE_INTERVAL_MS = 5 * 60 * 1000  # 5mns
+    SCHEDULE_INTERVAL_MS = 1 * 60 * 1000  # 1mn
     # Time before a complete or failed task is deleted from the DB
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
     # Maximum number of tasks that can run at the same time
@@ -164,8 +164,8 @@ class TaskScheduler:
             timestamp,
             resource_id,
             params,
-            None,
-            None,
+            result=None,
+            error=None,
         )
         await self._store.insert_scheduled_task(task)
 
@@ -228,7 +228,7 @@ class TaskScheduler:
         self,
         *,
         actions: Optional[List[str]] = None,
-        resource_ids: Optional[List[str]] = None,
+        resource_id: Optional[str] = None,
         statuses: Optional[List[TaskStatus]] = None,
         max_timestamp: Optional[int] = None,
     ) -> List[ScheduledTask]:
@@ -240,7 +240,7 @@ class TaskScheduler:
 
         Args:
             actions: Limit the returned tasks to those specific action names
-            resource_ids: Limit the returned tasks to the specific resource ids
+            resource_id: Limit the returned tasks to the specific resource id, if specified
             statuses: Limit the returned tasks to the specific statuses
             max_timestamp: Limit the returned tasks to the ones that have
                 a timestamp inferior to the specified one
@@ -250,7 +250,7 @@ class TaskScheduler:
         """
         return await self._store.get_scheduled_tasks(
             actions=actions,
-            resource_ids=resource_ids,
+            resource_id=resource_id,
             statuses=statuses,
             max_timestamp=max_timestamp,
         )
