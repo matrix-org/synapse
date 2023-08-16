@@ -778,17 +778,18 @@ class BackgroundUpdater:
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
 
-                # mypy ignore - `statement_timeout` is defined on PostgresEngine
-                default_timeout = self.db_pool.engine.statement_timeout  # type: ignore[attr-defined]
-                undo_timeout_sql = f"SET statement_timeout = {default_timeout}"
-                c.execute(undo_timeout_sql)
-
                 if replaces_index is not None:
                     # We drop the old index as the new index has now been created.
                     sql = f"DROP INDEX IF EXISTS {replaces_index}"
                     logger.debug("[SQL] %s", sql)
                     c.execute(sql)
             finally:
+                # mypy ignore - `statement_timeout` is defined on PostgresEngine
+                # reset the global timeout to the default
+                default_timeout = self.db_pool.engine.statement_timeout  # type: ignore[attr-defined]
+                undo_timeout_sql = f"SET statement_timeout = {default_timeout}"
+                conn.cursor().execute(undo_timeout_sql)
+
                 conn.set_session(autocommit=False)  # type: ignore
 
         def create_index_sqlite(conn: Connection) -> None:
