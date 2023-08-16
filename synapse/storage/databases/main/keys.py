@@ -21,7 +21,7 @@ from typing import Dict, Iterable, Mapping, Optional, Tuple
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.keys import FetchKeyResult, FetchKeyResultForRemote
 from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 db_binary_type = memoryview
 
 
-class KeyStore(SQLBaseStore):
+class KeyStore(CacheInvalidationWorkerStore):
     """Persistence for signature verification keys"""
 
     @cached()
@@ -187,7 +187,12 @@ class KeyStore(SQLBaseStore):
         # invalidate takes a tuple corresponding to the params of
         # _get_server_keys_json. _get_server_keys_json only takes one
         # param, which is itself the 2-tuple (server_name, key_id).
-        self._get_server_keys_json.invalidate(((server_name, key_id),))
+        await self.invalidate_cache_and_stream(
+            "_get_server_keys_json", ((server_name, key_id),)
+        )
+        await self.invalidate_cache_and_stream(
+            "get_server_key_json_for_remote", (server_name, key_id)
+        )
 
     @cached()
     def _get_server_keys_json(
@@ -252,6 +257,17 @@ class KeyStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction("get_server_keys_json", _txn)
 
+    @cached()
+    def get_server_key_json_for_remote(
+        self,
+        server_name: str,
+        key_id: str,
+    ) -> Optional[FetchKeyResultForRemote]:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="get_server_key_json_for_remote", list_name="key_ids"
+    )
     async def get_server_keys_json_for_remote(
         self, server_name: str, key_ids: Iterable[str]
     ) -> Dict[str, Optional[FetchKeyResultForRemote]]:
