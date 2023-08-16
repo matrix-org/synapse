@@ -295,5 +295,5 @@ class KeyStore(SQLBaseStore):
             return results
 
         return await self.db_pool.runInteraction(
-            "get_server_keys_json", _get_server_keys_json_txn
+            "get_server_keys_json_for_remote", _get_server_keys_json_txn
         )
