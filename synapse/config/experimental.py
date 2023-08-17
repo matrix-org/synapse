@@ -173,10 +173,11 @@ class MSC3861:
                 ("enable_registration",),
             )
 
-        if root.consent.user_consent_at_registration:
+        # We only need to test the user consent version, as if it must be set if the user_consent section was present in the config
+        if root.consent.user_consent_version is not None:
             raise ConfigError(
-                "User consent at registration cannot be enabled when OAuth delegation is enabled",
-                ("user_consent", "require_at_registration"),
+                "User consent cannot be enabled when OAuth delegation is enabled",
+                ("user_consent",),
             )
 
         if (
