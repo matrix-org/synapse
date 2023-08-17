@@ -39,6 +39,7 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.types import Requester, UserID, create_requester
 from synapse.util import json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
+from synapse.util.caches.expiringcache import ExpiringCache
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -106,6 +107,14 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         self._issuer_metadata = RetryOnExceptionCachedCall(self._load_metadata)
 
+        self._clock = hs.get_clock()
+        self._token_cache: ExpiringCache[str, IntrospectionToken] = ExpiringCache(
+            cache_name="introspection_token_cache",
+            clock=self._clock,
+            max_len=10000,
+            expiry_ms=5 * 60 * 1000,
+        )
+
         if isinstance(auth_method, PrivateKeyJWTWithKid):
             # Use the JWK as the client secret when using the private_key_jwt method
             assert self._config.jwk, "No JWK provided"
@@ -144,6 +153,20 @@ class MSC3861DelegatedAuth(BaseAuth):
         Returns:
             The introspection response
         """
+        # check the cache before doing a request
+        introspection_token = self._token_cache.get(token, None)
+
+        if introspection_token:
+            # check the expiration field of the token (if it exists)
+            exp = introspection_token.get("exp", None)
+            if exp:
+                time_now = self._clock.time()
+                expired = time_now > exp
+                if not expired:
+                    return introspection_token
+            else:
+                return introspection_token
+
         metadata = await self._issuer_metadata.get()
         introspection_endpoint = metadata.get("introspection_endpoint")
         raw_headers: Dict[str, str] = {
@@ -157,7 +180,10 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         # Fill the body/headers with credentials
         uri, raw_headers, body = self._client_auth.prepare(
-            method="POST", uri=introspection_endpoint, headers=raw_headers, body=body
+            method="POST",
+            uri=introspection_endpoint,
+            headers=raw_headers,
+            body=body,
         )
         headers = Headers({k: [v] for (k, v) in raw_headers.items()})
 
@@ -187,7 +213,17 @@ class MSC3861DelegatedAuth(BaseAuth):
                 "The introspection endpoint returned an invalid JSON response."
             )
 
-        return IntrospectionToken(**resp)
+        expiration = resp.get("exp", None)
+        if expiration:
+            if self._clock.time() > expiration:
+                raise InvalidClientTokenError("Token is expired.")
+
+        introspection_token = IntrospectionToken(**resp)
+
+        # add token to cache
+        self._token_cache[token] = introspection_token
+
+        return introspection_token
 
     async def is_server_admin(self, requester: Requester) -> bool:
         return "urn:synapse:admin:*" in requester.scope
