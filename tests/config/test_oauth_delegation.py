@@ -167,6 +167,11 @@ class MSC3861OAuthDelegation(TestCase):
         with self.assertRaises(ConfigError):
             self.parse_config()
 
+    def test_user_consent_on_registration_cannot_be_enabled(self) -> None:
+        self.config_dict["user_consent"]["require_at_registration"] = True
+        with self.assertRaises(ConfigError):
+            self.parse_config()
+
     def test_password_config_cannot_be_enabled(self) -> None:
         self.config_dict["password_config"] = {"enabled": True}
         with self.assertRaises(ConfigError):

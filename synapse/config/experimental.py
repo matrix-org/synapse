@@ -173,6 +173,12 @@ class MSC3861:
                 ("enable_registration",),
             )
 
+        if root.consent.user_consent_at_registration:
+            raise ConfigError(
+                "User consent at registration cannot be enabled when OAuth delegation is enabled",
+                ("user_consent", "require_at_registration"),
+            )
+
         if (
             root.oidc.oidc_enabled
             or root.saml2.saml2_enabled
