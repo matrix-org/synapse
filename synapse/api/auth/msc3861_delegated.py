@@ -20,6 +20,7 @@ from authlib.oauth2.auth import encode_client_secret_basic, encode_client_secret
 from authlib.oauth2.rfc7523 import ClientSecretJWT, PrivateKeyJWT, private_key_jwt_sign
 from authlib.oauth2.rfc7662 import IntrospectionToken
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
+from prometheus_client import Histogram
 
 from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
@@ -45,6 +46,13 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+introspection_response_timer = Histogram(
+    "synapse_api_auth_delegated_introspection_response",
+    "Time taken to get a response for an introspection request",
+    ["code"],
+)
+
 
 # Scope as defined by MSC2967
 # https://github.com/matrix-org/matrix-spec-proposals/pull/2967
@@ -190,14 +198,26 @@ class MSC3861DelegatedAuth(BaseAuth):
         # Do the actual request
         # We're not using the SimpleHttpClient util methods as we don't want to
         # check the HTTP status code, and we do the body encoding ourselves.
-        response = await self._http_client.request(
-            method="POST",
-            uri=uri,
-            data=body.encode("utf-8"),
-            headers=headers,
-        )
 
-        resp_body = await make_deferred_yieldable(readBody(response))
+        start_time = self._clock.time()
+        try:
+            response = await self._http_client.request(
+                method="POST",
+                uri=uri,
+                data=body.encode("utf-8"),
+                headers=headers,
+            )
+
+            resp_body = await make_deferred_yieldable(readBody(response))
+        except Exception:
+            end_time = self._clock.time()
+            introspection_response_timer.labels("ERR").observe(end_time - start_time)
+            raise
+
+        end_time = self._clock.time()
+        introspection_response_timer.labels(response.code).observe(
+            end_time - start_time
+        )
 
         if response.code < 200 or response.code >= 300:
             raise HttpResponseException(
