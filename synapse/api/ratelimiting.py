@@ -309,7 +309,8 @@ class Ratelimiter:
 
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                limiter_name=self._limiter_name,
+                retry_after_ms=int(1000 * (time_allowed - time_now_s)),
             )
 
 

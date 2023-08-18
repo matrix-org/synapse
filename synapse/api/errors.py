@@ -505,11 +505,14 @@ class LimitExceededError(SynapseError):
 
     def __init__(
         self,
+        limiter_name: str,
         code: int = 429,
-        msg: str = "Too Many Requests",
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
+        msg = "Too Many Requests"
+        if limiter_name:
+            msg += f" ({limiter_name})"
         super().__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
 
