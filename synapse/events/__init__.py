@@ -638,32 +638,37 @@ class _EventRelation:
     aggregation_key: Optional[str]
 
 
-def relation_from_event(event: EventBase) -> Optional[_EventRelation]:
+def relations_from_event(event: EventBase) -> List[_EventRelation]:
     """
     Attempt to parse relation information an event.
 
     Returns:
-        The event relation information, if it is valid. None, otherwise.
+        All valid event relation information.
     """
-    relation = event.content.get("m.relates_to")
-    if not relation or not isinstance(relation, collections.abc.Mapping):
-        # No relation information.
-        return None
 
-    # Relations must have a type and parent event ID.
-    rel_type = relation.get("rel_type")
-    if not isinstance(rel_type, str):
-        return None
+    relations = event.content.get("m.relations")
+    if not relations or not isinstance(relations, list):
+        relations = [event.content.get("m.relates_to")]
 
-    parent_id = relation.get("event_id")
-    if not isinstance(parent_id, str):
-        return None
+    ret: List[_EventRelation] = []
+    for relation in relations:
+        if not relation or not isinstance(relation, collections.abc.Mapping):
+            continue
+        # Relations must have a type and parent event ID.
+        rel_type = relation.get("rel_type")
+        if not isinstance(rel_type, str):
+            continue
 
-    # Annotations have a key field.
-    aggregation_key = None
-    if rel_type == RelationTypes.ANNOTATION:
-        aggregation_key = relation.get("key")
-        if not isinstance(aggregation_key, str):
-            aggregation_key = None
+        parent_id = relation.get("event_id")
+        if not isinstance(parent_id, str):
+            continue
 
-    return _EventRelation(parent_id, rel_type, aggregation_key)
+        # Annotations have a key field.
+        aggregation_key = None
+        if rel_type == RelationTypes.ANNOTATION:
+            aggregation_key = relation.get("key")
+            if not isinstance(aggregation_key, str):
+                aggregation_key = None
+
+        ret.append(_EventRelation(parent_id, rel_type, aggregation_key))
+    return ret

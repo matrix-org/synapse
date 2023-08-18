@@ -47,7 +47,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
-from synapse.events import EventBase, relation_from_event
+from synapse.events import EventBase, relations_from_event
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
 from synapse.events.utils import SerializeEventConfig, maybe_upsert_event_field
@@ -1334,51 +1334,55 @@ class EventCreationHandler:
             SynapseError if the event is invalid.
         """
 
-        relation = relation_from_event(event)
-        if not relation:
-            return
+        for relation in relations_from_event(event):
+            if not relation:
+                continue
 
-        parent_event = await self.store.get_event(relation.parent_id, allow_none=True)
-        if parent_event:
-            # And in the same room.
-            if parent_event.room_id != event.room_id:
-                raise SynapseError(400, "Relations must be in the same room")
-
-        else:
-            # There must be some reason that the client knows the event exists,
-            # see if there are existing relations. If so, assume everything is fine.
-            if not await self.store.event_is_target_of_relation(relation.parent_id):
-                # Otherwise, the client can't know about the parent event!
-                raise SynapseError(400, "Can't send relation to unknown event")
-
-        # If this event is an annotation then we check that that the sender
-        # can't annotate the same way twice (e.g. stops users from liking an
-        # event multiple times).
-        if relation.rel_type == RelationTypes.ANNOTATION:
-            aggregation_key = relation.aggregation_key
-
-            if aggregation_key is None:
-                raise SynapseError(400, "Missing aggregation key")
-
-            if len(aggregation_key) > 500:
-                raise SynapseError(400, "Aggregation key is too long")
-
-            already_exists = await self.store.has_user_annotated_event(
-                relation.parent_id, event.type, aggregation_key, event.sender
+            parent_event = await self.store.get_event(
+                relation.parent_id, allow_none=True
             )
-            if already_exists:
-                raise SynapseError(
-                    400,
-                    "Can't send same reaction twice",
-                    errcode=Codes.DUPLICATE_ANNOTATION,
-                )
+            if parent_event:
+                # And in the same room.
+                if parent_event.room_id != event.room_id:
+                    raise SynapseError(400, "Relations must be in the same room")
 
-        # Don't attempt to start a thread if the parent event is a relation.
-        elif relation.rel_type == RelationTypes.THREAD:
-            if await self.store.event_includes_relation(relation.parent_id):
-                raise SynapseError(
-                    400, "Cannot start threads from an event with a relation"
+            else:
+                # There must be some reason that the client knows the event exists,
+                # see if there are existing relations. If so, assume everything is fine.
+                if not await self.store.event_is_target_of_relation(relation.parent_id):
+                    # Otherwise, the client can't know about the parent event!
+                    raise SynapseError(400, "Can't send relation to unknown event")
+
+            # If this event is an annotation then we check that that the sender
+            # can't annotate the same way twice (e.g. stops users from liking an
+            # event multiple times).
+            if relation.rel_type == RelationTypes.ANNOTATION:
+                aggregation_key = relation.aggregation_key
+
+                if aggregation_key is None:
+                    raise SynapseError(400, "Missing aggregation key")
+
+                if len(aggregation_key) > 500:
+                    raise SynapseError(400, "Aggregation key is too long")
+
+                already_exists = await self.store.has_user_annotated_event(
+                    relation.parent_id, event.type, aggregation_key, event.sender
                 )
+                if already_exists:
+                    raise SynapseError(
+                        400,
+                        "Can't send same reaction twice",
+                        errcode=Codes.DUPLICATE_ANNOTATION,
+                    )
+
+            # Don't attempt to start a thread if the parent event is a relation.
+            # XXX: should this be commented out alongside multiple relations being
+            # introduced?
+            elif relation.rel_type == RelationTypes.THREAD:
+                if await self.store.event_includes_relation(relation.parent_id):
+                    raise SynapseError(
+                        400, "Cannot start threads from an event with a relation"
+                    )
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(

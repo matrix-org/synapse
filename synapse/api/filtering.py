@@ -36,7 +36,7 @@ from jsonschema import FormatChecker
 from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
-from synapse.events import EventBase, relation_from_event
+from synapse.events import EventBase, relations_from_event
 from synapse.types import JsonDict, RoomID, UserID
 
 if TYPE_CHECKING:
@@ -408,18 +408,17 @@ class Filter:
             labels = content.get(EventContentFields.LABELS, [])
 
             # Check if the event has a relation.
-            rel_type = None
+            rel_types: List[str] = []
             if isinstance(event, EventBase):
-                relation = relation_from_event(event)
-                if relation:
-                    rel_type = relation.rel_type
+                for relation in relations_from_event(event):
+                    rel_types.append(relation.rel_type)
 
             field_matchers = {
                 "rooms": lambda v: room_id == v,
                 "senders": lambda v: sender == v,
                 "types": lambda v: _matches_wildcard(ev_type, v),
                 "labels": lambda v: v in labels,
-                "rel_types": lambda v: rel_type == v,
+                "rel_types": lambda v: v in rel_types,
             }
 
             result = self._check_fields(field_matchers)
