@@ -371,6 +371,10 @@ that contain this value. This parameter is ignored when using the <code>name</co
 Defaults to <code>true</code> to include guest users.</p>
 </li>
 <li>
+<p><code>admins</code> - Optional flag to filter admins. If <code>true</code>, only admins are queried. If <code>false</code>, admins are excluded from 
+the query. When the flag is absent (the default), <strong>both</strong> admins and non-admins are included in the search results.</p>
+</li>
+<li>
 <p><code>deactivated</code> - string representing a bool - Is optional and if <code>true</code> will <strong>include</strong> deactivated users.
 Defaults to <code>false</code> to exclude deactivated users.</p>
 </li>
