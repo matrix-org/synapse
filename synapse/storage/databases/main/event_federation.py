@@ -654,7 +654,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             SELECT tc.event_id, ea.auth_id, eac.chain_id IS NOT NULL
             FROM event_auth_chain_to_calculate AS tc
             LEFT JOIN event_auth AS ea USING (event_id)
-            LEFT JOIN event_auth_chains AS eac ON (auth_id = eac.event_id)
+            LEFT JOIN event_auth_chains AS eac ON (ea.auth_id = eac.event_id)
             WHERE tc.room_id = ?
         """
         txn.execute(sql, (room_id,))
@@ -701,9 +701,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         #   1. Update the state sets to only include indexed events; and
         #   2. Create a new list containing the auth chains of the un-indexed
         #      events
-        new_state_sets: List[Set[str]] = []
+        unindexed_state_sets: List[Set[str]] = []
         for state_set in state_sets:
-            new_state_set = set()
+            unindexed_state_set = set()
             for event_id, auth_chain in event_id_to_partial_auth_chain.items():
                 if event_id not in state_set:
                     continue
