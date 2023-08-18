@@ -708,7 +708,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 if event_id not in state_set:
                     continue
 
-                new_state_set.add(event_id)
+                unindexed_state_set.add(event_id)
 
                 state_set.discard(event_id)
                 state_set.difference_update(auth_chain)
@@ -716,13 +716,13 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     if auth_id in events_that_have_chain_index:
                         state_set.add(auth_id)
                     else:
-                        new_state_set.add(auth_id)
+                        unindexed_state_set.add(auth_id)
 
-            new_state_sets.append(new_state_set)
+            unindexed_state_sets.append(unindexed_state_set)
 
         # Calculate and return the auth difference of the un-indexed events.
-        union = new_state_sets[0].union(*new_state_sets[1:])
-        intersection = new_state_sets[0].intersection(*new_state_sets[1:])
+        union = unindexed_state_sets[0].union(*unindexed_state_sets[1:])
+        intersection = unindexed_state_sets[0].intersection(*unindexed_state_sets[1:])
 
         return union - intersection
 
