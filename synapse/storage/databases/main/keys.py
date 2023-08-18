@@ -293,6 +293,7 @@ class KeyStore(CacheInvalidationWorkerStore):
         if not rows:
             return {}
 
+        # We sort the rows so that the most recently added entry is picked up.
         rows.sort(key=lambda r: r["ts_added_ms"])
 
         return {

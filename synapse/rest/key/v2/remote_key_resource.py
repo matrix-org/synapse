@@ -158,7 +158,7 @@ class RemoteKey(RestServlet):
     ) -> JsonDict:
         logger.info("Handling query for keys %r", query)
 
-        cached: Dict[Tuple[str, str], Optional[FetchKeyResultForRemote]] = {}
+        server_keys: Dict[Tuple[str, str], Optional[FetchKeyResultForRemote]] = {}
         for server_name, key_ids in query.items():
             if key_ids:
                 results: Mapping[
@@ -171,7 +171,7 @@ class RemoteKey(RestServlet):
                     server_name
                 )
 
-            cached.update(
+            server_keys.update(
                 ((server_name, key_id), res) for key_id, res in results.items()
             )
 
@@ -182,7 +182,7 @@ class RemoteKey(RestServlet):
         # Map server_name->key_id->int. Note that the value of the int is unused.
         # XXX: why don't we just use a set?
         cache_misses: Dict[str, Dict[str, int]] = {}
-        for (server_name, key_id), key_result in cached.items():
+        for (server_name, key_id), key_result in server_keys.items():
             if not query[server_name]:
                 # all keys were requested. Just return what we have without worrying
                 # about validity
