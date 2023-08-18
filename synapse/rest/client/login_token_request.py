@@ -75,7 +75,7 @@ class LoginTokenRequestServlet(RestServlet):
             store=self._main_store,
             clock=hs.get_clock(),
             cfg=RatelimitSettings(
-                key="",
+                key="<login token request>",
                 per_second=1 / 60,
                 burst_count=1,
             ),

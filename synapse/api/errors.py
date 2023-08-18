@@ -211,7 +211,7 @@ class SynapseError(CodeMessageException):
         return cs_error(self.msg, self.errcode, **self._additional_fields)
 
     @property
-    def extra_context_for_logging(self) -> Optional[str]:
+    def debug_context(self) -> Optional[str]:
         """Override this to add debugging context that shouldn't be sent to clients."""
         return None
 
@@ -523,7 +523,7 @@ class LimitExceededError(SynapseError):
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
 
     @property
-    def extra_context_for_logging(self) -> Optional[str]:
+    def debug_context(self) -> Optional[str]:
         return self.limiter_name
 
 

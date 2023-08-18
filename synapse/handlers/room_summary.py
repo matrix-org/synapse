@@ -97,7 +97,7 @@ class RoomSummaryHandler:
         self._ratelimiter = Ratelimiter(
             store=self._store,
             clock=hs.get_clock(),
-            cfg=RatelimitSettings("", per_second=5, burst_count=10),
+            cfg=RatelimitSettings("<room summary>", per_second=5, burst_count=10),
         )
 
         # If a user tries to fetch the same page multiple times in quick succession,

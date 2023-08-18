@@ -115,7 +115,7 @@ def return_json_error(
         if exc.headers is not None:
             for header, value in exc.headers.items():
                 request.setHeader(header, value)
-        error_ctx = exc.extra_context_for_logging
+        error_ctx = exc.debug_context
         if error_ctx:
             logger.info(
                 "%s SynapseError: %s - %s (%s)", request, error_code, exc.msg, error_ctx
