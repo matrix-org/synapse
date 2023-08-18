@@ -1,0 +1,1 @@
+Fix a rare race that could block new events from being sent for up to two minutes. Introduced in v1.90.0.
