@@ -358,7 +358,9 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         request = Mock(args={})
         request.args[b"access_token"] = [b"mockAccessToken"]
         impersonated_user_id = f"@{USERNAME}:{SERVER_NAME}"
-        request.args[b"user_id"] = [impersonated_user_id.encode("ascii")]
+        request.args[b"_oidc_admin_impersonate_user_id"] = [
+            impersonated_user_id.encode("ascii")
+        ]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
         self.http_client.get_json.assert_called_once_with(WELL_KNOWN)

@@ -243,21 +243,22 @@ class MSC3861DelegatedAuth(BaseAuth):
             # so that we don't provision the user if they don't have enough permission:
             requester = await self.get_user_by_access_token(access_token, allow_expired)
 
-            # Allow impersonation by an admin user using `user_id` query parameter
+            # Allow impersonation by an admin user using `_oidc_admin_impersonate_user_id` query parameter
             if request.args is not None:
-                user_id_params = request.args.get(b"user_id")
+                user_id_params = request.args.get(b"_oidc_admin_impersonate_user_id")
                 if user_id_params:
-                    if SCOPE_SYNAPSE_ADMIN in requester.scope:
+                    if await self.is_server_admin(requester):
                         user_id_str = user_id_params[0].decode("ascii")
                         impersonated_user_id = UserID.from_string(user_id_str)
                         logging.info(f"Admin impersonation of user {user_id_str}")
                         requester = create_requester(
                             user_id=impersonated_user_id,
                             scope=[SCOPE_MATRIX_API],
+                            authenticated_entity=requester.user.to_string(),
                         )
                     else:
                         raise AuthError(
-                            500,
+                            401,
                             "Impersonation not possible by a non admin user",
                         )
 
