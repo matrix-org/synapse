@@ -566,15 +566,16 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(res["events"]), 1)
         self.assertEqual(res["events"][0]["content"]["body"], "foo")
 
-        # Fetch the message of the dehydrated device again, which should return nothing
-        # and delete the old messages
+        # Fetch the message of the dehydrated device again, which should return
+        # the same message as it has not been deleted
         res = self.get_success(
             self.message_handler.get_events_for_dehydrated_device(
                 requester=requester,
                 device_id=stored_dehydrated_device_id,
-                since_token=res["next_batch"],
+                since_token=None,
                 limit=10,
             )
         )
         self.assertTrue(len(res["next_batch"]) > 1)
-        self.assertEqual(len(res["events"]), 0)
+        self.assertEqual(len(res["events"]), 1)
+        self.assertEqual(res["events"][0]["content"]["body"], "foo")

@@ -514,7 +514,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(response.code, 200)
 
         # Send the body
-        request.write('{ "a": 1 }'.encode("ascii"))
+        request.write(b'{ "a": 1 }')
         request.finish()
 
         self.reactor.pump((0.1,))

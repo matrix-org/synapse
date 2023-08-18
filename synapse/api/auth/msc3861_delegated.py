@@ -27,6 +27,7 @@ from twisted.web.http_headers import Headers
 from synapse.api.auth.base import BaseAuth
 from synapse.api.errors import (
     AuthError,
+    Codes,
     HttpResponseException,
     InvalidClientTokenError,
     OAuthInsufficientScopeError,
@@ -38,6 +39,7 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.types import Requester, UserID, create_requester
 from synapse.util import json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
+from synapse.util.caches.expiringcache import ExpiringCache
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -105,6 +107,14 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         self._issuer_metadata = RetryOnExceptionCachedCall(self._load_metadata)
 
+        self._clock = hs.get_clock()
+        self._token_cache: ExpiringCache[str, IntrospectionToken] = ExpiringCache(
+            cache_name="introspection_token_cache",
+            clock=self._clock,
+            max_len=10000,
+            expiry_ms=5 * 60 * 1000,
+        )
+
         if isinstance(auth_method, PrivateKeyJWTWithKid):
             # Use the JWK as the client secret when using the private_key_jwt method
             assert self._config.jwk, "No JWK provided"
@@ -143,6 +153,20 @@ class MSC3861DelegatedAuth(BaseAuth):
         Returns:
             The introspection response
         """
+        # check the cache before doing a request
+        introspection_token = self._token_cache.get(token, None)
+
+        if introspection_token:
+            # check the expiration field of the token (if it exists)
+            exp = introspection_token.get("exp", None)
+            if exp:
+                time_now = self._clock.time()
+                expired = time_now > exp
+                if not expired:
+                    return introspection_token
+            else:
+                return introspection_token
+
         metadata = await self._issuer_metadata.get()
         introspection_endpoint = metadata.get("introspection_endpoint")
         raw_headers: Dict[str, str] = {
@@ -156,7 +180,10 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         # Fill the body/headers with credentials
         uri, raw_headers, body = self._client_auth.prepare(
-            method="POST", uri=introspection_endpoint, headers=raw_headers, body=body
+            method="POST",
+            uri=introspection_endpoint,
+            headers=raw_headers,
+            body=body,
         )
         headers = Headers({k: [v] for (k, v) in raw_headers.items()})
 
@@ -186,7 +213,17 @@ class MSC3861DelegatedAuth(BaseAuth):
                 "The introspection endpoint returned an invalid JSON response."
             )
 
-        return IntrospectionToken(**resp)
+        expiration = resp.get("exp", None)
+        if expiration:
+            if self._clock.time() > expiration:
+                raise InvalidClientTokenError("Token is expired.")
+
+        introspection_token = IntrospectionToken(**resp)
+
+        # add token to cache
+        self._token_cache[token] = introspection_token
+
+        return introspection_token
 
     async def is_server_admin(self, requester: Requester) -> bool:
         return "urn:synapse:admin:*" in requester.scope
@@ -196,6 +233,7 @@ class MSC3861DelegatedAuth(BaseAuth):
         request: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
+        allow_locked: bool = False,
     ) -> Requester:
         access_token = self.get_access_token_from_request(request)
 
@@ -204,6 +242,17 @@ class MSC3861DelegatedAuth(BaseAuth):
             # TODO: we probably want to assert the allow_guest inside this call
             # so that we don't provision the user if they don't have enough permission:
             requester = await self.get_user_by_access_token(access_token, allow_expired)
+
+            # Deny the request if the user account is locked.
+            if not allow_locked and await self.store.get_user_locked_status(
+                requester.user.to_string()
+            ):
+                raise AuthError(
+                    401,
+                    "User account has been locked",
+                    errcode=Codes.USER_LOCKED,
+                    additional_fields={"soft_logout": True},
+                )
 
         if not allow_guest and requester.is_guest:
             raise OAuthInsufficientScopeError([SCOPE_MATRIX_API])

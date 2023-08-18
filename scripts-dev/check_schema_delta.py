@@ -43,7 +43,7 @@ def main(force_colors: bool) -> None:
     diffs: List[git.Diff] = repo.remote().refs.develop.commit.diff(None)
 
     # Get the schema version of the local file to check against current schema on develop
-    with open("synapse/storage/schema/__init__.py", "r") as file:
+    with open("synapse/storage/schema/__init__.py") as file:
         local_schema = file.read()
     new_locals: Dict[str, Any] = {}
     exec(local_schema, new_locals)

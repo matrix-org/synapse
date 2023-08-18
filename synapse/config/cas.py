@@ -47,6 +47,10 @@ class CasConfig(Config):
                 required_attributes
             )
 
+            self.idp_name = cas_config.get("idp_name", "CAS")
+            self.idp_icon = cas_config.get("idp_icon")
+            self.idp_brand = cas_config.get("idp_brand")
+
         else:
             self.cas_server_url = None
             self.cas_service_url = None

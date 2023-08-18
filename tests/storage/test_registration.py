@@ -48,6 +48,7 @@ class RegistrationStoreTestCase(HomeserverTestCase):
                 "creation_ts": 0,
                 "user_type": None,
                 "deactivated": 0,
+                "locked": 0,
                 "shadow_banned": 0,
                 "approved": 1,
             },

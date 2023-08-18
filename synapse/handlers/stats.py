@@ -14,9 +14,15 @@
 # limitations under the License.
 import logging
 from collections import Counter
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
-
-from typing_extensions import Counter as CounterType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Counter as CounterType,
+    Dict,
+    Iterable,
+    Optional,
+    Tuple,
+)
 
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.metrics import event_processing_positions
