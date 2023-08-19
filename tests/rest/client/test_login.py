@@ -189,14 +189,15 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             if i == 5:
                 self.assertEqual(channel.code, 429, msg=channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
-                retry_header = int(channel.headers.getRawHeaders("Retry-After"))
+                retry_header = channel.headers.getRawHeaders("Retry-After")
             else:
                 self.assertEqual(channel.code, 200, msg=channel.result)
 
         # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
-        self.assertTrue(retry_header < 6)
+        assert retry_header
+        self.assertTrue(int(retry_header[0]) < 6)
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
@@ -236,14 +237,15 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             if i == 5:
                 self.assertEqual(channel.code, 429, msg=channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
-                retry_header = int(channel.headers.getRawHeaders("Retry-After"))
+                retry_header = channel.headers.getRawHeaders("Retry-After")
             else:
                 self.assertEqual(channel.code, 200, msg=channel.result)
 
         # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
-        self.assertTrue(retry_header < 6)
+        assert retry_header
+        self.assertTrue(int(retry_header[0]) < 6)
 
         self.reactor.advance(retry_after_ms / 1000.0)
 
@@ -283,14 +285,15 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             if i == 5:
                 self.assertEqual(channel.code, 429, msg=channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
-                retry_header = int(channel.headers.getRawHeaders("Retry-After"))
+                retry_header = channel.headers.getRawHeaders("Retry-After")
             else:
                 self.assertEqual(channel.code, 403, msg=channel.result)
 
         # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
-        self.assertTrue(retry_header < 6)
+        assert retry_header
+        self.assertTrue(int(retry_header[0]) < 6)
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 

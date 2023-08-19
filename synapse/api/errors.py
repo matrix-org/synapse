@@ -511,10 +511,13 @@ class LimitExceededError(SynapseError):
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
-        super().__init__(code, msg, errcode)
+        headers = (
+            None
+            if retry_after_ms is None
+            else {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+        )
+        super().__init__(code, msg, errcode, None, headers)
         self.retry_after_ms = retry_after_ms
-        if self.retry_after_ms:
-            headers = {"Retry-After": math.ceil(retry_after_ms / 1000)}
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
