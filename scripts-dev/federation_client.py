@@ -329,15 +329,26 @@ class MatrixConnectionAdapter(HTTPAdapter):
                 raise ValueError("Invalid host:port '%s'" % (server_name,))
             return out[0], port, out[0]
 
+        # Look up SRV for Matrix 1.8 `matrix-fed` service first
         try:
-            srv = srvlookup.lookup("matrix", "tcp", server_name)[0]
+            srv = srvlookup.lookup("matrix-fed", "tcp", server_name)[0]
             print(
-                f"SRV lookup on _matrix._tcp.{server_name} gave {srv}",
+                f"SRV lookup on _matrix-fed._tcp.{server_name} gave {srv}",
                 file=sys.stderr,
             )
             return srv.host, srv.port, server_name
         except Exception:
-            return server_name, 8448, server_name
+            # Fall back to deprecated `matrix` service
+            try:
+                srv = srvlookup.lookup("matrix", "tcp", server_name)[0]
+                print(
+                    f"SRV lookup on _matrix._tcp.{server_name} gave {srv}",
+                    file=sys.stderr,
+                )
+                return srv.host, srv.port, server_name
+            except Exception:
+                # Fall even further back to just port 8448
+                return server_name, 8448, server_name
 
     @staticmethod
     def _get_well_known(server_name: str) -> Optional[str]:

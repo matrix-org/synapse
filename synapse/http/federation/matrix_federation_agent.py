@@ -400,11 +400,22 @@ class MatrixHostnameEndpoint:
             return [Server(host, port or 8448)]
 
         logger.debug("Looking up SRV record for %s", host.decode(errors="replace"))
-        server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
+        server_list = await self._srv_resolver.resolve_service(b"_matrix-fed._tcp." + host)
 
         if server_list:
             logger.debug(
                 "Got %s from SRV lookup for %s",
+                ", ".join(map(str, server_list)),
+                host.decode(errors="replace"),
+            )
+            return server_list
+
+        logger.debug("Looking up deprecated SRV record for %s", host.decode(errors="replace"))
+        server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
+
+        if server_list:
+            logger.debug(
+                "Got %s from deprecated SRV lookup for %s",
                 ", ".join(map(str, server_list)),
                 host.decode(errors="replace"),
             )
