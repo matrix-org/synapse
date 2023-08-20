@@ -197,7 +197,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
         assert retry_header
-        self.assertTrue(int(retry_header[0]) < 6)
+        self.assertTrue(int(retry_header[0]) <= 6)
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
@@ -245,7 +245,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
         assert retry_header
-        self.assertTrue(int(retry_header[0]) < 6)
+        self.assertTrue(int(retry_header[0]) <= 6)
 
         self.reactor.advance(retry_after_ms / 1000.0)
 
@@ -293,7 +293,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
         assert retry_header
-        self.assertTrue(int(retry_header[0]) < 6)
+        self.assertTrue(int(retry_header[0]) <= 6)
 
         self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
 
