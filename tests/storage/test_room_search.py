@@ -318,14 +318,14 @@ class MessageSearchTest(HomeserverTestCase):
             result = self.get_success(
                 store.search_msgs([self.room_id], query, ["content.body"])
             )
-            self.assertEquals(
+            self.assertEqual(
                 result["count"],
                 1 if expect_to_contain else 0,
                 f"expected '{query}' to match '{self.PHRASE}'"
                 if expect_to_contain
                 else f"'{query}' unexpectedly matched '{self.PHRASE}'",
             )
-            self.assertEquals(
+            self.assertEqual(
                 len(result["results"]),
                 1 if expect_to_contain else 0,
                 "results array length should match count",
@@ -336,14 +336,14 @@ class MessageSearchTest(HomeserverTestCase):
             result = self.get_success(
                 store.search_rooms([self.room_id], query, ["content.body"], 10)
             )
-            self.assertEquals(
+            self.assertEqual(
                 result["count"],
                 1 if expect_to_contain else 0,
                 f"expected '{query}' to match '{self.PHRASE}'"
                 if expect_to_contain
                 else f"'{query}' unexpectedly matched '{self.PHRASE}'",
             )
-            self.assertEquals(
+            self.assertEqual(
                 len(result["results"]),
                 1 if expect_to_contain else 0,
                 "results array length should match count",

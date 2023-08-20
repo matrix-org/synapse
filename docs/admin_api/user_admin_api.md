@@ -219,6 +219,8 @@ The following parameters should be set in the URL:
   **or** displaynames that contain this value.
 - `guests` - string representing a bool - Is optional and if `false` will **exclude** guest users.
   Defaults to `true` to include guest users.
+- `admins` - Optional flag to filter admins. If `true`, only admins are queried. If `false`, admins are excluded from 
+  the query. When the flag is absent (the default), **both** admins and non-admins are included in the search results.
 - `deactivated` - string representing a bool - Is optional and if `true` will **include** deactivated users.
   Defaults to `false` to exclude deactivated users.
 - `limit` - string representing a positive integer - Is optional but is used for pagination,

@@ -45,7 +45,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -357,7 +357,7 @@ class EventsPersistenceStorageController:
         # it. We might already have taken out the lock, but since this is just a
         # "read" lock its inherently reentrant.
         async with self.hs.get_worker_locks_handler().acquire_read_write_lock(
-            DELETE_ROOM_LOCK_NAME, room_id, write=False
+            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
         ):
             if isinstance(task, _PersistEventsTask):
                 return await self._persist_event_batch(room_id, task)

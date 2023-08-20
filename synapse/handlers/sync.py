@@ -387,16 +387,16 @@ class SyncHandler:
                 from_token=since_token,
             )
 
-            # if nothing has happened in any of the users' rooms since /sync was called,
-            # the resultant next_batch will be the same as since_token (since the result
-            # is generated when wait_for_events is first called, and not regenerated
-            # when wait_for_events times out).
-            #
-            # If that happens, we mustn't cache it, so that when the client comes back
-            # with the same cache token, we don't immediately return the same empty
-            # result, causing a tightloop. (#8518)
-            if result.next_batch == since_token:
-                cache_context.should_cache = False
+        # if nothing has happened in any of the users' rooms since /sync was called,
+        # the resultant next_batch will be the same as since_token (since the result
+        # is generated when wait_for_events is first called, and not regenerated
+        # when wait_for_events times out).
+        #
+        # If that happens, we mustn't cache it, so that when the client comes back
+        # with the same cache token, we don't immediately return the same empty
+        # result, causing a tightloop. (#8518)
+        if result.next_batch == since_token:
+            cache_context.should_cache = False
 
         if result:
             if sync_config.filter_collection.lazy_load_members():
@@ -1442,11 +1442,9 @@ class SyncHandler:
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
-            (
-                room_id
-                for room_id in mutable_joined_room_ids
-                if room_id not in mutable_rooms_to_exclude
-            )
+            room_id
+            for room_id in mutable_joined_room_ids
+            if room_id not in mutable_rooms_to_exclude
         )
 
         logger.debug(

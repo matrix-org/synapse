@@ -1,0 +1,1 @@
+Fix performance of state resolutions for large, old rooms that did not have the full auth chain persisted.

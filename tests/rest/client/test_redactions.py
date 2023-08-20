@@ -627,8 +627,8 @@ class RedactionsTestCase(HomeserverTestCase):
         redact_event = timeline[-1]
         self.assertEqual(redact_event["type"], EventTypes.Redaction)
         # The redacts key should be in the content and the redacts keys.
-        self.assertEquals(redact_event["content"]["redacts"], event_id)
-        self.assertEquals(redact_event["redacts"], event_id)
+        self.assertEqual(redact_event["content"]["redacts"], event_id)
+        self.assertEqual(redact_event["redacts"], event_id)
 
         # But it isn't actually part of the event.
         def get_event(txn: LoggingTransaction) -> JsonDict:
@@ -642,10 +642,10 @@ class RedactionsTestCase(HomeserverTestCase):
         event_json = self.get_success(
             main_datastore.db_pool.runInteraction("get_event", get_event)
         )
-        self.assertEquals(event_json["type"], EventTypes.Redaction)
+        self.assertEqual(event_json["type"], EventTypes.Redaction)
         if expect_content:
             self.assertNotIn("redacts", event_json)
-            self.assertEquals(event_json["content"]["redacts"], event_id)
+            self.assertEqual(event_json["content"]["redacts"], event_id)
         else:
-            self.assertEquals(event_json["redacts"], event_id)
+            self.assertEqual(event_json["redacts"], event_id)
             self.assertNotIn("redacts", event_json["content"])
