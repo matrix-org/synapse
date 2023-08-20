@@ -14,7 +14,7 @@
 
 import logging
 from collections import OrderedDict
-from typing import Any, Generic, Optional, TypeVar, Union, overload
+from typing import Any, Generic, List, Optional, TypeVar, Union, overload
 
 import attr
 from typing_extensions import Literal
@@ -140,6 +140,21 @@ class ExpiringCache(Generic[KT, VT]):
 
         return value.value
 
+    def invalidate(self, keys: List[KT]) -> None:
+        """
+        Remove the given key(s) from the cache.
+        """
+
+        for key in keys:
+            value = self._cache.pop(key, None)
+            if value:
+                if self.iterable:
+                    self.metrics.inc_evictions(
+                        EvictionReason.invalidation, len(value.value)
+                    )
+                else:
+                    self.metrics.inc_evictions(EvictionReason.invalidation)
+
     def __contains__(self, key: KT) -> bool:
         return key in self._cache
 
@@ -192,6 +207,14 @@ class ExpiringCache(Generic[KT, VT]):
             begin_length,
             len(self),
         )
+
+    def invalidate_all(self) -> None:
+        """
+        Remove all items from the cache.
+        """
+        keys = set(self._cache.keys())
+        for key in keys:
+            self._cache.pop(key)
 
     def __len__(self) -> int:
         if self.iterable:
