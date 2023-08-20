@@ -14,7 +14,6 @@
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Tuple
 
-from synapse.api.errors import InvalidClientTokenError
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
@@ -34,17 +33,18 @@ class OIDCTokenRevocationRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
 
     async def on_DELETE(
         self, request: SynapseRequest, token_id: str
     ) -> Tuple[HTTPStatus, Dict]:
         await assert_requester_is_admin(self.auth, request)
 
-        try:
-            # mypy ignore - this attribute is defined on MSC3861DelegatedAuth, which is loaded via a config flag
-            # this endpoint will only be loaded if the same config flag is present
-            self.auth._token_cache.pop(token_id)  # type: ignore[attr-defined]
-        except KeyError:
-            raise InvalidClientTokenError("Token not found.")
+        # mypy ignore - this attribute is defined on MSC3861DelegatedAuth, which is loaded via a config flag
+        # this endpoint will only be loaded if the same config flag is present
+        self.auth._token_cache.invalidate([token_id])  # type: ignore[attr-defined]
+
+        # make sure we invalidate the cache on any workers
+        await self.store.stream_introspection_token_invalidation((token_id,))
 
         return HTTPStatus.OK, {}

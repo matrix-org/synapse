@@ -49,6 +49,7 @@ class DeviceRestServlet(RestServlet):
         self.device_handler = handler
         self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
+        self.config = hs.config
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str, device_id: str
@@ -84,6 +85,16 @@ class DeviceRestServlet(RestServlet):
             raise NotFoundError("Unknown user")
 
         await self.device_handler.delete_devices(target_user.to_string(), [device_id])
+
+        # TODO: don't nuke the entire cache once there is a way to associate
+        #  device_id -> introspection_token
+        # TODO: is there a way to check if the deletion request has come from MAS/OIDC
+        # authorizing server and only invalidate if that's the case?
+        if self.config.experimental.msc3861.enabled:
+            # mypy ignore - the token cache is defined on MSC3861DelegatedAuth
+            self.auth._token_cache.invalidate_all()  # type: ignore[attr-defined]
+            await self.store.stream_introspection_token_invalidation((None,))
+
         return HTTPStatus.OK, {}
 
     async def on_PUT(
