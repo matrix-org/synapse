@@ -165,7 +165,11 @@ class BasePresenceHandler(abc.ABC):
 
     @abc.abstractmethod
     async def user_syncing(
-        self, user_id: str, affect_presence: bool, presence_state: str
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        affect_presence: bool,
+        presence_state: str,
     ) -> ContextManager[None]:
         """Returns a context manager that should surround any stream requests
         from the user.
@@ -176,6 +180,7 @@ class BasePresenceHandler(abc.ABC):
 
         Args:
             user_id: the user that is starting a sync
+            device_id: the user's device that is starting a sync
             affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
@@ -481,7 +486,11 @@ class WorkerPresenceHandler(BasePresenceHandler):
                 self.send_user_sync(user_id, False, last_sync_ms)
 
     async def user_syncing(
-        self, user_id: str, affect_presence: bool, presence_state: str
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        affect_presence: bool,
+        presence_state: str,
     ) -> ContextManager[None]:
         """Record that a user is syncing.
 
@@ -966,6 +975,7 @@ class PresenceHandler(BasePresenceHandler):
     async def user_syncing(
         self,
         user_id: str,
+        device_id: Optional[str],
         affect_presence: bool = True,
         presence_state: str = PresenceState.ONLINE,
     ) -> ContextManager[None]:
@@ -977,7 +987,8 @@ class PresenceHandler(BasePresenceHandler):
         when users disconnect/reconnect.
 
         Args:
-            user_id
+            user_id: the user that is starting a sync
+            device_id: the user's device that is starting a sync
             affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
