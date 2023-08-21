@@ -516,7 +516,7 @@ class LimitExceededError(SynapseError):
             if retry_after_ms is None
             else {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
         )
-        super().__init__(code, msg, errcode, None, headers)
+        super().__init__(code, msg, errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
