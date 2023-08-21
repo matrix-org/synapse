@@ -743,7 +743,9 @@ class PresenceHandler(BasePresenceHandler):
 
         # Keeps track of the number of *ongoing* syncs on this process. While
         # this is non zero a user will never go offline.
-        self.user_to_num_current_syncs: Dict[str, int] = {}
+        self._user_device_to_num_current_syncs: Dict[
+            Tuple[str, Optional[str]], int
+        ] = {}
 
         # Keeps track of the number of *ongoing* syncs on other processes.
         # While any sync is ongoing on another process the user will never
@@ -971,7 +973,10 @@ class PresenceHandler(BasePresenceHandler):
 
         syncing_user_ids = {
             user_id
-            for user_id, count in self.user_to_num_current_syncs.items()
+            for (
+                user_id,
+                device_id,
+            ), count in self._user_device_to_num_current_syncs.items()
             if count
         }
         for user_ids in self.external_process_to_current_syncs.values():
@@ -1033,8 +1038,8 @@ class PresenceHandler(BasePresenceHandler):
         if not affect_presence or not self._presence_enabled:
             return _NullContextManager()
 
-        curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
-        self.user_to_num_current_syncs[user_id] = curr_sync + 1
+        curr_sync = self._user_device_to_num_current_syncs.get((user_id, device_id), 0)
+        self._user_device_to_num_current_syncs[(user_id, device_id)] = curr_sync + 1
 
         # Note that this causes last_active_ts to be incremented which is not
         # what the spec wants.
@@ -1047,7 +1052,7 @@ class PresenceHandler(BasePresenceHandler):
 
         async def _end() -> None:
             try:
-                self.user_to_num_current_syncs[user_id] -= 1
+                self._user_device_to_num_current_syncs[(user_id, device_id)] -= 1
 
                 prev_state = await self.current_state_for_user(user_id)
                 await self._update_states(
