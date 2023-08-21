@@ -257,6 +257,7 @@ class BasePresenceHandler(abc.ABC):
         state: JsonDict,
         ignore_status_msg: bool = False,
         force_notify: bool = False,
+        is_sync: bool = False,
     ) -> None:
         """Set the presence state of the user.
 
@@ -266,6 +267,7 @@ class BasePresenceHandler(abc.ABC):
             ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
                 If False, the user's current status will be updated.
             force_notify: Whether to force notification of the update to clients.
+            is_sync: True if this update was from a sync
         """
 
     @abc.abstractmethod
@@ -491,18 +493,16 @@ class WorkerPresenceHandler(BasePresenceHandler):
         if not affect_presence or not self._presence_enabled:
             return _NullContextManager()
 
-        prev_state = await self.current_state_for_user(user_id)
-        if prev_state.state != PresenceState.BUSY:
-            # We set state here but pass ignore_status_msg = True as we don't want to
-            # cause the status message to be cleared.
-            # Note that this causes last_active_ts to be incremented which is not
-            # what the spec wants: see comment in the BasePresenceHandler version
-            # of this function.
-            await self.set_state(
-                UserID.from_string(user_id),
-                {"presence": presence_state},
-                ignore_status_msg=True,
-            )
+        # Pass ignore_status_msg = True to avoid clearing the status message.
+        #
+        # Note that this causes last_active_ts to be incremented which is not
+        # what the spec wants.
+        await self.set_state(
+            UserID.from_string(user_id),
+            state={"presence": presence_state},
+            ignore_status_msg=True,
+            is_sync=True,
+        )
 
         curr_sync = self._user_to_num_current_syncs.get(user_id, 0)
         self._user_to_num_current_syncs[user_id] = curr_sync + 1
@@ -600,6 +600,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         state: JsonDict,
         ignore_status_msg: bool = False,
         force_notify: bool = False,
+        is_sync: bool = False,
     ) -> None:
         """Set the presence state of the user.
 
@@ -609,6 +610,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
                 If False, the user's current status will be updated.
             force_notify: Whether to force notification of the update to clients.
+            is_sync: True if this update was from a sync
         """
         presence = state["presence"]
 
@@ -628,6 +630,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             state=state,
             ignore_status_msg=ignore_status_msg,
             force_notify=force_notify,
+            is_sync=is_sync,
         )
 
     async def bump_presence_active_time(self, user: UserID) -> None:
@@ -992,24 +995,19 @@ class PresenceHandler(BasePresenceHandler):
         curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
         self.user_to_num_current_syncs[user_id] = curr_sync + 1
 
+        # Pass ignore_status_msg = True to avoid clearing the status message.
+        #
+        # Note that this causes last_active_ts to be incremented which is not
+        # what the spec wants.
+        await self.set_state(
+            UserID.from_string(user_id),
+            state={"presence": presence_state},
+            ignore_status_msg=True,
+            is_sync=True,
+        )
+        # Retrieve the new state for the logic below. This should come from the
+        # in-memory cache.
         prev_state = await self.current_state_for_user(user_id)
-
-        # If they're busy then they don't stop being busy just by syncing,
-        # so just update the last sync time.
-        if prev_state.state != PresenceState.BUSY:
-            # XXX: We set_state separately here and just update the last_active_ts above
-            # This keeps the logic as similar as possible between the worker and single
-            # process modes. Using set_state will actually cause last_active_ts to be
-            # updated always, which is not what the spec calls for, but synapse has done
-            # this for... forever, I think.
-            await self.set_state(
-                UserID.from_string(user_id),
-                {"presence": presence_state},
-                ignore_status_msg=True,
-            )
-            # Retrieve the new state for the logic below. This should come from the
-            # in-memory cache.
-            prev_state = await self.current_state_for_user(user_id)
 
         # To keep the single process behaviour consistent with worker mode, run the
         # same logic as `update_external_syncs_row`, even though it looks weird.
@@ -1206,6 +1204,7 @@ class PresenceHandler(BasePresenceHandler):
         state: JsonDict,
         ignore_status_msg: bool = False,
         force_notify: bool = False,
+        is_sync: bool = False,
     ) -> None:
         """Set the presence state of the user.
 
@@ -1215,6 +1214,7 @@ class PresenceHandler(BasePresenceHandler):
             ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
                 If False, the user's current status will be updated.
             force_notify: Whether to force notification of the update to clients.
+            is_sync: True if this update was from a sync
         """
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
@@ -1229,6 +1229,13 @@ class PresenceHandler(BasePresenceHandler):
         user_id = target_user.to_string()
 
         prev_state = await self.current_state_for_user(user_id)
+
+        # Syncs do not override a previous presence of busy.
+        #
+        # TODO: This is a hack for lack of multi-device support. Unfortunately
+        # removing this requires coordination with clients.
+        if prev_state.state == PresenceState.BUSY and is_sync:
+            presence = PresenceState.BUSY
 
         new_fields = {"state": presence}
 

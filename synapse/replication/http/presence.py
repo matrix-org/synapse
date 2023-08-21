@@ -98,11 +98,13 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
         state: JsonDict,
         ignore_status_msg: bool = False,
         force_notify: bool = False,
+        is_sync: bool = False,
     ) -> JsonDict:
         return {
             "state": state,
             "ignore_status_msg": ignore_status_msg,
             "force_notify": force_notify,
+            "is_sync": is_sync,
         }
 
     async def _handle_request(  # type: ignore[override]
@@ -113,6 +115,7 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
             content["state"],
             content["ignore_status_msg"],
             content["force_notify"],
+            content.get("is_sync", False),
         )
 
         return (200, {})
