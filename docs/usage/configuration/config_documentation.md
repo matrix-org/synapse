@@ -3204,6 +3204,14 @@ Options for each entry include:
 
 * `client_secret`: oauth2 client secret to use. May be omitted if
   `client_secret_jwt_key` is given, or if `client_auth_method` is 'none'.
+  Must be omitted if `client_secret_path` is specified.
+
+* `client_secret_path`: path to the oauth2 client secret to use. With that
+   it's not necessary to leak secrets into the config file itself.
+   Mutually exclusive with `client_secret`. Can be omitted if
+   `client_secret_jwt_key` is specified.
+
+   *Added in Synapse 1.91.0.*
 
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
