@@ -3176,6 +3176,8 @@ Options for each entry include:
    Mutually exclusive with `client_secret`. Can be omitted if
    `client_secret_jwt_key` is specified.
 
+   *Added in Synapse 1.91.0.*
+
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
    given, must be a dictionary with the following properties:
