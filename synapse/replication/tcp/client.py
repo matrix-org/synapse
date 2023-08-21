@@ -14,15 +14,7 @@
 """A replication client for use by synapse workers.
 """
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    Iterable,
-    MutableSequence,
-    Optional,
-    Set,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, MutableSequence, Optional, Set, Tuple
 
 from sortedcontainers import SortedList
 
