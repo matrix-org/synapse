@@ -84,7 +84,6 @@ class DeviceRestServlet(RestServlet):
             raise NotFoundError("Unknown user")
 
         await self.device_handler.delete_devices(target_user.to_string(), [device_id])
-
         return HTTPStatus.OK, {}
 
     async def on_PUT(
