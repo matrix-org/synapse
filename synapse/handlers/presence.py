@@ -276,7 +276,9 @@ class BasePresenceHandler(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def bump_presence_active_time(self, user: UserID) -> None:
+    async def bump_presence_active_time(
+        self, user: UserID, device_id: Optional[str]
+    ) -> None:
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
@@ -644,7 +646,9 @@ class WorkerPresenceHandler(BasePresenceHandler):
             is_sync=is_sync,
         )
 
-    async def bump_presence_active_time(self, user: UserID) -> None:
+    async def bump_presence_active_time(
+        self, user: UserID, device_id: Optional[str]
+    ) -> None:
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
@@ -655,7 +659,9 @@ class WorkerPresenceHandler(BasePresenceHandler):
         # Proxy request to instance that writes presence
         user_id = user.to_string()
         await self._bump_active_client(
-            instance_name=self._presence_writer_instance, user_id=user_id
+            instance_name=self._presence_writer_instance,
+            user_id=user_id,
+            device_id=device_id,
         )
 
 
@@ -960,7 +966,9 @@ class PresenceHandler(BasePresenceHandler):
 
         return await self._update_states(changes)
 
-    async def bump_presence_active_time(self, user: UserID) -> None:
+    async def bump_presence_active_time(
+        self, user: UserID, device_id: Optional[str]
+    ) -> None:
         """We've seen the user do something that indicates they're interacting
         with the app.
         """

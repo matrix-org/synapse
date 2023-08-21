@@ -51,14 +51,14 @@ class ReplicationBumpPresenceActiveTime(ReplicationEndpoint):
         self._presence_handler = hs.get_presence_handler()
 
     @staticmethod
-    async def _serialize_payload(user_id: str) -> JsonDict:  # type: ignore[override]
-        return {}
+    async def _serialize_payload(user_id: str, device_id: Optional[str]) -> JsonDict:  # type: ignore[override]
+        return {"device_id": device_id}
 
     async def _handle_request(  # type: ignore[override]
         self, request: Request, content: JsonDict, user_id: str
     ) -> Tuple[int, JsonDict]:
         await self._presence_handler.bump_presence_active_time(
-            UserID.from_string(user_id)
+            UserID.from_string(user_id), content.get("device_id")
         )
 
         return (200, {})
