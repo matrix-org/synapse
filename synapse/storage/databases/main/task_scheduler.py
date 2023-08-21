@@ -72,13 +72,13 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             if resource_id:
                 clauses.append("resource_id = ?")
                 args.append(resource_id)
-            if actions:
+            if actions is not None:
                 clause, temp_args = make_in_list_sql_clause(
                     txn.database_engine, "action", actions
                 )
                 clauses.append(clause)
                 args.extend(temp_args)
-            if statuses:
+            if statuses is not None:
                 clause, temp_args = make_in_list_sql_clause(
                     txn.database_engine, "status", statuses
                 )
