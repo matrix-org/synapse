@@ -1,1 +1,1 @@
-User consent cannot be configured when experimental MSC3861 is enabled.
+User consent features cannot be enabled when using experimental MSC3861.
