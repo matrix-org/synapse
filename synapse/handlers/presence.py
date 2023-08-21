@@ -1017,17 +1017,8 @@ class PresenceHandler(BasePresenceHandler):
                     prev_state.copy_and_replace(
                         state=PresenceState.ONLINE,
                         last_active_ts=self.clock.time_msec(),
-                        last_user_sync_ts=self.clock.time_msec(),
                     )
                 ]
-            )
-        # otherwise, set the new presence state & update the last sync time,
-        # but don't update last_active_ts as this isn't an indication that
-        # they've been active (even though it's probably been updated by
-        # set_state above)
-        else:
-            await self._update_states(
-                [prev_state.copy_and_replace(last_user_sync_ts=self.clock.time_msec())]
             )
 
         async def _end() -> None:
@@ -1227,6 +1218,7 @@ class PresenceHandler(BasePresenceHandler):
             return
 
         user_id = target_user.to_string()
+        now = self.clock.time_msec()
 
         prev_state = await self.current_state_for_user(user_id)
 
@@ -1245,7 +1237,10 @@ class PresenceHandler(BasePresenceHandler):
         if presence == PresenceState.ONLINE or (
             presence == PresenceState.BUSY and self._busy_presence_enabled
         ):
-            new_fields["last_active_ts"] = self.clock.time_msec()
+            new_fields["last_active_ts"] = now
+
+        if is_sync:
+            new_fields["last_user_sync_ts"] = now
 
         await self._update_states(
             [prev_state.copy_and_replace(**new_fields)], force_notify=force_notify
