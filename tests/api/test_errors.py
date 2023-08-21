@@ -21,10 +21,12 @@ from tests import unittest
 class ErrorsTestCase(unittest.TestCase):
     def test_limit_exceeded_header(self) -> None:
         err = LimitExceededError(retry_after_ms=100)
-        self.assertEqual(err.error_dict({}).get("retry_after_ms"), 100)
+        self.assertEqual(err.error_dict(None).get("retry_after_ms"), 100)
+        assert err.headers
         self.assertEqual(err.headers.get("Retry-After"), "1")
 
     def test_limit_exceeded_rounding(self) -> None:
         err = LimitExceededError(retry_after_ms=3001)
-        self.assertEqual(err.error_dict({}).get("retry_after_ms"), 3001)
+        self.assertEqual(err.error_dict(None).get("retry_after_ms"), 3001)
+        assert err.headers
         self.assertEqual(err.headers.get("Retry-After"), "4")
