@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -95,11 +95,13 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
         user_id: str,
+        device_id: Optional[str],
         state: JsonDict,
         force_notify: bool = False,
         is_sync: bool = False,
     ) -> JsonDict:
         return {
+            "device_id": device_id,
             "state": state,
             "force_notify": force_notify,
             "is_sync": is_sync,
@@ -110,6 +112,7 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
     ) -> Tuple[int, JsonDict]:
         await self._presence_handler.set_state(
             UserID.from_string(user_id),
+            content.get("device_id"),
             content["state"],
             content["force_notify"],
             content.get("is_sync", False),
