@@ -2830,7 +2830,15 @@ is enabled) to discover the provider's endpoints.</p>
 </li>
 <li>
 <p><code>client_secret</code>: oauth2 client secret to use. May be omitted if
-<code>client_secret_jwt_key</code> is given, or if <code>client_auth_method</code> is 'none'.</p>
+<code>client_secret_jwt_key</code> is given, or if <code>client_auth_method</code> is 'none'.
+Must be omitted if <code>client_secret_path</code> is specified.</p>
+</li>
+<li>
+<p><code>client_secret_path</code>: path to the oauth2 client secret to use. With that
+it's not necessary to leak secrets into the config file itself.
+Mutually exclusive with <code>client_secret</code>. Can be omitted if
+<code>client_secret_jwt_key</code> is specified.</p>
+<p><em>Added in Synapse 1.91.0.</em></p>
 </li>
 <li>
 <p><code>client_secret_jwt_key</code>: Alternative to client_secret: details of a key used
