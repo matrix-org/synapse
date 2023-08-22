@@ -2046,6 +2046,7 @@ def handle_timeout(
         # Check per-device whether the device should be considered idle or offline
         # due to timeouts.
         device_changed = False
+        offline_devices = []
         for device_id, device_state in user_devices.items():
             if device_state.state == PresenceState.ONLINE:
                 if now - device_state.last_active_ts > IDLE_TIMER:
@@ -2065,8 +2066,12 @@ def handle_timeout(
 
                 if now - sync_or_active > SYNC_ONLINE_TIMEOUT:
                     # Mark the device as going offline.
-                    device_state.state = PresenceState.OFFLINE
+                    offline_devices.append(device_id)
                     device_changed = True
+
+        # Offline devices are not needed and do not add information.
+        for device_id in offline_devices:
+            user_devices.pop(device_id)
 
         # If the presence state of the devices changed, then (maybe) update
         # the user's overall presence state.
