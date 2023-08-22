@@ -42,7 +42,11 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-DELETE_ROOM_LOCK_NAME = "delete_room_lock"
+# This lock is used to avoid creating an event while we are purging the room.
+# We take a read lock when creating an event, and a write one when purging a room.
+# This is because it is fine to create several events concurrently, since referenced events
+# will not disappear under our feet as long as we don't delete the room.
+NEW_EVENT_DURING_PURGE_LOCK_NAME = "new_event_during_purge_lock"
 
 
 class WorkerLocksHandler:

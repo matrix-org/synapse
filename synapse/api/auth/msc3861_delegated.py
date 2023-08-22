@@ -20,6 +20,7 @@ from authlib.oauth2.auth import encode_client_secret_basic, encode_client_secret
 from authlib.oauth2.rfc7523 import ClientSecretJWT, PrivateKeyJWT, private_key_jwt_sign
 from authlib.oauth2.rfc7662 import IntrospectionToken
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
+from prometheus_client import Histogram
 
 from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
@@ -39,11 +40,19 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.types import Requester, UserID, create_requester
 from synapse.util import json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
+from synapse.util.caches.expiringcache import ExpiringCache
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+introspection_response_timer = Histogram(
+    "synapse_api_auth_delegated_introspection_response",
+    "Time taken to get a response for an introspection request",
+    ["code"],
+)
+
 
 # Scope as defined by MSC2967
 # https://github.com/matrix-org/matrix-spec-proposals/pull/2967
@@ -106,6 +115,14 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         self._issuer_metadata = RetryOnExceptionCachedCall(self._load_metadata)
 
+        self._clock = hs.get_clock()
+        self._token_cache: ExpiringCache[str, IntrospectionToken] = ExpiringCache(
+            cache_name="introspection_token_cache",
+            clock=self._clock,
+            max_len=10000,
+            expiry_ms=5 * 60 * 1000,
+        )
+
         if isinstance(auth_method, PrivateKeyJWTWithKid):
             # Use the JWK as the client secret when using the private_key_jwt method
             assert self._config.jwk, "No JWK provided"
@@ -144,6 +161,20 @@ class MSC3861DelegatedAuth(BaseAuth):
         Returns:
             The introspection response
         """
+        # check the cache before doing a request
+        introspection_token = self._token_cache.get(token, None)
+
+        if introspection_token:
+            # check the expiration field of the token (if it exists)
+            exp = introspection_token.get("exp", None)
+            if exp:
+                time_now = self._clock.time()
+                expired = time_now > exp
+                if not expired:
+                    return introspection_token
+            else:
+                return introspection_token
+
         metadata = await self._issuer_metadata.get()
         introspection_endpoint = metadata.get("introspection_endpoint")
         raw_headers: Dict[str, str] = {
@@ -157,21 +188,36 @@ class MSC3861DelegatedAuth(BaseAuth):
 
         # Fill the body/headers with credentials
         uri, raw_headers, body = self._client_auth.prepare(
-            method="POST", uri=introspection_endpoint, headers=raw_headers, body=body
+            method="POST",
+            uri=introspection_endpoint,
+            headers=raw_headers,
+            body=body,
         )
         headers = Headers({k: [v] for (k, v) in raw_headers.items()})
 
         # Do the actual request
         # We're not using the SimpleHttpClient util methods as we don't want to
         # check the HTTP status code, and we do the body encoding ourselves.
-        response = await self._http_client.request(
-            method="POST",
-            uri=uri,
-            data=body.encode("utf-8"),
-            headers=headers,
-        )
 
-        resp_body = await make_deferred_yieldable(readBody(response))
+        start_time = self._clock.time()
+        try:
+            response = await self._http_client.request(
+                method="POST",
+                uri=uri,
+                data=body.encode("utf-8"),
+                headers=headers,
+            )
+
+            resp_body = await make_deferred_yieldable(readBody(response))
+        except Exception:
+            end_time = self._clock.time()
+            introspection_response_timer.labels("ERR").observe(end_time - start_time)
+            raise
+
+        end_time = self._clock.time()
+        introspection_response_timer.labels(response.code).observe(
+            end_time - start_time
+        )
 
         if response.code < 200 or response.code >= 300:
             raise HttpResponseException(
@@ -187,10 +233,20 @@ class MSC3861DelegatedAuth(BaseAuth):
                 "The introspection endpoint returned an invalid JSON response."
             )
 
-        return IntrospectionToken(**resp)
+        expiration = resp.get("exp", None)
+        if expiration:
+            if self._clock.time() > expiration:
+                raise InvalidClientTokenError("Token is expired.")
+
+        introspection_token = IntrospectionToken(**resp)
+
+        # add token to cache
+        self._token_cache[token] = introspection_token
+
+        return introspection_token
 
     async def is_server_admin(self, requester: Requester) -> bool:
-        return "urn:synapse:admin:*" in requester.scope
+        return SCOPE_SYNAPSE_ADMIN in requester.scope
 
     async def get_user_by_req(
         self,
@@ -206,6 +262,25 @@ class MSC3861DelegatedAuth(BaseAuth):
             # TODO: we probably want to assert the allow_guest inside this call
             # so that we don't provision the user if they don't have enough permission:
             requester = await self.get_user_by_access_token(access_token, allow_expired)
+
+            # Allow impersonation by an admin user using `_oidc_admin_impersonate_user_id` query parameter
+            if request.args is not None:
+                user_id_params = request.args.get(b"_oidc_admin_impersonate_user_id")
+                if user_id_params:
+                    if await self.is_server_admin(requester):
+                        user_id_str = user_id_params[0].decode("ascii")
+                        impersonated_user_id = UserID.from_string(user_id_str)
+                        logging.info(f"Admin impersonation of user {user_id_str}")
+                        requester = create_requester(
+                            user_id=impersonated_user_id,
+                            scope=[SCOPE_MATRIX_API],
+                            authenticated_entity=requester.user.to_string(),
+                        )
+                    else:
+                        raise AuthError(
+                            401,
+                            "Impersonation not possible by a non admin user",
+                        )
 
             # Deny the request if the user account is locked.
             if not allow_locked and await self.store.get_user_locked_status(
@@ -234,14 +309,14 @@ class MSC3861DelegatedAuth(BaseAuth):
             # XXX: This is a temporary solution so that the admin API can be called by
             # the OIDC provider. This will be removed once we have OIDC client
             # credentials grant support in matrix-authentication-service.
-            logging.info("Admin toked used")
+            logging.info("Admin token used")
             # XXX: that user doesn't exist and won't be provisioned.
             # This is mostly fine for admin calls, but we should also think about doing
             # requesters without a user_id.
             admin_user = UserID("__oidc_admin", self._hostname)
             return create_requester(
                 user_id=admin_user,
-                scope=["urn:synapse:admin:*"],
+                scope=[SCOPE_SYNAPSE_ADMIN],
             )
 
         try:

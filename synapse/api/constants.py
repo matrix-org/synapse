@@ -18,8 +18,7 @@
 """Contains constants from the specification."""
 
 import enum
-
-from typing_extensions import Final
+from typing import Final
 
 # the max size of a (canonical-json-encoded) event
 MAX_PDU_SIZE = 65536

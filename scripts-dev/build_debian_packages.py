@@ -47,7 +47,7 @@ can be passed on the commandline for debugging.
 projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
-class Builder(object):
+class Builder:
     def __init__(
         self,
         redirect_stdout: bool = False,

@@ -17,6 +17,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
+    Deque,
     Dict,
     Iterable,
     Iterator,
@@ -29,7 +30,6 @@ from typing import (
 )
 
 from prometheus_client import Counter
-from typing_extensions import Deque
 
 from twisted.internet.protocol import ReconnectingClientFactory
 

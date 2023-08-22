@@ -26,7 +26,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
     def make_homeserver(
         self, reactor: ThreadedMemoryReactorClock, clock: Clock
     ) -> HomeServer:
-        hs = super(PhoneHomeR30V2TestCase, self).make_homeserver(reactor, clock)
+        hs = super().make_homeserver(reactor, clock)
 
         # We don't want our tests to actually report statistics, so check
         # that it's not enabled

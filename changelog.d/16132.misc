@@ -1,0 +1,1 @@
+MSC3861: allow impersonation by an admin user using `_oidc_admin_impersonate_user_id` query parameter.

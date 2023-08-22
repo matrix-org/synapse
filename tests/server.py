@@ -26,6 +26,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Deque,
     Dict,
     Iterable,
     List,
@@ -41,7 +42,7 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
-from typing_extensions import Deque, ParamSpec
+from typing_extensions import ParamSpec
 from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
@@ -999,8 +1000,6 @@ def setup_test_homeserver(
     hs.tls_server_context_factory = Mock()
 
     hs.setup()
-    if homeserver_to_use == TestHomeServer:
-        hs.setup_background_tasks()
 
     if isinstance(db_engine, PostgresEngine):
         database_pool = hs.get_datastores().databases[0]

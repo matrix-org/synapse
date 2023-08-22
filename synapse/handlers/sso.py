@@ -24,13 +24,14 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    NoReturn,
     Optional,
     Set,
 )
 from urllib.parse import urlencode
 
 import attr
-from typing_extensions import NoReturn, Protocol
+from typing_extensions import Protocol
 
 from twisted.web.iweb import IRequest
 from twisted.web.server import Request
@@ -791,7 +792,7 @@ class SsoHandler:
 
             if code != 200:
                 raise Exception(
-                    "GET request to download sso avatar image returned {}".format(code)
+                    f"GET request to download sso avatar image returned {code}"
                 )
 
             # upload name includes hash of the image file's content so that we can

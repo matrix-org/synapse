@@ -17,6 +17,7 @@ from enum import Enum, auto
 from typing import (
     Collection,
     Dict,
+    Final,
     FrozenSet,
     List,
     Mapping,
@@ -27,7 +28,6 @@ from typing import (
 )
 
 import attr
-from typing_extensions import Final
 
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase

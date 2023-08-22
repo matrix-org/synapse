@@ -38,7 +38,7 @@ class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore [assignment]
 
     def __init__(self, config: HomeServerConfig):
-        super(MockHomeserver, self).__init__(
+        super().__init__(
             hostname=config.server.server_name,
             config=config,
             reactor=reactor,
