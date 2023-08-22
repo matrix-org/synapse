@@ -455,18 +455,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # The profile should not be in the directory.
-        profile = self.get_success(
-            self.store._get_user_in_directory(s_user_id)
-        )
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
         self.assertIsNone(profile)
 
         # Remove the user from the directory.
         self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
 
         # The profile should still not be in the user directory.
-        profile = self.get_success(
-            self.store._get_user_in_directory(s_user_id)
-        )
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
         self.assertIsNone(profile)
 
     def test_handle_user_deactivated_regular_user(self) -> None:
