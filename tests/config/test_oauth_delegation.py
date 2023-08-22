@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from unittest.mock import Mock
 
 from synapse.config import ConfigError
@@ -164,6 +165,21 @@ class MSC3861OAuthDelegation(TestCase):
 
     def test_registration_cannot_be_enabled(self) -> None:
         self.config_dict["enable_registration"] = True
+        with self.assertRaises(ConfigError):
+            self.parse_config()
+
+    def test_user_consent_cannot_be_enabled(self) -> None:
+        tmpdir = self.mktemp()
+        os.mkdir(tmpdir)
+        self.config_dict["user_consent"] = {
+            "require_at_registration": True,
+            "version": "1",
+            "template_dir": tmpdir,
+            "server_notice_content": {
+                "msgtype": "m.text",
+                "body": "foo",
+            },
+        }
         with self.assertRaises(ConfigError):
             self.parse_config()
 
