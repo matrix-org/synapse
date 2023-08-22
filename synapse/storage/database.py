@@ -2395,6 +2395,7 @@ class DatabasePool:
             min_val = min(cache.values()) + 1
         else:
             min_val = max_value
+        logger.debug("Calling get_cache_dict %s: %s", table, sql)
 
         return cache, min_val
 
