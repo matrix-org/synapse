@@ -32,7 +32,14 @@ class OIDCTokenRevocationRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.auth = hs.get_auth()
+        auth = hs.get_auth()
+
+        # If this endpoint is loaded then we must have enabled delegated auth.
+        from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
+
+        assert isinstance(auth, MSC3861DelegatedAuth)
+
+        self.auth = auth
         self.store = hs.get_datastores().main
 
     async def on_DELETE(
@@ -40,9 +47,7 @@ class OIDCTokenRevocationRestServlet(RestServlet):
     ) -> Tuple[HTTPStatus, Dict]:
         await assert_requester_is_admin(self.auth, request)
 
-        # mypy ignore - this attribute is defined on MSC3861DelegatedAuth, which is loaded via a config flag
-        # this endpoint will only be loaded if the same config flag is present
-        self.auth._token_cache.invalidate([token_id])  # type: ignore[attr-defined]
+        self.auth._token_cache.invalidate(token_id)
 
         # make sure we invalidate the cache on any workers
         await self.store.stream_introspection_token_invalidation((token_id,))
