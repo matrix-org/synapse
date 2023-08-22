@@ -14,19 +14,34 @@
 # limitations under the License.
 
 from synapse.api.errors import LimitExceededError
+from synapse.config.homeserver import HomeServerConfig
 
 from tests import unittest
+from tests.utils import default_config
 
 
 class ErrorsTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.config = HomeServerConfig()
+        self.config.parse_config_dict(
+            {
+                **default_config("test"),
+                "experimental_features": {"msc4041_enabled": True},
+            },
+            "",
+            "",
+        )
+
     def test_limit_exceeded_header(self) -> None:
         err = LimitExceededError(retry_after_ms=100)
-        self.assertEqual(err.error_dict(None).get("retry_after_ms"), 100)
-        assert err.headers
-        self.assertEqual(err.headers.get("Retry-After"), "1")
+        self.assertEqual(err.error_dict(self.config).get("retry_after_ms"), 100)
+        headers = err.headers_dict(self.config)
+        assert headers is not None
+        self.assertEqual(headers.get("Retry-After"), "1")
 
     def test_limit_exceeded_rounding(self) -> None:
         err = LimitExceededError(retry_after_ms=3001)
         self.assertEqual(err.error_dict(None).get("retry_after_ms"), 3001)
-        assert err.headers
-        self.assertEqual(err.headers.get("Retry-After"), "4")
+        headers = err.headers_dict(self.config)
+        assert headers is not None
+        self.assertEqual(headers.get("Retry-After"), "4")
