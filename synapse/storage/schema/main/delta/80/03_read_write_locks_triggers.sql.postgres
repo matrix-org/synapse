@@ -25,7 +25,7 @@ BEGIN
         VALUES (NEW.lock_name, NEW.lock_key, NEW.write_lock, NEW.token)
         ON CONFLICT (lock_name, lock_key)
         DO UPDATE SET write_lock = NEW.write_lock
-            WHERE write_lock != NEW.write_lock;
+            WHERE OLD.write_lock != NEW.write_lock;
     RETURN NEW;
 END
 $$
