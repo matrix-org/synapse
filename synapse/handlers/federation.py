@@ -311,6 +311,15 @@ class FederationHandler:
         # of history that extends all the way back to where we are currently paginating
         # and it's within the 100 events that are returned from `/backfill`.
         if not sorted_backfill_points and current_depth != MAX_DEPTH:
+            # Check that we actually have later backfill points, if not just return.
+            have_later_backfill_points = await self.store.get_backfill_points_in_room(
+                room_id=room_id,
+                current_depth=MAX_DEPTH,
+                limit=1,
+            )
+            if not have_later_backfill_points:
+                return False
+
             logger.debug(
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Trying again with later backfill points."
             )
