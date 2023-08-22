@@ -443,7 +443,8 @@ class MSC3861DelegatedAuth(BaseAuth):
         """
         Invalidate the entry(s) in the introspection token cache corresponding to the given key
         """
-        self._token_cache.invalidate(keys)
+        for key in keys:
+            self._token_cache.invalidate(key)
 
     def invalidate_token_cache(self) -> None:
         """
