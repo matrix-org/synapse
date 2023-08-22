@@ -14,7 +14,7 @@
 """A replication client for use by synapse workers.
 """
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, MutableSequence, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Set, Tuple
 
 from sortedcontainers import SortedList
 
@@ -230,9 +230,9 @@ class ReplicationDataHandler:
         # Notify any waiting deferreds. The list is ordered by position so we
         # just iterate through the list until we reach a position that is
         # greater than the received row position.
-        waiting_list: MutableSequence[
-            Tuple[int, Deferred]
-        ] = self._streams_to_waiters.get((stream_name, instance_name), [])
+        waiting_list = self._streams_to_waiters.get((stream_name, instance_name))
+        if not waiting_list:
+            return
 
         # Index of first item with a position after the current token, i.e we
         # have called all deferreds before this index. If not overwritten by
