@@ -901,9 +901,6 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
         self.assertEqual(upto_token, now_token)
         self.assertFalse(limited)
 
-        expected_rows = [
-            (2, ("dest3", "@user3:test")),
-        ]
         self.assertCountEqual(rows, [])
 
         prev_token = self.queue.get_current_token(self.instance_name)
