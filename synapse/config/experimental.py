@@ -398,3 +398,6 @@ class ExperimentalConfig(Config):
         self.msc4010_push_rules_account_data = experimental.get(
             "msc4010_push_rules_account_data", False
         )
+
+        # MSC4041: Use http header Retry-After to enable library-assisted retry handling
+        self.msc4041_enabled: bool = experimental.get("msc4041_enabled", False)
