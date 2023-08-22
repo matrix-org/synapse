@@ -446,6 +446,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(profile)
 
     def test_handle_user_deactivated_support_user(self) -> None:
+        """Ensure a support user doesn't get added to the user directory after deactivation."""
         s_user_id = "@support:test"
         self.get_success(
             self.store.register_user(
@@ -453,14 +454,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        mock_remove_from_user_dir = Mock(return_value=make_awaitable(None))
-        with patch.object(
-            self.store, "remove_from_user_dir", mock_remove_from_user_dir
-        ):
-            self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
-        # BUG: the correct spelling is assert_not_called, but that makes the test fail
-        # and it's not clear that this is actually the behaviour we want.
-        mock_remove_from_user_dir.not_called()
+        # The profile should not be in the directory.
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
+        self.assertIsNone(profile)
+
+        # Remove the user from the directory.
+        self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
+
+        # The profile should still not be in the user directory.
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
+        self.assertIsNone(profile)
 
     def test_handle_user_deactivated_regular_user(self) -> None:
         r_user_id = "@regular:test"

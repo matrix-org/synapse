@@ -140,6 +140,20 @@ class ExpiringCache(Generic[KT, VT]):
 
         return value.value
 
+    def invalidate(self, key: KT) -> None:
+        """
+        Remove the given key from the cache.
+        """
+
+        value = self._cache.pop(key, None)
+        if value:
+            if self.iterable:
+                self.metrics.inc_evictions(
+                    EvictionReason.invalidation, len(value.value)
+                )
+            else:
+                self.metrics.inc_evictions(EvictionReason.invalidation)
+
     def __contains__(self, key: KT) -> bool:
         return key in self._cache
 
@@ -192,6 +206,14 @@ class ExpiringCache(Generic[KT, VT]):
             begin_length,
             len(self),
         )
+
+    def invalidate_all(self) -> None:
+        """
+        Remove all items from the cache.
+        """
+        keys = set(self._cache.keys())
+        for key in keys:
+            self._cache.pop(key)
 
     def __len__(self) -> int:
         if self.iterable:

@@ -438,3 +438,16 @@ class MSC3861DelegatedAuth(BaseAuth):
             scope=scope,
             is_guest=(has_guest_scope and not has_user_scope),
         )
+
+    def invalidate_cached_tokens(self, keys: List[str]) -> None:
+        """
+        Invalidate the entry(s) in the introspection token cache corresponding to the given key
+        """
+        for key in keys:
+            self._token_cache.invalidate(key)
+
+    def invalidate_token_cache(self) -> None:
+        """
+        Invalidate the entire token cache.
+        """
+        self._token_cache.invalidate_all()
