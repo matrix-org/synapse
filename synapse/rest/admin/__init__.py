@@ -47,6 +47,7 @@ from synapse.rest.admin.federation import (
     ListDestinationsRestServlet,
 )
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
+from synapse.rest.admin.oidc import OIDCTokenRevocationRestServlet
 from synapse.rest.admin.registration_tokens import (
     ListRegistrationTokensRestServlet,
     NewRegistrationTokenRestServlet,
@@ -297,6 +298,8 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     BackgroundUpdateRestServlet(hs).register(http_server)
     BackgroundUpdateStartJobRestServlet(hs).register(http_server)
     ExperimentalFeaturesRestServlet(hs).register(http_server)
+    if hs.config.experimental.msc3861.enabled:
+        OIDCTokenRevocationRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(

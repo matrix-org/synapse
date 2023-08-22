@@ -1,0 +1,1 @@
+Add an admin endpoint to allow authorizing server to signal token revocations.

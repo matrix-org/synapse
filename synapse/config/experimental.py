@@ -223,6 +223,12 @@ class MSC3861:
                 ("session_lifetime",),
             )
 
+        if root.registration.enable_3pid_changes:
+            raise ConfigError(
+                "enable_3pid_changes cannot be enabled when OAuth delegation is enabled",
+                ("enable_3pid_changes",),
+            )
+
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
 class MSC3866Config:
