@@ -205,6 +205,7 @@ class BasePresenceHandler(abc.ABC):
             self.VALID_PRESENCE += (PresenceState.BUSY,)
 
         active_presence = self.store.take_presence_startup_info()
+        # The combined status across all user devices.
         self.user_to_current_state = {state.user_id: state for state in active_presence}
 
     @abc.abstractmethod
@@ -1075,11 +1076,13 @@ class PresenceHandler(BasePresenceHandler):
         if device_state.state == PresenceState.UNAVAILABLE:
             device_state.state = PresenceState.ONLINE
 
+        # Update the user state, this will always update last_active_ts and
+        # might update the presence state.
         prev_state = await self.current_state_for_user(user_id)
-
-        new_fields: Dict[str, Any] = {"last_active_ts": now}
-        if prev_state.state == PresenceState.UNAVAILABLE:
-            new_fields["state"] = PresenceState.ONLINE
+        new_fields: Dict[str, Any] = {
+            "last_active_ts": now,
+            "state": _combine_device_states(devices.values()),
+        }
 
         await self._update_states([prev_state.copy_and_replace(**new_fields)])
 
@@ -1220,19 +1223,20 @@ class PresenceHandler(BasePresenceHandler):
             time_now_ms = self.clock.time_msec()
 
             # Mark each device as having a last sync time.
+            updated_users = set()
             for user_id, device_id in process_presence:
                 device_state = self._user_to_device_to_current_state.setdefault(
                     user_id, {}
                 ).setdefault(
                     device_id, UserDevicePresenceState.default(user_id, device_id)
                 )
+
                 device_state.last_sync_ts = time_now_ms
+                updated_users.add(user_id)
 
             # Update each user (and insert into the appropriate timers to check if
             # they've gone offline).
-            prev_states = await self.current_state_for_users(
-                {user_id for user_id, device_id in process_presence}
-            )
+            prev_states = await self.current_state_for_users(updated_users)
             await self._update_states(
                 [
                     prev_state.copy_and_replace(last_user_sync_ts=time_now_ms)
@@ -1364,6 +1368,9 @@ class PresenceHandler(BasePresenceHandler):
         device_state.last_active_ts = now
         if is_sync:
             device_state.last_sync_ts = now
+
+        # Based on the state of each user's device calculate the new presence state.
+        presence = _combine_device_states(devices.values())
 
         new_fields = {"state": presence}
 
@@ -2122,6 +2129,46 @@ def handle_update(
         persist_and_notify = True
 
     return new_state, persist_and_notify, federation_ping
+
+
+PRESENCE_BY_PRIORITY = {
+    PresenceState.BUSY: 4,
+    PresenceState.ONLINE: 3,
+    PresenceState.UNAVAILABLE: 2,
+    PresenceState.OFFLINE: 1,
+}
+
+
+def _combine_device_states(
+    device_states: Iterable[UserDevicePresenceState],
+) -> str:
+    """
+    Find the device to use presence information from.
+
+    Orders devices by priority, then last_active_ts.
+
+    Args:
+        device_states: An iterable of device presence states
+
+    Return:
+        The combined presence state.
+    """
+
+    # Based on (all) the user's devices calculate the new presence state.
+    presence = PresenceState.OFFLINE
+    last_active_ts = -1
+
+    # Find the device to use the presence state of based on the presence priority,
+    # but tie-break with how recently the device has been seen.
+    for device_state in device_states:
+        if (PRESENCE_BY_PRIORITY[device_state.state], device_state.last_active_ts) > (
+            PRESENCE_BY_PRIORITY[presence],
+            last_active_ts,
+        ):
+            presence = device_state.state
+            last_active_ts = device_state.last_active_ts
+
+    return presence
 
 
 async def get_interested_parties(
