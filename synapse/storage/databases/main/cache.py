@@ -584,6 +584,19 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         else:
             return 0
 
+    async def stream_introspection_token_invalidation(
+        self, key: Tuple[Optional[str]]
+    ) -> None:
+        """
+        Stream an invalidation request for the introspection token cache to workers
+
+        Args:
+            key: token_id of the introspection token to remove from the cache
+        """
+        await self.send_invalidation_to_replication(
+            "introspection_token_invalidation", key
+        )
+
     @wrap_as_background_process("clean_up_old_cache_invalidations")
     async def _clean_up_cache_invalidation_wrapper(self) -> None:
         """
