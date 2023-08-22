@@ -92,7 +92,7 @@ from prometheus_client import Counter
 import synapse.metrics
 from synapse.api.constants import EduTypes, EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
-from synapse.api.presence import UserPresenceState
+from synapse.api.presence import UserDevicePresenceState, UserPresenceState
 from synapse.appservice import ApplicationService
 from synapse.events.presence_router import PresenceRouter
 from synapse.logging.context import run_in_background
@@ -749,6 +749,11 @@ class PresenceHandler(BasePresenceHandler):
             lambda: len(self.user_to_current_state),
         )
 
+        # The per-device presence state, maps user to devices to per-device presence state.
+        self._user_to_device_to_current_state: Dict[
+            str, Dict[Optional[str], UserDevicePresenceState]
+        ] = {}
+
         now = self.clock.time_msec()
         if self._presence_enabled:
             for state in self.user_to_current_state.values():
@@ -1057,9 +1062,22 @@ class PresenceHandler(BasePresenceHandler):
 
         bump_active_time_counter.inc()
 
+        now = self.clock.time_msec()
+
+        # Update the device information & mark the device as online if it was
+        # unavailable.
+        devices = self._user_to_device_to_current_state.setdefault(user_id, {})
+        device_state = devices.setdefault(
+            device_id,
+            UserDevicePresenceState.default(user_id, device_id),
+        )
+        device_state.last_active_ts = now
+        if device_state.state == PresenceState.UNAVAILABLE:
+            device_state.state = PresenceState.ONLINE
+
         prev_state = await self.current_state_for_user(user_id)
 
-        new_fields: Dict[str, Any] = {"last_active_ts": self.clock.time_msec()}
+        new_fields: Dict[str, Any] = {"last_active_ts": now}
         if prev_state.state == PresenceState.UNAVAILABLE:
             new_fields["state"] = PresenceState.ONLINE
 
@@ -1173,6 +1191,12 @@ class PresenceHandler(BasePresenceHandler):
             if is_syncing and (user_id, device_id) not in process_presence:
                 process_presence.add((user_id, device_id))
             elif not is_syncing and (user_id, device_id) in process_presence:
+                devices = self._user_to_device_to_current_state.setdefault(user_id, {})
+                device_state = devices.setdefault(
+                    device_id, UserDevicePresenceState.default(user_id, device_id)
+                )
+                device_state.last_sync_ts = sync_time_msec
+
                 new_state = prev_state.copy_and_replace(
                     last_user_sync_ts=sync_time_msec
                 )
@@ -1192,11 +1216,23 @@ class PresenceHandler(BasePresenceHandler):
             process_presence = self.external_process_to_current_syncs.pop(
                 process_id, set()
             )
+
+            time_now_ms = self.clock.time_msec()
+
+            # Mark each device as having a last sync time.
+            for user_id, device_id in process_presence:
+                device_state = self._user_to_device_to_current_state.setdefault(
+                    user_id, {}
+                ).setdefault(
+                    device_id, UserDevicePresenceState.default(user_id, device_id)
+                )
+                device_state.last_sync_ts = time_now_ms
+
+            # Update each user (and insert into the appropriate timers to check if
+            # they've gone offline).
             prev_states = await self.current_state_for_users(
                 {user_id for user_id, device_id in process_presence}
             )
-            time_now_ms = self.clock.time_msec()
-
             await self._update_states(
                 [
                     prev_state.copy_and_replace(last_user_sync_ts=time_now_ms)
@@ -1317,6 +1353,17 @@ class PresenceHandler(BasePresenceHandler):
         # removing this requires coordination with clients.
         if prev_state.state == PresenceState.BUSY and is_sync:
             presence = PresenceState.BUSY
+
+        # Update the device specific information.
+        devices = self._user_to_device_to_current_state.setdefault(user_id, {})
+        device_state = devices.setdefault(
+            device_id,
+            UserDevicePresenceState.default(user_id, device_id),
+        )
+        device_state.state = presence
+        device_state.last_active_ts = now
+        if is_sync:
+            device_state.last_sync_ts = now
 
         new_fields = {"state": presence}
 
