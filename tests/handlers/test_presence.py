@@ -663,9 +663,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self._set_presencestate_with_status_msg(PresenceState.UNAVAILABLE, status_msg)
 
         self.get_success(
-            self.presence_handler.user_syncing(
-                self.user_id, True, PresenceState.ONLINE
-            )
+            self.presence_handler.user_syncing(self.user_id, True, PresenceState.ONLINE)
         )
 
         state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
@@ -679,9 +677,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self._set_presencestate_with_status_msg(PresenceState.UNAVAILABLE, status_msg)
 
         self.get_success(
-            self.presence_handler.user_syncing(
-                self.user_id, True, PresenceState.ONLINE
-            )
+            self.presence_handler.user_syncing(self.user_id, True, PresenceState.ONLINE)
         )
 
         state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
@@ -689,13 +685,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(state.status_msg, status_msg)
 
     @parameterized.expand([(False,), (True,)])
-    @unittest.override_config(
-        {
-            "experimental_features": {
-                "msc3026_enabled": True,
-            },
-        }
-    )
+    @unittest.override_config({"experimental_features": {"msc3026_enabled": True}})
     def test_set_presence_from_syncing_keeps_busy(
         self, test_with_workers: bool
     ) -> None:
