@@ -483,7 +483,7 @@ class AuthHandler:
 
         sid: Optional[str] = None
         authdict = clientdict.pop("auth", {})
-        if "session" in authdict:
+        if authdict and "session" in authdict:
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
