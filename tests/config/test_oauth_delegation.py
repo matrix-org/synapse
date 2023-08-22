@@ -255,3 +255,8 @@ class MSC3861OAuthDelegation(TestCase):
         self.config_dict["session_lifetime"] = "24h"
         with self.assertRaises(ConfigError):
             self.parse_config()
+
+    def test_enable_3pid_changes_cannot_be_enabled(self) -> None:
+        self.config_dict.update(enable_3pid_changes=True)
+        with self.assertRaises(ConfigError):
+            self.parse_config()
