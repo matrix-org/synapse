@@ -730,7 +730,6 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         """Set a PresenceState and status_msg and check the result.
 
         Args:
-            self.user_id: User for that the status is to be set.
             state: The new PresenceState.
             status_msg: Status message that is to be set.
         """
