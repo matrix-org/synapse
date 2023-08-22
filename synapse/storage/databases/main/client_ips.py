@@ -581,7 +581,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
     ) -> None:
         # The sync proxy continuously triggers /sync even if the user is not
         # present so should be excluded from user_ips entries.
-        if user_agent is "sync-v3-proxy-":
+        if user_agent == "sync-v3-proxy-":
             return
 
         if not now:
