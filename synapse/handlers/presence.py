@@ -151,15 +151,13 @@ class BasePresenceHandler(abc.ABC):
 
         self._federation_queue = PresenceFederationQueue(hs, self)
 
-        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
-
         self.VALID_PRESENCE: Tuple[str, ...] = (
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
         )
 
-        if self._busy_presence_enabled:
+        if hs.config.experimental.msc3026_enabled:
             self.VALID_PRESENCE += (PresenceState.BUSY,)
 
         active_presence = self.store.take_presence_startup_info()
@@ -1234,9 +1232,7 @@ class PresenceHandler(BasePresenceHandler):
         if not ignore_status_msg:
             new_fields["status_msg"] = status_msg
 
-        if presence == PresenceState.ONLINE or (
-            presence == PresenceState.BUSY and self._busy_presence_enabled
-        ):
+        if presence == PresenceState.ONLINE or presence == PresenceState.BUSY:
             new_fields["last_active_ts"] = now
 
         if is_sync:
