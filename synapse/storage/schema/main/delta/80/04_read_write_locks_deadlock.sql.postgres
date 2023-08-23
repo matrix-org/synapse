@@ -1,0 +1,71 @@
+/* Copyright 2023 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+-- Remove a previous attempt to avoid deadlocks
+DROP TRIGGER IF EXISTS delete_read_write_lock_parent_before_trigger ON worker_read_write_locks;
+DROP FUNCTION IF EXISTS delete_read_write_lock_parent_before;
+
+
+-- Ensure that we keep `worker_read_write_locks_mode` up to date whenever a lock
+-- is released (i.e. a row deleted from `worker_read_write_locks`). Either we
+-- update the `worker_read_write_locks_mode.token` to match another instance
+-- that has currently acquired the lock, or we delete the row if nobody has
+-- currently acquired a lock.
+CREATE OR REPLACE FUNCTION delete_read_write_lock_parent() RETURNS trigger AS $$
+DECLARE
+    new_token TEXT;
+    mode_row_token TEXT;
+BEGIN
+    -- Only update the token in `_mode` if its our token. This prevents
+    -- deadlocks.
+    --
+    -- We shove the token into `mode_row_token`, as otherwise postgres complains
+    -- we're not using the returned data.
+    SELECT token INTO mode_row_token FROM worker_read_write_locks_mode
+        WHERE
+            lock_name = OLD.lock_name
+            AND lock_key = OLD.lock_key
+            AND token = OLD.token
+        FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT token INTO new_token FROM worker_read_write_locks
+        WHERE
+            lock_name = OLD.lock_name
+            AND lock_key = OLD.lock_key
+        LIMIT 1 FOR UPDATE SKIP LOCKED;
+
+    IF NOT FOUND THEN
+        DELETE FROM worker_read_write_locks_mode
+            WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key AND token = OLD.token;
+    ELSE
+        UPDATE worker_read_write_locks_mode
+            SET token = new_token
+            WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key;
+    END IF;
+
+    RETURN NEW;
+END
+$$
+LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS delete_read_write_lock_parent_trigger ON worker_read_write_locks;
+CREATE TRIGGER delete_read_write_lock_parent_trigger AFTER DELETE ON worker_read_write_locks
+    FOR EACH ROW
+    EXECUTE PROCEDURE delete_read_write_lock_parent();
