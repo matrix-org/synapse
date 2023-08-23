@@ -27,10 +27,14 @@ DROP FUNCTION IF EXISTS delete_read_write_lock_parent_before;
 CREATE OR REPLACE FUNCTION delete_read_write_lock_parent() RETURNS trigger AS $$
 DECLARE
     new_token TEXT;
+    mode_row_token TEXT;
 BEGIN
     -- Only update the token in `_mode` if its our token. This prevents
     -- deadlocks.
-    PERFORM * FROM worker_read_write_locks_mode
+    --
+    -- We shove the token into `mode_row_token`, as otherwise postgres complains
+    -- we're not using the returned data.
+    SELECT token INTO mode_row_token FROM worker_read_write_locks_mode
         WHERE
             lock_name = OLD.lock_name
             AND lock_key = OLD.lock_key
