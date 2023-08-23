@@ -14,7 +14,7 @@
 
 from http import HTTPStatus
 from typing import Any, Dict, Union
-from unittest.mock import ANY, Mock
+from unittest.mock import ANY, AsyncMock, Mock
 from urllib.parse import parse_qs
 
 from signedjson.key import (
@@ -340,6 +340,41 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             get_awaitable_result(self.auth.is_server_admin(requester)), False
         )
 
+    def test_active_user_admin_impersonation(self) -> None:
+        """The handler should return a requester with normal user rights
+        and an user ID matching the one specified in query param `user_id`"""
+
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(
+                code=200,
+                payload={
+                    "active": True,
+                    "sub": SUBJECT,
+                    "scope": " ".join([SYNAPSE_ADMIN_SCOPE, MATRIX_USER_SCOPE]),
+                    "username": USERNAME,
+                },
+            )
+        )
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"mockAccessToken"]
+        impersonated_user_id = f"@{USERNAME}:{SERVER_NAME}"
+        request.args[b"_oidc_admin_impersonate_user_id"] = [
+            impersonated_user_id.encode("ascii")
+        ]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        requester = self.get_success(self.auth.get_user_by_req(request))
+        self.http_client.get_json.assert_called_once_with(WELL_KNOWN)
+        self.http_client.request.assert_called_once_with(
+            method="POST", uri=INTROSPECTION_ENDPOINT, data=ANY, headers=ANY
+        )
+        self._assertParams()
+        self.assertEqual(requester.user.to_string(), impersonated_user_id)
+        self.assertEqual(requester.is_guest, False)
+        self.assertEqual(requester.device_id, None)
+        self.assertEqual(
+            get_awaitable_result(self.auth.is_server_admin(requester)), False
+        )
+
     def test_active_user_with_device(self) -> None:
         """The handler should return a requester with normal user rights and a device ID."""
 
@@ -552,6 +587,38 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             self.auth._introspect_token("stale"), InvalidClientTokenError  # type: ignore[attr-defined]
         )
         self.assertEqual(self.http_client.request.call_count, 2)
+
+    def test_revocation_endpoint(self) -> None:
+        # mock introspection response and then admin verification response
+        self.http_client.request = AsyncMock(
+            side_effect=[
+                FakeResponse.json(
+                    code=200, payload={"active": True, "jti": "open_sesame"}
+                ),
+                FakeResponse.json(
+                    code=200,
+                    payload={
+                        "active": True,
+                        "sub": SUBJECT,
+                        "scope": " ".join([SYNAPSE_ADMIN_SCOPE, MATRIX_USER_SCOPE]),
+                        "username": USERNAME,
+                    },
+                ),
+            ]
+        )
+
+        # cache a token to delete
+        introspection_token = self.get_success(
+            self.auth._introspect_token("open_sesame")  # type: ignore[attr-defined]
+        )
+        self.assertEqual(self.auth._token_cache.get("open_sesame"), introspection_token)  # type: ignore[attr-defined]
+
+        # delete the revoked token
+        introspection_token_id = "open_sesame"
+        url = f"/_synapse/admin/v1/OIDC_token_revocation/{introspection_token_id}"
+        channel = self.make_request("DELETE", url, access_token="mockAccessToken")
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(self.auth._token_cache.get("open_sesame"), None)  # type: ignore[attr-defined]
 
     def make_device_keys(self, user_id: str, device_id: str) -> JsonDict:
         # We only generate a master key to simplify the test.

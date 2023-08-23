@@ -1000,8 +1000,6 @@ def setup_test_homeserver(
     hs.tls_server_context_factory = Mock()
 
     hs.setup()
-    if homeserver_to_use == TestHomeServer:
-        hs.setup_background_tasks()
 
     if isinstance(db_engine, PostgresEngine):
         database_pool = hs.get_datastores().databases[0]
