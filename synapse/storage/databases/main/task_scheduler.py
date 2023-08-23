@@ -92,7 +92,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             if clauses:
                 sql = sql + " WHERE " + " AND ".join(clauses)
 
-            sql = sql + "ORDER BY timestamp"
+            sql = sql + " ORDER BY timestamp"
 
             txn.execute(sql, args)
             return self.db_pool.cursor_to_dict(txn)

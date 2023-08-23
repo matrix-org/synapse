@@ -154,13 +154,15 @@ class TaskScheduler:
                 f"No function associated with action {action} of the scheduled task"
             )
 
+        status = TaskStatus.SCHEDULED
         if timestamp is None or timestamp < self._clock.time_msec():
             timestamp = self._clock.time_msec()
+            status = TaskStatus.ACTIVE
 
         task = ScheduledTask(
             random_string(16),
             action,
-            TaskStatus.SCHEDULED,
+            status,
             timestamp,
             resource_id,
             params,
