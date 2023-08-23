@@ -505,7 +505,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         curr_sync = self._user_to_num_current_syncs.get(user_id, 0)
         self._user_to_num_current_syncs[user_id] = curr_sync + 1
 
-        # If we went from no in flight sync to some, notify replication
+        # If this is the first in-flight sync, notify replication
         if self._user_to_num_current_syncs[user_id] == 1:
             self.mark_as_coming_online(user_id)
 
@@ -516,7 +516,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             if user_id in self._user_to_num_current_syncs:
                 self._user_to_num_current_syncs[user_id] -= 1
 
-                # If we went from one in flight sync to non, notify replication
+                # If there are no more in-flight syncs, notify replication
                 if self._user_to_num_current_syncs[user_id] == 0:
                     self.mark_as_going_offline(user_id)
 
@@ -1003,21 +1003,6 @@ class PresenceHandler(BasePresenceHandler):
             ignore_status_msg=True,
             is_sync=True,
         )
-        # Retrieve the new state for the logic below. This should come from the
-        # in-memory cache.
-        prev_state = await self.current_state_for_user(user_id)
-
-        # To keep the single process behaviour consistent with worker mode, run the
-        # same logic as `update_external_syncs_row`, even though it looks weird.
-        if prev_state.state == PresenceState.OFFLINE:
-            await self._update_states(
-                [
-                    prev_state.copy_and_replace(
-                        state=PresenceState.ONLINE,
-                        last_active_ts=self.clock.time_msec(),
-                    )
-                ]
-            )
 
         async def _end() -> None:
             try:
@@ -1067,31 +1052,26 @@ class PresenceHandler(BasePresenceHandler):
                 process_id, set()
             )
 
-            updates = []
+            # USER_SYNC is sent when a user starts or stops syncing on a remote
+            # process. (But only for the initial and last device.)
+            #
+            # When a user *starts* syncing it also calls set_state(...) which
+            # will update the state, last_active_ts, and last_user_sync_ts.
+            # Simply ensure the user is tracked as syncing in this case.
+            #
+            # When a user *stops* syncing, update the last_user_sync_ts and mark
+            # them as no longer syncing. Note this doesn't quite match the
+            # monolith behaviour, which updates last_user_sync_ts at the end of
+            # every sync, not just the last in-flight sync.
             if is_syncing and user_id not in process_presence:
-                if prev_state.state == PresenceState.OFFLINE:
-                    updates.append(
-                        prev_state.copy_and_replace(
-                            state=PresenceState.ONLINE,
-                            last_active_ts=sync_time_msec,
-                            last_user_sync_ts=sync_time_msec,
-                        )
-                    )
-                else:
-                    updates.append(
-                        prev_state.copy_and_replace(last_user_sync_ts=sync_time_msec)
-                    )
                 process_presence.add(user_id)
-            elif user_id in process_presence:
-                updates.append(
-                    prev_state.copy_and_replace(last_user_sync_ts=sync_time_msec)
+            elif not is_syncing and user_id in process_presence:
+                new_state = prev_state.copy_and_replace(
+                    last_user_sync_ts=sync_time_msec
                 )
+                await self._update_states([new_state])
 
-            if not is_syncing:
                 process_presence.discard(user_id)
-
-            if updates:
-                await self._update_states(updates)
 
             self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
 
