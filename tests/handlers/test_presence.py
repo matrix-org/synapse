@@ -38,6 +38,7 @@ from synapse.handlers.presence import (
 from synapse.rest import admin
 from synapse.rest.client import room
 from synapse.server import HomeServer
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util import Clock
 
@@ -511,6 +512,121 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
         self.assertIsNotNone(new_state)
         self.assertEqual(state, new_state)
+
+
+class PresenceHandlerInitTestCase(unittest.HomeserverTestCase):
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        # Disable background tasks on this worker so that the PresenceHandler isn't
+        # loaded until we request it.
+        config["run_background_tasks_on"] = "other"
+        return config
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.user_id = f"@test:{self.hs.config.server.server_name}"
+
+        # Move the reactor to the initial time.
+        self.reactor.advance(1000)
+        now = self.clock.time_msec()
+
+        main_store = hs.get_datastores().main
+        self.get_success(
+            main_store.update_presence(
+                [
+                    UserPresenceState(
+                        user_id=self.user_id,
+                        state=PresenceState.ONLINE,
+                        last_active_ts=now,
+                        last_federation_update_ts=now,
+                        last_user_sync_ts=now,
+                        status_msg=None,
+                        currently_active=True,
+                    )
+                ]
+            )
+        )
+
+        # Regenerate the preloaded presence information on PresenceStore.
+        def refill_presence(db_conn: LoggingDatabaseConnection) -> None:
+            main_store._presence_on_startup = main_store._get_active_presence(db_conn)
+
+        self.get_success(main_store.db_pool.runWithConnection(refill_presence))
+
+    def test_restored_presence_idles(self) -> None:
+        """The presence state restored from the database should not persist forever."""
+
+        # Get the handler (which kicks off a bunch of timers).
+        presence_handler = self.hs.get_presence_handler()
+
+        # Assert the user is online.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+        # Advance such that the user should timeout.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000)
+        self.reactor.pump([5])
+
+        # Check that the user is now offline.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, PresenceState.OFFLINE)
+
+    @parameterized.expand(
+        [
+            (PresenceState.BUSY, PresenceState.BUSY),
+            (PresenceState.ONLINE, PresenceState.ONLINE),
+            (PresenceState.UNAVAILABLE, PresenceState.UNAVAILABLE),
+            # Offline syncs don't update the state.
+            (PresenceState.OFFLINE, PresenceState.ONLINE),
+        ]
+    )
+    @unittest.override_config({"experimental_features": {"msc3026_enabled": True}})
+    def test_restored_presence_online_after_sync(
+        self, sync_state: str, expected_state: str
+    ) -> None:
+        """
+        The presence state restored from the database should be overridden with sync after a timeout.
+
+        Args:
+            sync_state: The presence state of the new sync.
+            expected_state: The expected presence right after the sync.
+        """
+
+        # Get the handler (which kicks off a bunch of timers).
+        presence_handler = self.hs.get_presence_handler()
+
+        # Assert the user is online, as restored.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+        # Advance slightly and sync.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000 / 2)
+        self.get_success(
+            presence_handler.user_syncing(
+                self.user_id, sync_state != PresenceState.OFFLINE, sync_state
+            )
+        )
+
+        # Assert the user is in the expected state.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, expected_state)
+
+        # Advance such that the user's preloaded data times out, but not the new sync.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000 / 2)
+        self.reactor.pump([5])
+
+        # Check that the user is in the sync state (as the client is currently syncing still).
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, sync_state)
 
 
 class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):

@@ -45,7 +45,7 @@
     # Output a development shell for x86_64/aarch64 Linux/Darwin (MacOS).
     systems.url = "github:nix-systems/default";
     # A development environment manager built on Nix. See https://devenv.sh.
-    devenv.url = "github:cachix/devenv/main";
+    devenv.url = "github:cachix/devenv/v0.6.3";
     # Rust toolchain.
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
