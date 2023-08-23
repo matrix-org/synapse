@@ -242,8 +242,6 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
     ) -> None:
         # Upsert retry time interval if retry_interval is zero (i.e. we're
         # resetting it) or greater than the existing retry interval.
-        # We also upsert when the new retry interval is the same as the existing one,
-        # since it will be the case when `destination_max_retry_interval` is reached.
         #
         # WARNING: This is executed in autocommit, so we shouldn't add any more
         # SQL calls in here (without being very careful).
@@ -258,8 +256,10 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
                     retry_interval = EXCLUDED.retry_interval
                 WHERE
                     EXCLUDED.retry_interval = 0
+                    OR EXCLUDED.retry_last_ts = 0
                     OR destinations.retry_interval IS NULL
-                    OR destinations.retry_interval <= EXCLUDED.retry_interval
+                    OR destinations.retry_interval < EXCLUDED.retry_interval
+                    OR destinations.retry_last_ts < EXCLUDED.retry_last_ts
         """
 
         txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
