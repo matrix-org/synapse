@@ -62,7 +62,6 @@
 * Bump types-pillow from 10.0.0.1 to 10.0.0.2. ([\#16105](https://github.com/matrix-org/synapse/issues/16105))
 * Bump types-pyopenssl from 23.2.0.1 to 23.2.0.2. ([\#16146](https://github.com/matrix-org/synapse/issues/16146))
 
->>>>>>> Stashed changes
 # Synapse 1.90.0 (2023-08-15)
 
 No significant changes since 1.90.0rc1.
