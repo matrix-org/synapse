@@ -26,6 +26,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events.builder import EventBuilder
 from synapse.federation.sender import FederationSender
 from synapse.handlers.presence import (
+    BUSY_ONLINE_TIMEOUT,
     EXTERNAL_PROCESS_EXPIRY,
     FEDERATION_PING_INTERVAL,
     FEDERATION_TIMEOUT,
@@ -913,6 +914,13 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
                 # If both devices have the same state, online should eventually idle.
                 # Otherwise, the state doesn't change.
                 (
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
                     PresenceState.ONLINE,
                     PresenceState.ONLINE,
                     PresenceState.ONLINE,
@@ -933,7 +941,29 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
                     PresenceState.OFFLINE,
                     PresenceState.OFFLINE,
                 ),
-                # If the second device has a "lower" state it should fallback to it.
+                # If the second device has a "lower" state it should fallback to it,
+                # except for "busy" which overrides.
+                (
+                    PresenceState.BUSY,
+                    PresenceState.ONLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.BUSY,
+                    PresenceState.UNAVAILABLE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.BUSY,
+                    PresenceState.OFFLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
                 (
                     PresenceState.ONLINE,
                     PresenceState.UNAVAILABLE,
@@ -956,6 +986,27 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
                     PresenceState.UNAVAILABLE,
                 ),
                 # If the second device has a "higher" state it should override.
+                (
+                    PresenceState.ONLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.UNAVAILABLE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.OFFLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
                 (
                     PresenceState.UNAVAILABLE,
                     PresenceState.ONLINE,
@@ -1115,6 +1166,12 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             for cases in [
                 # If both devices have the same state, nothing exciting should happen.
                 (
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
                     PresenceState.ONLINE,
                     PresenceState.ONLINE,
                     PresenceState.ONLINE,
@@ -1132,7 +1189,26 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
                     PresenceState.OFFLINE,
                     PresenceState.OFFLINE,
                 ),
-                # If the second device has a "lower" state it should fallback to it.
+                # If the second device has a "lower" state it should fallback to it,
+                # except for "busy" which overrides.
+                (
+                    PresenceState.BUSY,
+                    PresenceState.ONLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.BUSY,
+                    PresenceState.UNAVAILABLE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.BUSY,
+                    PresenceState.OFFLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
                 (
                     PresenceState.ONLINE,
                     PresenceState.UNAVAILABLE,
@@ -1152,6 +1228,24 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
                     PresenceState.OFFLINE,
                 ),
                 # If the second device has a "higher" state it should override.
+                (
+                    PresenceState.ONLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.UNAVAILABLE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
+                (
+                    PresenceState.OFFLINE,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                    PresenceState.BUSY,
+                ),
                 (
                     PresenceState.UNAVAILABLE,
                     PresenceState.ONLINE,
@@ -1266,7 +1360,11 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
         # 8. Advance such that the second device should be discarded (the sync timeout),
         # then pump so _handle_timeouts function to called.
-        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000)
+        if dev_1_state == PresenceState.BUSY or dev_2_state == PresenceState.BUSY:
+            timeout = BUSY_ONLINE_TIMEOUT
+        else:
+            timeout = SYNC_ONLINE_TIMEOUT
+        self.reactor.advance(timeout / 1000)
         self.reactor.pump([5])
 
         # 9. There are no more devices, should be offline.
