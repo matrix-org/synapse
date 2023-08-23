@@ -1,3 +1,1 @@
 Added additional debug logging to MultiWriterIdGenerator.__init__ and get_cache_dict.
-
-Credits: @prajjawal05
