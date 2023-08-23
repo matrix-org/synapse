@@ -1,0 +1,1 @@
+Fixed a dependency version update that broke the loading of lemonLDAP OIDC metadata. Contributed by @hachem2001 [OUERTANI Mohamed Hachem].
