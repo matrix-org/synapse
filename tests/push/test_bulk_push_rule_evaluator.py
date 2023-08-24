@@ -382,7 +382,6 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-    @override_config({"experimental_features": {"msc3958_supress_edit_notifs": True}})
     def test_suppress_edits(self) -> None:
         """Under the default push rules, event edits should not generate notifications."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -409,15 +408,32 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-        # Room mentions from those without power should not notify.
+        # The edit should not cause a notification.
         self.assertFalse(
             self._create_and_process(
                 bulk_evaluator,
                 {
-                    "body": self.alice,
+                    "body": "Test message",
                     "m.relates_to": {
                         "rel_type": RelationTypes.REPLACE,
                         "event_id": event.event_id,
+                    },
+                },
+            )
+        )
+
+        # An edit which is a mention will cause a notification.
+        self.assertTrue(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": "Test message",
+                    "m.relates_to": {
+                        "rel_type": RelationTypes.REPLACE,
+                        "event_id": event.event_id,
+                    },
+                    "m.mentions": {
+                        "user_ids": [self.alice],
                     },
                 },
             )

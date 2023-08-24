@@ -28,12 +28,12 @@ FROM docker.io/library/${distro} as builder
 
 RUN apt-get update -qq -o Acquire::Languages=none
 RUN env DEBIAN_FRONTEND=noninteractive apt-get install \
-        -yqq --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        devscripts \
-        equivs \
-        wget
+    -yqq --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    devscripts \
+    equivs \
+    wget
 
 # fetch and unpack the package
 # We are temporarily using a fork of dh-virtualenv due to an incompatibility with Python 3.11, which ships with
@@ -62,33 +62,29 @@ FROM docker.io/library/${distro}
 ARG distro=""
 ENV distro ${distro}
 
-# Python < 3.7 assumes LANG="C" means ASCII-only and throws on printing unicode
-# http://bugs.python.org/issue19846
-ENV LANG C.UTF-8
-
 # Install the build dependencies
 #
 # NB: keep this list in sync with the list of build-deps in debian/control
 # TODO: it would be nice to do that automatically.
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
-        -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-        build-essential \
-        curl \
-        debhelper \
-        devscripts \
-        libsystemd-dev \
-        lsb-release \
-        pkg-config \
-        python3-dev \
-        python3-pip \
-        python3-setuptools \
-        python3-venv \
-        sqlite3 \
-        libpq-dev \
-        libicu-dev \
-        pkg-config \
-        xmlsec1
+    -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
+    build-essential \
+    curl \
+    debhelper \
+    devscripts \
+    libsystemd-dev \
+    lsb-release \
+    pkg-config \
+    python3-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-venv \
+    sqlite3 \
+    libpq-dev \
+    libicu-dev \
+    pkg-config \
+    xmlsec1
 
 # Install rust and ensure it's in the PATH
 ENV RUSTUP_HOME=/rust

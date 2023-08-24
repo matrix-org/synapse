@@ -19,6 +19,7 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
+    Counter,
     Dict,
     Iterable,
     List,
@@ -27,8 +28,6 @@ from typing import (
     Union,
     cast,
 )
-
-from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
@@ -697,7 +696,7 @@ class StatsStore(StateDeltasStore):
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
             filters = []
-            args = [self.hs.config.server.server_name]
+            args: list = []
 
             if search_term:
                 filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")
@@ -733,7 +732,7 @@ class StatsStore(StateDeltasStore):
 
             sql_base = """
                 FROM local_media_repository as lmr
-                LEFT JOIN profiles AS p ON lmr.user_id = '@' || p.user_id || ':' || ?
+                LEFT JOIN profiles AS p ON lmr.user_id = p.full_user_id
                 {}
                 GROUP BY lmr.user_id, displayname
             """.format(

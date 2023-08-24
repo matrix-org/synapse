@@ -26,6 +26,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Deque,
     Dict,
     Iterable,
     List,
@@ -41,7 +42,7 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
-from typing_extensions import Deque, ParamSpec
+from typing_extensions import ParamSpec
 from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
@@ -53,6 +54,7 @@ from twisted.internet.interfaces import (
     IConnector,
     IConsumer,
     IHostnameResolver,
+    IListeningPort,
     IProducer,
     IProtocol,
     IPullProducer,
@@ -62,7 +64,7 @@ from twisted.internet.interfaces import (
     IResolverSimple,
     ITransport,
 )
-from twisted.internet.protocol import ClientFactory, DatagramProtocol
+from twisted.internet.protocol import ClientFactory, DatagramProtocol, Factory
 from twisted.python import threadpool
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
@@ -523,6 +525,35 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         """
         self._tcp_callbacks[(host, port)] = callback
 
+    def connectUNIX(
+        self,
+        address: str,
+        factory: ClientFactory,
+        timeout: float = 30,
+        checkPID: int = 0,
+    ) -> IConnector:
+        """
+        Unix sockets aren't supported for unit tests yet. Make it obvious to any
+        developer trying it out that they will need to do some work before being able
+        to use it in tests.
+        """
+        raise Exception("Unix sockets are not implemented for tests yet, sorry.")
+
+    def listenUNIX(
+        self,
+        address: str,
+        factory: Factory,
+        backlog: int = 50,
+        mode: int = 0o666,
+        wantPID: int = 0,
+    ) -> IListeningPort:
+        """
+        Unix sockets aren't supported for unit tests yet. Make it obvious to any
+        developer trying it out that they will need to do some work before being able
+        to use it in tests.
+        """
+        raise Exception("Unix sockets are not implemented for tests, sorry")
+
     def connectTCP(
         self,
         host: str,
@@ -969,8 +1000,6 @@ def setup_test_homeserver(
     hs.tls_server_context_factory = Mock()
 
     hs.setup()
-    if homeserver_to_use == TestHomeServer:
-        hs.setup_background_tasks()
 
     if isinstance(db_engine, PostgresEngine):
         database_pool = hs.get_datastores().databases[0]

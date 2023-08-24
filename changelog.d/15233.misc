@@ -1,1 +1,0 @@
-Replace `EventContext` fields `prev_group` and `delta_ids` with field `state_group_deltas`.

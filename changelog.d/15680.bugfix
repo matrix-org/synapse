@@ -1,1 +1,0 @@
-Fix a long-standing bug where media files were served in an unsafe manner. Contributed by @joshqou.

@@ -256,8 +256,10 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
                     retry_interval = EXCLUDED.retry_interval
                 WHERE
                     EXCLUDED.retry_interval = 0
+                    OR EXCLUDED.retry_last_ts = 0
                     OR destinations.retry_interval IS NULL
                     OR destinations.retry_interval < EXCLUDED.retry_interval
+                    OR destinations.retry_last_ts < EXCLUDED.retry_last_ts
         """
 
         txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))

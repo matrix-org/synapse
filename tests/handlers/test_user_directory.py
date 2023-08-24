@@ -356,7 +356,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 support_user_id, ProfileInfo("I love support me", None)
             )
         )
-        profile = self.get_success(self.store.get_user_in_directory(support_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(support_user_id))
         self.assertIsNone(profile)
         display_name = "display_name"
 
@@ -364,7 +364,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(
             self.handler.handle_local_profile_change(regular_user_id, profile_info)
         )
-        profile = self.get_success(self.store.get_user_in_directory(regular_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(regular_user_id))
         assert profile is not None
         self.assertTrue(profile["display_name"] == display_name)
 
@@ -383,7 +383,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is in directory
-        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(r_user_id))
         assert profile is not None
         self.assertTrue(profile["display_name"] == display_name)
 
@@ -392,7 +392,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
 
         # profile is not in directory
-        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(r_user_id))
         self.assertIsNone(profile)
 
         # update profile after deactivation
@@ -401,7 +401,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is furthermore not in directory
-        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(r_user_id))
         self.assertIsNone(profile)
 
     def test_handle_local_profile_change_with_appservice_user(self) -> None:
@@ -411,7 +411,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is not in directory
-        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(as_user_id))
         self.assertIsNone(profile)
 
         # update profile
@@ -421,13 +421,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is still not in directory
-        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(as_user_id))
         self.assertIsNone(profile)
 
     def test_handle_local_profile_change_with_appservice_sender(self) -> None:
         # profile is not in directory
         profile = self.get_success(
-            self.store.get_user_in_directory(self.appservice.sender)
+            self.store._get_user_in_directory(self.appservice.sender)
         )
         self.assertIsNone(profile)
 
@@ -441,11 +441,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is still not in directory
         profile = self.get_success(
-            self.store.get_user_in_directory(self.appservice.sender)
+            self.store._get_user_in_directory(self.appservice.sender)
         )
         self.assertIsNone(profile)
 
     def test_handle_user_deactivated_support_user(self) -> None:
+        """Ensure a support user doesn't get added to the user directory after deactivation."""
         s_user_id = "@support:test"
         self.get_success(
             self.store.register_user(
@@ -453,14 +454,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        mock_remove_from_user_dir = Mock(return_value=make_awaitable(None))
-        with patch.object(
-            self.store, "remove_from_user_dir", mock_remove_from_user_dir
-        ):
-            self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
-        # BUG: the correct spelling is assert_not_called, but that makes the test fail
-        # and it's not clear that this is actually the behaviour we want.
-        mock_remove_from_user_dir.not_called()
+        # The profile should not be in the directory.
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
+        self.assertIsNone(profile)
+
+        # Remove the user from the directory.
+        self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
+
+        # The profile should still not be in the user directory.
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
+        self.assertIsNone(profile)
 
     def test_handle_user_deactivated_regular_user(self) -> None:
         r_user_id = "@regular:test"

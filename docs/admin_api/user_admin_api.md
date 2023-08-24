@@ -146,6 +146,7 @@ Body parameters:
 - `admin` - **bool**, optional, defaults to `false`. Whether the user is a homeserver administrator,
   granting them access to the Admin API, among other things.
 - `deactivated` - **bool**, optional. If unspecified, deactivation state will be left unchanged.
+- `locked` - **bool**, optional. If unspecified, locked state will be left unchanged.
 
   Note: the `password` field must also be set if both of the following are true:
   - `deactivated` is set to `false` and the user was previously deactivated (you are reactivating this user)
@@ -218,6 +219,8 @@ The following parameters should be set in the URL:
   **or** displaynames that contain this value.
 - `guests` - string representing a bool - Is optional and if `false` will **exclude** guest users.
   Defaults to `true` to include guest users.
+- `admins` - Optional flag to filter admins. If `true`, only admins are queried. If `false`, admins are excluded from 
+  the query. When the flag is absent (the default), **both** admins and non-admins are included in the search results.
 - `deactivated` - string representing a bool - Is optional and if `true` will **include** deactivated users.
   Defaults to `false` to exclude deactivated users.
 - `limit` - string representing a positive integer - Is optional but is used for pagination,
@@ -242,6 +245,9 @@ The following parameters should be set in the URL:
 
 - `dir` - Direction of media order. Either `f` for forwards or `b` for backwards.
   Setting this value to `b` will reverse the above sort order. Defaults to `f`.
+- `not_user_type` - Exclude certain user types, such as bot users, from the request.
+   Can be provided multiple times. Possible values are `bot`, `support` or "empty string".
+   "empty string" here means to exclude users without a type.
 
 Caution. The database only has indexes on the columns `name` and `creation_ts`.
 This means that if a different sort order is used (`is_guest`, `admin`,
@@ -729,7 +735,8 @@ POST /_synapse/admin/v1/users/<user_id>/login
 
 An optional `valid_until_ms` field can be specified in the request body as an
 integer timestamp that specifies when the token should expire. By default tokens
-do not expire.
+do not expire. Note that this API does not allow a user to login as themselves
+(to create more tokens).
 
 A response body like the following is returned:
 
@@ -1180,7 +1187,7 @@ The following parameters should be set in the URL:
 - `user_id` - The fully qualified MXID: for example, `@user:server.com`. The user must
   be local.
 
-### Check username availability
+## Check username availability
 
 Checks to see if a username is available, and valid, for the server. See [the client-server 
 API](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available)
@@ -1198,7 +1205,7 @@ GET /_synapse/admin/v1/username_available?username=$localpart
 The request and response format is the same as the
 [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.
 
-### Find a user based on their ID in an auth provider
+## Find a user based on their ID in an auth provider
 
 The API is:
 
@@ -1237,7 +1244,7 @@ Returns a `404` HTTP status code if no user was found, with a response body like
 _Added in Synapse 1.68.0._
 
 
-### Find a user based on their Third Party ID (ThreePID or 3PID)
+## Find a user based on their Third Party ID (ThreePID or 3PID)
 
 The API is:
 

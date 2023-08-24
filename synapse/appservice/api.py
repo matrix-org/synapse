@@ -16,9 +16,6 @@ import logging
 import urllib.parse
 from typing import (
     TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Callable,
     Dict,
     Iterable,
     List,
@@ -27,10 +24,11 @@ from typing import (
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
 from prometheus_client import Counter
-from typing_extensions import Concatenate, ParamSpec, TypeGuard
+from typing_extensions import ParamSpec, TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException, HttpResponseException
@@ -80,9 +78,7 @@ sent_todevice_counter = Counter(
 
 HOUR_IN_MS = 60 * 60 * 1000
 
-
 APP_SERVICE_PREFIX = "/_matrix/app/v1"
-APP_SERVICE_UNSTABLE_PREFIX = "/_matrix/app/unstable"
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -123,51 +119,11 @@ class ApplicationServiceApi(SimpleHttpClient):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.clock = hs.get_clock()
+        self.config = hs.config.appservice
 
         self.protocol_meta_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )
-
-    async def _send_with_fallbacks(
-        self,
-        service: "ApplicationService",
-        prefixes: List[str],
-        path: str,
-        func: Callable[Concatenate[str, P], Awaitable[R]],
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> R:
-        """
-        Attempt to call an application service with multiple paths, falling back
-        until one succeeds.
-
-        Args:
-            service: The appliacation service, this provides the base URL.
-            prefixes: A last of paths to try in order for the requests.
-            path: A suffix to append to each prefix.
-            func: The function to call, the first argument will be the full
-                endpoint to fetch. Other arguments are provided by args/kwargs.
-
-        Returns:
-            The return value of func.
-        """
-        for i, prefix in enumerate(prefixes, start=1):
-            uri = f"{service.url}{prefix}{path}"
-            try:
-                return await func(uri, *args, **kwargs)
-            except HttpResponseException as e:
-                # If an error is received that is due to an unrecognised path,
-                # fallback to next path (if one exists). Otherwise, consider it
-                # a legitimate error and raise.
-                if i < len(prefixes) and is_unknown_endpoint(e):
-                    continue
-                raise
-            except Exception:
-                # Unexpected exceptions get sent to the caller.
-                raise
-
-        # The function should always exit via the return or raise above this.
-        raise RuntimeError("Unexpected fallback behaviour. This should never be seen.")
 
     async def query_user(self, service: "ApplicationService", user_id: str) -> bool:
         if service.url is None:
@@ -177,12 +133,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
-            response = await self._send_with_fallbacks(
-                service,
-                [APP_SERVICE_PREFIX, ""],
-                f"/users/{urllib.parse.quote(user_id)}",
-                self.get_json,
-                {"access_token": service.hs_token},
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
+            response = await self.get_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
+                args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if response is not None:  # just an empty json object
@@ -203,12 +159,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
-            response = await self._send_with_fallbacks(
-                service,
-                [APP_SERVICE_PREFIX, ""],
-                f"/rooms/{urllib.parse.quote(alias)}",
-                self.get_json,
-                {"access_token": service.hs_token},
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
+            response = await self.get_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
+                args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if response is not None:  # just an empty json object
@@ -241,15 +197,14 @@ class ApplicationServiceApi(SimpleHttpClient):
         assert service.hs_token is not None
 
         try:
-            args: Mapping[Any, Any] = {
-                **fields,
-                b"access_token": service.hs_token,
-            }
-            response = await self._send_with_fallbacks(
-                service,
-                [APP_SERVICE_PREFIX, APP_SERVICE_UNSTABLE_PREFIX],
-                f"/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
-                self.get_json,
+            args: Mapping[bytes, Union[List[bytes], str]] = fields
+            if self.config.use_appservice_legacy_authorization:
+                args = {
+                    **fields,
+                    b"access_token": service.hs_token,
+                }
+            response = await self.get_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 args=args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
@@ -285,12 +240,12 @@ class ApplicationServiceApi(SimpleHttpClient):
             # This is required by the configuration.
             assert service.hs_token is not None
             try:
-                info = await self._send_with_fallbacks(
-                    service,
-                    [APP_SERVICE_PREFIX, APP_SERVICE_UNSTABLE_PREFIX],
-                    f"/thirdparty/protocol/{urllib.parse.quote(protocol)}",
-                    self.get_json,
-                    {"access_token": service.hs_token},
+                args = None
+                if self.config.use_appservice_legacy_authorization:
+                    args = {"access_token": service.hs_token}
+                info = await self.get_json(
+                    f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
+                    args,
                     headers={"Authorization": [f"Bearer {service.hs_token}"]},
                 )
 
@@ -401,13 +356,14 @@ class ApplicationServiceApi(SimpleHttpClient):
                 }
 
         try:
-            await self._send_with_fallbacks(
-                service,
-                [APP_SERVICE_PREFIX, ""],
-                f"/transactions/{urllib.parse.quote(str(txn_id))}",
-                self.put_json,
+            args = None
+            if self.config.use_appservice_legacy_authorization:
+                args = {"access_token": service.hs_token}
+
+            await self.put_json(
+                f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
                 json_body=body,
-                args={"access_token": service.hs_token},
+                args=args,
                 headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if logger.isEnabledFor(logging.DEBUG):

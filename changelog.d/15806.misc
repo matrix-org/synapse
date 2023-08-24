@@ -1,1 +1,0 @@
-Switch from `matrix://` to `matrix-federation://` scheme for internal Synapse routing of outbound federation traffic.

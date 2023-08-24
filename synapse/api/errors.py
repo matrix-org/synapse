@@ -16,6 +16,7 @@
 """Contains exceptions and error codes."""
 
 import logging
+import math
 import typing
 from enum import Enum
 from http import HTTPStatus
@@ -80,6 +81,8 @@ class Codes(str, Enum):
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+    # USER_LOCKED = "M_USER_LOCKED"
+    USER_LOCKED = "ORG_MATRIX_MSC3939_USER_LOCKED"
 
     # Part of MSC3848
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
@@ -215,6 +218,13 @@ class InvalidAPICallError(SynapseError):
 
     def __init__(self, msg: str):
         super().__init__(HTTPStatus.BAD_REQUEST, msg, Codes.BAD_JSON)
+
+
+class InvalidProxyCredentialsError(SynapseError):
+    """Error raised when the proxy credentials are invalid."""
+
+    def __init__(self, msg: str, errcode: str = Codes.UNKNOWN):
+        super().__init__(401, msg, errcode)
 
 
 class ProxiedRequestError(SynapseError):
@@ -494,6 +504,8 @@ class InvalidCaptchaError(SynapseError):
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled."""
 
+    include_retry_after_header = False
+
     def __init__(
         self,
         code: int = 429,
@@ -501,7 +513,12 @@ class LimitExceededError(SynapseError):
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
-        super().__init__(code, msg, errcode)
+        headers = (
+            {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+            if self.include_retry_after_header and retry_after_ms is not None
+            else None
+        )
+        super().__init__(code, msg, errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":

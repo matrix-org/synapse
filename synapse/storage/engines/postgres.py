@@ -45,6 +45,15 @@ class PostgresEngine(
 
         psycopg2.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit: bool = database_config.get("synchronous_commit", True)
+        # Set the statement timeout to 1 hour by default.
+        # Any query taking more than 1 hour should probably be considered a bug;
+        # most of the time this is a sign that work needs to be split up or that
+        # some degenerate query plan has been created and the client has probably
+        # timed out/walked off anyway.
+        # This is in milliseconds.
+        self.statement_timeout: Optional[int] = database_config.get(
+            "statement_timeout", 60 * 60 * 1000
+        )
         self._version: Optional[int] = None  # unknown as yet
 
         self.isolation_level_map: Mapping[int, int] = {
@@ -156,6 +165,10 @@ class PostgresEngine(
         # https://www.postgresql.org/docs/current/static/wal-async-commit.html
         if not self.synchronous_commit:
             cursor.execute("SET synchronous_commit TO OFF")
+
+        # Abort really long-running statements and turn them into errors.
+        if self.statement_timeout is not None:
+            cursor.execute("SET statement_timeout TO ?", (self.statement_timeout,))
 
         cursor.close()
         db_conn.commit()

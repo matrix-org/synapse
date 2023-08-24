@@ -2313,6 +2313,43 @@ class DatabasePool:
 
         return txn.rowcount
 
+    @staticmethod
+    def simple_delete_many_batch_txn(
+        txn: LoggingTransaction,
+        table: str,
+        keys: Collection[str],
+        values: Iterable[Iterable[Any]],
+    ) -> None:
+        """Executes a DELETE query on the named table.
+
+        The input is given as a list of rows, where each row is a list of values.
+        (Actually any iterable is fine.)
+
+        Args:
+            txn: The transaction to use.
+            table: string giving the table name
+            keys: list of column names
+            values: for each row, a list of values in the same order as `keys`
+        """
+
+        if isinstance(txn.database_engine, PostgresEngine):
+            # We use `execute_values` as it can be a lot faster than `execute_batch`,
+            # but it's only available on postgres.
+            sql = "DELETE FROM %s WHERE (%s) IN (VALUES ?)" % (
+                table,
+                ", ".join(k for k in keys),
+            )
+
+            txn.execute_values(sql, values, fetch=False)
+        else:
+            sql = "DELETE FROM %s WHERE (%s) = (%s)" % (
+                table,
+                ", ".join(k for k in keys),
+                ", ".join("?" for _ in keys),
+            )
+
+            txn.execute_batch(sql, values)
+
     def get_cache_dict(
         self,
         db_conn: LoggingDatabaseConnection,

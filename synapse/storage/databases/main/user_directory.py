@@ -62,7 +62,6 @@ from synapse.types import (
     get_domain_from_id,
     get_localpart_from_id,
 )
-from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -410,23 +409,22 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 txn, users_to_work_on
             )
 
-            # Next fetch their profiles. Note that the `user_id` here is the
-            # *localpart*, and that not all users have profiles.
+            # Next fetch their profiles. Note that not all users have profiles.
             profile_rows = self.db_pool.simple_select_many_txn(
                 txn,
                 table="profiles",
-                column="user_id",
-                iterable=[get_localpart_from_id(u) for u in users_to_insert],
+                column="full_user_id",
+                iterable=list(users_to_insert),
                 retcols=(
-                    "user_id",
+                    "full_user_id",
                     "displayname",
                     "avatar_url",
                 ),
                 keyvalues={},
             )
             profiles = {
-                f"@{row['user_id']}:{self.server_name}": _UserDirProfile(
-                    f"@{row['user_id']}:{self.server_name}",
+                row["full_user_id"]: _UserDirProfile(
+                    row["full_user_id"],
                     row["displayname"],
                     row["avatar_url"],
                 )
@@ -771,9 +769,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
-        for p in profiles:
-            txn.call_after(self.get_user_in_directory.invalidate, (p.user_id,))
-
     async def add_users_who_share_private_room(
         self, room_id: str, user_id_tuples: Iterable[Tuple[str, str]]
     ) -> None:
@@ -831,14 +826,12 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             txn.execute(f"{truncate} user_directory_search")
             txn.execute(f"{truncate} users_in_public_rooms")
             txn.execute(f"{truncate} users_who_share_private_rooms")
-            txn.call_after(self.get_user_in_directory.invalidate_all)
 
         await self.db_pool.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
         )
 
-    @cached()
-    async def get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
+    async def _get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
         return await self.db_pool.simple_select_one(
             table="user_directory",
             keyvalues={"user_id": user_id},
@@ -900,7 +893,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 table="users_who_share_private_rooms",
                 keyvalues={"other_user_id": user_id},
             )
-            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
         await self.db_pool.runInteraction(
             "remove_from_user_dir", _remove_from_user_dir_txn
@@ -1003,7 +995,11 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         )
 
     async def search_user_dir(
-        self, user_id: str, search_term: str, limit: int
+        self,
+        user_id: str,
+        search_term: str,
+        limit: int,
+        show_locked_users: bool = False,
     ) -> SearchResult:
         """Searches for users in directory
 
@@ -1037,6 +1033,9 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 )
             """
 
+        if not show_locked_users:
+            where_clause += " AND (u.locked IS NULL OR u.locked = FALSE)"
+
         # We allow manipulating the ranking algorithm by injecting statements
         # based on config options.
         additional_ordering_statements = []
@@ -1068,6 +1067,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 SELECT d.user_id AS user_id, display_name, avatar_url
                 FROM matching_users as t
                 INNER JOIN user_directory AS d USING (user_id)
+                LEFT JOIN users AS u ON t.user_id = u.name
                 WHERE
                     %(where_clause)s
                 ORDER BY
@@ -1123,6 +1123,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 SELECT d.user_id AS user_id, display_name, avatar_url
                 FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
+                LEFT JOIN users AS u ON t.user_id = u.name
                 WHERE
                     %(where_clause)s
                     AND value MATCH ?
