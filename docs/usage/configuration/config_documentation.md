@@ -3867,6 +3867,19 @@ Example configuration:
 ```yaml
 forget_rooms_on_leave: false
 ```
+---
+### `exclude_rooms_from_sync`
+A list of rooms to exclude from sync responses. This is useful for server
+administrators wishing to group users into a room without these users being able
+to see it from their client.
+
+By default, no room is excluded.
+
+Example configuration:
+```yaml
+exclude_rooms_from_sync:
+    - !foo:example.com
+```
 
 ---
 ## Opentracing
