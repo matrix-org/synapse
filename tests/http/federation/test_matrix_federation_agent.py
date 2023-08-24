@@ -15,7 +15,7 @@ import base64
 import logging
 import os
 from typing import Any, Awaitable, Callable, Generator, List, Optional, cast
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import treq
 from netaddr import IPSet
@@ -41,7 +41,7 @@ from twisted.web.iweb import IPolicyForHTTPS, IResponse
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
-from synapse.http.federation.srv_resolver import Server
+from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import (
     WELL_KNOWN_MAX_SIZE,
     WellKnownResolver,
@@ -63,6 +63,7 @@ from tests.http import (
     get_test_ca_cert_file,
 )
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
+from tests.test_utils import make_awaitable
 from tests.utils import checked_cast, default_config
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
     def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
 
-        self.mock_resolver = Mock()
+        self.mock_resolver = Mock(spec=SrvResolver)
 
         config_dict = default_config("test", parse=False)
         config_dict["federation_custom_ca_list"] = [get_test_ca_cert_file()]
@@ -661,9 +662,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # .well-known request fails.
         self.reactor.pump((0.4,))
 
-        # now there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv1"
+        # now there should be two SRV lookup
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv1"), call(b"_matrix._tcp.testserv1")]
         )
 
         # we should fall back to a direct connection
@@ -748,8 +749,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.4,))
 
         # now there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
 
         # we should fall back to a direct connection
@@ -799,8 +800,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
 
         # there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.target-server"
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.target-server"),
+                call(b"_matrix._tcp.target-server"),
+            ]
         )
 
         # now we should get a connection to the target server
@@ -889,8 +893,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.1,))
 
         # there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.target-server"
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.target-server"),
+                call(b"_matrix._tcp.target-server"),
+            ]
         )
 
         # now we should get a connection to the target server
@@ -953,8 +960,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
 
         # now there should be a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
 
         # we should fall back to a direct connection
@@ -1027,10 +1034,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(len(http_proto.requests), 0)
 
         # and there should be a SRV lookup instead
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
 
+    # TODO Duplicate this test for the legacy lookup.
     def test_get_hostname_srv(self) -> None:
         """
         Test the behaviour when there is a single SRV record
@@ -1049,7 +1057,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         # the request for a .well-known will have failed with a DNS lookup error.
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+            b"_matrix-fed._tcp.testserv"
         )
 
         # Make sure treq is trying to connect
@@ -1073,6 +1081,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.1,))
         self.successResultOf(test_d)
 
+    # TODO Duplicate this for the legacy SRV record.
     def test_get_well_known_srv(self) -> None:
         """Test the behaviour when the .well-known redirects to a place where there
         is a SRV.
@@ -1106,7 +1115,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         # there should be a SRV lookup
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.target-server"
+            b"_matrix-fed._tcp.target-server"
         )
 
         # now we should get a connection to the target of the SRV record
@@ -1168,8 +1177,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.4,))
 
         # now there should have been a SRV lookup
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.xn--bcher-kva.com"
+        self.mock_resolver.resolve_service.assert_has_calls(
+            [
+                call(b"_matrix-fed._tcp.xn--bcher-kva.com"),
+                call(b"_matrix._tcp.xn--bcher-kva.com"),
+            ]
         )
 
         # We should fall back to port 8448
@@ -1197,6 +1209,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.1,))
         self.successResultOf(test_d)
 
+    # TODO Duplicate this with the legacy.
     def test_idna_srv_target(self) -> None:
         """test the behaviour when the target of a SRV record has idna chars"""
         self.agent = self._make_agent()
@@ -1214,7 +1227,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertNoResult(test_d)
 
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.xn--bcher-kva.com"
+            b"_matrix-fed._tcp.xn--bcher-kva.com"
         )
 
         # Make sure treq is trying to connect
@@ -1403,6 +1416,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         r = self.successResultOf(fetch_d)
         self.assertIsNone(r.delegated_server)
 
+    # TODO Duplicate this with the legacy.
     def test_srv_fallbacks(self) -> None:
         """Test that other SRV results are tried if the first one fails."""
         self.agent = self._make_agent()
@@ -1421,7 +1435,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertNoResult(test_d)
 
         self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv"
+            b"_matrix-fed._tcp.testserv"
         )
 
         # We should see an attempt to connect to the first server
