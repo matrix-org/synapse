@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Any, Awaitable, Callable, Dict
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from parameterized import parameterized
 
@@ -26,7 +26,6 @@ from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class ProfileTestCase(unittest.HomeserverTestCase):
@@ -35,7 +34,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     servlets = [admin.register_servlets]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        self.mock_federation = Mock()
+        self.mock_federation = AsyncMock()
         self.mock_registry = Mock()
 
         self.query_handlers: Dict[str, Callable[[dict], Awaitable[JsonDict]]] = {}
@@ -135,9 +134,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_get_other_name(self) -> None:
-        self.mock_federation.make_query.return_value = make_awaitable(
-            {"displayname": "Alice"}
-        )
+        self.mock_federation.make_query.return_value = {"displayname": "Alice"}
 
         displayname = self.get_success(self.handler.get_displayname(self.alice))
 

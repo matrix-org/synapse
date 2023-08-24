@@ -16,7 +16,7 @@
 
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Type, Union
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -478,7 +478,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.custom_auth_provider_callback_test_body()
 
     def custom_auth_provider_callback_test_body(self) -> None:
-        callback = Mock(return_value=make_awaitable(None))
+        callback = AsyncMock(return_value=None)
 
         mock_password_provider.check_auth.return_value = make_awaitable(
             ("@user:test", callback)
