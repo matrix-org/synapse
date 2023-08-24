@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Optional
 import attr
 import attr.validators
 
+from synapse.api.errors import LimitExceededError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.config import ConfigError
 from synapse.config._base import Config, RootConfig
@@ -405,4 +406,12 @@ class ExperimentalConfig(Config):
         # MSC4010: Do not allow setting m.push_rules account data.
         self.msc4010_push_rules_account_data = experimental.get(
             "msc4010_push_rules_account_data", False
+        )
+
+        # MSC4041: Use HTTP header Retry-After to enable library-assisted retry handling
+        #
+        # This is a bit hacky, but the most reasonable way to *alway* include the
+        # headers.
+        LimitExceededError.include_retry_after_header = experimental.get(
+            "msc4041_enabled", False
         )
