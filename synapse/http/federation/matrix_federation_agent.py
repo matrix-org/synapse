@@ -399,6 +399,7 @@ class MatrixHostnameEndpoint:
         if port or _is_ip_literal(host):
             return [Server(host, port or 8448)]
 
+        # Check _matrix-fed._tcp SRV record.
         logger.debug("Looking up SRV record for %s", host.decode(errors="replace"))
         server_list = await self._srv_resolver.resolve_service(
             b"_matrix-fed._tcp." + host
@@ -412,6 +413,7 @@ class MatrixHostnameEndpoint:
             )
             return server_list
 
+        # No _matrix-fed._tcp SRV record, fallback to legacy _matrix._tcp SRV record.
         logger.debug(
             "Looking up deprecated SRV record for %s", host.decode(errors="replace")
         )
