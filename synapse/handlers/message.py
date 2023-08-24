@@ -1474,23 +1474,23 @@ class EventCreationHandler:
 
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
-        event, context = events_and_context[0]
+        #
+        # Note: mypy gets confused if we inline dl and check with twisted#11770.
+        # Some kind of bug in mypy's deduction?
+        deferreds = (
+            run_in_background(
+                self._persist_events,
+                requester=requester,
+                events_and_context=events_and_context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            ),
+            run_in_background(
+                self.cache_joined_hosts_for_events, events_and_context
+            ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
+        )
         result, _ = await make_deferred_yieldable(
-            gather_results(
-                (
-                    run_in_background(
-                        self._persist_events,
-                        requester=requester,
-                        events_and_context=events_and_context,
-                        ratelimit=ratelimit,
-                        extra_users=extra_users,
-                    ),
-                    run_in_background(
-                        self.cache_joined_hosts_for_events, events_and_context
-                    ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
-                ),
-                consumeErrors=True,
-            )
+            gather_results(deferreds, consumeErrors=True)
         ).addErrback(unwrapFirstError)
 
         return result
