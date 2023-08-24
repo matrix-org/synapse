@@ -61,10 +61,6 @@ def setup_awaitable_errors() -> Callable[[], None]:
     """
     warnings.simplefilter("error", RuntimeWarning)
 
-    # unraisablehook was added in Python 3.8.
-    if not hasattr(sys, "unraisablehook"):
-        return lambda: None
-
     # State shared between unraisablehook and check_for_unraisable_exceptions.
     unraisable_exceptions = []
     orig_unraisablehook = sys.unraisablehook
