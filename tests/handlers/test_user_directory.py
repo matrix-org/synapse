@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Any, Tuple
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from urllib.parse import quote
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -30,7 +30,7 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.storage.test_user_directory import GetUserDirectoryTables
-from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils import event_injection
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import override_config
 
@@ -471,7 +471,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
 
-        mock_remove_from_user_dir = Mock(return_value=make_awaitable(None))
+        mock_remove_from_user_dir = AsyncMock(return_value=None)
         with patch.object(
             self.store, "remove_from_user_dir", mock_remove_from_user_dir
         ):

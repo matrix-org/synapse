@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from netaddr import IPSet
 
@@ -26,7 +26,6 @@ from synapse.types import UserID, create_requester
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import get_clock
-from tests.test_utils import make_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +61,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new event.
         """
         mock_client = Mock(spec=["put_json"])
-        mock_client.put_json.return_value = make_awaitable({})
+        mock_client.put_json = AsyncMock(return_value={})
         mock_client.agent = self.matrix_federation_agent
         self.make_worker_hs(
             "synapse.app.generic_worker",
@@ -93,7 +92,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new events.
         """
         mock_client1 = Mock(spec=["put_json"])
-        mock_client1.put_json.return_value = make_awaitable({})
+        mock_client1.put_json = AsyncMock(return_value={})
         mock_client1.agent = self.matrix_federation_agent
         self.make_worker_hs(
             "synapse.app.generic_worker",
@@ -108,7 +107,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         mock_client2 = Mock(spec=["put_json"])
-        mock_client2.put_json.return_value = make_awaitable({})
+        mock_client2.put_json = AsyncMock(return_value={})
         mock_client2.agent = self.matrix_federation_agent
         self.make_worker_hs(
             "synapse.app.generic_worker",
@@ -162,7 +161,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new typing EDUs.
         """
         mock_client1 = Mock(spec=["put_json"])
-        mock_client1.put_json.return_value = make_awaitable({})
+        mock_client1.put_json = AsyncMock(return_value={})
         mock_client1.agent = self.matrix_federation_agent
         self.make_worker_hs(
             "synapse.app.generic_worker",
@@ -177,7 +176,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         mock_client2 = Mock(spec=["put_json"])
-        mock_client2.put_json.return_value = make_awaitable({})
+        mock_client2.put_json = AsyncMock(return_value={})
         mock_client2.agent = self.matrix_federation_agent
         self.make_worker_hs(
             "synapse.app.generic_worker",

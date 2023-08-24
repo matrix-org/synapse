@@ -18,7 +18,6 @@ Utilities for running the unit tests
 import json
 import sys
 import warnings
-from asyncio import Future
 from binascii import unhexlify
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, TypeVar
 from unittest.mock import Mock
@@ -55,17 +54,6 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
 
     # if next didn't raise, the awaitable hasn't completed.
     raise Exception("awaitable has not yet completed")
-
-
-def make_awaitable(result: TV) -> Awaitable[TV]:
-    """
-    Makes an awaitable, suitable for mocking an `async` function.
-    This uses Futures as they can be awaited multiple times so can be returned
-    to multiple callers.
-    """
-    future: Future[TV] = Future()
-    future.set_result(result)
-    return future
 
 
 def setup_awaitable_errors() -> Callable[[], None]:
