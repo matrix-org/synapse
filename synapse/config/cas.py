@@ -18,7 +18,7 @@ from typing import Any, List
 from synapse.config.sso import SsoAttributeRequirement
 from synapse.types import JsonDict
 
-from ._base import Config
+from ._base import Config, ConfigError
 from ._util import validate_config
 
 
