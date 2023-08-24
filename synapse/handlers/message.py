@@ -53,7 +53,7 @@ from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
 from synapse.events.utils import SerializeEventConfig, maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -1034,7 +1034,7 @@ class EventCreationHandler:
                     )
 
         async with self._worker_lock_handler.acquire_read_write_lock(
-            DELETE_ROOM_LOCK_NAME, room_id, write=False
+            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
         ):
             return await self._create_and_send_nonmember_event_locked(
                 requester=requester,
@@ -1978,7 +1978,7 @@ class EventCreationHandler:
 
         for room_id in room_ids:
             async with self._worker_lock_handler.acquire_read_write_lock(
-                DELETE_ROOM_LOCK_NAME, room_id, write=False
+                NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
             ):
                 dummy_event_sent = await self._send_dummy_event_for_room(room_id)
 

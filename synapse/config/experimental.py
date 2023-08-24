@@ -173,6 +173,13 @@ class MSC3861:
                 ("enable_registration",),
             )
 
+        # We only need to test the user consent version, as if it must be set if the user_consent section was present in the config
+        if root.consent.user_consent_version is not None:
+            raise ConfigError(
+                "User consent cannot be enabled when OAuth delegation is enabled",
+                ("user_consent",),
+            )
+
         if (
             root.oidc.oidc_enabled
             or root.saml2.saml2_enabled
@@ -214,6 +221,12 @@ class MSC3861:
             raise ConfigError(
                 "session_lifetime cannot be set when OAuth delegation is enabled",
                 ("session_lifetime",),
+            )
+
+        if root.registration.enable_3pid_changes:
+            raise ConfigError(
+                "enable_3pid_changes cannot be enabled when OAuth delegation is enabled",
+                ("enable_3pid_changes",),
             )
 
 
@@ -369,11 +382,6 @@ class ExperimentalConfig(Config):
 
         # MSC3391: Removing account data.
         self.msc3391_enabled = experimental.get("msc3391_enabled", False)
-
-        # MSC3959: Do not generate notifications for edits.
-        self.msc3958_supress_edit_notifs = experimental.get(
-            "msc3958_supress_edit_notifs", False
-        )
 
         # MSC3967: Do not require UIA when first uploading cross signing keys
         self.msc3967_enabled = experimental.get("msc3967_enabled", False)

@@ -63,7 +63,7 @@ from synapse.federation.federation_base import (
 )
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -1245,7 +1245,7 @@ class FederationServer(FederationBase):
                         # while holding the `_INBOUND_EVENT_HANDLING_LOCK_NAME`
                         # lock.
                         async with self._worker_lock_handler.acquire_read_write_lock(
-                            DELETE_ROOM_LOCK_NAME, room_id, write=False
+                            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
                         ):
                             await self._federation_event_handler.on_receive_pdu(
                                 origin, event

@@ -39,7 +39,7 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -621,7 +621,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         async with self.member_as_limiter.queue(as_id):
             async with self.member_linearizer.queue(key):
                 async with self._worker_lock_handler.acquire_read_write_lock(
-                    DELETE_ROOM_LOCK_NAME, room_id, write=False
+                    NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
                 ):
                     with opentracing.start_active_span("update_membership_locked"):
                         result = await self.update_membership_locked(

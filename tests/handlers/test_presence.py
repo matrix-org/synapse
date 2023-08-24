@@ -38,6 +38,7 @@ from synapse.handlers.presence import (
 from synapse.rest import admin
 from synapse.rest.client import room
 from synapse.server import HomeServer
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util import Clock
 
@@ -513,7 +514,125 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEqual(state, new_state)
 
 
+class PresenceHandlerInitTestCase(unittest.HomeserverTestCase):
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        # Disable background tasks on this worker so that the PresenceHandler isn't
+        # loaded until we request it.
+        config["run_background_tasks_on"] = "other"
+        return config
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.user_id = f"@test:{self.hs.config.server.server_name}"
+
+        # Move the reactor to the initial time.
+        self.reactor.advance(1000)
+        now = self.clock.time_msec()
+
+        main_store = hs.get_datastores().main
+        self.get_success(
+            main_store.update_presence(
+                [
+                    UserPresenceState(
+                        user_id=self.user_id,
+                        state=PresenceState.ONLINE,
+                        last_active_ts=now,
+                        last_federation_update_ts=now,
+                        last_user_sync_ts=now,
+                        status_msg=None,
+                        currently_active=True,
+                    )
+                ]
+            )
+        )
+
+        # Regenerate the preloaded presence information on PresenceStore.
+        def refill_presence(db_conn: LoggingDatabaseConnection) -> None:
+            main_store._presence_on_startup = main_store._get_active_presence(db_conn)
+
+        self.get_success(main_store.db_pool.runWithConnection(refill_presence))
+
+    def test_restored_presence_idles(self) -> None:
+        """The presence state restored from the database should not persist forever."""
+
+        # Get the handler (which kicks off a bunch of timers).
+        presence_handler = self.hs.get_presence_handler()
+
+        # Assert the user is online.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+        # Advance such that the user should timeout.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000)
+        self.reactor.pump([5])
+
+        # Check that the user is now offline.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, PresenceState.OFFLINE)
+
+    @parameterized.expand(
+        [
+            (PresenceState.BUSY, PresenceState.BUSY),
+            (PresenceState.ONLINE, PresenceState.ONLINE),
+            (PresenceState.UNAVAILABLE, PresenceState.UNAVAILABLE),
+            # Offline syncs don't update the state.
+            (PresenceState.OFFLINE, PresenceState.ONLINE),
+        ]
+    )
+    @unittest.override_config({"experimental_features": {"msc3026_enabled": True}})
+    def test_restored_presence_online_after_sync(
+        self, sync_state: str, expected_state: str
+    ) -> None:
+        """
+        The presence state restored from the database should be overridden with sync after a timeout.
+
+        Args:
+            sync_state: The presence state of the new sync.
+            expected_state: The expected presence right after the sync.
+        """
+
+        # Get the handler (which kicks off a bunch of timers).
+        presence_handler = self.hs.get_presence_handler()
+
+        # Assert the user is online, as restored.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+        # Advance slightly and sync.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000 / 2)
+        self.get_success(
+            presence_handler.user_syncing(
+                self.user_id, sync_state != PresenceState.OFFLINE, sync_state
+            )
+        )
+
+        # Assert the user is in the expected state.
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, expected_state)
+
+        # Advance such that the user's preloaded data times out, but not the new sync.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000 / 2)
+        self.reactor.pump([5])
+
+        # Check that the user is in the sync state (as the client is currently syncing still).
+        state = self.get_success(
+            presence_handler.get_state(UserID.from_string(self.user_id))
+        )
+        self.assertEqual(state.state, sync_state)
+
+
 class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
+    user_id = "@test:server"
+    user_id_obj = UserID.from_string(user_id)
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.presence_handler = hs.get_presence_handler()
         self.clock = hs.get_clock()
@@ -523,12 +642,11 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         we time out their syncing users presence.
         """
         process_id = "1"
-        user_id = "@test:server"
 
         # Notify handler that a user is now syncing.
         self.get_success(
             self.presence_handler.update_external_syncs_row(
-                process_id, user_id, True, self.clock.time_msec()
+                process_id, self.user_id, True, self.clock.time_msec()
             )
         )
 
@@ -536,48 +654,37 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # stopped syncing that their presence state doesn't get timed out.
         self.reactor.advance(EXTERNAL_PROCESS_EXPIRY / 2)
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         self.assertEqual(state.state, PresenceState.ONLINE)
 
         # Check that if the external process timeout fires, then the syncing
         # user gets timed out
         self.reactor.advance(EXTERNAL_PROCESS_EXPIRY)
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         self.assertEqual(state.state, PresenceState.OFFLINE)
 
     def test_user_goes_offline_by_timeout_status_msg_remain(self) -> None:
         """Test that if a user doesn't update the records for a while
         users presence goes `OFFLINE` because of timeout and `status_msg` remains.
         """
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
         # Mark user as online
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.ONLINE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.ONLINE, status_msg)
 
         # Check that if we wait a while without telling the handler the user has
         # stopped syncing that their presence state doesn't get timed out.
         self.reactor.advance(SYNC_ONLINE_TIMEOUT / 2)
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         self.assertEqual(state.state, PresenceState.ONLINE)
         self.assertEqual(state.status_msg, status_msg)
 
         # Check that if the timeout fires, then the syncing user gets timed out
         self.reactor.advance(SYNC_ONLINE_TIMEOUT)
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         # status_msg should remain even after going offline
         self.assertEqual(state.state, PresenceState.OFFLINE)
         self.assertEqual(state.status_msg, status_msg)
@@ -586,24 +693,19 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         """Test that if a user change presence manually to `OFFLINE`
         and no status is set, that `status_msg` is `None`.
         """
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
         # Mark user as online
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.ONLINE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.ONLINE, status_msg)
 
         # Mark user as offline
         self.get_success(
             self.presence_handler.set_state(
-                UserID.from_string(user_id), {"presence": PresenceState.OFFLINE}
+                self.user_id_obj, {"presence": PresenceState.OFFLINE}
             )
         )
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         self.assertEqual(state.state, PresenceState.OFFLINE)
         self.assertEqual(state.status_msg, None)
 
@@ -611,41 +713,31 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         """Test that if a user change presence manually to `OFFLINE`
         and a status is set, that `status_msg` appears.
         """
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
         # Mark user as online
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.ONLINE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.ONLINE, status_msg)
 
         # Mark user as offline
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.OFFLINE, "And now here."
-        )
+        self._set_presencestate_with_status_msg(PresenceState.OFFLINE, "And now here.")
 
     def test_user_reset_online_with_no_status(self) -> None:
         """Test that if a user set again the presence manually
         and no status is set, that `status_msg` is `None`.
         """
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
         # Mark user as online
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.ONLINE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.ONLINE, status_msg)
 
         # Mark user as online again
         self.get_success(
             self.presence_handler.set_state(
-                UserID.from_string(user_id), {"presence": PresenceState.ONLINE}
+                self.user_id_obj, {"presence": PresenceState.ONLINE}
             )
         )
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         # status_msg should remain even after going offline
         self.assertEqual(state.state, PresenceState.ONLINE)
         self.assertEqual(state.status_msg, None)
@@ -654,33 +746,27 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         """Test that if a user set again the presence manually
         and status is `None`, that `status_msg` is `None`.
         """
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
         # Mark user as online
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.ONLINE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.ONLINE, status_msg)
 
         # Mark user as online and `status_msg = None`
-        self._set_presencestate_with_status_msg(user_id, PresenceState.ONLINE, None)
+        self._set_presencestate_with_status_msg(PresenceState.ONLINE, None)
 
     def test_set_presence_from_syncing_not_set(self) -> None:
         """Test that presence is not set by syncing if affect_presence is false"""
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.UNAVAILABLE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.UNAVAILABLE, status_msg)
 
         self.get_success(
-            self.presence_handler.user_syncing(user_id, False, PresenceState.ONLINE)
+            self.presence_handler.user_syncing(
+                self.user_id, False, PresenceState.ONLINE
+            )
         )
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         # we should still be unavailable
         self.assertEqual(state.state, PresenceState.UNAVAILABLE)
         # and status message should still be the same
@@ -688,50 +774,34 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
     def test_set_presence_from_syncing_is_set(self) -> None:
         """Test that presence is set by syncing if affect_presence is true"""
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.UNAVAILABLE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.UNAVAILABLE, status_msg)
 
         self.get_success(
-            self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
+            self.presence_handler.user_syncing(self.user_id, True, PresenceState.ONLINE)
         )
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         # we should now be online
         self.assertEqual(state.state, PresenceState.ONLINE)
 
     def test_set_presence_from_syncing_keeps_status(self) -> None:
         """Test that presence set by syncing retains status message"""
-        user_id = "@test:server"
         status_msg = "I'm here!"
 
-        self._set_presencestate_with_status_msg(
-            user_id, PresenceState.UNAVAILABLE, status_msg
-        )
+        self._set_presencestate_with_status_msg(PresenceState.UNAVAILABLE, status_msg)
 
         self.get_success(
-            self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
+            self.presence_handler.user_syncing(self.user_id, True, PresenceState.ONLINE)
         )
 
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         # our status message should be the same as it was before
         self.assertEqual(state.status_msg, status_msg)
 
     @parameterized.expand([(False,), (True,)])
-    @unittest.override_config(
-        {
-            "experimental_features": {
-                "msc3026_enabled": True,
-            },
-        }
-    )
+    @unittest.override_config({"experimental_features": {"msc3026_enabled": True}})
     def test_set_presence_from_syncing_keeps_busy(
         self, test_with_workers: bool
     ) -> None:
@@ -741,7 +811,6 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             test_with_workers: If True, check the presence state of the user by calling
                 /sync against a worker, rather than the main process.
         """
-        user_id = "@test:server"
         status_msg = "I'm busy!"
 
         # By default, we call /sync against the main process.
@@ -755,44 +824,39 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             )
 
         # Set presence to BUSY
-        self._set_presencestate_with_status_msg(user_id, PresenceState.BUSY, status_msg)
+        self._set_presencestate_with_status_msg(PresenceState.BUSY, status_msg)
 
         # Perform a sync with a presence state other than busy. This should NOT change
         # our presence status; we only change from busy if we explicitly set it via
         # /presence/*.
         self.get_success(
             worker_to_sync_against.get_presence_handler().user_syncing(
-                user_id, True, PresenceState.ONLINE
+                self.user_id, True, PresenceState.ONLINE
             )
         )
 
         # Check against the main process that the user's presence did not change.
-        state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         # we should still be busy
         self.assertEqual(state.state, PresenceState.BUSY)
 
     def _set_presencestate_with_status_msg(
-        self, user_id: str, state: str, status_msg: Optional[str]
+        self, state: str, status_msg: Optional[str]
     ) -> None:
         """Set a PresenceState and status_msg and check the result.
 
         Args:
-            user_id: User for that the status is to be set.
             state: The new PresenceState.
             status_msg: Status message that is to be set.
         """
         self.get_success(
             self.presence_handler.set_state(
-                UserID.from_string(user_id),
+                self.user_id_obj,
                 {"presence": state, "status_msg": status_msg},
             )
         )
 
-        new_state = self.get_success(
-            self.presence_handler.get_state(UserID.from_string(user_id))
-        )
+        new_state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         self.assertEqual(new_state.state, state)
         self.assertEqual(new_state.status_msg, status_msg)
 
@@ -952,9 +1016,6 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
         self.assertEqual(upto_token, now_token)
         self.assertFalse(limited)
 
-        expected_rows = [
-            (2, ("dest3", "@user3:test")),
-        ]
         self.assertCountEqual(rows, [])
 
         prev_token = self.queue.get_current_token(self.instance_name)

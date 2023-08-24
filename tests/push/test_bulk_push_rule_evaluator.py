@@ -382,7 +382,6 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-    @override_config({"experimental_features": {"msc3958_supress_edit_notifs": True}})
     def test_suppress_edits(self) -> None:
         """Under the default push rules, event edits should not generate notifications."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)

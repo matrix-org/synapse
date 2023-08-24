@@ -15,6 +15,7 @@
 import abc
 import re
 import string
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -969,3 +970,41 @@ class UserProfile(TypedDict):
 class RetentionPolicy:
     min_lifetime: Optional[int] = None
     max_lifetime: Optional[int] = None
+
+
+class TaskStatus(str, Enum):
+    """Status of a scheduled task"""
+
+    # Task is scheduled but not active
+    SCHEDULED = "scheduled"
+    # Task is active and probably running, and if not
+    # will be run on next scheduler loop run
+    ACTIVE = "active"
+    # Task has completed successfully
+    COMPLETE = "complete"
+    # Task is over and either returned a failed status, or had an exception
+    FAILED = "failed"
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class ScheduledTask:
+    """Description of a scheduled task"""
+
+    # Id used to identify the task
+    id: str
+    # Name of the action to be run by this task
+    action: str
+    # Current status of this task
+    status: TaskStatus
+    # If the status is SCHEDULED then this represents when it should be launched,
+    # otherwise it represents the last time this task got a change of state.
+    # In milliseconds since epoch in system time timezone, usually UTC.
+    timestamp: int
+    # Optionally bind a task to some resource id for easy retrieval
+    resource_id: Optional[str]
+    # Optional parameters that will be passed to the function ran by the task
+    params: Optional[JsonMapping]
+    # Optional result that can be updated by the running task
+    result: Optional[JsonMapping]
+    # Optional error that should be assigned a value when the status is FAILED
+    error: Optional[str]

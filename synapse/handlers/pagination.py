@@ -24,6 +24,7 @@ from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.room import ShutdownRoomResponse
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.admin._base import assert_user_is_admin
@@ -46,9 +47,10 @@ logger = logging.getLogger(__name__)
 BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD = 3
 
 
-PURGE_HISTORY_LOCK_NAME = "purge_history_lock"
-
-DELETE_ROOM_LOCK_NAME = "delete_room_lock"
+# This is used to avoid purging a room several time at the same moment,
+# and also paginating during a purge. Pagination can trigger backfill,
+# which would create old events locally, and would potentially clash with the room delete.
+PURGE_PAGINATION_LOCK_NAME = "purge_pagination_lock"
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -363,7 +365,7 @@ class PaginationHandler:
         self._purges_in_progress_by_room.add(room_id)
         try:
             async with self._worker_locks.acquire_read_write_lock(
-                PURGE_HISTORY_LOCK_NAME, room_id, write=True
+                PURGE_PAGINATION_LOCK_NAME, room_id, write=True
             ):
                 await self._storage_controllers.purge_events.purge_history(
                     room_id, token, delete_local_events
@@ -421,7 +423,10 @@ class PaginationHandler:
             force: set true to skip checking for joined users.
         """
         async with self._worker_locks.acquire_multi_read_write_lock(
-            [(PURGE_HISTORY_LOCK_NAME, room_id), (DELETE_ROOM_LOCK_NAME, room_id)],
+            [
+                (PURGE_PAGINATION_LOCK_NAME, room_id),
+                (NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id),
+            ],
             write=True,
         ):
             # first check that we have no users in this room
@@ -482,155 +487,150 @@ class PaginationHandler:
 
         room_token = from_token.room_key
 
-        async with self._worker_locks.acquire_read_write_lock(
-            PURGE_HISTORY_LOCK_NAME, room_id, write=False
-        ):
-            (membership, member_event_id) = (None, None)
-            if not use_admin_priviledge:
-                (
-                    membership,
-                    member_event_id,
-                ) = await self.auth.check_user_in_room_or_world_readable(
-                    room_id, requester, allow_departed_users=True
-                )
-
-            if pagin_config.direction == Direction.BACKWARDS:
-                # if we're going backwards, we might need to backfill. This
-                # requires that we have a topo token.
-                if room_token.topological:
-                    curr_topo = room_token.topological
-                else:
-                    curr_topo = await self.store.get_current_topological_token(
-                        room_id, room_token.stream
-                    )
-
-            # If they have left the room then clamp the token to be before
-            # they left the room, to save the effort of loading from the
-            # database.
-            if (
-                pagin_config.direction == Direction.BACKWARDS
-                and not use_admin_priviledge
-                and membership == Membership.LEAVE
-            ):
-                # This is only None if the room is world_readable, in which case
-                # "Membership.JOIN" would have been returned and we should never hit
-                # this branch.
-                assert member_event_id
-
-                leave_token = await self.store.get_topological_token_for_event(
-                    member_event_id
-                )
-                assert leave_token.topological is not None
-
-                if leave_token.topological < curr_topo:
-                    from_token = from_token.copy_and_replace(
-                        StreamKeyType.ROOM, leave_token
-                    )
-
-            to_room_key = None
-            if pagin_config.to_token:
-                to_room_key = pagin_config.to_token.room_key
-
-            # Initially fetch the events from the database. With any luck, we can return
-            # these without blocking on backfill (handled below).
-            events, next_key = await self.store.paginate_room_events(
-                room_id=room_id,
-                from_key=from_token.room_key,
-                to_key=to_room_key,
-                direction=pagin_config.direction,
-                limit=pagin_config.limit,
-                event_filter=event_filter,
+        (membership, member_event_id) = (None, None)
+        if not use_admin_priviledge:
+            (
+                membership,
+                member_event_id,
+            ) = await self.auth.check_user_in_room_or_world_readable(
+                room_id, requester, allow_departed_users=True
             )
 
-            if pagin_config.direction == Direction.BACKWARDS:
-                # We use a `Set` because there can be multiple events at a given depth
-                # and we only care about looking at the unique continum of depths to
-                # find gaps.
-                event_depths: Set[int] = {event.depth for event in events}
-                sorted_event_depths = sorted(event_depths)
-
-                # Inspect the depths of the returned events to see if there are any gaps
-                found_big_gap = False
-                number_of_gaps = 0
-                previous_event_depth = (
-                    sorted_event_depths[0] if len(sorted_event_depths) > 0 else 0
+        if pagin_config.direction == Direction.BACKWARDS:
+            # if we're going backwards, we might need to backfill. This
+            # requires that we have a topo token.
+            if room_token.topological:
+                curr_topo = room_token.topological
+            else:
+                curr_topo = await self.store.get_current_topological_token(
+                    room_id, room_token.stream
                 )
-                for event_depth in sorted_event_depths:
-                    # We don't expect a negative depth but we'll just deal with it in
-                    # any case by taking the absolute value to get the true gap between
-                    # any two integers.
-                    depth_gap = abs(event_depth - previous_event_depth)
-                    # A `depth_gap` of 1 is a normal continuous chain to the next event
-                    # (1 <-- 2 <-- 3) so anything larger indicates a missing event (it's
-                    # also possible there is no event at a given depth but we can't ever
-                    # know that for sure)
-                    if depth_gap > 1:
-                        number_of_gaps += 1
 
-                    # We only tolerate a small number single-event long gaps in the
-                    # returned events because those are most likely just events we've
-                    # failed to pull in the past. Anything longer than that is probably
-                    # a sign that we're missing a decent chunk of history and we should
-                    # try to backfill it.
-                    #
-                    # XXX: It's possible we could tolerate longer gaps if we checked
-                    # that a given events `prev_events` is one that has failed pull
-                    # attempts and we could just treat it like a dead branch of history
-                    # for now or at least something that we don't need the block the
-                    # client on to try pulling.
-                    #
-                    # XXX: If we had something like MSC3871 to indicate gaps in the
-                    # timeline to the client, we could also get away with any sized gap
-                    # and just have the client refetch the holes as they see fit.
-                    if depth_gap > 2:
-                        found_big_gap = True
-                        break
-                    previous_event_depth = event_depth
+        # If they have left the room then clamp the token to be before
+        # they left the room, to save the effort of loading from the
+        # database.
+        if (
+            pagin_config.direction == Direction.BACKWARDS
+            and not use_admin_priviledge
+            and membership == Membership.LEAVE
+        ):
+            # This is only None if the room is world_readable, in which case
+            # "Membership.JOIN" would have been returned and we should never hit
+            # this branch.
+            assert member_event_id
 
-                # Backfill in the foreground if we found a big gap, have too many holes,
-                # or we don't have enough events to fill the limit that the client asked
-                # for.
-                missing_too_many_events = (
-                    number_of_gaps > BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD
+            leave_token = await self.store.get_topological_token_for_event(
+                member_event_id
+            )
+            assert leave_token.topological is not None
+
+            if leave_token.topological < curr_topo:
+                from_token = from_token.copy_and_replace(
+                    StreamKeyType.ROOM, leave_token
                 )
-                not_enough_events_to_fill_response = len(events) < pagin_config.limit
-                if (
-                    found_big_gap
-                    or missing_too_many_events
-                    or not_enough_events_to_fill_response
-                ):
-                    did_backfill = (
-                        await self.hs.get_federation_handler().maybe_backfill(
-                            room_id,
-                            curr_topo,
-                            limit=pagin_config.limit,
-                        )
-                    )
 
-                    # If we did backfill something, refetch the events from the database to
-                    # catch anything new that might have been added since we last fetched.
-                    if did_backfill:
-                        events, next_key = await self.store.paginate_room_events(
-                            room_id=room_id,
-                            from_key=from_token.room_key,
-                            to_key=to_room_key,
-                            direction=pagin_config.direction,
-                            limit=pagin_config.limit,
-                            event_filter=event_filter,
-                        )
-                else:
-                    # Otherwise, we can backfill in the background for eventual
-                    # consistency's sake but we don't need to block the client waiting
-                    # for a costly federation call and processing.
-                    run_as_background_process(
-                        "maybe_backfill_in_the_background",
-                        self.hs.get_federation_handler().maybe_backfill,
-                        room_id,
-                        curr_topo,
+        to_room_key = None
+        if pagin_config.to_token:
+            to_room_key = pagin_config.to_token.room_key
+
+        # Initially fetch the events from the database. With any luck, we can return
+        # these without blocking on backfill (handled below).
+        events, next_key = await self.store.paginate_room_events(
+            room_id=room_id,
+            from_key=from_token.room_key,
+            to_key=to_room_key,
+            direction=pagin_config.direction,
+            limit=pagin_config.limit,
+            event_filter=event_filter,
+        )
+
+        if pagin_config.direction == Direction.BACKWARDS:
+            # We use a `Set` because there can be multiple events at a given depth
+            # and we only care about looking at the unique continum of depths to
+            # find gaps.
+            event_depths: Set[int] = {event.depth for event in events}
+            sorted_event_depths = sorted(event_depths)
+
+            # Inspect the depths of the returned events to see if there are any gaps
+            found_big_gap = False
+            number_of_gaps = 0
+            previous_event_depth = (
+                sorted_event_depths[0] if len(sorted_event_depths) > 0 else 0
+            )
+            for event_depth in sorted_event_depths:
+                # We don't expect a negative depth but we'll just deal with it in
+                # any case by taking the absolute value to get the true gap between
+                # any two integers.
+                depth_gap = abs(event_depth - previous_event_depth)
+                # A `depth_gap` of 1 is a normal continuous chain to the next event
+                # (1 <-- 2 <-- 3) so anything larger indicates a missing event (it's
+                # also possible there is no event at a given depth but we can't ever
+                # know that for sure)
+                if depth_gap > 1:
+                    number_of_gaps += 1
+
+                # We only tolerate a small number single-event long gaps in the
+                # returned events because those are most likely just events we've
+                # failed to pull in the past. Anything longer than that is probably
+                # a sign that we're missing a decent chunk of history and we should
+                # try to backfill it.
+                #
+                # XXX: It's possible we could tolerate longer gaps if we checked
+                # that a given events `prev_events` is one that has failed pull
+                # attempts and we could just treat it like a dead branch of history
+                # for now or at least something that we don't need the block the
+                # client on to try pulling.
+                #
+                # XXX: If we had something like MSC3871 to indicate gaps in the
+                # timeline to the client, we could also get away with any sized gap
+                # and just have the client refetch the holes as they see fit.
+                if depth_gap > 2:
+                    found_big_gap = True
+                    break
+                previous_event_depth = event_depth
+
+            # Backfill in the foreground if we found a big gap, have too many holes,
+            # or we don't have enough events to fill the limit that the client asked
+            # for.
+            missing_too_many_events = (
+                number_of_gaps > BACKFILL_BECAUSE_TOO_MANY_GAPS_THRESHOLD
+            )
+            not_enough_events_to_fill_response = len(events) < pagin_config.limit
+            if (
+                found_big_gap
+                or missing_too_many_events
+                or not_enough_events_to_fill_response
+            ):
+                did_backfill = await self.hs.get_federation_handler().maybe_backfill(
+                    room_id,
+                    curr_topo,
+                    limit=pagin_config.limit,
+                )
+
+                # If we did backfill something, refetch the events from the database to
+                # catch anything new that might have been added since we last fetched.
+                if did_backfill:
+                    events, next_key = await self.store.paginate_room_events(
+                        room_id=room_id,
+                        from_key=from_token.room_key,
+                        to_key=to_room_key,
+                        direction=pagin_config.direction,
                         limit=pagin_config.limit,
+                        event_filter=event_filter,
                     )
+            else:
+                # Otherwise, we can backfill in the background for eventual
+                # consistency's sake but we don't need to block the client waiting
+                # for a costly federation call and processing.
+                run_as_background_process(
+                    "maybe_backfill_in_the_background",
+                    self.hs.get_federation_handler().maybe_backfill,
+                    room_id,
+                    curr_topo,
+                    limit=pagin_config.limit,
+                )
 
-            next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
+        next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
 
         # if no events are returned from pagination, that implies
         # we have reached the end of the available events.
@@ -761,7 +761,7 @@ class PaginationHandler:
         self._purges_in_progress_by_room.add(room_id)
         try:
             async with self._worker_locks.acquire_read_write_lock(
-                PURGE_HISTORY_LOCK_NAME, room_id, write=True
+                PURGE_PAGINATION_LOCK_NAME, room_id, write=True
             ):
                 self._delete_by_id[delete_id].status = DeleteStatus.STATUS_SHUTTING_DOWN
                 self._delete_by_id[

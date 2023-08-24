@@ -879,6 +879,44 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self._order_test([self.admin_user, user1, user2], "creation_ts", "f")
         self._order_test([user2, user1, self.admin_user], "creation_ts", "b")
 
+    def test_filter_admins(self) -> None:
+        """
+        Tests whether the various values of the query parameter `admins` lead to the
+        expected result set.
+        """
+
+        # Register an additional non admin user
+        self.register_user("user", "pass", admin=False)
+
+        # Query all users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(2, channel.json_body["total"])
+
+        # Query only admin users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}?admins=true",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertEqual(1, channel.json_body["users"][0]["admin"])
+
+        # Query only non admin users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}?admins=false",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertFalse(channel.json_body["users"][0]["admin"])
+
     @override_config(
         {
             "experimental_features": {
