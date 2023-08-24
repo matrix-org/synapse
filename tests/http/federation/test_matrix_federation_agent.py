@@ -1677,14 +1677,14 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.reactor.pump((0.1,))
         self.successResultOf(test_d)
 
-    def test_srv_fallbacks_to_legacy(self) -> None:
-        """Test that other SRV results are tried if the _matrix-fed one fails."""
+    def test_srv_no_fallback_to_legacy(self) -> None:
+        """Test that _matrix SRV results are not tried if the _matrix-fed one fails."""
         self.agent = self._make_agent()
 
-        # Return a failing entry for _matrix-fed, and a valid response for _matrix.
+        # Return a failing entry for _matrix-fed.
         self.mock_resolver.resolve_service.side_effect = [
             [Server(host=b"target.com", port=8443)],
-            [Server(host=b"target.com", port=8444)],
+            [],
         ]
         self.reactor.lookups["target.com"] = "1.2.3.4"
 
@@ -1693,8 +1693,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_has_calls(
-            [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
+        # Only the _matrix-fed is checked, _matrix is ignored.
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix-fed._tcp.testserv"
         )
 
         # We should see an attempt to connect to the first server
@@ -1710,29 +1711,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # There's a 300ms delay in HostnameEndpoint
         self.reactor.pump((0.4,))
 
-        # Hasn't failed yet
-        self.assertNoResult(test_d)
-
-        # We shouldnow see an attempt to connect to the second server
-        clients = self.reactor.tcpClients
-        self.assertEqual(len(clients), 1)
-        (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
-        self.assertEqual(host, "1.2.3.4")
-        self.assertEqual(port, 8444)
-
-        # make a test server, and wire up the client
-        http_server = self._make_connection(client_factory, expected_sni=b"testserv")
-
-        self.assertEqual(len(http_server.requests), 1)
-        request = http_server.requests[0]
-        self.assertEqual(request.method, b"GET")
-        self.assertEqual(request.path, b"/foo/bar")
-        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
-
-        # finish the request
-        request.finish()
-        self.reactor.pump((0.1,))
-        self.successResultOf(test_d)
+        # Failed to resolve a server.
+        self.assertFailure(test_d, Exception)
 
 
 class TestCachePeriodFromHeaders(unittest.TestCase):
