@@ -127,12 +127,14 @@ class CodeMessageException(RuntimeError):
     Attributes:
         code: HTTP error code
         msg: string describing the error
+        headers: optional response headers to send
     """
 
     def __init__(
         self,
         code: Union[int, HTTPStatus],
         msg: str,
+        headers: Optional[Dict[str, str]] = None,
     ):
         super().__init__("%d: %s" % (code, msg))
 
@@ -144,11 +146,7 @@ class CodeMessageException(RuntimeError):
         # To eliminate this behaviour, we convert them to their integer equivalents here.
         self.code = int(code)
         self.msg = msg
-
-    def headers_dict(
-        self, config: Optional["HomeServerConfig"]
-    ) -> Optional[Dict[str, str]]:
-        return None
+        self.headers = headers
 
 
 class RedirectException(CodeMessageException):
@@ -194,6 +192,7 @@ class SynapseError(CodeMessageException):
         msg: str,
         errcode: str = Codes.UNKNOWN,
         additional_fields: Optional[Dict] = None,
+        headers: Optional[Dict[str, str]] = None,
     ):
         """Constructs a synapse error.
 
@@ -202,7 +201,7 @@ class SynapseError(CodeMessageException):
             msg: The human-readable error message.
             errcode: The matrix error code e.g 'M_FORBIDDEN'
         """
-        super().__init__(code, msg)
+        super().__init__(code, msg, headers)
         self.errcode = errcode
         if additional_fields is None:
             self._additional_fields: Dict = {}
@@ -361,14 +360,11 @@ class OAuthInsufficientScopeError(SynapseError):
         self,
         required_scopes: List[str],
     ):
-        self.required_scopes = required_scopes
-        super().__init__(401, "Insufficient scope", Codes.FORBIDDEN, None)
-
-    def headers_dict(self, config: Optional["HomeServerConfig"]) -> Dict[str, str]:
-        return {
+        headers = {
             "WWW-Authenticate": 'Bearer error="insufficient_scope", scope="%s"'
-            % (" ".join(self.required_scopes))
+            % (" ".join(required_scopes))
         }
+        super().__init__(401, "Insufficient scope", Codes.FORBIDDEN, None, headers)
 
 
 class UnstableSpecAuthError(AuthError):
@@ -515,22 +511,16 @@ class LimitExceededError(SynapseError):
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
-        super().__init__(code, msg, errcode)
+        headers = (
+            None
+            if retry_after_ms is None
+            else {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+        )
+        super().__init__(code, msg, errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
-
-    def headers_dict(
-        self, config: Optional["HomeServerConfig"]
-    ) -> Optional[Dict[str, str]]:
-        if (
-            self.retry_after_ms is not None
-            and config
-            and config.experimental.msc4041_enabled
-        ):
-            return {"Retry-After": str(math.ceil(self.retry_after_ms / 1000))}
-        return None
 
 
 class RoomKeysVersionError(SynapseError):

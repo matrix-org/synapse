@@ -112,9 +112,8 @@ def return_json_error(
         exc: SynapseError = f.value
         error_code = exc.code
         error_dict = exc.error_dict(config)
-        headers_dict = exc.headers_dict(config)
-        if headers_dict is not None:
-            for header, value in headers_dict.items():
+        if exc.headers is not None:
+            for header, value in exc.headers.items():
                 request.setHeader(header, value)
         logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
     elif f.check(CancelledError):
@@ -177,9 +176,8 @@ def return_html_error(
         cme: CodeMessageException = f.value
         code = cme.code
         msg = cme.msg
-        headers = cme.headers_dict(None)
-        if headers is not None:
-            for header, value in headers.items():
+        if cme.headers is not None:
+            for header, value in cme.headers.items():
                 request.setHeader(header, value)
 
         if isinstance(cme, RedirectException):
