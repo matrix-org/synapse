@@ -42,7 +42,7 @@ class CasConfig(Config):
             self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
 
             self.cas_protocol_version = cas_config.get("protocol_version")
-            if self.cas_protocol_version not in [1, 2, 3]:
+            if self.cas_protocol_version is not None and self.cas_protocol_version not in [1, 2, 3]:
                 raise ConfigError(
                     "Unsupported CAS protocol version %s (only versions 1, 2, 3 are supported)"
                     % (self.cas_protocol_version,),
