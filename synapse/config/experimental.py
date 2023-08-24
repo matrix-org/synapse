@@ -406,3 +406,6 @@ class ExperimentalConfig(Config):
         self.msc4010_push_rules_account_data = experimental.get(
             "msc4010_push_rules_account_data", False
         )
+
+        # MSC3944: Dropping stale send-to-device messages
+        self.msc3944_enabled: bool = experimental.get("msc3944_enabled", False)

@@ -27,6 +27,7 @@ from typing import (
 )
 
 from synapse.api.constants import EventContentFields
+from synapse.api.errors import StoreError
 from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -890,6 +891,46 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     for (device_id, msg) in messages_by_device.items()
                 ],
             )
+
+    async def delete_device_message(self, stream_id: int) -> bool:
+        """Delete a specific device message from the message inbox.
+
+        Args:
+            stream_id: the stream ID identifying the message.
+        Returns:
+            True if the message has been deleted, False if it didn't exist.
+        """
+        try:
+            await self.db_pool.simple_delete_one(
+                "device_inbox",
+                keyvalues={"stream_id": stream_id},
+                desc="delete_device_message",
+            )
+        except StoreError:
+            # Deletion failed because device message does not exist
+            return False
+        return True
+
+    async def get_all_device_messages(
+        self,
+        user_id: str,
+        device_id: str,
+    ) -> List[Tuple[int, str]]:
+        """Get all device messages in the inbox from a specific device.
+
+        Args:
+            user_id: the user ID of the device we want to query.
+            device_id: the device ID of the device we want to query.
+        Returns:
+            A list of (stream ID, message content) tuples.
+        """
+        rows = await self.db_pool.simple_select_list(
+            table="device_inbox",
+            keyvalues={"user_id": user_id, "device_id": device_id},
+            retcols=("stream_id", "message_json"),
+            desc="get_all_device_messages",
+        )
+        return [(r["stream_id"], r["message_json"]) for r in rows]
 
 
 class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
