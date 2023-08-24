@@ -3071,6 +3071,7 @@ and then copy the &quot;url&quot; from the source of the event.)</li>
 to style the login flow according to the identity provider in question.
 See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
 <li><code>server_url</code>: The URL of the CAS authorization endpoint.</li>
+<li><code>protocol_version</code>: The CAS protocol version, defaults to none (version 3 is required if you want to use &quot;required_attributes&quot;).</li>
 <li><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
 If no name is given here, no displayname will be set.</li>
 <li><code>required_attributes</code>:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3083,6 +3084,7 @@ All of the listed attributes must match for the login to be permitted.</li>
 <pre><code class="language-yaml">cas_config:
   enabled: true
   server_url: &quot;https://cas-server.com&quot;
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: &quot;staff&quot;
