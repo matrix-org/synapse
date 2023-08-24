@@ -19,14 +19,18 @@ from tests import unittest
 
 
 class ErrorsTestCase(unittest.TestCase):
+    # Create a sub-class to avoid mutating the class-level property.
+    class LimitExceededErrorHeaders(LimitExceededError):
+        include_retry_after_header = True
+
     def test_limit_exceeded_header(self) -> None:
-        err = LimitExceededError(retry_after_ms=100)
+        err = ErrorsTestCase.LimitExceededErrorHeaders(retry_after_ms=100)
         self.assertEqual(err.error_dict(None).get("retry_after_ms"), 100)
-        assert err.headers
+        assert err.headers is not None
         self.assertEqual(err.headers.get("Retry-After"), "1")
 
     def test_limit_exceeded_rounding(self) -> None:
-        err = LimitExceededError(retry_after_ms=3001)
+        err = ErrorsTestCase.LimitExceededErrorHeaders(retry_after_ms=3001)
         self.assertEqual(err.error_dict(None).get("retry_after_ms"), 3001)
-        assert err.headers
+        assert err.headers is not None
         self.assertEqual(err.headers.get("Retry-After"), "4")

@@ -504,6 +504,8 @@ class InvalidCaptchaError(SynapseError):
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled."""
 
+    include_retry_after_header = False
+
     def __init__(
         self,
         code: int = 429,
@@ -512,9 +514,9 @@ class LimitExceededError(SynapseError):
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
         headers = (
-            None
-            if retry_after_ms is None
-            else {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+            {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+            if self.include_retry_after_header and retry_after_ms is not None
+            else None
         )
         super().__init__(code, msg, errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
