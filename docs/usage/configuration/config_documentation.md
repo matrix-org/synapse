@@ -3420,6 +3420,7 @@ Has the following sub-options:
    to style the login flow according to the identity provider in question.
    See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
+* `protocol_version`: The CAS protocol version, defaults to none (version 3 is required if you want to use "required_attributes").
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
 * `required_attributes`:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3433,6 +3434,7 @@ Example configuration:
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: "staff"
