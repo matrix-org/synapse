@@ -455,10 +455,8 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             method="POST", uri=INTROSPECTION_ENDPOINT, data=ANY, headers=ANY
         )
         self._assertParams()
-        headers = error.value.headers_dict(None)
-        assert headers is not None
         self.assertEqual(
-            headers.get("WWW-Authenticate"),
+            getattr(error.value, "headers", {})["WWW-Authenticate"],
             'Bearer error="insufficient_scope", scope="urn:matrix:org.matrix.msc2967.client:api:*"',
         )
 
