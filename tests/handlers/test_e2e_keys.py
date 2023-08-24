@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Iterable
+from typing import Iterable, Dict
 from unittest import mock
 
 from parameterized import parameterized
@@ -1120,10 +1120,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
         # Setup a response.
-        self.appservice_api.claim_client_keys.return_value = (
-            {local_user: {device_id_1: {**as_otk, **as_fallback_key}}},
-            [],
-        )
+        response: Dict[str, Dict[str, Dict[str, JsonDict]]] = {
+            local_user: {device_id_1: {**as_otk, **as_fallback_key}}
+        }
+        self.appservice_api.claim_client_keys.return_value = (response, [])
 
         # Claim OTKs, which will ask the appservice and do nothing else.
         claim_res = self.get_success(
