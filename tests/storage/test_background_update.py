@@ -32,7 +32,6 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import simple_async_mock
 from tests.unittest import override_config
 
 
@@ -348,8 +347,8 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # Mock out the AsyncContextManager
         class MockCM:
-            __aenter__ = simple_async_mock(return_value=None)
-            __aexit__ = simple_async_mock(return_value=None)
+            __aenter__ = AsyncMock(return_value=None)
+            __aexit__ = AsyncMock(return_value=None)
 
         self._update_ctx_manager = MockCM
 
