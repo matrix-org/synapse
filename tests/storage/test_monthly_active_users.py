@@ -252,7 +252,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         )
         self.get_success(d)
 
-        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[assignment]
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
         d = self.store.populate_monthly_active_users(user_id)
         self.get_success(d)
@@ -260,9 +260,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.upsert_monthly_active_user.assert_not_called()
 
     def test_populate_monthly_users_should_update(self) -> None:
-        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[assignment]
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
-        self.store.is_trial_user = AsyncMock(return_value=False)  # type: ignore[assignment]
+        self.store.is_trial_user = AsyncMock(return_value=False)  # type: ignore[method-assign]
 
         self.store.user_last_seen_monthly_active = AsyncMock(return_value=None)
         d = self.store.populate_monthly_active_users("user_id")
@@ -271,9 +271,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.upsert_monthly_active_user.assert_called_once()
 
     def test_populate_monthly_users_should_not_update(self) -> None:
-        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[assignment]
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
-        self.store.is_trial_user = AsyncMock(return_value=False)  # type: ignore[assignment]
+        self.store.is_trial_user = AsyncMock(return_value=False)  # type: ignore[method-assign]
         self.store.user_last_seen_monthly_active = AsyncMock(
             return_value=self.hs.get_clock().time_msec()
         )
@@ -356,7 +356,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     @override_config({"limit_usage_by_mau": False, "mau_stats_only": False})
     def test_no_users_when_not_tracking(self) -> None:
-        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[assignment]
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
         self.get_success(self.store.populate_monthly_active_users("@user:sever"))
 

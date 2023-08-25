@@ -190,7 +190,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         # Mock the method which calculates push rules -- we do this instead of
         # e.g. checking the results in the database because we want to ensure
         # that code isn't even running.
-        bulk_evaluator._action_for_event_by_user = AsyncMock()  # type: ignore[assignment]
+        bulk_evaluator._action_for_event_by_user = AsyncMock()  # type: ignore[method-assign]
 
         # Ensure no actions are generated!
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))

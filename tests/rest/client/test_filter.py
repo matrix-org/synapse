@@ -65,14 +65,14 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def test_add_filter_non_local_user(self) -> None:
         _is_mine = self.hs.is_mine
-        self.hs.is_mine = lambda target_user: False  # type: ignore[assignment]
+        self.hs.is_mine = lambda target_user: False  # type: ignore[method-assign]
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/user/%s/filter" % (self.user_id),
             self.EXAMPLE_FILTER_JSON,
         )
 
-        self.hs.is_mine = _is_mine  # type: ignore[assignment]
+        self.hs.is_mine = _is_mine  # type: ignore[method-assign]
         self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 

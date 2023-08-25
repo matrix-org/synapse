@@ -50,7 +50,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # This mock is crucial for destination_rooms to be populated.
         # TODO: this seems to no longer be the case---tests pass with this mock
         # commented out.
-        state_storage_controller.get_current_hosts_in_room = AsyncMock(  # type: ignore[assignment]
+        state_storage_controller.get_current_hosts_in_room = AsyncMock(  # type: ignore[method-assign]
             return_value={"test", "host2"}
         )
 
@@ -436,7 +436,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         def wake_destination_track(destination: str) -> None:
             woken.add(destination)
 
-        self.federation_sender.wake_destination = wake_destination_track  # type: ignore[assignment]
+        self.federation_sender.wake_destination = wake_destination_track  # type: ignore[method-assign]
 
         # We wait quite long so that all dests can be woken up, since there is a delay
         # between them.

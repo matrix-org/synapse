@@ -800,7 +800,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
         remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
 
-        self.hs.get_federation_client().query_client_keys = mock.AsyncMock(  # type: ignore[assignment]
+        self.hs.get_federation_client().query_client_keys = mock.AsyncMock(  # type: ignore[method-assign]
             return_value={
                 "device_keys": {remote_user_id: {}},
                 "master_keys": {
@@ -876,7 +876,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
         remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
 
-        self.hs.get_federation_client().query_user_devices = mock.AsyncMock(  # type: ignore[assignment]
+        self.hs.get_federation_client().query_user_devices = mock.AsyncMock(  # type: ignore[method-assign]
             return_value={
                 "user_id": remote_user_id,
                 "stream_id": 1,

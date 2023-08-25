@@ -157,7 +157,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         sso_handler = hs.get_sso_handler()
         # Mock the render error method.
         self.render_error = Mock(return_value=None)
-        sso_handler.render_error = self.render_error  # type: ignore[assignment]
+        sso_handler.render_error = self.render_error  # type: ignore[method-assign]
 
         # Reduce the number of attempts when generating MXIDs.
         sso_handler._MAP_USERNAME_RETRIES = 3
@@ -165,7 +165,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         auth_handler = hs.get_auth_handler()
         # Mock the complete SSO login method.
         self.complete_sso_login = AsyncMock()
-        auth_handler.complete_sso_login = self.complete_sso_login  # type: ignore[assignment]
+        auth_handler.complete_sso_login = self.complete_sso_login  # type: ignore[method-assign]
 
         return hs
 

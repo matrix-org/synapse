@@ -47,11 +47,11 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             federation_transport_client=self.federation_transport_client,
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room = AsyncMock(  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room = AsyncMock(  # type: ignore[method-assign]
             return_value={"test", "host2"}
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (  # type: ignore[method-assign]
             hs.get_storage_controllers().state.get_current_hosts_in_room
         )
 

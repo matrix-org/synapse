@@ -68,7 +68,7 @@ class RoomBase(unittest.HomeserverTestCase):
             "red",
         )
 
-        self.hs.get_federation_handler = Mock()  # type: ignore[assignment]
+        self.hs.get_federation_handler = Mock()  # type: ignore[method-assign]
         self.hs.get_federation_handler.return_value.maybe_backfill = AsyncMock(
             return_value=None
         )
@@ -76,7 +76,7 @@ class RoomBase(unittest.HomeserverTestCase):
         async def _insert_client_ip(*args: Any, **kwargs: Any) -> None:
             return None
 
-        self.hs.get_datastores().main.insert_client_ip = _insert_client_ip  # type: ignore[assignment]
+        self.hs.get_datastores().main.insert_client_ip = _insert_client_ip  # type: ignore[method-assign]
 
         return self.hs
 
@@ -3413,8 +3413,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = AsyncMock(return_value=(Mock(event_id="abc"), 0))
-        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[assignment]
-        self.hs.get_identity_handler().lookup_3pid = AsyncMock(  # type: ignore[assignment]
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[method-assign]
+        self.hs.get_identity_handler().lookup_3pid = AsyncMock(  # type: ignore[method-assign]
             return_value=None,
         )
 
@@ -3477,8 +3477,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = AsyncMock(return_value=(Mock(event_id="abc"), 0))
-        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[assignment]
-        self.hs.get_identity_handler().lookup_3pid = AsyncMock(  # type: ignore[assignment]
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock  # type: ignore[method-assign]
+        self.hs.get_identity_handler().lookup_3pid = AsyncMock(  # type: ignore[method-assign]
             return_value=None,
         )
 

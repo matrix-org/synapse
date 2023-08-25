@@ -670,7 +670,7 @@ def _make_test_homeserver_synchronous(server: HomeServer) -> None:
                 **kwargs,
             )
 
-        pool.runWithConnection = runWithConnection  # type: ignore[assignment]
+        pool.runWithConnection = runWithConnection  # type: ignore[method-assign]
         pool.runInteraction = runInteraction  # type: ignore[assignment]
         # Replace the thread pool with a threadless 'thread' pool
         pool.threadpool = ThreadPool(clock._reactor)
