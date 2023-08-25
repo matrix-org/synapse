@@ -479,9 +479,7 @@ class TransportLayerClient:
 
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
-            data: Dict[str, Any] = {
-                "include_all_networks": include_all_networks
-            }
+            data: Dict[str, Any] = {"include_all_networks": include_all_networks}
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
