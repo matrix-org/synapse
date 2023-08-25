@@ -475,10 +475,10 @@ class TransportLayerClient:
         See synapse.federation.federation_client.FederationClient.get_public_rooms for
         more information.
         """
+        path = _create_v1_path("/publicRooms")
+
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
-            path = _create_v1_path("/publicRooms")
-
             data: Dict[str, Any] = {
                 "include_all_networks": include_all_networks
             }
@@ -505,8 +505,6 @@ class TransportLayerClient:
                     )
                 raise
         else:
-            path = _create_v1_path("/publicRooms")
-
             args: Dict[str, Union[str, Iterable[str]]] = {
                 "include_all_networks": "true" if include_all_networks else "false"
             }
