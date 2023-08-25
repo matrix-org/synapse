@@ -511,11 +511,11 @@ class TransportLayerClient:
                 "include_all_networks": "true" if include_all_networks else "false"
             }
             if third_party_instance_id:
-                args["third_party_instance_id"] = (third_party_instance_id,)
+                args["third_party_instance_id"] = third_party_instance_id
             if limit:
-                args["limit"] = [str(limit)]
+                args["limit"] = str(limit)
             if since_token:
-                args["since"] = [since_token]
+                args["since"] = since_token
 
             try:
                 response = await self.client.get_json(
