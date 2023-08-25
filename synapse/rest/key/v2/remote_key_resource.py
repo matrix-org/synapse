@@ -213,7 +213,9 @@ class RemoteKey(RestServlet):
             else:
                 ts_added_ms = key_result.added_ts
                 ts_valid_until_ms = key_result.valid_until_ts
-                req_key = query.get(server_name, {}).get(key_id, {})
+                req_key = query.get(server_name, {}).get(
+                    key_id, _KeyQueryCriteriaDataModel(minimum_valid_until_ts=None)
+                )
                 req_valid_until = req_key.minimum_valid_until_ts
                 if req_valid_until is not None:
                     if ts_valid_until_ms < req_valid_until:
