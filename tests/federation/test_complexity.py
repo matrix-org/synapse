@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
@@ -20,7 +20,6 @@ from synapse.rest.client import login, room
 from synapse.types import JsonDict, UserID, create_requester
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
@@ -75,9 +74,9 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))  # type: ignore[assignment]
-        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[assignment]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[assignment]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
@@ -106,9 +105,9 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))  # type: ignore[assignment]
-        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[assignment]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[assignment]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
@@ -143,9 +142,9 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
-        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value=None)  # type: ignore[assignment]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[assignment]
+            return_value=("", 1)
         )
 
         # Artificially raise the complexity
@@ -200,9 +199,9 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))  # type: ignore[assignment]
-        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[assignment]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[assignment]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
@@ -230,9 +229,9 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))  # type: ignore[assignment]
-        handler.federation_handler.do_invite_join = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[assignment]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[assignment]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
