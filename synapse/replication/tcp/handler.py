@@ -40,6 +40,7 @@ from synapse.replication.tcp.commands import (
     Command,
     FederationAckCommand,
     LockReleasedCommand,
+    NewActiveTaskCommand,
     PositionCommand,
     RdataCommand,
     RemoteServerUpCommand,
@@ -63,6 +64,7 @@ from synapse.replication.tcp.streams import (
     ToDeviceStream,
     TypingStream,
 )
+from synapse.types import TaskStatus
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -237,6 +239,10 @@ class ReplicationCommandHandler:
         self._server_notices_sender = None
         if self._is_master:
             self._server_notices_sender = hs.get_server_notices_sender()
+
+        self._task_scheduler = None
+        if hs.config.worker.run_background_tasks:
+            self._task_scheduler = hs.get_task_scheduler()
 
         if hs.config.redis.redis_enabled:
             # If we're using Redis, it's the background worker that should
@@ -663,6 +669,15 @@ class ReplicationCommandHandler:
             cmd.instance_name, cmd.lock_name, cmd.lock_key
         )
 
+    async def on_NEW_ACTIVE_TASK(
+        self, conn: IReplicationConnection, cmd: NewActiveTaskCommand
+    ) -> None:
+        """Called when get a new NEW_ACTIVE_TASK command."""
+        if self._task_scheduler:
+            task = await self._task_scheduler.get_task(cmd.data)
+            if task and task.status == TaskStatus.ACTIVE:
+                await self._task_scheduler._launch_task(task)
+
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""
         self._connections.append(connection)
@@ -775,6 +790,10 @@ class ReplicationCommandHandler:
         """Called when we released a lock and should notify other instances."""
         if instance_name == self._instance_name:
             self.send_command(LockReleasedCommand(instance_name, lock_name, lock_key))
+
+    def send_new_active_task(self, task_id: str) -> None:
+        """Called when a new task has been scheduled for immediate launch and is ACTIVE."""
+        self.send_command(NewActiveTaskCommand(task_id))
 
 
 UpdateToken = TypeVar("UpdateToken")
