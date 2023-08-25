@@ -57,8 +57,7 @@ class TaskScheduler:
     the code launching the task.
     You can also specify the `result` (and/or an `error`) when returning from the function.
 
-    The reconciliation loop runs every 5 mns, so this is not a precise scheduler. When wanting
-    to launch now, the launch will still not happen before the next loop run.
+    The reconciliation loop runs every minute, so this is not a precise scheduler.
 
     Tasks will be run on the worker specified with `run_background_tasks_on` config,
     or the main one by default.
