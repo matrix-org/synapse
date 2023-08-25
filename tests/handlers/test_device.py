@@ -122,50 +122,50 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(3, len(res))
         device_map = {d["device_id"]: d for d in res}
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "xyz",
                 "display_name": "display 0",
                 "last_seen_ip": None,
                 "last_seen_ts": None,
-            },
-            device_map["xyz"],
+            }.items(),
+            device_map["xyz"].items(),
         )
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "fco",
                 "display_name": "display 1",
                 "last_seen_ip": "ip1",
                 "last_seen_ts": 1000000,
-            },
-            device_map["fco"],
+            }.items(),
+            device_map["fco"].items(),
         )
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "abc",
                 "display_name": "display 2",
                 "last_seen_ip": "ip3",
                 "last_seen_ts": 3000000,
-            },
-            device_map["abc"],
+            }.items(),
+            device_map["abc"].items(),
         )
 
     def test_get_device(self) -> None:
         self._record_users()
 
         res = self.get_success(self.handler.get_device(user1, "abc"))
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "abc",
                 "display_name": "display 2",
                 "last_seen_ip": "ip3",
                 "last_seen_ts": 3000000,
-            },
-            res,
+            }.items(),
+            res.items(),
         )
 
     def test_delete_device(self) -> None:

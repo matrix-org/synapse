@@ -58,13 +58,13 @@ class DeviceStoreTestCase(HomeserverTestCase):
 
         res = self.get_success(self.store.get_device("user_id", "device_id"))
         assert res is not None
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": "user_id",
                 "device_id": "device_id",
                 "display_name": "display_name",
-            },
-            res,
+            }.items(),
+            res.items(),
         )
 
     def test_get_devices_by_user(self) -> None:
@@ -80,21 +80,21 @@ class DeviceStoreTestCase(HomeserverTestCase):
 
         res = self.get_success(self.store.get_devices_by_user("user_id"))
         self.assertEqual(2, len(res.keys()))
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": "user_id",
                 "device_id": "device1",
                 "display_name": "display_name 1",
-            },
-            res["device1"],
+            }.items(),
+            res["device1"].items(),
         )
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": "user_id",
                 "device_id": "device2",
                 "display_name": "display_name 2",
-            },
-            res["device2"],
+            }.items(),
+            res["device2"].items(),
         )
 
     def test_count_devices_by_users(self) -> None:
