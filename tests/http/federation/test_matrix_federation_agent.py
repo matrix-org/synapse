@@ -651,7 +651,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # .well-known request fails.
         self.reactor.pump((0.4,))
 
-        # now there should be two SRV lookup
+        # now there should be two SRV lookups
         self.mock_resolver.resolve_service.assert_has_calls(
             [call(b"_matrix-fed._tcp.testserv1"), call(b"_matrix._tcp.testserv1")]
         )
@@ -737,7 +737,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # .well-known request fails.
         self.reactor.pump((0.4,))
 
-        # now there should be a SRV lookup
+        # now there should be two SRV lookups
         self.mock_resolver.resolve_service.assert_has_calls(
             [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
@@ -788,7 +788,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             content=b'{ "m.server": "target-server" }',
         )
 
-        # there should be a SRV lookup
+        # there should be two SRV lookups
         self.mock_resolver.resolve_service.assert_has_calls(
             [
                 call(b"_matrix-fed._tcp.target-server"),
@@ -881,7 +881,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.reactor.pump((0.1,))
 
-        # there should be a SRV lookup
+        # there should be two SRV lookups
         self.mock_resolver.resolve_service.assert_has_calls(
             [
                 call(b"_matrix-fed._tcp.target-server"),
@@ -948,7 +948,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             client_factory, expected_sni=b"testserv", content=b"NOT JSON"
         )
 
-        # now there should be a SRV lookup
+        # now there should be two SRV lookups
         self.mock_resolver.resolve_service.assert_has_calls(
             [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
@@ -1022,7 +1022,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # there should be no requests
         self.assertEqual(len(http_proto.requests), 0)
 
-        # and there should be a SRV lookup instead
+        # and there should be two SRV lookups instead
         self.mock_resolver.resolve_service.assert_has_calls(
             [call(b"_matrix-fed._tcp.testserv"), call(b"_matrix._tcp.testserv")]
         )
@@ -1206,7 +1206,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             content=b'{ "m.server": "target-server" }',
         )
 
-        # there should be a SRV lookup
+        # there should be two SRV lookups
         self.mock_resolver.resolve_service.assert_has_calls(
             [
                 call(b"_matrix-fed._tcp.target-server"),
