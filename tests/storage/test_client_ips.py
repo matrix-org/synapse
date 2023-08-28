@@ -65,15 +65,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 12345678000,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
 
     def test_insert_new_client_ip_none_device_id(self) -> None:
@@ -526,15 +526,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": None,
                 "user_agent": None,
                 "last_seen": None,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
 
         # Register the background update to run again.
@@ -561,15 +561,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 0,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
 
     def test_old_user_ips_pruned(self) -> None:
@@ -640,15 +640,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result2[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 0,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
 
     def test_invalid_user_agents_are_ignored(self) -> None:
@@ -777,13 +777,13 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             self.store.get_last_client_ip_by_device(self.user_id, device_id)
         )
         r = result[(self.user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": self.user_id,
                 "device_id": device_id,
                 "ip": expected_ip,
                 "user_agent": "Mozzila pizza",
                 "last_seen": 123456100,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
