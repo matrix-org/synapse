@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import attr
 
@@ -30,7 +30,6 @@ from synapse.types import JsonDict, StreamToken, create_requester
 from synapse.util import Clock
 
 from tests.handlers.test_sync import generate_sync_config
-from tests.test_utils import simple_async_mock
 from tests.unittest import (
     FederatingHomeserverTestCase,
     HomeserverTestCase,
@@ -157,7 +156,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # Mock out the calls over federation.
         self.fed_transport_client = Mock(spec=["send_transaction"])
-        self.fed_transport_client.send_transaction = simple_async_mock({})
+        self.fed_transport_client.send_transaction = AsyncMock(return_value={})
 
         hs = self.setup_test_homeserver(
             federation_transport_client=self.fed_transport_client,
