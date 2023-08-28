@@ -475,13 +475,11 @@ class TransportLayerClient:
         See synapse.federation.federation_client.FederationClient.get_public_rooms for
         more information.
         """
+        path = _create_v1_path("/publicRooms")
+
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
-            path = _create_v1_path("/publicRooms")
-
-            data: Dict[str, Any] = {
-                "include_all_networks": "true" if include_all_networks else "false"
-            }
+            data: Dict[str, Any] = {"include_all_networks": include_all_networks}
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
@@ -505,17 +503,15 @@ class TransportLayerClient:
                     )
                 raise
         else:
-            path = _create_v1_path("/publicRooms")
-
             args: Dict[str, Union[str, Iterable[str]]] = {
                 "include_all_networks": "true" if include_all_networks else "false"
             }
             if third_party_instance_id:
-                args["third_party_instance_id"] = (third_party_instance_id,)
+                args["third_party_instance_id"] = third_party_instance_id
             if limit:
-                args["limit"] = [str(limit)]
+                args["limit"] = str(limit)
             if since_token:
-                args["since"] = [since_token]
+                args["since"] = since_token
 
             try:
                 response = await self.client.get_json(

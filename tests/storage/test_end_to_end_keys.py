@@ -38,7 +38,7 @@ class EndToEndKeyStoreTestCase(HomeserverTestCase):
         self.assertIn("user", res)
         self.assertIn("device", res["user"])
         dev = res["user"]["device"]
-        self.assertDictContainsSubset(json, dev)
+        self.assertLessEqual(json.items(), dev.items())
 
     def test_reupload_key(self) -> None:
         now = 1470174257070
@@ -71,8 +71,12 @@ class EndToEndKeyStoreTestCase(HomeserverTestCase):
         self.assertIn("user", res)
         self.assertIn("device", res["user"])
         dev = res["user"]["device"]
-        self.assertDictContainsSubset(
-            {"key": "value", "unsigned": {"device_display_name": "display_name"}}, dev
+        self.assertLessEqual(
+            {
+                "key": "value",
+                "unsigned": {"device_display_name": "display_name"},
+            }.items(),
+            dev.items(),
         )
 
     def test_multiple_devices(self) -> None:

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from typing import Any, Dict
-from unittest.mock import Mock
+from unittest.mock import AsyncMock
 
 from parameterized import parameterized
 
@@ -30,7 +30,6 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.server import make_request
-from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
 
@@ -66,15 +65,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 12345678000,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
 
     def test_insert_new_client_ip_none_device_id(self) -> None:
@@ -443,9 +442,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         lots_of_users = 100
         user_id = "@user:server"
 
-        self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(lots_of_users)
-        )
+        self.store.get_monthly_active_count = AsyncMock(return_value=lots_of_users)
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip", "user_agent", "device_id"
@@ -529,15 +526,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": None,
                 "user_agent": None,
                 "last_seen": None,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
 
         # Register the background update to run again.
@@ -564,15 +561,15 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 0,
-            },
-            r,
+            }.items(),
+            r.items(),
         )
 
     def test_old_user_ips_pruned(self) -> None:
@@ -643,15 +640,80 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
         r = result2[(user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user_id,
                 "device_id": device_id,
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 0,
-            },
-            r,
+            }.items(),
+            r.items(),
+        )
+
+    def test_invalid_user_agents_are_ignored(self) -> None:
+        # First make sure we have completed all updates.
+        self.wait_for_background_updates()
+
+        user_id1 = "@user1:id"
+        user_id2 = "@user2:id"
+        device_id1 = "MY_DEVICE1"
+        device_id2 = "MY_DEVICE2"
+        access_token1 = "access_token1"
+        access_token2 = "access_token2"
+
+        # Insert a user IP 1
+        self.get_success(
+            self.store.store_device(
+                user_id1,
+                device_id1,
+                "display name1",
+            )
+        )
+        # Insert a user IP 2
+        self.get_success(
+            self.store.store_device(
+                user_id2,
+                device_id2,
+                "display name2",
+            )
+        )
+
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id1, access_token1, "ip", "sync-v3-proxy-", device_id1
+            )
+        )
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id2, access_token2, "ip", "user_agent", device_id2
+            )
+        )
+        # Force persisting to disk
+        self.reactor.advance(200)
+
+        # We should see that in the DB
+        result = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="user_ips",
+                keyvalues={},
+                retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
+
+        # ensure user1 is filtered out
+        self.assertEqual(
+            result,
+            [
+                {
+                    "access_token": access_token2,
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "device_id": device_id2,
+                    "last_seen": 0,
+                }
+            ],
         )
 
 
@@ -715,13 +777,13 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
             self.store.get_last_client_ip_by_device(self.user_id, device_id)
         )
         r = result[(self.user_id, device_id)]
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": self.user_id,
                 "device_id": device_id,
                 "ip": expected_ip,
                 "user_agent": "Mozzila pizza",
                 "last_seen": 123456100,
-            },
-            r,
+            }.items(),
+            r.items(),
         )

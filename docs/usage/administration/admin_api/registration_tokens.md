@@ -1,5 +1,7 @@
 # Registration Tokens
 
+**Note:** This API is disabled when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
+
 This API allows you to manage tokens which can be used to authenticate
 registration requests, as proposed in
 [MSC3231](https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md)

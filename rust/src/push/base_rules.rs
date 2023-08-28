@@ -228,7 +228,7 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
     // We don't want to notify on edits *unless* the edit directly mentions a
     // user, which is handled above.
     PushRule {
-        rule_id: Cow::Borrowed("global/override/.org.matrix.msc3958.suppress_edits"),
+        rule_id: Cow::Borrowed("global/override/.m.rule.suppress_edits"),
         priority_class: 5,
         conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::EventPropertyIs(
             EventPropertyIsCondition {
