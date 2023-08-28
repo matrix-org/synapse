@@ -253,7 +253,6 @@ class BasePresenceHandler(abc.ABC):
         self,
         target_user: UserID,
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
         is_sync: bool = False,
     ) -> None:
@@ -262,10 +261,11 @@ class BasePresenceHandler(abc.ABC):
         Args:
             target_user: The ID of the user to set the presence state of.
             state: The presence state as a JSON dictionary.
-            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
-                If False, the user's current status will be updated.
             force_notify: Whether to force notification of the update to clients.
-            is_sync: True if this update was from a sync
+            is_sync: True if this update was from a sync, which results in
+                *not* overriding a previously set BUSY status, updating the
+                user's last_user_sync_ts, and ignoring the "status_msg" field of
+                the `state` dict.
         """
 
     @abc.abstractmethod
@@ -491,14 +491,11 @@ class WorkerPresenceHandler(BasePresenceHandler):
         if not affect_presence or not self._presence_enabled:
             return _NullContextManager()
 
-        # Pass ignore_status_msg = True to avoid clearing the status message.
-        #
         # Note that this causes last_active_ts to be incremented which is not
         # what the spec wants.
         await self.set_state(
             UserID.from_string(user_id),
             state={"presence": presence_state},
-            ignore_status_msg=True,
             is_sync=True,
         )
 
@@ -596,7 +593,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
         self,
         target_user: UserID,
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
         is_sync: bool = False,
     ) -> None:
@@ -605,10 +601,11 @@ class WorkerPresenceHandler(BasePresenceHandler):
         Args:
             target_user: The ID of the user to set the presence state of.
             state: The presence state as a JSON dictionary.
-            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
-                If False, the user's current status will be updated.
             force_notify: Whether to force notification of the update to clients.
-            is_sync: True if this update was from a sync
+            is_sync: True if this update was from a sync, which results in
+                *not* overriding a previously set BUSY status, updating the
+                user's last_user_sync_ts, and ignoring the "status_msg" field of
+                the `state` dict.
         """
         presence = state["presence"]
 
@@ -626,7 +623,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
             instance_name=self._presence_writer_instance,
             user_id=user_id,
             state=state,
-            ignore_status_msg=ignore_status_msg,
             force_notify=force_notify,
             is_sync=is_sync,
         )
@@ -993,14 +989,11 @@ class PresenceHandler(BasePresenceHandler):
         curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
         self.user_to_num_current_syncs[user_id] = curr_sync + 1
 
-        # Pass ignore_status_msg = True to avoid clearing the status message.
-        #
         # Note that this causes last_active_ts to be incremented which is not
         # what the spec wants.
         await self.set_state(
             UserID.from_string(user_id),
             state={"presence": presence_state},
-            ignore_status_msg=True,
             is_sync=True,
         )
 
@@ -1171,7 +1164,6 @@ class PresenceHandler(BasePresenceHandler):
         self,
         target_user: UserID,
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
         is_sync: bool = False,
     ) -> None:
@@ -1180,10 +1172,11 @@ class PresenceHandler(BasePresenceHandler):
         Args:
             target_user: The ID of the user to set the presence state of.
             state: The presence state as a JSON dictionary.
-            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
-                If False, the user's current status will be updated.
             force_notify: Whether to force notification of the update to clients.
-            is_sync: True if this update was from a sync
+            is_sync: True if this update was from a sync, which results in
+                *not* overriding a previously set BUSY status, updating the
+                user's last_user_sync_ts, and ignoring the "status_msg" field of
+                the `state` dict.
         """
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
@@ -1209,14 +1202,14 @@ class PresenceHandler(BasePresenceHandler):
 
         new_fields = {"state": presence}
 
-        if not ignore_status_msg:
-            new_fields["status_msg"] = status_msg
-
         if presence == PresenceState.ONLINE or presence == PresenceState.BUSY:
             new_fields["last_active_ts"] = now
 
         if is_sync:
             new_fields["last_user_sync_ts"] = now
+        else:
+            # Syncs do not override the status message.
+            new_fields["status_msg"] = status_msg
 
         await self._update_states(
             [prev_state.copy_and_replace(**new_fields)], force_notify=force_notify
