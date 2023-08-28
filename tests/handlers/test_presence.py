@@ -641,13 +641,20 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         """Test that if an external process doesn't update the records for a while
         we time out their syncing users presence.
         """
-        process_id = "1"
 
-        # Notify handler that a user is now syncing.
+        # Create a worker and use it to handle /sync traffic instead.
+        # This is used to test that presence changes get replicated from workers
+        # to the main process correctly.
+        worker_to_sync_against = self.make_worker_hs(
+            "synapse.app.generic_worker", {"worker_name": "synchrotron"}
+        )
+        worker_presence_handler = worker_to_sync_against.get_presence_handler()
+
         self.get_success(
-            self.presence_handler.update_external_syncs_row(
-                process_id, self.user_id, True, self.clock.time_msec()
-            )
+            worker_presence_handler.user_syncing(
+                self.user_id, True, PresenceState.ONLINE
+            ),
+            by=0.1,
         )
 
         # Check that if we wait a while without telling the handler the user has
@@ -820,7 +827,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
             # This is used to test that presence changes get replicated from workers
             # to the main process correctly.
             worker_to_sync_against = self.make_worker_hs(
-                "synapse.app.generic_worker", {"worker_name": "presence_writer"}
+                "synapse.app.generic_worker", {"worker_name": "synchrotron"}
             )
 
         # Set presence to BUSY
@@ -832,13 +839,29 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.get_success(
             worker_to_sync_against.get_presence_handler().user_syncing(
                 self.user_id, True, PresenceState.ONLINE
-            )
+            ),
+            by=0.1,
         )
 
         # Check against the main process that the user's presence did not change.
         state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
         # we should still be busy
         self.assertEqual(state.state, PresenceState.BUSY)
+
+        # Advance such that the device would be discarded if it was not busy,
+        # then pump so _handle_timeouts function to called.
+        self.reactor.advance(IDLE_TIMER / 1000)
+        self.reactor.pump([5])
+
+        # The account should still be busy.
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
+        self.assertEqual(state.state, PresenceState.BUSY)
+
+        # Ensure that a /presence call can set the user *off* busy.
+        self._set_presencestate_with_status_msg(PresenceState.ONLINE, status_msg)
+
+        state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
+        self.assertEqual(state.state, PresenceState.ONLINE)
 
     def _set_presencestate_with_status_msg(
         self, state: str, status_msg: Optional[str]

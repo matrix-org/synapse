@@ -73,8 +73,8 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
 
         {
             "state": { ... },
-            "ignore_status_msg": false,
-            "force_notify": false
+            "force_notify": false,
+            "is_sync": false
         }
 
         200 OK
@@ -96,13 +96,13 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
     async def _serialize_payload(  # type: ignore[override]
         user_id: str,
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
+        is_sync: bool = False,
     ) -> JsonDict:
         return {
             "state": state,
-            "ignore_status_msg": ignore_status_msg,
             "force_notify": force_notify,
+            "is_sync": is_sync,
         }
 
     async def _handle_request(  # type: ignore[override]
@@ -111,8 +111,8 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
         await self._presence_handler.set_state(
             UserID.from_string(user_id),
             content["state"],
-            content["ignore_status_msg"],
             content["force_notify"],
+            content.get("is_sync", False),
         )
 
         return (200, {})
