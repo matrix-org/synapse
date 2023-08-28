@@ -581,8 +581,9 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             body,
         )
         self.assertEqual(channel.code, 403, channel.result)
-        self.assertDictContainsSubset(
-            {"errcode": Codes.LIMIT_EXCEEDED, "extra": "value"}, channel.json_body
+        self.assertLessEqual(
+            {"errcode": Codes.LIMIT_EXCEEDED, "extra": "value"}.items(),
+            channel.json_body.items(),
         )
 
 
