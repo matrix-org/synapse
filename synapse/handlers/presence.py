@@ -165,7 +165,11 @@ class BasePresenceHandler(abc.ABC):
 
     @abc.abstractmethod
     async def user_syncing(
-        self, user_id: str, affect_presence: bool, presence_state: str
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        affect_presence: bool,
+        presence_state: str,
     ) -> ContextManager[None]:
         """Returns a context manager that should surround any stream requests
         from the user.
@@ -176,6 +180,7 @@ class BasePresenceHandler(abc.ABC):
 
         Args:
             user_id: the user that is starting a sync
+            device_id: the user's device that is starting a sync
             affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
@@ -252,6 +257,7 @@ class BasePresenceHandler(abc.ABC):
     async def set_state(
         self,
         target_user: UserID,
+        device_id: Optional[str],
         state: JsonDict,
         force_notify: bool = False,
         is_sync: bool = False,
@@ -260,6 +266,7 @@ class BasePresenceHandler(abc.ABC):
 
         Args:
             target_user: The ID of the user to set the presence state of.
+            device_id: the device that the user is setting the presence state of.
             state: The presence state as a JSON dictionary.
             force_notify: Whether to force notification of the update to clients.
             is_sync: True if this update was from a sync, which results in
@@ -269,7 +276,9 @@ class BasePresenceHandler(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def bump_presence_active_time(self, user: UserID) -> None:
+    async def bump_presence_active_time(
+        self, user: UserID, device_id: Optional[str]
+    ) -> None:
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
@@ -381,7 +390,9 @@ class BasePresenceHandler(abc.ABC):
         # We set force_notify=True here so that this presence update is guaranteed to
         # increment the presence stream ID (which resending the current user's presence
         # otherwise would not do).
-        await self.set_state(UserID.from_string(user_id), state, force_notify=True)
+        await self.set_state(
+            UserID.from_string(user_id), None, state, force_notify=True
+        )
 
     async def is_visible(self, observed_user: UserID, observer_user: UserID) -> bool:
         raise NotImplementedError(
@@ -481,7 +492,11 @@ class WorkerPresenceHandler(BasePresenceHandler):
                 self.send_user_sync(user_id, False, last_sync_ms)
 
     async def user_syncing(
-        self, user_id: str, affect_presence: bool, presence_state: str
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        affect_presence: bool,
+        presence_state: str,
     ) -> ContextManager[None]:
         """Record that a user is syncing.
 
@@ -495,6 +510,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         # what the spec wants.
         await self.set_state(
             UserID.from_string(user_id),
+            device_id,
             state={"presence": presence_state},
             is_sync=True,
         )
@@ -592,6 +608,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
     async def set_state(
         self,
         target_user: UserID,
+        device_id: Optional[str],
         state: JsonDict,
         force_notify: bool = False,
         is_sync: bool = False,
@@ -600,6 +617,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         Args:
             target_user: The ID of the user to set the presence state of.
+            device_id: the device that the user is setting the presence state of.
             state: The presence state as a JSON dictionary.
             force_notify: Whether to force notification of the update to clients.
             is_sync: True if this update was from a sync, which results in
@@ -622,12 +640,15 @@ class WorkerPresenceHandler(BasePresenceHandler):
         await self._set_state_client(
             instance_name=self._presence_writer_instance,
             user_id=user_id,
+            device_id=device_id,
             state=state,
             force_notify=force_notify,
             is_sync=is_sync,
         )
 
-    async def bump_presence_active_time(self, user: UserID) -> None:
+    async def bump_presence_active_time(
+        self, user: UserID, device_id: Optional[str]
+    ) -> None:
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
@@ -638,7 +659,9 @@ class WorkerPresenceHandler(BasePresenceHandler):
         # Proxy request to instance that writes presence
         user_id = user.to_string()
         await self._bump_active_client(
-            instance_name=self._presence_writer_instance, user_id=user_id
+            instance_name=self._presence_writer_instance,
+            user_id=user_id,
+            device_id=device_id,
         )
 
 
@@ -943,7 +966,9 @@ class PresenceHandler(BasePresenceHandler):
 
         return await self._update_states(changes)
 
-    async def bump_presence_active_time(self, user: UserID) -> None:
+    async def bump_presence_active_time(
+        self, user: UserID, device_id: Optional[str]
+    ) -> None:
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
@@ -966,6 +991,7 @@ class PresenceHandler(BasePresenceHandler):
     async def user_syncing(
         self,
         user_id: str,
+        device_id: Optional[str],
         affect_presence: bool = True,
         presence_state: str = PresenceState.ONLINE,
     ) -> ContextManager[None]:
@@ -977,7 +1003,8 @@ class PresenceHandler(BasePresenceHandler):
         when users disconnect/reconnect.
 
         Args:
-            user_id
+            user_id: the user that is starting a sync
+            device_id: the user's device that is starting a sync
             affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
@@ -993,6 +1020,7 @@ class PresenceHandler(BasePresenceHandler):
         # what the spec wants.
         await self.set_state(
             UserID.from_string(user_id),
+            device_id,
             state={"presence": presence_state},
             is_sync=True,
         )
@@ -1163,6 +1191,7 @@ class PresenceHandler(BasePresenceHandler):
     async def set_state(
         self,
         target_user: UserID,
+        device_id: Optional[str],
         state: JsonDict,
         force_notify: bool = False,
         is_sync: bool = False,
@@ -1171,6 +1200,7 @@ class PresenceHandler(BasePresenceHandler):
 
         Args:
             target_user: The ID of the user to set the presence state of.
+            device_id: the device that the user is setting the presence state of.
             state: The presence state as a JSON dictionary.
             force_notify: Whether to force notification of the update to clients.
             is_sync: True if this update was from a sync, which results in

@@ -524,6 +524,7 @@ class PresenceHandlerInitTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.user_id = f"@test:{self.hs.config.server.server_name}"
+        self.device_id = "dev-1"
 
         # Move the reactor to the initial time.
         self.reactor.advance(1000)
@@ -608,7 +609,10 @@ class PresenceHandlerInitTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(SYNC_ONLINE_TIMEOUT / 1000 / 2)
         self.get_success(
             presence_handler.user_syncing(
-                self.user_id, sync_state != PresenceState.OFFLINE, sync_state
+                self.user_id,
+                self.device_id,
+                sync_state != PresenceState.OFFLINE,
+                sync_state,
             )
         )
 
@@ -632,6 +636,7 @@ class PresenceHandlerInitTestCase(unittest.HomeserverTestCase):
 class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
     user_id = "@test:server"
     user_id_obj = UserID.from_string(user_id)
+    device_id = "dev-1"
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.presence_handler = hs.get_presence_handler()
@@ -652,7 +657,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
         self.get_success(
             worker_presence_handler.user_syncing(
-                self.user_id, True, PresenceState.ONLINE
+                self.user_id, self.device_id, True, PresenceState.ONLINE
             ),
             by=0.1,
         )
@@ -708,7 +713,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # Mark user as offline
         self.get_success(
             self.presence_handler.set_state(
-                self.user_id_obj, {"presence": PresenceState.OFFLINE}
+                self.user_id_obj, self.device_id, {"presence": PresenceState.OFFLINE}
             )
         )
 
@@ -740,7 +745,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # Mark user as online again
         self.get_success(
             self.presence_handler.set_state(
-                self.user_id_obj, {"presence": PresenceState.ONLINE}
+                self.user_id_obj, self.device_id, {"presence": PresenceState.ONLINE}
             )
         )
 
@@ -769,7 +774,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
 
         self.get_success(
             self.presence_handler.user_syncing(
-                self.user_id, False, PresenceState.ONLINE
+                self.user_id, self.device_id, False, PresenceState.ONLINE
             )
         )
 
@@ -786,7 +791,9 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self._set_presencestate_with_status_msg(PresenceState.UNAVAILABLE, status_msg)
 
         self.get_success(
-            self.presence_handler.user_syncing(self.user_id, True, PresenceState.ONLINE)
+            self.presence_handler.user_syncing(
+                self.user_id, self.device_id, True, PresenceState.ONLINE
+            )
         )
 
         state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
@@ -800,7 +807,9 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self._set_presencestate_with_status_msg(PresenceState.UNAVAILABLE, status_msg)
 
         self.get_success(
-            self.presence_handler.user_syncing(self.user_id, True, PresenceState.ONLINE)
+            self.presence_handler.user_syncing(
+                self.user_id, self.device_id, True, PresenceState.ONLINE
+            )
         )
 
         state = self.get_success(self.presence_handler.get_state(self.user_id_obj))
@@ -838,7 +847,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         # /presence/*.
         self.get_success(
             worker_to_sync_against.get_presence_handler().user_syncing(
-                self.user_id, True, PresenceState.ONLINE
+                self.user_id, self.device_id, True, PresenceState.ONLINE
             ),
             by=0.1,
         )
@@ -875,6 +884,7 @@ class PresenceHandlerTestCase(BaseMultiWorkerStreamTestCase):
         self.get_success(
             self.presence_handler.set_state(
                 self.user_id_obj,
+                self.device_id,
                 {"presence": state, "status_msg": status_msg},
             )
         )
@@ -1116,7 +1126,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # Mark test2 as online, test will be offline with a last_active of 0
         self.get_success(
             self.presence_handler.set_state(
-                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+                UserID.from_string("@test2:server"),
+                "dev-1",
+                {"presence": PresenceState.ONLINE},
             )
         )
         self.reactor.pump([0])  # Wait for presence updates to be handled
@@ -1163,7 +1175,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # Mark test as online
         self.get_success(
             self.presence_handler.set_state(
-                UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
+                UserID.from_string("@test:server"),
+                "dev-1",
+                {"presence": PresenceState.ONLINE},
             )
         )
 
@@ -1171,7 +1185,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # Note we don't join them to the room yet
         self.get_success(
             self.presence_handler.set_state(
-                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+                UserID.from_string("@test2:server"),
+                "dev-1",
+                {"presence": PresenceState.ONLINE},
             )
         )
 

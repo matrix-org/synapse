@@ -205,6 +205,7 @@ class SyncRestServlet(RestServlet):
 
         context = await self.presence_handler.user_syncing(
             user.to_string(),
+            requester.device_id,
             affect_presence=affect_presence,
             presence_state=set_presence,
         )
