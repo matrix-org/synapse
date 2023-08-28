@@ -675,7 +675,7 @@ class ReplicationCommandHandler:
         """Called when get a new NEW_ACTIVE_TASK command."""
         if self._task_scheduler:
             task = await self._task_scheduler.get_task(cmd.data)
-            if task and task.status == TaskStatus.ACTIVE:
+            if task:
                 await self._task_scheduler._launch_task(task)
 
     def new_connection(self, connection: IReplicationConnection) -> None:
