@@ -64,7 +64,6 @@ from synapse.replication.tcp.streams import (
     ToDeviceStream,
     TypingStream,
 )
-from synapse.types import TaskStatus
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
