@@ -57,14 +57,13 @@ class TaskScheduler:
     the code launching the task.
     You can also specify the `result` (and/or an `error`) when returning from the function.
 
-    The reconciliation loop runs every 5 mns, so this is not a precise scheduler. When wanting
-    to launch now, the launch will still not happen before the next loop run.
-
-    Tasks will be run on the worker specified with `run_background_tasks_on` config,
-    or the main one by default.
+    The reconciliation loop runs every minute, so this is not a precise scheduler.
     There is a limit of 10 concurrent tasks, so tasks may be delayed if the pool is already
     full. In this regard, please take great care that scheduled tasks can actually finished.
     For now there is no mechanism to stop a running task if it is stuck.
+
+    Tasks will be run on the worker specified with `run_background_tasks_on` config,
+    or the main one by default.
     """
 
     # Precision of the scheduler, evaluation of tasks to run will only happen
@@ -85,7 +84,7 @@ class TaskScheduler:
         self._actions: Dict[
             str,
             Callable[
-                [ScheduledTask, bool],
+                [ScheduledTask],
                 Awaitable[Tuple[TaskStatus, Optional[JsonMapping], Optional[str]]],
             ],
         ] = {}
@@ -98,11 +97,13 @@ class TaskScheduler:
                 "handle_scheduled_tasks",
                 self._handle_scheduled_tasks,
             )
+        else:
+            self.replication_client = hs.get_replication_command_handler()
 
     def register_action(
         self,
         function: Callable[
-            [ScheduledTask, bool],
+            [ScheduledTask],
             Awaitable[Tuple[TaskStatus, Optional[JsonMapping], Optional[str]]],
         ],
         action_name: str,
@@ -115,10 +116,9 @@ class TaskScheduler:
         calling `schedule_task` but rather in an `__init__` method.
 
         Args:
-            function: The function to be executed for this action. The parameters
-                passed to the function when launched are the `ScheduledTask` being run,
-                and a `first_launch` boolean to signal if it's a resumed task or the first
-                launch of it. The function should return a tuple of new `status`, `result`
+            function: The function to be executed for this action. The parameter
+                passed to the function when launched is the `ScheduledTask` being run.
+                The function should return a tuple of new `status`, `result`
                 and `error` as specified in `ScheduledTask`.
             action_name: The name of the action to be associated with the function
         """
@@ -170,6 +170,12 @@ class TaskScheduler:
             error=None,
         )
         await self._store.insert_scheduled_task(task)
+
+        if status == TaskStatus.ACTIVE:
+            if self._run_background_tasks:
+                await self._launch_task(task)
+            else:
+                self.replication_client.send_new_active_task(task.id)
 
         return task.id
 
@@ -265,20 +271,12 @@ class TaskScheduler:
         Args:
             id: id of the task to delete
         """
-        if self.task_is_running(id):
-            raise Exception(f"Task {id} is currently running and can't be deleted")
+        task = await self.get_task(id)
+        if task is None:
+            raise Exception(f"Task {id} does not exist")
+        if task.status == TaskStatus.ACTIVE:
+            raise Exception(f"Task {id} is currently ACTIVE and can't be deleted")
         await self._store.delete_scheduled_task(id)
-
-    def task_is_running(self, id: str) -> bool:
-        """Check if a task is currently running.
-
-        Can only be called from the worker handling the task scheduling.
-
-        Args:
-            id: id of the task to check
-        """
-        assert self._run_background_tasks
-        return id in self._running_tasks
 
     async def _handle_scheduled_tasks(self) -> None:
         """Main loop taking care of launching tasks and cleaning up old ones."""
@@ -288,29 +286,11 @@ class TaskScheduler:
     async def _launch_scheduled_tasks(self) -> None:
         """Retrieve and launch scheduled tasks that should be running at that time."""
         for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
-            if not self.task_is_running(task.id):
-                if (
-                    len(self._running_tasks)
-                    < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
-                ):
-                    await self._launch_task(task, first_launch=False)
-            else:
-                if (
-                    self._clock.time_msec()
-                    > task.timestamp + TaskScheduler.LAST_UPDATE_BEFORE_WARNING_MS
-                ):
-                    logger.warn(
-                        f"Task {task.id} (action {task.action}) has seen no update for more than 24h and may be stuck"
-                    )
+            await self._launch_task(task)
         for task in await self.get_tasks(
             statuses=[TaskStatus.SCHEDULED], max_timestamp=self._clock.time_msec()
         ):
-            if (
-                not self.task_is_running(task.id)
-                and len(self._running_tasks)
-                < TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS
-            ):
-                await self._launch_task(task, first_launch=True)
+            await self._launch_task(task)
 
         running_tasks_gauge.set(len(self._running_tasks))
 
@@ -320,27 +300,27 @@ class TaskScheduler:
             statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
         ):
             # FAILED and COMPLETE tasks should never be running
-            assert not self.task_is_running(task.id)
+            assert task.id not in self._running_tasks
             if (
                 self._clock.time_msec()
                 > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
             ):
                 await self._store.delete_scheduled_task(task.id)
 
-    async def _launch_task(self, task: ScheduledTask, first_launch: bool) -> None:
+    async def _launch_task(self, task: ScheduledTask) -> None:
         """Launch a scheduled task now.
 
         Args:
             task: the task to launch
-            first_launch: `True` if it's the first time is launched, `False` otherwise
         """
-        assert task.action in self._actions
+        assert self._run_background_tasks
 
+        assert task.action in self._actions
         function = self._actions[task.action]
 
         async def wrapper() -> None:
             try:
-                (status, result, error) = await function(task, first_launch)
+                (status, result, error) = await function(task)
             except Exception:
                 f = Failure()
                 logger.error(
@@ -359,6 +339,20 @@ class TaskScheduler:
                 error=error,
             )
             self._running_tasks.remove(task.id)
+
+        if len(self._running_tasks) >= TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS:
+            return
+
+        if (
+            self._clock.time_msec()
+            > task.timestamp + TaskScheduler.LAST_UPDATE_BEFORE_WARNING_MS
+        ):
+            logger.warn(
+                f"Task {task.id} (action {task.action}) has seen no update for more than 24h and may be stuck"
+            )
+
+        if task.id in self._running_tasks:
+            return
 
         self._running_tasks.add(task.id)
         await self.update_task(task.id, status=TaskStatus.ACTIVE)
