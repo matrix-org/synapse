@@ -473,7 +473,9 @@ StateGroup = Union[object, int]
 
 def _is_simple_value(value: Any) -> bool:
     return (
-        isinstance(value, (bool, str)) or type(value) is int or value is None  # noqa: E721
+        isinstance(value, (bool, str))
+        or type(value) is int  # noqa: E721
+        or value is None
     )
 
 

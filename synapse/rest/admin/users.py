@@ -1173,7 +1173,8 @@ class RateLimitRestServlet(RestServlet):
         burst_count = body.get("burst_count", 0)
 
         if (
-            type(messages_per_second) is not int or messages_per_second < 0  # noqa: E721
+            type(messages_per_second) is not int  # noqa: E721
+            or messages_per_second < 0
         ):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,

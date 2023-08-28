@@ -180,7 +180,8 @@ class NewRegistrationTokenRestServlet(RestServlet):
                 Codes.INVALID_PARAM,
             )
         if (
-            type(expiry_time) is int and expiry_time < self.clock.time_msec()  # noqa: E721
+            type(expiry_time) is int  # noqa: E721
+            and expiry_time < self.clock.time_msec()
         ):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
@@ -304,7 +305,8 @@ class RegistrationTokenRestServlet(RestServlet):
                     Codes.INVALID_PARAM,
                 )
             if (
-                type(expiry_time) is int and expiry_time < self.clock.time_msec()  # noqa: E721
+                type(expiry_time) is int  # noqa: E721
+                and expiry_time < self.clock.time_msec()
             ):
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
