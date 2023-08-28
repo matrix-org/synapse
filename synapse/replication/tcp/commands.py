@@ -453,6 +453,13 @@ class LockReleasedCommand(Command):
 
 
 class NewActiveTaskCommand(_SimpleCommand):
+    """Sent to inform instance handling background tasks that a new active task is available to run.
+
+    Format::
+
+        NEW_ACTIVE_TASK "<task_id>"
+    """
+
     NAME = "NEW_ACTIVE_TASK"
 
 

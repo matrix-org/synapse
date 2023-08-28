@@ -190,6 +190,7 @@ class TestTaskSchedulerWithBackgroundWorker(BaseMultiWorkerStreamTestCase):
 
     @override_config({"run_background_tasks_on": "worker1"})
     def test_schedule_task(self) -> None:
+        """Check that a task scheduled to run now is launch right away on the background worker."""
         bg_worker_hs = self.make_worker_hs(
             "synapse.app.generic_worker",
             extra_config={"worker_name": "worker1"},

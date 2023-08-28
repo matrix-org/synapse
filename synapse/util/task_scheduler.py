@@ -58,12 +58,12 @@ class TaskScheduler:
     You can also specify the `result` (and/or an `error`) when returning from the function.
 
     The reconciliation loop runs every minute, so this is not a precise scheduler.
-
-    Tasks will be run on the worker specified with `run_background_tasks_on` config,
-    or the main one by default.
     There is a limit of 10 concurrent tasks, so tasks may be delayed if the pool is already
     full. In this regard, please take great care that scheduled tasks can actually finished.
     For now there is no mechanism to stop a running task if it is stuck.
+
+    Tasks will be run on the worker specified with `run_background_tasks_on` config,
+    or the main one by default.
     """
 
     # Precision of the scheduler, evaluation of tasks to run will only happen
@@ -271,20 +271,12 @@ class TaskScheduler:
         Args:
             id: id of the task to delete
         """
-        if self.task_is_running(id):
-            raise Exception(f"Task {id} is currently running and can't be deleted")
+        task = await self.get_task(id)
+        if task is None:
+            raise Exception(f"Task {id} does not exist")
+        if task.status == TaskStatus.ACTIVE:
+            raise Exception(f"Task {id} is currently ACTIVE and can't be deleted")
         await self._store.delete_scheduled_task(id)
-
-    def task_is_running(self, id: str) -> bool:
-        """Check if a task is currently running.
-
-        Can only be called from the worker handling the task scheduling.
-
-        Args:
-            id: id of the task to check
-        """
-        assert self._run_background_tasks
-        return id in self._running_tasks
 
     async def _handle_scheduled_tasks(self) -> None:
         """Main loop taking care of launching tasks and cleaning up old ones."""
@@ -308,7 +300,7 @@ class TaskScheduler:
             statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
         ):
             # FAILED and COMPLETE tasks should never be running
-            assert not self.task_is_running(task.id)
+            assert task.id not in self._running_tasks
             if (
                 self._clock.time_msec()
                 > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
@@ -359,7 +351,7 @@ class TaskScheduler:
                 f"Task {task.id} (action {task.action}) has seen no update for more than 24h and may be stuck"
             )
 
-        if self.task_is_running(task.id):
+        if task.id in self._running_tasks:
             return
 
         self._running_tasks.add(task.id)
