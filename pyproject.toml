@@ -309,7 +309,7 @@ all = [
 # We pin black so that our tests don't start failing on new releases.
 isort = ">=5.10.1"
 black = ">=22.3.0"
-ruff = "0.0.277"
+ruff = "0.0.286"
 
 # Typechecking
 lxml-stubs = ">=0.4.0"
