@@ -474,7 +474,11 @@ def init_tracer(hs: "HomeServer") -> None:
     # off point into the logs. Can also be used to filter for an
     # instance that is under load.
     tags[SynapseTags.INSTANCE_NAME] = hs.get_instance_name()
-
+    # adding host and port of jaeger if it's hosted on different machine
+    jaeger_config['local_agent'] = {
+        'reporting_host': hs.config.tracing.host,
+        'reporting_port': hs.config.tracing.port
+    }
     config = JaegerConfig(
         config=jaeger_config,
         service_name=f"{hs.config.server.server_name} {instance_name_by_type}",
