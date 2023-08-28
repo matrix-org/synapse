@@ -44,6 +44,14 @@ class TracerConfig(Config):
 
         # The tracer is enabled so sanitize the config
 
+        # adding defaults for jaeger in case the values are empty in the homeserver.yaml
+        self.host: str = opentracing_config.get(
+            'host', '127.0.0.1'
+        )
+        # port 6831 is the default reporting port for jaeger
+        self.port: int = opentracing_config.get(
+            'port', 6831
+        )
         self.opentracer_whitelist: List[str] = opentracing_config.get(
             "homeserver_whitelist", []
         )
