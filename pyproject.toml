@@ -57,15 +57,21 @@ ignore = [
     "E731",
 ]
 select = [
-    # pycodestyle checks.
+    # pycodestyle
     "E",
     "W",
-    # pyflakes checks.
+    # pyflakes
     "F",
-    # flake8-bugbear checks.
+    # flake8-bugbear
     "B0",
-    # flake8-comprehensions checks.
+    # flake8-comprehensions
     "C4",
+    # flake8-2020
+    "YTT",
+    # flake8-slots
+    "SLOT",
+    # flake8-debugger
+    "T10",
 ]
 
 [tool.isort]
