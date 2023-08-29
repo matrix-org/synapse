@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.ratelimiting import RatelimitSettings, parse_rate_limit
+from synapse.config.ratelimiting import RatelimitSettings
 
 from tests.unittest import TestCase
 from tests.utils import default_config
@@ -26,7 +26,7 @@ class ParseRatelimitSettingsTestcase(TestCase):
                 "burst_count": 10,
             }
         }
-        parsed = parse_rate_limit(cfg, "a")
+        parsed = RatelimitSettings.parse(cfg, "a")
         self.assertEqual(parsed, RatelimitSettings("a", 5, 10))
 
     def test_depth_2(self) -> None:
@@ -38,11 +38,11 @@ class ParseRatelimitSettingsTestcase(TestCase):
                 },
             }
         }
-        parsed = parse_rate_limit(cfg, "a.b")
+        parsed = RatelimitSettings.parse(cfg, "a.b")
         self.assertEqual(parsed, RatelimitSettings("a.b", 5, 10))
 
     def test_missing(self) -> None:
-        parsed = parse_rate_limit(
+        parsed = RatelimitSettings.parse(
             {}, "a", defaults={"per_second": 5, "burst_count": 10}
         )
         self.assertEqual(parsed, RatelimitSettings("a", 5, 10))

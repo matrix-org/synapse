@@ -27,40 +27,41 @@ class RatelimitSettings:
     per_second: float
     burst_count: int
 
+    @classmethod
+    def parse(
+        cls,
+        config: Dict[str, Any],
+        key: str,
+        defaults: Optional[Dict[str, float]] = None,
+    ) -> "RatelimitSettings":
+        """Parse config[key] as a new-style rate limiter config.
 
-def parse_rate_limit(
-    config: Dict[str, Any],
-    key: str,
-    defaults: Optional[Dict[str, float]] = None,
-) -> RatelimitSettings:
-    """Parse config[key] as a new-style rate limiter config.
+        The key may refer to a nested dictionary using a full stop (.) to separate
+        each nested key. For example, use the key "a.b.c" to parse the following:
 
-    The key may refer to a nested dictionary using a full stop (.) to separate
-    each nested key. For example, use the key "a.b.c" to parse the following:
+        a:
+          b:
+            c:
+              per_second: 10
+              burst_count: 200
 
-    a:
-      b:
-        c:
-          per_second: 10
-          burst_count: 200
+        If this lookup fails, we'll fallback to the defaults.
+        """
+        defaults = defaults or {"per_second": 0.17, "burst_count": 3.0}
 
-    If this lookup fails, we'll fallback to the defaults.
-    """
-    defaults = defaults or {"per_second": 0.17, "burst_count": 3.0}
+        rl_config = config
+        for part in key.split("."):
+            rl_config = rl_config.get(part, {})
 
-    rl_config = config
-    for part in key.split("."):
-        rl_config = rl_config.get(part, {})
+        # By this point we should have hit the rate limiter parameters.
+        # We don't actually check this though!
+        rl_config = cast(Dict[str, float], rl_config)
 
-    # By this point we should have hit the rate limiter parameters.
-    # We don't actually check this though!
-    rl_config = cast(Dict[str, float], rl_config)
-
-    return RatelimitSettings(
-        key=key,
-        per_second=rl_config.get("per_second", defaults["per_second"]),
-        burst_count=int(rl_config.get("burst_count", defaults["burst_count"])),
-    )
+        return cls(
+            key=key,
+            per_second=rl_config.get("per_second", defaults["per_second"]),
+            burst_count=int(rl_config.get("burst_count", defaults["burst_count"])),
+        )
 
 
 @attr.s(auto_attribs=True)
@@ -79,7 +80,7 @@ class RatelimitConfig(Config):
         # Load the new-style messages config if it exists. Otherwise fall back
         # to the old method.
         if "rc_message" in config:
-            self.rc_message = parse_rate_limit(
+            self.rc_message = RatelimitSettings.parse(
                 config, "rc_message", defaults={"per_second": 0.2, "burst_count": 10.0}
             )
         else:
@@ -108,9 +109,9 @@ class RatelimitConfig(Config):
                 }
             )
 
-        self.rc_registration = parse_rate_limit(config, "rc_registration", {})
+        self.rc_registration = RatelimitSettings.parse(config, "rc_registration", {})
 
-        self.rc_registration_token_validity = parse_rate_limit(
+        self.rc_registration_token_validity = RatelimitSettings.parse(
             config,
             "rc_registration_token_validity",
             defaults={"per_second": 0.1, "burst_count": 5},
@@ -119,17 +120,17 @@ class RatelimitConfig(Config):
         # It is reasonable to login with a bunch of devices at once (i.e. when
         # setting up an account), but it is *not* valid to continually be
         # logging into new devices.
-        self.rc_login_address = parse_rate_limit(
+        self.rc_login_address = RatelimitSettings.parse(
             config,
             "rc_login.address",
             defaults={"per_second": 0.003, "burst_count": 5},
         )
-        self.rc_login_account = parse_rate_limit(
+        self.rc_login_account = RatelimitSettings.parse(
             config,
             "rc_login.account",
             defaults={"per_second": 0.003, "burst_count": 5},
         )
-        self.rc_login_failed_attempts = parse_rate_limit(
+        self.rc_login_failed_attempts = RatelimitSettings.parse(
             config,
             "rc_login.failed_attempts",
             {},
@@ -141,14 +142,16 @@ class RatelimitConfig(Config):
 
         self.rc_admin_redaction = None
         if "rc_admin_redaction" in config:
-            self.rc_admin_redaction = parse_rate_limit(config, "rc_admin_redaction", {})
+            self.rc_admin_redaction = RatelimitSettings.parse(
+                config, "rc_admin_redaction", {}
+            )
 
-        self.rc_joins_local = parse_rate_limit(
+        self.rc_joins_local = RatelimitSettings.parse(
             config,
             "rc_joins.local",
             defaults={"per_second": 0.1, "burst_count": 10},
         )
-        self.rc_joins_remote = parse_rate_limit(
+        self.rc_joins_remote = RatelimitSettings.parse(
             config,
             "rc_joins.remote",
             defaults={"per_second": 0.01, "burst_count": 10},
@@ -156,7 +159,7 @@ class RatelimitConfig(Config):
 
         # Track the rate of joins to a given room. If there are too many, temporarily
         # prevent local joins and remote joins via this server.
-        self.rc_joins_per_room = parse_rate_limit(
+        self.rc_joins_per_room = RatelimitSettings.parse(
             config,
             "rc_joins_per_room",
             defaults={"per_second": 1, "burst_count": 10},
@@ -167,36 +170,36 @@ class RatelimitConfig(Config):
         # * For requests received over federation this is keyed by the origin.
         #
         # Note that this isn't exposed in the configuration as it is obscure.
-        self.rc_key_requests = parse_rate_limit(
+        self.rc_key_requests = RatelimitSettings.parse(
             config,
             "rc_key_requests",
             defaults={"per_second": 20, "burst_count": 100},
         )
 
-        self.rc_3pid_validation = parse_rate_limit(
+        self.rc_3pid_validation = RatelimitSettings.parse(
             config,
             "rc_3pid_validation",
             defaults={"per_second": 0.003, "burst_count": 5},
         )
 
-        self.rc_invites_per_room = parse_rate_limit(
+        self.rc_invites_per_room = RatelimitSettings.parse(
             config,
             "rc_invites.per_room",
             defaults={"per_second": 0.3, "burst_count": 10},
         )
-        self.rc_invites_per_user = parse_rate_limit(
+        self.rc_invites_per_user = RatelimitSettings.parse(
             config,
             "rc_invites.per_user",
             defaults={"per_second": 0.003, "burst_count": 5},
         )
 
-        self.rc_invites_per_issuer = parse_rate_limit(
+        self.rc_invites_per_issuer = RatelimitSettings.parse(
             config,
             "rc_invites.per_issuer",
             defaults={"per_second": 0.3, "burst_count": 10},
         )
 
-        self.rc_third_party_invite = parse_rate_limit(
+        self.rc_third_party_invite = RatelimitSettings.parse(
             config,
             "rc_third_party_invite",
             defaults={"per_second": 0.0025, "burst_count": 5},
