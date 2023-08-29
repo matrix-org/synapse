@@ -61,12 +61,16 @@ class Ratelimiter:
     """
 
     def __init__(
-        self, store: DataStore, clock: Clock, rate_hz: float, burst_count: int
+        self,
+        store: DataStore,
+        clock: Clock,
+        cfg: RatelimitSettings,
     ):
         self.clock = clock
-        self.rate_hz = rate_hz
-        self.burst_count = burst_count
+        self.rate_hz = cfg.per_second
+        self.burst_count = cfg.burst_count
         self.store = store
+        self._limiter_name = cfg.key
 
         # An ordered dictionary representing the token buckets tracked by this rate
         # limiter. Each entry maps a key of arbitrary type to a tuple representing:
@@ -305,7 +309,8 @@ class Ratelimiter:
 
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                limiter_name=self._limiter_name,
+                retry_after_ms=int(1000 * (time_allowed - time_now_s)),
             )
 
 
@@ -322,7 +327,9 @@ class RequestRatelimiter:
 
         # The rate_hz and burst_count are overridden on a per-user basis
         self.request_ratelimiter = Ratelimiter(
-            store=self.store, clock=self.clock, rate_hz=0, burst_count=0
+            store=self.store,
+            clock=self.clock,
+            cfg=RatelimitSettings(key=rc_message.key, per_second=0, burst_count=0),
         )
         self._rc_message = rc_message
 
@@ -332,8 +339,7 @@ class RequestRatelimiter:
             self.admin_redaction_ratelimiter: Optional[Ratelimiter] = Ratelimiter(
                 store=self.store,
                 clock=self.clock,
-                rate_hz=rc_admin_redaction.per_second,
-                burst_count=rc_admin_redaction.burst_count,
+                cfg=rc_admin_redaction,
             )
         else:
             self.admin_redaction_ratelimiter = None

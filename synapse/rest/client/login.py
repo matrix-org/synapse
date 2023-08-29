@@ -120,14 +120,12 @@ class LoginRestServlet(RestServlet):
         self._address_ratelimiter = Ratelimiter(
             store=self._main_store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_address.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_address.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_address,
         )
         self._account_ratelimiter = Ratelimiter(
             store=self._main_store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_account,
         )
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
