@@ -306,7 +306,8 @@ all = [
 ]
 
 [tool.poetry.dev-dependencies]
-# We pin black so that our tests don't start failing on new releases.
+# We pin black via the lock file so that our tests don't start failing on new
+# releases. We use a >= comparison ro receive updates from dependabot.
 isort = ">=5.10.1"
 black = ">=22.7.0"
 ruff = "0.0.277"
