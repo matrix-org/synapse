@@ -313,7 +313,7 @@ class HomeserverTestCase(TestCase):
         servlets: List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
         hijack_auth: Whether to hijack auth to return the user specified
-        in user_id.
+           in user_id.
     """
 
     hijack_auth: ClassVar[bool] = True
