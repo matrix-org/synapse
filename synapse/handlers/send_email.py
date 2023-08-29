@@ -23,9 +23,11 @@ from pkg_resources import parse_version
 
 import twisted
 from twisted.internet.defer import Deferred
-from twisted.internet.interfaces import IOpenSSLContextFactory
+from twisted.internet.endpoints import HostnameEndpoint
+from twisted.internet.interfaces import IOpenSSLContextFactory, IProtocolFactory
 from twisted.internet.ssl import optionsForClientTLS
 from twisted.mail.smtp import ESMTPSender, ESMTPSenderFactory
+from twisted.protocols.tls import TLSMemoryBIOFactory
 
 from synapse.logging.context import make_deferred_yieldable
 from synapse.types import ISynapseReactor
@@ -97,6 +99,7 @@ async def _sendmail(
             **kwargs,
         )
 
+    factory: IProtocolFactory
     if _is_old_twisted:
         # before twisted 21.2, we have to override the ESMTPSender protocol to disable
         # TLS
@@ -110,22 +113,13 @@ async def _sendmail(
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
     if force_tls:
-        reactor.connectSSL(
-            smtphost,
-            smtpport,
-            factory,
-            optionsForClientTLS(smtphost),
-            timeout=30,
-            bindAddress=None,
-        )
-    else:
-        reactor.connectTCP(
-            smtphost,
-            smtpport,
-            factory,
-            timeout=30,
-            bindAddress=None,
-        )
+        factory = TLSMemoryBIOFactory(optionsForClientTLS(smtphost), True, factory)
+
+    endpoint = HostnameEndpoint(
+        reactor, smtphost, smtpport, timeout=30, bindAddress=None
+    )
+
+    await make_deferred_yieldable(endpoint.connect(factory))
 
     await make_deferred_yieldable(d)
 
