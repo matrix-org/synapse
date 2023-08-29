@@ -67,6 +67,7 @@ class CasHandler:
 
         self._cas_server_url = hs.config.cas.cas_server_url
         self._cas_service_url = hs.config.cas.cas_service_url
+        self._cas_protocol_version = hs.config.cas.cas_protocol_version
         self._cas_displayname_attribute = hs.config.cas.cas_displayname_attribute
         self._cas_required_attributes = hs.config.cas.cas_required_attributes
 
@@ -121,7 +122,10 @@ class CasHandler:
         Returns:
             The parsed CAS response.
         """
-        uri = self._cas_server_url + "/proxyValidate"
+        if self._cas_protocol_version == 3:
+            uri = self._cas_server_url + "/p3/proxyValidate"
+        else:
+            uri = self._cas_server_url + "/proxyValidate"
         args = {
             "ticket": ticket,
             "service": self._build_service_param(service_args),

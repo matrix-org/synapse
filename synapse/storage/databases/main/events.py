@@ -1638,7 +1638,7 @@ class PersistEventsStore:
             if self._ephemeral_messages_enabled:
                 # If there's an expiry timestamp on the event, store it.
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-                if type(expiry_ts) is int and not event.is_state():
+                if type(expiry_ts) is int and not event.is_state():  # noqa: E721
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
@@ -2006,10 +2006,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and type(event.content["min_lifetime"]) is not int
+                and type(event.content["min_lifetime"]) is not int  # noqa: E721
             ) or (
                 "max_lifetime" in event.content
-                and type(event.content["max_lifetime"]) is not int
+                and type(event.content["max_lifetime"]) is not int  # noqa: E721
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return

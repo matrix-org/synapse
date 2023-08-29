@@ -45,7 +45,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
 
         hs = self.setup_test_homeserver(config=config)
 
-        hs.get_federation_handler = Mock()  # type: ignore[assignment]
+        hs.get_federation_handler = Mock()  # type: ignore[method-assign]
 
         return hs
 

@@ -39,7 +39,7 @@ from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
 
-from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
+from tests.test_utils import FakeResponse, get_awaitable_result
 from tests.unittest import HomeserverTestCase, skip_unless
 from tests.utils import mock_getRawHeaders
 
@@ -147,7 +147,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_inactive_token(self) -> None:
         """The handler should return a 403 where the token is inactive."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={"active": False},
@@ -166,7 +166,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_no_scope(self) -> None:
         """The handler should return a 403 where no scope is given."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={"active": True},
@@ -185,7 +185,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_user_no_subject(self) -> None:
         """The handler should return a 500 when no subject is present."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={"active": True, "scope": " ".join([MATRIX_USER_SCOPE])},
@@ -204,7 +204,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_no_user_scope(self) -> None:
         """The handler should return a 500 when no subject is present."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -227,7 +227,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_admin_not_user(self) -> None:
         """The handler should raise when the scope has admin right but not user."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -251,7 +251,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_admin(self) -> None:
         """The handler should return a requester with admin rights."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -281,7 +281,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_admin_highest_privilege(self) -> None:
         """The handler should resolve to the most permissive scope."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -313,7 +313,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_user(self) -> None:
         """The handler should return a requester with normal user rights."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -344,7 +344,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         """The handler should return a requester with normal user rights
         and an user ID matching the one specified in query param `user_id`"""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -378,7 +378,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_user_with_device(self) -> None:
         """The handler should return a requester with normal user rights and a device ID."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -408,7 +408,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_multiple_devices(self) -> None:
         """The handler should raise an error if multiple devices are found in the scope."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -433,7 +433,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_guest_not_allowed(self) -> None:
         """The handler should return an insufficient scope error."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -463,7 +463,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_active_guest_allowed(self) -> None:
         """The handler should return a requester with guest user rights and a device ID."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -499,19 +499,19 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
         # The introspection endpoint is returning an error.
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse(code=500, body=b"Internal Server Error")
         )
         error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
         self.assertEqual(error.value.code, 503)
 
         # The introspection endpoint request fails.
-        self.http_client.request = simple_async_mock(raises=Exception())
+        self.http_client.request = AsyncMock(side_effect=Exception())
         error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
         self.assertEqual(error.value.code, 503)
 
         # The introspection endpoint does not return a JSON object.
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200, payload=["this is an array", "not an object"]
             )
@@ -520,7 +520,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.assertEqual(error.value.code, 503)
 
         # The introspection endpoint does not return valid JSON.
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse(code=200, body=b"this is not valid JSON")
         )
         error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
@@ -528,7 +528,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
 
     def test_introspection_token_cache(self) -> None:
         access_token = "open_sesame"
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={"active": "true", "scope": "guest", "jti": access_token},
@@ -559,7 +559,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
 
         # test that if a cached token is expired, a fresh token will be pulled from authorizing server - first add a
         # token with a soon-to-expire `exp` field to the cache
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={
@@ -640,7 +640,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
     def test_cross_signing(self) -> None:
         """Try uploading device keys with OAuth delegation enabled."""
 
-        self.http_client.request = simple_async_mock(
+        self.http_client.request = AsyncMock(
             return_value=FakeResponse.json(
                 code=200,
                 payload={

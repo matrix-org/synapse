@@ -32,7 +32,6 @@ from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
 user1 = "@boris:aaa"
@@ -41,7 +40,7 @@ user2 = "@theresa:bbb"
 
 class DeviceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        self.appservice_api = mock.Mock()
+        self.appservice_api = mock.AsyncMock()
         hs = self.setup_test_homeserver(
             "server",
             application_service_api=self.appservice_api,
@@ -123,50 +122,50 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(3, len(res))
         device_map = {d["device_id"]: d for d in res}
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "xyz",
                 "display_name": "display 0",
                 "last_seen_ip": None,
                 "last_seen_ts": None,
-            },
-            device_map["xyz"],
+            }.items(),
+            device_map["xyz"].items(),
         )
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "fco",
                 "display_name": "display 1",
                 "last_seen_ip": "ip1",
                 "last_seen_ts": 1000000,
-            },
-            device_map["fco"],
+            }.items(),
+            device_map["fco"].items(),
         )
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "abc",
                 "display_name": "display 2",
                 "last_seen_ip": "ip3",
                 "last_seen_ts": 3000000,
-            },
-            device_map["abc"],
+            }.items(),
+            device_map["abc"].items(),
         )
 
     def test_get_device(self) -> None:
         self._record_users()
 
         res = self.get_success(self.handler.get_device(user1, "abc"))
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "abc",
                 "display_name": "display 2",
                 "last_seen_ip": "ip3",
                 "last_seen_ts": 3000000,
-            },
-            res,
+            }.items(),
+            res.items(),
         )
 
     def test_delete_device(self) -> None:
@@ -375,13 +374,11 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         )
 
         # Setup a response.
-        self.appservice_api.query_keys.return_value = make_awaitable(
-            {
-                "device_keys": {
-                    local_user: {device_2: device_key_2b, device_3: device_key_3}
-                }
+        self.appservice_api.query_keys.return_value = {
+            "device_keys": {
+                local_user: {device_2: device_key_2b, device_3: device_key_3}
             }
-        )
+        }
 
         # Request all devices.
         res = self.get_success(

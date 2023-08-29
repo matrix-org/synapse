@@ -1,3 +1,131 @@
+# Synapse 1.91.0rc1 (2023-08-23)
+
+### Features
+
+- Implements an admin API to lock an user without deactivating them. Based on [MSC3939](https://github.com/matrix-org/matrix-spec-proposals/pull/3939). ([\#15870](https://github.com/matrix-org/synapse/issues/15870))
+- Implements a task scheduler for	resumable potentially long running tasks. ([\#15891](https://github.com/matrix-org/synapse/issues/15891))
+- Allow specifying `client_secret_path` as alternative to `client_secret` for OIDC providers. This avoids leaking the client secret in the homeserver config. Contributed by @Ma27. ([\#16030](https://github.com/matrix-org/synapse/issues/16030))
+- Allow customising the IdP display name, icon, and brand for SAML and CAS providers (in addition to OIDC provider). ([\#16094](https://github.com/matrix-org/synapse/issues/16094))
+- Add an `admins` query parameter to the [List Accounts](https://matrix-org.github.io/synapse/v1.91/admin_api/user_admin_api.html#list-accounts) [admin API](https://matrix-org.github.io/synapse/v1.91/usage/administration/admin_api/index.html), to include only admins or to exclude admins in user queries. ([\#16114](https://github.com/matrix-org/synapse/issues/16114))
+
+### Bugfixes
+
+- Fix long-standing bug where concurrent requests to change a user's push rules could cause a deadlock. Contributed by Nick @ Beeper (@fizzadar). ([\#16052](https://github.com/matrix-org/synapse/issues/16052))
+- Fix a long-standing bu in `/sync` where timeout=0 does not skip caching, resulting in slow calls in cases where there are no new changes. Contributed by @PlasmaIntec. ([\#16080](https://github.com/matrix-org/synapse/issues/16080))
+- Fix performance of state resolutions for large, old rooms that did not have the full auth chain persisted. ([\#16116](https://github.com/matrix-org/synapse/issues/16116))
+- Filter out user agent references to the sliding sync proxy and rust-sdk from the user_daily_visits table to ensure that Element X can be represented fully. ([\#16124](https://github.com/matrix-org/synapse/issues/16124))
+- User constent and 3-PID changes capability cannot be enabled when using experimental [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) support. ([\#16127](https://github.com/matrix-org/synapse/issues/16127), [\#16134](https://github.com/matrix-org/synapse/issues/16134))
+- Fix a rare race that could block new events from being sent for up to two minutes. Introduced in v1.90.0. ([\#16133](https://github.com/matrix-org/synapse/issues/16133), [\#16169](https://github.com/matrix-org/synapse/issues/16169))
+- Fix performance degredation when there are a lot of in-flight replication requests. ([\#16148](https://github.com/matrix-org/synapse/issues/16148))
+- Fix a bug introduced in 1.87 where synapse would send an excessive amount of federation requests to servers which have been offline for a long time. Contributed by Nico. ([\#16156](https://github.com/matrix-org/synapse/issues/16156), [\#16164](https://github.com/matrix-org/synapse/issues/16164))
+
+### Improved Documentation
+
+- Structured logging docs: add a link to explain the ELK stack ([\#16091](https://github.com/matrix-org/synapse/issues/16091))
+
+### Internal Changes
+
+- Update dehydrated devices implementation. ([\#16010](https://github.com/matrix-org/synapse/issues/16010))
+- Fix database performance of read/write worker locks. ([\#16061](https://github.com/matrix-org/synapse/issues/16061))
+- Fix building the nix development environment on MacOS systems. ([\#16063](https://github.com/matrix-org/synapse/issues/16063))
+- Override global statement timeout when creating indexes in Postgres. ([\#16085](https://github.com/matrix-org/synapse/issues/16085))
+- Fix the type annotation on `run_db_interaction` in the Module API. ([\#16089](https://github.com/matrix-org/synapse/issues/16089))
+- Clean-up the presence code. ([\#16092](https://github.com/matrix-org/synapse/issues/16092))
+- Run `pyupgrade` for Python 3.8+. ([\#16110](https://github.com/matrix-org/synapse/issues/16110))
+- Rename pagination and purge locks and add comments to explain why they exist and how they work. ([\#16112](https://github.com/matrix-org/synapse/issues/16112))
+- Attempt to fix the twisted trunk job. ([\#16115](https://github.com/matrix-org/synapse/issues/16115))
+- Cache token introspection response from OIDC provider. ([\#16117](https://github.com/matrix-org/synapse/issues/16117))
+- Add cache to `get_server_keys_json_for_remote`. ([\#16123](https://github.com/matrix-org/synapse/issues/16123))
+- Add an admin endpoint to allow authorizing server to signal token revocations. ([\#16125](https://github.com/matrix-org/synapse/issues/16125))
+- Add response time metrics for introspection requests for delegated auth. ([\#16131](https://github.com/matrix-org/synapse/issues/16131))
+- MSC3861: allow impersonation by an admin user using `_oidc_admin_impersonate_user_id` query parameter. ([\#16132](https://github.com/matrix-org/synapse/issues/16132))
+- Increase performance of read/write locks. ([\#16149](https://github.com/matrix-org/synapse/issues/16149))
+- Improve presence tests. ([\#16150](https://github.com/matrix-org/synapse/issues/16150), [\#16151](https://github.com/matrix-org/synapse/issues/16151), [\#16158](https://github.com/matrix-org/synapse/issues/16158))
+- Raised the poetry-core version cap to 1.7.0. ([\#16152](https://github.com/matrix-org/synapse/issues/16152))
+- Fix assertion in user directory unit tests. ([\#16157](https://github.com/matrix-org/synapse/issues/16157))
+- Reduce scope of locks when paginating to alleviate DB contention. ([\#16159](https://github.com/matrix-org/synapse/issues/16159))
+- Reduce DB contention on worker locks. ([\#16160](https://github.com/matrix-org/synapse/issues/16160))
+- Task scheduler: mark task as active if we are scheduling as soon as possible. ([\#16165](https://github.com/matrix-org/synapse/issues/16165))
+
+### Updates to locked dependencies
+
+* Bump click from 8.1.6 to 8.1.7. ([\#16145](https://github.com/matrix-org/synapse/issues/16145))
+* Bump gitpython from 3.1.31 to 3.1.32. ([\#16103](https://github.com/matrix-org/synapse/issues/16103))
+* Bump ijson from 3.2.1 to 3.2.3. ([\#16143](https://github.com/matrix-org/synapse/issues/16143))
+* Bump isort from 5.11.5 to 5.12.0. ([\#16108](https://github.com/matrix-org/synapse/issues/16108))
+* Bump log from 0.4.19 to 0.4.20. ([\#16109](https://github.com/matrix-org/synapse/issues/16109))
+* Bump pygithub from 1.59.0 to 1.59.1. ([\#16144](https://github.com/matrix-org/synapse/issues/16144))
+* Bump sentry-sdk from 1.28.1 to 1.29.2. ([\#16142](https://github.com/matrix-org/synapse/issues/16142))
+* Bump serde from 1.0.183 to 1.0.184. ([\#16139](https://github.com/matrix-org/synapse/issues/16139))
+* Bump txredisapi from 1.4.9 to 1.4.10. ([\#16107](https://github.com/matrix-org/synapse/issues/16107))
+* Bump types-bleach from 6.0.0.3 to 6.0.0.4. ([\#16106](https://github.com/matrix-org/synapse/issues/16106))
+* Bump types-pillow from 10.0.0.1 to 10.0.0.2. ([\#16105](https://github.com/matrix-org/synapse/issues/16105))
+* Bump types-pyopenssl from 23.2.0.1 to 23.2.0.2. ([\#16146](https://github.com/matrix-org/synapse/issues/16146))
+
+# Synapse 1.91.0rc1 (2023-08-23)
+
+### Features
+
+- Implements an admin API to lock an user without deactivating them. Based on [MSC3939](https://github.com/matrix-org/matrix-spec-proposals/pull/3939). ([\#15870](https://github.com/matrix-org/synapse/issues/15870))
+- Allow specifying `client_secret_path` as alternative to `client_secret` for OIDC providers. This avoids leaking the client secret in the homeserver config. Contributed by @Ma27. ([\#16030](https://github.com/matrix-org/synapse/issues/16030))
+- Allow customising the IdP display name, icon, and brand for SAML and CAS providers (in addition to OIDC provider). ([\#16094](https://github.com/matrix-org/synapse/issues/16094))
+- Add an `admins` query parameter to the [List Accounts](https://matrix-org.github.io/synapse/v1.91/admin_api/user_admin_api.html#list-accounts) [admin API](https://matrix-org.github.io/synapse/v1.91/usage/administration/admin_api/index.html), to include only admins or to exclude admins in user queries. ([\#16114](https://github.com/matrix-org/synapse/issues/16114))
+
+### Bugfixes
+
+- Fix long-standing bug where concurrent requests to change a user's push rules could cause a deadlock. Contributed by Nick @ Beeper (@fizzadar). ([\#16052](https://github.com/matrix-org/synapse/issues/16052))
+- Fix a long-standing bug in `/sync` where timeout=0 does not skip caching, resulting in slow calls in cases where there are no new changes. Contributed by @PlasmaIntec. ([\#16080](https://github.com/matrix-org/synapse/issues/16080))
+- Fix performance of state resolutions for large, old rooms that did not have the full auth chain persisted. ([\#16116](https://github.com/matrix-org/synapse/issues/16116))
+- Filter out user agent references to the sliding sync proxy and rust-sdk from the `user_daily_visits` table to ensure that Element X can be represented fully. ([\#16124](https://github.com/matrix-org/synapse/issues/16124))
+- User constent and third-party ID changes capability cannot be enabled when using experimental [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) support. ([\#16127](https://github.com/matrix-org/synapse/issues/16127), [\#16134](https://github.com/matrix-org/synapse/issues/16134))
+- Fix a rare race that could block new events from being sent for up to two minutes. Introduced in v1.90.0. ([\#16133](https://github.com/matrix-org/synapse/issues/16133), [\#16169](https://github.com/matrix-org/synapse/issues/16169))
+- Fix performance degredation when there are a lot of in-flight replication requests. ([\#16148](https://github.com/matrix-org/synapse/issues/16148))
+- Fix a bug introduced in 1.87 where synapse would send an excessive amount of federation requests to servers which have been offline for a long time. Contributed by Nico. ([\#16156](https://github.com/matrix-org/synapse/issues/16156), [\#16164](https://github.com/matrix-org/synapse/issues/16164))
+
+### Improved Documentation
+
+- Structured logging docs: add a link to explain the ELK stack ([\#16091](https://github.com/matrix-org/synapse/issues/16091))
+
+### Internal Changes
+
+- Update dehydrated devices implementation. ([\#16010](https://github.com/matrix-org/synapse/issues/16010))
+- Fix database performance of read/write worker locks. ([\#16061](https://github.com/matrix-org/synapse/issues/16061))
+- Fix building the nix development environment on MacOS systems. ([\#16063](https://github.com/matrix-org/synapse/issues/16063))
+- Override global statement timeout when creating indexes in Postgres. ([\#16085](https://github.com/matrix-org/synapse/issues/16085))
+- Fix the type annotation on `run_db_interaction` in the Module API. ([\#16089](https://github.com/matrix-org/synapse/issues/16089))
+- Clean-up the presence code. ([\#16092](https://github.com/matrix-org/synapse/issues/16092))
+- Run `pyupgrade` for Python 3.8+. ([\#16110](https://github.com/matrix-org/synapse/issues/16110))
+- Rename pagination and purge locks and add comments to explain why they exist and how they work. ([\#16112](https://github.com/matrix-org/synapse/issues/16112))
+- Attempt to fix the twisted trunk job. ([\#16115](https://github.com/matrix-org/synapse/issues/16115))
+- Cache token introspection response from OIDC provider. ([\#16117](https://github.com/matrix-org/synapse/issues/16117))
+- Add cache to `get_server_keys_json_for_remote`. ([\#16123](https://github.com/matrix-org/synapse/issues/16123))
+- Add an admin endpoint to allow authorizing server to signal token revocations. ([\#16125](https://github.com/matrix-org/synapse/issues/16125))
+- Add response time metrics for introspection requests for delegated auth. ([\#16131](https://github.com/matrix-org/synapse/issues/16131))
+- [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861): allow impersonation by an admin user using `_oidc_admin_impersonate_user_id` query parameter. ([\#16132](https://github.com/matrix-org/synapse/issues/16132))
+- Increase performance of read/write locks. ([\#16149](https://github.com/matrix-org/synapse/issues/16149))
+- Improve presence tests. ([\#16150](https://github.com/matrix-org/synapse/issues/16150), [\#16151](https://github.com/matrix-org/synapse/issues/16151), [\#16158](https://github.com/matrix-org/synapse/issues/16158))
+- Raised the poetry-core version cap to 1.7.0. ([\#16152](https://github.com/matrix-org/synapse/issues/16152))
+- Fix assertion in user directory unit tests. ([\#16157](https://github.com/matrix-org/synapse/issues/16157))
+- Reduce scope of locks when paginating to alleviate DB contention. ([\#16159](https://github.com/matrix-org/synapse/issues/16159))
+- Reduce DB contention on worker locks. ([\#16160](https://github.com/matrix-org/synapse/issues/16160))
+- Task scheduler: mark task as active if we are scheduling as soon as possible. ([\#16165](https://github.com/matrix-org/synapse/issues/16165))
+- Implements a task scheduler for	resumable potentially long running tasks. ([\#15891](https://github.com/matrix-org/synapse/issues/15891))
+
+### Updates to locked dependencies
+
+* Bump click from 8.1.6 to 8.1.7. ([\#16145](https://github.com/matrix-org/synapse/issues/16145))
+* Bump gitpython from 3.1.31 to 3.1.32. ([\#16103](https://github.com/matrix-org/synapse/issues/16103))
+* Bump ijson from 3.2.1 to 3.2.3. ([\#16143](https://github.com/matrix-org/synapse/issues/16143))
+* Bump isort from 5.11.5 to 5.12.0. ([\#16108](https://github.com/matrix-org/synapse/issues/16108))
+* Bump log from 0.4.19 to 0.4.20. ([\#16109](https://github.com/matrix-org/synapse/issues/16109))
+* Bump pygithub from 1.59.0 to 1.59.1. ([\#16144](https://github.com/matrix-org/synapse/issues/16144))
+* Bump sentry-sdk from 1.28.1 to 1.29.2. ([\#16142](https://github.com/matrix-org/synapse/issues/16142))
+* Bump serde from 1.0.183 to 1.0.184. ([\#16139](https://github.com/matrix-org/synapse/issues/16139))
+* Bump txredisapi from 1.4.9 to 1.4.10. ([\#16107](https://github.com/matrix-org/synapse/issues/16107))
+* Bump types-bleach from 6.0.0.3 to 6.0.0.4. ([\#16106](https://github.com/matrix-org/synapse/issues/16106))
+* Bump types-pillow from 10.0.0.1 to 10.0.0.2. ([\#16105](https://github.com/matrix-org/synapse/issues/16105))
+* Bump types-pyopenssl from 23.2.0.1 to 23.2.0.2. ([\#16146](https://github.com/matrix-org/synapse/issues/16146))
+
 # Synapse 1.90.0 (2023-08-15)
 
 No significant changes since 1.90.0rc1.

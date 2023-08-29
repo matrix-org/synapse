@@ -50,7 +50,7 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
             )
 
         handler = self.hs.get_registration_handler()
-        handler.check_username = check_username  # type: ignore[assignment]
+        handler.check_username = check_username  # type: ignore[method-assign]
 
     def test_username_available(self) -> None:
         """

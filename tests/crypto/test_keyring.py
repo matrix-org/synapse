@@ -13,7 +13,7 @@
 # limitations under the License.
 import time
 from typing import Any, Dict, List, Optional, cast
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import attr
 import canonicaljson
@@ -45,7 +45,6 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 from tests.unittest import logcontext_clean, override_config
 
 
@@ -291,7 +290,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         with a null `ts_valid_until_ms`
         """
         mock_fetcher = Mock()
-        mock_fetcher.get_keys = Mock(return_value=make_awaitable({}))
+        mock_fetcher.get_keys = AsyncMock(return_value={})
 
         key1 = signedjson.key.generate_signing_key("1")
         r = self.hs.get_datastores().main.store_server_signature_keys(

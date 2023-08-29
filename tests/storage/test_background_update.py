@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import yaml
 
@@ -32,7 +32,6 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable, simple_async_mock
 from tests.unittest import override_config
 
 
@@ -348,8 +347,8 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # Mock out the AsyncContextManager
         class MockCM:
-            __aenter__ = simple_async_mock(return_value=None)
-            __aexit__ = simple_async_mock(return_value=None)
+            __aenter__ = AsyncMock(return_value=None)
+            __aexit__ = AsyncMock(return_value=None)
 
         self._update_ctx_manager = MockCM
 
@@ -363,9 +362,9 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         # Register the callbacks with more mocks
         self.hs.get_module_api().register_background_update_controller_callbacks(
             on_update=self._on_update,
-            min_batch_size=Mock(return_value=make_awaitable(self._default_batch_size)),
-            default_batch_size=Mock(
-                return_value=make_awaitable(self._default_batch_size),
+            min_batch_size=AsyncMock(return_value=self._default_batch_size),
+            default_batch_size=AsyncMock(
+                return_value=self._default_batch_size,
             ),
         )
 
