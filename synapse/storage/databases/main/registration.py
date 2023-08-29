@@ -2404,7 +2404,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         shadow_banned: bool,
         approved: bool,
     ) -> None:
-        user_id_obj = UserID.from_string(user_id)
+        UserID.from_string(user_id)
 
         now = int(self._clock.time())
 
@@ -2464,12 +2464,9 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         if create_profile_with_displayname:
             # set a default displayname serverside to avoid ugly race
             # between auto-joins and clients trying to set displaynames
-            #
-            # *obviously* the 'profiles' table uses localpart for user_id
-            # while everything else uses the full mxid.
             txn.execute(
-                "INSERT INTO profiles(full_user_id, user_id, displayname) VALUES (?,?,?)",
-                (user_id, user_id_obj.localpart, create_profile_with_displayname),
+                "INSERT INTO profiles(full_user_id, displayname) VALUES (?,?)",
+                (user_id, create_profile_with_displayname),
             )
 
         if self.hs.config.stats.stats_enabled:
