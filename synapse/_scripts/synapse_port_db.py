@@ -482,7 +482,10 @@ class Porter:
                         do_backward[0] = False
 
                 if forward_rows or backward_rows:
-                    headers = [column[0] for column in txn.description]
+                    assert txn.description is not None
+                    headers: Optional[List[str]] = [
+                        column[0] for column in txn.description
+                    ]
                 else:
                     headers = None
 
@@ -544,6 +547,7 @@ class Porter:
             def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
                 txn.execute(select, (forward_chunk, self.batch_size))
                 rows = txn.fetchall()
+                assert txn.description is not None
                 headers = [column[0] for column in txn.description]
 
                 return headers, rows
@@ -919,7 +923,8 @@ class Porter:
         def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
             txn.execute(select)
             rows = txn.fetchall()
-            headers: List[str] = [column[0] for column in txn.description]
+            assert txn.description is not None
+            headers = [column[0] for column in txn.description]
 
             ts_ind = headers.index("ts")
 

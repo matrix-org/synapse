@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -29,7 +29,6 @@ from synapse.util import Clock
 
 import tests.unittest
 import tests.utils
-from tests.test_utils import make_awaitable
 
 
 class SyncTestCase(tests.unittest.HomeserverTestCase):
@@ -253,8 +252,8 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         mocked_get_prev_events = patch.object(
             self.hs.get_datastores().main,
             "get_prev_events_for_room",
-            new_callable=MagicMock,
-            return_value=make_awaitable([last_room_creation_event_id]),
+            new_callable=AsyncMock,
+            return_value=[last_room_creation_event_id],
         )
         with mocked_get_prev_events:
             self.helper.join(room_id, eve, tok=eve_token)

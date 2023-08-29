@@ -16,6 +16,7 @@
 """Contains exceptions and error codes."""
 
 import logging
+import math
 import typing
 from enum import Enum
 from http import HTTPStatus
@@ -508,6 +509,8 @@ class InvalidCaptchaError(SynapseError):
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled."""
 
+    include_retry_after_header = False
+
     def __init__(
         self,
         limiter_name: str,
@@ -515,7 +518,12 @@ class LimitExceededError(SynapseError):
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
-        super().__init__(code, "Too Many Requests", errcode)
+        headers = (
+            {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+            if self.include_retry_after_header and retry_after_ms is not None
+            else None
+        )
+        super().__init__(code, "Too Many Requests", errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
         self.limiter_name = limiter_name
 

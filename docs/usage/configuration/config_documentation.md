@@ -3204,6 +3204,14 @@ Options for each entry include:
 
 * `client_secret`: oauth2 client secret to use. May be omitted if
   `client_secret_jwt_key` is given, or if `client_auth_method` is 'none'.
+  Must be omitted if `client_secret_path` is specified.
+
+* `client_secret_path`: path to the oauth2 client secret to use. With that
+   it's not necessary to leak secrets into the config file itself.
+   Mutually exclusive with `client_secret`. Can be omitted if
+   `client_secret_jwt_key` is specified.
+
+   *Added in Synapse 1.91.0.*
 
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
@@ -3412,6 +3420,7 @@ Has the following sub-options:
    to style the login flow according to the identity provider in question.
    See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
+* `protocol_version`: The CAS protocol version, defaults to none (version 3 is required if you want to use "required_attributes").
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
 * `required_attributes`:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3425,6 +3434,7 @@ Example configuration:
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: "staff"
@@ -3856,6 +3866,19 @@ normally or via a kick or ban. Defaults to false.
 Example configuration:
 ```yaml
 forget_rooms_on_leave: false
+```
+---
+### `exclude_rooms_from_sync`
+A list of rooms to exclude from sync responses. This is useful for server
+administrators wishing to group users into a room without these users being able
+to see it from their client.
+
+By default, no room is excluded.
+
+Example configuration:
+```yaml
+exclude_rooms_from_sync:
+    - !foo:example.com
 ```
 
 ---

@@ -164,7 +164,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         # Call requestReceived to finish instantiating the object.
         request.content = BytesIO()
         # Partially skip some internal processing of SynapseRequest.
-        request._started_processing = Mock()  # type: ignore[assignment]
+        request._started_processing = Mock()  # type: ignore[method-assign]
         request.request_metrics = Mock(spec=["name"])
         with patch.object(Request, "render"):
             request.requestReceived(b"POST", b"/_matrix/client/versions", b"1.1")

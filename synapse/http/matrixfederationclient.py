@@ -243,7 +243,7 @@ class LegacyJsonSendParser(_BaseJsonParser[Tuple[int, JsonDict]]):
         return (
             isinstance(v, list)
             and len(v) == 2
-            and type(v[0]) == int
+            and type(v[0]) == int  # noqa: E721
             and isinstance(v[1], dict)
         )
 

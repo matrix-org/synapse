@@ -1346,7 +1346,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
                 return {}
 
         # Register a mock that will return the expected result depending on the remote.
-        self.hs.get_federation_http_client().post_json = Mock(side_effect=post_json)  # type: ignore[assignment]
+        self.hs.get_federation_http_client().post_json = Mock(side_effect=post_json)  # type: ignore[method-assign]
 
         # Check that we've got the correct response from the client-side endpoint.
         self._test_status(
