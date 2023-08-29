@@ -829,7 +829,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 spam_check = await self._spam_checker_module_callbacks.user_may_invite(
                     requester.user.to_string(), target_id, room_id
                 )
-                if spam_check != NOT_SPAM:
+                if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                     logger.info("Blocking invite due to spam checker")
                     block_invite_result = spam_check
 
@@ -964,7 +964,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         target.to_string(), room_id, is_invited=inviter is not None
                     )
                 )
-                if spam_check != NOT_SPAM:
+                if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                     raise SynapseError(
                         403,
                         "Not allowed to join this room",
@@ -1582,7 +1582,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     room_id=room_id,
                 )
             )
-            if spam_check != NOT_SPAM:
+            if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                 raise SynapseError(
                     403,
                     "Cannot send threepid invite",

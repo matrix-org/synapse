@@ -54,7 +54,6 @@ from synapse.events import EventBase
 from synapse.events.snapshot import UnpersistedEventContext
 from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
-from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.streams import EventSource
 from synapse.types import (
@@ -455,7 +454,7 @@ class RoomCreationHandler:
         spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
             user_id
         )
-        if spam_check != NOT_SPAM:
+        if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
             raise SynapseError(
                 403,
                 "You are not permitted to create rooms",
@@ -769,7 +768,7 @@ class RoomCreationHandler:
             spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
                 user_id
             )
-            if spam_check != NOT_SPAM:
+            if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                 raise SynapseError(
                     403,
                     "You are not permitted to create rooms",
