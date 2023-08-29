@@ -984,10 +984,12 @@ class PresenceHandler(BasePresenceHandler):
             for (user_id, _), count in self._user_device_to_num_current_syncs.items()
             if count
         }
-        for user_id, _ in itertools.chain(
-            *self.external_process_to_current_syncs.values()
-        ):
-            syncing_user_ids.add(user_id)
+        syncing_user_ids.update(
+            user_id
+            for user_id, _ in itertools.chain(
+                *self.external_process_to_current_syncs.values()
+            )
+        )
 
         changes = handle_timeouts(
             states,
