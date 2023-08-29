@@ -44,7 +44,6 @@ from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.module_api import NOT_SPAM
 from synapse.types import (
     JsonDict,
     Requester,
