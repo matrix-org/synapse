@@ -2053,7 +2053,7 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         mapping = {}
-        txn_id_to_event: Dict[Tuple[str, str, str], str] = {}
+        txn_id_to_event: Dict[Tuple[str, str, str, str], str] = {}
 
         for event in events:
             device_id = getattr(event.internal_metadata, "device_id", None)
@@ -2061,7 +2061,9 @@ class EventsWorkerStore(SQLBaseStore):
 
             if device_id and txn_id:
                 # Check if this is a duplicate of an event in the given events.
-                existing = txn_id_to_event.get((event.room_id, device_id, txn_id))
+                existing = txn_id_to_event.get(
+                    (event.room_id, event.sender, device_id, txn_id)
+                )
                 if existing:
                     mapping[event.event_id] = existing
                     continue
@@ -2073,9 +2075,13 @@ class EventsWorkerStore(SQLBaseStore):
                 )
                 if existing:
                     mapping[event.event_id] = existing
-                    txn_id_to_event[(event.room_id, device_id, txn_id)] = existing
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = existing
                 else:
-                    txn_id_to_event[(event.room_id, device_id, txn_id)] = event.event_id
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = event.event_id
 
         return mapping
 
