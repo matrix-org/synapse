@@ -452,6 +452,17 @@ class LockReleasedCommand(Command):
         return json_encoder.encode([self.instance_name, self.lock_name, self.lock_key])
 
 
+class NewActiveTaskCommand(_SimpleCommand):
+    """Sent to inform instance handling background tasks that a new active task is available to run.
+
+    Format::
+
+        NEW_ACTIVE_TASK "<task_id>"
+    """
+
+    NAME = "NEW_ACTIVE_TASK"
+
+
 _COMMANDS: Tuple[Type[Command], ...] = (
     ServerCommand,
     RdataCommand,
@@ -466,6 +477,7 @@ _COMMANDS: Tuple[Type[Command], ...] = (
     RemoteServerUpCommand,
     ClearUserSyncsCommand,
     LockReleasedCommand,
+    NewActiveTaskCommand,
 )
 
 # Map of command name to command type.
