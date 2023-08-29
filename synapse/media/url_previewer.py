@@ -846,9 +846,7 @@ def _is_media(content_type: str) -> bool:
 
 def _is_html(content_type: str) -> bool:
     content_type = content_type.lower()
-    return content_type.startswith("text/html") or content_type.startswith(
-        "application/xhtml"
-    )
+    return content_type.startswith(("text/html", "application/xhtml"))
 
 
 def _is_json(content_type: str) -> bool:

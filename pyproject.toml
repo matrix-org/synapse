@@ -72,6 +72,8 @@ select = [
     "SLOT",
     # flake8-debugger
     "T10",
+    # flake8-pie
+    "PIE",
 ]
 
 [tool.isort]

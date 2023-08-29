@@ -62,7 +62,6 @@ class Constraint(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def make_check_clause(self, table: str) -> str:
         """Returns an SQL expression that checks the row passes the constraint."""
-        pass
 
     @abc.abstractmethod
     def make_constraint_clause_postgres(self) -> str:
@@ -70,7 +69,6 @@ class Constraint(metaclass=abc.ABCMeta):
 
         Only used on Postgres DBs
         """
-        pass
 
 
 @attr.s(auto_attribs=True)

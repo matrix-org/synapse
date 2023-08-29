@@ -51,12 +51,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         # before we do that, we persist some other events to act as state.
         self._inject_visibility("@admin:hs", "joined")
-        for i in range(0, 10):
+        for i in range(10):
             self._inject_room_member("@resident%i:hs" % i)
 
         events_to_filter = []
 
-        for i in range(0, 10):
+        for i in range(10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
             evt = self._inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
@@ -74,7 +74,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
-        for i in range(0, 5):
+        for i in range(5):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertNotIn("a", filtered[i].content)
 
@@ -177,7 +177,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        for i in range(0, len(events_to_filter)):
+        for i in range(len(events_to_filter)):
             self.assertEqual(
                 events_to_filter[i].event_id,
                 filtered[i].event_id,

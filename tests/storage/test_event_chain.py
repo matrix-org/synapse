@@ -664,7 +664,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
 
         # Add a bunch of state so that it takes multiple iterations of the
         # background update to process the room.
-        for i in range(0, 150):
+        for i in range(150):
             self.helper.send_state(
                 room_id, event_type="m.test", body={"index": i}, tok=self.token
             )
@@ -718,12 +718,12 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
 
         # Add a bunch of state so that it takes multiple iterations of the
         # background update to process the room.
-        for i in range(0, 150):
+        for i in range(150):
             self.helper.send_state(
                 room_id1, event_type="m.test", body={"index": i}, tok=self.token
             )
 
-        for i in range(0, 150):
+        for i in range(150):
             self.helper.send_state(
                 room_id2, event_type="m.test", body={"index": i}, tok=self.token
             )
