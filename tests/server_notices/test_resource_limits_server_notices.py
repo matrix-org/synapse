@@ -69,7 +69,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn = rlsn
 
         self._rlsn._store.user_last_seen_monthly_active = AsyncMock(return_value=1000)
-        self._rlsn._server_notices_manager.send_notice = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._server_notices_manager.send_notice = AsyncMock(  # type: ignore[method-assign]
             return_value=Mock()
         )
         self._send_notice = self._rlsn._server_notices_manager.send_notice
@@ -82,8 +82,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._server_notices_manager.maybe_get_notice_room_for_user = AsyncMock(
             return_value="!something:localhost"
         )
-        self._rlsn._store.add_tag_to_room = AsyncMock(return_value=None)  # type: ignore[assignment]
-        self._rlsn._store.get_tags_for_room = AsyncMock(return_value={})  # type: ignore[assignment]
+        self._rlsn._store.add_tag_to_room = AsyncMock(return_value=None)  # type: ignore[method-assign]
+        self._rlsn._store.get_tags_for_room = AsyncMock(return_value={})  # type: ignore[method-assign]
 
     @override_config({"hs_disabled": True})
     def test_maybe_send_server_notice_disabled_hs(self) -> None:
@@ -100,13 +100,13 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
     def test_maybe_send_server_notice_to_user_remove_blocked_notice(self) -> None:
         """Test when user has blocked notice, but should have it removed"""
 
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None
         )
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._store.get_events = AsyncMock(  # type: ignore[method-assign]
             return_value={"123": mock_event}
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
@@ -122,7 +122,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user has blocked notice, but notice ought to be there (NOOP)
         """
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None,
             side_effect=ResourceLimitError(403, "foo"),
         )
@@ -130,7 +130,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._store.get_events = AsyncMock(  # type: ignore[method-assign]
             return_value={"123": mock_event}
         )
 
@@ -142,7 +142,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, but should have one
         """
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None,
             side_effect=ResourceLimitError(403, "foo"),
         )
@@ -155,7 +155,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, nor should they (NOOP)
         """
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None
         )
 
@@ -168,7 +168,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user is not part of the MAU cohort - this should not ever
         happen - but ...
         """
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None
         )
         self._rlsn._store.user_last_seen_monthly_active = AsyncMock(return_value=None)
@@ -184,7 +184,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test that when server is over MAU limit and alerting is suppressed, then
         an alert message is not sent into the room
         """
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None,
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
@@ -199,7 +199,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test that when a server is disabled, that MAU limit alerting is ignored.
         """
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None,
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.HS_DISABLED
@@ -218,21 +218,21 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         When the room is already in a blocked state, test that when alerting
         is suppressed that the room is returned to an unblocked state.
         """
-        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
             return_value=None,
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
             ),
         )
 
-        self._rlsn._is_room_currently_blocked = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._is_room_currently_blocked = AsyncMock(  # type: ignore[method-assign]
             return_value=(True, [])
         )
 
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = AsyncMock(  # type: ignore[assignment]
+        self._rlsn._store.get_events = AsyncMock(  # type: ignore[method-assign]
             return_value={"123": mock_event}
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))

@@ -122,15 +122,15 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore.get_destination_retry_timings = AsyncMock(return_value=None)
 
-        self.datastore.get_device_updates_by_remote = AsyncMock(  # type: ignore[assignment]
+        self.datastore.get_device_updates_by_remote = AsyncMock(  # type: ignore[method-assign]
             return_value=(0, [])
         )
 
-        self.datastore.get_destination_last_successful_stream_ordering = AsyncMock(  # type: ignore[assignment]
+        self.datastore.get_destination_last_successful_stream_ordering = AsyncMock(  # type: ignore[method-assign]
             return_value=None
         )
 
-        self.datastore.get_received_txn_response = AsyncMock(  # type: ignore[assignment]
+        self.datastore.get_received_txn_response = AsyncMock(  # type: ignore[method-assign]
             return_value=None
         )
 
@@ -143,25 +143,25 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 raise AuthError(401, "User is not in the room")
             return None
 
-        hs.get_auth().check_user_in_room = Mock(  # type: ignore[assignment]
+        hs.get_auth().check_user_in_room = Mock(  # type: ignore[method-assign]
             side_effect=check_user_in_room
         )
 
         async def check_host_in_room(room_id: str, server_name: str) -> bool:
             return room_id == ROOM_ID
 
-        hs.get_event_auth_handler().is_host_in_room = Mock(  # type: ignore[assignment]
+        hs.get_event_auth_handler().is_host_in_room = Mock(  # type: ignore[method-assign]
             side_effect=check_host_in_room
         )
 
         async def get_current_hosts_in_room(room_id: str) -> Set[str]:
             return {member.domain for member in self.room_members}
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(  # type: ignore[method-assign]
             side_effect=get_current_hosts_in_room
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = Mock(  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = Mock(  # type: ignore[method-assign]
             side_effect=get_current_hosts_in_room
         )
 
@@ -170,24 +170,24 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore.get_users_in_room = Mock(side_effect=get_users_in_room)
 
-        self.datastore.get_user_directory_stream_pos = AsyncMock(  # type: ignore[assignment]
+        self.datastore.get_user_directory_stream_pos = AsyncMock(  # type: ignore[method-assign]
             # we deliberately return a non-None stream pos to avoid
             # doing an initial_sync
             return_value=1
         )
 
-        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))  # type: ignore[assignment]
+        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))  # type: ignore[method-assign]
 
-        self.datastore.get_to_device_stream_token = Mock(  # type: ignore[assignment]
+        self.datastore.get_to_device_stream_token = Mock(  # type: ignore[method-assign]
             return_value=0
         )
-        self.datastore.get_new_device_msgs_for_remote = AsyncMock(  # type: ignore[assignment]
+        self.datastore.get_new_device_msgs_for_remote = AsyncMock(  # type: ignore[method-assign]
             return_value=([], 0)
         )
-        self.datastore.delete_device_msgs_for_remote = AsyncMock(  # type: ignore[assignment]
+        self.datastore.delete_device_msgs_for_remote = AsyncMock(  # type: ignore[method-assign]
             return_value=None
         )
-        self.datastore.set_received_txn_response = AsyncMock(  # type: ignore[assignment]
+        self.datastore.set_received_txn_response = AsyncMock(  # type: ignore[method-assign]
             return_value=None
         )
 

@@ -371,14 +371,14 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         # We mock out the FederationClient.backfill method, to pretend that a remote
         # server has returned our fake event.
         federation_client_backfill_mock = AsyncMock(return_value=[event])
-        self.hs.get_federation_client().backfill = federation_client_backfill_mock  # type: ignore[assignment]
+        self.hs.get_federation_client().backfill = federation_client_backfill_mock  # type: ignore[method-assign]
 
         # We also mock the persist method with a side effect of itself. This allows us
         # to track when it has been called while preserving its function.
         persist_events_and_notify_mock = Mock(
             side_effect=self.hs.get_federation_event_handler().persist_events_and_notify
         )
-        self.hs.get_federation_event_handler().persist_events_and_notify = (  # type: ignore[assignment]
+        self.hs.get_federation_event_handler().persist_events_and_notify = (  # type: ignore[method-assign]
             persist_events_and_notify_mock
         )
 
