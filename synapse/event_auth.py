@@ -669,10 +669,16 @@ def _is_membership_change_allowed(
                     errcode=Codes.INSUFFICIENT_POWER,
                 )
     elif Membership.BAN == membership:
-        if user_level < ban_level or user_level <= target_level:
+        if user_level < ban_level:
             raise UnstableSpecAuthError(
                 403,
                 "You don't have permission to ban",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
+        elif user_level <= target_level:
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to ban this user",
                 errcode=Codes.INSUFFICIENT_POWER,
             )
     elif room_version.knock_join_rule and Membership.KNOCK == membership:

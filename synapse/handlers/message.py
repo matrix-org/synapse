@@ -1921,7 +1921,10 @@ class EventCreationHandler:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
                 run_as_background_process(
-                    "bump_presence_active_time", self._bump_active_time, requester.user
+                    "bump_presence_active_time",
+                    self._bump_active_time,
+                    requester.user,
+                    requester.device_id,
                 )
 
         async def _notify() -> None:
@@ -1958,10 +1961,10 @@ class EventCreationHandler:
         logger.info("maybe_kick_guest_users %r", current_state)
         await self.hs.get_room_member_handler().kick_guest_users(current_state)
 
-    async def _bump_active_time(self, user: UserID) -> None:
+    async def _bump_active_time(self, user: UserID, device_id: Optional[str]) -> None:
         try:
             presence = self.hs.get_presence_handler()
-            await presence.bump_presence_active_time(user)
+            await presence.bump_presence_active_time(user, device_id)
         except Exception:
             logger.exception("Error bumping presence active time")
 
