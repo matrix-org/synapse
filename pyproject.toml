@@ -43,20 +43,16 @@ target-version = ['py38', 'py39', 'py310', 'py311']
 [tool.ruff]
 line-length = 88
 
-# See https://github.com/charliermarsh/ruff/#pycodestyle
+# See https://beta.ruff.rs/docs/rules/#error-e
 # for error codes. The ones we ignore are:
-#  E731: do not assign a lambda expression, use a def
 #  E501: Line too long (black enforces this for us)
+#  E731: do not assign a lambda expression, use a def
 #
 # flake8-bugbear compatible checks. Its error codes are described at
-# https://github.com/charliermarsh/ruff/#flake8-bugbear
-#  B019: Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
+# https://beta.ruff.rs/docs/rules/#flake8-bugbear-b
 #  B023: Functions defined inside a loop must not use variables redefined in the loop
-#  B024: Abstract base class with no abstract method.
 ignore = [
-    "B019",
     "B023",
-    "B024",
     "E501",
     "E731",
 ]
