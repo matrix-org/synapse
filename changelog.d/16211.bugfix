@@ -1,0 +1,1 @@
+Fix bug where uploading images would fail if we could not generate thumbanils for them.
