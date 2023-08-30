@@ -6177,6 +6177,16 @@ enable SAML login. You can either put your entire pysaml config inline using the
 option, or you can specify a path to a psyaml config file with the sub-option <code>config_path</code>.
 This setting has the following sub-options:</p>
 <ul>
+<li><code>idp_name</code>: A user-facing name for this identity provider, which is used to
+offer the user a choice of login mechanisms.</li>
+<li><code>idp_icon</code>: An optional icon for this identity provider, which is presented
+by clients and Synapse's own IdP picker page. If given, must be an
+MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
+obtain such an MXC URI is to upload an image to an (unencrypted) room
+and then copy the &quot;url&quot; from the source of the event.)</li>
+<li><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
+to style the login flow according to the identity provider in question.
+See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
 <li><code>sp_config</code>: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
 Default values will be used for the <code>entityid</code> and <code>service</code> settings,
 so it is not normally necessary to specify them unless you need to
@@ -6335,7 +6345,7 @@ offer the user a choice of login mechanisms.</p>
 <li>
 <p><code>idp_icon</code>: An optional icon for this identity provider, which is presented
 by clients and Synapse's own IdP picker page. If given, must be an
-MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
 obtain such an MXC URI is to upload an image to an (unencrypted) room
 and then copy the &quot;url&quot; from the source of the event.)</p>
 </li>
@@ -6357,7 +6367,15 @@ is enabled) to discover the provider's endpoints.</p>
 </li>
 <li>
 <p><code>client_secret</code>: oauth2 client secret to use. May be omitted if
-<code>client_secret_jwt_key</code> is given, or if <code>client_auth_method</code> is 'none'.</p>
+<code>client_secret_jwt_key</code> is given, or if <code>client_auth_method</code> is 'none'.
+Must be omitted if <code>client_secret_path</code> is specified.</p>
+</li>
+<li>
+<p><code>client_secret_path</code>: path to the oauth2 client secret to use. With that
+it's not necessary to leak secrets into the config file itself.
+Mutually exclusive with <code>client_secret</code>. Can be omitted if
+<code>client_secret_jwt_key</code> is specified.</p>
+<p><em>Added in Synapse 1.91.0.</em></p>
 </li>
 <li>
 <p><code>client_secret_jwt_key</code>: Alternative to client_secret: details of a key used
@@ -6579,6 +6597,16 @@ Has the following sub-options:</p>
 <ul>
 <li><code>enabled</code>: Set this to true to enable authorization against a CAS server.
 Defaults to false.</li>
+<li><code>idp_name</code>: A user-facing name for this identity provider, which is used to
+offer the user a choice of login mechanisms.</li>
+<li><code>idp_icon</code>: An optional icon for this identity provider, which is presented
+by clients and Synapse's own IdP picker page. If given, must be an
+MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
+obtain such an MXC URI is to upload an image to an (unencrypted) room
+and then copy the &quot;url&quot; from the source of the event.)</li>
+<li><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
+to style the login flow according to the identity provider in question.
+See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
 <li><code>server_url</code>: The URL of the CAS authorization endpoint.</li>
 <li><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
 If no name is given here, no displayname will be set.</li>
@@ -6802,12 +6830,16 @@ user does not share a room with the requester.</p>
 If set to true, local users are more likely to appear above remote users when searching the
 user directory. Defaults to false.</p>
 </li>
+<li>
+<p><code>show_locked_users</code>: Defines whether to show locked users in search query results. Defaults to false.</p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 </code></pre>
 <hr />
 <h3 id="user_consent"><a class="header" href="#user_consent"><code>user_consent</code></a></h3>
@@ -7503,7 +7535,7 @@ disable_existing_loggers: false
 <p>A structured logging system can be useful when your logs are destined for a
 machine to parse and process. By maintaining its machine-readable characteristics,
 it enables more efficient searching and aggregations when consumed by software
-such as the &quot;ELK stack&quot;.</p>
+such as the <a href="https://opensource.com/article/18/9/open-source-log-aggregation-tools">ELK stack</a>.</p>
 <p>Synapse's structured logging system is configured via the file that Synapse's
 <code>log_config</code> config option points to. The file should include a formatter which
 uses the <code>synapse.logging.TerseJsonFormatter</code> class included with Synapse and a
@@ -13893,6 +13925,9 @@ granting them access to the Admin API, among other things.</p>
 </li>
 <li>
 <p><code>deactivated</code> - <strong>bool</strong>, optional. If unspecified, deactivation state will be left unchanged.</p>
+</li>
+<li>
+<p><code>locked</code> - <strong>bool</strong>, optional. If unspecified, locked state will be left unchanged.</p>
 <p>Note: the <code>password</code> field must also be set if both of the following are true:</p>
 <ul>
 <li><code>deactivated</code> is set to <code>false</code> and the user was previously deactivated (you are reactivating this user)</li>
@@ -13963,6 +13998,10 @@ that contain this value. This parameter is ignored when using the <code>name</co
 <li>
 <p><code>guests</code> - string representing a bool - Is optional and if <code>false</code> will <strong>exclude</strong> guest users.
 Defaults to <code>true</code> to include guest users.</p>
+</li>
+<li>
+<p><code>admins</code> - Optional flag to filter admins. If <code>true</code>, only admins are queried. If <code>false</code>, admins are excluded from 
+the query. When the flag is absent (the default), <strong>both</strong> admins and non-admins are included in the search results.</p>
 </li>
 <li>
 <p><code>deactivated</code> - string representing a bool - Is optional and if <code>true</code> will <strong>include</strong> deactivated users.
