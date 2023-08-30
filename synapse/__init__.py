@@ -21,8 +21,13 @@ import os
 import sys
 from typing import Any, Dict
 
+from PIL import ImageFile
+
 from synapse.util.rust import check_rust_lib_up_to_date
 from synapse.util.stringutils import strtobool
+
+# Allow truncated JPEG images to be thumbnailed.
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Check that we're not running on an unsupported Python version.
 #
