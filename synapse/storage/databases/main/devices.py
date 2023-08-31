@@ -1664,6 +1664,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self.device_id_exists_cache: LruCache[
             Tuple[str, str], Literal[True]
         ] = LruCache(cache_name="device_id_exists", max_size=10000)
+        self.hs = hs
         self.config: HomeServerConfig = hs.config
 
     async def store_device(
@@ -1790,7 +1791,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         #  device_id -> introspection_token
         if self.config.experimental.msc3861.enabled:
             # mypy ignore - the token cache is defined on MSC3861DelegatedAuth
-            self.auth._token_cache.invalidate_all()  # type: ignore[attr-defined]
+            self.hs.get_auth()._token_cache.invalidate_all()  # type: ignore[attr-defined]
             await self.stream_introspection_token_invalidation((None,))
 
     async def update_device(
