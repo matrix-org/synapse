@@ -28,7 +28,6 @@ from twisted.web.http_headers import Headers
 from synapse.api.auth.base import BaseAuth
 from synapse.api.errors import (
     AuthError,
-    Codes,
     HttpResponseException,
     InvalidClientTokenError,
     OAuthInsufficientScopeError,
