@@ -282,17 +282,6 @@ class MSC3861DelegatedAuth(BaseAuth):
                             "Impersonation not possible by a non admin user",
                         )
 
-            # Deny the request if the user account is locked.
-            if not allow_locked and await self.store.get_user_locked_status(
-                requester.user.to_string()
-            ):
-                raise AuthError(
-                    401,
-                    "User account has been locked",
-                    errcode=Codes.USER_LOCKED,
-                    additional_fields={"soft_logout": True},
-                )
-
         if not allow_guest and requester.is_guest:
             raise OAuthInsufficientScopeError([SCOPE_MATRIX_API])
 
