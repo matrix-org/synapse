@@ -892,6 +892,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Literal[None] = None,
+        backoff_on_all_error_codes: bool = False,
     ) -> JsonDict:
         ...
 
@@ -909,6 +910,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser[T]] = None,
+        backoff_on_all_error_codes: bool = False,
     ) -> T:
         ...
 
@@ -925,6 +927,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser[T]] = None,
+        backoff_on_all_error_codes: bool = False,
     ) -> Union[JsonDict, T]:
         """Sends the specified json data using PUT
 
@@ -960,6 +963,7 @@ class MatrixFederationHttpClient:
                 enabled.
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
+            backoff_on_all_error_codes: Back off if we get any error response
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
@@ -993,6 +997,7 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
             long_retries=long_retries,
             timeout=timeout,
+            backoff_on_all_error_codes=backoff_on_all_error_codes,
         )
 
         if timeout is not None:
