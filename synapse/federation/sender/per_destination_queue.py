@@ -314,7 +314,14 @@ class PerDestinationQueue:
             # This will throw if we wouldn't retry. We do this here so we fail
             # quickly, but we will later check this again in the http client,
             # hence why we throw the result away.
-            await get_retry_limiter(self._destination, self._clock, self._store)
+            await get_retry_limiter(
+                self._destination,
+                self._clock,
+                self._store,
+                # Sending a transaction should always succeed, if it doesn't
+                # then something is wrong and we should backoff.
+                backoff_on_all_error_codes=True,
+            )
 
             if self._catching_up:
                 # we potentially need to catch-up first
