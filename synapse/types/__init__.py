@@ -958,6 +958,7 @@ class UserInfo:
     is_deactivated: bool
     is_guest: bool
     is_shadow_banned: bool
+    last_seen_ts: Optional[int]
 
 
 class UserProfile(TypedDict):
