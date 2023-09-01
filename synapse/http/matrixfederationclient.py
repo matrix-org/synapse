@@ -512,6 +512,7 @@ class MatrixFederationHttpClient:
         long_retries: bool = False,
         ignore_backoff: bool = False,
         backoff_on_404: bool = False,
+        backoff_on_all_error_codes: bool = False,
     ) -> IResponse:
         """
         Sends a request to the given server.
@@ -552,6 +553,7 @@ class MatrixFederationHttpClient:
                 and try the request anyway.
 
             backoff_on_404: Back off if we get a 404
+            backoff_on_all_error_codes: Back off if we get any error response
 
         Returns:
             Resolves with the HTTP response object on success.
@@ -594,6 +596,7 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
             notifier=self.hs.get_notifier(),
             replication_client=self.hs.get_replication_command_handler(),
+            backoff_on_all_error_codes=backoff_on_all_error_codes,
         )
 
         method_bytes = request.method.encode("ascii")
