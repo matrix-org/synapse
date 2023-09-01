@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 from unittest.mock import AsyncMock, Mock
 
 import yaml
@@ -329,6 +329,28 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
 
         self.update_handler.side_effect = update_short
         self.get_success(self.updates.do_next_background_update(False))
+
+    def test_failed_update_logs_exception_details(self) -> None:
+        needle = "RUH ROH RAGGY"
+
+        def failing_update(progress: JsonDict, count: int) -> int:
+            raise Exception(needle)
+
+        self.update_handler.side_effect = failing_update
+        self.update_handler.reset_mock()
+
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                values={"update_name": "test_update", "progress_json": "{}"},
+            )
+        )
+
+        with self.assertLogs(level=logging.ERROR) as logs:
+            # Expect a back-to-back RuntimeError to be raised
+            self.get_failure(self.updates.run_background_updates(False), RuntimeError)
+
+        self.assertTrue(any(needle in log for log in logs.output), logs.output)
 
 
 class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
