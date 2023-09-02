@@ -75,7 +75,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             thread_id=None,
             data={"ts": 1234},
         )
-        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
+        self.get_success(sender.send_read_receipt(receipt))
 
         self.pump()
 
@@ -111,6 +111,9 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         # * The same room / user on multiple threads.
         # * A different user in the same room.
         sender = self.hs.get_federation_sender()
+        # Hack so that we have a txn in-flight so we batch up read receipts
+        # below
+        sender.wake_destination("host2")
         for user, thread in (
             ("alice", None),
             ("alice", "thread"),
@@ -125,9 +128,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
                 thread_id=thread,
                 data={"ts": 1234},
             )
-            self.successResultOf(
-                defer.ensureDeferred(sender.send_read_receipt(receipt))
-            )
+            defer.ensureDeferred(sender.send_read_receipt(receipt))
 
         self.pump()
 
@@ -191,7 +192,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             thread_id=None,
             data={"ts": 1234},
         )
-        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
+        self.get_success(sender.send_read_receipt(receipt))
 
         self.pump()
 

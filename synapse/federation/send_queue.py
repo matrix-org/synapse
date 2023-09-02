@@ -229,7 +229,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         """
         # nothing to do here: the replication listener will handle it.
 
-    def send_presence_to_destinations(
+    async def send_presence_to_destinations(
         self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """As per FederationSender
@@ -463,7 +463,7 @@ class ParsedFederationStreamData:
     edus: Dict[str, List[Edu]]
 
 
-def process_rows_for_federation(
+async def process_rows_for_federation(
     transaction_queue: FederationSender,
     rows: List[FederationStream.FederationStreamRow],
 ) -> None:
@@ -496,7 +496,7 @@ def process_rows_for_federation(
         parsed_row.add_to_buffer(buff)
 
     for state, destinations in buff.presence_destinations:
-        transaction_queue.send_presence_to_destinations(
+        await transaction_queue.send_presence_to_destinations(
             states=[state], destinations=destinations
         )
 

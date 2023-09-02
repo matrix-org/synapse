@@ -422,7 +422,7 @@ class FederationSenderHandler:
         # The federation stream contains things that we want to send out, e.g.
         # presence, typing, etc.
         if stream_name == "federation":
-            send_queue.process_rows_for_federation(self.federation_sender, rows)
+            await send_queue.process_rows_for_federation(self.federation_sender, rows)
             await self.update_token(token)
 
         # ... and when new receipts happen

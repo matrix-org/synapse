@@ -120,8 +120,6 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore = hs.get_datastores().main
 
-        self.datastore.get_destination_retry_timings = AsyncMock(return_value=None)
-
         self.datastore.get_device_updates_by_remote = AsyncMock(  # type: ignore[method-assign]
             return_value=(0, [])
         )
