@@ -216,6 +216,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             iterable=destinations,
             column="destination",
             retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
+            desc="get_destination_retry_timings_batch",
         )
 
         return {
