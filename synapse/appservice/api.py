@@ -40,6 +40,7 @@ from synapse.appservice import (
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient, is_unknown_endpoint
+from synapse.logging import opentracing
 from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -136,10 +137,15 @@ class ApplicationServiceApi(SimpleHttpClient):
             args = None
             if self.config.use_appservice_legacy_authorization:
                 args = {"access_token": service.hs_token}
+
+            headers: Dict[bytes, List[bytes]] = {
+                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+            }
+            opentracing.inject_header_dict(headers, check_destination=False)
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
                 args,
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                headers=headers,
             )
             if response is not None:  # just an empty json object
                 return True
@@ -162,10 +168,15 @@ class ApplicationServiceApi(SimpleHttpClient):
             args = None
             if self.config.use_appservice_legacy_authorization:
                 args = {"access_token": service.hs_token}
+
+            headers: Dict[bytes, List[bytes]] = {
+                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+            }
+            opentracing.inject_header_dict(headers, check_destination=False)
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
                 args,
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                headers=headers,
             )
             if response is not None:  # just an empty json object
                 return True
@@ -203,10 +214,15 @@ class ApplicationServiceApi(SimpleHttpClient):
                     **fields,
                     b"access_token": service.hs_token,
                 }
+
+            headers: Dict[bytes, List[bytes]] = {
+                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+            }
+            opentracing.inject_header_dict(headers, check_destination=False)
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 args=args,
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                headers=headers,
             )
             if not isinstance(response, list):
                 logger.warning(
@@ -243,10 +259,15 @@ class ApplicationServiceApi(SimpleHttpClient):
                 args = None
                 if self.config.use_appservice_legacy_authorization:
                     args = {"access_token": service.hs_token}
+
+                headers: Dict[bytes, List[bytes]] = {
+                    b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+                }
+                opentracing.inject_header_dict(headers, check_destination=False)
                 info = await self.get_json(
                     f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
                     args,
-                    headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                    headers=headers,
                 )
 
                 if not _is_valid_3pe_metadata(info):
@@ -280,10 +301,14 @@ class ApplicationServiceApi(SimpleHttpClient):
         # This is required by the configuration.
         assert service.hs_token is not None
 
+        headers: Dict[bytes, List[bytes]] = {
+            b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+        }
+        opentracing.inject_header_dict(headers, check_destination=False)
         await self.post_json_get_json(
             uri=f"{service.url}{APP_SERVICE_PREFIX}/ping",
             post_json={"transaction_id": txn_id},
-            headers={"Authorization": [f"Bearer {service.hs_token}"]},
+            headers=headers,
         )
 
     async def push_bulk(
@@ -360,11 +385,15 @@ class ApplicationServiceApi(SimpleHttpClient):
             if self.config.use_appservice_legacy_authorization:
                 args = {"access_token": service.hs_token}
 
+            headers: Dict[bytes, List[bytes]] = {
+                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+            }
+            opentracing.inject_header_dict(headers, check_destination=False)
             await self.put_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
                 json_body=body,
                 args=args,
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                headers=headers,
             )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -432,12 +461,16 @@ class ApplicationServiceApi(SimpleHttpClient):
                 [algorithm] * count
             )
 
+        headers: Dict[bytes, List[bytes]] = {
+            b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+        }
+        opentracing.inject_header_dict(headers, check_destination=False)
         uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3983/keys/claim"
         try:
             response = await self.post_json_get_json(
                 uri,
                 body,
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                headers=headers,
             )
         except HttpResponseException as e:
             # The appservice doesn't support this endpoint.
@@ -492,13 +525,16 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         # This is required by the configuration.
         assert service.hs_token is not None
-
+        headers: Dict[bytes, List[bytes]] = {
+            b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
+        }
+        opentracing.inject_header_dict(headers, check_destination=False)
         uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3984/keys/query"
         try:
             response = await self.post_json_get_json(
                 uri,
                 query,
-                headers={"Authorization": [f"Bearer {service.hs_token}"]},
+                headers=headers,
             )
         except HttpResponseException as e:
             # The appservice doesn't support this endpoint.
