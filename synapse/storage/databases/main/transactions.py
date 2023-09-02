@@ -218,7 +218,11 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
         )
 
-        return {row.pop("destination"): DestinationRetryTimings(**row) for row in rows}
+        return {
+            row.pop("destination"): DestinationRetryTimings(**row)
+            for row in rows
+            if row["retry_last_ts"] and row["failure_ts"] and row["retry_interval"]
+        }
 
     async def set_destination_retry_timings(
         self,
