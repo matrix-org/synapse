@@ -1,1 +1,0 @@
-Fix a performance regression introduced in Synapse 1.91.0 where event persistence would cause excessive CPU usage over time.
