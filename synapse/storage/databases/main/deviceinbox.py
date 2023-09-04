@@ -477,10 +477,12 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 log_kv({"message": "No changes in cache since last check"})
                 return 0
 
+        ROW_ID_LITERAL = "ctid" if isinstance(self.database_engine, PostgresEngine) else "rowid"
+
         def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
             sql = (
-                "DELETE FROM device_inbox WHERE rowid IN ("
-                "SELECT rowid FROM device_inbox"
+                f"DELETE FROM device_inbox WHERE {ROW_ID_LITERAL} IN ("
+                f"SELECT {ROW_ID_LITERAL} FROM device_inbox"
                 " WHERE user_id = ? AND device_id = ?"
                 " AND stream_id <= ?"
             )
