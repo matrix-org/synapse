@@ -445,13 +445,18 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
     @trace
     async def delete_messages_for_device(
-        self, user_id: str, device_id: Optional[str], up_to_stream_id: int
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        up_to_stream_id: int,
+        limit: Optional[int] = None,
     ) -> int:
         """
         Args:
             user_id: The recipient user_id.
             device_id: The recipient device_id.
             up_to_stream_id: Where to delete messages up to.
+            limit: maximum number of messages to delete
 
         Returns:
             The number of messages deleted.
@@ -474,10 +479,15 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
             sql = (
-                "DELETE FROM device_inbox"
+                "DELETE FROM device_inbox WHERE rowid IN ("
+                "SELECT rowid FROM device_inbox"
                 " WHERE user_id = ? AND device_id = ?"
                 " AND stream_id <= ?"
             )
+            if limit:
+                sql += f" LIMIT {limit}"
+            sql += ")"
+
             txn.execute(sql, (user_id, device_id, up_to_stream_id))
             return txn.rowcount
 
@@ -487,12 +497,19 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         log_kv({"message": f"deleted {count} messages for device", "count": count})
 
+        # In this case we don't know if we hit the limit or the delete is complete
+        # so let's not update the cache.
+        if count == limit:
+            return count
+
         # Update the cache, ensuring that we only ever increase the value
         updated_last_deleted_stream_id = self._last_device_delete_cache.get(
             (user_id, device_id), 0
         )
+
         self._last_device_delete_cache[(user_id, device_id)] = max(
-            updated_last_deleted_stream_id, up_to_stream_id
+            updated_last_deleted_stream_id,
+            up_to_stream_id,
         )
 
         return count
@@ -821,6 +838,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 )
 
                 message_json = json_encoder.encode(messages_by_device["*"])
+
                 for device_id in devices:
                     # Add the message for all devices for this user on this
                     # server.
