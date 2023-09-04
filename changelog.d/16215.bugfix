@@ -1,0 +1,1 @@
+Fix a bug where admin tokens stopped working with MSC3861 auth delegation was enabled.

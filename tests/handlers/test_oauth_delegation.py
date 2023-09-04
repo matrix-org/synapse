@@ -122,6 +122,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
                 "client_id": CLIENT_ID,
                 "client_auth_method": "client_secret_post",
                 "client_secret": CLIENT_SECRET,
+                "admin_token": "admin_token_value",
             }
         }
         return config
@@ -791,3 +792,39 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.expect_unrecognized("GET", "/_synapse/admin/v1/users/foo/admin")
         self.expect_unrecognized("PUT", "/_synapse/admin/v1/users/foo/admin")
         self.expect_unrecognized("POST", "/_synapse/admin/v1/account_validity/validity")
+
+    def test_admin_token(self) -> None:
+        """The handler should return a requester with admin rights when admin_token is used."""
+
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"admin_token_value"]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        requester = self.get_success(self.auth.get_user_by_req(request))
+        self.assertEqual(
+            requester.user.to_string(), "@%s:%s" % ("__oidc_admin", SERVER_NAME)
+        )
+        self.assertEqual(requester.is_guest, False)
+        self.assertEqual(requester.device_id, None)
+        self.assertEqual(
+            get_awaitable_result(self.auth.is_server_admin(requester)), True
+        )
+
+    def test_oidc_admin_impersonate_user_id(self) -> None:
+        """The handler should return a requester with the correct user when _oidc_admin_impersonate_user_id param is used."""
+
+        request = Mock(
+            args={
+                b"_oidc_admin_impersonate_user_id": [
+                    ("@foo:" + SERVER_NAME).encode("ascii")
+                ],
+                b"access_token": [b"admin_token_value"],
+            }
+        )
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        requester = self.get_success(self.auth.get_user_by_req(request))
+        self.assertEqual(requester.user.to_string(), "@%s:%s" % ("foo", SERVER_NAME))
+        self.assertEqual(requester.is_guest, False)
+        self.assertEqual(requester.device_id, None)
+        self.assertEqual(
+            get_awaitable_result(self.auth.is_server_admin(requester)), False
+        )
