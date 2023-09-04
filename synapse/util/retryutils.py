@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Optional, Type
 from synapse.api.errors import CodeMessageException
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import DataStore
+from synapse.types import StrCollection
 from synapse.util import Clock
 
 if TYPE_CHECKING:
@@ -114,6 +115,30 @@ async def get_retry_limiter(
         backoff_on_failure=backoff_on_failure,
         **kwargs,
     )
+
+
+async def filter_destinations_by_retry_limiter(
+    destinations: StrCollection,
+    clock: Clock,
+    store: DataStore,
+    retry_due_within_ms: int = 0,
+) -> StrCollection:
+    """Filter down the list of destinations to only those that will are either
+    alive or due for a retry (within `retry_due_within_ms`)
+    """
+    if not destinations:
+        return destinations
+
+    retry_timings = await store.get_destination_retry_timings_batch(destinations)
+
+    now = int(clock.time_msec())
+
+    return [
+        destination
+        for destination, timings in retry_timings.items()
+        if timings is None
+        or timings.retry_last_ts + timings.retry_interval <= now + retry_due_within_ms
+    ]
 
 
 class RetryDestinationLimiter:
