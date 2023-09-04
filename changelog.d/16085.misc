@@ -1,1 +1,0 @@
-Override global statement timeout when creating indexes in Postgres.
