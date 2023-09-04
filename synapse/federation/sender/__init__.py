@@ -246,9 +246,11 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
+    async def send_device_messages(
+        self, destinations: StrCollection, immediate: bool = True
+    ) -> None:
         """Tells the sender that a new device message is ready to be sent to the
-        destination. The `immediate` flag specifies whether the messages should
+        destinations. The `immediate` flag specifies whether the messages should
         be tried to be sent immediately, or whether it can be delayed for a
         short while (to aid performance).
         """
@@ -922,21 +924,29 @@ class FederationSender(AbstractFederationSender):
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
-        if self.is_mine_server_name(destination):
-            logger.warning("Not sending device update to ourselves")
-            return
+    async def send_device_messages(
+        self, destinations: StrCollection, immediate: bool = True
+    ) -> None:
+        destinations = await filter_destinations_by_retry_limiter(
+            [
+                destination
+                for destination in destinations
+                if self._federation_shard_config.should_handle(
+                    self._instance_name, destination
+                )
+                and not self.is_mine_server_name(destination)
+            ],
+            clock=self.clock,
+            store=self.store,
+            retry_due_within_ms=CATCHUP_RETRY_INTERVAL,
+        )
 
-        if not self._federation_shard_config.should_handle(
-            self._instance_name, destination
-        ):
-            return
-
-        if immediate:
-            self._get_per_destination_queue(destination).attempt_new_transaction()
-        else:
-            self._get_per_destination_queue(destination).mark_new_data()
-            self._destination_wakeup_queue.add_to_queue(destination)
+        for destination in destinations:
+            if immediate:
+                self._get_per_destination_queue(destination).attempt_new_transaction()
+            else:
+                self._get_per_destination_queue(destination).mark_new_data()
+                self._destination_wakeup_queue.add_to_queue(destination)
 
     def wake_destination(self, destination: str) -> None:
         """Called when we want to retry sending transactions to a remote.

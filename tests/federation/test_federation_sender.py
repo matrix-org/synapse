@@ -343,7 +343,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.reactor.advance(1)
 
         # a second call should produce no new device EDUs
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
         self.assertEqual(self.edus, [])
 
         # a second device
@@ -551,7 +553,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
 
         # We queue up device list updates to be sent over federation, so we
         # advance to clear the queue.
@@ -602,7 +606,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
 
         # We queue up device list updates to be sent over federation, so we
         # advance to clear the queue.
@@ -657,7 +663,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
 
         # We queue up device list updates to be sent over federation, so we
         # advance to clear the queue.

@@ -439,16 +439,14 @@ class FederationSenderHandler:
                 for row in rows
                 if not row.entity.startswith("@") and not row.is_signature
             }
-            for host in hosts:
-                self.federation_sender.send_device_messages(host, immediate=False)
+            await self.federation_sender.send_device_messages(hosts, immediate=False)
 
         elif stream_name == ToDeviceStream.NAME:
             # The to_device stream includes stuff to be pushed to both local
             # clients and remote servers, so we ignore entities that start with
             # '@' (since they'll be local users rather than destinations).
             hosts = {row.entity for row in rows if not row.entity.startswith("@")}
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
+            await self.federation_sender.send_device_messages(hosts)
 
     async def _on_new_receipts(
         self, rows: Iterable[ReceiptsStream.ReceiptsStreamRow]
