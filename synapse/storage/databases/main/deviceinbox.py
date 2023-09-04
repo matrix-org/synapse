@@ -838,7 +838,6 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 )
 
                 message_json = json_encoder.encode(messages_by_device["*"])
-
                 for device_id in devices:
                     # Add the message for all devices for this user on this
                     # server.
