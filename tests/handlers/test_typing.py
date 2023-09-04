@@ -251,8 +251,8 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             json_data_callback=ANY,
             long_retries=True,
-            backoff_on_404=True,
             try_trailing_slash_on_400=True,
+            backoff_on_all_error_codes=True,
         )
 
     def test_started_typing_remote_recv(self) -> None:
@@ -366,7 +366,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             json_data_callback=ANY,
             long_retries=True,
-            backoff_on_404=True,
+            backoff_on_all_error_codes=True,
             try_trailing_slash_on_400=True,
         )
 

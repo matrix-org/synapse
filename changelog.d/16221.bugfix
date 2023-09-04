@@ -1,0 +1,1 @@
+Fix long-standing bug where we did not correctly back off from servers that had "gone" if they returned 4xx series error codes.
