@@ -84,7 +84,9 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                     "Access token should not be passed as a query param."
                 )
 
-            self.assertEqual(headers.get(b"Authorization"), [f"Bearer {TOKEN}".encode()])
+            self.assertEqual(
+                headers.get(b"Authorization"), [f"Bearer {TOKEN}".encode()]
+            )
             self.request_url = url
             if url == URL_USER:
                 return SUCCESS_RESULT_USER
@@ -156,8 +158,9 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                 raise RuntimeError("Access token should be provided in auth headers.")
 
             self.assertEqual(args.get(b"access_token"), TOKEN)
-            self.assertEqual(headers.get(b"Authorization"),
-                             [f"Bearer {TOKEN}".encode()])
+            self.assertEqual(
+                headers.get(b"Authorization"), [f"Bearer {TOKEN}".encode()]
+            )
             self.request_url = url
             if url == URL_USER:
                 return SUCCESS_RESULT_USER
@@ -212,8 +215,9 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             if not headers.get(b"Authorization"):
                 raise RuntimeError("Access token not provided")
 
-            self.assertEqual(headers.get(b"Authorization"),
-                             [f"Bearer {TOKEN}".encode()])
+            self.assertEqual(
+                headers.get(b"Authorization"), [f"Bearer {TOKEN}".encode()]
+            )
             return RESPONSE
 
         # We assign to a method, which mypy doesn't like.
