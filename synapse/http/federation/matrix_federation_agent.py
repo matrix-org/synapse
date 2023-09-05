@@ -405,12 +405,13 @@ class MatrixHostnameEndpoint:
             b"_matrix-fed._tcp." + host
         )
 
-        if server_list and logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                "Got %s from SRV lookup for %s",
-                ", ".join(map(str, server_list)),
-                host.decode(errors="replace"),
-            )
+        if server_list:
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "Got %s from SRV lookup for %s",
+                    ", ".join(map(str, server_list)),
+                    host.decode(errors="replace"),
+                )
             return server_list
 
         # No _matrix-fed._tcp SRV record, fallback to legacy _matrix._tcp SRV record.
@@ -419,12 +420,13 @@ class MatrixHostnameEndpoint:
         )
         server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
 
-        if server_list and logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                "Got %s from deprecated SRV lookup for %s",
-                ", ".join(map(str, server_list)),
-                host.decode(errors="replace"),
-            )
+        if server_list:
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "Got %s from deprecated SRV lookup for %s",
+                    ", ".join(map(str, server_list)),
+                    host.decode(errors="replace"),
+                )
             return server_list
 
         # No SRV records, so we fallback to host and 8448
