@@ -338,17 +338,18 @@ class MatrixConnectionAdapter(HTTPAdapter):
             )
             return srv.host, srv.port, server_name
         except Exception:
-            # Fall back to deprecated `matrix` service
-            try:
-                srv = srvlookup.lookup("matrix", "tcp", server_name)[0]
-                print(
-                    f"SRV lookup on _matrix._tcp.{server_name} gave {srv}",
-                    file=sys.stderr,
-                )
-                return srv.host, srv.port, server_name
-            except Exception:
-                # Fall even further back to just port 8448
-                return server_name, 8448, server_name
+            pass
+        # Fall back to deprecated `matrix` service
+        try:
+            srv = srvlookup.lookup("matrix", "tcp", server_name)[0]
+            print(
+                f"SRV lookup on _matrix._tcp.{server_name} gave {srv}",
+                file=sys.stderr,
+            )
+            return srv.host, srv.port, server_name
+        except Exception:
+            # Fall even further back to just port 8448
+            return server_name, 8448, server_name
 
     @staticmethod
     def _get_well_known(server_name: str) -> Optional[str]:
