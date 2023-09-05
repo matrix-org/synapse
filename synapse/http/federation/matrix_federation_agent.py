@@ -405,7 +405,7 @@ class MatrixHostnameEndpoint:
             b"_matrix-fed._tcp." + host
         )
 
-        if server_list:
+        if server_list and logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Got %s from SRV lookup for %s",
                 ", ".join(map(str, server_list)),
@@ -419,7 +419,7 @@ class MatrixHostnameEndpoint:
         )
         server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
 
-        if server_list:
+        if server_list and logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Got %s from deprecated SRV lookup for %s",
                 ", ".join(map(str, server_list)),
