@@ -866,9 +866,9 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     )
     def test_application_services_receive_local_to_device_for_many_users(self) -> None:
         """
-        Test that when a user sends a to-device message to another user
-        that is an application service's user namespace, the
-        application service will receive it.
+        Test that when a user sends a to-device message to many users
+        in an application service's user namespace, the
+        application service will receive all of them.
         """
         interested_appservice = self._register_application_service(
             namespaces={
