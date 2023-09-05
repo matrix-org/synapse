@@ -340,41 +340,6 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             get_awaitable_result(self.auth.is_server_admin(requester)), False
         )
 
-    def test_active_user_admin_impersonation(self) -> None:
-        """The handler should return a requester with normal user rights
-        and an user ID matching the one specified in query param `user_id`"""
-
-        self.http_client.request = simple_async_mock(
-            return_value=FakeResponse.json(
-                code=200,
-                payload={
-                    "active": True,
-                    "sub": SUBJECT,
-                    "scope": " ".join([SYNAPSE_ADMIN_SCOPE, MATRIX_USER_SCOPE]),
-                    "username": USERNAME,
-                },
-            )
-        )
-        request = Mock(args={})
-        request.args[b"access_token"] = [b"mockAccessToken"]
-        impersonated_user_id = f"@{USERNAME}:{SERVER_NAME}"
-        request.args[b"_oidc_admin_impersonate_user_id"] = [
-            impersonated_user_id.encode("ascii")
-        ]
-        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = self.get_success(self.auth.get_user_by_req(request))
-        self.http_client.get_json.assert_called_once_with(WELL_KNOWN)
-        self.http_client.request.assert_called_once_with(
-            method="POST", uri=INTROSPECTION_ENDPOINT, data=ANY, headers=ANY
-        )
-        self._assertParams()
-        self.assertEqual(requester.user.to_string(), impersonated_user_id)
-        self.assertEqual(requester.is_guest, False)
-        self.assertEqual(requester.device_id, None)
-        self.assertEqual(
-            get_awaitable_result(self.auth.is_server_admin(requester)), False
-        )
-
     def test_active_user_with_device(self) -> None:
         """The handler should return a requester with normal user rights and a device ID."""
 
