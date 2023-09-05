@@ -996,7 +996,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         # Assert we can no longer peek into the room
         self._assert_peek(self.room_id, expect_code=403)
 
-    @unittest.override_config({"purge_retention_period": "1d"})
+    @unittest.override_config({"forgotten_room_retention_period": "1d"})
     def test_purge_forgotten_room(self) -> None:
         # Create a test room
         room_id = self.helper.create_room_as(
@@ -1015,7 +1015,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         with self.assertRaises(AssertionError):
             self._is_purged(room_id)
 
-        # Advance 24 hours in the future, past the `purge_retention_period`
+        # Advance 24 hours in the future, past the `forgotten_room_retention_period`
         self.reactor.advance(24 * ONE_HOUR_IN_S)
 
         self._is_purged(room_id)

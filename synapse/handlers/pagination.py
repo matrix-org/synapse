@@ -99,7 +99,9 @@ class PaginationHandler:
         self._retention_allowed_lifetime_max = (
             hs.config.retention.retention_allowed_lifetime_max
         )
-        self._purge_retention_period = hs.config.server.purge_retention_period
+        self._forgotten_room_retention_period = (
+            hs.config.server.forgotten_room_retention_period
+        )
         self._is_master = hs.config.worker.worker_app is None
 
         if hs.config.retention.retention_enabled and self._is_master:

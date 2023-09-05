@@ -934,6 +934,17 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
+### `forgotten_room_retention_period`
+
+How long to keep locally forgotten rooms before purging them from the DB.
+
+Defaults to `null`, meaning it's disabled.
+
+Example configuration:
+```yaml
+forgotten_room_retention_period: 28d
+```
+---
 ### `user_ips_max_age`
 
 How long to track users' last seen time and IPs in the database.

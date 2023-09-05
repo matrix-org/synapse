@@ -176,7 +176,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.request_ratelimiter = hs.get_request_ratelimiter()
         hs.get_notifier().add_new_join_in_room_callback(self._on_user_joined_room)
 
-        self._purge_retention_period = hs.config.server.purge_retention_period
+        self._forgotten_room_retention_period = (
+            hs.config.server.forgotten_room_retention_period
+        )
 
     def _on_user_joined_room(self, event_id: str, room_id: str) -> None:
         """Notify the rate limiter that a room join has occurred.
@@ -313,13 +315,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # room around and we automatically purge room after a little bit
         if (
             not do_not_schedule_purge
-            and self._purge_retention_period
+            and self._forgotten_room_retention_period
             and await self.store.is_locally_forgotten_room(room_id)
         ):
             await self.hs.get_task_scheduler().schedule_task(
                 PURGE_ROOM_ACTION_NAME,
                 resource_id=room_id,
-                timestamp=self.clock.time_msec() + self._purge_retention_period,
+                timestamp=self.clock.time_msec()
+                + self._forgotten_room_retention_period,
             )
 
     async def ratelimit_multiple_invites(
