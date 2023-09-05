@@ -199,9 +199,7 @@ class InitialSyncHandler:
                     deferred_room_state = run_in_background(
                         self._state_storage_controller.get_state_for_events,
                         [event.event_id],
-                    ).addCallback(
-                        lambda states: cast(StateMap[EventBase], states[event.event_id])
-                    )
+                    ).addCallback(lambda states: states[event.event_id])
 
                 (messages, token), current_state = await make_deferred_yieldable(
                     gather_results(
