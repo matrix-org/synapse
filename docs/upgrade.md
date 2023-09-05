@@ -88,6 +88,14 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.92.0
+
+## Minimum supported Rust version
+The minimum supported Rust version has been increased from v1.60.0 to v1.61.0.
+Users building from source will need to ensure their `rustc` version is up to
+date.
+
+
 # Upgrading to v1.90.0
 
 ## App service query parameter authorization is now a configuration option
