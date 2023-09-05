@@ -222,7 +222,7 @@ class PaginationHandler:
             (stream, topo, _event_id) = r
             token = "t%d-%d" % (topo, stream)
 
-            logger.info("Starting purging events in room %s" % (room_id))
+            logger.info("Starting purging events in room %s", room_id)
 
             # We want to purge everything, including local events, and to run the purge in
             # the background so that it's not blocking any other operation apart from
