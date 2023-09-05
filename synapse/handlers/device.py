@@ -65,6 +65,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+DELETE_DEVICE_MSGS_TASK_NAME = "delete_device_messages"
 MAX_DEVICE_DISPLAY_NAME_LEN = 100
 DELETE_STALE_DEVICES_INTERVAL_MS = 24 * 60 * 60 * 1000
 
@@ -425,7 +426,7 @@ class DeviceHandler(DeviceWorkerHandler):
             )
 
         self._task_scheduler.register_action(
-            self._delete_device_messages, "delete_device_messages"
+            self._delete_device_messages, DELETE_DEVICE_MSGS_TASK_NAME
         )
 
     def _check_device_name_length(self, name: Optional[str]) -> None:
@@ -571,7 +572,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
             # Delete device messages asynchronously and in batches using the task scheduler
             await self._task_scheduler.schedule_task(
-                "delete_device_messages",
+                DELETE_DEVICE_MSGS_TASK_NAME,
                 resource_id=device_id,
                 params={
                     "user_id": user_id,
@@ -599,10 +600,10 @@ class DeviceHandler(DeviceWorkerHandler):
         up_to_stream_id = task.params["up_to_stream_id"]
 
         res = await self.store.delete_messages_for_device(
-            user_id,
-            device_id,
-            up_to_stream_id,
-            DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT,
+            user_id=user_id,
+            device_id=device_id,
+            up_to_stream_id=up_to_stream_id,
+            limit=DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT,
         )
 
         if res < DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT:

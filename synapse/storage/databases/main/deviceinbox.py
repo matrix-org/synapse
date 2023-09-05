@@ -449,7 +449,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         user_id: str,
         device_id: Optional[str],
         up_to_stream_id: int,
-        limit: Optional[int] = None,
+        limit: int,
     ) -> int:
         """
         Args:
@@ -477,17 +477,16 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 log_kv({"message": "No changes in cache since last check"})
                 return 0
 
+        ROW_ID_NAME = self.database_engine.row_id_name
+
         def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
-            sql = (
-                f"""
-                DELETE FROM device_inbox WHERE {self.database_engine.row_id_name} IN (
-                  SELECT {self.database_engine.row_id_name} FROM device_inbox
+            sql = f"""
+                DELETE FROM device_inbox WHERE {ROW_ID_NAME} IN (
+                  SELECT {ROW_ID_NAME} FROM device_inbox
                   WHERE user_id = ? AND device_id = ? AND stream_id <= ?
+                  LIMIT {limit}
+                )
                 """
-            )
-            if limit:
-                sql += f" LIMIT {limit}"
-            sql += ")"
 
             txn.execute(sql, (user_id, device_id, up_to_stream_id))
             return txn.rowcount
