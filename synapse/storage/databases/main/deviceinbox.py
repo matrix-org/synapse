@@ -479,9 +479,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         def delete_messages_for_device_txn(txn: LoggingTransaction) -> int:
             sql = (
-                f"DELETE FROM device_inbox WHERE {self.database_engine.row_id_name} IN ("
-                f"SELECT {self.database_engine.row_id_name} FROM device_inbox"
-                " WHERE user_id = ? AND device_id = ? AND stream_id <= ?"
+                f"""
+                DELETE FROM device_inbox WHERE {self.database_engine.row_id_name} IN (
+                  SELECT {self.database_engine.row_id_name} FROM device_inbox
+                  WHERE user_id = ? AND device_id = ? AND stream_id <= ?
+                """
             )
             if limit:
                 sql += f" LIMIT {limit}"
