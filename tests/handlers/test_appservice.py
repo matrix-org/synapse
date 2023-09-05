@@ -956,25 +956,22 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             self.assertEqual(device_msg["sender"], self.local_user)
             self.assertEqual(device_msg["content"], message_content)
 
+        self.assertEqual(to_device_messages[0]["to_user_id"], self.exclusive_as_user)
         self.assertEqual(
-            to_device_messages[0]["to_user_id"], self.exclusive_as_user
-        )
-        self.assertEqual(
-            to_device_messages[0]["to_device_id"], self.exclusive_as_user_device_id,
-        )
-
-        self.assertEqual(
-            to_device_messages[1]["to_user_id"], self.exclusive_as_user_2
-        )
-        self.assertEqual(
-            to_device_messages[1]["to_device_id"], self.exclusive_as_user_2_device_id,
+            to_device_messages[0]["to_device_id"],
+            self.exclusive_as_user_device_id,
         )
 
+        self.assertEqual(to_device_messages[1]["to_user_id"], self.exclusive_as_user_2)
         self.assertEqual(
-            to_device_messages[2]["to_user_id"], self.exclusive_as_user_3
+            to_device_messages[1]["to_device_id"],
+            self.exclusive_as_user_2_device_id,
         )
+
+        self.assertEqual(to_device_messages[2]["to_user_id"], self.exclusive_as_user_3)
         self.assertEqual(
-            to_device_messages[2]["to_device_id"], self.exclusive_as_user_3_device_id,
+            to_device_messages[2]["to_device_id"],
+            self.exclusive_as_user_3_device_id,
         )
 
     def _register_application_service(
