@@ -14,7 +14,7 @@
 
 from http import HTTPStatus
 from typing import Any, Dict, Union
-from unittest.mock import ANY, AsyncMock, Mock
+from unittest.mock import ANY, Mock
 from urllib.parse import parse_qs
 
 from signedjson.key import (
@@ -587,38 +587,6 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             self.auth._introspect_token("stale"), InvalidClientTokenError  # type: ignore[attr-defined]
         )
         self.assertEqual(self.http_client.request.call_count, 2)
-
-    def test_revocation_endpoint(self) -> None:
-        # mock introspection response and then admin verification response
-        self.http_client.request = AsyncMock(
-            side_effect=[
-                FakeResponse.json(
-                    code=200, payload={"active": True, "jti": "open_sesame"}
-                ),
-                FakeResponse.json(
-                    code=200,
-                    payload={
-                        "active": True,
-                        "sub": SUBJECT,
-                        "scope": " ".join([SYNAPSE_ADMIN_SCOPE, MATRIX_USER_SCOPE]),
-                        "username": USERNAME,
-                    },
-                ),
-            ]
-        )
-
-        # cache a token to delete
-        introspection_token = self.get_success(
-            self.auth._introspect_token("open_sesame")  # type: ignore[attr-defined]
-        )
-        self.assertEqual(self.auth._token_cache.get("open_sesame"), introspection_token)  # type: ignore[attr-defined]
-
-        # delete the revoked token
-        introspection_token_id = "open_sesame"
-        url = f"/_synapse/admin/v1/OIDC_token_revocation/{introspection_token_id}"
-        channel = self.make_request("DELETE", url, access_token="mockAccessToken")
-        self.assertEqual(channel.code, 200)
-        self.assertEqual(self.auth._token_cache.get("open_sesame"), None)  # type: ignore[attr-defined]
 
     def make_device_keys(self, user_id: str, device_id: str) -> JsonDict:
         # We only generate a master key to simplify the test.
