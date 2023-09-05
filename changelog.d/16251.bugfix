@@ -1,0 +1,1 @@
+Fix a longstanding bug where appservices using MSC2049 to receive to_device messages, would only get messages for one user.
