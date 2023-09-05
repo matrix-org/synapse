@@ -830,7 +830,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             username: The username to use for the test.
             registration: Whether to test with registration URLs.
         """
-        self.hs.get_identity_handler().send_threepid_validation = AsyncMock(  # type: ignore[assignment]
+        self.hs.get_identity_handler().send_threepid_validation = AsyncMock(  # type: ignore[method-assign]
             return_value=0
         )
 

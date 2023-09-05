@@ -60,7 +60,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         cas_response = CasResponse("test_user", {})
         request = _mock_request()
@@ -88,7 +88,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # Map a user via SSO.
         cas_response = CasResponse("test_user", {})
@@ -128,7 +128,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         cas_response = CasResponse("föö", {})
         request = _mock_request()
@@ -159,7 +159,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # The response doesn't have the proper userGroup or department.
         cas_response = CasResponse("test_user", {})

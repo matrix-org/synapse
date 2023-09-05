@@ -31,6 +31,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -358,7 +359,21 @@ class LoggingTransaction:
         return self.txn.rowcount
 
     @property
-    def description(self) -> Any:
+    def description(
+        self,
+    ) -> Optional[
+        Sequence[
+            Tuple[
+                str,
+                Optional[Any],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+            ]
+        ]
+    ]:
         return self.txn.description
 
     def execute_batch(self, sql: str, args: Iterable[Iterable[Any]]) -> None:

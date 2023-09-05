@@ -80,7 +80,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         ) -> None:
             pass
 
-        federation_event_handler._check_event_auth = _check_event_auth  # type: ignore[assignment]
+        federation_event_handler._check_event_auth = _check_event_auth  # type: ignore[method-assign]
         self.client = self.hs.get_federation_client()
 
         async def _check_sigs_and_hash_for_pulled_events_and_fetch(
@@ -190,7 +190,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Register the mock on the federation client.
         federation_client = self.hs.get_federation_client()
-        federation_client.query_user_devices = Mock(side_effect=query_user_devices)  # type: ignore[assignment]
+        federation_client.query_user_devices = Mock(side_effect=query_user_devices)  # type: ignore[method-assign]
 
         # Register a mock on the store so that the incoming update doesn't fail because
         # we don't share a room with the user.
@@ -240,7 +240,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Register mock device list retrieval on the federation client.
         federation_client = self.hs.get_federation_client()
-        federation_client.query_user_devices = AsyncMock(  # type: ignore[assignment]
+        federation_client.query_user_devices = AsyncMock(  # type: ignore[method-assign]
             return_value={
                 "user_id": remote_user_id,
                 "stream_id": 1,

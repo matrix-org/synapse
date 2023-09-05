@@ -62,7 +62,7 @@ class ReplicationMultiUserDevicesResyncRestServlet(ReplicationEndpoint):
 
     NAME = "multi_user_device_resync"
     PATH_ARGS = ()
-    CACHE = False
+    CACHE = True
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)

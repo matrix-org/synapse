@@ -978,26 +978,12 @@ class PersistEventsStore:
         """Persist the mapping from transaction IDs to event IDs (if defined)."""
 
         inserted_ts = self._clock.time_msec()
-        to_insert_token_id: List[Tuple[str, str, str, int, str, int]] = []
         to_insert_device_id: List[Tuple[str, str, str, str, str, int]] = []
         for event, _ in events_and_contexts:
             txn_id = getattr(event.internal_metadata, "txn_id", None)
-            token_id = getattr(event.internal_metadata, "token_id", None)
             device_id = getattr(event.internal_metadata, "device_id", None)
 
             if txn_id is not None:
-                if token_id is not None:
-                    to_insert_token_id.append(
-                        (
-                            event.event_id,
-                            event.room_id,
-                            event.sender,
-                            token_id,
-                            txn_id,
-                            inserted_ts,
-                        )
-                    )
-
                 if device_id is not None:
                     to_insert_device_id.append(
                         (
@@ -1010,26 +996,7 @@ class PersistEventsStore:
                         )
                     )
 
-        # Synapse usually relies on the device_id to scope transactions for events,
-        # except for users without device IDs (appservice, guests, and access
-        # tokens minted with the admin API) which use the access token ID instead.
-        #
-        # TODO https://github.com/matrix-org/synapse/issues/16042
-        if to_insert_token_id:
-            self.db_pool.simple_insert_many_txn(
-                txn,
-                table="event_txn_id",
-                keys=(
-                    "event_id",
-                    "room_id",
-                    "user_id",
-                    "token_id",
-                    "txn_id",
-                    "inserted_ts",
-                ),
-                values=to_insert_token_id,
-            )
-
+        # Synapse relies on the device_id to scope transactions for events..
         if to_insert_device_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
@@ -1671,7 +1638,7 @@ class PersistEventsStore:
             if self._ephemeral_messages_enabled:
                 # If there's an expiry timestamp on the event, store it.
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-                if type(expiry_ts) is int and not event.is_state():
+                if type(expiry_ts) is int and not event.is_state():  # noqa: E721
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
@@ -2039,10 +2006,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and type(event.content["min_lifetime"]) is not int
+                and type(event.content["min_lifetime"]) is not int  # noqa: E721
             ) or (
                 "max_lifetime" in event.content
-                and type(event.content["max_lifetime"]) is not int
+                and type(event.content["max_lifetime"]) is not int  # noqa: E721
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return

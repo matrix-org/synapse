@@ -400,11 +400,11 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
         # we can track any outgoing ephemeral events
         self.send_mock = AsyncMock()
-        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[assignment]
+        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[method-assign]
 
         # Mock out application services, and allow defining our own in tests
         self._services: List[ApplicationService] = []
-        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[assignment]
+        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[method-assign]
             return_value=self._services
         )
 
@@ -898,11 +898,11 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
         # Mock ApplicationServiceApi's put_json, so we can verify the raw JSON that
         # will be sent over the wire
         self.put_json = AsyncMock()
-        hs.get_application_service_api().put_json = self.put_json  # type: ignore[assignment]
+        hs.get_application_service_api().put_json = self.put_json  # type: ignore[method-assign]
 
         # Mock out application services, and allow defining our own in tests
         self._services: List[ApplicationService] = []
-        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[assignment]
+        self.hs.get_datastores().main.get_app_services = Mock(  # type: ignore[method-assign]
             return_value=self._services
         )
 
@@ -1004,7 +1004,7 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
         # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
         # we can track what's going out
         self.send_mock = AsyncMock()
-        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[assignment]  # We assign to a method.
+        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock  # type: ignore[method-assign]  # We assign to a method.
 
         # Define an application service for the tests
         self._service_token = "VERYSECRET"

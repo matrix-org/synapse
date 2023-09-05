@@ -428,7 +428,11 @@ class ReplicationCommandHandler:
 
         if self._is_presence_writer:
             return self._presence_handler.update_external_syncs_row(
-                cmd.instance_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
+                cmd.instance_id,
+                cmd.user_id,
+                cmd.device_id,
+                cmd.is_syncing,
+                cmd.last_sync_ms,
             )
         else:
             return None
@@ -699,9 +703,9 @@ class ReplicationCommandHandler:
         )
 
         now = self._clock.time_msec()
-        for user_id in currently_syncing:
+        for user_id, device_id in currently_syncing:
             connection.send_command(
-                UserSyncCommand(self._instance_id, user_id, True, now)
+                UserSyncCommand(self._instance_id, user_id, device_id, True, now)
             )
 
     def lost_connection(self, connection: IReplicationConnection) -> None:
@@ -753,11 +757,16 @@ class ReplicationCommandHandler:
         self.send_command(FederationAckCommand(self._instance_name, token))
 
     def send_user_sync(
-        self, instance_id: str, user_id: str, is_syncing: bool, last_sync_ms: int
+        self,
+        instance_id: str,
+        user_id: str,
+        device_id: Optional[str],
+        is_syncing: bool,
+        last_sync_ms: int,
     ) -> None:
         """Poke the master that a user has started/stopped syncing."""
         self.send_command(
-            UserSyncCommand(instance_id, user_id, is_syncing, last_sync_ms)
+            UserSyncCommand(instance_id, user_id, device_id, is_syncing, last_sync_ms)
         )
 
     def send_user_ip(

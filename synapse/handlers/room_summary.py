@@ -35,6 +35,7 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.events import EventBase
 from synapse.types import JsonDict, Requester, StrCollection
 from synapse.util.caches.response_cache import ResponseCache
@@ -94,7 +95,9 @@ class RoomSummaryHandler:
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
         self._ratelimiter = Ratelimiter(
-            store=self._store, clock=hs.get_clock(), rate_hz=5, burst_count=10
+            store=self._store,
+            clock=hs.get_clock(),
+            cfg=RatelimitSettings("<room summary>", per_second=5, burst_count=10),
         )
 
         # If a user tries to fetch the same page multiple times in quick succession,

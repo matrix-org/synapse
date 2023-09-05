@@ -133,7 +133,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # send a mocked-up SAML response to the callback
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})
@@ -163,7 +163,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # Map a user via SSO.
         saml_response = FakeAuthnResponse(
@@ -205,11 +205,11 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # mock out the error renderer too
         sso_handler = self.hs.get_sso_handler()
-        sso_handler.render_error = Mock(return_value=None)  # type: ignore[assignment]
+        sso_handler.render_error = Mock(return_value=None)  # type: ignore[method-assign]
 
         saml_response = FakeAuthnResponse({"uid": "test", "username": "föö"})
         request = _mock_request()
@@ -226,9 +226,9 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler and error renderer
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
         sso_handler = self.hs.get_sso_handler()
-        sso_handler.render_error = Mock(return_value=None)  # type: ignore[assignment]
+        sso_handler.render_error = Mock(return_value=None)  # type: ignore[method-assign]
 
         # register a user to occupy the first-choice MXID
         store = self.hs.get_datastores().main
@@ -311,7 +311,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[assignment]
+        auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
 
         # The response doesn't have the proper userGroup or department.
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})

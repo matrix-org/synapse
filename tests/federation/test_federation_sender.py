@@ -47,11 +47,11 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             federation_transport_client=self.federation_transport_client,
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room = AsyncMock(  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room = AsyncMock(  # type: ignore[method-assign]
             return_value={"test", "host2"}
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = (  # type: ignore[method-assign]
             hs.get_storage_controllers().state.get_current_hosts_in_room
         )
 
@@ -75,7 +75,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             thread_id=None,
             data={"ts": 1234},
         )
-        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
+        self.get_success(sender.send_read_receipt(receipt))
 
         self.pump()
 
@@ -111,6 +111,9 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         # * The same room / user on multiple threads.
         # * A different user in the same room.
         sender = self.hs.get_federation_sender()
+        # Hack so that we have a txn in-flight so we batch up read receipts
+        # below
+        sender.wake_destination("host2")
         for user, thread in (
             ("alice", None),
             ("alice", "thread"),
@@ -125,9 +128,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
                 thread_id=thread,
                 data={"ts": 1234},
             )
-            self.successResultOf(
-                defer.ensureDeferred(sender.send_read_receipt(receipt))
-            )
+            defer.ensureDeferred(sender.send_read_receipt(receipt))
 
         self.pump()
 
@@ -191,7 +192,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             thread_id=None,
             data={"ts": 1234},
         )
-        self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
+        self.get_success(sender.send_read_receipt(receipt))
 
         self.pump()
 
@@ -342,7 +343,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.reactor.advance(1)
 
         # a second call should produce no new device EDUs
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
         self.assertEqual(self.edus, [])
 
         # a second device
@@ -550,7 +553,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
 
         # We queue up device list updates to be sent over federation, so we
         # advance to clear the queue.
@@ -601,7 +606,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
 
         # We queue up device list updates to be sent over federation, so we
         # advance to clear the queue.
@@ -656,7 +663,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
-        self.hs.get_federation_sender().send_device_messages("host2")
+        self.get_success(
+            self.hs.get_federation_sender().send_device_messages(["host2"])
+        )
 
         # We queue up device list updates to be sent over federation, so we
         # advance to clear the queue.

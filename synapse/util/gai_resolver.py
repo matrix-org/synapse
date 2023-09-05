@@ -136,7 +136,7 @@ class GAIResolver:
 
     # The types on IHostnameResolver is incorrect in Twisted, see
     # https://twistedmatrix.com/trac/ticket/10276
-    def resolveHostName(  # type: ignore[override]
+    def resolveHostName(
         self,
         resolutionReceiver: IResolutionReceiver,
         hostName: str,

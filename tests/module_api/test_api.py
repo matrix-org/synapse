@@ -233,7 +233,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
     def test_sending_events_into_room(self) -> None:
         """Tests that a module can send events into a room"""
         # Mock out create_and_send_nonmember_event to check whether events are being sent
-        self.event_creation_handler.create_and_send_nonmember_event = Mock(  # type: ignore[assignment]
+        self.event_creation_handler.create_and_send_nonmember_event = Mock(  # type: ignore[method-assign]
             spec=[],
             side_effect=self.event_creation_handler.create_and_send_nonmember_event,
         )
@@ -579,7 +579,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         # Necessary to fake a remote join.
         fake_stream_id = 1
         mocked_remote_join = AsyncMock(return_value=("fake-event-id", fake_stream_id))
-        self.hs.get_room_member_handler()._remote_join = mocked_remote_join  # type: ignore[assignment]
+        self.hs.get_room_member_handler()._remote_join = mocked_remote_join  # type: ignore[method-assign]
         fake_remote_host = f"{self.module_api.server_name}-remote"
 
         # Given that the join is to be faked, we expect the relevant join event not to

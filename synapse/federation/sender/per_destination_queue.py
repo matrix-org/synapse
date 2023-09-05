@@ -59,6 +59,10 @@ sent_edus_by_type = Counter(
 )
 
 
+# If the retry interval is larger than this then we enter "catchup" mode
+CATCHUP_RETRY_INTERVAL = 60 * 60 * 1000
+
+
 class PerDestinationQueue:
     """
     Manages the per-destination transmission queues.
@@ -370,7 +374,7 @@ class PerDestinationQueue:
                 ),
             )
 
-            if e.retry_interval > 60 * 60 * 1000:
+            if e.retry_interval > CATCHUP_RETRY_INTERVAL:
                 # we won't retry for another hour!
                 # (this suggests a significant outage)
                 # We drop pending EDUs because otherwise they will

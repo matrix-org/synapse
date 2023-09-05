@@ -243,7 +243,7 @@ class LegacyJsonSendParser(_BaseJsonParser[Tuple[int, JsonDict]]):
         return (
             isinstance(v, list)
             and len(v) == 2
-            and type(v[0]) == int
+            and type(v[0]) == int  # noqa: E721
             and isinstance(v[1], dict)
         )
 
@@ -512,6 +512,7 @@ class MatrixFederationHttpClient:
         long_retries: bool = False,
         ignore_backoff: bool = False,
         backoff_on_404: bool = False,
+        backoff_on_all_error_codes: bool = False,
     ) -> IResponse:
         """
         Sends a request to the given server.
@@ -552,6 +553,7 @@ class MatrixFederationHttpClient:
                 and try the request anyway.
 
             backoff_on_404: Back off if we get a 404
+            backoff_on_all_error_codes: Back off if we get any error response
 
         Returns:
             Resolves with the HTTP response object on success.
@@ -594,6 +596,7 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
             notifier=self.hs.get_notifier(),
             replication_client=self.hs.get_replication_command_handler(),
+            backoff_on_all_error_codes=backoff_on_all_error_codes,
         )
 
         method_bytes = request.method.encode("ascii")
@@ -889,6 +892,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Literal[None] = None,
+        backoff_on_all_error_codes: bool = False,
     ) -> JsonDict:
         ...
 
@@ -906,6 +910,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser[T]] = None,
+        backoff_on_all_error_codes: bool = False,
     ) -> T:
         ...
 
@@ -922,6 +927,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser[T]] = None,
+        backoff_on_all_error_codes: bool = False,
     ) -> Union[JsonDict, T]:
         """Sends the specified json data using PUT
 
@@ -957,6 +963,7 @@ class MatrixFederationHttpClient:
                 enabled.
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
+            backoff_on_all_error_codes: Back off if we get any error response
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
@@ -990,6 +997,7 @@ class MatrixFederationHttpClient:
             ignore_backoff=ignore_backoff,
             long_retries=long_retries,
             timeout=timeout,
+            backoff_on_all_error_codes=backoff_on_all_error_codes,
         )
 
         if timeout is not None:

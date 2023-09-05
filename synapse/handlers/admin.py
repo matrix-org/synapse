@@ -76,6 +76,7 @@ class AdminHandler:
             "consent_ts",
             "user_type",
             "is_guest",
+            "last_seen_ts",
         }
 
         if self._msc3866_enabled:

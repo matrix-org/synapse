@@ -117,7 +117,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         async def _check_event_auth(origin: Any, event: Any, context: Any) -> None:
             pass
 
-        hs.get_federation_event_handler()._check_event_auth = _check_event_auth  # type: ignore[assignment]
+        hs.get_federation_event_handler()._check_event_auth = _check_event_auth  # type: ignore[method-assign]
 
         return hs
 

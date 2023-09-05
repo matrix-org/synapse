@@ -202,7 +202,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     @override_config({"limit_usage_by_mau": True})
     def test_get_or_create_user_mau_not_blocked(self) -> None:
-        self.store.count_monthly_users = AsyncMock(  # type: ignore[assignment]
+        self.store.count_monthly_users = AsyncMock(  # type: ignore[method-assign]
             return_value=self.hs.config.server.max_mau_value - 1
         )
         # Ensure does not throw exception
@@ -299,7 +299,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self) -> None:
         room_alias_str = "#room:test"
 
-        self.store.count_real_users = AsyncMock(return_value=1)  # type: ignore[assignment]
+        self.store.count_real_users = AsyncMock(return_value=1)  # type: ignore[method-assign]
         self.store.is_real_user = AsyncMock(return_value=True)
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
@@ -314,7 +314,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_auto_create_auto_join_rooms_when_user_is_not_the_first_real_user(
         self,
     ) -> None:
-        self.store.count_real_users = AsyncMock(return_value=2)  # type: ignore[assignment]
+        self.store.count_real_users = AsyncMock(return_value=2)  # type: ignore[method-assign]
         self.store.is_real_user = AsyncMock(return_value=True)
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))

@@ -291,7 +291,8 @@ class _PerHostRatelimiter:
             if self.metrics_name:
                 rate_limit_reject_counter.labels(self.metrics_name).inc()
             raise LimitExceededError(
-                retry_after_ms=int(self.window_size / self.sleep_limit)
+                limiter_name="rc_federation",
+                retry_after_ms=int(self.window_size / self.sleep_limit),
             )
 
         self.request_times.append(time_now)

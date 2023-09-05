@@ -1,0 +1,1 @@
+Fix a long-standing bug where uploading images would fail if we could not generate thumbnails for them.

@@ -35,7 +35,7 @@
         showcontent = true
 
 [tool.black]
-target-version = ['py37', 'py38', 'py39', 'py310']
+target-version = ['py38', 'py39', 'py310', 'py311']
 # black ignores everything in .gitignore by default, see
 # https://black.readthedocs.io/en/stable/usage_and_configuration/file_collection_and_discovery.html#gitignore
 # Use `extend-exclude` if you want to exclude something in addition to this.
@@ -89,7 +89,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.91.0rc1"
+version = "1.91.1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -306,10 +306,13 @@ all = [
 ]
 
 [tool.poetry.dev-dependencies]
-# We pin black so that our tests don't start failing on new releases.
+# We pin development dependencies in poetry.lock so that our tests don't start
+# failing on new releases. Keeping lower bounds loose here means that dependabot
+# can bump versions without having to update the content-hash in the lockfile.
+# This helps prevents merge conflicts when running a batch of dependabot updates.
 isort = ">=5.10.1"
-black = ">=22.3.0"
-ruff = "0.0.277"
+black = ">=22.7.0"
+ruff = "0.0.286"
 
 # Typechecking
 lxml-stubs = ">=0.4.0"

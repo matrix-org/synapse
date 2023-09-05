@@ -728,7 +728,7 @@ async def _unwrap_awaitable(awaitable: Awaitable[R]) -> R:
 
 
 @overload
-def preserve_fn(  # type: ignore[misc]
+def preserve_fn(
     f: Callable[P, Awaitable[R]],
 ) -> Callable[P, "defer.Deferred[R]"]:
     # The `type: ignore[misc]` above suppresses
@@ -756,7 +756,7 @@ def preserve_fn(
 
 
 @overload
-def run_in_background(  # type: ignore[misc]
+def run_in_background(
     f: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     # The `type: ignore[misc]` above suppresses
