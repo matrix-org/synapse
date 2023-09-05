@@ -107,6 +107,7 @@ class MSC3861DelegatedAuth(BaseAuth):
         assert self._config.client_id, "No client_id provided"
         assert auth_method is not None, "Invalid client_auth_method provided"
 
+        self._clock = hs.get_clock()
         self._http_client = hs.get_proxied_http_client()
         self._hostname = hs.hostname
         self._admin_token = self._config.admin_token
