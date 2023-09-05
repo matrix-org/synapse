@@ -30,7 +30,7 @@ jobs:
         run: docker buildx inspect
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Extract version from pyproject.toml
         # Note: explicitly requesting bash will mean bash is invoked with `-eo pipefail`, see

@@ -33,17 +33,17 @@ jobs:
       packages: write
     steps:
       - name: Checkout specific branch (debug build)
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         if: github.event_name == 'workflow_dispatch'
         with:
           ref: ${{ inputs.branch }}
       - name: Checkout clean copy of develop (scheduled build)
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         if: github.event_name == 'schedule'
         with:
           ref: develop
       - name: Checkout clean copy of master (on-push)
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         if: github.event_name == 'push'
         with:
           ref: master
