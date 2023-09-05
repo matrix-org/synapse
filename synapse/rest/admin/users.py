@@ -132,6 +132,7 @@ class UsersRestServletV2(RestServlet):
                 UserSortOrder.AVATAR_URL.value,
                 UserSortOrder.SHADOW_BANNED.value,
                 UserSortOrder.CREATION_TS.value,
+                UserSortOrder.LAST_SEEN_TS.value,
             ),
         )
 
@@ -1172,14 +1173,17 @@ class RateLimitRestServlet(RestServlet):
         messages_per_second = body.get("messages_per_second", 0)
         burst_count = body.get("burst_count", 0)
 
-        if type(messages_per_second) is not int or messages_per_second < 0:
+        if (
+            type(messages_per_second) is not int  # noqa: E721
+            or messages_per_second < 0
+        ):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (messages_per_second,),
                 errcode=Codes.INVALID_PARAM,
             )
 
-        if type(burst_count) is not int or burst_count < 0:
+        if type(burst_count) is not int or burst_count < 0:  # noqa: E721
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (burst_count,),

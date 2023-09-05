@@ -1891,7 +1891,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if type(origin_server_ts) is not int:
+        if type(origin_server_ts) is not int:  # noqa: E721
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

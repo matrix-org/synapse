@@ -14,7 +14,7 @@
 
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, cast
 
 import attr
 from canonicaljson import encode_canonical_json
@@ -28,8 +28,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
-from synapse.types import JsonDict
-from synapse.util.caches.descriptors import cached
+from synapse.types import JsonDict, StrCollection
+from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -204,6 +204,26 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             return DestinationRetryTimings(**result)
         else:
             return None
+
+    @cachedList(
+        cached_method_name="get_destination_retry_timings", list_name="destinations"
+    )
+    async def get_destination_retry_timings_batch(
+        self, destinations: StrCollection
+    ) -> Dict[str, Optional[DestinationRetryTimings]]:
+        rows = await self.db_pool.simple_select_many_batch(
+            table="destinations",
+            iterable=destinations,
+            column="destination",
+            retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
+            desc="get_destination_retry_timings_batch",
+        )
+
+        return {
+            row.pop("destination"): DestinationRetryTimings(**row)
+            for row in rows
+            if row["retry_last_ts"] and row["failure_ts"] and row["retry_interval"]
+        }
 
     async def set_destination_retry_timings(
         self,

@@ -809,23 +809,24 @@ def run_in_background(  # type: ignore[misc]
 
     # `res` may be a coroutine, `Deferred`, some other kind of awaitable, or a plain
     # value. Convert it to a `Deferred`.
+    d: "defer.Deferred[R]"
     if isinstance(res, typing.Coroutine):
         # Wrap the coroutine in a `Deferred`.
-        res = defer.ensureDeferred(res)
+        d = defer.ensureDeferred(res)
     elif isinstance(res, defer.Deferred):
-        pass
+        d = res
     elif isinstance(res, Awaitable):
         # `res` is probably some kind of completed awaitable, such as a `DoneAwaitable`
         # or `Future` from `make_awaitable`.
-        res = defer.ensureDeferred(_unwrap_awaitable(res))
+        d = defer.ensureDeferred(_unwrap_awaitable(res))
     else:
         # `res` is a plain value. Wrap it in a `Deferred`.
-        res = defer.succeed(res)
+        d = defer.succeed(res)
 
-    if res.called and not res.paused:
+    if d.called and not d.paused:
         # The function should have maintained the logcontext, so we can
         # optimise out the messing about
-        return res
+        return d
 
     # The function may have reset the context before returning, so
     # we need to restore it now.
@@ -843,8 +844,8 @@ def run_in_background(  # type: ignore[misc]
     # which is supposed to have a single entry and exit point. But
     # by spawning off another deferred, we are effectively
     # adding a new exit point.)
-    res.addBoth(_set_context_cb, ctx)
-    return res
+    d.addBoth(_set_context_cb, ctx)
+    return d
 
 
 T = TypeVar("T")
@@ -877,7 +878,7 @@ def make_deferred_yieldable(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]
 ResultT = TypeVar("ResultT")
 
 
-def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
+def _set_context_cb(result: ResultT, context: LoggingContextOrSentinel) -> ResultT:
     """A callback function which just sets the logging context"""
     set_current_context(context)
     return result

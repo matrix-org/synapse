@@ -66,14 +66,12 @@ class IdentityHandler:
         self._3pid_validation_ratelimiter_ip = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
-            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+            cfg=hs.config.ratelimiting.rc_3pid_validation,
         )
         self._3pid_validation_ratelimiter_address = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
-            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+            cfg=hs.config.ratelimiting.rc_3pid_validation,
         )
 
     async def ratelimit_request_token_requests(

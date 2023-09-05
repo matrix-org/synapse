@@ -58,7 +58,7 @@ def patch__eq__(cls: object) -> Callable[[], None]:
 
     def unpatch() -> None:
         if eq is not None:
-            cls.__eq__ = eq  # type: ignore[assignment]
+            cls.__eq__ = eq  # type: ignore[method-assign]
 
     return unpatch
 

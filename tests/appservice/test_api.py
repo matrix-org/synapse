@@ -96,7 +96,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                 )
 
         # We assign to a method, which mypy doesn't like.
-        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
+        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[method-assign]
 
         result = self.get_success(
             self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
@@ -168,7 +168,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                 )
 
         # We assign to a method, which mypy doesn't like.
-        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
+        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[method-assign]
 
         result = self.get_success(
             self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
@@ -215,7 +215,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             return RESPONSE
 
         # We assign to a method, which mypy doesn't like.
-        self.api.post_json_get_json = Mock(side_effect=post_json_get_json)  # type: ignore[assignment]
+        self.api.post_json_get_json = Mock(side_effect=post_json_get_json)  # type: ignore[method-assign]
 
         MISSING_KEYS = [
             # Known user, known device, missing algorithm.
