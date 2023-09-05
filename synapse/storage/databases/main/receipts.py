@@ -939,6 +939,7 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
         receipts."""
 
         def _remote_duplicate_receipts_txn(txn: LoggingTransaction) -> None:
+            ROW_ID_NAME = self.database_engine.row_id_name
             # Identify any duplicate receipts arising from
             # https://github.com/matrix-org/synapse/issues/14406.
             # The following query takes less than a minute on matrix.org.
@@ -957,7 +958,7 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
             # `stream_id`, we delete by the ctid instead.
             for stream_id, room_id, receipt_type, user_id in duplicate_keys:
                 sql = f"""
-                SELECT {self.database_engine.row_id_name}
+                SELECT {ROW_ID_NAME}
                 FROM receipts_linearized
                 WHERE
                     room_id = ? AND
@@ -977,7 +978,7 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
                         receipt_type = ? AND
                         user_id = ? AND
                         thread_id IS NULL AND
-                        {self.database_engine.row_id_name} != ?
+                        {ROW_ID_NAME} != ?
                 """
                 txn.execute(sql, (room_id, receipt_type, user_id, row_id))
 
