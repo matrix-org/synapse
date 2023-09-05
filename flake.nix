@@ -106,6 +106,10 @@
 
                   # Native dependencies for running Complement.
                   olm
+                  # also needed for Complement: without a C compiler, 'CGO' is disabled and
+                  # Go will silently ignore files with `import "C"` like the Olm bindings,
+                  # c.f. https://stackoverflow.com/a/68138546
+                  gcc
 
                   # For building the Synapse documentation website.
                   mdbook
