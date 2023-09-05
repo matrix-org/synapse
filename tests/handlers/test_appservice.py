@@ -951,34 +951,31 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Assert expected number of messages
         self.assertEqual(len(to_device_messages), 3)
 
-        device_msg_1 = {
-            "msg": to_device_messages[0],
-            "expected_user": self.exclusive_as_user,
-            "expected_device": self.exclusive_as_user_device_id,
-        }
+        for device_msg in to_device_messages:
+            self.assertEqual(device_msg["type"], "m.room_key_request")
+            self.assertEqual(device_msg["sender"], self.local_user)
+            self.assertEqual(device_msg["content"], message_content)
 
-        device_msg_2 = {
-            "msg": to_device_messages[1],
-            "expected_user": self.exclusive_as_user_2,
-            "expected_device": self.exclusive_as_user_2_device_id,
-        }
+        self.assertEqual(
+            to_device_messages[0]["to_user_id"], self.exclusive_as_user
+        )
+        self.assertEqual(
+            to_device_messages[0]["to_device_id"], self.exclusive_as_user_device_id,
+        )
 
-        device_msg_3 = {
-            "msg": to_device_messages[2],
-            "expected_user": self.exclusive_as_user_3,
-            "expected_device": self.exclusive_as_user_3_device_id,
-        }
+        self.assertEqual(
+            to_device_messages[1]["to_user_id"], self.exclusive_as_user_2
+        )
+        self.assertEqual(
+            to_device_messages[1]["to_device_id"], self.exclusive_as_user_2_device_id,
+        )
 
-        for device_msg in [device_msg_1, device_msg_2, device_msg_3]:
-            self.assertEqual(device_msg["msg"]["type"], "m.room_key_request")
-            self.assertEqual(device_msg["msg"]["sender"], self.local_user)
-            self.assertEqual(
-                device_msg["msg"]["to_user_id"], device_msg["expected_user"]
-            )
-            self.assertEqual(
-                device_msg["msg"]["to_device_id"], device_msg["expected_device"]
-            )
-            self.assertEqual(device_msg["msg"]["content"], message_content)
+        self.assertEqual(
+            to_device_messages[2]["to_user_id"], self.exclusive_as_user_3
+        )
+        self.assertEqual(
+            to_device_messages[2]["to_device_id"], self.exclusive_as_user_3_device_id,
+        )
 
     def _register_application_service(
         self,
