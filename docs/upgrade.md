@@ -88,7 +88,7 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.92.0
+# Upgrading to v1.93.0
 
 ## Minimum supported Rust version
 The minimum supported Rust version has been increased from v1.60.0 to v1.61.0.
