@@ -43,6 +43,7 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     StrCollection,
     StreamKeyType,
     StreamToken,
@@ -982,7 +983,7 @@ class DeviceListWorkerUpdater:
 
     async def multi_user_device_resync(
         self, user_ids: List[str], mark_failed_as_stale: bool = True
-    ) -> Dict[str, Optional[JsonDict]]:
+    ) -> Dict[str, Optional[JsonMapping]]:
         """
         Like `user_device_resync` but operates on multiple users **from the same origin**
         at once.
@@ -1253,7 +1254,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
 
     async def multi_user_device_resync(
         self, user_ids: List[str], mark_failed_as_stale: bool = True
-    ) -> Dict[str, Optional[JsonDict]]:
+    ) -> Dict[str, Optional[JsonMapping]]:
         """
         Like `user_device_resync` but operates on multiple users **from the same origin**
         at once.
@@ -1287,7 +1288,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
 
     async def _user_device_resync_returning_failed(
         self, user_id: str
-    ) -> Tuple[Optional[JsonDict], bool]:
+    ) -> Tuple[Optional[JsonMapping], bool]:
         """Fetches all devices for a user and updates the device cache with them.
 
         Args:
@@ -1300,6 +1301,12 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
               e.g. due to a connection problem.
             - True iff the resync failed and the device list should be marked as stale.
         """
+        # Check that we haven't gone and fetched the devices since we last
+        # checked if we needed to resync these device lists.
+        if await self.store.get_users_whose_devices_are_cached([user_id]):
+            cached = await self.store.get_cached_devices_for_user(user_id)
+            return cached, False
+
         logger.debug("Attempting to resync the device list for %s", user_id)
         log_kv({"message": "Doing resync to update device list."})
         # Fetch all devices for the user.
