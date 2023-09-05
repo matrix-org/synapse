@@ -741,7 +741,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         async def purge_room(room_id: str, force: bool) -> None:
             await deferLater(self.hs.get_reactor(), 100, lambda: None)
 
-        self.pagination_handler.purge_room = AsyncMock(side_effect=purge_room)  # type: ignore[assignment]
+        self.pagination_handler.purge_room = AsyncMock(side_effect=purge_room)  # type: ignore[method-assign]
 
         # first call to delete room
         # and do not wait for finish the task
