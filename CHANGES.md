@@ -5,7 +5,7 @@
 - Add configuration setting for CAS protocol version. Contributed by Aurélien Grimpard. ([\#15816](https://github.com/matrix-org/synapse/issues/15816))
 - Suppress notifications from message edits per [MSC3958](https://github.com/matrix-org/matrix-spec-proposals/pull/3958). ([\#16113](https://github.com/matrix-org/synapse/issues/16113))
 - Return a `Retry-After` with `M_LIMIT_EXCEEDED` error responses. ([\#16136](https://github.com/matrix-org/synapse/issues/16136))
-- Add `last_seen_ts` to the admin users API. ([\#16218](https://github.com/matrix-org/synapse/issues/16218))
+- Add `last_seen_ts` to the [admin users API](https://matrix-org.github.io/synapse/latest/admin_api/user_admin_api.html). ([\#16218](https://github.com/matrix-org/synapse/issues/16218))
 - Improve resource usage when sending data to a large number of remote hosts that are marked as "down". ([\#16223](https://github.com/matrix-org/synapse/issues/16223))
 
 ### Bugfixes
@@ -13,20 +13,20 @@
 - Fix IPv6-related bugs on SMTP settings, adding groundwork to fix similar issues. Contributed by @evilham and @telmich (ungleich.ch). ([\#16155](https://github.com/matrix-org/synapse/issues/16155))
 - Fix a spec compliance issue where requests to the `/publicRooms` federation API would specify `include_all_networks` as a string. ([\#16185](https://github.com/matrix-org/synapse/issues/16185))
 - Fix inaccurate error message while attempting to ban or unban a user with the same or higher PL by spliting the conditional statements. Contributed by @leviosacz. ([\#16205](https://github.com/matrix-org/synapse/issues/16205))
-- Fix rare bug that broke looping calls, which could lead to e.g. linearly increasing memory usage. Introduced in v1.90.0. ([\#16210](https://github.com/matrix-org/synapse/issues/16210))
+- Fix a rare bug that broke looping calls, which could lead to e.g. linearly increasing memory usage. Introduced in v1.90.0. ([\#16210](https://github.com/matrix-org/synapse/issues/16210))
 - Fix a long-standing bug where uploading images would fail if we could not generate thumbnails for them. ([\#16211](https://github.com/matrix-org/synapse/issues/16211))
-- Fix long-standing bug where we did not correctly back off from servers that had "gone" if they returned 4xx series error codes. ([\#16221](https://github.com/matrix-org/synapse/issues/16221))
+- Fix a long-standing bug where we did not correctly back off from servers that had "gone" if they returned 4xx series error codes. ([\#16221](https://github.com/matrix-org/synapse/issues/16221))
 
 ### Improved Documentation
 
-- Update links to the matrix.org blog. ([\#16008](https://github.com/matrix-org/synapse/issues/16008))
-- Document which admin APIs are disabled when experimental [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) support is enabled. ([\#16168](https://github.com/matrix-org/synapse/issues/16168))
-- Document `exclude_rooms_from_sync` configuration option. ([\#16178](https://github.com/matrix-org/synapse/issues/16178))
+- Update links to the [matrix.org blog](https://matrix.org/blog/). ([\#16008](https://github.com/matrix-org/synapse/issues/16008))
+- Document which [admin APIs](https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/index.html) are disabled when experimental [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) support is enabled. ([\#16168](https://github.com/matrix-org/synapse/issues/16168))
+- Document [`exclude_rooms_from_sync`](https://matrix-org.github.io/synapse/v1.92/usage/configuration/config_documentation.html#exclude_rooms_from_sync) configuration option. ([\#16178](https://github.com/matrix-org/synapse/issues/16178))
 
 ### Internal Changes
 
 - Prepare unit tests for Python 3.12. ([\#16099](https://github.com/matrix-org/synapse/issues/16099))
-- Attempt to fix the twisted trunk job. ([\#16121](https://github.com/matrix-org/synapse/issues/16121))
+- Fix nightly CI jobs. ([\#16121](https://github.com/matrix-org/synapse/issues/16121), [\#16213](https://github.com/matrix-org/synapse/issues/16213))
 - Describe which rate limiter was hit in logs. ([\#16135](https://github.com/matrix-org/synapse/issues/16135))
 - Simplify presence code when using workers. ([\#16170](https://github.com/matrix-org/synapse/issues/16170))
 - Track per-device information in the presence code. ([\#16171](https://github.com/matrix-org/synapse/issues/16171), [\#16172](https://github.com/matrix-org/synapse/issues/16172))
@@ -37,8 +37,6 @@
 - Improve type hints. ([\#16186](https://github.com/matrix-org/synapse/issues/16186), [\#16188](https://github.com/matrix-org/synapse/issues/16188), [\#16201](https://github.com/matrix-org/synapse/issues/16201))
 - Bump black version to 23.7.0. ([\#16187](https://github.com/matrix-org/synapse/issues/16187))
 - Log the details of background update failures. ([\#16212](https://github.com/matrix-org/synapse/issues/16212))
-- Fix the latest-deps CI job. ([\#16213](https://github.com/matrix-org/synapse/issues/16213))
-- Fix typo where we ended up with multiple `WorkerLocksHandler`. ([\#16220](https://github.com/matrix-org/synapse/issues/16220))
 - Cache device resync requests over replication. ([\#16241](https://github.com/matrix-org/synapse/issues/16241))
 
 ### Updates to locked dependencies
