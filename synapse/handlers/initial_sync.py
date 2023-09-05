@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.constants import (
     AccountDataTypes,
@@ -23,7 +23,6 @@ from synapse.api.constants import (
     Membership,
 )
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
@@ -35,7 +34,6 @@ from synapse.types import (
     JsonDict,
     Requester,
     RoomStreamToken,
-    StateMap,
     StreamKeyType,
     StreamToken,
     UserID,
