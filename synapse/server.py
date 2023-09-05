@@ -913,6 +913,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """Usage metrics shared between phone home stats and the prometheus exporter."""
         return CommonUsageMetricsManager(self)
 
+    @cache_in_self
     def get_worker_locks_handler(self) -> WorkerLocksHandler:
         return WorkerLocksHandler(self)
 

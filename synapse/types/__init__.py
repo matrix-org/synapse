@@ -946,6 +946,7 @@ class UserInfo:
         is_guest:  True if the user is a guest user.
         is_shadow_banned:  True if the user has been shadow-banned.
         user_type:  User type (None for normal user, 'support' and 'bot' other options).
+        last_seen_ts:  Last activity timestamp of the user.
     """
 
     user_id: UserID
@@ -958,6 +959,7 @@ class UserInfo:
     is_deactivated: bool
     is_guest: bool
     is_shadow_banned: bool
+    last_seen_ts: Optional[int]
 
 
 class UserProfile(TypedDict):
