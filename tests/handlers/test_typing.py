@@ -120,8 +120,6 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore = hs.get_datastores().main
 
-        self.datastore.get_destination_retry_timings = AsyncMock(return_value=None)
-
         self.datastore.get_device_updates_by_remote = AsyncMock(  # type: ignore[method-assign]
             return_value=(0, [])
         )
@@ -251,8 +249,8 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             json_data_callback=ANY,
             long_retries=True,
-            backoff_on_404=True,
             try_trailing_slash_on_400=True,
+            backoff_on_all_error_codes=True,
         )
 
     def test_started_typing_remote_recv(self) -> None:
@@ -366,7 +364,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             json_data_callback=ANY,
             long_retries=True,
-            backoff_on_404=True,
+            backoff_on_all_error_codes=True,
             try_trailing_slash_on_400=True,
         )
 

@@ -249,8 +249,10 @@ class TransportLayerClient:
             data=json_data,
             json_data_callback=json_data_callback,
             long_retries=True,
-            backoff_on_404=True,  # If we get a 404 the other side has gone
             try_trailing_slash_on_400=True,
+            # Sending a transaction should always succeed, if it doesn't
+            # then something is wrong and we should backoff.
+            backoff_on_all_error_codes=True,
         )
 
     async def make_query(

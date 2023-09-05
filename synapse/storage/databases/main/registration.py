@@ -206,8 +206,12 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     consent_server_notice_sent, appservice_id, creation_ts, user_type,
                     deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
                     COALESCE(approved, TRUE) AS approved,
-                    COALESCE(locked, FALSE) AS locked
+                    COALESCE(locked, FALSE) AS locked, last_seen_ts
                 FROM users
+                LEFT JOIN (
+                    SELECT user_id, MAX(last_seen) AS last_seen_ts
+                    FROM user_ips GROUP BY user_id
+                ) ls ON users.name = ls.user_id
                 WHERE name = ?
                 """,
                 (user_id,),
@@ -268,6 +272,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             is_shadow_banned=bool(user_data["shadow_banned"]),
             user_id=UserID.from_string(user_data["name"]),
             user_type=user_data["user_type"],
+            last_seen_ts=user_data["last_seen_ts"],
         )
 
     async def is_trial_user(self, user_id: str) -> bool:
