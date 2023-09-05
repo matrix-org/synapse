@@ -1012,6 +1012,7 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
         self._notifier = hs.get_notifier()
 
         self._remote_edu_linearizer = Linearizer(name="remote_device_list")
+        self._resync_linearizer = Linearizer(name="remote_device_resync")
 
         # user_id -> list of updates waiting to be handled.
         self._pending_updates: Dict[
@@ -1274,9 +1275,11 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
         failed = set()
         # TODO(Perf): Actually batch these up
         for user_id in user_ids:
-            user_result, user_failed = await self._user_device_resync_returning_failed(
-                user_id
-            )
+            async with self._resync_linearizer.queue(user_id):
+                (
+                    user_result,
+                    user_failed,
+                ) = await self._user_device_resync_returning_failed(user_id)
             result[user_id] = user_result
             if user_failed:
                 failed.add(user_id)
