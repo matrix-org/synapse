@@ -349,7 +349,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     table="devices",
                     column="user_id",
                     iterable=user_ids_to_query,
-                    keyvalues={"user_id": user_id, "hidden": False},
+                    keyvalues={"hidden": False},
                     retcols=("device_id",),
                 )
 
