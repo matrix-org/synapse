@@ -487,7 +487,6 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                   LIMIT {limit}
                 )
                 """
-
             txn.execute(sql, (user_id, device_id, up_to_stream_id))
             return txn.rowcount
 
@@ -506,10 +505,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         updated_last_deleted_stream_id = self._last_device_delete_cache.get(
             (user_id, device_id), 0
         )
-
         self._last_device_delete_cache[(user_id, device_id)] = max(
-            updated_last_deleted_stream_id,
-            up_to_stream_id,
+            updated_last_deleted_stream_id, up_to_stream_id
         )
 
         return count
