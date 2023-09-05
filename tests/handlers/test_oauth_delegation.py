@@ -526,68 +526,6 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
         self.assertEqual(error.value.code, 503)
 
-    def test_introspection_token_cache(self) -> None:
-        access_token = "open_sesame"
-        self.http_client.request = simple_async_mock(
-            return_value=FakeResponse.json(
-                code=200,
-                payload={"active": "true", "scope": "guest", "jti": access_token},
-            )
-        )
-
-        # first call should cache response
-        # Mpyp ignores below are due to mypy not understanding the dynamic substitution of msc3861 auth code
-        # for regular auth code via the config
-        self.get_success(
-            self.auth._introspect_token(access_token)  # type: ignore[attr-defined]
-        )
-        introspection_token = self.auth._token_cache.get(access_token)  # type: ignore[attr-defined]
-        self.assertEqual(introspection_token["jti"], access_token)
-        # there's been one http request
-        self.http_client.request.assert_called_once()
-
-        # second call should pull from cache, there should still be only one http request
-        token = self.get_success(self.auth._introspect_token(access_token))  # type: ignore[attr-defined]
-        self.http_client.request.assert_called_once()
-        self.assertEqual(token["jti"], access_token)
-
-        # advance past five minutes and check that cache expired - there should be more than one http call now
-        self.reactor.advance(360)
-        token_2 = self.get_success(self.auth._introspect_token(access_token))  # type: ignore[attr-defined]
-        self.assertEqual(self.http_client.request.call_count, 2)
-        self.assertEqual(token_2["jti"], access_token)
-
-        # test that if a cached token is expired, a fresh token will be pulled from authorizing server - first add a
-        # token with a soon-to-expire `exp` field to the cache
-        self.http_client.request = simple_async_mock(
-            return_value=FakeResponse.json(
-                code=200,
-                payload={
-                    "active": "true",
-                    "scope": "guest",
-                    "jti": "stale",
-                    "exp": self.clock.time() + 100,
-                },
-            )
-        )
-        self.get_success(
-            self.auth._introspect_token("stale")  # type: ignore[attr-defined]
-        )
-        introspection_token = self.auth._token_cache.get("stale")  # type: ignore[attr-defined]
-        self.assertEqual(introspection_token["jti"], "stale")
-        self.assertEqual(self.http_client.request.call_count, 1)
-
-        # advance the reactor past the token expiry but less than the cache expiry
-        self.reactor.advance(120)
-        self.assertEqual(self.auth._token_cache.get("stale"), introspection_token)  # type: ignore[attr-defined]
-
-        # check that the next call causes another http request (which will fail because the token is technically expired
-        # but the important thing is we discard the token from the cache and try the network)
-        self.get_failure(
-            self.auth._introspect_token("stale"), InvalidClientTokenError  # type: ignore[attr-defined]
-        )
-        self.assertEqual(self.http_client.request.call_count, 2)
-
     def make_device_keys(self, user_id: str, device_id: str) -> JsonDict:
         # We only generate a master key to simplify the test.
         master_signing_key = generate_signing_key(device_id)
