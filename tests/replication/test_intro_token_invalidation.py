@@ -17,8 +17,17 @@ from typing import Any, Dict
 import synapse.rest.admin._base
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
+from tests.unittest import skip_unless
+
+try:
+    import authlib  # noqa: F401
+
+    HAS_AUTHLIB = True
+except ImportError:
+    HAS_AUTHLIB = False
 
 
+@skip_unless(HAS_AUTHLIB, "requires authlib")
 class IntrospectionTokenCacheInvalidationTestCase(BaseMultiWorkerStreamTestCase):
     servlets = [synapse.rest.admin.register_servlets]
 
