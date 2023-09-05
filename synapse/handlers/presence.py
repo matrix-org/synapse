@@ -155,6 +155,8 @@ LAST_ACTIVE_GRANULARITY = 60 * 1000
 # How long to wait until a new /events or /sync request before assuming
 # the client has gone.
 SYNC_ONLINE_TIMEOUT = 30 * 1000
+# Busy status waits longer, but does eventually go offline.
+BUSY_ONLINE_TIMEOUT = 60 * 60 * 1000
 
 # How long to wait before marking the user as idle. Compared against last active
 IDLE_TIMER = 5 * 60 * 1000
@@ -2066,7 +2068,15 @@ def handle_timeout(
                     device_state.last_sync_ts, device_state.last_active_ts
                 )
 
-                if now - sync_or_active > SYNC_ONLINE_TIMEOUT:
+                # Implementations aren't meant to timeout a device with a busy
+                # state, but it needs to timeout *eventually* or else the user
+                # will be stuck in that state.
+                online_timeout = (
+                    BUSY_ONLINE_TIMEOUT
+                    if device_state.state == PresenceState.BUSY
+                    else SYNC_ONLINE_TIMEOUT
+                )
+                if now - sync_or_active > online_timeout:
                     # Mark the device as going offline.
                     offline_devices.append(device_id)
                     device_changed = True
@@ -2165,6 +2175,13 @@ def handle_update(
                 # Been a while since we've poked remote servers
                 new_state = new_state.copy_and_replace(last_federation_update_ts=now)
                 federation_ping = True
+
+        if new_state.state == PresenceState.BUSY:
+            wheel_timer.insert(
+                now=now,
+                obj=user_id,
+                then=new_state.last_user_sync_ts + BUSY_ONLINE_TIMEOUT,
+            )
 
     else:
         wheel_timer.insert(
