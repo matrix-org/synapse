@@ -836,17 +836,16 @@ class DeviceHandler(DeviceWorkerHandler):
                             user_id,
                             hosts,
                         )
-                        for host in hosts:
-                            self.federation_sender.send_device_messages(
-                                host, immediate=False
-                            )
-                            # TODO: when called, this isn't in a logging context.
-                            # This leads to log spam, sentry event spam, and massive
-                            # memory usage.
-                            # See https://github.com/matrix-org/synapse/issues/12552.
-                            # log_kv(
-                            #     {"message": "sent device update to host", "host": host}
-                            # )
+                        await self.federation_sender.send_device_messages(
+                            hosts, immediate=False
+                        )
+                        # TODO: when called, this isn't in a logging context.
+                        # This leads to log spam, sentry event spam, and massive
+                        # memory usage.
+                        # See https://github.com/matrix-org/synapse/issues/12552.
+                        # log_kv(
+                        #     {"message": "sent device update to host", "host": host}
+                        # )
 
                     if current_stream_id != stream_id:
                         # Clear the set of hosts we've already sent to as we're
@@ -951,8 +950,9 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # Notify things that device lists need to be sent out.
         self.notifier.notify_replication()
-        for host in potentially_changed_hosts:
-            self.federation_sender.send_device_messages(host, immediate=False)
+        await self.federation_sender.send_device_messages(
+            potentially_changed_hosts, immediate=False
+        )
 
 
 def _update_device_from_client_ips(

@@ -399,7 +399,9 @@ class BasePresenceHandler(abc.ABC):
         )
 
         for destination, host_states in hosts_to_states.items():
-            self._federation.send_presence_to_destinations(host_states, [destination])
+            await self._federation.send_presence_to_destinations(
+                host_states, [destination]
+            )
 
     async def send_full_presence_to_users(self, user_ids: StrCollection) -> None:
         """
@@ -999,7 +1001,7 @@ class PresenceHandler(BasePresenceHandler):
                 )
 
                 for destination, states in hosts_to_states.items():
-                    self._federation_queue.send_presence_to_destinations(
+                    await self._federation_queue.send_presence_to_destinations(
                         states, [destination]
                     )
 
@@ -1618,7 +1620,7 @@ class PresenceHandler(BasePresenceHandler):
                 or state.status_msg is not None
             ]
 
-            self._federation_queue.send_presence_to_destinations(
+            await self._federation_queue.send_presence_to_destinations(
                 destinations=newly_joined_remote_hosts,
                 states=states,
             )
@@ -1629,7 +1631,7 @@ class PresenceHandler(BasePresenceHandler):
             prev_remote_hosts or newly_joined_remote_hosts
         ):
             local_states = await self.current_state_for_users(newly_joined_local_users)
-            self._federation_queue.send_presence_to_destinations(
+            await self._federation_queue.send_presence_to_destinations(
                 destinations=prev_remote_hosts | newly_joined_remote_hosts,
                 states=list(local_states.values()),
             )
@@ -2367,7 +2369,7 @@ class PresenceFederationQueue:
         index = bisect(self._queue, (clear_before,))
         self._queue = self._queue[index:]
 
-    def send_presence_to_destinations(
+    async def send_presence_to_destinations(
         self, states: Collection[UserPresenceState], destinations: StrCollection
     ) -> None:
         """Send the presence states to the given destinations.
@@ -2387,7 +2389,7 @@ class PresenceFederationQueue:
             return
 
         if self._federation:
-            self._federation.send_presence_to_destinations(
+            await self._federation.send_presence_to_destinations(
                 states=states,
                 destinations=destinations,
             )
@@ -2510,7 +2512,7 @@ class PresenceFederationQueue:
 
         for host, user_ids in hosts_to_users.items():
             states = await self._presence_handler.current_state_for_users(user_ids)
-            self._federation.send_presence_to_destinations(
+            await self._federation.send_presence_to_destinations(
                 states=states.values(),
                 destinations=[host],
             )

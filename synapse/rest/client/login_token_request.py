@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -66,15 +67,18 @@ class LoginTokenRequestServlet(RestServlet):
         self.token_timeout = hs.config.auth.login_via_existing_token_timeout
         self._require_ui_auth = hs.config.auth.login_via_existing_require_ui_auth
 
-        # Ratelimit aggressively to a maxmimum of 1 request per minute.
+        # Ratelimit aggressively to a maximum of 1 request per minute.
         #
         # This endpoint can be used to spawn additional sessions and could be
         # abused by a malicious client to create many sessions.
         self._ratelimiter = Ratelimiter(
             store=self._main_store,
             clock=hs.get_clock(),
-            rate_hz=1 / 60,
-            burst_count=1,
+            cfg=RatelimitSettings(
+                key="<login token request>",
+                per_second=1 / 60,
+                burst_count=1,
+            ),
         )
 
     @interactive_auth_handler

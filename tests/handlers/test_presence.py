@@ -1389,8 +1389,14 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         prev_token = self.queue.get_current_token(self.instance_name)
 
-        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
-        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        self.get_success(
+            self.queue.send_presence_to_destinations(
+                (state1, state2), ("dest1", "dest2")
+            )
+        )
+        self.get_success(
+            self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        )
 
         now_token = self.queue.get_current_token(self.instance_name)
 
@@ -1426,11 +1432,17 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         prev_token = self.queue.get_current_token(self.instance_name)
 
-        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+        self.get_success(
+            self.queue.send_presence_to_destinations(
+                (state1, state2), ("dest1", "dest2")
+            )
+        )
 
         now_token = self.queue.get_current_token(self.instance_name)
 
-        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        self.get_success(
+            self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        )
 
         rows, upto_token, limited = self.get_success(
             self.queue.get_replication_rows("master", prev_token, now_token, 10)
@@ -1469,8 +1481,14 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         prev_token = self.queue.get_current_token(self.instance_name)
 
-        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
-        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        self.get_success(
+            self.queue.send_presence_to_destinations(
+                (state1, state2), ("dest1", "dest2")
+            )
+        )
+        self.get_success(
+            self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        )
 
         self.reactor.advance(10 * 60 * 1000)
 
@@ -1485,8 +1503,14 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         prev_token = self.queue.get_current_token(self.instance_name)
 
-        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
-        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        self.get_success(
+            self.queue.send_presence_to_destinations(
+                (state1, state2), ("dest1", "dest2")
+            )
+        )
+        self.get_success(
+            self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        )
 
         now_token = self.queue.get_current_token(self.instance_name)
 
@@ -1513,11 +1537,17 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         prev_token = self.queue.get_current_token(self.instance_name)
 
-        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+        self.get_success(
+            self.queue.send_presence_to_destinations(
+                (state1, state2), ("dest1", "dest2")
+            )
+        )
 
         self.reactor.advance(2 * 60 * 1000)
 
-        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        self.get_success(
+            self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        )
 
         self.reactor.advance(4 * 60 * 1000)
 
@@ -1533,8 +1563,14 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         prev_token = self.queue.get_current_token(self.instance_name)
 
-        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
-        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        self.get_success(
+            self.queue.send_presence_to_destinations(
+                (state1, state2), ("dest1", "dest2")
+            )
+        )
+        self.get_success(
+            self.queue.send_presence_to_destinations((state3,), ("dest3",))
+        )
 
         now_token = self.queue.get_current_token(self.instance_name)
 

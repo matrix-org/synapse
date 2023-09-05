@@ -211,6 +211,11 @@ class SynapseError(CodeMessageException):
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, **self._additional_fields)
 
+    @property
+    def debug_context(self) -> Optional[str]:
+        """Override this to add debugging context that shouldn't be sent to clients."""
+        return None
+
 
 class InvalidAPICallError(SynapseError):
     """You called an existing API endpoint, but fed that endpoint
@@ -508,8 +513,8 @@ class LimitExceededError(SynapseError):
 
     def __init__(
         self,
+        limiter_name: str,
         code: int = 429,
-        msg: str = "Too Many Requests",
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
@@ -518,11 +523,16 @@ class LimitExceededError(SynapseError):
             if self.include_retry_after_header and retry_after_ms is not None
             else None
         )
-        super().__init__(code, msg, errcode, headers=headers)
+        super().__init__(code, "Too Many Requests", errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
+        self.limiter_name = limiter_name
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
+
+    @property
+    def debug_context(self) -> Optional[str]:
+        return self.limiter_name
 
 
 class RoomKeysVersionError(SynapseError):

@@ -1,3 +1,15 @@
+# Synapse 1.91.1 (2023-09-04)
+
+### Bugfixes
+
+- Fix a performance regression introduced in Synapse 1.91.0 where event persistence would cause an excessive linear growth in CPU usage. ([\#16220](https://github.com/matrix-org/synapse/issues/16220))
+
+
+# Synapse 1.91.0 (2023-08-30)
+
+No significant changes since 1.91.0rc1.
+
+
 # Synapse 1.91.0rc1 (2023-08-23)
 
 ### Features

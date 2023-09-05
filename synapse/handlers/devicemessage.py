@@ -90,8 +90,7 @@ class DeviceMessageHandler:
         self._ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_key_requests.per_second,
-            burst_count=hs.config.ratelimiting.rc_key_requests.burst_count,
+            cfg=hs.config.ratelimiting.rc_key_requests,
         )
 
     async def on_direct_to_device_edu(self, origin: str, content: JsonDict) -> None:
@@ -303,10 +302,9 @@ class DeviceMessageHandler:
         )
 
         if self.federation_sender:
-            for destination in remote_messages.keys():
-                # Enqueue a new federation transaction to send the new
-                # device messages to each remote destination.
-                self.federation_sender.send_device_messages(destination)
+            # Enqueue a new federation transaction to send the new
+            # device messages to each remote destination.
+            await self.federation_sender.send_device_messages(remote_messages.keys())
 
     async def get_events_for_dehydrated_device(
         self,
