@@ -203,14 +203,12 @@ class MediaRepository:
         """
         media_id = random_string(24)
         now = self.clock.time_msec()
-        unused_expires_at = now + self.unused_expiration_time
         await self.store.store_local_media_id(
             media_id=media_id,
             time_now_ms=now,
             user_id=auth_user,
-            unused_expires_at=unused_expires_at,
         )
-        return f"mxc://{self.server_name}/{media_id}", unused_expires_at
+        return f"mxc://{self.server_name}/{media_id}", now + self.unused_expiration_time
 
     @trace
     async def reached_pending_media_limit(
@@ -264,7 +262,8 @@ class MediaRepository:
                 errcode=Codes.CANNOT_OVERWRITE_MEDIA,
             )
 
-        if media.get("unused_expires_at", 0) < self.clock.time_msec():
+        expired_time_ms = self.clock.time_msec() - self.unused_expiration_time
+        if media.created_ts < expired_time_ms:
             raise NotFoundError("Media ID has expired")
 
     @trace
@@ -392,12 +391,12 @@ class MediaRepository:
                 return media_info
 
             # Check if the media ID has expired and still hasn't been uploaded to.
-            unused_expires_at = media_info.get("unused_expires_at", 0)
-            if 0 < unused_expires_at < self.clock.time_msec():
+            now = self.clock.time_msec()
+            if media_info.get("created_ts", now) + self.unused_expiration_time < now:
                 respond_404(request)
                 return None
 
-            if self.clock.time_msec() >= wait_until:
+            if now >= wait_until:
                 break
 
             await self.clock.sleep(0.5)

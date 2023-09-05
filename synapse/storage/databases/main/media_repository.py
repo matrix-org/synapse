@@ -150,6 +150,8 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             self._drop_media_index_without_method,
         )
 
+        self.unused_expiration_time = hs.config.media.unused_expiration_time
+
     async def _drop_media_index_without_method(
         self, progress: JsonDict, batch_size: int
     ) -> int:
@@ -204,7 +206,6 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "last_access_ts",
                 "safe_from_quarantine",
                 "user_id",
-                "unused_expires_at",
             ),
             allow_none=True,
             desc="get_local_media",
@@ -400,7 +401,6 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         media_id: str,
         time_now_ms: int,
         user_id: UserID,
-        unused_expires_at: int,
     ) -> None:
         await self.db_pool.simple_insert(
             "local_media_repository",
@@ -408,7 +408,6 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "media_id": media_id,
                 "created_ts": time_now_ms,
                 "user_id": user_id.to_string(),
-                "unused_expires_at": unused_expires_at,
             },
             desc="store_local_media_id",
         )
@@ -497,7 +496,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             row = txn.fetchone()
             if not row:
                 raise StoreError(404, "Failed to count pending media for user")
-            return row[0], row[1] or 0
+            return row[0], (row[1] + self.unused_expiration_time if row[1] else 0)
 
         return await self.db_pool.runInteraction("get_url_cache", get_pending_media_txn)
 
