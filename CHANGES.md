@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-- Revert MSC3861 introspection cache, admin impersonation and account lock. ([\#16258](https://github.com/matrix-org/synapse/issues/16258))
+- Revert [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) introspection cache, admin impersonation and account lock. ([\#16258](https://github.com/matrix-org/synapse/issues/16258))
 
 
 # Synapse 1.91.1 (2023-09-04)
