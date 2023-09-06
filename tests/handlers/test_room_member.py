@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -16,7 +16,6 @@ from synapse.util import Clock
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import make_request
-from tests.test_utils import make_awaitable
 from tests.unittest import (
     FederatingHomeserverTestCase,
     HomeserverTestCase,
@@ -154,25 +153,21 @@ class TestJoinsLimitedByPerRoomRateLimiter(FederatingHomeserverTestCase):
             None,
         )
 
-        mock_make_membership_event = Mock(
-            return_value=make_awaitable(
-                (
-                    self.OTHER_SERVER_NAME,
-                    join_event,
-                    self.hs.config.server.default_room_version,
-                )
+        mock_make_membership_event = AsyncMock(
+            return_value=(
+                self.OTHER_SERVER_NAME,
+                join_event,
+                self.hs.config.server.default_room_version,
             )
         )
-        mock_send_join = Mock(
-            return_value=make_awaitable(
-                SendJoinResult(
-                    join_event,
-                    self.OTHER_SERVER_NAME,
-                    state=[create_event],
-                    auth_chain=[create_event],
-                    partial_state=False,
-                    servers_in_room=frozenset(),
-                )
+        mock_send_join = AsyncMock(
+            return_value=SendJoinResult(
+                join_event,
+                self.OTHER_SERVER_NAME,
+                state=[create_event],
+                auth_chain=[create_event],
+                partial_state=False,
+                servers_in_room=frozenset(),
             )
         )
 

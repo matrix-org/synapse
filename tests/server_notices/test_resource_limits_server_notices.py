@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Tuple
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -29,7 +29,6 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 from tests.utils import default_config
 
@@ -69,24 +68,22 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         assert isinstance(rlsn, ResourceLimitsServerNotices)
         self._rlsn = rlsn
 
-        self._rlsn._store.user_last_seen_monthly_active = Mock(
-            return_value=make_awaitable(1000)
-        )
-        self._rlsn._server_notices_manager.send_notice = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(Mock())
+        self._rlsn._store.user_last_seen_monthly_active = AsyncMock(return_value=1000)
+        self._rlsn._server_notices_manager.send_notice = AsyncMock(  # type: ignore[method-assign]
+            return_value=Mock()
         )
         self._send_notice = self._rlsn._server_notices_manager.send_notice
 
         self.user_id = "@user_id:test"
 
-        self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
-            return_value=make_awaitable("!something:localhost")
+        self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = (
+            AsyncMock(return_value="!something:localhost")
         )
-        self._rlsn._server_notices_manager.maybe_get_notice_room_for_user = Mock(
-            return_value=make_awaitable("!something:localhost")
+        self._rlsn._server_notices_manager.maybe_get_notice_room_for_user = AsyncMock(
+            return_value="!something:localhost"
         )
-        self._rlsn._store.add_tag_to_room = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
-        self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))  # type: ignore[assignment]
+        self._rlsn._store.add_tag_to_room = AsyncMock(return_value=None)  # type: ignore[method-assign]
+        self._rlsn._store.get_tags_for_room = AsyncMock(return_value={})  # type: ignore[method-assign]
 
     @override_config({"hs_disabled": True})
     def test_maybe_send_server_notice_disabled_hs(self) -> None:
@@ -103,14 +100,14 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
     def test_maybe_send_server_notice_to_user_remove_blocked_notice(self) -> None:
         """Test when user has blocked notice, but should have it removed"""
 
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None)
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None
         )
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable({"123": mock_event})
+        self._rlsn._store.get_events = AsyncMock(  # type: ignore[method-assign]
+            return_value={"123": mock_event}
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
         # Would be better to check the content, but once == remove blocking event
@@ -125,16 +122,16 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user has blocked notice, but notice ought to be there (NOOP)
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None),
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None,
             side_effect=ResourceLimitError(403, "foo"),
         )
 
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable({"123": mock_event})
+        self._rlsn._store.get_events = AsyncMock(  # type: ignore[method-assign]
+            return_value={"123": mock_event}
         )
 
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
@@ -145,8 +142,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, but should have one
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None),
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None,
             side_effect=ResourceLimitError(403, "foo"),
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
@@ -158,8 +155,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, nor should they (NOOP)
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None)
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None
         )
 
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
@@ -171,12 +168,10 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user is not part of the MAU cohort - this should not ever
         happen - but ...
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None)
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None
         )
-        self._rlsn._store.user_last_seen_monthly_active = Mock(
-            return_value=make_awaitable(None)
-        )
+        self._rlsn._store.user_last_seen_monthly_active = AsyncMock(return_value=None)
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
         self._send_notice.assert_not_called()
@@ -189,8 +184,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test that when server is over MAU limit and alerting is suppressed, then
         an alert message is not sent into the room
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None),
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None,
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
             ),
@@ -204,8 +199,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test that when a server is disabled, that MAU limit alerting is ignored.
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None),
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None,
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.HS_DISABLED
             ),
@@ -223,22 +218,22 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         When the room is already in a blocked state, test that when alerting
         is suppressed that the room is returned to an unblocked state.
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None),
+        self._rlsn._auth_blocking.check_auth_blocking = AsyncMock(  # type: ignore[method-assign]
+            return_value=None,
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
             ),
         )
 
-        self._rlsn._is_room_currently_blocked = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable((True, []))
+        self._rlsn._is_room_currently_blocked = AsyncMock(  # type: ignore[method-assign]
+            return_value=(True, [])
         )
 
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable({"123": mock_event})
+        self._rlsn._store.get_events = AsyncMock(  # type: ignore[method-assign]
+            return_value={"123": mock_event}
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
@@ -284,11 +279,9 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         self.user_id = "@user_id:test"
 
     def test_server_notice_only_sent_once(self) -> None:
-        self.store.get_monthly_active_count = Mock(return_value=make_awaitable(1000))
+        self.store.get_monthly_active_count = AsyncMock(return_value=1000)
 
-        self.store.user_last_seen_monthly_active = Mock(
-            return_value=make_awaitable(1000)
-        )
+        self.store.user_last_seen_monthly_active = AsyncMock(return_value=1000)
 
         # Call the function multiple times to ensure we only send the notice once
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
@@ -327,7 +320,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         hasn't been reached (since it's the only user and the limit is 5), so users
         shouldn't receive a server notice.
         """
-        m = Mock(return_value=make_awaitable(None))
+        m = AsyncMock(return_value=None)
         self._rlsn._server_notices_manager.maybe_get_notice_room_for_user = m
 
         user_id = self.register_user("user", "password")

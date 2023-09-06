@@ -218,7 +218,7 @@ The following parameters should be set in the URL:
 - `name` - Is optional and filters to only return users with user ID localparts
   **or** displaynames that contain this value.
 - `guests` - string representing a bool - Is optional and if `false` will **exclude** guest users.
-  Defaults to `true` to include guest users.
+  Defaults to `true` to include guest users. This parameter is not supported when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
 - `admins` - Optional flag to filter admins. If `true`, only admins are queried. If `false`, admins are excluded from 
   the query. When the flag is absent (the default), **both** admins and non-admins are included in the search results.
 - `deactivated` - string representing a bool - Is optional and if `true` will **include** deactivated users.
@@ -242,6 +242,7 @@ The following parameters should be set in the URL:
   - `displayname` - Users are ordered alphabetically by `displayname`.
   - `avatar_url` - Users are ordered alphabetically by avatar URL.
   - `creation_ts` - Users are ordered by when the users was created in ms.
+  - `last_seen_ts` - Users are ordered by when the user was lastly seen in ms.
 
 - `dir` - Direction of media order. Either `f` for forwards or `b` for backwards.
   Setting this value to `b` will reverse the above sort order. Defaults to `f`.
@@ -272,6 +273,7 @@ The following fields are returned in the JSON response body:
   - `displayname` - string - The user's display name if they have set one.
   - `avatar_url` - string -  The user's avatar URL if they have set one.
   - `creation_ts` - integer - The user's creation timestamp in ms.
+  - `last_seen_ts` - integer - The user's last activity timestamp in ms.
 
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
@@ -390,6 +392,8 @@ The following actions are **NOT** performed. The list may be incomplete.
 
 ## Reset password
 
+**Note:** This API is disabled when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
+
 Changes the password of another user. This will automatically log the user out of all their devices.
 
 The api is:
@@ -413,6 +417,8 @@ The parameter `logout_devices` is optional and defaults to `true`.
 
 ## Get whether a user is a server administrator or not
 
+**Note:** This API is disabled when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
+
 The api is:
 
 ```
@@ -429,6 +435,8 @@ A response body like the following is returned:
 
 
 ## Change whether a user is a server administrator or not
+
+**Note:** This API is disabled when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
 
 Note that you cannot demote yourself.
 
@@ -722,6 +730,8 @@ With the parameters you can for example limit the number of files to delete at o
 delete largest/smallest or newest/oldest files first.
 
 ## Login as a user
+
+**Note:** This API is disabled when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
 
 Get an access token that can be used to authenticate as that user. Useful for
 when admins wish to do actions on behalf of a user.

@@ -97,7 +97,7 @@ class PresenceStatusRestServlet(RestServlet):
             raise SynapseError(400, "Unable to parse state")
 
         if self._use_presence:
-            await self.presence_handler.set_state(user, state)
+            await self.presence_handler.set_state(user, requester.device_id, state)
 
         return 200, {}
 

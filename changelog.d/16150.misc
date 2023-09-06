@@ -1,1 +1,0 @@
-Clean-up calling `setup_background_tasks` in unit tests.

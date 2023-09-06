@@ -115,7 +115,13 @@ def return_json_error(
         if exc.headers is not None:
             for header, value in exc.headers.items():
                 request.setHeader(header, value)
-        logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
+        error_ctx = exc.debug_context
+        if error_ctx:
+            logger.info(
+                "%s SynapseError: %s - %s (%s)", request, error_code, exc.msg, error_ctx
+            )
+        else:
+            logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
     elif f.check(CancelledError):
         error_code = HTTP_STATUS_REQUEST_CANCELLED
         error_dict = {"error": "Request cancelled", "errcode": Codes.UNKNOWN}

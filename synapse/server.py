@@ -408,8 +408,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Ratelimiter(
             store=self.get_datastores().main,
             clock=self.get_clock(),
-            rate_hz=self.config.ratelimiting.rc_registration.per_second,
-            burst_count=self.config.ratelimiting.rc_registration.burst_count,
+            cfg=self.config.ratelimiting.rc_registration,
         )
 
     @cache_in_self
@@ -914,6 +913,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """Usage metrics shared between phone home stats and the prometheus exporter."""
         return CommonUsageMetricsManager(self)
 
+    @cache_in_self
     def get_worker_locks_handler(self) -> WorkerLocksHandler:
         return WorkerLocksHandler(self)
 

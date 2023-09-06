@@ -277,6 +277,10 @@ class DataStore(
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = p.full_user_id
                 LEFT JOIN erased_users AS eu ON u.name = eu.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(last_seen) AS last_seen_ts
+                    FROM user_ips GROUP BY user_id
+                ) ls ON u.name = ls.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -286,7 +290,7 @@ class DataStore(
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
                 displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
-                eu.user_id is not null as erased
+                eu.user_id is not null as erased, last_seen_ts
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?

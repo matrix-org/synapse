@@ -132,6 +132,7 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         # We simulate the process getting stuck by cancelling the looping call
         # that keeps the lock active.
+        assert lock._looping_call
         lock._looping_call.stop()
 
         # Wait for the lock to timeout.
@@ -403,6 +404,7 @@ class ReadWriteLockTestCase(unittest.HomeserverTestCase):
 
         # We simulate the process getting stuck by cancelling the looping call
         # that keeps the lock active.
+        assert lock._looping_call
         lock._looping_call.stop()
 
         # Wait for the lock to timeout.

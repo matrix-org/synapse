@@ -1,5 +1,7 @@
 # Shared-Secret Registration
 
+**Note:** This API is disabled when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
+
 This API allows for the creation of users in an administrative and
 non-interactive way. This is generally used for bootstrapping a Synapse
 instance with administrator accounts.
