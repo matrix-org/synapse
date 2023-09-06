@@ -228,14 +228,24 @@ class PasswordRestServlet(RestServlet):
             # they're not required to provide the password again.
             #
             # If a password is available now, hash the provided password and
-            # store it for later.
-            if new_password:
-                new_password_hash = await self.auth_handler.hash(new_password)
-                await self.auth_handler.set_session_data(
-                    e.session_id,
-                    UIAuthSessionDataConstants.PASSWORD_HASH,
-                    new_password_hash,
-                )
+            # store it for later. We only do this if we don't already have the
+            # password hash stored, to avoid repeatedly hashing the password.
+
+            if not new_password:
+                raise
+
+            existing_session_password_hash = await self.auth_handler.get_session_data(
+                e.session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
+            )
+            if existing_session_password_hash:
+                raise
+
+            new_password_hash = await self.auth_handler.hash(new_password)
+            await self.auth_handler.set_session_data(
+                e.session_id,
+                UIAuthSessionDataConstants.PASSWORD_HASH,
+                new_password_hash,
+            )
             raise
 
         # If we have a password in this request, prefer it. Otherwise, use the
@@ -243,9 +253,7 @@ class PasswordRestServlet(RestServlet):
         if new_password:
             password_hash: Optional[str] = await self.auth_handler.hash(new_password)
         elif session_id is not None:
-            password_hash = await self.auth_handler.get_session_data(
-                session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
-            )
+            password_hash = existing_session_password_hash
         else:
             # UI validation was skipped, but the request did not include a new
             # password.
