@@ -240,6 +240,19 @@
                   URI
                   YAMLLibYAML
                 ]}";
+
+                # Clear the LD_LIBRARY_PATH environment variable on shell init.
+                #
+                # By default, devenv will set LD_LIBRARY_PATH to point to .devenv/profile/lib. This causes
+                # issues when we include `gcc` as a dependency to build C libraries, as the version of glibc
+                # that the development environment's cc compiler uses may differ from that of the system.
+                #
+                # When LD_LIBRARY_PATH is set, system tools will attempt to use the development environment's
+                # libraries. Which, when built against an different glibc version lead, to "version 'GLIBC_X.YY' not
+                # found" errors.
+                enterShell = ''
+                  unset LD_LIBRARY_PATH
+                '';
               }
             ];
           };
