@@ -246,6 +246,7 @@ information.
     ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
     ^/_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*$
     ^/_matrix/client/(r0|v3|unstable)/capabilities$
+    ^/_matrix/client/(r0|v3|unstable)/notifications$
 
     # Encryption requests
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
