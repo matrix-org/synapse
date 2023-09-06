@@ -3433,6 +3433,8 @@ Has the following sub-options:
    automatically registering users that have a valid SSO login but do not have
    a pre-registered account. Defaults to true.
 
+   *Added in Synapse 1.93.0.*
+
 Example configuration:
 ```yaml
 cas_config:
