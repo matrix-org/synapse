@@ -69,7 +69,7 @@ class CasConfig(Config):
             self.cas_protocol_version = None
             self.cas_displayname_attribute = None
             self.cas_required_attributes = []
-            self.cas_enable_registration = None
+            self.cas_enable_registration = False
 
 
 # CAS uses a legacy required attributes mapping, not the one provided by
