@@ -14,7 +14,7 @@
 
 from http import HTTPStatus
 from typing import Any, Dict, Union
-from unittest.mock import ANY, AsyncMock, Mock
+from unittest.mock import ANY, Mock
 from urllib.parse import parse_qs
 
 from signedjson.key import (
@@ -122,6 +122,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
                 "client_id": CLIENT_ID,
                 "client_auth_method": "client_secret_post",
                 "client_secret": CLIENT_SECRET,
+                "admin_token": "admin_token_value",
             }
         }
         return config
@@ -340,41 +341,6 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
             get_awaitable_result(self.auth.is_server_admin(requester)), False
         )
 
-    def test_active_user_admin_impersonation(self) -> None:
-        """The handler should return a requester with normal user rights
-        and an user ID matching the one specified in query param `user_id`"""
-
-        self.http_client.request = simple_async_mock(
-            return_value=FakeResponse.json(
-                code=200,
-                payload={
-                    "active": True,
-                    "sub": SUBJECT,
-                    "scope": " ".join([SYNAPSE_ADMIN_SCOPE, MATRIX_USER_SCOPE]),
-                    "username": USERNAME,
-                },
-            )
-        )
-        request = Mock(args={})
-        request.args[b"access_token"] = [b"mockAccessToken"]
-        impersonated_user_id = f"@{USERNAME}:{SERVER_NAME}"
-        request.args[b"_oidc_admin_impersonate_user_id"] = [
-            impersonated_user_id.encode("ascii")
-        ]
-        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = self.get_success(self.auth.get_user_by_req(request))
-        self.http_client.get_json.assert_called_once_with(WELL_KNOWN)
-        self.http_client.request.assert_called_once_with(
-            method="POST", uri=INTROSPECTION_ENDPOINT, data=ANY, headers=ANY
-        )
-        self._assertParams()
-        self.assertEqual(requester.user.to_string(), impersonated_user_id)
-        self.assertEqual(requester.is_guest, False)
-        self.assertEqual(requester.device_id, None)
-        self.assertEqual(
-            get_awaitable_result(self.auth.is_server_admin(requester)), False
-        )
-
     def test_active_user_with_device(self) -> None:
         """The handler should return a requester with normal user rights and a device ID."""
 
@@ -525,100 +491,6 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         )
         error = self.get_failure(self.auth.get_user_by_req(request), SynapseError)
         self.assertEqual(error.value.code, 503)
-
-    def test_introspection_token_cache(self) -> None:
-        access_token = "open_sesame"
-        self.http_client.request = simple_async_mock(
-            return_value=FakeResponse.json(
-                code=200,
-                payload={"active": "true", "scope": "guest", "jti": access_token},
-            )
-        )
-
-        # first call should cache response
-        # Mpyp ignores below are due to mypy not understanding the dynamic substitution of msc3861 auth code
-        # for regular auth code via the config
-        self.get_success(
-            self.auth._introspect_token(access_token)  # type: ignore[attr-defined]
-        )
-        introspection_token = self.auth._token_cache.get(access_token)  # type: ignore[attr-defined]
-        self.assertEqual(introspection_token["jti"], access_token)
-        # there's been one http request
-        self.http_client.request.assert_called_once()
-
-        # second call should pull from cache, there should still be only one http request
-        token = self.get_success(self.auth._introspect_token(access_token))  # type: ignore[attr-defined]
-        self.http_client.request.assert_called_once()
-        self.assertEqual(token["jti"], access_token)
-
-        # advance past five minutes and check that cache expired - there should be more than one http call now
-        self.reactor.advance(360)
-        token_2 = self.get_success(self.auth._introspect_token(access_token))  # type: ignore[attr-defined]
-        self.assertEqual(self.http_client.request.call_count, 2)
-        self.assertEqual(token_2["jti"], access_token)
-
-        # test that if a cached token is expired, a fresh token will be pulled from authorizing server - first add a
-        # token with a soon-to-expire `exp` field to the cache
-        self.http_client.request = simple_async_mock(
-            return_value=FakeResponse.json(
-                code=200,
-                payload={
-                    "active": "true",
-                    "scope": "guest",
-                    "jti": "stale",
-                    "exp": self.clock.time() + 100,
-                },
-            )
-        )
-        self.get_success(
-            self.auth._introspect_token("stale")  # type: ignore[attr-defined]
-        )
-        introspection_token = self.auth._token_cache.get("stale")  # type: ignore[attr-defined]
-        self.assertEqual(introspection_token["jti"], "stale")
-        self.assertEqual(self.http_client.request.call_count, 1)
-
-        # advance the reactor past the token expiry but less than the cache expiry
-        self.reactor.advance(120)
-        self.assertEqual(self.auth._token_cache.get("stale"), introspection_token)  # type: ignore[attr-defined]
-
-        # check that the next call causes another http request (which will fail because the token is technically expired
-        # but the important thing is we discard the token from the cache and try the network)
-        self.get_failure(
-            self.auth._introspect_token("stale"), InvalidClientTokenError  # type: ignore[attr-defined]
-        )
-        self.assertEqual(self.http_client.request.call_count, 2)
-
-    def test_revocation_endpoint(self) -> None:
-        # mock introspection response and then admin verification response
-        self.http_client.request = AsyncMock(
-            side_effect=[
-                FakeResponse.json(
-                    code=200, payload={"active": True, "jti": "open_sesame"}
-                ),
-                FakeResponse.json(
-                    code=200,
-                    payload={
-                        "active": True,
-                        "sub": SUBJECT,
-                        "scope": " ".join([SYNAPSE_ADMIN_SCOPE, MATRIX_USER_SCOPE]),
-                        "username": USERNAME,
-                    },
-                ),
-            ]
-        )
-
-        # cache a token to delete
-        introspection_token = self.get_success(
-            self.auth._introspect_token("open_sesame")  # type: ignore[attr-defined]
-        )
-        self.assertEqual(self.auth._token_cache.get("open_sesame"), introspection_token)  # type: ignore[attr-defined]
-
-        # delete the revoked token
-        introspection_token_id = "open_sesame"
-        url = f"/_synapse/admin/v1/OIDC_token_revocation/{introspection_token_id}"
-        channel = self.make_request("DELETE", url, access_token="mockAccessToken")
-        self.assertEqual(channel.code, 200)
-        self.assertEqual(self.auth._token_cache.get("open_sesame"), None)  # type: ignore[attr-defined]
 
     def make_device_keys(self, user_id: str, device_id: str) -> JsonDict:
         # We only generate a master key to simplify the test.
@@ -791,3 +663,25 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.expect_unrecognized("GET", "/_synapse/admin/v1/users/foo/admin")
         self.expect_unrecognized("PUT", "/_synapse/admin/v1/users/foo/admin")
         self.expect_unrecognized("POST", "/_synapse/admin/v1/account_validity/validity")
+
+    def test_admin_token(self) -> None:
+        """The handler should return a requester with admin rights when admin_token is used."""
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(code=200, payload={"active": False}),
+        )
+
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"admin_token_value"]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        requester = self.get_success(self.auth.get_user_by_req(request))
+        self.assertEqual(
+            requester.user.to_string(), "@%s:%s" % ("__oidc_admin", SERVER_NAME)
+        )
+        self.assertEqual(requester.is_guest, False)
+        self.assertEqual(requester.device_id, None)
+        self.assertEqual(
+            get_awaitable_result(self.auth.is_server_admin(requester)), True
+        )
+
+        # There should be no call to the introspection endpoint
+        self.http_client.request.assert_not_called()
