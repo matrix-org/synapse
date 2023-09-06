@@ -204,7 +204,7 @@ class CasHandlerTestCase(HomeserverTestCase):
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
-        
+
         cas_response = CasResponse("test_user", {})
         request = _mock_request()
         self.get_success(
@@ -212,15 +212,7 @@ class CasHandlerTestCase(HomeserverTestCase):
         )
 
         # check that the auth handler was not called as expected
-        auth_handler.complete_sso_login.assert_not_called(
-            "@test_user:test",
-            "cas",
-            request,
-            "redirect_uri",
-            None,
-            new_user=True,
-            auth_provider_session_id=None,
-        )
+        auth_handler.complete_sso_login.assert_not_called()
 
 def _mock_request() -> Mock:
     """Returns a mock which will stand in as a SynapseRequest"""
