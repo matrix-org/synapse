@@ -1,1 +1,0 @@
-Improve error reporting of invalid data passed to `/_matrix/key/v2/query`.

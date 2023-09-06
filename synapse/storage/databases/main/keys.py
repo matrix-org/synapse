@@ -221,12 +221,17 @@ class KeyStore(CacheInvalidationWorkerStore):
             """Processes a batch of keys to fetch, and adds the result to `keys`."""
 
             # batch_iter always returns tuples so it's safe to do len(batch)
-            sql = """
-            SELECT server_name, key_id, key_json, ts_valid_until_ms
-            FROM server_keys_json WHERE 1=0
-            """ + " OR (server_name=? AND key_id=?)" * len(
-                batch
-            )
+            where_clause = " OR (server_name=? AND key_id=?)" * len(batch)
+
+            # `server_keys_json` can have multiple entries per server (one per
+            # remote server we fetched from, if using perspectives). Order by
+            # `ts_added_ms` so the most recently fetched one always wins.
+            sql = f"""
+                SELECT server_name, key_id, key_json, ts_valid_until_ms
+                FROM server_keys_json WHERE 1=0
+                {where_clause}
+                ORDER BY ts_added_ms
+            """
 
             txn.execute(sql, tuple(itertools.chain.from_iterable(batch)))
 

@@ -422,6 +422,18 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             "exclusive_as_user", "password", self.exclusive_as_user_device_id
         )
 
+        self.exclusive_as_user_2_device_id = "exclusive_as_device_2"
+        self.exclusive_as_user_2 = self.register_user("exclusive_as_user_2", "password")
+        self.exclusive_as_user_2_token = self.login(
+            "exclusive_as_user_2", "password", self.exclusive_as_user_2_device_id
+        )
+
+        self.exclusive_as_user_3_device_id = "exclusive_as_device_3"
+        self.exclusive_as_user_3 = self.register_user("exclusive_as_user_3", "password")
+        self.exclusive_as_user_3_token = self.login(
+            "exclusive_as_user_3", "password", self.exclusive_as_user_3_device_id
+        )
+
     def _notify_interested_services(self) -> None:
         # This is normally set in `notify_interested_services` but we need to call the
         # internal async version so the reactor gets pushed to completion.
@@ -848,6 +860,119 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Assert that each interested service received the full count of messages
         for count in service_id_to_message_count.values():
             self.assertEqual(count, number_of_messages)
+
+    @unittest.override_config(
+        {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
+    )
+    def test_application_services_receive_local_to_device_for_many_users(self) -> None:
+        """
+        Test that when a user sends a to-device message to many users
+        in an application service's user namespace, the
+        application service will receive all of them.
+        """
+        interested_appservice = self._register_application_service(
+            namespaces={
+                ApplicationService.NS_USERS: [
+                    {
+                        "regex": "@exclusive_as_user:.+",
+                        "exclusive": True,
+                    },
+                    {
+                        "regex": "@exclusive_as_user_2:.+",
+                        "exclusive": True,
+                    },
+                    {
+                        "regex": "@exclusive_as_user_3:.+",
+                        "exclusive": True,
+                    },
+                ],
+            },
+        )
+
+        # Have local_user send a to-device message to exclusive_as_users
+        message_content = {"some_key": "some really interesting value"}
+        chan = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/sendToDevice/m.room_key_request/3",
+            content={
+                "messages": {
+                    self.exclusive_as_user: {
+                        self.exclusive_as_user_device_id: message_content
+                    },
+                    self.exclusive_as_user_2: {
+                        self.exclusive_as_user_2_device_id: message_content
+                    },
+                    self.exclusive_as_user_3: {
+                        self.exclusive_as_user_3_device_id: message_content
+                    },
+                }
+            },
+            access_token=self.local_user_token,
+        )
+        self.assertEqual(chan.code, 200, chan.result)
+
+        # Have exclusive_as_user send a to-device message to local_user
+        for user_token in [
+            self.exclusive_as_user_token,
+            self.exclusive_as_user_2_token,
+            self.exclusive_as_user_3_token,
+        ]:
+            chan = self.make_request(
+                "PUT",
+                "/_matrix/client/r0/sendToDevice/m.room_key_request/4",
+                content={
+                    "messages": {
+                        self.local_user: {self.local_user_device_id: message_content}
+                    }
+                },
+                access_token=user_token,
+            )
+            self.assertEqual(chan.code, 200, chan.result)
+
+        # Check if our application service - that is interested in exclusive_as_user - received
+        # the to-device message as part of an AS transaction.
+        # Only the local_user -> exclusive_as_user to-device message should have been forwarded to the AS.
+        #
+        # The uninterested application service should not have been notified at all.
+        self.send_mock.assert_called_once()
+        (
+            service,
+            _events,
+            _ephemeral,
+            to_device_messages,
+            _otks,
+            _fbks,
+            _device_list_summary,
+        ) = self.send_mock.call_args[0]
+
+        # Assert that this was the same to-device message that local_user sent
+        self.assertEqual(service, interested_appservice)
+
+        # Assert expected number of messages
+        self.assertEqual(len(to_device_messages), 3)
+
+        for device_msg in to_device_messages:
+            self.assertEqual(device_msg["type"], "m.room_key_request")
+            self.assertEqual(device_msg["sender"], self.local_user)
+            self.assertEqual(device_msg["content"], message_content)
+
+        self.assertEqual(to_device_messages[0]["to_user_id"], self.exclusive_as_user)
+        self.assertEqual(
+            to_device_messages[0]["to_device_id"],
+            self.exclusive_as_user_device_id,
+        )
+
+        self.assertEqual(to_device_messages[1]["to_user_id"], self.exclusive_as_user_2)
+        self.assertEqual(
+            to_device_messages[1]["to_device_id"],
+            self.exclusive_as_user_2_device_id,
+        )
+
+        self.assertEqual(to_device_messages[2]["to_user_id"], self.exclusive_as_user_3)
+        self.assertEqual(
+            to_device_messages[2]["to_device_id"],
+            self.exclusive_as_user_3_device_id,
+        )
 
     def _register_application_service(
         self,
