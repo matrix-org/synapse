@@ -46,6 +46,7 @@ jobs:
           integration:
             - 'synapse/**'
             - 'rust/**'
+            - 'docker/**'
             - 'Cargo.toml'
             - 'Cargo.lock'
             - 'pyproject.toml'
