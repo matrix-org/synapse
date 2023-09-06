@@ -214,6 +214,7 @@ class CasHandlerTestCase(HomeserverTestCase):
         # check that the auth handler was not called as expected
         auth_handler.complete_sso_login.assert_not_called()
 
+
 def _mock_request() -> Mock:
     """Returns a mock which will stand in as a SynapseRequest"""
     mock = Mock(
