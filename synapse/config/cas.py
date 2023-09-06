@@ -57,7 +57,7 @@ class CasConfig(Config):
                 required_attributes
             )
 
-            self.cas_enable_registration = cas_config.get("enable_registration")
+            self.cas_enable_registration = cas_config.get("enable_registration", True)
 
             self.idp_name = cas_config.get("idp_name", "CAS")
             self.idp_icon = cas_config.get("idp_icon")
