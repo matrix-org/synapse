@@ -1848,8 +1848,9 @@ class RoomShutdownHandler:
         Args:
             room_id: The ID of the room to shut down.
             delete_id: The delete ID identifying this delete request
-            shutdown_params: parameters for the shutdown, cf `ShutdownRoomParams`
-            shutdown_response: current status of the shutdown, if it was interrupted
+            params: parameters for the shutdown, cf `ShutdownRoomParams`
+            result: current status of the shutdown, if it was interrupted
+            update_result_fct: function called when `result` is updated locally
 
         Returns: a dict matching `ShutdownRoomResponse`.
         """
@@ -1887,6 +1888,10 @@ class RoomShutdownHandler:
 
         # Action the block first (even if the room doesn't exist yet)
         if block:
+            if requester_user_id is None:
+                raise ValueError(
+                    "shutdown_room: block=True not allowed when requester_user_id is None."
+                )
             # This will work even if the room is already blocked, but that is
             # desirable in case the first attempt at blocking the room failed below.
             await self.store.block_room(room_id, requester_user_id)
