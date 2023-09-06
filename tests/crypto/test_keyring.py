@@ -189,23 +189,24 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         kr = keyring.Keyring(self.hs)
 
         key1 = signedjson.key.generate_signing_key("1")
-        r = self.hs.get_datastores().main.store_server_keys_json(
+        r = self.hs.get_datastores().main.store_server_keys_response(
             "server9",
-            get_key_id(key1),
             from_server="test",
-            ts_now_ms=int(time.time() * 1000),
-            ts_expires_ms=1000,
+            ts_added_ms=int(time.time() * 1000),
+            verify_keys={
+                get_key_id(key1): FetchKeyResult(
+                    verify_key=get_verify_key(key1), valid_until_ts=1000
+                )
+            },
             # The entire response gets signed & stored, just include the bits we
             # care about.
-            key_json_bytes=canonicaljson.encode_canonical_json(
-                {
-                    "verify_keys": {
-                        get_key_id(key1): {
-                            "key": encode_verify_key_base64(get_verify_key(key1))
-                        }
+            response_json={
+                "verify_keys": {
+                    get_key_id(key1): {
+                        "key": encode_verify_key_base64(get_verify_key(key1))
                     }
                 }
-            ),
+            },
         )
         self.get_success(r)
 
