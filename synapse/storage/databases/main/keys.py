@@ -16,7 +16,7 @@
 import itertools
 import json
 import logging
-from typing import Dict, Iterable, Mapping, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -98,56 +98,6 @@ class KeyStore(CacheInvalidationWorkerStore):
 
         return await self.db_pool.runInteraction("get_server_signature_keys", _txn)
 
-    async def store_server_signature_keys(
-        self,
-        from_server: str,
-        ts_added_ms: int,
-        verify_keys: Mapping[Tuple[str, str], FetchKeyResult],
-    ) -> None:
-        """Stores NACL verification keys for remote servers.
-        Args:
-            from_server: Where the verification keys were looked up
-            ts_added_ms: The time to record that the key was added
-            verify_keys:
-                keys to be stored. Each entry is a triplet of
-                (server_name, key_id, key).
-        """
-        key_values = []
-        value_values = []
-        invalidations = []
-        for (server_name, key_id), fetch_result in verify_keys.items():
-            key_values.append((server_name, key_id))
-            value_values.append(
-                (
-                    from_server,
-                    ts_added_ms,
-                    fetch_result.valid_until_ts,
-                    db_binary_type(fetch_result.verify_key.encode()),
-                )
-            )
-            # invalidate takes a tuple corresponding to the params of
-            # _get_server_signature_key. _get_server_signature_key only takes one
-            # param, which is itself the 2-tuple (server_name, key_id).
-            invalidations.append((server_name, key_id))
-
-        await self.db_pool.simple_upsert_many(
-            table="server_signature_keys",
-            key_names=("server_name", "key_id"),
-            key_values=key_values,
-            value_names=(
-                "from_server",
-                "ts_added_ms",
-                "ts_valid_until_ms",
-                "verify_key",
-            ),
-            value_values=value_values,
-            desc="store_server_signature_keys",
-        )
-
-        invalidate = self._get_server_signature_key.invalidate
-        for i in invalidations:
-            invalidate((i,))
-
     async def store_server_keys_response(
         self,
         server_name: str,
@@ -156,6 +106,16 @@ class KeyStore(CacheInvalidationWorkerStore):
         verify_keys: Dict[str, FetchKeyResult],
         response_json: JsonDict,
     ) -> None:
+        """Stores the keys for the given server that we got from `from_server`.
+
+        Args:
+            server_name: The owner of the keys
+            from_server: Which server we got the keys from
+            ts_added_ms: When we're adding the keys
+            verify_keys: The decoded keys
+            response_json: The full *signed* response JSON that contains the keys.
+        """
+
         key_json_bytes = encode_canonical_json(response_json)
 
         def store_server_keys_response_txn(txn: LoggingTransaction) -> None:

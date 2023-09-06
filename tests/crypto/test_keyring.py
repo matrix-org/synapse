@@ -294,13 +294,17 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         mock_fetcher.get_keys = AsyncMock(return_value={})
 
         key1 = signedjson.key.generate_signing_key("1")
-        r = self.hs.get_datastores().main.store_server_signature_keys(
-            "server9",
-            int(time.time() * 1000),
-            # None is not a valid value in FetchKeyResult, but we're abusing this
-            # API to insert null values into the database. The nulls get converted
-            # to 0 when fetched in KeyStore.get_server_signature_keys.
-            {("server9", get_key_id(key1)): FetchKeyResult(get_verify_key(key1), None)},  # type: ignore[arg-type]
+
+        r = self.hs.get_datastores().main.db_pool.simple_upsert(
+            table="server_signature_keys",
+            keyvalues={"server_name": "server9", "key_id": get_key_id(key1)},
+            values={
+                "from_server": "server9",
+                "ts_added_ms": int(time.time() * 1000),
+                "ts_valid_until_ms": None,
+                "verify_key": memoryview(get_verify_key(key1).encode()),
+            },
+            desc="store_server_signature_keys",
         )
         self.get_success(r)
 

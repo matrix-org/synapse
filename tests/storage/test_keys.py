@@ -43,14 +43,25 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         key_id_1 = "ed25519:key1"
         key_id_2 = "ed25519:KEY_ID_2"
         self.get_success(
-            store.store_server_signature_keys(
-                "from_server",
-                10,
-                {
-                    ("server1", key_id_1): FetchKeyResult(KEY_1, 100),
-                    ("server1", key_id_2): FetchKeyResult(KEY_2, 200),
+            store.store_server_keys_response(
+                "server1",
+                from_server="from_server",
+                ts_added_ms=10,
+                verify_keys={
+                    key_id_1: FetchKeyResult(KEY_1, 100),
+                    key_id_2: FetchKeyResult(KEY_2, 200),
                 },
-            )
+                response_json={
+                    "verify_keys": {
+                        key_id_1: {
+                            "key": signedjson.key.encode_verify_key_base64(KEY_1)
+                        },
+                        key_id_2: {
+                            "key": signedjson.key.encode_verify_key_base64(KEY_2)
+                        },
+                    }
+                },
+            ),
         )
 
         res = self.get_success(
@@ -87,14 +98,25 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         key_id_2 = "ed25519:key2"
 
         self.get_success(
-            store.store_server_signature_keys(
-                "from_server",
-                0,
-                {
-                    ("srv1", key_id_1): FetchKeyResult(KEY_1, 100),
-                    ("srv1", key_id_2): FetchKeyResult(KEY_2, 200),
+            store.store_server_keys_response(
+                "srv1",
+                from_server="from_server",
+                ts_added_ms=0,
+                verify_keys={
+                    key_id_1: FetchKeyResult(KEY_1, 100),
+                    key_id_2: FetchKeyResult(KEY_2, 200),
                 },
-            )
+                response_json={
+                    "verify_keys": {
+                        key_id_1: {
+                            "key": signedjson.key.encode_verify_key_base64(KEY_1)
+                        },
+                        key_id_2: {
+                            "key": signedjson.key.encode_verify_key_base64(KEY_2)
+                        },
+                    }
+                },
+            ),
         )
 
         res = self.get_success(
@@ -118,8 +140,20 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         new_key_2 = signedjson.key.get_verify_key(
             signedjson.key.generate_signing_key("key2")
         )
-        d = store.store_server_signature_keys(
-            "from_server", 10, {("srv1", key_id_2): FetchKeyResult(new_key_2, 300)}
+        d = store.store_server_keys_response(
+            "srv1",
+            from_server="from_server",
+            ts_added_ms=0,
+            verify_keys={
+                key_id_2: FetchKeyResult(new_key_2, 300),
+            },
+            response_json={
+                "verify_keys": {
+                    key_id_2: {
+                        "key": signedjson.key.encode_verify_key_base64(new_key_2)
+                    },
+                }
+            },
         )
         self.get_success(d)
 
