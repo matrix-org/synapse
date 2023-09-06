@@ -126,6 +126,17 @@ class ApplicationServiceApi(SimpleHttpClient):
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )
 
+    def _get_headers(self, service: "ApplicationService") -> Dict[bytes, List[bytes]]:
+        """This makes sure we have always the auth header and opentracing headers set."""
+
+        # This is also ensured before in the functions. However this is needed to please
+        # the typechecks.
+        assert service.hs_token is not None
+
+        headers = {b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]}
+        opentracing.inject_header_dict(headers, check_destination=False)
+        return headers
+
     async def query_user(self, service: "ApplicationService", user_id: str) -> bool:
         if service.url is None:
             return False
@@ -138,14 +149,10 @@ class ApplicationServiceApi(SimpleHttpClient):
             if self.config.use_appservice_legacy_authorization:
                 args = {"access_token": service.hs_token}
 
-            headers: Dict[bytes, List[bytes]] = {
-                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-            }
-            opentracing.inject_header_dict(headers, check_destination=False)
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/users/{urllib.parse.quote(user_id)}",
                 args,
-                headers=headers,
+                headers=self._get_headers(service),
             )
             if response is not None:  # just an empty json object
                 return True
@@ -169,14 +176,10 @@ class ApplicationServiceApi(SimpleHttpClient):
             if self.config.use_appservice_legacy_authorization:
                 args = {"access_token": service.hs_token}
 
-            headers: Dict[bytes, List[bytes]] = {
-                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-            }
-            opentracing.inject_header_dict(headers, check_destination=False)
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/rooms/{urllib.parse.quote(alias)}",
                 args,
-                headers=headers,
+                headers=self._get_headers(service),
             )
             if response is not None:  # just an empty json object
                 return True
@@ -215,14 +218,10 @@ class ApplicationServiceApi(SimpleHttpClient):
                     b"access_token": service.hs_token,
                 }
 
-            headers: Dict[bytes, List[bytes]] = {
-                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-            }
-            opentracing.inject_header_dict(headers, check_destination=False)
             response = await self.get_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/{kind}/{urllib.parse.quote(protocol)}",
                 args=args,
-                headers=headers,
+                headers=self._get_headers(service),
             )
             if not isinstance(response, list):
                 logger.warning(
@@ -260,14 +259,10 @@ class ApplicationServiceApi(SimpleHttpClient):
                 if self.config.use_appservice_legacy_authorization:
                     args = {"access_token": service.hs_token}
 
-                headers: Dict[bytes, List[bytes]] = {
-                    b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-                }
-                opentracing.inject_header_dict(headers, check_destination=False)
                 info = await self.get_json(
                     f"{service.url}{APP_SERVICE_PREFIX}/thirdparty/protocol/{urllib.parse.quote(protocol)}",
                     args,
-                    headers=headers,
+                    headers=self._get_headers(service),
                 )
 
                 if not _is_valid_3pe_metadata(info):
@@ -301,14 +296,10 @@ class ApplicationServiceApi(SimpleHttpClient):
         # This is required by the configuration.
         assert service.hs_token is not None
 
-        headers: Dict[bytes, List[bytes]] = {
-            b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-        }
-        opentracing.inject_header_dict(headers, check_destination=False)
         await self.post_json_get_json(
             uri=f"{service.url}{APP_SERVICE_PREFIX}/ping",
             post_json={"transaction_id": txn_id},
-            headers=headers,
+            headers=self._get_headers(service),
         )
 
     async def push_bulk(
@@ -385,15 +376,11 @@ class ApplicationServiceApi(SimpleHttpClient):
             if self.config.use_appservice_legacy_authorization:
                 args = {"access_token": service.hs_token}
 
-            headers: Dict[bytes, List[bytes]] = {
-                b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-            }
-            opentracing.inject_header_dict(headers, check_destination=False)
             await self.put_json(
                 f"{service.url}{APP_SERVICE_PREFIX}/transactions/{urllib.parse.quote(str(txn_id))}",
                 json_body=body,
                 args=args,
-                headers=headers,
+                headers=self._get_headers(service),
             )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -461,16 +448,12 @@ class ApplicationServiceApi(SimpleHttpClient):
                 [algorithm] * count
             )
 
-        headers: Dict[bytes, List[bytes]] = {
-            b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-        }
-        opentracing.inject_header_dict(headers, check_destination=False)
         uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3983/keys/claim"
         try:
             response = await self.post_json_get_json(
                 uri,
                 body,
-                headers=headers,
+                headers=self._get_headers(service),
             )
         except HttpResponseException as e:
             # The appservice doesn't support this endpoint.
@@ -525,16 +508,13 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         # This is required by the configuration.
         assert service.hs_token is not None
-        headers: Dict[bytes, List[bytes]] = {
-            b"Authorization": [b"Bearer " + service.hs_token.encode("ascii")]
-        }
-        opentracing.inject_header_dict(headers, check_destination=False)
+
         uri = f"{service.url}/_matrix/app/unstable/org.matrix.msc3984/keys/query"
         try:
             response = await self.post_json_get_json(
                 uri,
                 query,
-                headers=headers,
+                headers=self._get_headers(service),
             )
         except HttpResponseException as e:
             # The appservice doesn't support this endpoint.
