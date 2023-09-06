@@ -208,11 +208,15 @@ class CasHandlerTestCase(HomeserverTestCase):
         self.get_success(
             self.handler._handle_cas_response(request, cas_response, "redirect_uri", "")
         )
-        auth_handler.complete_sso_login.assert_not_called()
-        self.assertRenderedError(
-            "mapping_error",
-            "User does not exist and registrations are disabled",
-        )
+        auth_handler.complete_sso_login.assert_not_called(
+            "@test_user:test",
+            "cas",
+            request,
+            "redirect_uri",
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
+		)
 
 
 def _mock_request() -> Mock:
