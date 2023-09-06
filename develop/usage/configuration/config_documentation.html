@@ -3060,27 +3060,50 @@ claim MUST contain &quot;admin&quot;.</p>
 <p>Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>: Set this to true to enable authorization against a CAS server.
-Defaults to false.</li>
-<li><code>idp_name</code>: A user-facing name for this identity provider, which is used to
-offer the user a choice of login mechanisms.</li>
-<li><code>idp_icon</code>: An optional icon for this identity provider, which is presented
+<li>
+<p><code>enabled</code>: Set this to true to enable authorization against a CAS server.
+Defaults to false.</p>
+</li>
+<li>
+<p><code>idp_name</code>: A user-facing name for this identity provider, which is used to
+offer the user a choice of login mechanisms.</p>
+</li>
+<li>
+<p><code>idp_icon</code>: An optional icon for this identity provider, which is presented
 by clients and Synapse's own IdP picker page. If given, must be an
 MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
 obtain such an MXC URI is to upload an image to an (unencrypted) room
-and then copy the &quot;url&quot; from the source of the event.)</li>
-<li><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
+and then copy the &quot;url&quot; from the source of the event.)</p>
+</li>
+<li>
+<p><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
 to style the login flow according to the identity provider in question.
-See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
-<li><code>server_url</code>: The URL of the CAS authorization endpoint.</li>
-<li><code>protocol_version</code>: The CAS protocol version, defaults to none (version 3 is required if you want to use &quot;required_attributes&quot;).</li>
-<li><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
-If no name is given here, no displayname will be set.</li>
-<li><code>required_attributes</code>:  It is possible to configure Synapse to only allow logins if CAS attributes
+See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</p>
+</li>
+<li>
+<p><code>server_url</code>: The URL of the CAS authorization endpoint.</p>
+</li>
+<li>
+<p><code>protocol_version</code>: The CAS protocol version, defaults to none (version 3 is required if you want to use &quot;required_attributes&quot;).</p>
+</li>
+<li>
+<p><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
+If no name is given here, no displayname will be set.</p>
+</li>
+<li>
+<p><code>required_attributes</code>:  It is possible to configure Synapse to only allow logins if CAS attributes
 match particular values. All of the keys given below must exist
 and the values must match the given value. Alternately if the given value
 is <code>None</code> then any value is allowed (the attribute just must exist).
-All of the listed attributes must match for the login to be permitted.</li>
+All of the listed attributes must match for the login to be permitted.</p>
+</li>
+<li>
+<p><code>enable_registration</code>: set to 'false' to disable automatic registration of new
+users. This allows the CAS SSO flow to be limited to sign in only, rather than
+automatically registering users that have a valid SSO login but do not have
+a pre-registered account. Defaults to true.</p>
+<p><em>Added in Synapse 1.93.0.</em></p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">cas_config:
@@ -3091,6 +3114,7 @@ All of the listed attributes must match for the login to be permitted.</li>
   required_attributes:
     userGroup: &quot;staff&quot;
     department: None
+  enable_registration: true
 </code></pre>
 <hr />
 <h3 id="sso"><a class="header" href="#sso"><code>sso</code></a></h3>
