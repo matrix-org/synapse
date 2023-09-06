@@ -122,6 +122,7 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
                 "client_id": CLIENT_ID,
                 "client_auth_method": "client_secret_post",
                 "client_secret": CLIENT_SECRET,
+                "admin_token": "admin_token_value",
             }
         }
         return config
@@ -662,3 +663,25 @@ class MSC3861OAuthDelegation(HomeserverTestCase):
         self.expect_unrecognized("GET", "/_synapse/admin/v1/users/foo/admin")
         self.expect_unrecognized("PUT", "/_synapse/admin/v1/users/foo/admin")
         self.expect_unrecognized("POST", "/_synapse/admin/v1/account_validity/validity")
+
+    def test_admin_token(self) -> None:
+        """The handler should return a requester with admin rights when admin_token is used."""
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse.json(code=200, payload={"active": False}),
+        )
+
+        request = Mock(args={})
+        request.args[b"access_token"] = [b"admin_token_value"]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        requester = self.get_success(self.auth.get_user_by_req(request))
+        self.assertEqual(
+            requester.user.to_string(), "@%s:%s" % ("__oidc_admin", SERVER_NAME)
+        )
+        self.assertEqual(requester.is_guest, False)
+        self.assertEqual(requester.device_id, None)
+        self.assertEqual(
+            get_awaitable_result(self.auth.is_server_admin(requester)), True
+        )
+
+        # There should be no call to the introspection endpoint
+        self.http_client.request.assert_not_called()
