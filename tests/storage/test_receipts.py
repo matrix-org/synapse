@@ -37,9 +37,9 @@ class ReceiptTestCase(HomeserverTestCase):
         self.store = homeserver.get_datastores().main
 
         self.room_creator = homeserver.get_room_creation_handler()
-        self.persist_event_storage_controller = (
-            self.hs.get_storage_controllers().persistence
-        )
+        persist_event_storage_controller = self.hs.get_storage_controllers().persistence
+        assert persist_event_storage_controller is not None
+        self.persist_event_storage_controller = persist_event_storage_controller
 
         # Create a test user
         self.ourUser = UserID.from_string(OUR_USER_ID)
@@ -50,12 +50,14 @@ class ReceiptTestCase(HomeserverTestCase):
         self.otherRequester = create_requester(self.otherUser)
 
         # Create a test room
-        info, _ = self.get_success(self.room_creator.create_room(self.ourRequester, {}))
-        self.room_id1 = info["room_id"]
+        self.room_id1, _, _ = self.get_success(
+            self.room_creator.create_room(self.ourRequester, {})
+        )
 
         # Create a second test room
-        info, _ = self.get_success(self.room_creator.create_room(self.ourRequester, {}))
-        self.room_id2 = info["room_id"]
+        self.room_id2, _, _ = self.get_success(
+            self.room_creator.create_room(self.ourRequester, {})
+        )
 
         # Join the second user to the first room
         memberEvent, memberEventContext = self.get_success(

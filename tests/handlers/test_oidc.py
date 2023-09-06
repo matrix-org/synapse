@@ -13,7 +13,7 @@
 # limitations under the License.
 import os
 from typing import Any, Awaitable, ContextManager, Dict, Optional, Tuple
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, AsyncMock, Mock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pymacaroons
@@ -28,7 +28,7 @@ from synapse.util import Clock
 from synapse.util.macaroons import get_value_from_macaroon
 from synapse.util.stringutils import random_string
 
-from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
+from tests.test_utils import FakeResponse, get_awaitable_result
 from tests.test_utils.oidc import FakeAuthorizationGrant, FakeOidcServer
 from tests.unittest import HomeserverTestCase, override_config
 
@@ -150,27 +150,27 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         hs = self.setup_test_homeserver()
         self.hs_patcher = self.fake_server.patch_homeserver(hs=hs)
-        self.hs_patcher.start()
+        self.hs_patcher.start()  # type: ignore[attr-defined]
 
         self.handler = hs.get_oidc_handler()
         self.provider = self.handler._providers["oidc"]
         sso_handler = hs.get_sso_handler()
         # Mock the render error method.
         self.render_error = Mock(return_value=None)
-        sso_handler.render_error = self.render_error  # type: ignore[assignment]
+        sso_handler.render_error = self.render_error  # type: ignore[method-assign]
 
         # Reduce the number of attempts when generating MXIDs.
         sso_handler._MAP_USERNAME_RETRIES = 3
 
         auth_handler = hs.get_auth_handler()
         # Mock the complete SSO login method.
-        self.complete_sso_login = simple_async_mock()
-        auth_handler.complete_sso_login = self.complete_sso_login  # type: ignore[assignment]
+        self.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = self.complete_sso_login  # type: ignore[method-assign]
 
         return hs
 
     def tearDown(self) -> None:
-        self.hs_patcher.stop()
+        self.hs_patcher.stop()  # type: ignore[attr-defined]
         return super().tearDown()
 
     def reset_mocks(self) -> None:
@@ -396,6 +396,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(params["client_id"], [CLIENT_ID])
         self.assertEqual(len(params["state"]), 1)
         self.assertEqual(len(params["nonce"]), 1)
+        self.assertNotIn("code_challenge", params)
 
         # Check what is in the cookies
         self.assertEqual(len(req.cookies), 2)  # two cookies
@@ -411,11 +412,116 @@ class OidcHandlerTestCase(HomeserverTestCase):
         macaroon = pymacaroons.Macaroon.deserialize(cookie)
         state = get_value_from_macaroon(macaroon, "state")
         nonce = get_value_from_macaroon(macaroon, "nonce")
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
         redirect = get_value_from_macaroon(macaroon, "client_redirect_url")
 
         self.assertEqual(params["state"], [state])
         self.assertEqual(params["nonce"], [nonce])
+        self.assertEqual(code_verifier, "")
         self.assertEqual(redirect, "http://client/redirect")
+
+    @override_config({"oidc_config": DEFAULT_CONFIG})
+    def test_redirect_request_with_code_challenge(self) -> None:
+        """The redirect request has the right arguments & generates a valid session cookie."""
+        req = Mock(spec=["cookies"])
+        req.cookies = []
+
+        with self.metadata_edit({"code_challenge_methods_supported": ["S256"]}):
+            url = urlparse(
+                self.get_success(
+                    self.provider.handle_redirect_request(
+                        req, b"http://client/redirect"
+                    )
+                )
+            )
+
+        # Ensure the code_challenge param is added to the redirect.
+        params = parse_qs(url.query)
+        self.assertEqual(len(params["code_challenge"]), 1)
+
+        # Check what is in the cookies
+        self.assertEqual(len(req.cookies), 2)  # two cookies
+        cookie_header = req.cookies[0]
+
+        # The cookie name and path don't really matter, just that it has to be coherent
+        # between the callback & redirect handlers.
+        parts = [p.strip() for p in cookie_header.split(b";")]
+        self.assertIn(b"Path=/_synapse/client/oidc", parts)
+        name, cookie = parts[0].split(b"=")
+        self.assertEqual(name, b"oidc_session")
+
+        # Ensure the code_verifier is set in the cookie.
+        macaroon = pymacaroons.Macaroon.deserialize(cookie)
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
+        self.assertNotEqual(code_verifier, "")
+
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "pkce_method": "always"}})
+    def test_redirect_request_with_forced_code_challenge(self) -> None:
+        """The redirect request has the right arguments & generates a valid session cookie."""
+        req = Mock(spec=["cookies"])
+        req.cookies = []
+
+        url = urlparse(
+            self.get_success(
+                self.provider.handle_redirect_request(req, b"http://client/redirect")
+            )
+        )
+
+        # Ensure the code_challenge param is added to the redirect.
+        params = parse_qs(url.query)
+        self.assertEqual(len(params["code_challenge"]), 1)
+
+        # Check what is in the cookies
+        self.assertEqual(len(req.cookies), 2)  # two cookies
+        cookie_header = req.cookies[0]
+
+        # The cookie name and path don't really matter, just that it has to be coherent
+        # between the callback & redirect handlers.
+        parts = [p.strip() for p in cookie_header.split(b";")]
+        self.assertIn(b"Path=/_synapse/client/oidc", parts)
+        name, cookie = parts[0].split(b"=")
+        self.assertEqual(name, b"oidc_session")
+
+        # Ensure the code_verifier is set in the cookie.
+        macaroon = pymacaroons.Macaroon.deserialize(cookie)
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
+        self.assertNotEqual(code_verifier, "")
+
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "pkce_method": "never"}})
+    def test_redirect_request_with_disabled_code_challenge(self) -> None:
+        """The redirect request has the right arguments & generates a valid session cookie."""
+        req = Mock(spec=["cookies"])
+        req.cookies = []
+
+        # The metadata should state that PKCE is enabled.
+        with self.metadata_edit({"code_challenge_methods_supported": ["S256"]}):
+            url = urlparse(
+                self.get_success(
+                    self.provider.handle_redirect_request(
+                        req, b"http://client/redirect"
+                    )
+                )
+            )
+
+        # Ensure the code_challenge param is added to the redirect.
+        params = parse_qs(url.query)
+        self.assertNotIn("code_challenge", params)
+
+        # Check what is in the cookies
+        self.assertEqual(len(req.cookies), 2)  # two cookies
+        cookie_header = req.cookies[0]
+
+        # The cookie name and path don't really matter, just that it has to be coherent
+        # between the callback & redirect handlers.
+        parts = [p.strip() for p in cookie_header.split(b";")]
+        self.assertIn(b"Path=/_synapse/client/oidc", parts)
+        name, cookie = parts[0].split(b"=")
+        self.assertEqual(name, b"oidc_session")
+
+        # Ensure the code_verifier is blank in the cookie.
+        macaroon = pymacaroons.Macaroon.deserialize(cookie)
+        code_verifier = get_value_from_macaroon(macaroon, "code_verifier")
+        self.assertEqual(code_verifier, "")
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
     def test_callback_error(self) -> None:
@@ -601,7 +707,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             payload=token
         )
         code = "code"
-        ret = self.get_success(self.provider._exchange_code(code))
+        ret = self.get_success(self.provider._exchange_code(code, code_verifier=""))
         kwargs = self.fake_server.request.call_args[1]
 
         self.assertEqual(ret, token)
@@ -615,13 +721,34 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(args["client_secret"], [CLIENT_SECRET])
         self.assertEqual(args["redirect_uri"], [CALLBACK_URL])
 
+        # Test providing a code verifier.
+        code_verifier = "code_verifier"
+        ret = self.get_success(
+            self.provider._exchange_code(code, code_verifier=code_verifier)
+        )
+        kwargs = self.fake_server.request.call_args[1]
+
+        self.assertEqual(ret, token)
+        self.assertEqual(kwargs["method"], "POST")
+        self.assertEqual(kwargs["uri"], self.fake_server.token_endpoint)
+
+        args = parse_qs(kwargs["data"].decode("utf-8"))
+        self.assertEqual(args["grant_type"], ["authorization_code"])
+        self.assertEqual(args["code"], [code])
+        self.assertEqual(args["client_id"], [CLIENT_ID])
+        self.assertEqual(args["client_secret"], [CLIENT_SECRET])
+        self.assertEqual(args["redirect_uri"], [CALLBACK_URL])
+        self.assertEqual(args["code_verifier"], [code_verifier])
+
         # Test error handling
         self.fake_server.post_token_handler.return_value = FakeResponse.json(
             code=400, payload={"error": "foo", "error_description": "bar"}
         )
         from synapse.handlers.oidc import OidcError
 
-        exc = self.get_failure(self.provider._exchange_code(code), OidcError)
+        exc = self.get_failure(
+            self.provider._exchange_code(code, code_verifier=""), OidcError
+        )
         self.assertEqual(exc.value.error, "foo")
         self.assertEqual(exc.value.error_description, "bar")
 
@@ -629,7 +756,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.fake_server.post_token_handler.return_value = FakeResponse(
             code=500, body=b"Not JSON"
         )
-        exc = self.get_failure(self.provider._exchange_code(code), OidcError)
+        exc = self.get_failure(
+            self.provider._exchange_code(code, code_verifier=""), OidcError
+        )
         self.assertEqual(exc.value.error, "server_error")
 
         # Internal server error with JSON body
@@ -637,21 +766,27 @@ class OidcHandlerTestCase(HomeserverTestCase):
             code=500, payload={"error": "internal_server_error"}
         )
 
-        exc = self.get_failure(self.provider._exchange_code(code), OidcError)
+        exc = self.get_failure(
+            self.provider._exchange_code(code, code_verifier=""), OidcError
+        )
         self.assertEqual(exc.value.error, "internal_server_error")
 
         # 4xx error without "error" field
         self.fake_server.post_token_handler.return_value = FakeResponse.json(
             code=400, payload={}
         )
-        exc = self.get_failure(self.provider._exchange_code(code), OidcError)
+        exc = self.get_failure(
+            self.provider._exchange_code(code, code_verifier=""), OidcError
+        )
         self.assertEqual(exc.value.error, "server_error")
 
         # 2xx error with "error" field
         self.fake_server.post_token_handler.return_value = FakeResponse.json(
             code=200, payload={"error": "some_error"}
         )
-        exc = self.get_failure(self.provider._exchange_code(code), OidcError)
+        exc = self.get_failure(
+            self.provider._exchange_code(code, code_verifier=""), OidcError
+        )
         self.assertEqual(exc.value.error, "some_error")
 
     @override_config(
@@ -688,7 +823,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # timestamps.
         self.reactor.advance(1000)
         start_time = self.reactor.seconds()
-        ret = self.get_success(self.provider._exchange_code(code))
+        ret = self.get_success(self.provider._exchange_code(code, code_verifier=""))
 
         self.assertEqual(ret, token)
 
@@ -739,7 +874,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             payload=token
         )
         code = "code"
-        ret = self.get_success(self.provider._exchange_code(code))
+        ret = self.get_success(self.provider._exchange_code(code, code_verifier=""))
 
         self.assertEqual(ret, token)
 
@@ -787,7 +922,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             auth_provider_session_id=None,
         )
 
-    @override_config({"oidc_config": DEFAULT_CONFIG})
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "enable_registration": True}})
     def test_map_userinfo_to_user(self) -> None:
         """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""
         userinfo: dict = {
@@ -838,6 +973,21 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError(
             "mapping_error",
             "Mapping provider does not support de-duplicating Matrix IDs",
+        )
+
+    @override_config({"oidc_config": {**DEFAULT_CONFIG, "enable_registration": False}})
+    def test_map_userinfo_to_user_does_not_register_new_user(self) -> None:
+        """Ensures new users are not registered if the enabled registration flag is disabled."""
+        userinfo: dict = {
+            "sub": "test_user",
+            "username": "test_user",
+        }
+        request, _ = self.start_authorization(userinfo)
+        self.get_success(self.handler.handle_oidc_callback(request))
+        self.complete_sso_login.assert_not_called()
+        self.assertRenderedError(
+            "mapping_error",
+            "User does not exist and registrations are disabled",
         )
 
     @override_config({"oidc_config": {**DEFAULT_CONFIG, "allow_existing_users": True}})
@@ -1203,6 +1353,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 nonce=nonce,
                 client_redirect_url=client_redirect_url,
                 ui_auth_session_id=ui_auth_session_id,
+                code_verifier="",
             ),
         )
 

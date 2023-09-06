@@ -11,16 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.test.proto_helpers import AccumulatingProtocol
+from typing import Tuple
+
+from twisted.internet.protocol import Protocol
+from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
 
 from synapse.logging import RemoteHandler
 
 from tests.logging import LoggerCleanupMixin
 from tests.server import FakeTransport, get_clock
 from tests.unittest import TestCase
+from tests.utils import checked_cast
 
 
-def connect_logging_client(reactor, client_id):
+def connect_logging_client(
+    reactor: MemoryReactorClock, client_id: int
+) -> Tuple[Protocol, AccumulatingProtocol]:
     # This is essentially tests.server.connect_client, but disabling autoflush on
     # the client transport. This is necessary to avoid an infinite loop due to
     # sending of data via the logging transport causing additional logs to be
@@ -35,10 +41,10 @@ def connect_logging_client(reactor, client_id):
 
 
 class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor, _ = get_clock()
 
-    def test_log_output(self):
+    def test_log_output(self) -> None:
         """
         The remote handler delivers logs over TCP.
         """
@@ -51,7 +57,8 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
         client, server = connect_logging_client(self.reactor, 0)
 
         # Trigger data being sent
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # One log message, with a single trailing newline
         logs = server.data.decode("utf8").splitlines()
@@ -61,7 +68,7 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
         # Ensure the data passed through properly.
         self.assertEqual(logs[0], "Hello there, wally!")
 
-    def test_log_backpressure_debug(self):
+    def test_log_backpressure_debug(self) -> None:
         """
         When backpressure is hit, DEBUG logs will be shed.
         """
@@ -83,14 +90,15 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
 
         # Allow the reconnection
         client, server = connect_logging_client(self.reactor, 0)
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # Only the 7 infos made it through, the debugs were elided
         logs = server.data.splitlines()
         self.assertEqual(len(logs), 7)
         self.assertNotIn(b"debug", server.data)
 
-    def test_log_backpressure_info(self):
+    def test_log_backpressure_info(self) -> None:
         """
         When backpressure is hit, DEBUG and INFO logs will be shed.
         """
@@ -116,7 +124,8 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
 
         # Allow the reconnection
         client, server = connect_logging_client(self.reactor, 0)
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # The 10 warnings made it through, the debugs and infos were elided
         logs = server.data.splitlines()
@@ -124,7 +133,7 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
         self.assertNotIn(b"debug", server.data)
         self.assertNotIn(b"info", server.data)
 
-    def test_log_backpressure_cut_middle(self):
+    def test_log_backpressure_cut_middle(self) -> None:
         """
         When backpressure is hit, and no more DEBUG and INFOs cannot be culled,
         it will cut the middle messages out.
@@ -140,7 +149,8 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
 
         # Allow the reconnection
         client, server = connect_logging_client(self.reactor, 0)
-        client.transport.flush()
+        client_transport = checked_cast(FakeTransport, client.transport)
+        client_transport.flush()
 
         # The first five and last five warnings made it through, the debugs and
         # infos were elided
@@ -151,7 +161,7 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
             logs,
         )
 
-    def test_cancel_connection(self):
+    def test_cancel_connection(self) -> None:
         """
         Gracefully handle the connection being cancelled.
         """

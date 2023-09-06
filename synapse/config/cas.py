@@ -18,7 +18,7 @@ from typing import Any, List
 from synapse.config.sso import SsoAttributeRequirement
 from synapse.types import JsonDict
 
-from ._base import Config
+from ._base import Config, ConfigError
 from ._util import validate_config
 
 
@@ -41,15 +41,30 @@ class CasConfig(Config):
             public_baseurl = self.root.server.public_baseurl
             self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
 
+            self.cas_protocol_version = cas_config.get("protocol_version")
+            if (
+                self.cas_protocol_version is not None
+                and self.cas_protocol_version not in [1, 2, 3]
+            ):
+                raise ConfigError(
+                    "Unsupported CAS protocol version %s (only versions 1, 2, 3 are supported)"
+                    % (self.cas_protocol_version,),
+                    ("cas_config", "protocol_version"),
+                )
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
             required_attributes = cas_config.get("required_attributes") or {}
             self.cas_required_attributes = _parsed_required_attributes_def(
                 required_attributes
             )
 
+            self.idp_name = cas_config.get("idp_name", "CAS")
+            self.idp_icon = cas_config.get("idp_icon")
+            self.idp_brand = cas_config.get("idp_brand")
+
         else:
             self.cas_server_url = None
             self.cas_service_url = None
+            self.cas_protocol_version = None
             self.cas_displayname_attribute = None
             self.cas_required_attributes = []
 

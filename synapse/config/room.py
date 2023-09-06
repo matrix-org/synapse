@@ -75,3 +75,7 @@ class RoomConfig(Config):
                         % preset
                     )
                 # We validate the actual overrides when we try to apply them.
+
+        # When enabled, users will forget rooms when they leave them, either via a
+        # leave, kick or ban.
+        self.forget_on_leave = config.get("forget_rooms_on_leave", False)

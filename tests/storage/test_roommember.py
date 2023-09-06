@@ -27,7 +27,6 @@ from tests.test_utils import event_injection
 
 
 class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         login.register_servlets,
         register_servlets_for_client_rest_resource,
@@ -35,7 +34,6 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: TestHomeServer) -> None:  # type: ignore[override]
-
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic
         self.store = hs.get_datastores().main
@@ -48,7 +46,6 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
     def test_one_member(self) -> None:
-
         # Alice creates the room, and is automatically joined
         self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
 

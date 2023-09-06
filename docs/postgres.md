@@ -16,7 +16,7 @@ connect to a postgres database.
 -   For other pre-built packages, please consult the documentation from
     the relevant package.
 -   If you installed synapse [in a
-    virtualenv](setup/installation.md#installing-from-source), you can install
+    virtualenv](setup/installation.md#installing-as-a-python-module-from-pypi), you can install
     the library with:
 
         ~/synapse/env/bin/pip install "matrix-synapse[postgres]"

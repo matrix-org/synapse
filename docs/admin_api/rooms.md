@@ -5,7 +5,7 @@ server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 **Parameters**
 
@@ -400,7 +400,7 @@ sent to a room in a given timeframe. There are various parameters available
 that allow for filtering and ordering the returned list. This API supports pagination.
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 This endpoint mirrors the [Matrix Spec defined Messages API](https://spec.matrix.org/v1.1/client-server-api/#get_matrixclientv3roomsroomidmessages).
 
@@ -419,7 +419,7 @@ The following query parameters are available:
 
 * `from` (required) - The token to start returning events from. This token can be obtained from a prev_batch
   or next_batch token returned by the /sync endpoint, or from an end token returned by a previous request to this endpoint.
-* `to` - The token to spot returning events at.
+* `to` - The token to stop returning events at.
 * `limit` - The maximum number of events to return. Defaults to `10`.
 * `filter` - A JSON RoomEventFilter to filter returned events with.
 * `dir` - The direction to return events from. Either `f` for forwards or `b` for backwards. Setting

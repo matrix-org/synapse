@@ -7,7 +7,7 @@ ARG FROM=matrixdotorg/synapse:$SYNAPSE_VERSION
 # target image. For repeated rebuilds, this is much faster than apt installing
 # each time.
 
-FROM debian:bullseye-slim AS deps_base
+FROM docker.io/library/debian:bullseye-slim AS deps_base
     RUN \
        --mount=type=cache,target=/var/cache/apt,sharing=locked \
        --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -21,7 +21,7 @@ FROM debian:bullseye-slim AS deps_base
 # which makes it much easier to copy (but we need to make sure we use an image
 # based on the same debian version as the synapse image, to make sure we get
 # the expected version of libc.
-FROM redis:6-bullseye AS redis_base
+FROM docker.io/library/redis:7-bullseye AS redis_base
 
 # now build the final image, based on the the regular Synapse docker image
 FROM $FROM

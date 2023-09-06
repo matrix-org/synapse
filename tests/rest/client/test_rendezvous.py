@@ -25,7 +25,6 @@ endpoint = "/_matrix/client/unstable/org.matrix.msc3886/rendezvous"
 
 
 class RendezvousServletTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         rendezvous.register_servlets,
     ]

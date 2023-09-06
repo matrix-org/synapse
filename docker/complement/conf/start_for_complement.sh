@@ -6,7 +6,7 @@ set -e
 
 echo "Complement Synapse launcher"
 echo "  Args: $@"
-echo "  Env: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE SYNAPSE_COMPLEMENT_USE_WORKERS=$SYNAPSE_COMPLEMENT_USE_WORKERS"
+echo "  Env: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE SYNAPSE_COMPLEMENT_USE_WORKERS=$SYNAPSE_COMPLEMENT_USE_WORKERS SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=$SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR"
 
 function log {
     d=$(date +"%Y-%m-%d %H:%M:%S,%3N")
@@ -51,8 +51,7 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
   # -z True if the length of string is zero.
   if [[ -z "$SYNAPSE_WORKER_TYPES" ]]; then
     export SYNAPSE_WORKER_TYPES="\
-      event_persister, \
-      event_persister, \
+      event_persister:2, \
       background_worker, \
       frontend_proxy, \
       event_creator, \
@@ -64,7 +63,8 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       synchrotron, \
       client_reader, \
       appservice, \
-      pusher"
+      pusher, \
+      stream_writers=account_data+presence+receipts+to_device+typing"
 
   fi
   log "Workers requested: $SYNAPSE_WORKER_TYPES"
@@ -73,6 +73,17 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
 else
   # Empty string here means 'main process only'
   export SYNAPSE_WORKER_TYPES=""
+fi
+
+
+if [[ -n "$SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR" ]]; then
+  if [[ -n "$SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER" ]]; then
+    export SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR="1"
+  else
+    export SYNAPSE_ASYNC_IO_REACTOR="1"
+  fi
+else
+  export SYNAPSE_ASYNC_IO_REACTOR="0"
 fi
 
 

@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Tuple
 from twisted.web.server import Request
 
 from synapse.http.server import HttpServer
-from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import JsonDict
 
@@ -61,10 +60,8 @@ class ReplicationRemovePusherRestServlet(ReplicationEndpoint):
         return payload
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, user_id: str
+        self, request: Request, content: JsonDict, user_id: str
     ) -> Tuple[int, JsonDict]:
-        content = parse_json_object_from_request(request)
-
         app_id = content["app_id"]
         pushkey = content["pushkey"]
 

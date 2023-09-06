@@ -470,7 +470,7 @@ class CacheMultipleEntries(CacheEntry[KT, VT]):
     def deferred(self, key: KT) -> "defer.Deferred[VT]":
         if not self._deferred:
             self._deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
-        return self._deferred.observe().addCallback(lambda res: res.get(key))
+        return self._deferred.observe().addCallback(lambda res: res[key])
 
     def add_invalidation_callback(
         self, key: KT, callback: Optional[Callable[[], None]]

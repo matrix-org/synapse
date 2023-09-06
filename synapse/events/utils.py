@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    Match,
     MutableMapping,
     Optional,
     Union,
@@ -38,8 +39,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
-from synapse.types import JsonDict
-from synapse.util.frozenutils import unfreeze
+from synapse.types import JsonDict, Requester
 
 from . import EventBase
 
@@ -47,12 +47,10 @@ if TYPE_CHECKING:
     from synapse.handlers.relations import BundledAggregations
 
 
-# Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
-# (?<!stuff) matches if the current position in the string is not preceded
-# by a match for 'stuff'.
-# TODO: This is fast, but fails to handle "foo\\.bar" which should be treated as
-#       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
-SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
+# Split strings on "." but not "\." (or "\\\.").
+SPLIT_FIELD_REGEX = re.compile(r"\\*\.")
+# Find escaped characters, e.g. those with a \ in front of them.
+ESCAPE_SEQUENCE_PATTERN = re.compile(r"\\(.)")
 
 CANONICALJSON_MAX_INT = (2**53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
@@ -107,13 +105,12 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         "depth",
         "prev_events",
         "auth_events",
-        "origin",
         "origin_server_ts",
     ]
 
-    # Room versions from before MSC2176 had additional allowed keys.
-    if not room_version.msc2176_redaction_rules:
-        allowed_keys.extend(["prev_state", "membership"])
+    # Earlier room versions from had additional allowed keys.
+    if not room_version.updated_redaction_rules:
+        allowed_keys.extend(["prev_state", "membership", "origin"])
 
     event_type = event_dict["type"]
 
@@ -126,17 +123,29 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
 
     if event_type == EventTypes.Member:
         add_fields("membership")
-        if room_version.msc3375_redaction_rules:
+        if room_version.restricted_join_rule_fix:
             add_fields(EventContentFields.AUTHORISING_USER)
-    elif event_type == EventTypes.Create:
-        # MSC2176 rules state that create events cannot be redacted.
-        if room_version.msc2176_redaction_rules:
-            return event_dict
+        if room_version.updated_redaction_rules:
+            # Preserve the signed field under third_party_invite.
+            third_party_invite = event_dict["content"].get("third_party_invite")
+            if isinstance(third_party_invite, collections.abc.Mapping):
+                new_content["third_party_invite"] = {}
+                if "signed" in third_party_invite:
+                    new_content["third_party_invite"]["signed"] = third_party_invite[
+                        "signed"
+                    ]
 
-        add_fields("creator")
+    elif event_type == EventTypes.Create:
+        if room_version.updated_redaction_rules:
+            # MSC2176 rules state that create events cannot have their `content` redacted.
+            new_content = event_dict["content"]
+        elif not room_version.implicit_room_creator:
+            # Some room versions give meaning to `creator`
+            add_fields("creator")
+
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             add_fields("allow")
     elif event_type == EventTypes.PowerLevels:
         add_fields(
@@ -150,24 +159,27 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
             "redact",
         )
 
-        if room_version.msc2176_redaction_rules:
+        if room_version.updated_redaction_rules:
             add_fields("invite")
-
-        if room_version.msc2716_historical:
-            add_fields("historical")
 
     elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
-    elif event_type == EventTypes.Redaction and room_version.msc2176_redaction_rules:
+    elif event_type == EventTypes.Redaction and room_version.updated_redaction_rules:
         add_fields("redacts")
-    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_INSERTION:
-        add_fields(EventContentFields.MSC2716_NEXT_BATCH_ID)
-    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_BATCH:
-        add_fields(EventContentFields.MSC2716_BATCH_ID)
-    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_MARKER:
-        add_fields(EventContentFields.MSC2716_INSERTION_EVENT_REFERENCE)
+
+    # Protect the rel_type and event_id fields under the m.relates_to field.
+    if room_version.msc3389_relation_redactions:
+        relates_to = event_dict["content"].get("m.relates_to")
+        if isinstance(relates_to, collections.abc.Mapping):
+            new_relates_to = {}
+            for field in ("rel_type", "event_id"):
+                if field in relates_to:
+                    new_relates_to[field] = relates_to[field]
+            # Only include a non-empty relates_to field.
+            if new_relates_to:
+                new_content["m.relates_to"] = new_relates_to
 
     allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 
@@ -229,6 +241,57 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
     sub_out_dict[key_to_move] = sub_dict[key_to_move]
 
 
+def _escape_slash(m: Match[str]) -> str:
+    """
+    Replacement function; replace a backslash-backslash or backslash-dot with the
+    second character. Leaves any other string alone.
+    """
+    if m.group(1) in ("\\", "."):
+        return m.group(1)
+    return m.group(0)
+
+
+def _split_field(field: str) -> List[str]:
+    """
+    Splits strings on unescaped dots and removes escaping.
+
+    Args:
+        field: A string representing a path to a field.
+
+    Returns:
+        A list of nested fields to traverse.
+    """
+
+    # Convert the field and remove escaping:
+    #
+    # 1. "content.body.thing\.with\.dots"
+    # 2. ["content", "body", "thing\.with\.dots"]
+    # 3. ["content", "body", "thing.with.dots"]
+
+    # Find all dots (and their preceding backslashes). If the dot is unescaped
+    # then emit a new field part.
+    result = []
+    prev_start = 0
+    for match in SPLIT_FIELD_REGEX.finditer(field):
+        # If the match is an *even* number of characters than the dot was escaped.
+        if len(match.group()) % 2 == 0:
+            continue
+
+        # Add a new part (up to the dot, exclusive) after escaping.
+        result.append(
+            ESCAPE_SEQUENCE_PATTERN.sub(
+                _escape_slash, field[prev_start : match.end() - 1]
+            )
+        )
+        prev_start = match.end()
+
+    # Add any part of the field after the last unescaped dot. (Note that if the
+    # character is a dot this correctly adds a blank string.)
+    result.append(re.sub(r"\\(.)", _escape_slash, field[prev_start:]))
+
+    return result
+
+
 def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
     """Return a new dict with only the fields in 'dictionary' which are present
     in 'fields'.
@@ -236,7 +299,7 @@ def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
     If there are no event fields specified then all fields are included.
     The entries may include '.' characters to indicate sub-fields.
     So ['content.body'] will include the 'body' field of the 'content' object.
-    A literal '.' character in a field name may be escaped using a '\'.
+    A literal '.' or '\' character in a field name may be escaped using a '\'.
 
     Args:
         dictionary: The dictionary to read from.
@@ -251,13 +314,7 @@ def only_fields(dictionary: JsonDict, fields: List[str]) -> JsonDict:
 
     # for each field, convert it:
     # ["content.body.thing\.with\.dots"] => [["content", "body", "thing\.with\.dots"]]
-    split_fields = [SPLIT_FIELD_REGEX.split(f) for f in fields]
-
-    # for each element of the output array of arrays:
-    # remove escaping so we can use the right key names.
-    split_fields[:] = [
-        [f.replace(r"\.", r".") for f in field_array] for field_array in split_fields
-    ]
+    split_fields = [_split_field(f) for f in fields]
 
     output: JsonDict = {}
     for field_array in split_fields:
@@ -317,8 +374,9 @@ class SerializeEventConfig:
     as_client_event: bool = True
     # Function to convert from federation format to client format
     event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1
-    # ID of the user's auth token - used for namespacing of transaction IDs
-    token_id: Optional[int] = None
+    # The entity that requested the event. This is used to determine whether to include
+    # the transaction_id in the unsigned section of the event.
+    requester: Optional[Requester] = None
     # List of event fields to include. If empty, all fields will be returned.
     only_event_fields: Optional[List[str]] = None
     # Some events can have stripped room state stored in the `unsigned` field.
@@ -355,7 +413,7 @@ def serialize_event(
     time_now_ms = int(time_now_ms)
 
     # Should this strip out None's?
-    d = {k: v for k, v in e.get_dict().items()}
+    d = dict(e.get_dict().items())
 
     d["event_id"] = e.event_id
 
@@ -365,13 +423,50 @@ def serialize_event(
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms, config=config
+            e.unsigned["redacted_because"],
+            time_now_ms,
+            config=config,
         )
 
-    if config.token_id is not None:
-        if config.token_id == getattr(e.internal_metadata, "token_id", None):
-            txn_id = getattr(e.internal_metadata, "txn_id", None)
-            if txn_id is not None:
+    # If we have a txn_id saved in the internal_metadata, we should include it in the
+    # unsigned section of the event if it was sent by the same session as the one
+    # requesting the event.
+    txn_id: Optional[str] = getattr(e.internal_metadata, "txn_id", None)
+    if (
+        txn_id is not None
+        and config.requester is not None
+        and config.requester.user.to_string() == e.sender
+    ):
+        # Some events do not have the device ID stored in the internal metadata,
+        # this includes old events as well as those created by appservice, guests,
+        # or with tokens minted with the admin API. For those events, fallback
+        # to using the access token instead.
+        event_device_id: Optional[str] = getattr(e.internal_metadata, "device_id", None)
+        if event_device_id is not None:
+            if event_device_id == config.requester.device_id:
+                d["unsigned"]["transaction_id"] = txn_id
+
+        else:
+            # Fallback behaviour: only include the transaction ID if the event
+            # was sent from the same access token.
+            #
+            # For regular users, the access token ID can be used to determine this.
+            # This includes access tokens minted with the admin API.
+            #
+            # For guests and appservice users, we can't check the access token ID
+            # so assume it is the same session.
+            event_token_id: Optional[int] = getattr(
+                e.internal_metadata, "token_id", None
+            )
+            if (
+                (
+                    event_token_id is not None
+                    and config.requester.access_token_id is not None
+                    and event_token_id == config.requester.access_token_id
+                )
+                or config.requester.is_guest
+                or config.requester.app_service
+            ):
                 d["unsigned"]["transaction_id"] = txn_id
 
     # invite_room_state and knock_room_state are a list of stripped room state events
@@ -384,6 +479,17 @@ def serialize_event(
 
     if config.as_client_event:
         d = config.event_format(d)
+
+    # If the event is a redaction, the field with the redacted event ID appears
+    # in a different location depending on the room version. e.redacts handles
+    # fetching from the proper location; copy it to the other location for forwards-
+    # and backwards-compatibility with clients.
+    if e.type == EventTypes.Redaction and e.redacts is not None:
+        if e.room_version.updated_redaction_rules:
+            d["redacts"] = e.redacts
+        else:
+            d["content"] = dict(d["content"])
+            d["content"]["redacts"] = e.redacts
 
     only_event_fields = config.only_event_fields
     if only_event_fields:
@@ -410,7 +516,6 @@ class EventClientSerializer:
         *,
         config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
         bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
-        apply_edits: bool = True,
     ) -> JsonDict:
         """Serializes a single event.
 
@@ -420,8 +525,7 @@ class EventClientSerializer:
             config: Event serialization config
             bundle_aggregations: A map from event_id to the aggregations to be bundled
                into the event.
-            apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `bundle_aggregations[<event_id>].replace`.
+
         Returns:
             The serialized event
         """
@@ -440,37 +544,9 @@ class EventClientSerializer:
                     config,
                     bundle_aggregations,
                     serialized_event,
-                    apply_edits=apply_edits,
                 )
 
         return serialized_event
-
-    def _apply_edit(
-        self, orig_event: EventBase, serialized_event: JsonDict, edit: EventBase
-    ) -> None:
-        """Replace the content, preserving existing relations of the serialized event.
-
-        Args:
-            orig_event: The original event.
-            serialized_event: The original event, serialized. This is modified.
-            edit: The event which edits the above.
-        """
-
-        # Ensure we take copies of the edit content, otherwise we risk modifying
-        # the original event.
-        edit_content = edit.content.copy()
-
-        # Unfreeze the event content if necessary, so that we may modify it below
-        edit_content = unfreeze(edit_content)
-        serialized_event["content"] = edit_content.get("m.new_content", {})
-
-        # Check for existing relations
-        relates_to = orig_event.content.get("m.relates_to")
-        if relates_to:
-            # Keep the relations, ensuring we use a dict copy of the original
-            serialized_event["content"]["m.relates_to"] = relates_to.copy()
-        else:
-            serialized_event["content"].pop("m.relates_to", None)
 
     def _inject_bundled_aggregations(
         self,
@@ -479,7 +555,6 @@ class EventClientSerializer:
         config: SerializeEventConfig,
         bundled_aggregations: Dict[str, "BundledAggregations"],
         serialized_event: JsonDict,
-        apply_edits: bool,
     ) -> None:
         """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
 
@@ -494,8 +569,6 @@ class EventClientSerializer:
                 While serializing the bundled aggregations this map may be searched
                 again for additional events in a recursive manner.
             serialized_event: The serialized event which may be modified.
-            apply_edits: Whether the content of the event should be modified to reflect
-               any replacement in `aggregations.replace`.
         """
 
         # We have already checked that aggregations exist for this event.
@@ -505,28 +578,23 @@ class EventClientSerializer:
         # being serialized.
         serialized_aggregations = {}
 
-        if event_aggregations.annotations:
-            serialized_aggregations[
-                RelationTypes.ANNOTATION
-            ] = event_aggregations.annotations
-
         if event_aggregations.references:
             serialized_aggregations[
                 RelationTypes.REFERENCE
             ] = event_aggregations.references
 
         if event_aggregations.replace:
-            # If there is an edit, optionally apply it to the event.
-            edit = event_aggregations.replace
-            if apply_edits:
-                self._apply_edit(event, serialized_event, edit)
-
             # Include information about it in the relations dict.
-            serialized_aggregations[RelationTypes.REPLACE] = {
-                "event_id": edit.event_id,
-                "origin_server_ts": edit.origin_server_ts,
-                "sender": edit.sender,
-            }
+            #
+            # Matrix spec v1.5 (https://spec.matrix.org/v1.5/client-server-api/#server-side-aggregation-of-mreplace-relationships)
+            # said that we should only include the `event_id`, `origin_server_ts` and
+            # `sender` of the edit; however MSC3925 proposes extending it to the whole
+            # of the edit, which is what we do here.
+            serialized_aggregations[RelationTypes.REPLACE] = self.serialize_event(
+                event_aggregations.replace,
+                time_now,
+                config=config,
+            )
 
         # Include any threaded replies to this event.
         if event_aggregations.thread:
@@ -588,12 +656,13 @@ class EventClientSerializer:
 
 
 _PowerLevel = Union[str, int]
+PowerLevelsContent = Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
 
 
 def copy_and_fixup_power_levels_contents(
-    old_power_levels: Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
+    old_power_levels: PowerLevelsContent,
 ) -> Dict[str, Union[int, Dict[str, int]]]:
-    """Copy the content of a power_levels event, unfreezing frozendicts along the way.
+    """Copy the content of a power_levels event, unfreezing immutabledicts along the way.
 
     We accept as input power level values which are strings, provided they represent an
     integer, e.g. `"`100"` instead of 100. Such strings are converted to integers
@@ -630,10 +699,10 @@ def _copy_power_level_value_as_integer(
 ) -> None:
     """Set `power_levels[key]` to the integer represented by `old_value`.
 
-    :raises TypeError: if `old_value` is not an integer, nor a base-10 string
+    :raises TypeError: if `old_value` is neither an integer nor a base-10 string
         representation of an integer.
     """
-    if isinstance(old_value, int):
+    if type(old_value) is int:  # noqa: E721
         power_levels[key] = old_value
         return
 
@@ -661,7 +730,7 @@ def validate_canonicaljson(value: Any) -> None:
     * Floats
     * NaN, Infinity, -Infinity
     """
-    if isinstance(value, int):
+    if type(value) is int:  # noqa: E721
         if value < CANONICALJSON_MIN_INT or CANONICALJSON_MAX_INT < value:
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 

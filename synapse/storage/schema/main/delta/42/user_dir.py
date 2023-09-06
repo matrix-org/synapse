@@ -14,7 +14,8 @@
 
 import logging
 
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ CREATE VIRTUAL TABLE user_directory_search
 """
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     for statement in get_statements(BOTH_TABLES.splitlines()):
         cur.execute(statement)
 
@@ -78,7 +79,3 @@ def run_create(cur, database_engine, *args, **kwargs):
             cur.execute(statement)
     else:
         raise Exception("Unrecognized database engine")
-
-
-def run_upgrade(*args, **kwargs):
-    pass

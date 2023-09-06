@@ -18,6 +18,7 @@
 import argparse
 import curses
 import logging
+import os
 import sys
 import time
 import traceback
@@ -51,13 +52,16 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.notifier import ReplicationNotifier
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
-from synapse.storage.databases.main import PushRuleStore
+from synapse.storage.databases.main import FilteringWorkerStore, PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
+from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyBackgroundStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
+from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
 from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
@@ -66,7 +70,11 @@ from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
 from synapse.storage.databases.main.presence import PresenceBackgroundUpdateStore
-from synapse.storage.databases.main.pusher import PusherWorkerStore
+from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.pusher import (
+    PusherBackgroundUpdatesStore,
+    PusherWorkerStore,
+)
 from synapse.storage.databases.main.receipts import ReceiptsBackgroundUpdateStore
 from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
@@ -93,61 +101,81 @@ reactor = cast(ISynapseReactor, reactor_)
 logger = logging.getLogger("synapse_port_db")
 
 
+# SQLite doesn't have a dedicated boolean type (it stores True/False as 1/0). This means
+# portdb will read sqlite bools as integers, then try to insert them into postgres
+# boolean columns---which fails. Lacking some Python-parseable metaschema, we must
+# specify which integer columns should be inserted as booleans into postgres.
 BOOLEAN_COLUMNS = {
-    "events": ["processed", "outlier", "contains_url"],
-    "rooms": ["is_public", "has_auth_chain_index"],
+    "access_tokens": ["used"],
+    "account_validity": ["email_sent"],
+    "device_lists_changes_in_room": ["converted_to_destinations"],
+    "device_lists_outbound_pokes": ["sent"],
+    "devices": ["hidden"],
+    "e2e_fallback_keys_json": ["used"],
+    "e2e_room_keys": ["is_verified"],
     "event_edges": ["is_state"],
+    "events": ["processed", "outlier", "contains_url"],
+    "local_media_repository": ["safe_from_quarantine"],
     "presence_list": ["accepted"],
     "presence_stream": ["currently_active"],
     "public_room_list_stream": ["visibility"],
-    "devices": ["hidden"],
-    "device_lists_outbound_pokes": ["sent"],
-    "users_who_share_rooms": ["share_private"],
-    "e2e_room_keys": ["is_verified"],
-    "account_validity": ["email_sent"],
+    "pushers": ["enabled"],
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
-    "local_media_repository": ["safe_from_quarantine"],
-    "users": ["shadow_banned", "approved"],
-    "e2e_fallback_keys_json": ["used"],
-    "access_tokens": ["used"],
-    "device_lists_changes_in_room": ["converted_to_destinations"],
-    "pushers": ["enabled"],
+    "rooms": ["is_public", "has_auth_chain_index"],
+    "users": ["shadow_banned", "approved", "locked"],
+    "un_partial_stated_event_stream": ["rejection_status_changed"],
+    "users_who_share_rooms": ["share_private"],
+    "per_user_experimental_features": ["enabled"],
 }
 
 
+# These tables are never deleted from in normal operation [*], so we can resume porting
+# over rows from a previous attempt rather than starting from scratch.
+#
+# [*]: We do delete from many of these tables when purging a room, and
+#      presumably when purging old events. So we might e.g.
+#
+#      1. Run portdb and port half of some table.
+#      2. Stop portdb.
+#      3. Purge something, deleting some of the rows we've ported over.
+#      4. Restart portdb. The rows deleted from sqlite are still present in postgres.
+#
+#      But this isn't the end of the world: we should be able to repeat the purge
+#      on the postgres DB when porting completes.
 APPEND_ONLY_TABLES = [
-    "event_reference_hashes",
-    "events",
+    "cache_invalidation_stream_by_instance",
+    "event_auth",
+    "event_edges",
     "event_json",
-    "state_events",
-    "room_memberships",
-    "topics",
-    "room_names",
-    "rooms",
+    "event_reference_hashes",
+    "event_search",
+    "event_to_state_groups",
+    "events",
+    "ex_outlier_stream",
     "local_media_repository",
     "local_media_repository_thumbnails",
+    "presence_stream",
+    "public_room_list_stream",
+    "push_rules_stream",
+    "received_transactions",
+    "redactions",
+    "rejections",
     "remote_media_cache",
     "remote_media_cache_thumbnails",
-    "redactions",
-    "event_edges",
-    "event_auth",
-    "received_transactions",
+    "room_memberships",
+    "room_names",
+    "rooms",
     "sent_transactions",
-    "transaction_id_to_pdu",
-    "users",
+    "state_events",
+    "state_group_edges",
     "state_groups",
     "state_groups_state",
-    "event_to_state_groups",
-    "rejections",
-    "event_search",
-    "presence_stream",
-    "push_rules_stream",
-    "ex_outlier_stream",
-    "cache_invalidation_stream_by_instance",
-    "public_room_list_stream",
-    "state_group_edges",
     "stream_ordering_to_exterm",
+    "topics",
+    "transaction_id_to_pdu",
+    "un_partial_stated_event_stream",
+    "users",
 ]
 
 
@@ -169,6 +197,11 @@ IGNORED_TABLES = {
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
     "ui_auth_sessions_ips",
+    # Ignore the worker locks table, as a) there shouldn't be any acquired locks
+    # after porting, and b) the circular foreign key constraints make it hard to
+    # port.
+    "worker_read_write_locks_mode",
+    "worker_read_write_locks",
 }
 
 
@@ -201,13 +234,18 @@ class Store(
     MainStateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
+    EndToEndRoomKeyBackgroundStore,
     StatsStore,
     AccountDataWorkerStore,
+    FilteringWorkerStore,
+    ProfileWorkerStore,
     PushRuleStore,
     PusherWorkerStore,
+    PusherBackgroundUpdatesStore,
     PresenceBackgroundUpdateStore,
     ReceiptsBackgroundUpdateStore,
     RelationsWorkerStore,
+    EventFederationWorkerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -259,6 +297,9 @@ class MockHomeserver:
 
     def should_send_federation(self) -> bool:
         return False
+
+    def get_replication_notifier(self) -> ReplicationNotifier:
+        return ReplicationNotifier()
 
 
 class Porter:
@@ -441,7 +482,10 @@ class Porter:
                         do_backward[0] = False
 
                 if forward_rows or backward_rows:
-                    headers = [column[0] for column in txn.description]
+                    assert txn.description is not None
+                    headers: Optional[List[str]] = [
+                        column[0] for column in txn.description
+                    ]
                 else:
                     headers = None
 
@@ -503,6 +547,7 @@ class Porter:
             def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
                 txn.execute(select, (forward_chunk, self.batch_size))
                 rows = txn.fetchall()
+                assert txn.description is not None
                 headers = [column[0] for column in txn.description]
 
                 return headers, rows
@@ -720,7 +765,7 @@ class Porter:
 
             # Step 2. Set up sequences
             #
-            # We do this before porting the tables so that event if we fail half
+            # We do this before porting the tables so that even if we fail half
             # way through the postgres DB always have sequences that are greater
             # than their respective tables. If we don't then creating the
             # `DataStore` object will fail due to the inconsistency.
@@ -728,6 +773,10 @@ class Porter:
             await self._setup_state_group_id_seq()
             await self._setup_user_id_seq()
             await self._setup_events_stream_seqs()
+            await self._setup_sequence(
+                "un_partial_stated_event_stream_sequence",
+                ("un_partial_stated_event_stream",),
+            )
             await self._setup_sequence(
                 "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
             )
@@ -738,6 +787,11 @@ class Porter:
             await self._setup_sequence("receipts_sequence", ("receipts_linearized",))
             await self._setup_sequence("presence_stream_sequence", ("presence_stream",))
             await self._setup_auth_chain_sequence()
+            await self._setup_sequence(
+                "application_services_txn_id_seq",
+                ("application_services_txns",),
+                "txn_id",
+            )
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -769,7 +823,9 @@ class Porter:
             )
             # Map from table name to args passed to `handle_table`, i.e. a tuple
             # of: `postgres_size`, `table_size`, `forward_chunk`, `backward_chunk`.
-            tables_to_port_info_map = {r[0]: r[1:] for r in setup_res}
+            tables_to_port_info_map = {
+                r[0]: r[1:] for r in setup_res if r[0] not in IGNORED_TABLES
+            }
 
             # Step 5. Do the copying.
             #
@@ -867,7 +923,8 @@ class Porter:
         def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
             txn.execute(select)
             rows = txn.fetchall()
-            headers: List[str] = [column[0] for column in txn.description]
+            assert txn.description is not None
+            headers = [column[0] for column in txn.description]
 
             ts_ind = headers.index("ts")
 
@@ -1040,7 +1097,10 @@ class Porter:
         )
 
     async def _setup_sequence(
-        self, sequence_name: str, stream_id_tables: Iterable[str]
+        self,
+        sequence_name: str,
+        stream_id_tables: Iterable[str],
+        column_name: str = "stream_id",
     ) -> None:
         """Set a sequence to the correct value."""
         current_stream_ids = []
@@ -1050,7 +1110,7 @@ class Porter:
                 await self.sqlite_store.db_pool.simple_select_one_onecol(
                     table=stream_id_table,
                     keyvalues={},
-                    retcol="COALESCE(MAX(stream_id), 1)",
+                    retcol=f"COALESCE(MAX({column_name}), 1)",
                     allow_none=True,
                 ),
             )
@@ -1150,10 +1210,10 @@ class CursesProgress(Progress):
         self.total_processed = 0
         self.total_remaining = 0
 
-        super(CursesProgress, self).__init__()
+        super().__init__()
 
     def update(self, table: str, num_done: int) -> None:
-        super(CursesProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         self.total_processed = 0
         self.total_remaining = 0
@@ -1182,7 +1242,6 @@ class CursesProgress(Progress):
         if self.finished:
             status = "Time spent: %s (Done!)" % (duration_str,)
         else:
-
             if self.total_processed > 0:
                 left = float(self.total_remaining) / self.total_processed
 
@@ -1250,7 +1309,7 @@ class TerminalProgress(Progress):
     """Just prints progress to the terminal"""
 
     def update(self, table: str, num_done: int) -> None:
-        super(TerminalProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         data = self.tables[table]
 
@@ -1304,10 +1363,17 @@ def main() -> None:
         filename="port-synapse.log" if args.curses else None,
     )
 
+    if not os.path.isfile(args.sqlite_database):
+        sys.stderr.write(
+            "The sqlite database you specified does not exist, please check that you have the"
+            "correct path."
+        )
+        sys.exit(1)
+
     sqlite_config = {
         "name": "sqlite3",
         "args": {
-            "database": "file:{}?mode=rw".format(args.sqlite_database),
+            "database": args.sqlite_database,
             "cp_min": 1,
             "cp_max": 1,
             "check_same_thread": False,
@@ -1328,6 +1394,9 @@ def main() -> None:
     if postgres_config["name"] != "psycopg2":
         sys.stderr.write("Database must use the 'psycopg2' connector.\n")
         sys.exit(3)
+
+    # Don't run the background tasks that get started by the data stores.
+    hs_config["run_background_tasks_on"] = "some_other_process"
 
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")

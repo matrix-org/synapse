@@ -13,8 +13,12 @@
 // limitations under the License.
 
 #![feature(test)]
+
+use std::borrow::Cow;
+
 use synapse::push::{
-    evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, PushRules,
+    evaluator::PushRuleEvaluator, Condition, EventMatchCondition, FilteredPushRules, JsonValue,
+    PushRules, SimpleJsonValue,
 };
 use test::Bencher;
 
@@ -23,15 +27,25 @@ extern crate test;
 #[bench]
 fn bench_match_exact(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
         10,
         Some(0),
         Default::default(),
@@ -45,8 +59,7 @@ fn bench_match_exact(b: &mut Bencher) {
     let condition = Condition::Known(synapse::push::KnownCondition::EventMatch(
         EventMatchCondition {
             key: "room_id".into(),
-            pattern: Some("!room:server".into()),
-            pattern_type: None,
+            pattern: "!room:server".into(),
         },
     ));
 
@@ -59,15 +72,25 @@ fn bench_match_exact(b: &mut Bencher) {
 #[bench]
 fn bench_match_word(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
         10,
         Some(0),
         Default::default(),
@@ -81,8 +104,7 @@ fn bench_match_word(b: &mut Bencher) {
     let condition = Condition::Known(synapse::push::KnownCondition::EventMatch(
         EventMatchCondition {
             key: "content.body".into(),
-            pattern: Some("test".into()),
-            pattern_type: None,
+            pattern: "test".into(),
         },
     ));
 
@@ -95,15 +117,25 @@ fn bench_match_word(b: &mut Bencher) {
 #[bench]
 fn bench_match_word_miss(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
         10,
         Some(0),
         Default::default(),
@@ -117,8 +149,7 @@ fn bench_match_word_miss(b: &mut Bencher) {
     let condition = Condition::Known(synapse::push::KnownCondition::EventMatch(
         EventMatchCondition {
             key: "content.body".into(),
-            pattern: Some("foobar".into()),
-            pattern_type: None,
+            pattern: "foobar".into(),
         },
     ));
 
@@ -131,15 +162,25 @@ fn bench_match_word_miss(b: &mut Bencher) {
 #[bench]
 fn bench_eval_message(b: &mut Bencher) {
     let flattened_keys = [
-        ("type".to_string(), "m.text".to_string()),
-        ("room_id".to_string(), "!room:server".to_string()),
-        ("content.body".to_string(), "test message".to_string()),
+        (
+            "type".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("m.text"))),
+        ),
+        (
+            "room_id".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("!room:server"))),
+        ),
+        (
+            "content.body".to_string(),
+            JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("test message"))),
+        ),
     ]
     .into_iter()
     .collect();
 
     let eval = PushRuleEvaluator::py_new(
         flattened_keys,
+        false,
         10,
         Some(0),
         Default::default(),
@@ -150,8 +191,13 @@ fn bench_eval_message(b: &mut Bencher) {
     )
     .unwrap();
 
-    let rules =
-        FilteredPushRules::py_new(PushRules::new(Vec::new()), Default::default(), false, false);
+    let rules = FilteredPushRules::py_new(
+        PushRules::new(Vec::new()),
+        Default::default(),
+        false,
+        false,
+        false,
+    );
 
     b.iter(|| eval.run(&rules, Some("bob"), Some("person")));
 }

@@ -46,7 +46,6 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
-    AbstractStreamIdTracker,
     IdGenerator,
     StreamIdGenerator,
 )
@@ -86,8 +85,9 @@ def _load_rules(
     filtered_rules = FilteredPushRules(
         push_rules,
         enabled_map,
-        msc3664_enabled=experimental_config.msc3664_enabled,
         msc1767_enabled=experimental_config.msc1767_enabled,
+        msc3664_enabled=experimental_config.msc3664_enabled,
+        msc3381_polls_enabled=experimental_config.msc3381_polls_enabled,
     )
 
     return filtered_rules
@@ -115,8 +115,9 @@ class PushRulesWorkerStore(
 
         # In the worker store this is an ID tracker which we overwrite in the non-worker
         # class below that is used on the main process.
-        self._push_rules_stream_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+        self._push_rules_stream_id_gen = StreamIdGenerator(
             db_conn,
+            hs.get_replication_notifier(),
             "push_rules_stream",
             "stream_id",
             is_writer=hs.config.worker.worker_app is None,
@@ -153,6 +154,13 @@ class PushRulesWorkerStore(
                 self.get_push_rules_for_user.invalidate((row.user_id,))
                 self.push_rules_stream_cache.entity_has_changed(row.user_id, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == PushRulesStream.NAME:
+            self._push_rules_stream_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     @cached(max_entries=5000)
     async def get_push_rules_for_user(self, user_id: str) -> FilteredPushRules:
@@ -551,19 +559,19 @@ class PushRuleStore(PushRulesWorkerStore):
         if isinstance(self.database_engine, PostgresEngine):
             sql = """
                 INSERT INTO push_rules_enable (id, user_name, rule_id, enabled)
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, 1)
                 ON CONFLICT DO NOTHING
             """
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = """
                 INSERT OR IGNORE INTO push_rules_enable (id, user_name, rule_id, enabled)
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, 1)
             """
         else:
             raise RuntimeError("Unknown database engine")
 
         new_enable_id = self._push_rules_enable_id_gen.get_next()
-        txn.execute(sql, (new_enable_id, user_id, rule_id, 1))
+        txn.execute(sql, (new_enable_id, user_id, rule_id))
 
     async def delete_push_rule(self, user_id: str, rule_id: str) -> None:
         """

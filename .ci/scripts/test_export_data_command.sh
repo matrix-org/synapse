@@ -23,8 +23,9 @@ poetry run python -m synapse.app.admin_cmd -c .ci/sqlite-config.yaml  export-dat
 --output-directory /tmp/export_data
 
 # Test that the output directory exists and contains the rooms directory
-dir="/tmp/export_data/rooms"
-if [ -d "$dir" ]; then
+dir_r="/tmp/export_data/rooms"
+dir_u="/tmp/export_data/user_data"
+if [ -d "$dir_r" ] && [ -d "$dir_u" ]; then
   echo "Command successful, this test passes"
 else
   echo "No output directories found, the command fails against a sqlite database."
@@ -43,8 +44,9 @@ poetry run python -m synapse.app.admin_cmd -c .ci/postgres-config.yaml  export-d
 --output-directory /tmp/export_data2
 
 # Test that the output directory exists and contains the rooms directory
-dir2="/tmp/export_data2/rooms"
-if [ -d "$dir2" ]; then
+dir_r2="/tmp/export_data2/rooms"
+dir_u2="/tmp/export_data2/user_data"
+if [ -d "$dir_r2" ] && [ -d "$dir_u2" ]; then
   echo "Command successful, this test passes"
 else
   echo "No output directories found, the command fails against a postgres database."

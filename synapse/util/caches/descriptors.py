@@ -220,7 +220,9 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         self.iterable = iterable
         self.prune_unread_entries = prune_unread_entries
 
-    def __get__(self, obj: Optional[Any], owner: Optional[Type]) -> Callable[..., Any]:
+    def __get__(
+        self, obj: Optional[Any], owner: Optional[Type]
+    ) -> Callable[..., "defer.Deferred[Any]"]:
         cache: DeferredCache[CacheKey, Any] = DeferredCache(
             name=self.name,
             max_entries=self.max_entries,
@@ -232,7 +234,7 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         get_cache_key = self.cache_key_builder
 
         @functools.wraps(self.orig)
-        def _wrapped(*args: Any, **kwargs: Any) -> Any:
+        def _wrapped(*args: Any, **kwargs: Any) -> "defer.Deferred[Any]":
             # If we're passed a cache_context then we'll want to call its invalidate()
             # whenever we are invalidated
             invalidate_callback = kwargs.pop("on_invalidate", None)

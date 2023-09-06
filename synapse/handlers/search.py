@@ -14,7 +14,7 @@
 
 import itertools
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
 from unpaddedbase64 import decode_base64, encode_base64
@@ -23,7 +23,8 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
-from synapse.types import JsonDict, StreamKeyType, UserID
+from synapse.events.utils import SerializeEventConfig
+from synapse.types import JsonDict, Requester, StrCollection, StreamKeyType, UserID
 from synapse.types.state import StateFilter
 from synapse.visibility import filter_events_for_client
 
@@ -109,12 +110,12 @@ class SearchHandler:
         return historical_room_ids
 
     async def search(
-        self, user: UserID, content: JsonDict, batch: Optional[str] = None
+        self, requester: Requester, content: JsonDict, batch: Optional[str] = None
     ) -> JsonDict:
         """Performs a full text search for a user.
 
         Args:
-            user: The user performing the search.
+            requester: The user performing the search.
             content: Search parameters
             batch: The next_batch parameter. Used for pagination.
 
@@ -199,7 +200,7 @@ class SearchHandler:
             )
 
         return await self._search(
-            user,
+            requester,
             batch_group,
             batch_group_key,
             batch_token,
@@ -217,7 +218,7 @@ class SearchHandler:
 
     async def _search(
         self,
-        user: UserID,
+        requester: Requester,
         batch_group: Optional[str],
         batch_group_key: Optional[str],
         batch_token: Optional[str],
@@ -235,7 +236,7 @@ class SearchHandler:
         """Performs a full text search for a user.
 
         Args:
-            user: The user performing the search.
+            requester: The user performing the search.
             batch_group: Pagination information.
             batch_group_key: Pagination information.
             batch_token: Pagination information.
@@ -269,13 +270,13 @@ class SearchHandler:
 
         # TODO: Search through left rooms too
         rooms = await self.store.get_rooms_for_local_user_where_membership_is(
-            user.to_string(),
+            requester.user.to_string(),
             membership_list=[Membership.JOIN],
             # membership_list=[Membership.JOIN, Membership.LEAVE, Membership.Ban],
         )
         room_ids = {r.room_id for r in rooms}
 
-        # If doing a subset of all rooms seearch, check if any of the rooms
+        # If doing a subset of all rooms search, check if any of the rooms
         # are from an upgraded room, and search their contents as well
         if search_filter.rooms:
             historical_room_ids: List[str] = []
@@ -303,13 +304,13 @@ class SearchHandler:
 
         if order_by == "rank":
             search_result, sender_group = await self._search_by_rank(
-                user, room_ids, search_term, keys, search_filter
+                requester.user, room_ids, search_term, keys, search_filter
             )
             # Unused return values for rank search.
             global_next_batch = None
         elif order_by == "recent":
             search_result, global_next_batch = await self._search_by_recent(
-                user,
+                requester.user,
                 room_ids,
                 search_term,
                 keys,
@@ -334,7 +335,7 @@ class SearchHandler:
             assert after_limit is not None
 
             contexts = await self._calculate_event_contexts(
-                user,
+                requester.user,
                 search_result.allowed_events,
                 before_limit,
                 after_limit,
@@ -363,27 +364,37 @@ class SearchHandler:
                 # The returned events.
                 search_result.allowed_events,
             ),
-            user.to_string(),
+            requester.user.to_string(),
         )
 
         # We're now about to serialize the events. We should not make any
         # blocking calls after this. Otherwise, the 'age' will be wrong.
 
         time_now = self.clock.time_msec()
+        serialize_options = SerializeEventConfig(requester=requester)
 
         for context in contexts.values():
             context["events_before"] = self._event_serializer.serialize_events(
-                context["events_before"], time_now, bundle_aggregations=aggregations
+                context["events_before"],
+                time_now,
+                bundle_aggregations=aggregations,
+                config=serialize_options,
             )
             context["events_after"] = self._event_serializer.serialize_events(
-                context["events_after"], time_now, bundle_aggregations=aggregations
+                context["events_after"],
+                time_now,
+                bundle_aggregations=aggregations,
+                config=serialize_options,
             )
 
         results = [
             {
                 "rank": search_result.rank_map[e.event_id],
                 "result": self._event_serializer.serialize_event(
-                    e, time_now, bundle_aggregations=aggregations
+                    e,
+                    time_now,
+                    bundle_aggregations=aggregations,
+                    config=serialize_options,
                 ),
                 "context": contexts.get(e.event_id, {}),
             }
@@ -398,7 +409,9 @@ class SearchHandler:
 
         if state_results:
             rooms_cat_res["state"] = {
-                room_id: self._event_serializer.serialize_events(state_events, time_now)
+                room_id: self._event_serializer.serialize_events(
+                    state_events, time_now, config=serialize_options
+                )
                 for room_id, state_events in state_results.items()
             }
 
@@ -418,7 +431,7 @@ class SearchHandler:
     async def _search_by_rank(
         self,
         user: UserID,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         search_term: str,
         keys: Iterable[str],
         search_filter: Filter,
@@ -491,7 +504,7 @@ class SearchHandler:
     async def _search_by_recent(
         self,
         user: UserID,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         search_term: str,
         keys: Iterable[str],
         search_filter: Filter,

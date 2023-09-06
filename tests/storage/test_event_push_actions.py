@@ -154,7 +154,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         # Create a user to receive notifications and send receipts.
         user_id, token, _, other_token, room_id = self._create_users_and_room()
 
-        last_event_id: str
+        last_event_id = ""
 
         def _assert_counts(notif_count: int, highlight_count: int) -> None:
             counts = self.get_success(
@@ -289,7 +289,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         user_id, token, _, other_token, room_id = self._create_users_and_room()
         thread_id: str
 
-        last_event_id: str
+        last_event_id = ""
 
         def _assert_counts(
             notif_count: int,
@@ -471,7 +471,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         user_id, token, _, other_token, room_id = self._create_users_and_room()
         thread_id: str
 
-        last_event_id: str
+        last_event_id = ""
 
         def _assert_counts(
             notif_count: int,
@@ -774,7 +774,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         self.assertEqual(r, 3)
 
         # add a bunch of dummy events to the events table
-        for (stream_ordering, ts) in (
+        for stream_ordering, ts in (
             (3, 110),
             (4, 120),
             (5, 120),

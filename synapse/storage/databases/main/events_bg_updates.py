@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Set, Tuple, cast
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, cast
 
 import attr
 
@@ -29,7 +29,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events import PersistEventsStore
 from synapse.storage.types import Cursor
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrCollection
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -68,6 +68,8 @@ class _BackgroundUpdates:
     EVENT_EDGES_REPLACE_INDEX = "event_edges_replace_index"
 
     EVENTS_POPULATE_STATE_KEY_REJECTIONS = "events_populate_state_key_rejections"
+
+    EVENTS_JUMP_TO_DATE_INDEX = "events_jump_to_date_index"
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -258,6 +260,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             _BackgroundUpdates.EVENTS_POPULATE_STATE_KEY_REJECTIONS,
             self._background_events_populate_state_key_rejections,
+        )
+
+        # Add an index that would be useful for jumping to date using
+        # get_event_id_for_timestamp.
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.EVENTS_JUMP_TO_DATE_INDEX,
+            index_name="events_jump_to_date_idx",
+            table="events",
+            columns=["room_id", "origin_server_ts"],
+            where_clause="NOT outlier",
         )
 
     async def _background_reindex_fields_sender(
@@ -697,7 +709,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             nbrows = 0
             last_row_event_id = ""
-            for (event_id, event_json_raw) in results:
+            for event_id, event_json_raw in results:
                 try:
                     event_json = db_to_json(event_json_raw)
 
@@ -1049,7 +1061,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             self.event_chain_id_gen,  # type: ignore[attr-defined]
             event_to_room_id,
             event_to_types,
-            cast(Dict[str, Sequence[str]], event_to_auth_chain),
+            cast(Dict[str, StrCollection], event_to_auth_chain),
         )
 
         return _CalculateChainCover(
@@ -1155,7 +1167,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             results = list(txn)
             # (event_id, parent_id, rel_type) for each relation
             relations_to_insert: List[Tuple[str, str, str]] = []
-            for (event_id, event_json_raw) in results:
+            for event_id, event_json_raw in results:
                 try:
                     event_json = db_to_json(event_json_raw)
                 except Exception as e:
@@ -1206,9 +1218,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     cache_tuple = (parent_id,)
                     self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                         txn, self.get_relations_for_event, cache_tuple  # type: ignore[attr-defined]
-                    )
-                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
-                        txn, self.get_aggregation_groups_for_event, cache_tuple  # type: ignore[attr-defined]
                     )
                     self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                         txn, self.get_thread_summary, cache_tuple  # type: ignore[attr-defined]

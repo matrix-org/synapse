@@ -20,7 +20,7 @@ from tests.unittest import DEBUG, override_config
 
 class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
     @override_config({"allow_public_rooms_over_federation": False})
-    def test_blocked_public_room_list_over_federation(self):
+    def test_blocked_public_room_list_over_federation(self) -> None:
         """Test that unauthenticated requests to the public rooms directory 403 when
         allow_public_rooms_over_federation is False.
         """
@@ -31,7 +31,7 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(403, channel.code)
 
     @override_config({"allow_public_rooms_over_federation": True})
-    def test_open_public_room_list_over_federation(self):
+    def test_open_public_room_list_over_federation(self) -> None:
         """Test that unauthenticated requests to the public rooms directory 200 when
         allow_public_rooms_over_federation is True.
         """
@@ -42,7 +42,7 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(200, channel.code)
 
     @DEBUG
-    def test_edu_debugging_doesnt_explode(self):
+    def test_edu_debugging_doesnt_explode(self) -> None:
         """Sanity check incoming federation succeeds with `synapse.debug_8631` enabled.
 
         Remove this when we strip out issue_8631_logger.

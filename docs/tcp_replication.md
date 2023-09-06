@@ -25,7 +25,7 @@ position of all streams. The server then periodically sends `RDATA` commands
 which have the format `RDATA <stream_name> <instance_name> <token> <row>`, where
 the format of `<row>` is defined by the individual streams. The
 `<instance_name>` is the name of the Synapse process that generated the data
-(usually "master").
+(usually "master"). We expect an RDATA for every row in the DB.
 
 Error reporting happens by either the client or server sending an ERROR
 command, and usually the connection will be closed.
@@ -107,7 +107,7 @@ reconnect, following the steps above.
 If the server sends messages faster than the client can consume them the
 server will first buffer a (fairly large) number of commands and then
 disconnect the client. This ensures that we don't queue up an unbounded
-number of commands in memory and gives us a potential oppurtunity to
+number of commands in memory and gives us a potential opportunity to
 squawk loudly. When/if the client recovers it can reconnect to the
 server and ask for missed messages.
 
@@ -122,7 +122,7 @@ since these include tokens which can be used to restart the stream on
 connection errors.
 
 The client should keep track of the token in the last RDATA command
-received for each stream so that on reconneciton it can start streaming
+received for each stream so that on reconnection it can start streaming
 from the correct place. Note: not all RDATA have valid tokens due to
 batching. See `RdataCommand` for more details.
 
@@ -188,7 +188,8 @@ client (C):
    Two positions are included, the "new" position and the last position sent respectively.
    This allows servers to tell instances that the positions have advanced but no
    data has been written, without clients needlessly checking to see if they
-   have missed any updates.
+   have missed any updates. Instances will only fetch stuff if there is a gap between
+   their current position and the given last position.
 
 #### ERROR (S, C)
 

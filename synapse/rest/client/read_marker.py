@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class ReadMarkerRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
+    CATEGORY = "Receipts requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -51,7 +52,9 @@ class ReadMarkerRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
+        await self.presence_handler.bump_presence_active_time(
+            requester.user, requester.device_id
+        )
 
         body = parse_json_object_from_request(request)
 

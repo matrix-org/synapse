@@ -37,6 +37,8 @@ class SQLBaseStore(metaclass=ABCMeta):
     per data store (and not one per physical database).
     """
 
+    db_pool: DatabasePool
+
     def __init__(
         self,
         database: DatabasePool,
@@ -57,7 +59,22 @@ class SQLBaseStore(metaclass=ABCMeta):
         token: int,
         rows: Iterable[Any],
     ) -> None:
-        pass
+        """
+        Used by storage classes to invalidate caches based on incoming replication data. These
+        must not update any ID generators, use `process_replication_position`.
+        """
+
+    def process_replication_position(  # noqa: B027 (no-op by design)
+        self,
+        stream_name: str,
+        instance_name: str,
+        token: int,
+    ) -> None:
+        """
+        Used by storage classes to advance ID generators based on incoming replication data. This
+        is called after process_replication_rows such that caches are invalidated before any token
+        positions advance.
+        """
 
     def _invalidate_state_caches(
         self, room_id: str, members_changed: Collection[str]
@@ -69,9 +86,14 @@ class SQLBaseStore(metaclass=ABCMeta):
             room_id: Room where state changed
             members_changed: The user_ids of members that have changed
         """
+
+        # XXX: If you add something to this function make sure you add it to
+        # `_invalidate_state_caches_all` as well.
+
         # If there were any membership changes, purge the appropriate caches.
         for host in {get_domain_from_id(u) for u in members_changed}:
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
+            self._attempt_to_invalidate_cache("is_host_invited", (room_id, host))
         if members_changed:
             self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
             self._attempt_to_invalidate_cache("get_current_hosts_in_room", (room_id,))
@@ -99,6 +121,32 @@ class SQLBaseStore(metaclass=ABCMeta):
         # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
         self._attempt_to_invalidate_cache("get_partial_current_state_ids", (room_id,))
+
+    def _invalidate_state_caches_all(self, room_id: str) -> None:
+        """Invalidates caches that are based on the current state, but does
+        not stream invalidations down replication.
+
+        Same as `_invalidate_state_caches`, except that works when we don't know
+        which memberships have changed.
+
+        Args:
+            room_id: Room where state changed
+        """
+        self._attempt_to_invalidate_cache("get_partial_current_state_ids", (room_id,))
+        self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("is_host_invited", None)
+        self._attempt_to_invalidate_cache("is_host_joined", None)
+        self._attempt_to_invalidate_cache("get_current_hosts_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_users_in_room_with_profiles", (room_id,))
+        self._attempt_to_invalidate_cache("get_number_joined_users_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_local_users_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("does_pair_of_users_share_a_room", None)
+        self._attempt_to_invalidate_cache("get_user_in_room_with_profile", None)
+        self._attempt_to_invalidate_cache(
+            "get_rooms_for_user_with_stream_ordering", None
+        )
+        self._attempt_to_invalidate_cache("get_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
 
     def _attempt_to_invalidate_cache(
         self, cache_name: str, key: Optional[Collection[Any]]

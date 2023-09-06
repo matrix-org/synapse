@@ -31,9 +31,11 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -53,11 +55,11 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
-from synapse.metrics import register_threadpool
+from synapse.metrics import LaterGauge, register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Connection, Cursor
+from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter
 
@@ -98,6 +100,15 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "receipts_linearized": "receipts_linearized_unique_index",
     "receipts_graph": "receipts_graph_unique_index",
 }
+
+
+class _PoolConnection(Connection):
+    """
+    A Connection from twisted.enterprise.adbapi.Connection.
+    """
+
+    def reconnect(self) -> None:
+        ...
 
 
 def make_pool(
@@ -348,7 +359,21 @@ class LoggingTransaction:
         return self.txn.rowcount
 
     @property
-    def description(self) -> Any:
+    def description(
+        self,
+    ) -> Optional[
+        Sequence[
+            Tuple[
+                str,
+                Optional[Any],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+            ]
+        ]
+    ]:
         return self.txn.description
 
     def execute_batch(self, sql: str, args: Iterable[Iterable[Any]]) -> None:
@@ -361,33 +386,56 @@ class LoggingTransaction:
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
 
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_batch
+            # suggests each arg in args should be a sequence or mapping
             self._do_execute(
                 lambda the_sql: execute_batch(self.txn, the_sql, args), sql
             )
         else:
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#sqlite3.Cursor.executemany
+            # suggests that the outer collection may be iterable, but
+            # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#how-to-use-placeholders-to-bind-values-in-sql-queries
+            # suggests that the inner collection should be a sequence or dict.
             self.executemany(sql, args)
 
     def execute_values(
-        self, sql: str, values: Iterable[Iterable[Any]], fetch: bool = True
+        self,
+        sql: str,
+        values: Iterable[Iterable[Any]],
+        template: Optional[str] = None,
+        fetch: bool = True,
     ) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
         The `fetch` parameter must be set to False if the query does not return
         rows (e.g. INSERTs).
+
+        The `template` is the snippet to merge to every item in argslist to
+        compose the query.
         """
         assert isinstance(self.database_engine, PostgresEngine)
         from psycopg2.extras import execute_values
 
         return self._do_execute(
-            lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
+            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
+            lambda the_sql: execute_values(
+                self.txn, the_sql, values, template=template, fetch=fetch
+            ),
             sql,
         )
 
-    def execute(self, sql: str, *args: Any) -> None:
-        self._do_execute(self.txn.execute, sql, *args)
+    def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
+        self._do_execute(self.txn.execute, sql, parameters)
 
     def executemany(self, sql: str, *args: Any) -> None:
+        # TODO: we should add a type for *args here. Looking at Cursor.executemany
+        # and DBAPI2 it ought to be Sequence[_Parameter], but we pass in
+        # Iterable[Iterable[Any]] in execute_batch and execute_values above, which mypy
+        # complains about.
         self._do_execute(self.txn.executemany, sql, *args)
 
     def executescript(self, sql: str) -> None:
@@ -499,6 +547,7 @@ class DatabasePool:
     """
 
     _TXN_ID = 0
+    engine: BaseDatabaseEngine
 
     def __init__(
         self,
@@ -513,6 +562,12 @@ class DatabasePool:
         self._db_pool = make_pool(hs.get_reactor(), database_config, engine)
 
         self.updates = BackgroundUpdater(hs, self)
+        LaterGauge(
+            "synapse_background_update_status",
+            "Background update status",
+            [],
+            self.updates.get_status,
+        )
 
         self._previous_txn_total_time = 0.0
         self._current_txn_total_time = 0.0
@@ -531,9 +586,8 @@ class DatabasePool:
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = set(UNIQUE_INDEX_BACKGROUND_UPDATES.keys())
 
-        # We add the user_directory_search table to the blacklist on SQLite
-        # because the existing search table does not have an index, making it
-        # unsafe to use native upserts.
+        # The user_directory_search table is unsafe to use native upserts
+        # on SQLite because the existing search table does not have an index.
         if isinstance(self.engine, Sqlite3Engine):
             self._unsafe_to_upsert_tables.add("user_directory_search")
 
@@ -671,7 +725,15 @@ class DatabasePool:
             f = cast(types.FunctionType, func)  # type: ignore[redundant-cast]
             if f.__closure__:
                 for i, cell in enumerate(f.__closure__):
-                    if inspect.isgenerator(cell.cell_contents):
+                    try:
+                        contents = cell.cell_contents
+                    except ValueError:
+                        # cell.cell_contents can raise if the "cell" is empty,
+                        # which indicates that the variable is currently
+                        # unbound.
+                        continue
+
+                    if inspect.isgenerator(contents):
                         logger.error(
                             "Programming error: function %s references generator %s "
                             "via its closure",
@@ -847,7 +909,8 @@ class DatabasePool:
             try:
                 with opentracing.start_active_span(f"db.{desc}"):
                     result = await self.runWithConnection(
-                        self.new_transaction,
+                        # mypy seems to have an issue with this, maybe a bug?
+                        self.new_transaction,  # type: ignore[arg-type]
                         desc,
                         after_callbacks,
                         async_after_callbacks,
@@ -883,7 +946,7 @@ class DatabasePool:
 
     async def runWithConnection(
         self,
-        func: Callable[..., R],
+        func: Callable[Concatenate[LoggingDatabaseConnection, P], R],
         *args: Any,
         db_autocommit: bool = False,
         isolation_level: Optional[int] = None,
@@ -917,7 +980,7 @@ class DatabasePool:
 
         start_time = monotonic_time()
 
-        def inner_func(conn, *args, **kwargs):
+        def inner_func(conn: _PoolConnection, *args: P.args, **kwargs: P.kwargs) -> R:
             # We shouldn't be in a transaction. If we are then something
             # somewhere hasn't committed after doing work. (This is likely only
             # possible during startup, as `run*` will ensure changes are
@@ -1010,7 +1073,7 @@ class DatabasePool:
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
         *args: Any,
-    ) -> R:
+    ) -> Union[List[Tuple[Any, ...]], R]:
         """Runs a single query for a result set.
 
         Args:
@@ -1023,7 +1086,7 @@ class DatabasePool:
             The result of decoder(results)
         """
 
-        def interaction(txn):
+        def interaction(txn: LoggingTransaction) -> Union[List[Tuple[Any, ...]], R]:
             txn.execute(query, args)
             if decoder:
                 return decoder(txn)
@@ -1481,11 +1544,11 @@ class DatabasePool:
         # Lock the table just once, to prevent it being done once per row.
         # Note that, according to Postgres' documentation, once obtained,
         # the lock is held for the remainder of the current transaction.
-        self.engine.lock_table(txn, "user_ips")
+        self.engine.lock_table(txn, table)
 
         for keyv, valv in zip(key_values, value_values):
-            _keys = {x: y for x, y in zip(key_names, keyv)}
-            _vals = {x: y for x, y in zip(value_names, valv)}
+            _keys = dict(zip(key_names, keyv))
+            _vals = dict(zip(value_names, valv))
 
             self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=False)
 
@@ -1762,7 +1825,8 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
 
         Returns:
-            A list of dictionaries.
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         return await self.runInteraction(
             desc,
@@ -1791,6 +1855,10 @@ class DatabasePool:
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+
+        Returns:
+            A list of dictionaries, one per result row, each a mapping between the
+            column names from `retcols` and that column's value for the row.
         """
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s" % (
@@ -1814,7 +1882,7 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
-    ) -> List[Any]:
+    ) -> List[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1898,6 +1966,19 @@ class DatabasePool:
         updatevalues: Dict[str, Any],
         desc: str,
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+            desc: description of the transaction, for logging and metrics.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         return await self.runInteraction(
             desc, self.simple_update_txn, table, keyvalues, updatevalues
         )
@@ -1909,6 +1990,19 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
     ) -> int:
+        """
+        Update rows in the given database table.
+        If the given keyvalues don't match anything, nothing will be updated.
+
+        Args:
+            txn: The database transaction object.
+            table: The database table to update.
+            keyvalues: A mapping of column name to value to match rows on.
+            updatevalues: A mapping of column name to value to replace in any matched rows.
+
+        Returns:
+            The number of rows that were updated. Will be 0 if no matching rows were found.
+        """
         if keyvalues:
             where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
         else:
@@ -2233,6 +2327,43 @@ class DatabasePool:
         txn.execute(sql, values)
 
         return txn.rowcount
+
+    @staticmethod
+    def simple_delete_many_batch_txn(
+        txn: LoggingTransaction,
+        table: str,
+        keys: Collection[str],
+        values: Iterable[Iterable[Any]],
+    ) -> None:
+        """Executes a DELETE query on the named table.
+
+        The input is given as a list of rows, where each row is a list of values.
+        (Actually any iterable is fine.)
+
+        Args:
+            txn: The transaction to use.
+            table: string giving the table name
+            keys: list of column names
+            values: for each row, a list of values in the same order as `keys`
+        """
+
+        if isinstance(txn.database_engine, PostgresEngine):
+            # We use `execute_values` as it can be a lot faster than `execute_batch`,
+            # but it's only available on postgres.
+            sql = "DELETE FROM %s WHERE (%s) IN (VALUES ?)" % (
+                table,
+                ", ".join(k for k in keys),
+            )
+
+            txn.execute_values(sql, values, fetch=False)
+        else:
+            sql = "DELETE FROM %s WHERE (%s) = (%s)" % (
+                table,
+                ", ".join(k for k in keys),
+                ", ".join("?" for _ in keys),
+            )
+
+            txn.execute_batch(sql, values)
 
     def get_cache_dict(
         self,

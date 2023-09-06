@@ -49,9 +49,9 @@ class FederationBase:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
 
-        self.server_name = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
         self.keyring = hs.get_keyring()
-        self.spam_checker = hs.get_spam_checker()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self.store = hs.get_datastores().main
         self._clock = hs.get_clock()
         self._storage_controllers = hs.get_storage_controllers()
@@ -137,9 +137,9 @@ class FederationBase:
                     )
             return redacted_event
 
-        spam_check = await self.spam_checker.check_event_for_spam(pdu)
+        spam_check = await self._spam_checker_module_callbacks.check_event_for_spam(pdu)
 
-        if spam_check != self.spam_checker.NOT_SPAM:
+        if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
             logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
             log_kv(
                 {
@@ -231,7 +231,7 @@ async def _check_sigs_on_pdu(
     # If this is a join event for a restricted room it may have been authorised
     # via a different server from the sending server. Check those signatures.
     if (
-        room_version.msc3083_join_rules
+        room_version.restricted_join_rule
         and pdu.type == EventTypes.Member
         and pdu.membership == Membership.JOIN
         and EventContentFields.AUTHORISING_USER in pdu.content
@@ -280,7 +280,7 @@ def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventB
         _strip_unsigned_values(pdu_json)
 
     depth = pdu_json["depth"]
-    if not isinstance(depth, int):
+    if type(depth) is not int:  # noqa: E721
         raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
 
     if depth < 0:

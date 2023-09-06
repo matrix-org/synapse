@@ -38,7 +38,7 @@ from synapse.app._base import (
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.config.server import ListenerConfig
+from synapse.config.server import ListenerConfig, TCPListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.logging.context import LoggingContext
@@ -83,7 +83,6 @@ from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
 from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
-from synapse.storage.databases.main.room_batch import RoomBatchStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
@@ -92,6 +91,7 @@ from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
+from synapse.storage.databases.main.task_scheduler import TaskSchedulerWorkerStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
@@ -102,7 +102,7 @@ from synapse.util.httpresourcetree import create_resource_tree
 logger = logging.getLogger("synapse.app.generic_worker")
 
 
-class GenericWorkerSlavedStore(
+class GenericWorkerStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
     UserDirectoryStore,
@@ -120,7 +120,6 @@ class GenericWorkerSlavedStore(
     # the races it creates aren't too bad.
     KeyStore,
     RoomWorkerStore,
-    RoomBatchStore,
     DirectoryWorkerStore,
     PushRulesWorkerStore,
     ApplicationServiceTransactionWorkerStore,
@@ -146,6 +145,7 @@ class GenericWorkerSlavedStore(
     TransactionWorkerStore,
     LockStore,
     SessionStore,
+    TaskSchedulerWorkerStore,
 ):
     # Properties that multiple storage classes define. Tell mypy what the
     # expected type is.
@@ -154,10 +154,9 @@ class GenericWorkerSlavedStore(
 
 
 class GenericWorkerServer(HomeServer):
-    DATASTORE_CLASS = GenericWorkerSlavedStore  # type: ignore
+    DATASTORE_CLASS = GenericWorkerStore  # type: ignore
 
     def _listen_http(self, listener_config: ListenerConfig) -> None:
-
         assert listener_config.http_options is not None
 
         # We always include a health resource.
@@ -199,6 +198,9 @@ class GenericWorkerServer(HomeServer):
                             "A 'media' listener is configured but the media"
                             " repository is disabled. Ignoring."
                         )
+                elif name == "health":
+                    # Skip loading, health resource is always included
+                    continue
 
                 if name == "openid" and "federation" not in res.names:
                     # Only load the openid resource separately if federation resource
@@ -221,6 +223,7 @@ class GenericWorkerServer(HomeServer):
         root_resource = create_resource_tree(resources, OptionsResource())
 
         _base.listen_http(
+            self,
             listener_config,
             root_resource,
             self.version_string,
@@ -234,12 +237,18 @@ class GenericWorkerServer(HomeServer):
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
-                _base.listen_manhole(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole_settings=self.config.server.manhole_settings,
-                    manhole_globals={"hs": self},
-                )
+                if isinstance(listener, TCPListenerConfig):
+                    _base.listen_manhole(
+                        listener.bind_addresses,
+                        listener.port,
+                        manhole_settings=self.config.server.manhole_settings,
+                        manhole_globals={"hs": self},
+                    )
+                else:
+                    raise ConfigError(
+                        "Can not using a unix socket for manhole at this time."
+                    )
+
             elif listener.type == "metrics":
                 if not self.config.metrics.enable_metrics:
                     logger.warning(
@@ -247,10 +256,16 @@ class GenericWorkerServer(HomeServer):
                         "enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(
-                        listener.bind_addresses,
-                        listener.port,
-                    )
+                    if isinstance(listener, TCPListenerConfig):
+                        _base.listen_metrics(
+                            listener.bind_addresses,
+                            listener.port,
+                        )
+                    else:
+                        raise ConfigError(
+                            "Can not use a unix socket for metrics at this time."
+                        )
+
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
 
@@ -278,13 +293,6 @@ def start(config_options: List[str]) -> None:
         "synapse.app.synchrotron",
         "synapse.app.user_dir",
     )
-
-    if config.experimental.faster_joins_enabled:
-        raise ConfigError(
-            "You have enabled the experimental `faster_joins` config option, but it is "
-            "not compatible with worker deployments yet. Please disable `faster_joins` "
-            "or run Synapse as a single process deployment instead."
-        )
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage

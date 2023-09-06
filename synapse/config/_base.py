@@ -44,6 +44,7 @@ import jinja2
 import pkg_resources
 import yaml
 
+from synapse.types import StrSequence
 from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ class ConfigError(Exception):
            the problem lies.
     """
 
-    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+    def __init__(self, msg: str, path: Optional[StrSequence] = None):
         self.msg = msg
         self.path = path
 
@@ -174,15 +175,30 @@ class Config:
 
     @staticmethod
     def parse_size(value: Union[str, int]) -> int:
-        if isinstance(value, int):
+        """Interpret `value` as a number of bytes.
+
+        If an integer is provided it is treated as bytes and is unchanged.
+
+        String byte sizes can have a suffix of 'K', `M`, `G` or `T`,
+        representing kibibytes, mebibytes, gibibytes and tebibytes respectively.
+        No suffix is understood as a plain byte count.
+
+        Raises:
+            TypeError, if given something other than an integer or a string
+            ValueError: if given a string not of the form described above.
+        """
+        if type(value) is int:  # noqa: E721
             return value
-        sizes = {"K": 1024, "M": 1024 * 1024}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+        elif isinstance(value, str):
+            sizes = {"K": 1024, "M": 1024 * 1024, "G": 1024**3, "T": 1024**4}
+            size = 1
+            suffix = value[-1]
+            if suffix in sizes:
+                value = value[:-1]
+                size = sizes[suffix]
+            return int(value) * size
+        else:
+            raise TypeError(f"Bad byte size {value!r}")
 
     @staticmethod
     def parse_duration(value: Union[str, int]) -> int:
@@ -198,22 +214,36 @@ class Config:
 
         Returns:
             The number of milliseconds in the duration.
+
+        Raises:
+            TypeError, if given something other than an integer or a string
+            ValueError: if given a string not of the form described above.
         """
-        if isinstance(value, int):
+        if type(value) is int:  # noqa: E721
             return value
-        second = 1000
-        minute = 60 * second
-        hour = 60 * minute
-        day = 24 * hour
-        week = 7 * day
-        year = 365 * day
-        sizes = {"s": second, "m": minute, "h": hour, "d": day, "w": week, "y": year}
-        size = 1
-        suffix = value[-1]
-        if suffix in sizes:
-            value = value[:-1]
-            size = sizes[suffix]
-        return int(value) * size
+        elif isinstance(value, str):
+            second = 1000
+            minute = 60 * second
+            hour = 60 * minute
+            day = 24 * hour
+            week = 7 * day
+            year = 365 * day
+            sizes = {
+                "s": second,
+                "m": minute,
+                "h": hour,
+                "d": day,
+                "w": week,
+                "y": year,
+            }
+            size = 1
+            suffix = value[-1]
+            if suffix in sizes:
+                value = value[:-1]
+                size = sizes[suffix]
+            return int(value) * size
+        else:
+            raise TypeError(f"Bad duration {value!r}")
 
     @staticmethod
     def abspath(file_path: str) -> str:

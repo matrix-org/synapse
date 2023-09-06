@@ -1,1 +1,0 @@
-Check that the SQLite database file exists before porting to PostgreSQL.

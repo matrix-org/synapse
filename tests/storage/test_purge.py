@@ -23,12 +23,11 @@ from tests.unittest import HomeserverTestCase
 
 
 class PurgeTests(HomeserverTestCase):
-
     user_id = "@red:server"
     servlets = [room.register_servlets]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        hs = self.setup_test_homeserver("server", federation_http_client=None)
+        hs = self.setup_test_homeserver("server")
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -112,7 +111,7 @@ class PurgeTests(HomeserverTestCase):
                 self.room_id, "m.room.create", ""
             )
         )
-        self.assertIsNotNone(create_event)
+        assert create_event is not None
 
         # Purge everything before this topological token
         self.get_success(

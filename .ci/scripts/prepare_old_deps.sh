@@ -31,34 +31,6 @@ sed -i \
    -e '/systemd/d' \
    pyproject.toml
 
-# Use poetry to do the installation. This ensures that the versions are all mutually
-# compatible (as far the package metadata declares, anyway); pip's package resolver
-# is more lax.
-#
-# Rather than `poetry install --no-dev`, we drop all dev dependencies from the
-# toml file. This means we don't have to ensure compatibility between old deps and
-# dev tools.
-
-pip install toml wheel
-
-REMOVE_DEV_DEPENDENCIES="
-import toml
-with open('pyproject.toml', 'r') as f:
-    data = toml.loads(f.read())
-
-del data['tool']['poetry']['dev-dependencies']
-
-with open('pyproject.toml', 'w') as f:
-    toml.dump(data, f)
-"
-python3 -c "$REMOVE_DEV_DEPENDENCIES"
-
-pip install poetry==1.2.0
-poetry lock
-
 echo "::group::Patched pyproject.toml"
 cat pyproject.toml
-echo "::endgroup::"
-echo "::group::Lockfile after patch"
-cat poetry.lock
 echo "::endgroup::"

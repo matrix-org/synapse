@@ -53,16 +53,13 @@ SQLite:
 
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    pass
-
-
-def run_upgrade(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if isinstance(database_engine, PostgresEngine):
         cur.execute(
             """
@@ -76,7 +73,9 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
     cur.execute(
         "SELECT sql FROM sqlite_master WHERE tbl_name='events' AND type='table'"
     )
-    (oldsql,) = cur.fetchone()
+    row = cur.fetchone()
+    assert row is not None
+    (oldsql,) = row
 
     sql = oldsql.replace("content TEXT NOT NULL", "content TEXT")
     if sql == oldsql:
@@ -85,7 +84,9 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
     logger.info("Replacing definition of 'events' with: %s", sql)
 
     cur.execute("PRAGMA schema_version")
-    (oldver,) = cur.fetchone()
+    row = cur.fetchone()
+    assert row is not None
+    (oldver,) = row
     cur.execute("PRAGMA writable_schema=ON")
     cur.execute(
         "UPDATE sqlite_master SET sql=? WHERE tbl_name='events' AND type='table'",

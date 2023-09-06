@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 from typing import (
     Any,
@@ -20,7 +18,7 @@ from typing import (
 
 import jinja2
 
-from synapse.config import (
+from synapse.config import (  # noqa: F401
     account_validity,
     api,
     appservice,
@@ -63,9 +61,10 @@ from synapse.config import (
     voip,
     workers,
 )
+from synapse.types import StrSequence
 
 class ConfigError(Exception):
-    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+    def __init__(self, msg: str, path: Optional[StrSequence] = None):
         self.msg = msg
         self.path = path
 
@@ -169,7 +168,7 @@ class RootConfig:
         self, section_name: Literal["caches"]
     ) -> cache.CacheConfig: ...
     @overload
-    def reload_config_section(self, section_name: str) -> Config: ...
+    def reload_config_section(self, section_name: str) -> "Config": ...
 
 class Config:
     root: RootConfig
@@ -202,9 +201,9 @@ def find_config_files(search_paths: List[str]) -> List[str]: ...
 class ShardedWorkerHandlingConfig:
     instances: List[str]
     def __init__(self, instances: List[str]) -> None: ...
-    def should_handle(self, instance_name: str, key: str) -> bool: ...
+    def should_handle(self, instance_name: str, key: str) -> bool: ...  # noqa: F811
 
 class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
-    def get_instance(self, key: str) -> str: ...
+    def get_instance(self, key: str) -> str: ...  # noqa: F811
 
 def read_file(file_path: Any, config_path: Iterable[str]) -> str: ...

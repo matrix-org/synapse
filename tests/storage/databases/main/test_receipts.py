@@ -26,7 +26,6 @@ from tests.unittest import HomeserverTestCase
 
 
 class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
@@ -62,6 +61,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                 keys and expected receipt key-values after duplicate receipts have been
                 removed.
         """
+
         # First, undo the background update.
         def drop_receipts_unique_index(txn: LoggingTransaction) -> None:
             txn.execute(f"DROP INDEX IF EXISTS {index_name}")
@@ -168,7 +168,9 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                     {"stream_id": 6, "event_id": "$some_event"},
                 ],
                 (self.other_room_id, "m.read", self.user_id): [
-                    {"stream_id": 7, "event_id": "$some_event"}
+                    # It is possible for stream IDs to be duplicated.
+                    {"stream_id": 7, "event_id": "$some_event"},
+                    {"stream_id": 7, "event_id": "$some_event"},
                 ],
             },
             expected_unique_receipts={

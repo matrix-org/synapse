@@ -13,11 +13,11 @@
 # limitations under the License.
 import json
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, Sqlite3Engine
-from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     """
     Upgrade the event_search table to use the porter tokenizer if it isn't already
 
@@ -38,6 +38,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
     # Re-run the background job to re-populate the event_search table.
     cur.execute("SELECT MIN(stream_ordering) FROM events")
     row = cur.fetchone()
+    assert row is not None
     min_stream_id = row[0]
 
     # If there are not any events, nothing to do.
@@ -46,6 +47,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine) -> None:
 
     cur.execute("SELECT MAX(stream_ordering) FROM events")
     row = cur.fetchone()
+    assert row is not None
     max_stream_id = row[0]
 
     progress = {

@@ -77,6 +77,8 @@ RegistryProxy = cast(CollectorRegistry, _RegistryProxy)
 
 @attr.s(slots=True, hash=True, auto_attribs=True)
 class LaterGauge(Collector):
+    """A Gauge which periodically calls a user-provided callback to produce metrics."""
+
     name: str
     desc: str
     labels: Optional[Sequence[str]] = attr.ib(hash=False)
@@ -87,7 +89,6 @@ class LaterGauge(Collector):
     ]
 
     def collect(self) -> Iterable[Metric]:
-
         g = GaugeMetricFamily(self.name, self.desc, labels=self.labels)
 
         try:

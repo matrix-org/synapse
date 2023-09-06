@@ -36,6 +36,7 @@ class ReceiptRestServlet(RestServlet):
         "/receipt/(?P<receipt_type>[^/]*)"
         "/(?P<event_id>[^/]*)$"
     )
+    CATEGORY = "Receipts requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -93,7 +94,9 @@ class ReceiptRestServlet(RestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
+        await self.presence_handler.bump_presence_active_time(
+            requester.user, requester.device_id
+        )
 
         if receipt_type == ReceiptTypes.FULLY_READ:
             await self.read_marker_handler.received_client_read_marker(

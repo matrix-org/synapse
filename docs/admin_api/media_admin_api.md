@@ -6,7 +6,7 @@ Details about the format of the `media_id` and storage of the media in the file 
 are documented under [media repository](../media_repository.md).
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 ## List all media in a room
 
@@ -236,6 +236,14 @@ The following fields are returned in the JSON response body:
 Request:
 
 ```
+POST /_synapse/admin/v1/media/delete?before_ts=<before_ts>
+
+{}
+```
+
+*Deprecated in Synapse v1.78.0:* This API is available at the deprecated endpoint:
+
+```
 POST /_synapse/admin/v1/media/<server_name>/delete?before_ts=<before_ts>
 
 {}
@@ -243,7 +251,7 @@ POST /_synapse/admin/v1/media/<server_name>/delete?before_ts=<before_ts>
 
 URL Parameters
 
-* `server_name`: string - The name of your local server (e.g `matrix.org`).
+* `server_name`: string - The name of your local server (e.g `matrix.org`). *Deprecated in Synapse v1.78.0.*
 * `before_ts`: string representing a positive integer - Unix timestamp in milliseconds.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
 last access, not the timestamp when the file was created.

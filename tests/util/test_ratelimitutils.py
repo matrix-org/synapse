@@ -13,6 +13,7 @@
 # limitations under the License.
 from typing import Optional
 
+from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
 from synapse.config.homeserver import HomeServerConfig
@@ -57,6 +58,7 @@ class FederationRateLimiterTestCase(TestCase):
 
             # ... until we complete an earlier request
             cm2.__exit__(None, None, None)
+            reactor.advance(0.0)
             self.successResultOf(d3)
 
     def test_sleep_limit(self) -> None:
@@ -80,6 +82,43 @@ class FederationRateLimiterTestCase(TestCase):
             self.assertNoResult(d3)
             sleep_time = _await_resolution(reactor, d3)
             self.assertAlmostEqual(sleep_time, 500, places=3)
+
+    def test_lots_of_queued_things(self) -> None:
+        """Tests lots of synchronous things queued up behind a slow thing.
+
+        The stack should *not* explode when the slow thing completes.
+        """
+        reactor, clock = get_clock()
+        rc_config = build_rc_config(
+            {
+                "rc_federation": {
+                    "sleep_limit": 1000000000,  # never sleep
+                    "reject_limit": 1000000000,  # never reject requests
+                    "concurrent": 1,
+                }
+            }
+        )
+        ratelimiter = FederationRateLimiter(clock, rc_config)
+
+        with ratelimiter.ratelimit("testhost") as d:
+            # shouldn't block
+            self.successResultOf(d)
+
+            async def task() -> None:
+                with ratelimiter.ratelimit("testhost") as d:
+                    await d
+
+            for _ in range(1, 100):
+                defer.ensureDeferred(task())
+
+            last_task = defer.ensureDeferred(task())
+
+            # Upon exiting the context manager, all the synchronous things will resume.
+            # If a stack overflow occurs, the final task will not complete.
+
+        # Wait for all the things to complete.
+        reactor.advance(0.0)
+        self.successResultOf(last_task)
 
 
 def _await_resolution(reactor: ThreadedMemoryReactorClock, d: Deferred) -> float:

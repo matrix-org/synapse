@@ -5,10 +5,8 @@
 from __future__ import annotations
 
 from typing import (
-    AbstractSet,
     Any,
     Callable,
-    Generic,
     Hashable,
     Iterable,
     Iterator,

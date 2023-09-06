@@ -39,6 +39,7 @@ from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
 )
+from synapse.rest.admin.experimental_features import ExperimentalFeaturesRestServlet
 from synapse.rest.admin.federation import (
     DestinationMembershipRestServlet,
     DestinationResetConnectionRestServlet,
@@ -68,7 +69,10 @@ from synapse.rest.admin.rooms import (
     RoomTimestampToEventRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
-from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
+from synapse.rest.admin.statistics import (
+    LargestRoomsStatistics,
+    UserMediaStatisticsRestServlet,
+)
 from synapse.rest.admin.username_available import UsernameAvailableRestServlet
 from synapse.rest.admin.users import (
     AccountDataRestServlet,
@@ -152,7 +156,7 @@ class PurgeHistoryRestServlet(RestServlet):
             logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
         elif "purge_up_to_ts" in body:
             ts = body["purge_up_to_ts"]
-            if not isinstance(ts, int):
+            if type(ts) is not int:  # noqa: E721
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     "purge_up_to_ts must be an int",
@@ -253,12 +257,15 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     DeleteRoomStatusByRoomIdRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
-    UserAdminServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        UserAdminServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
-    UserTokenRestServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     UserMediaStatisticsRestServlet(hs).register(http_server)
+    LargestRoomsStatistics(hs).register(http_server)
     EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
     AccountDataRestServlet(hs).register(http_server)
@@ -269,9 +276,10 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomEventContextServlet(hs).register(http_server)
     RateLimitRestServlet(hs).register(http_server)
     UsernameAvailableRestServlet(hs).register(http_server)
-    ListRegistrationTokensRestServlet(hs).register(http_server)
-    NewRegistrationTokenRestServlet(hs).register(http_server)
-    RegistrationTokenRestServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        ListRegistrationTokensRestServlet(hs).register(http_server)
+        NewRegistrationTokenRestServlet(hs).register(http_server)
+        RegistrationTokenRestServlet(hs).register(http_server)
     DestinationMembershipRestServlet(hs).register(http_server)
     DestinationResetConnectionRestServlet(hs).register(http_server)
     DestinationRestServlet(hs).register(http_server)
@@ -288,6 +296,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     BackgroundUpdateEnabledRestServlet(hs).register(http_server)
     BackgroundUpdateRestServlet(hs).register(http_server)
     BackgroundUpdateStartJobRestServlet(hs).register(http_server)
+    ExperimentalFeaturesRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
@@ -300,10 +309,12 @@ def register_servlets_for_client_rest_resource(
     # The following resources can only be run on the main process.
     if hs.config.worker.worker_app is None:
         DeactivateAccountRestServlet(hs).register(http_server)
-        ResetPasswordRestServlet(hs).register(http_server)
+        if not hs.config.experimental.msc3861.enabled:
+            ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
-    UserRegisterServlet(hs).register(http_server)
-    AccountValidityRenewServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        UserRegisterServlet(hs).register(http_server)
+        AccountValidityRenewServlet(hs).register(http_server)
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which
     # don't need a media repo (typically readonly admin APIs).

@@ -88,6 +88,267 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.93.0
+
+## Minimum supported Rust version
+The minimum supported Rust version has been increased from v1.60.0 to v1.61.0.
+Users building from source will need to ensure their `rustc` version is up to
+date.
+
+
+# Upgrading to v1.90.0
+
+## App service query parameter authorization is now a configuration option
+
+Synapse v1.81.0 deprecated application service authorization via query parameters as this is
+considered insecure - and from Synapse v1.71.0 forwards the application service token has also been sent via 
+[the `Authorization` header](https://spec.matrix.org/v1.6/application-service-api/#authorization)], making the insecure
+query parameter authorization redundant. Since removing the ability to continue to use query parameters could break 
+backwards compatibility it has now been put behind a configuration option, `use_appservice_legacy_authorization`.  
+This option defaults to false, but can be activated by adding 
+```yaml
+use_appservice_legacy_authorization: true 
+```
+to your configuration.
+
+# Upgrading to v1.89.0
+
+## Removal of unspecced `user` property for `/register`
+
+Application services can no longer call `/register` with a `user` property to create new users.
+The standard `username` property should be used instead. See the
+[Application Service specification](https://spec.matrix.org/v1.7/application-service-api/#server-admin-style-permissions)
+for more information.
+
+# Upgrading to v1.88.0
+
+## Minimum supported Python version
+
+The minimum supported Python version has been increased from v3.7 to v3.8.
+You will need Python 3.8 to run Synapse v1.88.0 (due out July 18th, 2023).
+
+If you use current versions of the Matrix.org-distributed Debian
+packages or Docker images, no action is required.
+
+## Removal of `worker_replication_*` settings
+
+As mentioned previously in [Upgrading to v1.84.0](#upgrading-to-v1840), the following deprecated settings
+are being removed in this release of Synapse:
+
+* [`worker_replication_host`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_host)
+* [`worker_replication_http_port`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_port)
+* [`worker_replication_http_tls`](https://matrix-org.github.io/synapse/v1.86/usage/configuration/config_documentation.html#worker_replication_http_tls)
+
+Please ensure that you have migrated to using `main` on your shared configuration's `instance_map`
+(or create one if necessary). This is required if you have ***any*** workers at all;
+administrators of single-process (monolith) installations don't need to do anything.
+
+For an illustrative example, please see [Upgrading to v1.84.0](#upgrading-to-v1840) below.
+
+
+# Upgrading to v1.86.0
+
+## Minimum supported Rust version
+
+The minimum supported Rust version has been increased from v1.58.1 to v1.60.0.
+Users building from source will need to ensure their `rustc` version is up to
+date.
+
+
+# Upgrading to v1.85.0
+
+## Application service registration with "user" property deprecation
+
+Application services should ensure they call the `/register` endpoint with a
+`username` property. The legacy `user` property is considered deprecated and
+should no longer be included.
+
+A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service login.
+
+# Upgrading to v1.84.0
+
+## Deprecation of `worker_replication_*` configuration settings
+
+When using workers,
+
+* `worker_replication_host`
+* `worker_replication_http_port`
+* `worker_replication_http_tls`
+ 
+should now be removed from individual worker YAML configurations and the main process should instead be added to the `instance_map`
+in the shared YAML configuration, using the name `main`.
+
+The old `worker_replication_*` settings are now considered deprecated and are expected to be removed in Synapse v1.88.0.
+
+
+### Example change
+
+#### Before:
+
+Shared YAML
+```yaml
+instance_map:
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+```
+
+Worker YAML
+```yaml
+worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_replication_host: localhost
+worker_replication_http_port: 3456
+worker_replication_http_tls: false
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+```
+
+
+#### After:
+
+Shared YAML
+```yaml
+instance_map:
+  main:
+    host: localhost
+    port: 3456
+    tls: false
+  generic_worker1:
+    host: localhost
+    port: 5678
+    tls: false
+```
+
+Worker YAML
+```yaml
+worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
+
+worker_listeners:
+  - type: http
+    port: 1234
+    resources:
+      - names: [client, federation]
+  - type: http
+    port: 5678
+    resources:
+      - names: [replication]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+
+```
+Notes: 
+* `tls` is optional but mirrors the functionality of `worker_replication_http_tls`
+
+
+# Upgrading to v1.81.0
+
+## Application service path & authentication deprecations
+
+Synapse now attempts the versioned appservice paths before falling back to the
+[legacy paths](https://spec.matrix.org/v1.6/application-service-api/#legacy-routes).
+Usage of the legacy routes should be considered deprecated.
+
+Additionally, Synapse has supported sending the application service access token
+via [the `Authorization` header](https://spec.matrix.org/v1.6/application-service-api/#authorization)
+since v1.70.0. For backwards compatibility it is *also* sent as the `access_token`
+query parameter. This is insecure and should be considered deprecated.
+
+A future version of Synapse (v1.88.0 or later) will remove support for legacy
+application service routes and query parameter authorization.
+
+# Upgrading to v1.80.0
+
+## Reporting events error code change
+
+Before this update, the
+[`POST /_matrix/client/v3/rooms/{roomId}/report/{eventId}`](https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3roomsroomidreporteventid)
+endpoint would return a `403` if a user attempted to report an event that they did not have access to.
+This endpoint will now return a `404` in this case instead.
+
+Clients that implement event reporting should check that their error handling code will handle this
+change.
+
+# Upgrading to v1.79.0
+
+## The `on_threepid_bind` module callback method has been deprecated
+
+Synapse v1.79.0 deprecates the
+[`on_threepid_bind`](modules/third_party_rules_callbacks.md#on_threepid_bind)
+"third-party rules" Synapse module callback method in favour of a new module method,
+[`on_add_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_add_user_third_party_identifier).
+`on_threepid_bind` will be removed in a future version of Synapse. You should check whether any Synapse
+modules in use in your deployment are making use of `on_threepid_bind`, and update them where possible.
+
+The arguments and functionality of the new method are the same.
+
+The justification behind the name change is that the old method's name, `on_threepid_bind`, was
+misleading. A user is considered to "bind" their third-party ID to their Matrix ID only if they
+do so via an [identity server](https://spec.matrix.org/latest/identity-service-api/)
+(so that users on other homeservers may find them). But this method was not called in that case -
+it was only called when a user added a third-party identifier on the local homeserver.
+
+Module developers may also be interested in the related
+[`on_remove_user_third_party_identifier`](modules/third_party_rules_callbacks.md#on_remove_user_third_party_identifier)
+module callback method that was also added in Synapse v1.79.0. This new method is called when a
+user removes a third-party identifier from their account.
+
+# Upgrading to v1.78.0
+
+## Deprecate the `/_synapse/admin/v1/media/<server_name>/delete` admin API
+
+Synapse 1.78.0 replaces the `/_synapse/admin/v1/media/<server_name>/delete`
+admin API with an identical endpoint at `/_synapse/admin/v1/media/delete`. Please
+update your tooling to use the new endpoint. The deprecated version will be removed
+in a future release.
+
+# Upgrading to v1.76.0
+
+## Faster joins are enabled by default
+
+When joining a room for the first time, Synapse 1.76.0 will request a partial join from the other server by default. Previously, server admins had to opt-in to this using an experimental config flag.
+
+Server admins can opt out of this feature for the time being by setting
+
+```yaml
+experimental:
+    faster_joins: false
+```
+
+in their server config.
+
+## Changes to the account data replication streams
+
+Synapse has changed the format of the account data and devices replication
+streams (between workers). This is a forwards- and backwards-incompatible
+change: v1.75 workers cannot process account data replicated by v1.76 workers,
+and vice versa.
+
+Once all workers are upgraded to v1.76 (or downgraded to v1.75), account data
+and device replication will resume as normal.
+
+## Minimum version of Poetry is now 1.3.2
+
+The minimum supported version of Poetry is now 1.3.2 (previously 1.2.0, [since 
+Synapse 1.67](#upgrading-to-v1670)). If you have used `poetry install` to 
+install Synapse from a source checkout, you should upgrade poetry: see its
+[installation instructions](https://python-poetry.org/docs/#installation).
+For all other installation methods, no acction is required.
+
 # Upgrading to v1.74.0
 
 ## Unicode support in user search
@@ -99,10 +360,22 @@ the ICU native dependency and its development headers
 so that PyICU can build since no prebuilt wheels are available.
 
 You can follow [the PyICU documentation](https://pypi.org/project/PyICU/) to do so,
-and then do `pip install matrix-synapse[icu]` for a PyPI install.
+and then do `pip install matrix-synapse[user-search]` for a PyPI install.
 
 Docker images and Debian packages need nothing specific as they already
 include or specify ICU as an explicit dependency.
+
+
+## User directory rebuild
+
+Synapse 1.74 queues a background update
+[to rebuild the user directory](https://github.com/matrix-org/synapse/pull/14643),
+in order to fix missing or erroneous entries.
+
+When this update begins, the user directory will be cleared out and rebuilt from
+scratch. User directory lookups will be incomplete until the rebuild completes.
+Admins can monitor the rebuild's progress by using the
+[Background update Admin API](usage/administration/admin_api/background_updates.md#status).
 
 # Upgrading to v1.73.0
 
@@ -889,8 +1162,8 @@ Any scripts still using the above APIs should be converted to use the
 ## User-interactive authentication fallback templates can now display errors
 
 This may affect you if you make use of custom HTML templates for the
-[reCAPTCHA](../synapse/res/templates/recaptcha.html) or
-[terms](../synapse/res/templates/terms.html) fallback pages.
+[reCAPTCHA (`synapse/res/templates/recaptcha.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/recaptcha.html) or
+[terms (`synapse/res/templates/terms.html`)](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates/terms.html) fallback pages.
 
 The template is now provided an `error` variable if the authentication
 process failed. See the default templates linked above for an example.
@@ -1488,7 +1761,7 @@ New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
 is configured to use SSO and a custom
 `sso_redirect_confirm_template_dir` configuration then these templates
 will need to be copied from
-[synapse/res/templates](synapse/res/templates) into that directory.
+[`synapse/res/templates`](https://github.com/matrix-org/synapse/tree/develop/synapse/res/templates) into that directory.
 
 ## Synapse SSO Plugins Method Deprecation
 
