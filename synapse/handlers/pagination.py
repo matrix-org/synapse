@@ -161,7 +161,7 @@ class PaginationHandler:
             include_null = False
 
         logger.info(
-            "[purge] Running purge job for %s < max_lifetime <= %s (include NULLs = %s)",
+            "[purge] Running retention purge job for %s < max_lifetime <= %s (include NULLs = %s)",
             min_ms,
             max_ms,
             include_null,
@@ -175,6 +175,14 @@ class PaginationHandler:
 
         for room_id, retention_policy in rooms.items():
             logger.info("[purge] Attempting to purge messages in room %s", room_id)
+
+            if len(await self.get_delete_tasks_by_room(room_id, only_active=True)) > 0:
+                logger.warning(
+                    "[purge] not purging room %s for retention as there's an ongoing purge"
+                    " running for this room",
+                    room_id,
+                )
+                continue
 
             # If max_lifetime is None, it means that the room has no retention policy.
             # Given we only retrieve such rooms when there's a default retention policy
