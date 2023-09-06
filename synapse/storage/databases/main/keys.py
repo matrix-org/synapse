@@ -18,12 +18,15 @@ import json
 import logging
 from typing import Dict, Iterable, Mapping, Optional, Tuple
 
+from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.keys import FetchKeyResult, FetchKeyResultForRemote
 from synapse.storage.types import Cursor
+from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
 
@@ -192,6 +195,79 @@ class KeyStore(CacheInvalidationWorkerStore):
         )
         await self.invalidate_cache_and_stream(
             "get_server_key_json_for_remote", (server_name, key_id)
+        )
+
+    async def store_server_keys_response(
+        self,
+        server_name: str,
+        from_server: str,
+        ts_added_ms: int,
+        verify_keys: Dict[str, FetchKeyResult],
+        response_json: JsonDict,
+    ) -> None:
+        key_json_bytes = encode_canonical_json(response_json)
+
+        def store_server_keys_response_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_upsert_many_txn(
+                txn,
+                table="server_signature_keys",
+                key_names=("server_name", "key_id"),
+                key_values=[(server_name, key_id) for key_id in verify_keys],
+                value_names=(
+                    "from_server",
+                    "ts_added_ms",
+                    "ts_valid_until_ms",
+                    "verify_key",
+                ),
+                value_values=[
+                    (
+                        from_server,
+                        ts_added_ms,
+                        fetch_result.valid_until_ts,
+                        db_binary_type(fetch_result.verify_key.encode()),
+                    )
+                    for fetch_result in verify_keys.values()
+                ],
+            )
+
+            self.db_pool.simple_upsert_many_txn(
+                txn,
+                table="server_keys_json",
+                key_names=("server_name", "key_id", "from_server"),
+                key_values=[
+                    (server_name, key_id, from_server) for key_id in verify_keys
+                ],
+                value_names=(
+                    "ts_added_ms",
+                    "ts_valid_until_ms",
+                    "key_json",
+                ),
+                value_values=[
+                    (
+                        ts_added_ms,
+                        fetch_result.valid_until_ts,
+                        db_binary_type(key_json_bytes),
+                    )
+                    for fetch_result in verify_keys.values()
+                ],
+            )
+
+            # invalidate takes a tuple corresponding to the params of
+            # _get_server_keys_json. _get_server_keys_json only takes one
+            # param, which is itself the 2-tuple (server_name, key_id).
+            for key_id in verify_keys:
+                self._invalidate_cache_and_stream(
+                    txn, self._get_server_keys_json, ((server_name, key_id),)
+                )
+                self._invalidate_cache_and_stream(
+                    txn, self.get_server_key_json_for_remote, (server_name, key_id)
+                )
+                self._invalidate_cache_and_stream(
+                    txn, self._get_server_signature_key, ((server_name, key_id),)
+                )
+
+        await self.db_pool.runInteraction(
+            "store_server_keys_response", store_server_keys_response_txn
         )
 
     @cached()
