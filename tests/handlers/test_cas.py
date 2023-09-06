@@ -208,7 +208,7 @@ class CasHandlerTestCase(HomeserverTestCase):
         self.get_success(
             self.handler._handle_cas_response(request, cas_response, "redirect_uri", "")
         )
-        self.complete_sso_login.assert_not_called()
+        auth_handler.complete_sso_login.assert_not_called()
         self.assertRenderedError(
             "mapping_error",
             "User does not exist and registrations are disabled",
