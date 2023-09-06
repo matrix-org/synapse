@@ -33,7 +33,6 @@ from typing_extensions import Literal
 
 from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, StoreError
-from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.opentracing import (
     get_active_span_text_map,
     set_tag,
@@ -1664,7 +1663,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self.device_id_exists_cache: LruCache[
             Tuple[str, str], Literal[True]
         ] = LruCache(cache_name="device_id_exists", max_size=10000)
-        self.config: HomeServerConfig = hs.config
 
     async def store_device(
         self,
@@ -1777,13 +1775,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
-
-        # TODO: don't nuke the entire cache once there is a way to associate
-        #  device_id -> introspection_token
-        if self.config.experimental.msc3861.enabled:
-            # mypy ignore - the token cache is defined on MSC3861DelegatedAuth
-            self.auth._token_cache.invalidate_all()  # type: ignore[attr-defined]
-            await self.stream_introspection_token_invalidation((None,))
 
     async def update_device(
         self, user_id: str, device_id: str, new_display_name: Optional[str] = None

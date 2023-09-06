@@ -40,7 +40,7 @@ class Ratelimiter:
     - the cost C of this request in tokens.
     Then, if there is room in the bucket for C tokens (T + C <= `burst_count`),
     the request is permitted and `cost` tokens are added to the bucket.
-    Otherwise the request is denied, and the bucket continues to hold T tokens.
+    Otherwise, the request is denied, and the bucket continues to hold T tokens.
 
     This means that the limiter enforces an average request frequency of `rate_hz`,
     while accumulating a buffer of up to `burst_count` requests which can be consumed
@@ -55,9 +55,10 @@ class Ratelimiter:
     request.
 
     Args:
+        store: The datastore providing get_ratelimit_for_user.
         clock: A homeserver clock, for retrieving the current time
-        rate_hz: The long term number of actions that can be performed in a second.
-        burst_count: How many actions that can be performed before being limited.
+        cfg: The ratelimit configuration for this rate limiter including the
+            allowed rate and burst count.
     """
 
     def __init__(
