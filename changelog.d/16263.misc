@@ -1,0 +1,1 @@
+Add GCC and GNU Make to the Nix flake development environment so that `ruff` can be compiled.

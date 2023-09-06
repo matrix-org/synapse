@@ -26,9 +26,10 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.replication.tcp.streams import TypingStream
 from synapse.streams import EventSource
-from synapse.types import JsonDict, Requester, StreamKeyType, UserID
+from synapse.types import JsonDict, Requester, StrCollection, StreamKeyType, UserID
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.metrics import Measure
+from synapse.util.retryutils import filter_destinations_by_retry_limiter
 from synapse.util.wheel_timer import WheelTimer
 
 if TYPE_CHECKING:
@@ -150,8 +151,15 @@ class FollowerTypingHandler:
                 now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
             )
 
-            hosts = await self._storage_controllers.state.get_current_hosts_in_room(
-                member.room_id
+            hosts: StrCollection = (
+                await self._storage_controllers.state.get_current_hosts_in_room(
+                    member.room_id
+                )
+            )
+            hosts = await filter_destinations_by_retry_limiter(
+                hosts,
+                clock=self.clock,
+                store=self.store,
             )
             for domain in hosts:
                 if not self.is_mine_server_name(domain):

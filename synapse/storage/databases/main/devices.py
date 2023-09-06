@@ -1768,14 +1768,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
             self.db_pool.simple_delete_many_txn(
                 txn,
-                table="device_inbox",
-                column="device_id",
-                values=device_ids,
-                keyvalues={"user_id": user_id},
-            )
-
-            self.db_pool.simple_delete_many_txn(
-                txn,
                 table="device_auth_providers",
                 column="device_id",
                 values=device_ids,

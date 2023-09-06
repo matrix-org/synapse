@@ -1180,7 +1180,7 @@ class ModuleApi:
 
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
-            presence_handler.get_federation_queue().send_presence_to_destinations(
+            await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events, [destination]
             )
 
@@ -1729,6 +1729,19 @@ class ModuleApi:
         )
         room_alias_str = room_alias.to_string() if room_alias else None
         return room_id, room_alias_str
+
+    async def delete_room(self, room_id: str) -> None:
+        """
+        Schedules the deletion of a room from Synapse's database.
+
+        If the room is already being deleted, this method does nothing.
+        This method does not wait for the room to be deleted.
+
+        Added in Synapse v1.89.0.
+        """
+        # Future extensions to this method might want to e.g. allow use of `force_purge`.
+        # TODO In the future we should make sure this is persistent.
+        self._hs.get_pagination_handler().start_shutdown_and_purge_room(room_id, None)
 
     async def set_displayname(
         self,
