@@ -3430,6 +3430,12 @@ Has the following sub-options:
    and the values must match the given value. Alternately if the given value
    is `None` then any value is allowed (the attribute just must exist).
    All of the listed attributes must match for the login to be permitted.
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the CAS SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
+   *Added in Synapse 1.93.0.*
 
 Example configuration:
 ```yaml
@@ -3441,6 +3447,7 @@ cas_config:
   required_attributes:
     userGroup: "staff"
     department: None
+  enable_registration: true
 ```
 ---
 ### `sso`
