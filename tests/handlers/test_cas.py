@@ -197,16 +197,10 @@ class CasHandlerTestCase(HomeserverTestCase):
             auth_provider_session_id=None,
         )
 
-    @override_config(
-        {
-            "cas_config": {
-                "enable_registration": False
-            }
-        }
-    )
+    @override_config({"cas_config": {"enable_registration": False}})
     def test_map_cas_user_does_not_register_new_user(self) -> None:
         """Ensures new users are not registered if the enabled registration flag is disabled."""
-        
+
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = AsyncMock()  # type: ignore[method-assign]
         cas_response = CasResponse("test_user", {})
