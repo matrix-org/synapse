@@ -1780,7 +1780,7 @@ class ShutdownRoomParams(TypedDict):
             even if there are still users joined to the room.
     """
 
-    requester_user_id: str
+    requester_user_id: Optional[str]
     new_room_user_id: Optional[str]
     new_room_name: Optional[str]
     message: Optional[str]

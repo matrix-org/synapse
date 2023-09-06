@@ -1741,7 +1741,18 @@ class ModuleApi:
         """
         # Future extensions to this method might want to e.g. allow use of `force_purge`.
         # TODO In the future we should make sure this is persistent.
-        self._hs.get_pagination_handler().start_shutdown_and_purge_room(room_id, None)
+        await self._hs.get_pagination_handler().start_shutdown_and_purge_room(
+            room_id,
+            {
+                "new_room_user_id": None,
+                "new_room_name": None,
+                "message": None,
+                "requester_user_id": None,
+                "block": False,
+                "purge": True,
+                "force_purge": False,
+            },
+        )
 
     async def set_displayname(
         self,
