@@ -73,7 +73,7 @@ class ExpiringCache(Generic[KT, VT]):
         self._expiry_ms = expiry_ms
         self._reset_expiry_on_get = reset_expiry_on_get
 
-        self._cache: OrderedDict[KT, _CacheEntry] = OrderedDict()
+        self._cache: OrderedDict[KT, _CacheEntry[VT]] = OrderedDict()
 
         self.iterable = iterable
 
@@ -218,6 +218,6 @@ class ExpiringCache(Generic[KT, VT]):
 
 
 @attr.s(slots=True, auto_attribs=True)
-class _CacheEntry:
+class _CacheEntry(Generic[VT]):
     time: int
-    value: Any
+    value: VT

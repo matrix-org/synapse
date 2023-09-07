@@ -19,6 +19,7 @@ import collections
 import inspect
 import itertools
 import logging
+import typing
 from contextlib import asynccontextmanager
 from typing import (
     Any,
@@ -43,7 +44,6 @@ from typing import (
 )
 
 import attr
-import typing
 from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
