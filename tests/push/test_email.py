@@ -179,7 +179,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         self._check_for_mail()
 
-    @parameterized.expand([False, True])
+    @parameterized.expand([(False,), (True,)])
     def test_unsubscribe(self, use_post: bool) -> None:
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
