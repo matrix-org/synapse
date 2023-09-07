@@ -43,6 +43,7 @@ from typing import (
 )
 
 import attr
+import typing
 from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
@@ -398,7 +399,7 @@ class _LinearizerEntry:
     # The number of things executing.
     count: int
     # Deferreds for the things blocked from executing.
-    deferreds: collections.OrderedDict
+    deferreds: typing.OrderedDict["defer.Deferred[None]", Literal[1]]
 
 
 class Linearizer:
