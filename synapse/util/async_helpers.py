@@ -30,6 +30,7 @@ from typing import (
     Collection,
     Coroutine,
     Dict,
+    Generator,
     Generic,
     Hashable,
     Iterable,
@@ -718,30 +719,25 @@ def timeout_deferred(
     return new_d
 
 
-# This class can't be generic because it uses slots with attrs.
-# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class DoneAwaitable:  # should be: Generic[R]
+class DoneAwaitable(Awaitable[R]):
     """Simple awaitable that returns the provided value."""
 
-    value: Any  # should be: R
+    value: R
 
-    def __await__(self) -> Any:
-        return self
-
-    def __iter__(self) -> "DoneAwaitable":
-        return self
-
-    def __next__(self) -> None:
-        raise StopIteration(self.value)
+    def __await__(self) -> Generator[Any, None, R]:
+        yield None
+        return self.value
 
 
 def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
     """Convert a value to an awaitable if not already an awaitable."""
     if inspect.isawaitable(value):
-        assert isinstance(value, Awaitable)
         return value
 
+    # For some reason mypy doesn't deduce that value is not Awaitable here, even though
+    # inspect.isawaitable returns a TypeGuard.
+    assert not isinstance(value, Awaitable)
     return DoneAwaitable(value)
 
 
