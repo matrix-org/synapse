@@ -142,6 +142,7 @@ from synapse.util.distributor import Distributor
 from synapse.util.macaroons import MacaroonGenerator
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
+from synapse.util.task_scheduler import TaskScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -360,6 +361,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
             getattr(self, "get_" + i + "_handler")()
+        self.get_task_scheduler()
 
     def get_reactor(self) -> ISynapseReactor:
         """
@@ -406,8 +408,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Ratelimiter(
             store=self.get_datastores().main,
             clock=self.get_clock(),
-            rate_hz=self.config.ratelimiting.rc_registration.per_second,
-            burst_count=self.config.ratelimiting.rc_registration.burst_count,
+            cfg=self.config.ratelimiting.rc_registration,
         )
 
     @cache_in_self
@@ -915,3 +916,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_worker_locks_handler(self) -> WorkerLocksHandler:
         return WorkerLocksHandler(self)
+
+    @cache_in_self
+    def get_task_scheduler(self) -> TaskScheduler:
+        return TaskScheduler(self)

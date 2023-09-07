@@ -179,17 +179,18 @@ class Config:
 
         If an integer is provided it is treated as bytes and is unchanged.
 
-        String byte sizes can have a suffix of 'K' or `M`, representing kibibytes and
-        mebibytes respectively. No suffix is understood as a plain byte count.
+        String byte sizes can have a suffix of 'K', `M`, `G` or `T`,
+        representing kibibytes, mebibytes, gibibytes and tebibytes respectively.
+        No suffix is understood as a plain byte count.
 
         Raises:
             TypeError, if given something other than an integer or a string
             ValueError: if given a string not of the form described above.
         """
-        if type(value) is int:
+        if type(value) is int:  # noqa: E721
             return value
-        elif type(value) is str:
-            sizes = {"K": 1024, "M": 1024 * 1024}
+        elif isinstance(value, str):
+            sizes = {"K": 1024, "M": 1024 * 1024, "G": 1024**3, "T": 1024**4}
             size = 1
             suffix = value[-1]
             if suffix in sizes:
@@ -218,9 +219,9 @@ class Config:
             TypeError, if given something other than an integer or a string
             ValueError: if given a string not of the form described above.
         """
-        if type(value) is int:
+        if type(value) is int:  # noqa: E721
             return value
-        elif type(value) is str:
+        elif isinstance(value, str):
             second = 1000
             minute = 60 * second
             hour = 60 * minute

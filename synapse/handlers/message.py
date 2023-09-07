@@ -53,7 +53,7 @@ from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
 from synapse.events.utils import SerializeEventConfig, maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -379,7 +379,7 @@ class MessageHandler:
         """
 
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-        if type(expiry_ts) is not int or event.is_state():
+        if type(expiry_ts) is not int or event.is_state():  # noqa: E721
             return
 
         # _schedule_expiry_for_event won't actually schedule anything if there's already
@@ -908,19 +908,6 @@ class EventCreationHandler:
             if existing_event_id:
                 return existing_event_id
 
-        # Some requsters don't have device IDs (appservice, guests, and access
-        # tokens minted with the admin API), fallback to checking the access token
-        # ID, which should be close enough.
-        if requester.access_token_id:
-            existing_event_id = (
-                await self.store.get_event_id_from_transaction_id_and_token_id(
-                    room_id,
-                    requester.user.to_string(),
-                    requester.access_token_id,
-                    txn_id,
-                )
-            )
-
         return existing_event_id
 
     async def get_event_from_transaction(
@@ -1034,7 +1021,7 @@ class EventCreationHandler:
                     )
 
         async with self._worker_lock_handler.acquire_read_write_lock(
-            DELETE_ROOM_LOCK_NAME, room_id, write=False
+            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
         ):
             return await self._create_and_send_nonmember_event_locked(
                 requester=requester,
@@ -1474,23 +1461,23 @@ class EventCreationHandler:
 
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
-        event, context = events_and_context[0]
+        #
+        # Note: mypy gets confused if we inline dl and check with twisted#11770.
+        # Some kind of bug in mypy's deduction?
+        deferreds = (
+            run_in_background(
+                self._persist_events,
+                requester=requester,
+                events_and_context=events_and_context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            ),
+            run_in_background(
+                self.cache_joined_hosts_for_events, events_and_context
+            ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
+        )
         result, _ = await make_deferred_yieldable(
-            gather_results(
-                (
-                    run_in_background(
-                        self._persist_events,
-                        requester=requester,
-                        events_and_context=events_and_context,
-                        ratelimit=ratelimit,
-                        extra_users=extra_users,
-                    ),
-                    run_in_background(
-                        self.cache_joined_hosts_for_events, events_and_context
-                    ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
-                ),
-                consumeErrors=True,
-            )
+            gather_results(deferreds, consumeErrors=True)
         ).addErrback(unwrapFirstError)
 
         return result
@@ -1921,7 +1908,10 @@ class EventCreationHandler:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
                 run_as_background_process(
-                    "bump_presence_active_time", self._bump_active_time, requester.user
+                    "bump_presence_active_time",
+                    self._bump_active_time,
+                    requester.user,
+                    requester.device_id,
                 )
 
         async def _notify() -> None:
@@ -1958,10 +1948,10 @@ class EventCreationHandler:
         logger.info("maybe_kick_guest_users %r", current_state)
         await self.hs.get_room_member_handler().kick_guest_users(current_state)
 
-    async def _bump_active_time(self, user: UserID) -> None:
+    async def _bump_active_time(self, user: UserID, device_id: Optional[str]) -> None:
         try:
             presence = self.hs.get_presence_handler()
-            await presence.bump_presence_active_time(user)
+            await presence.bump_presence_active_time(user, device_id)
         except Exception:
             logger.exception("Error bumping presence active time")
 
@@ -1978,7 +1968,7 @@ class EventCreationHandler:
 
         for room_id in room_ids:
             async with self._worker_lock_handler.acquire_read_write_lock(
-                DELETE_ROOM_LOCK_NAME, room_id, write=False
+                NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
             ):
                 dummy_event_sent = await self._send_dummy_event_for_room(room_id)
 

@@ -12,7 +12,7 @@ Note that this schedule might be modified depending on the availability of the
 Synapse team, e.g. releases may be skipped to avoid holidays.
 
 Release announcements can be found in the
-[release category of the Matrix blog](https://matrix.org/blog/category/releases).
+[release category of the Matrix blog](https://matrix.org/category/releases).
 
 ## Bugfix releases
 
@@ -34,4 +34,4 @@ be held to be released together.
 
 In some cases, a pre-disclosure of a security release will be issued as a notice
 to Synapse operators that there is an upcoming security release. These can be
-found in the [security category of the Matrix blog](https://matrix.org/blog/category/security).
+found in the [security category of the Matrix blog](https://matrix.org/category/security).

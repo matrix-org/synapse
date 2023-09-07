@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 80  # remember to update the list below when updating
+SCHEMA_VERSION = 81  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -113,19 +113,16 @@ Changes in SCHEMA_VERSION = 79
 
 Changes in SCHEMA_VERSION = 80
     - The event_txn_id_device_id is always written to for new events.
+    - Add tables for the task scheduler.
+
+Changes in SCHEMA_VERSION = 81
+    - The event_txn_id is no longer written to for new events.
 """
 
 
 SCHEMA_COMPAT_VERSION = (
-    # Queries against `event_stream_ordering` columns in membership tables must
-    # be disambiguated.
-    #
-    # The threads_id column must written to with non-null values for the
-    # event_push_actions, event_push_actions_staging, and event_push_summary tables.
-    #
-    # insertions to the column `full_user_id` of tables profiles and user_filters can no
-    # longer be null
-    76
+    # The `event_txn_id_device_id` must be written to for new events.
+    80
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

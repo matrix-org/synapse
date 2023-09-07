@@ -123,7 +123,7 @@ class ClientRestResource(JsonResource):
         if is_main_process:
             report_event.register_servlets(hs, client_resource)
             openid.register_servlets(hs, client_resource)
-            notifications.register_servlets(hs, client_resource)
+        notifications.register_servlets(hs, client_resource)
         devices.register_servlets(hs, client_resource)
         if is_main_process:
             thirdparty.register_servlets(hs, client_resource)

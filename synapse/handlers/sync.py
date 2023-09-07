@@ -40,6 +40,7 @@ from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
+from synapse.handlers.device import DELETE_DEVICE_MSGS_TASK_NAME
 from synapse.handlers.relations import BundledAggregations
 from synapse.logging import issue9533_logger
 from synapse.logging.context import current_context
@@ -268,6 +269,7 @@ class SyncHandler:
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
         self._device_handler = hs.get_device_handler()
+        self._task_scheduler = hs.get_task_scheduler()
 
         self.should_calculate_push_rules = hs.config.push.enable_push
 
@@ -360,11 +362,19 @@ class SyncHandler:
         # (since we now know that the device has received them)
         if since_token is not None:
             since_stream_id = since_token.to_device_key
-            deleted = await self.store.delete_messages_for_device(
-                sync_config.user.to_string(), sync_config.device_id, since_stream_id
+            # Delete device messages asynchronously and in batches using the task scheduler
+            await self._task_scheduler.schedule_task(
+                DELETE_DEVICE_MSGS_TASK_NAME,
+                resource_id=sync_config.device_id,
+                params={
+                    "user_id": sync_config.user.to_string(),
+                    "device_id": sync_config.device_id,
+                    "up_to_stream_id": since_stream_id,
+                },
             )
             logger.debug(
-                "Deleted %d to-device messages up to %d", deleted, since_stream_id
+                "Deletion of to-device messages up to %d scheduled",
+                since_stream_id,
             )
 
         if timeout == 0 or since_token is None or full_state:
@@ -387,16 +397,16 @@ class SyncHandler:
                 from_token=since_token,
             )
 
-            # if nothing has happened in any of the users' rooms since /sync was called,
-            # the resultant next_batch will be the same as since_token (since the result
-            # is generated when wait_for_events is first called, and not regenerated
-            # when wait_for_events times out).
-            #
-            # If that happens, we mustn't cache it, so that when the client comes back
-            # with the same cache token, we don't immediately return the same empty
-            # result, causing a tightloop. (#8518)
-            if result.next_batch == since_token:
-                cache_context.should_cache = False
+        # if nothing has happened in any of the users' rooms since /sync was called,
+        # the resultant next_batch will be the same as since_token (since the result
+        # is generated when wait_for_events is first called, and not regenerated
+        # when wait_for_events times out).
+        #
+        # If that happens, we mustn't cache it, so that when the client comes back
+        # with the same cache token, we don't immediately return the same empty
+        # result, causing a tightloop. (#8518)
+        if result.next_batch == since_token:
+            cache_context.should_cache = False
 
         if result:
             if sync_config.filter_collection.lazy_load_members():
@@ -1442,11 +1452,9 @@ class SyncHandler:
 
         # Now we have our list of joined room IDs, exclude as configured and freeze
         joined_room_ids = frozenset(
-            (
-                room_id
-                for room_id in mutable_joined_room_ids
-                if room_id not in mutable_rooms_to_exclude
-            )
+            room_id
+            for room_id in mutable_joined_room_ids
+            if room_id not in mutable_rooms_to_exclude
         )
 
         logger.debug(

@@ -16,6 +16,7 @@
 """Contains exceptions and error codes."""
 
 import logging
+import math
 import typing
 from enum import Enum
 from http import HTTPStatus
@@ -80,6 +81,8 @@ class Codes(str, Enum):
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+    # USER_LOCKED = "M_USER_LOCKED"
+    USER_LOCKED = "ORG_MATRIX_MSC3939_USER_LOCKED"
 
     # Part of MSC3848
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
@@ -207,6 +210,11 @@ class SynapseError(CodeMessageException):
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, **self._additional_fields)
+
+    @property
+    def debug_context(self) -> Optional[str]:
+        """Override this to add debugging context that shouldn't be sent to clients."""
+        return None
 
 
 class InvalidAPICallError(SynapseError):
@@ -501,18 +509,30 @@ class InvalidCaptchaError(SynapseError):
 class LimitExceededError(SynapseError):
     """A client has sent too many requests and is being throttled."""
 
+    include_retry_after_header = False
+
     def __init__(
         self,
+        limiter_name: str,
         code: int = 429,
-        msg: str = "Too Many Requests",
         retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
-        super().__init__(code, msg, errcode)
+        headers = (
+            {"Retry-After": str(math.ceil(retry_after_ms / 1000))}
+            if self.include_retry_after_header and retry_after_ms is not None
+            else None
+        )
+        super().__init__(code, "Too Many Requests", errcode, headers=headers)
         self.retry_after_ms = retry_after_ms
+        self.limiter_name = limiter_name
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
+
+    @property
+    def debug_context(self) -> Optional[str]:
+        return self.limiter_name
 
 
 class RoomKeysVersionError(SynapseError):

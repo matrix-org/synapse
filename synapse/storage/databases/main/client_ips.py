@@ -579,6 +579,11 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         device_id: Optional[str],
         now: Optional[int] = None,
     ) -> None:
+        # The sync proxy continuously triggers /sync even if the user is not
+        # present so should be excluded from user_ips entries.
+        if user_agent == "sync-v3-proxy-":
+            return
+
         if not now:
             now = int(self._clock.time_msec())
         key = (user_id, access_token, ip)

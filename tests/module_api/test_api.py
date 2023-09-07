@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Any, Dict, Optional
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
@@ -33,7 +33,6 @@ from synapse.util import Clock
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.test_utils import simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 
@@ -70,7 +69,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # Mock out the calls over federation.
         self.fed_transport_client = Mock(spec=["send_transaction"])
-        self.fed_transport_client.send_transaction = simple_async_mock({})
+        self.fed_transport_client.send_transaction = AsyncMock(return_value={})
 
         return self.setup_test_homeserver(
             federation_transport_client=self.fed_transport_client,
@@ -234,7 +233,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
     def test_sending_events_into_room(self) -> None:
         """Tests that a module can send events into a room"""
         # Mock out create_and_send_nonmember_event to check whether events are being sent
-        self.event_creation_handler.create_and_send_nonmember_event = Mock(  # type: ignore[assignment]
+        self.event_creation_handler.create_and_send_nonmember_event = Mock(  # type: ignore[method-assign]
             spec=[],
             side_effect=self.event_creation_handler.create_and_send_nonmember_event,
         )
@@ -579,10 +578,8 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         """Test that the module API can join a remote room."""
         # Necessary to fake a remote join.
         fake_stream_id = 1
-        mocked_remote_join = simple_async_mock(
-            return_value=("fake-event-id", fake_stream_id)
-        )
-        self.hs.get_room_member_handler()._remote_join = mocked_remote_join  # type: ignore[assignment]
+        mocked_remote_join = AsyncMock(return_value=("fake-event-id", fake_stream_id))
+        self.hs.get_room_member_handler()._remote_join = mocked_remote_join  # type: ignore[method-assign]
         fake_remote_host = f"{self.module_api.server_name}-remote"
 
         # Given that the join is to be faked, we expect the relevant join event not to
@@ -757,7 +754,7 @@ class ModuleApiTestCase(BaseModuleApiTestCase):
         self.assertEqual(channel.json_body["creator"], user_id)
 
         # Check room alias.
-        self.assertEquals(room_alias, f"#foo-bar:{self.module_api.server_name}")
+        self.assertEqual(room_alias, f"#foo-bar:{self.module_api.server_name}")
 
         # Let's try a room with no alias.
         room_id, room_alias = self.get_success(

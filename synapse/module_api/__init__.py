@@ -31,9 +31,10 @@ from typing import (
 
 import attr
 import jinja2
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IDelayedCall
 from twisted.web.resource import Resource
 
 from synapse.api import errors
@@ -884,7 +885,7 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[P, T],
+        func: Callable[Concatenate[LoggingTransaction, P], T],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
@@ -1179,7 +1180,7 @@ class ModuleApi:
 
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
-            presence_handler.get_federation_queue().send_presence_to_destinations(
+            await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events, [destination]
             )
 
@@ -1241,6 +1242,46 @@ class ModuleApi:
         Added in Synapse v1.89.0.
         """
         return self._hs.config.worker.run_background_tasks
+
+    def delayed_background_call(
+        self,
+        msec: float,
+        f: Callable,
+        *args: object,
+        desc: Optional[str] = None,
+        **kwargs: object,
+    ) -> IDelayedCall:
+        """Wraps a function as a background process and calls it in a given number of milliseconds.
+
+        The scheduled call is not persistent: if the current Synapse instance is
+        restarted before the call is made, the call will not be made.
+
+        Added in Synapse v1.90.0.
+
+        Args:
+            msec: How long to wait before calling, in milliseconds.
+            f: The function to call once. f can be either synchronous or
+                asynchronous, and must follow Synapse's logcontext rules.
+                More info about logcontexts is available at
+                https://matrix-org.github.io/synapse/latest/log_contexts.html
+            *args: Positional arguments to pass to function.
+            desc: The background task's description. Default to the function's name.
+            **kwargs: Keyword arguments to pass to function.
+
+        Returns:
+            IDelayedCall handle from twisted, which allows to cancel the delayed call if desired.
+        """
+
+        if desc is None:
+            desc = f.__name__
+
+        return self._clock.call_later(
+            # convert ms to seconds as needed by call_later.
+            msec * 0.001,
+            run_as_background_process,
+            desc,
+            lambda: maybe_awaitable(f(*args, **kwargs)),
+        )
 
     async def sleep(self, seconds: float) -> None:
         """Sleeps for the given number of seconds.
@@ -1688,6 +1729,19 @@ class ModuleApi:
         )
         room_alias_str = room_alias.to_string() if room_alias else None
         return room_id, room_alias_str
+
+    async def delete_room(self, room_id: str) -> None:
+        """
+        Schedules the deletion of a room from Synapse's database.
+
+        If the room is already being deleted, this method does nothing.
+        This method does not wait for the room to be deleted.
+
+        Added in Synapse v1.89.0.
+        """
+        # Future extensions to this method might want to e.g. allow use of `force_purge`.
+        # TODO In the future we should make sure this is persistent.
+        self._hs.get_pagination_handler().start_shutdown_and_purge_room(room_id, None)
 
     async def set_displayname(
         self,

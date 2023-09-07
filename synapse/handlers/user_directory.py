@@ -94,6 +94,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.worker.should_update_user_directory
         self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
+        self.show_locked_users = hs.config.userdirectory.show_locked_users
         self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
         self._hs = hs
 
@@ -144,7 +145,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                     ]
                 }
         """
-        results = await self.store.search_user_dir(user_id, search_term, limit)
+        results = await self.store.search_user_dir(
+            user_id, search_term, limit, self.show_locked_users
+        )
 
         # Remove any spammy users from the results.
         non_spammy_users = []

@@ -669,10 +669,16 @@ def _is_membership_change_allowed(
                     errcode=Codes.INSUFFICIENT_POWER,
                 )
     elif Membership.BAN == membership:
-        if user_level < ban_level or user_level <= target_level:
+        if user_level < ban_level:
             raise UnstableSpecAuthError(
                 403,
                 "You don't have permission to ban",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
+        elif user_level <= target_level:
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to ban this user",
                 errcode=Codes.INSUFFICIENT_POWER,
             )
     elif room_version.knock_join_rule and Membership.KNOCK == membership:
@@ -846,11 +852,11 @@ def _check_power_levels(
                 "kick",
                 "invite",
             }:
-                if type(v) is not int:
+                if type(v) is not int:  # noqa: E721
                     raise SynapseError(400, f"{v!r} must be an integer.")
             if k in {"events", "notifications", "users"}:
                 if not isinstance(v, collections.abc.Mapping) or not all(
-                    type(v) is int for v in v.values()
+                    type(v) is int for v in v.values()  # noqa: E721
                 ):
                     raise SynapseError(
                         400,

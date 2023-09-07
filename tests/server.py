@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import hashlib
+import ipaddress
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Deque,
     Dict,
     Iterable,
     List,
@@ -41,10 +43,10 @@ from typing import (
 from unittest.mock import Mock
 
 import attr
-from typing_extensions import Deque, ParamSpec
+from typing_extensions import ParamSpec
 from zope.interface import implementer
 
-from twisted.internet import address, threads, udp
+from twisted.internet import address, tcp, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
 from twisted.internet.error import DNSLookupError
@@ -566,6 +568,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         conn = super().connectTCP(
             host, port, factory, timeout=timeout, bindAddress=None
         )
+        if self.lookups and host in self.lookups:
+            validate_connector(conn, self.lookups[host])
 
         callback = self._tcp_callbacks.get((host, port))
         if callback:
@@ -596,6 +600,55 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
             # reactor.callFromThread to feed results back from the db functions to the
             # main thread.
             super().advance(0)
+
+
+def validate_connector(connector: tcp.Connector, expected_ip: str) -> None:
+    """Try to validate the obtained connector as it would happen when
+    synapse is running and the conection will be established.
+
+    This method will raise a useful exception when necessary, else it will
+    just do nothing.
+
+    This is in order to help catch quirks related to reactor.connectTCP,
+    since when called directly, the connector's destination will be of type
+    IPv4Address, with the hostname as the literal host that was given (which
+    could be an IPv6-only host or an IPv6 literal).
+
+    But when called from reactor.connectTCP *through* e.g. an Endpoint, the
+    connector's destination will contain the specific IP address with the
+    correct network stack class.
+
+    Note that testing code paths that use connectTCP directly should not be
+    affected by this check, unless they specifically add a test with a
+    matching reactor.lookups[HOSTNAME] = "IPv6Literal", where reactor is of
+    type ThreadedMemoryReactorClock.
+    For an example of implementing such tests, see test/handlers/send_email.py.
+    """
+    destination = connector.getDestination()
+
+    # We use address.IPv{4,6}Address to check what the reactor thinks it is
+    # is sending but check for validity with ipaddress.IPv{4,6}Address
+    # because they fail with IPs on the wrong network stack.
+    cls_mapping = {
+        address.IPv4Address: ipaddress.IPv4Address,
+        address.IPv6Address: ipaddress.IPv6Address,
+    }
+
+    cls = cls_mapping.get(destination.__class__)
+
+    if cls is not None:
+        try:
+            cls(expected_ip)
+        except Exception as exc:
+            raise ValueError(
+                "Invalid IP type and resolution for %s. Expected %s to be %s"
+                % (destination, expected_ip, cls.__name__)
+            ) from exc
+    else:
+        raise ValueError(
+            "Unknown address type %s for %s"
+            % (destination.__class__.__name__, destination)
+        )
 
 
 class ThreadPool:
@@ -669,7 +722,7 @@ def _make_test_homeserver_synchronous(server: HomeServer) -> None:
                 **kwargs,
             )
 
-        pool.runWithConnection = runWithConnection  # type: ignore[assignment]
+        pool.runWithConnection = runWithConnection  # type: ignore[method-assign]
         pool.runInteraction = runInteraction  # type: ignore[assignment]
         # Replace the thread pool with a threadless 'thread' pool
         pool.threadpool = ThreadPool(clock._reactor)
@@ -999,8 +1052,6 @@ def setup_test_homeserver(
     hs.tls_server_context_factory = Mock()
 
     hs.setup()
-    if homeserver_to_use == TestHomeServer:
-        hs.setup_background_tasks()
 
     if isinstance(db_engine, PostgresEngine):
         database_pool = hs.get_datastores().databases[0]

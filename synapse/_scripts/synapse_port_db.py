@@ -123,7 +123,7 @@ BOOLEAN_COLUMNS = {
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
     "rooms": ["is_public", "has_auth_chain_index"],
-    "users": ["shadow_banned", "approved"],
+    "users": ["shadow_banned", "approved", "locked"],
     "un_partial_stated_event_stream": ["rejection_status_changed"],
     "users_who_share_rooms": ["share_private"],
     "per_user_experimental_features": ["enabled"],
@@ -482,7 +482,10 @@ class Porter:
                         do_backward[0] = False
 
                 if forward_rows or backward_rows:
-                    headers = [column[0] for column in txn.description]
+                    assert txn.description is not None
+                    headers: Optional[List[str]] = [
+                        column[0] for column in txn.description
+                    ]
                 else:
                     headers = None
 
@@ -544,6 +547,7 @@ class Porter:
             def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
                 txn.execute(select, (forward_chunk, self.batch_size))
                 rows = txn.fetchall()
+                assert txn.description is not None
                 headers = [column[0] for column in txn.description]
 
                 return headers, rows
@@ -919,7 +923,8 @@ class Porter:
         def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
             txn.execute(select)
             rows = txn.fetchall()
-            headers: List[str] = [column[0] for column in txn.description]
+            assert txn.description is not None
+            headers = [column[0] for column in txn.description]
 
             ts_ind = headers.index("ts")
 
@@ -1205,10 +1210,10 @@ class CursesProgress(Progress):
         self.total_processed = 0
         self.total_remaining = 0
 
-        super(CursesProgress, self).__init__()
+        super().__init__()
 
     def update(self, table: str, num_done: int) -> None:
-        super(CursesProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         self.total_processed = 0
         self.total_remaining = 0
@@ -1304,7 +1309,7 @@ class TerminalProgress(Progress):
     """Just prints progress to the terminal"""
 
     def update(self, table: str, num_done: int) -> None:
-        super(TerminalProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         data = self.tables[table]
 

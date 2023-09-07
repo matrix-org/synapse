@@ -15,7 +15,7 @@
 
 import json
 from typing import Dict, List, Set
-from unittest.mock import ANY, Mock, call
+from unittest.mock import ANY, AsyncMock, Mock, call
 
 from netaddr import IPSet
 
@@ -33,7 +33,6 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock
-from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
 # Some local users to test with
@@ -74,11 +73,11 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         # we mock out the keyring so as to skip the authentication check on the
         # federation API call.
         mock_keyring = Mock(spec=["verify_json_for_server"])
-        mock_keyring.verify_json_for_server.return_value = make_awaitable(True)
+        mock_keyring.verify_json_for_server = AsyncMock(return_value=True)
 
         # we mock out the federation client too
-        self.mock_federation_client = Mock(spec=["put_json"])
-        self.mock_federation_client.put_json.return_value = make_awaitable((200, "OK"))
+        self.mock_federation_client = AsyncMock(spec=["put_json"])
+        self.mock_federation_client.put_json.return_value = (200, "OK")
         self.mock_federation_client.agent = MatrixFederationAgent(
             reactor,
             tls_client_options_factory=None,
@@ -121,20 +120,16 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore = hs.get_datastores().main
 
-        self.datastore.get_destination_retry_timings = Mock(
-            return_value=make_awaitable(None)
+        self.datastore.get_device_updates_by_remote = AsyncMock(  # type: ignore[method-assign]
+            return_value=(0, [])
         )
 
-        self.datastore.get_device_updates_by_remote = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable((0, []))
+        self.datastore.get_destination_last_successful_stream_ordering = AsyncMock(  # type: ignore[method-assign]
+            return_value=None
         )
 
-        self.datastore.get_destination_last_successful_stream_ordering = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None)
-        )
-
-        self.datastore.get_received_txn_response = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(None)
+        self.datastore.get_received_txn_response = AsyncMock(  # type: ignore[method-assign]
+            return_value=None
         )
 
         self.room_members: List[UserID] = []
@@ -146,25 +141,25 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 raise AuthError(401, "User is not in the room")
             return None
 
-        hs.get_auth().check_user_in_room = Mock(  # type: ignore[assignment]
+        hs.get_auth().check_user_in_room = Mock(  # type: ignore[method-assign]
             side_effect=check_user_in_room
         )
 
         async def check_host_in_room(room_id: str, server_name: str) -> bool:
             return room_id == ROOM_ID
 
-        hs.get_event_auth_handler().is_host_in_room = Mock(  # type: ignore[assignment]
+        hs.get_event_auth_handler().is_host_in_room = Mock(  # type: ignore[method-assign]
             side_effect=check_host_in_room
         )
 
         async def get_current_hosts_in_room(room_id: str) -> Set[str]:
             return {member.domain for member in self.room_members}
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(  # type: ignore[method-assign]
             side_effect=get_current_hosts_in_room
         )
 
-        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = Mock(  # type: ignore[assignment]
+        hs.get_storage_controllers().state.get_current_hosts_in_room_or_partial_state_approximation = Mock(  # type: ignore[method-assign]
             side_effect=get_current_hosts_in_room
         )
 
@@ -173,27 +168,25 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore.get_users_in_room = Mock(side_effect=get_users_in_room)
 
-        self.datastore.get_user_directory_stream_pos = Mock(  # type: ignore[assignment]
-            side_effect=(
-                # we deliberately return a non-None stream pos to avoid
-                # doing an initial_sync
-                lambda: make_awaitable(1)
-            )
+        self.datastore.get_user_directory_stream_pos = AsyncMock(  # type: ignore[method-assign]
+            # we deliberately return a non-None stream pos to avoid
+            # doing an initial_sync
+            return_value=1
         )
 
-        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))  # type: ignore[assignment]
+        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))  # type: ignore[method-assign]
 
-        self.datastore.get_to_device_stream_token = Mock(  # type: ignore[assignment]
-            side_effect=lambda: 0
+        self.datastore.get_to_device_stream_token = Mock(  # type: ignore[method-assign]
+            return_value=0
         )
-        self.datastore.get_new_device_msgs_for_remote = Mock(  # type: ignore[assignment]
-            side_effect=lambda *args, **kargs: make_awaitable(([], 0))
+        self.datastore.get_new_device_msgs_for_remote = AsyncMock(  # type: ignore[method-assign]
+            return_value=([], 0)
         )
-        self.datastore.delete_device_msgs_for_remote = Mock(  # type: ignore[assignment]
-            side_effect=lambda *args, **kargs: make_awaitable(None)
+        self.datastore.delete_device_msgs_for_remote = AsyncMock(  # type: ignore[method-assign]
+            return_value=None
         )
-        self.datastore.set_received_txn_response = Mock(  # type: ignore[assignment]
-            side_effect=lambda *args, **kwargs: make_awaitable(None)
+        self.datastore.set_received_txn_response = AsyncMock(  # type: ignore[method-assign]
+            return_value=None
         )
 
     def test_started_typing_local(self) -> None:
@@ -256,8 +249,8 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             json_data_callback=ANY,
             long_retries=True,
-            backoff_on_404=True,
             try_trailing_slash_on_400=True,
+            backoff_on_all_error_codes=True,
         )
 
     def test_started_typing_remote_recv(self) -> None:
@@ -371,7 +364,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ),
             json_data_callback=ANY,
             long_retries=True,
-            backoff_on_404=True,
+            backoff_on_all_error_codes=True,
             try_trailing_slash_on_400=True,
         )
 

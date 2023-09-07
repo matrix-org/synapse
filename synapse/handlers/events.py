@@ -67,6 +67,7 @@ class EventStreamHandler:
 
         context = await presence_handler.user_syncing(
             requester.user.to_string(),
+            requester.device_id,
             affect_presence=affect_presence,
             presence_state=PresenceState.ONLINE,
         )

@@ -379,7 +379,7 @@ class BulkPushRuleEvaluator:
             keys = list(notification_levels.keys())
             for key in keys:
                 level = notification_levels.get(key, SENTINEL)
-                if level is not SENTINEL and type(level) is not int:
+                if level is not SENTINEL and type(level) is not int:  # noqa: E721
                     try:
                         notification_levels[key] = int(level)
                     except (TypeError, ValueError):
@@ -472,7 +472,11 @@ StateGroup = Union[object, int]
 
 
 def _is_simple_value(value: Any) -> bool:
-    return isinstance(value, (bool, str)) or type(value) is int or value is None
+    return (
+        isinstance(value, (bool, str))
+        or type(value) is int  # noqa: E721
+        or value is None
+    )
 
 
 def _flatten_dict(

@@ -25,8 +25,10 @@ messages from the database after 5 minutes, rather than 5 months.
 
 In addition, configuration options referring to size use the following suffixes:
 
-* `M` = MiB, or 1,048,576 bytes
 * `K` = KiB, or 1024 bytes
+* `M` = MiB, or 1,048,576 bytes
+* `G` = GiB, or 1,073,741,824 bytes
+* `T` = TiB, or 1,099,511,627,776 bytes
 
 For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.
@@ -3025,6 +3027,16 @@ enable SAML login. You can either put your entire pysaml config inline using the
 option, or you can specify a path to a psyaml config file with the sub-option `config_path`.
 This setting has the following sub-options:
 
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `sp_config`: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
    Default values will be used for the `entityid` and `service` settings,
    so it is not normally necessary to specify them unless you need to
@@ -3176,7 +3188,7 @@ Options for each entry include:
 
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 
@@ -3194,6 +3206,14 @@ Options for each entry include:
 
 * `client_secret`: oauth2 client secret to use. May be omitted if
   `client_secret_jwt_key` is given, or if `client_auth_method` is 'none'.
+  Must be omitted if `client_secret_path` is specified.
+
+* `client_secret_path`: path to the oauth2 client secret to use. With that
+   it's not necessary to leak secrets into the config file itself.
+   Mutually exclusive with `client_secret`. Can be omitted if
+   `client_secret_jwt_key` is specified.
+
+   *Added in Synapse 1.91.0.*
 
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
@@ -3391,7 +3411,18 @@ Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:
 * `enabled`: Set this to true to enable authorization against a CAS server.
    Defaults to false.
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
+* `protocol_version`: The CAS protocol version, defaults to none (version 3 is required if you want to use "required_attributes").
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
 * `required_attributes`:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3399,16 +3430,24 @@ Has the following sub-options:
    and the values must match the given value. Alternately if the given value
    is `None` then any value is allowed (the attribute just must exist).
    All of the listed attributes must match for the login to be permitted.
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the CAS SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
+   *Added in Synapse 1.93.0.*
 
 Example configuration:
 ```yaml
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: "staff"
     department: None
+  enable_registration: true
 ```
 ---
 ### `sso`
@@ -3631,6 +3670,7 @@ This option has the following sub-options:
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
    user directory. Defaults to false.
+* `show_locked_users`: Defines whether to show locked users in search query results. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -3638,6 +3678,7 @@ user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 ```
 ---
 ### `user_consent`
@@ -3834,6 +3875,19 @@ normally or via a kick or ban. Defaults to false.
 Example configuration:
 ```yaml
 forget_rooms_on_leave: false
+```
+---
+### `exclude_rooms_from_sync`
+A list of rooms to exclude from sync responses. This is useful for server
+administrators wishing to group users into a room without these users being able
+to see it from their client.
+
+By default, no room is excluded.
+
+Example configuration:
+```yaml
+exclude_rooms_from_sync:
+    - !foo:example.com
 ```
 
 ---
