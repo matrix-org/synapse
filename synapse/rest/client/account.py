@@ -186,7 +186,7 @@ class PasswordRestServlet(RestServlet):
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
                     requester,
                     request,
-                    body.dict(exclude_unset=True),
+                    body.dict(exclude_unset=True, exclude={"new_password"}),
                     "modify your account password",
                 )
                 user_id = requester.user.to_string()
@@ -194,7 +194,7 @@ class PasswordRestServlet(RestServlet):
                 result, params, session_id = await self.auth_handler.check_ui_auth(
                     [[LoginType.EMAIL_IDENTITY]],
                     request,
-                    body.dict(exclude_unset=True),
+                    body.dict(exclude_unset=True, exclude={"new_password"}),
                     "modify your account password",
                 )
 
