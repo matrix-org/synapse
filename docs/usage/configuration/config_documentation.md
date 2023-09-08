@@ -521,7 +521,7 @@ listeners:
 Example configuration #2:
 ```yaml
 listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -2945,7 +2945,7 @@ Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a `verify key`, which
 will make synapse check that the response is signed by that key.
 
-This setting supercedes an older setting named `perspectives`. The old format
+This setting supersedes an older setting named `perspectives`. The old format
 is still supported for backwards-compatibility, but it is deprecated.
 
 `trusted_key_servers` defaults to matrix.org, but using it will generate a
