@@ -823,7 +823,7 @@ Bugfixes
 - Fix error message for events with m.room.create missing from auth_events ([\#3960](https://github.com/matrix-org/synapse/issues/3960))
 - Fix errors due to concurrent monthly_active_user upserts ([\#3961](https://github.com/matrix-org/synapse/issues/3961))
 - Fix exceptions when processing incoming events over federation ([\#3968](https://github.com/matrix-org/synapse/issues/3968))
-- Replaced all occurences of e.message with str(e). Contributed by Schnuffle ([\#3970](https://github.com/matrix-org/synapse/issues/3970))
+- Replaced all occurrences of e.message with str(e). Contributed by Schnuffle ([\#3970](https://github.com/matrix-org/synapse/issues/3970))
 - Fix lazy loaded sync in the presence of rejected state events ([\#3986](https://github.com/matrix-org/synapse/issues/3986))
 - Fix error when logging incomplete HTTP requests ([\#3990](https://github.com/matrix-org/synapse/issues/3990))
 
@@ -841,7 +841,7 @@ Internal Changes
 - Fix the docker image building on python 3 ([\#3911](https://github.com/matrix-org/synapse/issues/3911))
 - Add a regression test for logging failed HTTP requests on Python 3. ([\#3912](https://github.com/matrix-org/synapse/issues/3912))
 - Comments and interface cleanup for on_receive_pdu ([\#3924](https://github.com/matrix-org/synapse/issues/3924))
-- Fix spurious exceptions when remote http client closes conncetion ([\#3925](https://github.com/matrix-org/synapse/issues/3925))
+- Fix spurious exceptions when remote http client closes connection ([\#3925](https://github.com/matrix-org/synapse/issues/3925))
 - Log exceptions thrown by background tasks ([\#3927](https://github.com/matrix-org/synapse/issues/3927))
 - Add a cache to get_destination_retry_timings ([\#3933](https://github.com/matrix-org/synapse/issues/3933), [\#3991](https://github.com/matrix-org/synapse/issues/3991))
 - Automate pushes to docker hub ([\#3946](https://github.com/matrix-org/synapse/issues/3946))
@@ -1057,7 +1057,7 @@ Bugfixes
 - Make the tests pass on Twisted < 18.7.0 ([\#3676](https://github.com/matrix-org/synapse/issues/3676))
 - Don’t ship recaptcha_ajax.js, use it directly from Google ([\#3677](https://github.com/matrix-org/synapse/issues/3677))
 - Fixes test_reap_monthly_active_users so it passes under postgres ([\#3681](https://github.com/matrix-org/synapse/issues/3681))
-- Fix mau blocking calulation bug on login ([\#3689](https://github.com/matrix-org/synapse/issues/3689))
+- Fix mau blocking calculation bug on login ([\#3689](https://github.com/matrix-org/synapse/issues/3689))
 - Fix missing yield in synapse.storage.monthly_active_users.initialise_reserved_users ([\#3692](https://github.com/matrix-org/synapse/issues/3692))
 - Improve HTTP request logging to include all requests ([\#3700](https://github.com/matrix-org/synapse/issues/3700))
 - Avoid timing out requests while we are streaming back the response ([\#3701](https://github.com/matrix-org/synapse/issues/3701))
@@ -1556,7 +1556,7 @@ v0.27.3-rc1 used a stale version of the develop branch so the changelog overstat
 Changes in synapse v0.27.3-rc1 (2018-04-09)
 ===========================================
 
-Notable changes include API support for joinability of groups. Also new metrics and phone home stats. Phone home stats include better visibility of system usage so we can tweak synpase to work better for all users rather than our own experience with matrix.org. Also, recording \'r30\' stat which is the measure we use to track overal growth of the Matrix ecosystem. It is defined as:-
+Notable changes include API support for joinability of groups. Also new metrics and phone home stats. Phone home stats include better visibility of system usage so we can tweak synpase to work better for all users rather than our own experience with matrix.org. Also, recording \'r30\' stat which is the measure we use to track overall growth of the Matrix ecosystem. It is defined as:-
 
 Counts the number of native 30 day retained users, defined as:- \* Users who have created their accounts more than 30 days
 
@@ -2254,7 +2254,7 @@ Features:
 
 Changes:
 
--   Use external ldap auth pacakge (PR #1628)
+-   Use external ldap auth package (PR #1628)
 -   Split out federation transaction sending to a worker (PR #1635)
 -   Fail with a coherent error message if /sync?filter= is invalid (PR #1636)
 -   More efficient notif count queries (PR #1644)
@@ -2289,7 +2289,7 @@ SECURITY UPDATE
 
 Explicitly require authentication when using LDAP3. This is the default on versions of `ldap3` above 1.0, but some distributions will package an older version.
 
-If you are using LDAP3 login and have a version of `ldap3` older than 1.0 it is **CRITICAL to updgrade**.
+If you are using LDAP3 login and have a version of `ldap3` older than 1.0 it is **CRITICAL to upgrade**.
 
 Changes in synapse v0.18.2 (2016-11-01)
 =======================================
@@ -2932,7 +2932,7 @@ Changes in synapse v0.11.1 (2015-11-20)
 =======================================
 
 -   Add extra options to search API (PR #394)
--   Fix bug where we did not correctly cap federation retry timers. This meant it could take several hours for servers to start talking to ressurected servers, even when they were receiving traffic from them (PR #393)
+-   Fix bug where we did not correctly cap federation retry timers. This meant it could take several hours for servers to start talking to resurrected servers, even when they were receiving traffic from them (PR #393)
 -   Don't advertise login token flow unless CAS is enabled. This caused issues where some clients would always use the fallback API if they did not recognize all login flows (PR #391)
 -   Change /v2 sync API to rename `private_user_data` to `account_data` (PR #386)
 -   Change /v2 sync API to remove the `event_map` and rename keys in `rooms` object (PR #389)
@@ -3342,7 +3342,7 @@ Homeserver:
 
 -   Add authentication and authorization to the federation protocol. Events are now signed by their originating homeservers.
 -   Implement the new authorization model for rooms.
--   Split out web client into a seperate repository: matrix-angular-sdk.
+-   Split out web client into a separate repository: matrix-angular-sdk.
 -   Change the structure of PDUs.
 -   Fix bug where user could not join rooms via an alias containing 4-byte UTF-8 characters.
 -   Merge concept of PDUs and Events internally.
@@ -3352,7 +3352,7 @@ Homeserver:
 
 Webclient:
 
--   The webclient has been moved to a seperate repository.
+-   The webclient has been moved to a separate repository.
 
 Changes in synapse 0.4.2 (2014-10-31)
 =====================================
@@ -3587,7 +3587,7 @@ Homeserver:
 Changes in synapse 0.1.0 (2014-08-29)
 =====================================
 
-Presence has been reenabled in this release.
+Presence has been re-enabled in this release.
 
 Homeserver:
 
