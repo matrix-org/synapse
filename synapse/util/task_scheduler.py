@@ -19,6 +19,7 @@ from prometheus_client import Gauge
 
 from twisted.python.failure import Failure
 
+from synapse.logging.context import nested_logging_context
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import JsonMapping, ScheduledTask, TaskStatus
 from synapse.util.stringutils import random_string
@@ -316,26 +317,27 @@ class TaskScheduler:
         function = self._actions[task.action]
 
         async def wrapper() -> None:
-            try:
-                (status, result, error) = await function(task)
-            except Exception:
-                f = Failure()
-                logger.error(
-                    f"scheduled task {task.id} failed",
-                    exc_info=(f.type, f.value, f.getTracebackObject()),
-                )
-                status = TaskStatus.FAILED
-                result = None
-                error = f.getErrorMessage()
+            with nested_logging_context(task.id):
+                try:
+                    (status, result, error) = await function(task)
+                except Exception:
+                    f = Failure()
+                    logger.error(
+                        f"scheduled task {task.id} failed",
+                        exc_info=(f.type, f.value, f.getTracebackObject()),
+                    )
+                    status = TaskStatus.FAILED
+                    result = None
+                    error = f.getErrorMessage()
 
-            await self._store.update_scheduled_task(
-                task.id,
-                self._clock.time_msec(),
-                status=status,
-                result=result,
-                error=error,
-            )
-            self._running_tasks.remove(task.id)
+                await self._store.update_scheduled_task(
+                    task.id,
+                    self._clock.time_msec(),
+                    status=status,
+                    result=result,
+                    error=error,
+                )
+                self._running_tasks.remove(task.id)
 
         if len(self._running_tasks) >= TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS:
             return
@@ -353,5 +355,4 @@ class TaskScheduler:
 
         self._running_tasks.add(task.id)
         await self.update_task(task.id, status=TaskStatus.ACTIVE)
-        description = f"{task.id}-{task.action}"
-        run_as_background_process(description, wrapper)
+        run_as_background_process(task.action, wrapper)
