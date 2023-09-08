@@ -18,7 +18,7 @@ This documentation provides two TURN server configuration examples:
 
 For TURN relaying to work, the TURN service must be hosted on a server/endpoint with a public IP.
 
-Hosting TURN behind NAT requires port forwaring and for the NAT gateway to have a public IP.
+Hosting TURN behind NAT requires port forwarding and for the NAT gateway to have a public IP.
 However, even with appropriate configuration, NAT is known to cause issues and to often not work.
 
 Afterwards, the homeserver needs some further configuration.

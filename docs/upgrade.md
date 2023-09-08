@@ -1352,7 +1352,7 @@ In line with our [deprecation policy](deprecation_policy.md),
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.
 
-This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or
+This release of Synapse requires Python 3.6+ and PostgreSQL 9.6+ or
 SQLite 3.22+.
 
 ## Removal of old List Accounts Admin API
@@ -2312,7 +2312,7 @@ for details.
 # Upgrading to v0.11.0
 
 This release includes the option to send anonymous usage stats to
-matrix.org, and requires that administrators explictly opt in or out by
+matrix.org, and requires that administrators explicitly opt in or out by
 setting the `report_stats` option to either `true` or `false`.
 
 We would really appreciate it if you could help our project out by
@@ -2416,7 +2416,7 @@ latest module, please run:
 
 # Upgrading to v0.5.0
 
-The webclient has been split out into a seperate repository/pacakage in
+The webclient has been split out into a separate repository/package in
 this release. Before you restart your homeserver you will need to pull
 in the webclient package by running:
 
