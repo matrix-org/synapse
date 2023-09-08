@@ -257,7 +257,7 @@ on hub.docker.com.</p>
 Dockerfile to automate a synapse server in a single Docker image, at
 <a href="https://hub.docker.com/r/avhost/docker-matrix/tags/">https://hub.docker.com/r/avhost/docker-matrix/tags/</a></p>
 <p>Slavi Pantaleev has created an Ansible playbook,
-which installs the offical Docker image of Matrix Synapse
+which installs the official Docker image of Matrix Synapse
 along with many other Matrix-related services (Postgres database, Element, coturn,
 ma1sd, SSL support, etc.).
 For more details, see
@@ -296,7 +296,7 @@ the Debian repositories.
 For <code>bookworm</code> and <code>sid</code>, it can be installed simply with:</p>
 <pre><code class="language-sh">sudo apt install matrix-synapse
 </code></pre>
-<p>Synapse is also avaliable in <code>bullseye-backports</code>.  Please
+<p>Synapse is also available in <code>bullseye-backports</code>.  Please
 see the <a href="https://backports.debian.org/Instructions/">Debian documentation</a>
 for information on how to use backports.</p>
 <p><code>matrix-synapse</code> is no longer maintained for <code>buster</code> and older.</p>
@@ -850,7 +850,7 @@ of <code>COLLATE</code> and <code>CTYPE</code> unless the config flag <code>allo
 <code>database</code> section of the config, is set to true. Using different locales can cause issues if the locale library is updated from
 underneath the database, or if a different version of the locale is used on any
 replicas.</p>
-<p>If you have a databse with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
+<p>If you have a database with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
 the correct locale parameter (as shown above). It is also possible to change the
 parameters on a live database and run a <code>REINDEX</code> on the entire database,
 however extreme care must be taken to avoid database corruption.</p>
@@ -1175,7 +1175,7 @@ TURN server.</p>
 </ul>
 <h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
 <p>For TURN relaying to work, the TURN service must be hosted on a server/endpoint with a public IP.</p>
-<p>Hosting TURN behind NAT requires port forwaring and for the NAT gateway to have a public IP.
+<p>Hosting TURN behind NAT requires port forwarding and for the NAT gateway to have a public IP.
 However, even with appropriate configuration, NAT is known to cause issues and to often not work.</p>
 <p>Afterwards, the homeserver needs some further configuration.</p>
 <h2 id="synapse-setup"><a class="header" href="#synapse-setup">Synapse setup</a></h2>
@@ -2673,7 +2673,7 @@ Instructions for doing so are provided
 <p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.</p>
-<p>This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or
+<p>This release of Synapse requires Python 3.6+ and PostgreSQL 9.6+ or
 SQLite 3.22+.</p>
 <h2 id="removal-of-old-list-accounts-admin-api"><a class="header" href="#removal-of-old-list-accounts-admin-api">Removal of old List Accounts Admin API</a></h2>
 <p>The deprecated v1 &quot;list accounts&quot; admin API
@@ -3454,7 +3454,7 @@ in the config and update your dependencies dependencies. See README.rst
 for details.</p>
 <h1 id="upgrading-to-v0110"><a class="header" href="#upgrading-to-v0110">Upgrading to v0.11.0</a></h1>
 <p>This release includes the option to send anonymous usage stats to
-matrix.org, and requires that administrators explictly opt in or out by
+matrix.org, and requires that administrators explicitly opt in or out by
 setting the <code>report_stats</code> option to either <code>true</code> or <code>false</code>.</p>
 <p>We would really appreciate it if you could help our project out by
 reporting anonymized usage statistics from your homeserver. Only very
@@ -3534,7 +3534,7 @@ latest module, please run:</p>
 <pre><code>$ pip uninstall syweb
 </code></pre>
 <h1 id="upgrading-to-v050"><a class="header" href="#upgrading-to-v050">Upgrading to v0.5.0</a></h1>
-<p>The webclient has been split out into a seperate repository/pacakage in
+<p>The webclient has been split out into a separate repository/package in
 this release. Before you restart your homeserver you will need to pull
 in the webclient package by running:</p>
 <pre><code>python setup.py develop --user
@@ -4136,7 +4136,7 @@ for <a href="usage/configuration/../../workers.html">workers</a> and containers 
 </code></pre>
 <p>Example configuration #2:</p>
 <pre><code class="language-yaml">listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -6116,7 +6116,7 @@ are still valid. Defaults to 1d.</p>
 <p>Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a <code>verify key</code>, which
 will make synapse check that the response is signed by that key.</p>
-<p>This setting supercedes an older setting named <code>perspectives</code>. The old format
+<p>This setting supersedes an older setting named <code>perspectives</code>. The old format
 is still supported for backwards-compatibility, but it is deprecated.</p>
 <p><code>trusted_key_servers</code> defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set
@@ -9285,9 +9285,9 @@ terms and conditions set by the administrator of a server - and blocking access
 to the server until they have.</p>
 <p>There are several parts to this functionality; each requires some specific
 configuration in <code>homeserver.yaml</code> to be enabled.</p>
-<p>Note that various parts of the configuation and this document refer to the
+<p>Note that various parts of the configuration and this document refer to the
 &quot;privacy policy&quot;: agreement with a privacy policy is one particular use of this
-feature, but of course adminstrators can specify other terms and conditions
+feature, but of course administrators can specify other terms and conditions
 unrelated to &quot;privacy&quot; per se.</p>
 <h2 id="collecting-policy-agreement-from-a-user"><a class="header" href="#collecting-policy-agreement-from-a-user">Collecting policy agreement from a user</a></h2>
 <p>Synapse can be configured to serve the user a simple policy form with an
@@ -15013,7 +15013,7 @@ Destination objects contain the following fields:
 remote server, in ms. This is <code>0</code> if the last attempt to communicate with the
 remote server was successful.</li>
 <li><code>retry_interval</code> - integer - How long since the last time Synapse tried to reach
-the remote server before trying again, in ms. This is <code>0</code> if no further retrying occuring.</li>
+the remote server before trying again, in ms. This is <code>0</code> if no further retrying occurring.</li>
 <li><code>failure_ts</code> - nullable integer - The first time Synapse tried and failed to reach the
 remote server, in ms. This is <code>null</code> if communication with the remote server has never failed.</li>
 <li><code>last_successful_stream_ordering</code> - nullable integer - The stream ordering of the most
@@ -16255,7 +16255,7 @@ useful to reproduce this locally.</p>
 <h4 id="using-docker"><a class="header" href="#using-docker">Using Docker</a></h4>
 <p>The easiest way to do so is to run Postgres via a docker container. In one
 terminal:</p>
-<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 postgres:14
 </code></pre>
 <p>If you see an error like</p>
 <pre><code>docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
@@ -17764,7 +17764,7 @@ blocking operation, and returns an awaitable:</p>
 <p>So we have stopped processing the request (and will probably go on to
 start processing the next), without clearing the logcontext.</p>
 <p>To circumvent this problem, synapse code assumes that, wherever you have
-an awaitable, you will want to <code>await</code> it. To that end, whereever
+an awaitable, you will want to <code>await</code> it. To that end, wherever
 functions return awaitables, we adopt the following conventions:</p>
 <p><strong>Rules for functions returning awaitables:</strong></p>
 <blockquote>
@@ -18179,7 +18179,7 @@ noted when manually using the protocol:</p>
 been disabled on the main process.</li>
 <li>The server will only time connections out that have sent a <code>PING</code>
 command. If a ping is sent then the connection will be closed if no
-further commands are receieved within 15s. Both the client and
+further commands are received within 15s. Both the client and
 server protocol implementations will send an initial PING on
 connection and ensure at least one command every 5s is sent (not
 necessarily <code>PING</code>).</li>
@@ -18250,7 +18250,7 @@ received for each stream so that on reconnection it can start streaming
 from the correct place. Note: not all RDATA have valid tokens due to
 batching. See <code>RdataCommand</code> for more details.</p>
 <h3 id="example-5"><a class="header" href="#example-5">Example</a></h3>
-<p>An example iteraction is shown below. Each line is prefixed with '&gt;'
+<p>An example interaction is shown below. Each line is prefixed with '&gt;'
 or '&lt;' to indicate which side is sending, these are <em>not</em> included on
 the wire:</p>
 <pre><code>* connection established *
@@ -18578,7 +18578,7 @@ But don't want to send out sensitive data in other HS's events in this way.</p>
 <p>Suppose we discover after resync that we shouldn't have sent out one our events (not a prev_event) to a target HS. Not much we can do.
 What about if we didn't send them an event but shouldn't've?
 E.g. what if someone joined from a new HS shortly after you did? We wouldn't talk to them.
-Could imagine sending out the &quot;Missed&quot; events after the resync but... painful to work out what they shuld have seen if they joined/left.
+Could imagine sending out the &quot;Missed&quot; events after the resync but... painful to work out what they should have seen if they joined/left.
 Instead, just send them the latest event (if they're still in the room after resync) and let them backfill.(?)</p>
 <ul>
 <li>Don't do this currently.</li>

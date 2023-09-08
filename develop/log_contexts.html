@@ -215,7 +215,7 @@ blocking operation, and returns an awaitable:</p>
 <p>So we have stopped processing the request (and will probably go on to
 start processing the next), without clearing the logcontext.</p>
 <p>To circumvent this problem, synapse code assumes that, wherever you have
-an awaitable, you will want to <code>await</code> it. To that end, whereever
+an awaitable, you will want to <code>await</code> it. To that end, wherever
 functions return awaitables, we adopt the following conventions:</p>
 <p><strong>Rules for functions returning awaitables:</strong></p>
 <blockquote>

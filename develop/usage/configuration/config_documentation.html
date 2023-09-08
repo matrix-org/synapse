@@ -594,7 +594,7 @@ for <a href="../../workers.html">workers</a> and containers without listener e.g
 </code></pre>
 <p>Example configuration #2:</p>
 <pre><code class="language-yaml">listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -2574,7 +2574,7 @@ are still valid. Defaults to 1d.</p>
 <p>Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a <code>verify key</code>, which
 will make synapse check that the response is signed by that key.</p>
-<p>This setting supercedes an older setting named <code>perspectives</code>. The old format
+<p>This setting supersedes an older setting named <code>perspectives</code>. The old format
 is still supported for backwards-compatibility, but it is deprecated.</p>
 <p><code>trusted_key_servers</code> defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set

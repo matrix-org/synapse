@@ -317,7 +317,7 @@ useful to reproduce this locally.</p>
 <h4 id="using-docker"><a class="header" href="#using-docker">Using Docker</a></h4>
 <p>The easiest way to do so is to run Postgres via a docker container. In one
 terminal:</p>
-<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 postgres:14
 </code></pre>
 <p>If you see an error like</p>
 <pre><code>docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.

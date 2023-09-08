@@ -179,7 +179,7 @@ noted when manually using the protocol:</p>
 been disabled on the main process.</li>
 <li>The server will only time connections out that have sent a <code>PING</code>
 command. If a ping is sent then the connection will be closed if no
-further commands are receieved within 15s. Both the client and
+further commands are received within 15s. Both the client and
 server protocol implementations will send an initial PING on
 connection and ensure at least one command every 5s is sent (not
 necessarily <code>PING</code>).</li>
@@ -250,7 +250,7 @@ received for each stream so that on reconnection it can start streaming
 from the correct place. Note: not all RDATA have valid tokens due to
 batching. See <code>RdataCommand</code> for more details.</p>
 <h3 id="example"><a class="header" href="#example">Example</a></h3>
-<p>An example iteraction is shown below. Each line is prefixed with '&gt;'
+<p>An example interaction is shown below. Each line is prefixed with '&gt;'
 or '&lt;' to indicate which side is sending, these are <em>not</em> included on
 the wire:</p>
 <pre><code>* connection established *
