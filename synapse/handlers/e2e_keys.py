@@ -1593,9 +1593,9 @@ class SigningKeyEduUpdater:
             logger.warning("Got signing key update edu for %r from %r", user_id, origin)
             return
 
-        # The result of `validate` is not used yet because for now we only want to
+        # The result of `is_valid` is not used yet because for now we only want to
         # log invalid mxids in the wild.
-        UserID.from_string(user_id).validate(allow_historical_mxids=True)
+        UserID.is_valid(user_id, allow_historical_mxids=True)
 
         room_ids = await self.store.get_rooms_for_user(user_id)
         if not room_ids:

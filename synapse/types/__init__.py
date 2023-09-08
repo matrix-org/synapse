@@ -310,7 +310,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
     @classmethod
-    def is_valid(cls: Type[DS], s: str) -> bool:
+    def is_valid(cls: Type[DS], s: str, **kwargs: Any) -> bool:
         """Parses the input string and attempts to ensure it is valid."""
         # TODO: this does not reject an empty localpart or an overly-long string.
         # See https://spec.matrix.org/v1.2/appendices/#identifier-grammar
@@ -332,6 +332,35 @@ class UserID(DomainSpecificString):
     """Structure representing a user ID."""
 
     SIGIL = "@"
+
+    @classmethod
+    def is_valid(cls: Type[DS], s: str, **kwargs: Any) -> bool:
+        """"""
+        """Parses the user id str and attempts to ensure it is valid per the spec.
+
+        Args:
+            allow_historical_mxids: True to allow historical mxids, which can
+            include all printable ASCII chars minus `:`
+        Returns:
+            False if the user ID is invalid per the spec
+        """
+        allow_historical_mxids = kwargs.get("allow_historical_mxids", False)
+
+        is_valid = DomainSpecificString.is_valid(s)
+
+        if len(s.encode("utf-8")) > 255:
+            logger.warn(
+                f"User ID {s} has more than 255 bytes and is invalid per the spec"
+            )
+            is_valid = False
+        obj = UserID.from_string(s)
+        if contains_invalid_mxid_characters(obj.localpart, allow_historical_mxids):
+            logger.warn(
+                f"localpart of User ID {s} contains invalid characters per the spec"
+            )
+            is_valid = False
+
+        return is_valid
 
     def validate(self, allow_historical_mxids: Optional[bool] = False) -> bool:
         """Validate an user ID against the spec.

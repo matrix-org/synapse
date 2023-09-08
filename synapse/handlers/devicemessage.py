@@ -109,9 +109,9 @@ class DeviceMessageHandler:
                 origin,
                 sender_user_id,
             )
-        # The result of `validate` is not used yet because for now we only want to
+        # The result of `is_valid` is not used yet because for now we only want to
         # log invalid mxids in the wild.
-        UserID.from_string(sender_user_id).validate(allow_historical_mxids=True)
+        UserID.is_valid(sender_user_id, allow_historical_mxids=True)
 
         message_type = content["type"]
         message_id = content["message_id"]
