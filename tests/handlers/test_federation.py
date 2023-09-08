@@ -262,7 +262,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             if (ev.type, ev.state_key)
             in {("m.room.create", ""), ("m.room.member", remote_server_user_id)}
         ]
-        for _ in range(0, 8):
+        for _ in range(8):
             event = make_event_from_dict(
                 self.add_hashes_and_signatures_from_other_server(
                     {

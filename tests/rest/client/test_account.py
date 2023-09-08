@@ -575,7 +575,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
         # create a bunch of users and add keys for them
         users = []
-        for i in range(0, 20):
+        for i in range(20):
             user_id = self.register_user("missPiggy" + str(i), "test")
             users.append((user_id,))
 
