@@ -362,28 +362,6 @@ class UserID(DomainSpecificString):
 
         return is_valid
 
-    def validate(self, allow_historical_mxids: Optional[bool] = False) -> bool:
-        """Validate an user ID against the spec.
-
-        Args:
-            allow_historical_mxids: True to allow historical mxids, which can
-            include all printable ASCII chars minus `:`
-        Returns:
-            True if the user ID is invalid per the spec
-        """
-        is_valid = True
-        if len(self.to_string().encode("utf-8")) > 255:
-            logger.warn(
-                f"User ID {self.to_string()} has more than 255 bytes and is invalid per the spec"
-            )
-            is_valid = False
-        if contains_invalid_mxid_characters(self.localpart, allow_historical_mxids):
-            logger.warn(
-                f"localpart of User ID {self.to_string()} contains invalid characters per the spec"
-            )
-            is_valid = False
-        return is_valid
-
 
 @attr.s(slots=True, frozen=True, repr=False)
 class RoomAlias(DomainSpecificString):
