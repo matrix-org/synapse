@@ -1,0 +1,1 @@
+Fix bug when rehydrated devices do not have the device refresh tokens. Contributed by Hanadi.
