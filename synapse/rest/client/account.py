@@ -179,85 +179,81 @@ class PasswordRestServlet(RestServlet):
         #
         # In the second case, we require a password to confirm their identity.
 
-        requester = None
-        if self.auth.has_access_token(request):
-            requester = await self.auth.get_user_by_req(request)
-            try:
+        try:
+            requester = None
+            if self.auth.has_access_token(request):
+                requester = await self.auth.get_user_by_req(request)
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
                     requester,
                     request,
-                    body.dict(exclude_unset=True),
+                    body.dict(exclude_unset=True, exclude={"new_password"}),
                     "modify your account password",
                 )
-            except InteractiveAuthIncompleteError as e:
-                # The user needs to provide more steps to complete auth, but
-                # they're not required to provide the password again.
-                #
-                # If a password is available now, hash the provided password and
-                # store it for later.
-                if new_password:
-                    new_password_hash = await self.auth_handler.hash(new_password)
-                    await self.auth_handler.set_session_data(
-                        e.session_id,
-                        UIAuthSessionDataConstants.PASSWORD_HASH,
-                        new_password_hash,
-                    )
-                raise
-            user_id = requester.user.to_string()
-        else:
-            try:
+                user_id = requester.user.to_string()
+            else:
                 result, params, session_id = await self.auth_handler.check_ui_auth(
                     [[LoginType.EMAIL_IDENTITY]],
                     request,
-                    body.dict(exclude_unset=True),
+                    body.dict(exclude_unset=True, exclude={"new_password"}),
                     "modify your account password",
                 )
-            except InteractiveAuthIncompleteError as e:
-                # The user needs to provide more steps to complete auth, but
-                # they're not required to provide the password again.
-                #
-                # If a password is available now, hash the provided password and
-                # store it for later.
-                if new_password:
-                    new_password_hash = await self.auth_handler.hash(new_password)
-                    await self.auth_handler.set_session_data(
-                        e.session_id,
-                        UIAuthSessionDataConstants.PASSWORD_HASH,
-                        new_password_hash,
+
+                if LoginType.EMAIL_IDENTITY in result:
+                    threepid = result[LoginType.EMAIL_IDENTITY]
+                    if "medium" not in threepid or "address" not in threepid:
+                        raise SynapseError(500, "Malformed threepid")
+                    if threepid["medium"] == "email":
+                        # For emails, canonicalise the address.
+                        # We store all email addresses canonicalised in the DB.
+                        # (See add_threepid in synapse/handlers/auth.py)
+                        try:
+                            threepid["address"] = validate_email(threepid["address"])
+                        except ValueError as e:
+                            raise SynapseError(400, str(e))
+                    # if using email, we must know about the email they're authing with!
+                    threepid_user_id = await self.datastore.get_user_id_by_threepid(
+                        threepid["medium"], threepid["address"]
                     )
+                    if not threepid_user_id:
+                        raise SynapseError(
+                            404, "Email address not found", Codes.NOT_FOUND
+                        )
+                    user_id = threepid_user_id
+                else:
+                    logger.error("Auth succeeded but no known type! %r", result.keys())
+                    raise SynapseError(500, "", Codes.UNKNOWN)
+
+        except InteractiveAuthIncompleteError as e:
+            # The user needs to provide more steps to complete auth, but
+            # they're not required to provide the password again.
+            #
+            # If a password is available now, hash the provided password and
+            # store it for later. We only do this if we don't already have the
+            # password hash stored, to avoid repeatedly hashing the password.
+
+            if not new_password:
                 raise
 
-            if LoginType.EMAIL_IDENTITY in result:
-                threepid = result[LoginType.EMAIL_IDENTITY]
-                if "medium" not in threepid or "address" not in threepid:
-                    raise SynapseError(500, "Malformed threepid")
-                if threepid["medium"] == "email":
-                    # For emails, canonicalise the address.
-                    # We store all email addresses canonicalised in the DB.
-                    # (See add_threepid in synapse/handlers/auth.py)
-                    try:
-                        threepid["address"] = validate_email(threepid["address"])
-                    except ValueError as e:
-                        raise SynapseError(400, str(e))
-                # if using email, we must know about the email they're authing with!
-                threepid_user_id = await self.datastore.get_user_id_by_threepid(
-                    threepid["medium"], threepid["address"]
-                )
-                if not threepid_user_id:
-                    raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
-                user_id = threepid_user_id
-            else:
-                logger.error("Auth succeeded but no known type! %r", result.keys())
-                raise SynapseError(500, "", Codes.UNKNOWN)
+            existing_session_password_hash = await self.auth_handler.get_session_data(
+                e.session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
+            )
+            if existing_session_password_hash:
+                raise
+
+            new_password_hash = await self.auth_handler.hash(new_password)
+            await self.auth_handler.set_session_data(
+                e.session_id,
+                UIAuthSessionDataConstants.PASSWORD_HASH,
+                new_password_hash,
+            )
+            raise
 
         # If we have a password in this request, prefer it. Otherwise, use the
         # password hash from an earlier request.
         if new_password:
             password_hash: Optional[str] = await self.auth_handler.hash(new_password)
         elif session_id is not None:
-            password_hash = await self.auth_handler.get_session_data(
-                session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
-            )
+            password_hash = existing_session_password_hash
         else:
             # UI validation was skipped, but the request did not include a new
             # password.

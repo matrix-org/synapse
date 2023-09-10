@@ -31,6 +31,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -358,7 +359,21 @@ class LoggingTransaction:
         return self.txn.rowcount
 
     @property
-    def description(self) -> Any:
+    def description(
+        self,
+    ) -> Optional[
+        Sequence[
+            Tuple[
+                str,
+                Optional[Any],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+                Optional[int],
+            ]
+        ]
+    ]:
         return self.txn.description
 
     def execute_batch(self, sql: str, args: Iterable[Iterable[Any]]) -> None:
@@ -407,10 +422,11 @@ class LoggingTransaction:
         return self._do_execute(
             # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
             # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
-            lambda the_sql: execute_values(
-                self.txn, the_sql, values, template=template, fetch=fetch
+            lambda the_sql, the_values: execute_values(
+                self.txn, the_sql, the_values, template=template, fetch=fetch
             ),
             sql,
+            values,
         )
 
     def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:

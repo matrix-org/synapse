@@ -123,7 +123,7 @@ BOOLEAN_COLUMNS = {
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
     "rooms": ["is_public", "has_auth_chain_index"],
-    "users": ["shadow_banned", "approved"],
+    "users": ["shadow_banned", "approved", "locked"],
     "un_partial_stated_event_stream": ["rejection_status_changed"],
     "users_who_share_rooms": ["share_private"],
     "per_user_experimental_features": ["enabled"],
@@ -482,7 +482,10 @@ class Porter:
                         do_backward[0] = False
 
                 if forward_rows or backward_rows:
-                    headers = [column[0] for column in txn.description]
+                    assert txn.description is not None
+                    headers: Optional[List[str]] = [
+                        column[0] for column in txn.description
+                    ]
                 else:
                     headers = None
 
@@ -544,6 +547,7 @@ class Porter:
             def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
                 txn.execute(select, (forward_chunk, self.batch_size))
                 rows = txn.fetchall()
+                assert txn.description is not None
                 headers = [column[0] for column in txn.description]
 
                 return headers, rows
@@ -761,7 +765,7 @@ class Porter:
 
             # Step 2. Set up sequences
             #
-            # We do this before porting the tables so that event if we fail half
+            # We do this before porting the tables so that even if we fail half
             # way through the postgres DB always have sequences that are greater
             # than their respective tables. If we don't then creating the
             # `DataStore` object will fail due to the inconsistency.
@@ -769,6 +773,10 @@ class Porter:
             await self._setup_state_group_id_seq()
             await self._setup_user_id_seq()
             await self._setup_events_stream_seqs()
+            await self._setup_sequence(
+                "un_partial_stated_event_stream_sequence",
+                ("un_partial_stated_event_stream",),
+            )
             await self._setup_sequence(
                 "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
             )
@@ -779,6 +787,11 @@ class Porter:
             await self._setup_sequence("receipts_sequence", ("receipts_linearized",))
             await self._setup_sequence("presence_stream_sequence", ("presence_stream",))
             await self._setup_auth_chain_sequence()
+            await self._setup_sequence(
+                "application_services_txn_id_seq",
+                ("application_services_txns",),
+                "txn_id",
+            )
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -910,7 +923,8 @@ class Porter:
         def r(txn: LoggingTransaction) -> Tuple[List[str], List[Tuple]]:
             txn.execute(select)
             rows = txn.fetchall()
-            headers: List[str] = [column[0] for column in txn.description]
+            assert txn.description is not None
+            headers = [column[0] for column in txn.description]
 
             ts_ind = headers.index("ts")
 
@@ -1083,7 +1097,10 @@ class Porter:
         )
 
     async def _setup_sequence(
-        self, sequence_name: str, stream_id_tables: Iterable[str]
+        self,
+        sequence_name: str,
+        stream_id_tables: Iterable[str],
+        column_name: str = "stream_id",
     ) -> None:
         """Set a sequence to the correct value."""
         current_stream_ids = []
@@ -1093,7 +1110,7 @@ class Porter:
                 await self.sqlite_store.db_pool.simple_select_one_onecol(
                     table=stream_id_table,
                     keyvalues={},
-                    retcol="COALESCE(MAX(stream_id), 1)",
+                    retcol=f"COALESCE(MAX({column_name}), 1)",
                     allow_none=True,
                 ),
             )
@@ -1193,10 +1210,10 @@ class CursesProgress(Progress):
         self.total_processed = 0
         self.total_remaining = 0
 
-        super(CursesProgress, self).__init__()
+        super().__init__()
 
     def update(self, table: str, num_done: int) -> None:
-        super(CursesProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         self.total_processed = 0
         self.total_remaining = 0
@@ -1292,7 +1309,7 @@ class TerminalProgress(Progress):
     """Just prints progress to the terminal"""
 
     def update(self, table: str, num_done: int) -> None:
-        super(TerminalProgress, self).update(table, num_done)
+        super().update(table, num_done)
 
         data = self.tables[table]
 

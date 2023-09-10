@@ -48,8 +48,10 @@ class RegistrationStoreTestCase(HomeserverTestCase):
                 "creation_ts": 0,
                 "user_type": None,
                 "deactivated": 0,
+                "locked": 0,
                 "shadow_banned": 0,
                 "approved": 1,
+                "last_seen_ts": None,
             },
             (self.get_success(self.store.get_user_by_id(self.user_id))),
         )

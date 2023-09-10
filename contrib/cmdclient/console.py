@@ -769,7 +769,7 @@ def main(server_url, identity_server_url, username, token, config_path):
     global CONFIG_JSON
     CONFIG_JSON = config_path  # bit cheeky, but just overwrite the global
     try:
-        with open(config_path, "r") as config:
+        with open(config_path) as config:
             syn_cmd.config = json.load(config)
             try:
                 http_client.verbose = "on" == syn_cmd.config["verbose"]

@@ -90,8 +90,7 @@ class DeviceMessageHandler:
         self._ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_key_requests.per_second,
-            burst_count=hs.config.ratelimiting.rc_key_requests.burst_count,
+            cfg=hs.config.ratelimiting.rc_key_requests,
         )
 
     async def on_direct_to_device_edu(self, origin: str, content: JsonDict) -> None:
@@ -303,10 +302,9 @@ class DeviceMessageHandler:
         )
 
         if self.federation_sender:
-            for destination in remote_messages.keys():
-                # Enqueue a new federation transaction to send the new
-                # device messages to each remote destination.
-                self.federation_sender.send_device_messages(destination)
+            # Enqueue a new federation transaction to send the new
+            # device messages to each remote destination.
+            await self.federation_sender.send_device_messages(remote_messages.keys())
 
     async def get_events_for_dehydrated_device(
         self,
@@ -366,19 +364,6 @@ class DeviceMessageHandler:
                     "from parameter %r has an invalid format" % (since_token,),
                     errcode=Codes.INVALID_PARAM,
                 )
-
-            # if we have a since token, delete any to-device messages before that token
-            # (since we now know that the device has received them)
-            deleted = await self.store.delete_messages_for_device(
-                user_id, device_id, since_stream_id
-            )
-            logger.debug(
-                "Deleted %d to-device messages up to %d for user_id %s device_id %s",
-                deleted,
-                since_stream_id,
-                user_id,
-                device_id,
-            )
 
         to_token = self.event_sources.get_current_token().to_device_key
 

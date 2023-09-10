@@ -29,7 +29,6 @@ from synapse.http.servlet import (
     parse_integer,
 )
 from synapse.http.site import SynapseRequest
-from synapse.replication.http.devices import ReplicationUploadKeysForUserRestServlet
 from synapse.rest.client._base import client_patterns, interactive_auth_handler
 from synapse.rest.client.models import AuthenticationData
 from synapse.rest.models import RequestBodyModel
@@ -232,7 +231,7 @@ class DehydratedDeviceDataModel(RequestBodyModel):
 class DehydratedDeviceServlet(RestServlet):
     """Retrieve or store a dehydrated device.
 
-    Implements either MSC2697 or MSC3814.
+    Implements MSC2697.
 
     GET /org.matrix.msc2697.v2/dehydrated_device
 
@@ -266,20 +265,18 @@ class DehydratedDeviceServlet(RestServlet):
 
     """
 
-    def __init__(self, hs: "HomeServer", msc2697: bool = True):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc2697.v2/dehydrated_device$",
+        releases=(),
+    )
+
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         handler = hs.get_device_handler()
         assert isinstance(handler, DeviceHandler)
         self.device_handler = handler
-
-        self.PATTERNS = client_patterns(
-            "/org.matrix.msc2697.v2/dehydrated_device$"
-            if msc2697
-            else "/org.matrix.msc3814.v1/dehydrated_device$",
-            releases=(),
-        )
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -482,13 +479,6 @@ class DehydratedDeviceV2Servlet(RestServlet):
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
         self.device_handler = handler
 
-        if hs.config.worker.worker_app is None:
-            # if main process
-            self.key_uploader = self.e2e_keys_handler.upload_keys_for_user
-        else:
-            # then a worker
-            self.key_uploader = ReplicationUploadKeysForUserRestServlet.make_client(hs)
-
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
@@ -513,10 +503,8 @@ class DehydratedDeviceV2Servlet(RestServlet):
         if dehydrated_device is not None:
             (device_id, device_data) = dehydrated_device
 
-            result = await self.device_handler.rehydrate_device(
-                requester.user.to_string(),
-                self.auth.get_access_token_from_request(request),
-                device_id,
+            await self.device_handler.delete_dehydrated_device(
+                requester.user.to_string(), device_id
             )
 
             result = {"device_id": device_id}
@@ -538,6 +526,14 @@ class DehydratedDeviceV2Servlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
+        old_dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
+
+        # if an old device exists, delete it before creating a new one
+        if old_dehydrated_device:
+            await self.device_handler.delete_dehydrated_device(
+                user_id, old_dehydrated_device[0]
+            )
+
         device_info = submission.dict()
         if "device_keys" not in device_info.keys():
             raise SynapseError(
@@ -545,18 +541,12 @@ class DehydratedDeviceV2Servlet(RestServlet):
                 "Device key(s) not found, these must be provided.",
             )
 
-        # TODO: Those two operations, creating a device and storing the
-        # device's keys should be atomic.
         device_id = await self.device_handler.store_dehydrated_device(
             requester.user.to_string(),
             submission.device_id,
             submission.device_data.dict(),
             submission.initial_device_display_name,
-        )
-
-        # TODO: Do we need to do something with the result here?
-        await self.key_uploader(
-            user_id=user_id, device_id=submission.device_id, keys=submission.dict()
+            device_info,
         )
 
         return 200, {"device_id": device_id}
@@ -573,7 +563,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.worker.worker_app is None:
         DeviceRestServlet(hs).register(http_server)
         if hs.config.experimental.msc2697_enabled:
-            DehydratedDeviceServlet(hs, msc2697=True).register(http_server)
+            DehydratedDeviceServlet(hs).register(http_server)
             ClaimDehydratedDeviceServlet(hs).register(http_server)
         if hs.config.experimental.msc3814_enabled:
             DehydratedDeviceV2Servlet(hs).register(http_server)

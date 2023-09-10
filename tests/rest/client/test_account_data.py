@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest.mock import Mock
+from unittest.mock import AsyncMock
 
 from synapse.rest import admin
 from synapse.rest.client import account_data, login, room
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class AccountDataTestCase(unittest.HomeserverTestCase):
@@ -32,7 +31,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         """Tests that the on_account_data_updated module callback is called correctly when
         a user's account data changes.
         """
-        mocked_callback = Mock(return_value=make_awaitable(None))
+        mocked_callback = AsyncMock(return_value=None)
         self.hs.get_account_data_handler()._on_account_data_updated_callbacks.append(
             mocked_callback
         )

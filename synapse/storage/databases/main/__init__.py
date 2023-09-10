@@ -70,6 +70,7 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamWorkerStore
 from .tags import TagsStore
+from .task_scheduler import TaskSchedulerWorkerStore
 from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
@@ -127,6 +128,7 @@ class DataStore(
     CacheInvalidationWorkerStore,
     LockStore,
     SessionStore,
+    TaskSchedulerWorkerStore,
 ):
     def __init__(
         self,
@@ -168,6 +170,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
+        admins: Optional[bool] = None,
         order_by: str = UserSortOrder.NAME.value,
         direction: Direction = Direction.FORWARDS,
         approved: bool = True,
@@ -184,6 +187,9 @@ class DataStore(
             name: search for local part of user_id or display name
             guests: whether to in include guest users
             deactivated: whether to include deactivated users
+            admins: Optional flag to filter admins. If true, only admins are queried.
+                    if false, admins are excluded from the query. When it is
+                    none (the default), both admins and none-admins are queried.
             order_by: the sort order of the returned list
             direction: sort ascending or descending
             approved: whether to include approved users
@@ -219,6 +225,12 @@ class DataStore(
 
             if not deactivated:
                 filters.append("deactivated = 0")
+
+            if admins is not None:
+                if admins:
+                    filters.append("admin = 1")
+                else:
+                    filters.append("admin = 0")
 
             if not approved:
                 # We ignore NULL values for the approved flag because these should only
@@ -265,6 +277,10 @@ class DataStore(
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = p.full_user_id
                 LEFT JOIN erased_users AS eu ON u.name = eu.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(last_seen) AS last_seen_ts
+                    FROM user_ips GROUP BY user_id
+                ) ls ON u.name = ls.user_id
                 {where_clause}
                 """
             sql = "SELECT COUNT(*) as total_users " + sql_base
@@ -274,7 +290,7 @@ class DataStore(
             sql = f"""
                 SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
                 displayname, avatar_url, creation_ts * 1000 as creation_ts, approved,
-                eu.user_id is not null as erased
+                eu.user_id is not null as erased, last_seen_ts
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?

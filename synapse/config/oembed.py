@@ -30,7 +30,7 @@ class OEmbedEndpointConfig:
     # The API endpoint to fetch.
     api_endpoint: str
     # The patterns to match.
-    url_patterns: List[Pattern]
+    url_patterns: List[Pattern[str]]
     # The supported formats.
     formats: Optional[List[str]]
 

@@ -30,9 +30,9 @@ from synapse.server import HomeServer
 from synapse.storage.databases.main.appservice import _make_exclusive_regex
 from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
+from synapse.util.task_scheduler import TaskScheduler
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
 user1 = "@boris:aaa"
@@ -41,7 +41,7 @@ user2 = "@theresa:bbb"
 
 class DeviceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        self.appservice_api = mock.Mock()
+        self.appservice_api = mock.AsyncMock()
         hs = self.setup_test_homeserver(
             "server",
             application_service_api=self.appservice_api,
@@ -50,6 +50,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         assert isinstance(handler, DeviceHandler)
         self.handler = handler
         self.store = hs.get_datastores().main
+        self.device_message_handler = hs.get_device_message_handler()
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -123,50 +124,50 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(3, len(res))
         device_map = {d["device_id"]: d for d in res}
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "xyz",
                 "display_name": "display 0",
                 "last_seen_ip": None,
                 "last_seen_ts": None,
-            },
-            device_map["xyz"],
+            }.items(),
+            device_map["xyz"].items(),
         )
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "fco",
                 "display_name": "display 1",
                 "last_seen_ip": "ip1",
                 "last_seen_ts": 1000000,
-            },
-            device_map["fco"],
+            }.items(),
+            device_map["fco"].items(),
         )
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "abc",
                 "display_name": "display 2",
                 "last_seen_ip": "ip3",
                 "last_seen_ts": 3000000,
-            },
-            device_map["abc"],
+            }.items(),
+            device_map["abc"].items(),
         )
 
     def test_get_device(self) -> None:
         self._record_users()
 
         res = self.get_success(self.handler.get_device(user1, "abc"))
-        self.assertDictContainsSubset(
+        self.assertLessEqual(
             {
                 "user_id": user1,
                 "device_id": "abc",
                 "display_name": "display 2",
                 "last_seen_ip": "ip3",
                 "last_seen_ts": 3000000,
-            },
-            res,
+            }.items(),
+            res.items(),
         )
 
     def test_delete_device(self) -> None:
@@ -211,6 +212,51 @@ class DeviceTestCase(unittest.HomeserverTestCase):
             )
         )
         self.assertIsNone(res)
+
+    def test_delete_device_and_big_device_inbox(self) -> None:
+        """Check that deleting a big device inbox is staged and batched asynchronously."""
+        DEVICE_ID = "abc"
+        sender = "@sender:" + self.hs.hostname
+        receiver = "@receiver:" + self.hs.hostname
+        self._record_user(sender, DEVICE_ID, DEVICE_ID)
+        self._record_user(receiver, DEVICE_ID, DEVICE_ID)
+
+        # queue a bunch of messages in the inbox
+        requester = create_requester(sender, device_id=DEVICE_ID)
+        for i in range(DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT + 10):
+            self.get_success(
+                self.device_message_handler.send_device_message(
+                    requester, "message_type", {receiver: {"*": {"val": i}}}
+                )
+            )
+
+        # delete the device
+        self.get_success(self.handler.delete_devices(receiver, [DEVICE_ID]))
+
+        # messages should be deleted up to DEVICE_MSGS_DELETE_BATCH_LIMIT straight away
+        res = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="device_inbox",
+                keyvalues={"user_id": receiver},
+                retcols=("user_id", "device_id", "stream_id"),
+                desc="get_device_id_from_device_inbox",
+            )
+        )
+        self.assertEqual(10, len(res))
+
+        # wait for the task scheduler to do a second delete pass
+        self.reactor.advance(TaskScheduler.SCHEDULE_INTERVAL_MS / 1000)
+
+        # remaining messages should now be deleted
+        res = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="device_inbox",
+                keyvalues={"user_id": receiver},
+                retcols=("user_id", "device_id", "stream_id"),
+                desc="get_device_id_from_device_inbox",
+            )
+        )
+        self.assertEqual(0, len(res))
 
     def test_update_device(self) -> None:
         self._record_users()
@@ -375,13 +421,11 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         )
 
         # Setup a response.
-        self.appservice_api.query_keys.return_value = make_awaitable(
-            {
-                "device_keys": {
-                    local_user: {device_2: device_key_2b, device_3: device_key_3}
-                }
+        self.appservice_api.query_keys.return_value = {
+            "device_keys": {
+                local_user: {device_2: device_key_2b, device_3: device_key_3}
             }
-        )
+        }
 
         # Request all devices.
         res = self.get_success(
@@ -566,15 +610,16 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(res["events"]), 1)
         self.assertEqual(res["events"][0]["content"]["body"], "foo")
 
-        # Fetch the message of the dehydrated device again, which should return nothing
-        # and delete the old messages
+        # Fetch the message of the dehydrated device again, which should return
+        # the same message as it has not been deleted
         res = self.get_success(
             self.message_handler.get_events_for_dehydrated_device(
                 requester=requester,
                 device_id=stored_dehydrated_device_id,
-                since_token=res["next_batch"],
+                since_token=None,
                 limit=10,
             )
         )
         self.assertTrue(len(res["next_batch"]) > 1)
-        self.assertEqual(len(res["events"]), 0)
+        self.assertEqual(len(res["events"]), 1)
+        self.assertEqual(res["events"][0]["content"]["body"], "foo")

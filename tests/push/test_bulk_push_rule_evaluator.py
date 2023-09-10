@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from typing import Any, Optional
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from parameterized import parameterized
 
@@ -28,7 +28,6 @@ from synapse.server import HomeServer
 from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 
-from tests.test_utils import simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 
@@ -191,7 +190,7 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
         # Mock the method which calculates push rules -- we do this instead of
         # e.g. checking the results in the database because we want to ensure
         # that code isn't even running.
-        bulk_evaluator._action_for_event_by_user = simple_async_mock()  # type: ignore[assignment]
+        bulk_evaluator._action_for_event_by_user = AsyncMock()  # type: ignore[method-assign]
 
         # Ensure no actions are generated!
         self.get_success(bulk_evaluator.action_for_events_by_user([(event, context)]))
@@ -382,7 +381,6 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-    @override_config({"experimental_features": {"msc3958_supress_edit_notifs": True}})
     def test_suppress_edits(self) -> None:
         """Under the default push rules, event edits should not generate notifications."""
         bulk_evaluator = BulkPushRuleEvaluator(self.hs)
@@ -409,15 +407,32 @@ class TestBulkPushRuleEvaluator(HomeserverTestCase):
             )
         )
 
-        # Room mentions from those without power should not notify.
+        # The edit should not cause a notification.
         self.assertFalse(
             self._create_and_process(
                 bulk_evaluator,
                 {
-                    "body": self.alice,
+                    "body": "Test message",
                     "m.relates_to": {
                         "rel_type": RelationTypes.REPLACE,
                         "event_id": event.event_id,
+                    },
+                },
+            )
+        )
+
+        # An edit which is a mention will cause a notification.
+        self.assertTrue(
+            self._create_and_process(
+                bulk_evaluator,
+                {
+                    "body": "Test message",
+                    "m.relates_to": {
+                        "rel_type": RelationTypes.REPLACE,
+                        "event_id": event.event_id,
+                    },
+                    "m.mentions": {
+                        "user_ids": [self.alice],
                     },
                 },
             )

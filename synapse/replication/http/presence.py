@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -51,14 +51,14 @@ class ReplicationBumpPresenceActiveTime(ReplicationEndpoint):
         self._presence_handler = hs.get_presence_handler()
 
     @staticmethod
-    async def _serialize_payload(user_id: str) -> JsonDict:  # type: ignore[override]
-        return {}
+    async def _serialize_payload(user_id: str, device_id: Optional[str]) -> JsonDict:  # type: ignore[override]
+        return {"device_id": device_id}
 
     async def _handle_request(  # type: ignore[override]
         self, request: Request, content: JsonDict, user_id: str
     ) -> Tuple[int, JsonDict]:
         await self._presence_handler.bump_presence_active_time(
-            UserID.from_string(user_id)
+            UserID.from_string(user_id), content.get("device_id")
         )
 
         return (200, {})
@@ -73,8 +73,8 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
 
         {
             "state": { ... },
-            "ignore_status_msg": false,
-            "force_notify": false
+            "force_notify": false,
+            "is_sync": false
         }
 
         200 OK
@@ -95,14 +95,16 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
         user_id: str,
+        device_id: Optional[str],
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
+        is_sync: bool = False,
     ) -> JsonDict:
         return {
+            "device_id": device_id,
             "state": state,
-            "ignore_status_msg": ignore_status_msg,
             "force_notify": force_notify,
+            "is_sync": is_sync,
         }
 
     async def _handle_request(  # type: ignore[override]
@@ -110,9 +112,10 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
     ) -> Tuple[int, JsonDict]:
         await self._presence_handler.set_state(
             UserID.from_string(user_id),
+            content.get("device_id"),
             content["state"],
-            content["ignore_status_msg"],
             content["force_notify"],
+            content.get("is_sync", False),
         )
 
         return (200, {})

@@ -156,7 +156,7 @@ class PurgeHistoryRestServlet(RestServlet):
             logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
         elif "purge_up_to_ts" in body:
             ts = body["purge_up_to_ts"]
-            if type(ts) is not int:
+            if type(ts) is not int:  # noqa: E721
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     "purge_up_to_ts must be an int",

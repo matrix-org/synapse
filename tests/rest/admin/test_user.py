@@ -18,7 +18,7 @@ import os
 import urllib.parse
 from binascii import unhexlify
 from typing import List, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from parameterized import parameterized, parameterized_class
 
@@ -29,14 +29,24 @@ from synapse.api.constants import ApprovalNoticeMedium, LoginType, UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
 from synapse.media.filepath import MediaFilePaths
-from synapse.rest.client import devices, login, logout, profile, register, room, sync
+from synapse.rest.client import (
+    devices,
+    login,
+    logout,
+    profile,
+    register,
+    room,
+    sync,
+    user_directory,
+)
 from synapse.server import HomeServer
+from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeSite, make_request
-from tests.test_utils import SMALL_PNG, make_awaitable
+from tests.test_utils import SMALL_PNG
 from tests.unittest import override_config
 
 
@@ -62,8 +72,8 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.hs.config.registration.registration_shared_secret = "shared"
 
-        self.hs.get_media_repository = Mock()  # type: ignore[assignment]
-        self.hs.get_deactivate_account_handler = Mock()  # type: ignore[assignment]
+        self.hs.get_media_repository = Mock()  # type: ignore[method-assign]
+        self.hs.get_deactivate_account_handler = Mock()  # type: ignore[method-assign]
 
         return self.hs
 
@@ -410,8 +420,8 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         store = self.hs.get_datastores().main
 
         # Set monthly active users to the limit
-        store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.server.max_mau_value)
+        store.get_monthly_active_count = AsyncMock(
+            return_value=self.hs.config.server.max_mau_value
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -447,6 +457,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
+        room.register_servlets,
     ]
     url = "/_synapse/admin/v2/users"
 
@@ -496,6 +507,62 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         # Check that all fields are available
         self._check_fields(channel.json_body["users"])
+
+    def test_last_seen(self) -> None:
+        """
+        Test that last_seen_ts field is properly working.
+        """
+        user1 = self.register_user("u1", "pass")
+        user1_token = self.login("u1", "pass")
+        user2 = self.register_user("u2", "pass")
+        user2_token = self.login("u2", "pass")
+        user3 = self.register_user("u3", "pass")
+        user3_token = self.login("u3", "pass")
+
+        self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        self.reactor.advance(10)
+        self.helper.create_room_as(user2, tok=user2_token)
+        self.reactor.advance(10)
+        self.helper.create_room_as(user1, tok=user1_token)
+        self.reactor.advance(10)
+        self.helper.create_room_as(user3, tok=user3_token)
+        self.reactor.advance(10)
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(4, len(channel.json_body["users"]))
+        self.assertEqual(4, channel.json_body["total"])
+
+        admin_last_seen = channel.json_body["users"][0]["last_seen_ts"]
+        user1_last_seen = channel.json_body["users"][1]["last_seen_ts"]
+        user2_last_seen = channel.json_body["users"][2]["last_seen_ts"]
+        user3_last_seen = channel.json_body["users"][3]["last_seen_ts"]
+        self.assertTrue(admin_last_seen > 0 and admin_last_seen < 10000)
+        self.assertTrue(user2_last_seen > 10000 and user2_last_seen < 20000)
+        self.assertTrue(user1_last_seen > 20000 and user1_last_seen < 30000)
+        self.assertTrue(user3_last_seen > 30000 and user3_last_seen < 40000)
+
+        self._order_test([self.admin_user, user2, user1, user3], "last_seen_ts")
+
+        self.reactor.advance(LAST_SEEN_GRANULARITY / 1000)
+        self.helper.create_room_as(user1, tok=user1_token)
+        self.reactor.advance(10)
+
+        channel = self.make_request(
+            "GET",
+            self.url + "/" + user1,
+            access_token=self.admin_user_tok,
+        )
+        self.assertTrue(
+            channel.json_body["last_seen_ts"] > 40000 + LAST_SEEN_GRANULARITY
+        )
+
+        self._order_test([self.admin_user, user2, user3, user1], "last_seen_ts")
 
     def test_search_term(self) -> None:
         """Test that searching for a users works correctly"""
@@ -870,6 +937,44 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self._order_test([self.admin_user, user1, user2], "creation_ts", "f")
         self._order_test([user2, user1, self.admin_user], "creation_ts", "b")
 
+    def test_filter_admins(self) -> None:
+        """
+        Tests whether the various values of the query parameter `admins` lead to the
+        expected result set.
+        """
+
+        # Register an additional non admin user
+        self.register_user("user", "pass", admin=False)
+
+        # Query all users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(2, channel.json_body["total"])
+
+        # Query only admin users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}?admins=true",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertEqual(1, channel.json_body["users"][0]["admin"])
+
+        # Query only non admin users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}?admins=false",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertFalse(channel.json_body["users"][0]["admin"])
+
     @override_config(
         {
             "experimental_features": {
@@ -1088,6 +1193,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             self.assertIn("displayname", u)
             self.assertIn("avatar_url", u)
             self.assertIn("creation_ts", u)
+            self.assertIn("last_seen_ts", u)
 
     def _create_users(self, number_users: int) -> None:
         """
@@ -1477,6 +1583,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         sync.register_servlets,
         register.register_servlets,
+        user_directory.register_servlets,
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -1786,8 +1893,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             )
 
         # Set monthly active users to the limit
-        self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.server.max_mau_value)
+        self.store.get_monthly_active_count = AsyncMock(
+            return_value=self.hs.config.server.max_mau_value
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -1823,8 +1930,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         handler = self.hs.get_registration_handler()
 
         # Set monthly active users to the limit
-        self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.server.max_mau_value)
+        self.store.get_monthly_active_count = AsyncMock(
+            return_value=self.hs.config.server.max_mau_value
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -2464,6 +2571,105 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # This key was removed intentionally. Ensure it is not accidentally re-included.
         self.assertNotIn("password_hash", channel.json_body)
 
+    def test_locked_user(self) -> None:
+        # User can sync
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/v3/sync",
+            access_token=self.other_user_token,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        # Lock user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"locked": True},
+        )
+
+        # User is not authorized to sync anymore
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/v3/sync",
+            access_token=self.other_user_token,
+        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.USER_LOCKED, channel.json_body["errcode"])
+        self.assertTrue(channel.json_body["soft_logout"])
+
+    @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
+    def test_locked_user_not_in_user_dir(self) -> None:
+        # User is available in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
+        # Lock user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"locked": True},
+        )
+
+        # User is not available anymore in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(0, len(channel.json_body["results"]))
+
+    @override_config(
+        {
+            "user_directory": {
+                "enabled": True,
+                "search_all_users": True,
+                "show_locked_users": True,
+            }
+        }
+    )
+    def test_locked_user_in_user_dir_with_show_locked_users_option(self) -> None:
+        # User is available in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
+        # Lock user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"locked": True},
+        )
+
+        # User is still available in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
     @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
     def test_change_name_deactivate_user_user_directory(self) -> None:
         """
@@ -2888,6 +3094,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("consent_version", content)
         self.assertIn("consent_ts", content)
         self.assertIn("external_ids", content)
+        self.assertIn("last_seen_ts", content)
 
         # This key was removed intentionally. Ensure it is not accidentally re-included.
         self.assertNotIn("password_hash", content)

@@ -18,10 +18,8 @@ Utilities for running the unit tests
 import json
 import sys
 import warnings
-from asyncio import Future
 from binascii import unhexlify
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, TypeVar
-from unittest.mock import Mock
+from typing import TYPE_CHECKING, Awaitable, Callable, Tuple, TypeVar
 
 import attr
 import zope.interface
@@ -57,26 +55,11 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
     raise Exception("awaitable has not yet completed")
 
 
-def make_awaitable(result: TV) -> Awaitable[TV]:
-    """
-    Makes an awaitable, suitable for mocking an `async` function.
-    This uses Futures as they can be awaited multiple times so can be returned
-    to multiple callers.
-    """
-    future: Future[TV] = Future()
-    future.set_result(result)
-    return future
-
-
 def setup_awaitable_errors() -> Callable[[], None]:
     """
     Convert warnings from a non-awaited coroutines into errors.
     """
     warnings.simplefilter("error", RuntimeWarning)
-
-    # unraisablehook was added in Python 3.8.
-    if not hasattr(sys, "unraisablehook"):
-        return lambda: None
 
     # State shared between unraisablehook and check_for_unraisable_exceptions.
     unraisable_exceptions = []
@@ -98,18 +81,6 @@ def setup_awaitable_errors() -> Callable[[], None]:
     sys.unraisablehook = unraisablehook
 
     return cleanup
-
-
-def simple_async_mock(
-    return_value: Optional[TV] = None, raises: Optional[Exception] = None
-) -> Mock:
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args: Any, **kwargs: Any) -> Optional[TV]:
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
 
 
 # Type ignore: it does not fully implement IResponse, but is good enough for tests

@@ -19,6 +19,7 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
+    Counter,
     Dict,
     Iterable,
     List,
@@ -27,8 +28,6 @@ from typing import (
     Union,
     cast,
 )
-
-from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
@@ -108,6 +107,7 @@ class UserSortOrder(Enum):
     AVATAR_URL = "avatar_url"
     SHADOW_BANNED = "shadow_banned"
     CREATION_TS = "creation_ts"
+    LAST_SEEN_TS = "last_seen_ts"
 
 
 class StatsStore(StateDeltasStore):

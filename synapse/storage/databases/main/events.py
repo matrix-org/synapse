@@ -127,8 +127,6 @@ class PersistEventsStore:
         self._backfill_id_gen: AbstractStreamIdGenerator = self.store._backfill_id_gen
         self._stream_id_gen: AbstractStreamIdGenerator = self.store._stream_id_gen
 
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
-
     @trace
     async def _persist_events_and_state_updates(
         self,
@@ -980,26 +978,12 @@ class PersistEventsStore:
         """Persist the mapping from transaction IDs to event IDs (if defined)."""
 
         inserted_ts = self._clock.time_msec()
-        to_insert_token_id: List[Tuple[str, str, str, int, str, int]] = []
         to_insert_device_id: List[Tuple[str, str, str, str, str, int]] = []
         for event, _ in events_and_contexts:
             txn_id = getattr(event.internal_metadata, "txn_id", None)
-            token_id = getattr(event.internal_metadata, "token_id", None)
             device_id = getattr(event.internal_metadata, "device_id", None)
 
             if txn_id is not None:
-                if token_id is not None:
-                    to_insert_token_id.append(
-                        (
-                            event.event_id,
-                            event.room_id,
-                            event.sender,
-                            token_id,
-                            txn_id,
-                            inserted_ts,
-                        )
-                    )
-
                 if device_id is not None:
                     to_insert_device_id.append(
                         (
@@ -1012,28 +996,8 @@ class PersistEventsStore:
                         )
                     )
 
-        # Pre-MSC3970, we rely on the access_token_id to scope the txn_id for events.
-        # Since this is an experimental flag, we still store the mapping even if the
-        # flag is disabled.
-        if to_insert_token_id:
-            self.db_pool.simple_insert_many_txn(
-                txn,
-                table="event_txn_id",
-                keys=(
-                    "event_id",
-                    "room_id",
-                    "user_id",
-                    "token_id",
-                    "txn_id",
-                    "inserted_ts",
-                ),
-                values=to_insert_token_id,
-            )
-
-        # With MSC3970, we rely on the device_id instead to scope the txn_id for events.
-        # We're only inserting if MSC3970 is *enabled*, because else the pre-MSC3970
-        # behaviour would allow for a UNIQUE constraint violation on this table
-        if to_insert_device_id and self._msc3970_enabled:
+        # Synapse relies on the device_id to scope transactions for events..
+        if to_insert_device_id:
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="event_txn_id_device_id",
@@ -1674,7 +1638,7 @@ class PersistEventsStore:
             if self._ephemeral_messages_enabled:
                 # If there's an expiry timestamp on the event, store it.
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-                if type(expiry_ts) is int and not event.is_state():
+                if type(expiry_ts) is int and not event.is_state():  # noqa: E721
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
 
         # Insert into the room_memberships table.
@@ -2042,10 +2006,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and type(event.content["min_lifetime"]) is not int
+                and type(event.content["min_lifetime"]) is not int  # noqa: E721
             ) or (
                 "max_lifetime" in event.content
-                and type(event.content["max_lifetime"]) is not int
+                and type(event.content["max_lifetime"]) is not int  # noqa: E721
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return

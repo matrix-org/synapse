@@ -39,7 +39,7 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
-from synapse.handlers.worker_lock import DELETE_ROOM_LOCK_NAME
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -112,8 +112,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._join_rate_limiter_local = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_joins_local.per_second,
-            burst_count=hs.config.ratelimiting.rc_joins_local.burst_count,
+            cfg=hs.config.ratelimiting.rc_joins_local,
         )
         # Tracks joins from local users to rooms this server isn't a member of.
         # I.e. joins this server makes by requesting /make_join /send_join from
@@ -121,8 +120,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._join_rate_limiter_remote = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_joins_remote.per_second,
-            burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
+            cfg=hs.config.ratelimiting.rc_joins_remote,
         )
         # TODO: find a better place to keep this Ratelimiter.
         #   It needs to be
@@ -135,8 +133,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._join_rate_per_room_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_joins_per_room.per_second,
-            burst_count=hs.config.ratelimiting.rc_joins_per_room.burst_count,
+            cfg=hs.config.ratelimiting.rc_joins_per_room,
         )
 
         # Ratelimiter for invites, keyed by room (across all issuers, all
@@ -144,8 +141,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._invites_per_room_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
-            burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
+            cfg=hs.config.ratelimiting.rc_invites_per_room,
         )
 
         # Ratelimiter for invites, keyed by recipient (across all rooms, all
@@ -153,8 +149,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._invites_per_recipient_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
-            burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
+            cfg=hs.config.ratelimiting.rc_invites_per_user,
         )
 
         # Ratelimiter for invites, keyed by issuer (across all rooms, all
@@ -162,21 +157,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._invites_per_issuer_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_invites_per_issuer.per_second,
-            burst_count=hs.config.ratelimiting.rc_invites_per_issuer.burst_count,
+            cfg=hs.config.ratelimiting.rc_invites_per_issuer,
         )
 
         self._third_party_invite_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_third_party_invite.per_second,
-            burst_count=hs.config.ratelimiting.rc_third_party_invite.burst_count,
+            cfg=hs.config.ratelimiting.rc_third_party_invite,
         )
 
         self.request_ratelimiter = hs.get_request_ratelimiter()
         hs.get_notifier().add_new_join_in_room_callback(self._on_user_joined_room)
-
-        self._msc3970_enabled = hs.config.experimental.msc3970_enabled
 
     def _on_user_joined_room(self, event_id: str, room_id: str) -> None:
         """Notify the rate limiter that a room join has occurred.
@@ -418,29 +409,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # do this check just before we persist an event as well, but may as well
         # do it up front for efficiency.)
         if txn_id:
-            existing_event_id = None
-            if self._msc3970_enabled and requester.device_id:
-                # When MSC3970 is enabled, we lookup for events sent by the same device
-                # first, and fallback to the old behaviour if none were found.
-                existing_event_id = (
-                    await self.store.get_event_id_from_transaction_id_and_device_id(
-                        room_id,
-                        requester.user.to_string(),
-                        requester.device_id,
-                        txn_id,
-                    )
+            existing_event_id = (
+                await self.event_creation_handler.get_event_id_from_transaction(
+                    requester, txn_id, room_id
                 )
-
-            if requester.access_token_id and not existing_event_id:
-                existing_event_id = (
-                    await self.store.get_event_id_from_transaction_id_and_token_id(
-                        room_id,
-                        requester.user.to_string(),
-                        requester.access_token_id,
-                        txn_id,
-                    )
-                )
-
+            )
             if existing_event_id:
                 event_pos = await self.store.get_position_for_event(existing_event_id)
                 return existing_event_id, event_pos.stream
@@ -641,7 +614,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         async with self.member_as_limiter.queue(as_id):
             async with self.member_linearizer.queue(key):
                 async with self._worker_lock_handler.acquire_read_write_lock(
-                    DELETE_ROOM_LOCK_NAME, room_id, write=False
+                    NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
                 ):
                     with opentracing.start_active_span("update_membership_locked"):
                         result = await self.update_membership_locked(

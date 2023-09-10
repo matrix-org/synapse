@@ -3,7 +3,7 @@
 A structured logging system can be useful when your logs are destined for a
 machine to parse and process. By maintaining its machine-readable characteristics,
 it enables more efficient searching and aggregations when consumed by software
-such as the "ELK stack".
+such as the [ELK stack](https://opensource.com/article/18/9/open-source-log-aggregation-tools).
 
 Synapse's structured logging system is configured via the file that Synapse's
 `log_config` config option points to. The file should include a formatter which

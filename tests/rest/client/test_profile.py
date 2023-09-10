@@ -68,6 +68,18 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         res = self._get_displayname()
         self.assertEqual(res, "test")
 
+    def test_set_displayname_with_extra_spaces(self) -> None:
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/displayname" % (self.owner,),
+            content={"displayname": "  test  "},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        res = self._get_displayname()
+        self.assertEqual(res, "test")
+
     def test_set_displayname_noauth(self) -> None:
         channel = self.make_request(
             "PUT",

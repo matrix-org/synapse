@@ -13,14 +13,13 @@
 # limitations under the License.
 import re
 from typing import Any, Generator
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.internet import defer
 
 from synapse.appservice import ApplicationService, Namespace
 
 from tests import unittest
-from tests.test_utils import simple_async_mock
 
 
 def _regex(regex: str, exclusive: bool = True) -> Namespace:
@@ -43,8 +42,8 @@ class ApplicationServiceTestCase(unittest.TestCase):
         )
 
         self.store = Mock()
-        self.store.get_aliases_for_room = simple_async_mock([])
-        self.store.get_local_users_in_room = simple_async_mock([])
+        self.store.get_aliases_for_room = AsyncMock(return_value=[])
+        self.store.get_local_users_in_room = AsyncMock(return_value=[])
 
     @defer.inlineCallbacks
     def test_regex_user_id_prefix_match(
@@ -127,10 +126,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org")
         )
-        self.store.get_aliases_for_room = simple_async_mock(
-            ["#irc_foobar:matrix.org", "#athing:matrix.org"]
+        self.store.get_aliases_for_room = AsyncMock(
+            return_value=["#irc_foobar:matrix.org", "#athing:matrix.org"]
         )
-        self.store.get_local_users_in_room = simple_async_mock([])
+        self.store.get_local_users_in_room = AsyncMock(return_value=[])
         self.assertTrue(
             (
                 yield self.service.is_interested_in_event(
@@ -182,10 +181,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org")
         )
-        self.store.get_aliases_for_room = simple_async_mock(
-            ["#xmpp_foobar:matrix.org", "#athing:matrix.org"]
+        self.store.get_aliases_for_room = AsyncMock(
+            return_value=["#xmpp_foobar:matrix.org", "#athing:matrix.org"]
         )
-        self.store.get_local_users_in_room = simple_async_mock([])
+        self.store.get_local_users_in_room = AsyncMock(return_value=[])
         self.assertFalse(
             (
                 yield defer.ensureDeferred(
@@ -205,8 +204,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
         )
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@irc_foobar:matrix.org"
-        self.store.get_aliases_for_room = simple_async_mock(["#irc_barfoo:matrix.org"])
-        self.store.get_local_users_in_room = simple_async_mock([])
+        self.store.get_aliases_for_room = AsyncMock(
+            return_value=["#irc_barfoo:matrix.org"]
+        )
+        self.store.get_local_users_in_room = AsyncMock(return_value=[])
         self.assertTrue(
             (
                 yield self.service.is_interested_in_event(
@@ -235,10 +236,10 @@ class ApplicationServiceTestCase(unittest.TestCase):
     def test_member_list_match(self) -> Generator["defer.Deferred[Any]", object, None]:
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         # Note that @irc_fo:here is the AS user.
-        self.store.get_local_users_in_room = simple_async_mock(
-            ["@alice:here", "@irc_fo:here", "@bob:here"]
+        self.store.get_local_users_in_room = AsyncMock(
+            return_value=["@alice:here", "@irc_fo:here", "@bob:here"]
         )
-        self.store.get_aliases_for_room = simple_async_mock([])
+        self.store.get_aliases_for_room = AsyncMock(return_value=[])
 
         self.event.sender = "@xmpp_foobar:matrix.org"
         self.assertTrue(

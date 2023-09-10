@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from unittest.mock import Mock
+import logging
+from unittest.mock import AsyncMock, Mock
 
 import yaml
 
@@ -32,7 +32,6 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable, simple_async_mock
 from tests.unittest import override_config
 
 
@@ -331,6 +330,28 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.update_handler.side_effect = update_short
         self.get_success(self.updates.do_next_background_update(False))
 
+    def test_failed_update_logs_exception_details(self) -> None:
+        needle = "RUH ROH RAGGY"
+
+        def failing_update(progress: JsonDict, count: int) -> int:
+            raise Exception(needle)
+
+        self.update_handler.side_effect = failing_update
+        self.update_handler.reset_mock()
+
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                values={"update_name": "test_update", "progress_json": "{}"},
+            )
+        )
+
+        with self.assertLogs(level=logging.ERROR) as logs:
+            # Expect a back-to-back RuntimeError to be raised
+            self.get_failure(self.updates.run_background_updates(False), RuntimeError)
+
+        self.assertTrue(any(needle in log for log in logs.output), logs.output)
+
 
 class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -348,8 +369,8 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # Mock out the AsyncContextManager
         class MockCM:
-            __aenter__ = simple_async_mock(return_value=None)
-            __aexit__ = simple_async_mock(return_value=None)
+            __aenter__ = AsyncMock(return_value=None)
+            __aexit__ = AsyncMock(return_value=None)
 
         self._update_ctx_manager = MockCM
 
@@ -363,9 +384,9 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         # Register the callbacks with more mocks
         self.hs.get_module_api().register_background_update_controller_callbacks(
             on_update=self._on_update,
-            min_batch_size=Mock(return_value=make_awaitable(self._default_batch_size)),
-            default_batch_size=Mock(
-                return_value=make_awaitable(self._default_batch_size),
+            min_batch_size=AsyncMock(return_value=self._default_batch_size),
+            default_batch_size=AsyncMock(
+                return_value=self._default_batch_size,
             ),
         )
 
