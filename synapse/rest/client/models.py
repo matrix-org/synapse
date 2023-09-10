@@ -11,9 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from pydantic import Extra, StrictInt, StrictStr, constr, validator
+from pydantic import (
+    ConfigDict,
+    StrictInt,
+    StrictStr,
+    constr,
+    field_validator,
+    model_validator,
+)
 
 from synapse.rest.models import RequestBodyModel
 from synapse.util.threepids import validate_email
@@ -29,8 +36,7 @@ class AuthenticationData(RequestBodyModel):
     `.dict(exclude_unset=True)` to access them.
     """
 
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
     session: Optional[StrictStr] = None
     type: Optional[StrictStr] = None
@@ -41,7 +47,7 @@ if TYPE_CHECKING:
 else:
     # See also assert_valid_client_secret()
     ClientSecretStr = constr(
-        regex="[0-9a-zA-Z.=_-]",  # noqa: F722
+        pattern="[0-9a-zA-Z.=_-]",  # noqa: F722
         min_length=1,
         max_length=255,
         strict=True,
@@ -50,18 +56,18 @@ else:
 
 class ThreepidRequestTokenBody(RequestBodyModel):
     client_secret: ClientSecretStr
-    id_server: Optional[StrictStr]
-    id_access_token: Optional[StrictStr]
-    next_link: Optional[StrictStr]
+    id_server: Optional[StrictStr] = None
+    id_access_token: Optional[StrictStr] = None
+    next_link: Optional[StrictStr] = None
     send_attempt: StrictInt
 
-    @validator("id_access_token", always=True)
-    def token_required_for_identity_server(
-        cls, token: Optional[str], values: Dict[str, object]
-    ) -> Optional[str]:
-        if values.get("id_server") is not None and token is None:
+    @model_validator(mode="before")
+    def token_required_for_identity_server(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Ensure that an access token is provided when a server is provided."""
+        if data.get("id_server") is not None and data.get("id_access_token") is None:
             raise ValueError("id_access_token is required if an id_server is supplied.")
-        return token
+
+        return data
 
 
 class EmailRequestTokenBody(ThreepidRequestTokenBody):
@@ -72,14 +78,14 @@ class EmailRequestTokenBody(ThreepidRequestTokenBody):
     # know the exact spelling (eg. upper and lower case) of address in the database.
     # Without this, an email stored in the database as "foo@bar.com" would cause
     # user requests for "FOO@bar.com" to raise a Not Found error.
-    _email_validator = validator("email", allow_reuse=True)(validate_email)
+    email_validator = field_validator("email")(validate_email)
 
 
 if TYPE_CHECKING:
     ISO3116_1_Alpha_2 = StrictStr
 else:
     # Per spec: two-letter uppercase ISO-3166-1-alpha-2
-    ISO3116_1_Alpha_2 = constr(regex="[A-Z]{2}", strict=True)
+    ISO3116_1_Alpha_2 = constr(pattern="[A-Z]{2}", strict=True)
 
 
 class MsisdnRequestTokenBody(ThreepidRequestTokenBody):

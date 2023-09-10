@@ -807,21 +807,21 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     def test_add_email_no_at(self) -> None:
         self._request_token_invalid_email(
             "address-without-at.bar",
-            expected_errcode=Codes.BAD_JSON,
+            expected_errcode=Codes.INVALID_PARAM,
             expected_error="Unable to parse email address",
         )
 
     def test_add_email_two_at(self) -> None:
         self._request_token_invalid_email(
             "foo@foo@test.bar",
-            expected_errcode=Codes.BAD_JSON,
+            expected_errcode=Codes.INVALID_PARAM,
             expected_error="Unable to parse email address",
         )
 
     def test_add_email_bad_format(self) -> None:
         self._request_token_invalid_email(
             "user@bad.example.net@good.example.com",
-            expected_errcode=Codes.BAD_JSON,
+            expected_errcode=Codes.INVALID_PARAM,
             expected_error="Unable to parse email address",
         )
 

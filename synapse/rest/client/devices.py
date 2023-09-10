@@ -17,7 +17,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from pydantic import Extra, StrictStr
+from pydantic import ConfigDict, StrictStr
 
 from synapse.api import errors
 from synapse.api.errors import NotFoundError, SynapseError, UnrecognizedRequestError
@@ -90,7 +90,7 @@ class DeleteDevicesRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
 
     class PostBody(RequestBodyModel):
-        auth: Optional[AuthenticationData]
+        auth: Optional[AuthenticationData] = None
         devices: List[StrictStr]
 
     @interactive_auth_handler
@@ -104,7 +104,7 @@ class DeleteDevicesRestServlet(RestServlet):
                 # TODO: Can/should we remove this fallback now?
                 # deal with older clients which didn't pass a JSON dict
                 # the same as those that pass an empty dict
-                body = self.PostBody.parse_obj({})
+                body = self.PostBody.model_validate({}, strict=True)
             else:
                 raise e
 
@@ -163,7 +163,7 @@ class DeviceRestServlet(RestServlet):
         return 200, device
 
     class DeleteBody(RequestBodyModel):
-        auth: Optional[AuthenticationData]
+        auth: Optional[AuthenticationData] = None
 
     @interactive_auth_handler
     async def on_DELETE(
@@ -182,7 +182,7 @@ class DeviceRestServlet(RestServlet):
                 # TODO: can/should we remove this fallback now?
                 # deal with older clients which didn't pass a JSON dict
                 # the same as those that pass an empty dict
-                body = self.DeleteBody.parse_obj({})
+                body = self.DeleteBody.model_validate({}, strict=True)
             else:
                 raise
 
@@ -202,7 +202,7 @@ class DeviceRestServlet(RestServlet):
         return 200, {}
 
     class PutBody(RequestBodyModel):
-        display_name: Optional[StrictStr]
+        display_name: Optional[StrictStr] = None
 
     async def on_PUT(
         self, request: SynapseRequest, device_id: str
@@ -222,8 +222,7 @@ class DehydratedDeviceDataModel(RequestBodyModel):
     Expects other freeform fields. Use .dict() to access them.
     """
 
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
     algorithm: StrictStr
 
@@ -292,7 +291,7 @@ class DehydratedDeviceServlet(RestServlet):
 
     class PutBody(RequestBodyModel):
         device_data: DehydratedDeviceDataModel
-        initial_device_display_name: Optional[StrictStr]
+        initial_device_display_name: Optional[StrictStr] = None
 
     async def on_PUT(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         submission = parse_and_validate_json_object_from_request(request, self.PutBody)
@@ -518,8 +517,7 @@ class DehydratedDeviceV2Servlet(RestServlet):
         device_id: StrictStr
         initial_device_display_name: Optional[StrictStr]
 
-        class Config:
-            extra = Extra.allow
+        model_config = ConfigDict(extra="allow")
 
     async def on_PUT(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         submission = parse_and_validate_json_object_from_request(request, self.PutBody)

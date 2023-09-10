@@ -36,11 +36,10 @@ import textwrap
 import traceback
 import unittest.mock
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Set, Type, TypeVar
+from typing import Callable, Dict, Generator, List, Set, TypeVar
 
 from parameterized import parameterized
 from pydantic import BaseModel as PydanticBaseModel, conbytes, confloat, conint, constr
-from pydantic.typing import get_args
 from typing_extensions import ParamSpec
 
 logger = logging.getLogger(__name__)
@@ -50,14 +49,6 @@ CONSTRAINED_TYPE_FACTORIES_WITH_STRICT_FLAG: List[Callable] = [
     conbytes,
     conint,
     confloat,
-]
-
-TYPES_THAT_PYDANTIC_WILL_COERCE_TO = [
-    str,
-    bytes,
-    int,
-    float,
-    bool,
 ]
 
 
@@ -97,41 +88,11 @@ def make_wrapper(factory: Callable[P, R]) -> Callable[P, R]:
     return wrapper
 
 
-def field_type_unwanted(type_: Any) -> bool:
-    """Very rough attempt to detect if a type is unwanted as a Pydantic annotation.
-
-    At present, we exclude types which will coerce, or any generic type involving types
-    which will coerce."""
-    logger.debug("Is %s unwanted?")
-    if type_ in TYPES_THAT_PYDANTIC_WILL_COERCE_TO:
-        logger.debug("yes")
-        return True
-    logger.debug("Maybe. Subargs are %s", get_args(type_))
-    rv = any(field_type_unwanted(t) for t in get_args(type_))
-    logger.debug("Conclusion: %s %s unwanted", type_, "is" if rv else "is not")
-    return rv
-
-
 class PatchedBaseModel(PydanticBaseModel):
     """A patched version of BaseModel that inspects fields after models are defined.
 
     We complain loudly if we see an unwanted type.
-
-    Beware: ModelField.type_ is presumably private; this is likely to be very brittle.
     """
-
-    @classmethod
-    def __init_subclass__(cls: Type[PydanticBaseModel], **kwargs: object):
-        for field in cls.__fields__.values():
-            # Note that field.type_ and field.outer_type are computed based on the
-            # annotation type, see pydantic.fields.ModelField._type_analysis
-            if field_type_unwanted(field.outer_type_):
-                # TODO: this only reports the first bad field. Can we find all bad ones
-                #  and report them all?
-                raise FieldHasUnwantedTypeException(
-                    f"{cls.__module__}.{cls.__qualname__} has field '{field.name}' "
-                    f"with unwanted type `{field.outer_type_}`"
-                )
 
 
 @contextmanager
