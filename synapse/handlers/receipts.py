@@ -93,7 +93,7 @@ class ReceiptsHandler:
 
                     # Check if these receipts apply to a thread.
                     data = user_values.get("data", {})
-                    thread_id = data.get("thread_id")
+                    thread_id = data.pop("thread_id")
                     # If the thread ID is invalid, consider it missing.
                     if not isinstance(thread_id, str):
                         thread_id = None
