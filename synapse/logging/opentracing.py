@@ -991,9 +991,7 @@ def trace_with_opname(
         if not opentracing:
             return func
 
-        return _custom_sync_async_decorator(
-            func, _wrapping_logic
-        )
+        return _custom_sync_async_decorator(func, _wrapping_logic)
 
     return _decorator
 
