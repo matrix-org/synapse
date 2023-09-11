@@ -804,6 +804,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
             event_ids,
             thread_id,
             data,
+            # Use READ_COMMITTED to avoid 'could not serialize access due to concurrent
+            # update' Postgres errors which lead to rollbacks and re-dos.
+            isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
         max_persisted_id = self._receipts_id_gen.get_current_token()
