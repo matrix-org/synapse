@@ -58,7 +58,10 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.cancellation import cancellable
 from synapse.util.metrics import measure_func
-from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.retryutils import (
+    NotRetryingDestination,
+    filter_destinations_by_retry_limiter,
+)
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1269,8 +1272,18 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
             self._resync_retry_in_progress = True
             # Get all of the users that need resyncing.
             need_resync = await self.store.get_user_ids_requiring_device_list_resync()
+
+            # Filter out users whose host is marked as "down" up front.
+            hosts = await filter_destinations_by_retry_limiter(
+                {get_domain_from_id(u) for u in need_resync}, self.clock, self.store
+            )
+            hosts = set(hosts)
+
             # Iterate over the set of user IDs.
             for user_id in need_resync:
+                if get_domain_from_id(user_id) not in hosts:
+                    continue
+
                 try:
                     # Try to resync the current user's devices list.
                     result = (await self.multi_user_device_resync([user_id], False))[
