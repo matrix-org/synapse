@@ -155,6 +155,14 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
+#### AlpineLinux
+
+In the AlpineLinux packages exist [official maintained package](https://pkgs.alpinelinux.org/packages?name=synapse&branch=edge), so you can just install it with:
+
+```sh
+sudo apk add synapse
+```
+
 #### Void Linux
 
 Synapse can be found in the void repositories as
