@@ -95,6 +95,7 @@ StrCollection = Union[Tuple[str, ...], List[str], AbstractSet[str]]
 #
 # Unlike StrCollection, StrSequence is an ordered collection of strings.
 StrSequence = Union[Tuple[str, ...], List[str]]
+BytesSequence = Union[Tuple[bytes, ...], List[bytes]]
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
