@@ -991,10 +991,8 @@ def trace_with_opname(
         if not opentracing:
             return func
 
-        # type-ignore: mypy seems to be confused by the ParamSpecs here.
-        # I think the problem is https://github.com/python/mypy/issues/12909
         return _custom_sync_async_decorator(
-            func, _wrapping_logic  # type: ignore[arg-type]
+            func, _wrapping_logic
         )
 
     return _decorator
@@ -1040,9 +1038,7 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         set_tag(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 
-    # type-ignore: mypy seems to be confused by the ParamSpecs here.
-    # I think the problem is https://github.com/python/mypy/issues/12909
-    return _custom_sync_async_decorator(func, _wrapping_logic)  # type: ignore[arg-type]
+    return _custom_sync_async_decorator(func, _wrapping_logic)
 
 
 @contextlib.contextmanager
