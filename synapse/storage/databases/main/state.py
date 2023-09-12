@@ -14,7 +14,17 @@
 # limitations under the License.
 import collections.abc
 import logging
-from typing import TYPE_CHECKING, Any, Collection, Dict, Iterable, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import attr
 
@@ -372,7 +382,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     )
     async def _get_state_group_for_events(
         self, event_ids: Collection[str]
-    ) -> Dict[str, int]:
+    ) -> Mapping[str, int]:
         """Returns mapping event_id -> state_group.
 
         Raises:

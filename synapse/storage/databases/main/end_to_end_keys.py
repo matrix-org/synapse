@@ -846,7 +846,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     )
     async def _get_bare_e2e_cross_signing_keys_bulk(
         self, user_ids: Iterable[str]
-    ) -> Dict[str, Optional[Mapping[str, JsonDict]]]:
+    ) -> Mapping[str, Optional[Mapping[str, JsonDict]]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if
         the signatures for the calling user need to be fetched.
@@ -1026,7 +1026,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @cancellable
     async def get_e2e_cross_signing_keys_bulk(
         self, user_ids: List[str], from_user_id: Optional[str] = None
-    ) -> Dict[str, Optional[Mapping[str, JsonDict]]]:
+    ) -> Mapping[str, Optional[Mapping[str, JsonDict]]]:
         """Returns the cross-signing keys for a set of users.
 
         Args:
@@ -1043,7 +1043,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         if from_user_id:
             result = cast(
-                Dict[str, Optional[Mapping[str, JsonDict]]],
+                Mapping[str, Optional[Mapping[str, JsonDict]]],
                 await self.db_pool.runInteraction(
                     "get_e2e_cross_signing_signatures",
                     self._get_e2e_cross_signing_signatures_txn,
