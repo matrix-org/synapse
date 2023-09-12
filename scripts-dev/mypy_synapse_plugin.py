@@ -157,6 +157,8 @@ def check_is_cacheable(
     return_type = deferred_return_type.args[0]
 
     verbose = ctx.api.options.verbosity >= 1
+    # TODO Technically a cachedList only needs immutable values, but forcing them
+    # to return Mapping instead of Dict is fine.
     ok, note = is_cacheable(return_type, signature, verbose)
 
     if ok:

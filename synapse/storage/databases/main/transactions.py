@@ -14,7 +14,7 @@
 
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Iterable, List, Mapping, Optional, Tuple, cast
 
 import attr
 from canonicaljson import encode_canonical_json
@@ -210,7 +210,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
     )
     async def get_destination_retry_timings_batch(
         self, destinations: StrCollection
-    ) -> Dict[str, Optional[DestinationRetryTimings]]:
+    ) -> Mapping[str, Optional[DestinationRetryTimings]]:
         rows = await self.db_pool.simple_select_many_batch(
             table="destinations",
             iterable=destinations,

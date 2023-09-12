@@ -353,7 +353,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     async def _get_linearized_receipts_for_rooms(
         self, room_ids: Collection[str], to_key: int, from_key: Optional[int] = None
-    ) -> Dict[str, Sequence[JsonDict]]:
+    ) -> Mapping[str, Sequence[JsonDict]]:
         if not room_ids:
             return {}
 
