@@ -1,3 +1,15 @@
+# Synapse 1.92.0 (2023-09-12)
+
+### Bugfixes
+
+- Revert [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) introspection cache, admin impersonation and account lock. ([\#16258](https://github.com/matrix-org/synapse/issues/16258))
+
+### Internal Changes
+
+- Fix incorrect docstring for `Ratelimiter`. ([\#16255](https://github.com/matrix-org/synapse/issues/16255))
+- Update the release script to work on macOS. ([\#16266](https://github.com/matrix-org/synapse/issues/16266))
+
+
 # Synapse 1.91.2 (2023-09-06)
 
 ### Bugfixes
