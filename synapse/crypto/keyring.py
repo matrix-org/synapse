@@ -23,12 +23,7 @@ from signedjson.key import (
     get_verify_key,
     is_signing_algorithm_supported,
 )
-from signedjson.sign import (
-    SignatureVerifyException,
-    encode_canonical_json,
-    signature_ids,
-    verify_signed_json,
-)
+from signedjson.sign import SignatureVerifyException, signature_ids, verify_signed_json
 from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
@@ -596,24 +591,12 @@ class BaseV2KeyFetcher(KeyFetcher):
                     verify_key=verify_key, valid_until_ts=key_data["expired_ts"]
                 )
 
-        key_json_bytes = encode_canonical_json(response_json)
-
-        await make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store.store_server_keys_json,
-                        server_name=server_name,
-                        key_id=key_id,
-                        from_server=from_server,
-                        ts_now_ms=time_added_ms,
-                        ts_expires_ms=ts_valid_until_ms,
-                        key_json_bytes=key_json_bytes,
-                    )
-                    for key_id in verify_keys
-                ],
-                consumeErrors=True,
-            ).addErrback(unwrapFirstError)
+        await self.store.store_server_keys_response(
+            server_name=server_name,
+            from_server=from_server,
+            ts_added_ms=time_added_ms,
+            verify_keys=verify_keys,
+            response_json=response_json,
         )
 
         return verify_keys
@@ -774,10 +757,6 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 added_keys[dict_key] = key
 
             keys.setdefault(server_name, {}).update(processed_response)
-
-        await self.store.store_server_signature_keys(
-            perspective_name, time_now_ms, added_keys
-        )
 
         return keys
 
