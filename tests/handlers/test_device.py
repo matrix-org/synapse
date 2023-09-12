@@ -223,7 +223,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
         # queue a bunch of messages in the inbox
         requester = create_requester(sender, device_id=DEVICE_ID)
-        for i in range(0, DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT + 10):
+        for i in range(DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT + 10):
             self.get_success(
                 self.device_message_handler.send_device_message(
                     requester, "message_type", {receiver: {"*": {"val": i}}}

@@ -33,7 +33,6 @@ from typing_extensions import Literal
 
 from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, StoreError
-from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.opentracing import (
     get_active_span_text_map,
     set_tag,
@@ -760,18 +759,10 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             mapping of user_id -> device_id -> device_info.
         """
         unique_user_ids = user_ids | {user_id for user_id, _ in user_and_device_ids}
-        user_map = await self.get_device_list_last_stream_id_for_remotes(
-            list(unique_user_ids)
-        )
 
-        # We go and check if any of the users need to have their device lists
-        # resynced. If they do then we remove them from the cached list.
-        users_needing_resync = await self.get_user_ids_requiring_device_list_resync(
+        user_ids_in_cache = await self.get_users_whose_devices_are_cached(
             unique_user_ids
         )
-        user_ids_in_cache = {
-            user_id for user_id, stream_id in user_map.items() if stream_id
-        } - users_needing_resync
         user_ids_not_in_cache = unique_user_ids - user_ids_in_cache
 
         # First fetch all the users which all devices are to be returned.
@@ -792,6 +783,22 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         set_tag("not_in_cache", str(user_ids_not_in_cache))
 
         return user_ids_not_in_cache, results
+
+    async def get_users_whose_devices_are_cached(
+        self, user_ids: StrCollection
+    ) -> Set[str]:
+        """Checks which of the given users we have cached the devices for."""
+        user_map = await self.get_device_list_last_stream_id_for_remotes(user_ids)
+
+        # We go and check if any of the users need to have their device lists
+        # resynced. If they do then we remove them from the cached list.
+        users_needing_resync = await self.get_user_ids_requiring_device_list_resync(
+            user_ids
+        )
+        user_ids_in_cache = {
+            user_id for user_id, stream_id in user_map.items() if stream_id
+        } - users_needing_resync
+        return user_ids_in_cache
 
     @cached(num_args=2, tree=True)
     async def _get_cached_user_device(self, user_id: str, device_id: str) -> JsonDict:
@@ -1664,7 +1671,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self.device_id_exists_cache: LruCache[
             Tuple[str, str], Literal[True]
         ] = LruCache(cache_name="device_id_exists", max_size=10000)
-        self.config: HomeServerConfig = hs.config
 
     async def store_device(
         self,
@@ -1777,13 +1783,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
-
-        # TODO: don't nuke the entire cache once there is a way to associate
-        #  device_id -> introspection_token
-        if self.config.experimental.msc3861.enabled:
-            # mypy ignore - the token cache is defined on MSC3861DelegatedAuth
-            self.auth._token_cache.invalidate_all()  # type: ignore[attr-defined]
-            await self.stream_introspection_token_invalidation((None,))
 
     async def update_device(
         self, user_id: str, device_id: str, new_display_name: Optional[str] = None

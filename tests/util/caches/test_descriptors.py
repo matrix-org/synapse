@@ -623,14 +623,14 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         a = A()
 
-        for k in range(0, 12):
+        for k in range(12):
             yield a.func(k)
 
         self.assertEqual(callcount[0], 12)
 
         # There must have been at least 2 evictions, meaning if we calculate
         # all 12 values again, we must get called at least 2 more times
-        for k in range(0, 12):
+        for k in range(12):
             yield a.func(k)
 
         self.assertTrue(
