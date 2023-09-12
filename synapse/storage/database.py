@@ -1193,6 +1193,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
+        where_clause: Optional[str] = None,
         desc: str = "simple_upsert",
     ) -> bool:
         """Insert a row with values + insertion_values; on conflict, update with values.
@@ -1243,6 +1244,7 @@ class DatabasePool:
             keyvalues: The unique key columns and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            where_clause: An index predicate to apply to the upsert.
             desc: description of the transaction, for logging and metrics
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
@@ -1263,6 +1265,7 @@ class DatabasePool:
                     keyvalues,
                     values,
                     insertion_values,
+                    where_clause,
                     db_autocommit=autocommit,
                 )
             except self.engine.module.IntegrityError as e:
