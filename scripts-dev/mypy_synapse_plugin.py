@@ -59,10 +59,10 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         3. an optional keyword argument `on_invalidated` should be added.
     """
 
-    # First we mark this as a bound function signature.
+    # 1. Mark this as a bound function signature.
     signature: CallableType = bind_self(ctx.default_signature)
 
-    # Secondly, we remove any "cache_context" args.
+    # 2. Remove any "cache_context" args.
     #
     # Note: We should be only doing this if `cache_context=True` is set, but if
     # it isn't then the code will raise an exception when its called anyway, so
@@ -82,7 +82,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         arg_names.pop(context_arg_index)
         arg_kinds.pop(context_arg_index)
 
-    # Third, we add an optional "on_invalidate" argument.
+    # 3. Add an optional "on_invalidate" argument.
     #
     # This is a either
     # - a callable which accepts no input and returns nothing, or
@@ -104,7 +104,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     arg_names.append("on_invalidate")
     arg_kinds.append(ARG_NAMED_OPT)  # Arg is an optional kwarg.
 
-    # Finally we ensure the return type is a Deferred.
+    # 4. Ensure the return type is a Deferred.
     if (
         isinstance(signature.ret_type, Instance)
         and signature.ret_type.type.fullname == "twisted.internet.defer.Deferred"
@@ -141,7 +141,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         ret_type=ret_type,
     )
 
-    # 4. Complain loudly if we are returning something mutable
+    # 5. Complain loudly if we are returning something mutable
     check_is_cacheable(signature, ctx)
 
     return signature
