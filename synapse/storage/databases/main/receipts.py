@@ -795,27 +795,21 @@ class ReceiptsWorkerStore(SQLBaseStore):
             now - event_ts,
         )
 
-        await self.db_pool.runInteraction(
-            "insert_graph_receipt",
-            self._insert_graph_receipt_txn,
+        await self._insert_graph_receipt(
             room_id,
             receipt_type,
             user_id,
             event_ids,
             thread_id,
             data,
-            # Use READ_COMMITTED to avoid 'could not serialize access due to concurrent
-            # update' Postgres errors which lead to rollbacks and re-dos.
-            isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
         max_persisted_id = self._receipts_id_gen.get_current_token()
 
         return stream_id, max_persisted_id
 
-    def _insert_graph_receipt_txn(
+    async def _insert_graph_receipt(
         self,
-        txn: LoggingTransaction,
         room_id: str,
         receipt_type: str,
         user_id: str,
@@ -824,13 +818,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         data: JsonDict,
     ) -> None:
         assert self._can_write_to_receipts
-
-        txn.call_after(
-            self._get_receipts_for_user_with_orderings.invalidate,
-            (user_id, receipt_type),
-        )
-        # FIXME: This shouldn't invalidate the whole cache
-        txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
         keyvalues = {
             "room_id": room_id,
@@ -843,8 +830,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         else:
             keyvalues["thread_id"] = thread_id
 
-        self.db_pool.simple_upsert_txn(
-            txn,
+        await self.db_pool.simple_upsert(
+            desc="insert_graph_receipt",
             table="receipts_graph",
             keyvalues=keyvalues,
             values={
@@ -853,6 +840,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
             },
             where_clause=where_clause,
         )
+
+        self._get_receipts_for_user_with_orderings.invalidate((user_id, receipt_type))
+
+        # FIXME: This shouldn't invalidate the whole cache
+        self._get_linearized_receipts_for_room.invalidate((room_id,))
 
 
 class ReceiptsBackgroundUpdateStore(SQLBaseStore):
