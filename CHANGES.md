@@ -1,3 +1,8 @@
+# Synapse 1.92.1 (2023-09-12)
+
+Stop building Ubuntu Kinetic since it is EOL and repos seem to be dead.
+
+
 # Synapse 1.92.0 (2023-09-12)
 
 ### Bugfixes
