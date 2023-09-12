@@ -368,7 +368,7 @@ that contain this value. This parameter is ignored when using the <code>name</co
 </li>
 <li>
 <p><code>guests</code> - string representing a bool - Is optional and if <code>false</code> will <strong>exclude</strong> guest users.
-Defaults to <code>true</code> to include guest users.</p>
+Defaults to <code>true</code> to include guest users. This parameter is not supported when MSC3861 is enabled. <a href="https://github.com/matrix-org/synapse/pull/15582">See #15582</a></p>
 </li>
 <li>
 <p><code>admins</code> - Optional flag to filter admins. If <code>true</code>, only admins are queried. If <code>false</code>, admins are excluded from 
@@ -402,6 +402,7 @@ which guarantees a stable ordering. Valid values are:</p>
 <li><code>displayname</code> - Users are ordered alphabetically by <code>displayname</code>.</li>
 <li><code>avatar_url</code> - Users are ordered alphabetically by avatar URL.</li>
 <li><code>creation_ts</code> - Users are ordered by when the users was created in ms.</li>
+<li><code>last_seen_ts</code> - Users are ordered by when the user was lastly seen in ms.</li>
 </ul>
 </li>
 <li>
@@ -436,6 +437,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <li><code>displayname</code> - string - The user's display name if they have set one.</li>
 <li><code>avatar_url</code> - string -  The user's avatar URL if they have set one.</li>
 <li><code>creation_ts</code> - integer - The user's creation timestamp in ms.</li>
+<li><code>last_seen_ts</code> - integer - The user's last activity timestamp in ms.</li>
 </ul>
 </li>
 <li>
@@ -537,6 +539,7 @@ is set to <code>true</code>:</p>
 <li>Remove user's consent information (consent version and timestamp)</li>
 </ul>
 <h2 id="reset-password"><a class="header" href="#reset-password">Reset password</a></h2>
+<p><strong>Note:</strong> This API is disabled when MSC3861 is enabled. <a href="https://github.com/matrix-org/synapse/pull/15582">See #15582</a></p>
 <p>Changes the password of another user. This will automatically log the user out of all their devices.</p>
 <p>The api is:</p>
 <pre><code>POST /_synapse/admin/v1/reset_password/&lt;user_id&gt;
@@ -550,6 +553,7 @@ is set to <code>true</code>:</p>
 <p>The parameter <code>new_password</code> is required.
 The parameter <code>logout_devices</code> is optional and defaults to <code>true</code>.</p>
 <h2 id="get-whether-a-user-is-a-server-administrator-or-not"><a class="header" href="#get-whether-a-user-is-a-server-administrator-or-not">Get whether a user is a server administrator or not</a></h2>
+<p><strong>Note:</strong> This API is disabled when MSC3861 is enabled. <a href="https://github.com/matrix-org/synapse/pull/15582">See #15582</a></p>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/admin
 </code></pre>
@@ -559,6 +563,7 @@ The parameter <code>logout_devices</code> is optional and defaults to <code>true
 }
 </code></pre>
 <h2 id="change-whether-a-user-is-a-server-administrator-or-not"><a class="header" href="#change-whether-a-user-is-a-server-administrator-or-not">Change whether a user is a server administrator or not</a></h2>
+<p><strong>Note:</strong> This API is disabled when MSC3861 is enabled. <a href="https://github.com/matrix-org/synapse/pull/15582">See #15582</a></p>
 <p>Note that you cannot demote yourself.</p>
 <p>The api is:</p>
 <pre><code>PUT /_synapse/admin/v1/users/&lt;user_id&gt;/admin
@@ -812,6 +817,7 @@ after deleting media the remaining media have a new order.</p>
 With the parameters you can for example limit the number of files to delete at once or
 delete largest/smallest or newest/oldest files first.</p>
 <h2 id="login-as-a-user"><a class="header" href="#login-as-a-user">Login as a user</a></h2>
+<p><strong>Note:</strong> This API is disabled when MSC3861 is enabled. <a href="https://github.com/matrix-org/synapse/pull/15582">See #15582</a></p>
 <p>Get an access token that can be used to authenticate as that user. Useful for
 when admins wish to do actions on behalf of a user.</p>
 <p>The API is:</p>
