@@ -764,7 +764,7 @@ class DeviceHandler(DeviceWorkerHandler):
         old_device_id = await self.store.set_device_for_access_token(
             access_token, device_id
         )
-        await self.store.move_device_refresh_token(old_device_id, device_id)
+        await self.store.set_device_for_refresh_token(user_id, old_device_id, device_id)
         old_device = await self.store.get_device(user_id, old_device_id)
         if old_device is None:
             raise errors.NotFoundError()

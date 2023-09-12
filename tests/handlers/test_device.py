@@ -488,7 +488,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(device_data, {"device_data": {"foo": "bar"}})
 
         # Create a new login for the user and dehydrated the device
-        device_id, access_token, _expiration_time, _refresh_token = self.get_success(
+        device_id, access_token, _expiration_time, refresh_token = self.get_success(
             self.registration.register_device(
                 user_id=user_id,
                 device_id=None,
@@ -525,12 +525,10 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(user_info.device_id, retrieved_device_id)
 
         # make sure the user device has the refresh token
-        if _refresh_token:
-            self.get_success(
-                self.auth_handler.refresh_token(
-                    _refresh_token, 5 * 60 * 1000, 5 * 60 * 1000
-                )
-            )
+        assert refresh_token is not None
+        self.get_success(
+            self.auth_handler.refresh_token(refresh_token, 5 * 60 * 1000, 5 * 60 * 1000)
+        )
 
         # make sure the device has the display name that was set from the login
         res = self.get_success(self.handler.get_device(user_id, retrieved_device_id))

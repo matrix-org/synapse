@@ -2312,35 +2312,24 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
         return next_id
 
-    def _move_device_refresh_token_txn(
-        self, txn: LoggingTransaction, old_device_id: str, device_id: str
-    ) -> None:
-        """Updates rows of old_device_id with current device_id"""
-
-        self.db_pool.simple_update_txn(
-            txn,
-            "refresh_tokens",
-            {"device_id": old_device_id},
-            {"device_id": device_id},
-        )
-
-    async def move_device_refresh_token(
-        self, old_device_id: str, device_id: str
+    async def set_device_for_refresh_token(
+        self, user_id: str, old_device_id: str, device_id: str
     ) -> None:
         """Moves refresh tokens from old device to current device
 
         Args:
+            user_id: The user of the devices.
             old_device_id: The old device.
             device_id: The new device ID.
         Returns:
             None
         """
 
-        await self.db_pool.runInteraction(
-            "move_device_refresh_token",
-            self._move_device_refresh_token_txn,
-            old_device_id,
-            device_id,
+        await self.db_pool.simple_update(
+            "refresh_tokens",
+            {"user_id": user_id, "device_id": old_device_id},
+            {"device_id": device_id},
+            "set_device_for_refresh_token",
         )
 
     def _set_device_for_access_token_txn(
