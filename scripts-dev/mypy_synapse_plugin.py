@@ -174,6 +174,7 @@ def check_is_cacheable(
         ctx.api.fail(message, ctx.context, code=AT_CACHED_MUTABLE_RETURN)
 
 
+# Immutable simple values.
 IMMUTABLE_VALUE_TYPES = {
     "builtins.bool",
     "builtins.int",
@@ -182,12 +183,12 @@ IMMUTABLE_VALUE_TYPES = {
     "builtins.bytes",
 }
 
-IMMUTABLE_CONTAINER_TYPES_REQUIRING_HASHABLE_ELEMENTS = {
+# Immutable containers only if the values are also immutable.
+IMMUTABLE_CONTAINER_TYPES_REQUIRING_IMMUTABLE_ELEMENTS = {
     "builtins.frozenset",
     "typing.AbstractSet",
+    "typing.Sequence",
 }
-
-IMMUTABLE_CONTAINER_TYPES_ALLOWING_MUTABLE_ELEMENTS = {"typing.Sequence"}
 
 MUTABLE_CONTAINER_TYPES = {
     "builtins.set",
@@ -217,16 +218,13 @@ def is_cacheable(
         return True, ("may be mutable" if verbose else None)
 
     elif isinstance(rt, Instance):
-        if (
-            rt.type.fullname in IMMUTABLE_VALUE_TYPES
-            or rt.type.fullname in IMMUTABLE_CONTAINER_TYPES_REQUIRING_HASHABLE_ELEMENTS
-        ):
+        if rt.type.fullname in IMMUTABLE_VALUE_TYPES:
             return True, None
 
         elif rt.type.fullname == "typing.Mapping":
             return is_cacheable(rt.args[1], signature, verbose)
 
-        elif rt.type.fullname in IMMUTABLE_CONTAINER_TYPES_ALLOWING_MUTABLE_ELEMENTS:
+        elif rt.type.fullname in IMMUTABLE_CONTAINER_TYPES_REQUIRING_IMMUTABLE_ELEMENTS:
             # E.g. Collection[T] is cachable iff T is cachable.
             return is_cacheable(rt.args[0], signature, verbose)
 
