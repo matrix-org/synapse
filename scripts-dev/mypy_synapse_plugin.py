@@ -142,30 +142,20 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     )
 
     # 5. Complain loudly if we are returning something mutable
-    check_is_cacheable(signature, ctx)
+    check_is_cacheable(signature, ctx, ret_type)
 
     return signature
 
 
-def clean_message(value: str) -> str:
-    return value.replace("builtins.", "").replace("typing.", "")
+def check_is_cacheable(
+    signature: CallableType,
+    ctx: MethodSigContext,
+    deferred_return_type: Instance,
+) -> None:
+    # The previous code wraps the return type into a Deferred.
+    assert deferred_return_type.type.fullname == "twisted.internet.defer.Deferred"
+    return_type = deferred_return_type.args[0]
 
-
-def unwrap_awaitable_types(t: mypy.types.Type) -> mypy.types.Type:
-    if isinstance(t, Instance):
-        if t.type.fullname == "typing.Coroutine":
-            # We're assuming this is Awaitable[R]m aka Coroutine[None, None, R].
-            # TODO: assert yield type and send type are None
-            # Extract the `R` type from `Coroutine[Y, S, R]`, and reinspect
-            t = t.args[2]
-        elif t.type.fullname == "twisted.internet.defer.Deferred":
-            t = t.args[0]
-
-    return mypy.types.get_proper_type(t)
-
-
-def check_is_cacheable(signature: CallableType, ctx: MethodSigContext) -> None:
-    return_type = unwrap_awaitable_types(signature.ret_type)
     verbose = ctx.api.options.verbosity >= 1
     ok, note = is_cacheable(return_type, signature, verbose)
 
@@ -176,7 +166,7 @@ def check_is_cacheable(signature: CallableType, ctx: MethodSigContext) -> None:
 
     if note:
         message += f" ({note})"
-    message = clean_message(message)
+    message = message.replace("builtins.", "").replace("typing.", "")
 
     if ok and note:
         ctx.api.note(message, ctx.context)  # type: ignore[attr-defined]
