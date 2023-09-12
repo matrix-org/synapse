@@ -229,7 +229,6 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_task.error:
             result["error"] = purge_task.error
 
-        # TODO active vs purging etc
         return HTTPStatus.OK, result
 
 
