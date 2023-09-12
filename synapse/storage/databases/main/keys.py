@@ -39,65 +39,6 @@ db_binary_type = memoryview
 class KeyStore(CacheInvalidationWorkerStore):
     """Persistence for signature verification keys"""
 
-    @cached()
-    def _get_server_signature_key(
-        self, server_name_and_key_id: Tuple[str, str]
-    ) -> FetchKeyResult:
-        raise NotImplementedError()
-
-    @cachedList(
-        cached_method_name="_get_server_signature_key",
-        list_name="server_name_and_key_ids",
-    )
-    async def get_server_signature_keys(
-        self, server_name_and_key_ids: Iterable[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], FetchKeyResult]:
-        """
-        Args:
-            server_name_and_key_ids:
-                iterable of (server_name, key-id) tuples to fetch keys for
-
-        Returns:
-            A map from (server_name, key_id) -> FetchKeyResult, or None if the
-            key is unknown
-        """
-        keys = {}
-
-        def _get_keys(txn: Cursor, batch: Tuple[Tuple[str, str], ...]) -> None:
-            """Processes a batch of keys to fetch, and adds the result to `keys`."""
-
-            # batch_iter always returns tuples so it's safe to do len(batch)
-            sql = """
-            SELECT server_name, key_id, verify_key, ts_valid_until_ms
-            FROM server_signature_keys WHERE 1=0
-            """ + " OR (server_name=? AND key_id=?)" * len(
-                batch
-            )
-
-            txn.execute(sql, tuple(itertools.chain.from_iterable(batch)))
-
-            for row in txn:
-                server_name, key_id, key_bytes, ts_valid_until_ms = row
-
-                if ts_valid_until_ms is None:
-                    # Old keys may be stored with a ts_valid_until_ms of null,
-                    # in which case we treat this as if it was set to `0`, i.e.
-                    # it won't match key requests that define a minimum
-                    # `ts_valid_until_ms`.
-                    ts_valid_until_ms = 0
-
-                keys[(server_name, key_id)] = FetchKeyResult(
-                    verify_key=decode_verify_key_bytes(key_id, bytes(key_bytes)),
-                    valid_until_ts=ts_valid_until_ms,
-                )
-
-        def _txn(txn: Cursor) -> Dict[Tuple[str, str], FetchKeyResult]:
-            for batch in batch_iter(server_name_and_key_ids, 50):
-                _get_keys(txn, batch)
-            return keys
-
-        return await self.db_pool.runInteraction("get_server_signature_keys", _txn)
-
     async def store_server_keys_response(
         self,
         server_name: str,
@@ -172,9 +113,6 @@ class KeyStore(CacheInvalidationWorkerStore):
                 )
                 self._invalidate_cache_and_stream(
                     txn, self.get_server_key_json_for_remote, (server_name, key_id)
-                )
-                self._invalidate_cache_and_stream(
-                    txn, self._get_server_signature_key, ((server_name, key_id),)
                 )
 
         await self.db_pool.runInteraction(

@@ -13,7 +13,7 @@
 # limitations under the License.
 import time
 from typing import Any, Dict, List, Optional, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import attr
 import canonicaljson
@@ -285,38 +285,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # ... and check we can verify it.
         d = kr.verify_json_for_server(self.hs.hostname, json1, 0)
         self.get_success(d)
-
-    def test_verify_json_for_server_with_null_valid_until_ms(self) -> None:
-        """Tests that we correctly handle key requests for keys we've stored
-        with a null `ts_valid_until_ms`
-        """
-        mock_fetcher = Mock()
-        mock_fetcher.get_keys = AsyncMock(return_value={})
-
-        key1 = signedjson.key.generate_signing_key("1")
-
-        r = self.hs.get_datastores().main.db_pool.simple_upsert(
-            table="server_signature_keys",
-            keyvalues={"server_name": "server9", "key_id": get_key_id(key1)},
-            values={
-                "from_server": "server9",
-                "ts_added_ms": int(time.time() * 1000),
-                "ts_valid_until_ms": None,
-                "verify_key": memoryview(get_verify_key(key1).encode()),
-            },
-            desc="store_server_signature_keys",
-        )
-        self.get_success(r)
-
-        json1: JsonDict = {}
-        signedjson.sign.sign_json(json1, "server9", key1)
-
-        # should succeed on a signed object with a 0 minimum_valid_until_ms
-        d = self.hs.get_datastores().main.get_server_signature_keys(
-            [("server9", get_key_id(key1))]
-        )
-        result = self.get_success(d)
-        self.assertEqual(result[("server9", get_key_id(key1))].valid_until_ts, 0)
 
     def test_verify_json_dedupes_key_requests(self) -> None:
         """Two requests for the same key should be deduped."""
