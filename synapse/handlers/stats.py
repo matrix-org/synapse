@@ -14,9 +14,15 @@
 # limitations under the License.
 import logging
 from collections import Counter
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
-
-from typing_extensions import Counter as CounterType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Counter as CounterType,
+    Dict,
+    Iterable,
+    Optional,
+    Tuple,
+)
 
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.metrics import event_processing_positions
@@ -42,7 +48,6 @@ class StatsHandler:
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self.state = hs.get_state_handler()
-        self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id

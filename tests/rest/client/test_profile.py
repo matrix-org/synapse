@@ -30,7 +30,6 @@ from tests import unittest
 
 
 class ProfileTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -62,6 +61,18 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             "PUT",
             "/profile/%s/displayname" % (self.owner,),
             content={"displayname": "test"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        res = self._get_displayname()
+        self.assertEqual(res, "test")
+
+    def test_set_displayname_with_extra_spaces(self) -> None:
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/displayname" % (self.owner,),
+            content={"displayname": "  test  "},
             access_token=self.owner_tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -324,7 +335,6 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -404,7 +414,6 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
 
 
 class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,

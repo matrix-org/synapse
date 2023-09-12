@@ -140,3 +140,25 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         # No one ignores the user now.
         self.assert_ignored(self.user, set())
         self.assert_ignorers("@other:test", set())
+
+    def test_ignoring_users_with_latest_stream_ids(self) -> None:
+        """Test that ignoring users updates the latest stream ID for the ignored
+        user list account data."""
+
+        def get_latest_ignore_streampos(user_id: str) -> Optional[int]:
+            return self.get_success(
+                self.store.get_latest_stream_id_for_global_account_data_by_type_for_user(
+                    user_id, AccountDataTypes.IGNORED_USER_LIST
+                )
+            )
+
+        self.assertIsNone(get_latest_ignore_streampos("@user:test"))
+
+        self._update_ignore_list("@other:test", "@another:remote")
+
+        self.assertEqual(get_latest_ignore_streampos("@user:test"), 2)
+
+        # Add one user, remove one user, and leave one user.
+        self._update_ignore_list("@foo:test", "@another:remote")
+
+        self.assertEqual(get_latest_ignore_streampos("@user:test"), 3)

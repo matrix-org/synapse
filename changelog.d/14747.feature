@@ -1,1 +1,0 @@
-Add a dedicated listener configuration for `health` endpoint.

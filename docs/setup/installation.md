@@ -26,8 +26,8 @@ for most users.
 #### Docker images and Ansible playbooks
 
 There is an official synapse image available at
-<https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
-the docker-compose file available at
+<https://hub.docker.com/r/matrixdotorg/synapse> or at [`ghcr.io/matrix-org/synapse`](https://ghcr.io/matrix-org/synapse)
+which can be used with the docker-compose file available at
 [contrib/docker](https://github.com/matrix-org/synapse/tree/develop/contrib/docker).
 Further information on this including configuration options is available in the README
 on hub.docker.com.
@@ -37,7 +37,7 @@ Dockerfile to automate a synapse server in a single Docker image, at
 <https://hub.docker.com/r/avhost/docker-matrix/tags/>
 
 Slavi Pantaleev has created an Ansible playbook,
-which installs the offical Docker image of Matrix Synapse
+which installs the official Docker image of Matrix Synapse
 along with many other Matrix-related services (Postgres database, Element, coturn,
 ma1sd, SSL support, etc.).
 For more details, see
@@ -93,7 +93,7 @@ For `bookworm` and `sid`, it can be installed simply with:
 sudo apt install matrix-synapse
 ```
 
-Synapse is also avaliable in `bullseye-backports`.  Please
+Synapse is also available in `bullseye-backports`.  Please
 see the [Debian documentation](https://backports.debian.org/Instructions/)
 for information on how to use backports.
 
@@ -135,8 +135,8 @@ Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 reposi
 
 #### ArchLinux
 
-The quickest way to get up and running with ArchLinux is probably with the community package
-<https://archlinux.org/packages/community/x86_64/matrix-synapse/>, which should pull in most of
+The quickest way to get up and running with ArchLinux is probably with the package provided by ArchLinux
+<https://archlinux.org/packages/extra/x86_64/matrix-synapse/>, which should pull in most of
 the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
@@ -200,7 +200,7 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.7 or later, up to Python 3.11.
+- Python 3.8 or later, up to Python 3.11.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 If building on an uncommon architecture for which pre-built wheels are

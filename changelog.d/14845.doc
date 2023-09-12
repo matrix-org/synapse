@@ -1,1 +1,0 @@
-Fix the example config missing the `id` field in [application service documentation](https://matrix-org.github.io/synapse/latest/application_services.html).

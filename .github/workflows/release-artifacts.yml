@@ -4,13 +4,15 @@ name: Build release artifacts
 
 on:
   # we build on PRs and develop to (hopefully) get early warning
-  # of things breaking (but only build one set of debs)
+  # of things breaking (but only build one set of debs). PRs skip
+  # building wheels on macOS & ARM.
   pull_request:
   push:
     branches: ["develop", "release-*"]
 
     # we do the full build on tags.
     tags: ["v*"]
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -32,6 +34,7 @@ jobs:
       - id: set-distros
         run: |
           # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
+          # NOTE: inside the actual Dockerfile-dhvirtualenv, the image name is expanded into its full image path
           dists='["debian:sid"]'
           if [[ $GITHUB_REF == refs/tags/* ]]; then
               dists=$(scripts-dev/build_debian_packages.py --show-dists-json)
@@ -141,14 +144,14 @@ jobs:
 
       - name: Only build a single wheel on PR
         if: startsWith(github.ref, 'refs/pull/')
-        run: echo "CIBW_BUILD="cp37-manylinux_${{ matrix.arch }}"" >> $GITHUB_ENV
+        run: echo "CIBW_BUILD="cp38-manylinux_${{ matrix.arch }}"" >> $GITHUB_ENV
 
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
           # Skip testing for platforms which various libraries don't have wheels
           # for, and so need extra build deps.
-          CIBW_TEST_SKIP: pp3{7,9}-* *i686* *musl*
+          CIBW_TEST_SKIP: pp3*-* *i686* *musl*
           # Fix Rust OOM errors on emulated aarch64: https://github.com/rust-lang/cargo/issues/10583
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CIBW_ENVIRONMENT_PASS_LINUX: CARGO_NET_GIT_FETCH_WITH_CLI

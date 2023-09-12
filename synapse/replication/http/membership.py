@@ -142,17 +142,12 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore[override]
-        self,
-        request: SynapseRequest,
-        content: JsonDict,
-        room_id: str,
-        user_id: str,
+        self, request: SynapseRequest, content: JsonDict, room_id: str, user_id: str
     ) -> Tuple[int, JsonDict]:
         remote_room_hosts = content["remote_room_hosts"]
         event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
-
         request.requester = requester
 
         logger.debug("remote_knock: %s on room: %s", user_id, room_id)
@@ -277,16 +272,12 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
         }
 
     async def _handle_request(  # type: ignore[override]
-        self,
-        request: SynapseRequest,
-        content: JsonDict,
-        knock_event_id: str,
+        self, request: SynapseRequest, content: JsonDict, knock_event_id: str
     ) -> Tuple[int, JsonDict]:
         txn_id = content["txn_id"]
         event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
-
         request.requester = requester
 
         # hopefully we're now on the master, so this won't recurse!
@@ -363,3 +354,5 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationRemoteJoinRestServlet(hs).register(http_server)
     ReplicationRemoteRejectInviteRestServlet(hs).register(http_server)
     ReplicationUserJoinedLeftRoomRestServlet(hs).register(http_server)
+    ReplicationRemoteKnockRestServlet(hs).register(http_server)
+    ReplicationRemoteRescindKnockRestServlet(hs).register(http_server)

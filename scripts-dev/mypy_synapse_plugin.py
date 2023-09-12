@@ -19,6 +19,7 @@ can crop up, e.g the cache descriptors.
 from typing import Callable, Optional, Tuple, Type
 
 import mypy.types
+from mypy.erasetype import remove_instance_last_known_values
 from mypy.errorcodes import ErrorCode
 from mypy.nodes import ARG_NAMED_OPT
 from mypy.plugin import MethodSigContext, Plugin
@@ -39,9 +40,10 @@ class SynapsePlugin(Plugin):
         self, fullname: str
     ) -> Optional[Callable[[MethodSigContext], CallableType]]:
         if fullname.startswith(
-            "synapse.util.caches.descriptors.CachedFunction.__call__"
-        ) or fullname.startswith(
-            "synapse.util.caches.descriptors._LruCachedFunction.__call__"
+            (
+                "synapse.util.caches.descriptors.CachedFunction.__call__",
+                "synapse.util.caches.descriptors._LruCachedFunction.__call__",
+            )
         ):
             return cached_function_method_signature
         return None
@@ -102,10 +104,41 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     arg_names.append("on_invalidate")
     arg_kinds.append(ARG_NAMED_OPT)  # Arg is an optional kwarg.
 
+    # Finally we ensure the return type is a Deferred.
+    if (
+        isinstance(signature.ret_type, Instance)
+        and signature.ret_type.type.fullname == "twisted.internet.defer.Deferred"
+    ):
+        # If it is already a Deferred, nothing to do.
+        ret_type = signature.ret_type
+    else:
+        ret_arg = None
+        if isinstance(signature.ret_type, Instance):
+            # If a coroutine, wrap the coroutine's return type in a Deferred.
+            if signature.ret_type.type.fullname == "typing.Coroutine":
+                ret_arg = signature.ret_type.args[2]
+
+            # If an awaitable, wrap the awaitable's final value in a Deferred.
+            elif signature.ret_type.type.fullname == "typing.Awaitable":
+                ret_arg = signature.ret_type.args[0]
+
+        # Otherwise, wrap the return value in a Deferred.
+        if ret_arg is None:
+            ret_arg = signature.ret_type
+
+        # This should be able to use ctx.api.named_generic_type, but that doesn't seem
+        # to find the correct symbol for anything more than 1 module deep.
+        #
+        # modules is not part of CheckerPluginInterface. The following is a combination
+        # of TypeChecker.named_generic_type and TypeChecker.lookup_typeinfo.
+        sym = ctx.api.modules["twisted.internet.defer"].names.get("Deferred")  # type: ignore[attr-defined]
+        ret_type = Instance(sym.node, [remove_instance_last_known_values(ret_arg)])
+
     signature = signature.copy_modified(
         arg_types=arg_types,
         arg_names=arg_names,
         arg_kinds=arg_kinds,
+        ret_type=ret_type,
     )
 
     # 4. Complain loudly if we are returning something mutable
@@ -164,9 +197,7 @@ IMMUTABLE_CONTAINER_TYPES_REQUIRING_HASHABLE_ELEMENTS = {
     "typing.AbstractSet",
 }
 
-IMMUTABLE_CONTAINER_TYPES_ALLOWING_MUTABLE_ELEMENTS = {
-    "typing.Sequence"
-}
+IMMUTABLE_CONTAINER_TYPES_ALLOWING_MUTABLE_ELEMENTS = {"typing.Sequence"}
 
 MUTABLE_CONTAINER_TYPES = {
     "builtins.set",

@@ -86,18 +86,7 @@ class SendJoinParserTestCase(TestCase):
             return parsed_response.members_omitted
 
         self.assertTrue(parse({"members_omitted": True}))
-        self.assertTrue(parse({"org.matrix.msc3706.partial_state": True}))
-
         self.assertFalse(parse({"members_omitted": False}))
-        self.assertFalse(parse({"org.matrix.msc3706.partial_state": False}))
-
-        # If there's a conflict, the stable field wins.
-        self.assertTrue(
-            parse({"members_omitted": True, "org.matrix.msc3706.partial_state": False})
-        )
-        self.assertFalse(
-            parse({"members_omitted": False, "org.matrix.msc3706.partial_state": True})
-        )
 
     def test_servers_in_room(self) -> None:
         """Check that the servers_in_room field is correctly parsed"""
@@ -113,28 +102,10 @@ class SendJoinParserTestCase(TestCase):
             parsed_response = parser.finish()
             return parsed_response.servers_in_room
 
-        self.assertEqual(
-            parse({"org.matrix.msc3706.servers_in_room": ["hs1", "hs2"]}),
-            ["hs1", "hs2"],
-        )
         self.assertEqual(parse({"servers_in_room": ["example.com"]}), ["example.com"])
 
-        # If both are provided, the stable identifier should win
-        self.assertEqual(
-            parse(
-                {
-                    "org.matrix.msc3706.servers_in_room": ["old"],
-                    "servers_in_room": ["new"],
-                }
-            ),
-            ["new"],
-        )
-
-        # And lastly, we should be able to tell if neither field was present.
-        self.assertEqual(
-            parse({}),
-            None,
-        )
+        # We should be able to tell the field is not present.
+        self.assertEqual(parse({}), None)
 
     def test_errors_closing_coroutines(self) -> None:
         """Check we close all coroutines, even if closing the first raises an Exception.
@@ -143,7 +114,7 @@ class SendJoinParserTestCase(TestCase):
         assertions about its attributes or type.
         """
         parser = SendJoinParser(RoomVersions.V1, False)
-        response = {"org.matrix.msc3706.servers_in_room": ["hs1", "hs2"]}
+        response = {"servers_in_room": ["hs1", "hs2"]}
         serialisation = json.dumps(response).encode()
 
         # Mock the coroutines managed by this parser.

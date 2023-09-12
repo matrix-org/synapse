@@ -14,20 +14,18 @@
 """A replication client for use by synapse workers.
 """
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Set, Tuple
+
+from sortedcontainers import SortedList
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
-from twisted.internet.interfaces import IAddress, IConnector
-from twisted.internet.protocol import ReconnectingClientFactory
-from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership, ReceiptTypes
 from synapse.federation import send_queue
 from synapse.federation.sender import FederationSender
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
@@ -53,7 +51,6 @@ from synapse.util.async_helpers import Linearizer, timeout_deferred
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
-    from synapse.replication.tcp.handler import ReplicationCommandHandler
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -62,56 +59,10 @@ logger = logging.getLogger(__name__)
 _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 5
 
 
-class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
-    """Factory for building connections to the master. Will reconnect if the
-    connection is lost.
-
-    Accepts a handler that is passed to `ClientReplicationStreamProtocol`.
-    """
-
-    initialDelay = 0.1
-    maxDelay = 1  # Try at least once every N seconds
-
-    def __init__(
-        self,
-        hs: "HomeServer",
-        client_name: str,
-        command_handler: "ReplicationCommandHandler",
-    ):
-        self.client_name = client_name
-        self.command_handler = command_handler
-        self.server_name = hs.config.server.server_name
-        self.hs = hs
-        self._clock = hs.get_clock()  # As self.clock is defined in super class
-
-        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self.stopTrying)
-
-    def startedConnecting(self, connector: IConnector) -> None:
-        logger.info("Connecting to replication: %r", connector.getDestination())
-
-    def buildProtocol(self, addr: IAddress) -> ClientReplicationStreamProtocol:
-        logger.info("Connected to replication: %r", addr)
-        return ClientReplicationStreamProtocol(
-            self.hs,
-            self.client_name,
-            self.server_name,
-            self._clock,
-            self.command_handler,
-        )
-
-    def clientConnectionLost(self, connector: IConnector, reason: Failure) -> None:
-        logger.error("Lost replication conn: %r", reason)
-        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
-
-    def clientConnectionFailed(self, connector: IConnector, reason: Failure) -> None:
-        logger.error("Failed to connect to replication: %r", reason)
-        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
-
-
 class ReplicationDataHandler:
     """Handles incoming stream updates from replication.
 
-    This instance notifies the slave data store about updates. Can be subclassed
+    This instance notifies the data store about updates. Can be subclassed
     to handle updates in additional ways.
     """
 
@@ -135,14 +86,16 @@ class ReplicationDataHandler:
 
         # Map from stream and instance to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
-        self._streams_to_waiters: Dict[Tuple[str, str], List[Tuple[int, Deferred]]] = {}
+        self._streams_to_waiters: Dict[
+            Tuple[str, str], SortedList[Tuple[int, Deferred]]
+        ] = {}
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list
     ) -> None:
         """Called to handle a batch of replication data with a given stream token.
 
-        By default this just pokes the slave store. Can be overridden in subclasses to
+        By default, this just pokes the data store. Can be overridden in subclasses to
         handle more.
 
         Args:
@@ -277,7 +230,9 @@ class ReplicationDataHandler:
         # Notify any waiting deferreds. The list is ordered by position so we
         # just iterate through the list until we reach a position that is
         # greater than the received row position.
-        waiting_list = self._streams_to_waiters.get((stream_name, instance_name), [])
+        waiting_list = self._streams_to_waiters.get((stream_name, instance_name))
+        if not waiting_list:
+            return
 
         # Index of first item with a position after the current token, i.e we
         # have called all deferreds before this index. If not overwritten by
@@ -301,7 +256,7 @@ class ReplicationDataHandler:
 
         # Drop all entries in the waiting list that were called in the above
         # loop. (This maintains the order so no need to resort)
-        waiting_list[:] = waiting_list[index_of_first_deferred_not_called:]
+        del waiting_list[:index_of_first_deferred_not_called]
 
         for deferred in deferreds_to_callback:
             try:
@@ -361,24 +316,31 @@ class ReplicationDataHandler:
         )
 
         waiting_list = self._streams_to_waiters.setdefault(
-            (stream_name, instance_name), []
+            (stream_name, instance_name), SortedList(key=lambda t: t[0])
         )
 
-        waiting_list.append((position, deferred))
-        waiting_list.sort(key=lambda t: t[0])
+        waiting_list.add((position, deferred))
 
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):
             logger.info(
-                "Waiting for repl stream %r to reach %s (%s)",
+                "Waiting for repl stream %r to reach %s (%s); currently at: %s",
                 stream_name,
                 position,
                 instance_name,
+                current_position,
             )
             try:
                 await make_deferred_yieldable(deferred)
             except defer.TimeoutError:
-                logger.error("Timed out waiting for stream %s", stream_name)
+                logger.error(
+                    "Timed out waiting for repl stream %r to reach %s (%s)"
+                    "; currently at: %s",
+                    stream_name,
+                    position,
+                    instance_name,
+                    self._streams[stream_name].current_token(instance_name),
+                )
                 return
 
             logger.info(
@@ -448,7 +410,7 @@ class FederationSenderHandler:
         # The federation stream contains things that we want to send out, e.g.
         # presence, typing, etc.
         if stream_name == "federation":
-            send_queue.process_rows_for_federation(self.federation_sender, rows)
+            await send_queue.process_rows_for_federation(self.federation_sender, rows)
             await self.update_token(token)
 
         # ... and when new receipts happen
@@ -465,16 +427,14 @@ class FederationSenderHandler:
                 for row in rows
                 if not row.entity.startswith("@") and not row.is_signature
             }
-            for host in hosts:
-                self.federation_sender.send_device_messages(host, immediate=False)
+            await self.federation_sender.send_device_messages(hosts, immediate=False)
 
         elif stream_name == ToDeviceStream.NAME:
             # The to_device stream includes stuff to be pushed to both local
             # clients and remote servers, so we ignore entities that start with
             # '@' (since they'll be local users rather than destinations).
             hosts = {row.entity for row in rows if not row.entity.startswith("@")}
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
+            await self.federation_sender.send_device_messages(hosts)
 
     async def _on_new_receipts(
         self, rows: Iterable[ReceiptsStream.ReceiptsStreamRow]

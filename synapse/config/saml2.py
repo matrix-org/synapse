@@ -89,7 +89,13 @@ class SAML2Config(Config):
             "grandfathered_mxid_source_attribute", "uid"
         )
 
+        # refers to a SAML IdP entity ID
         self.saml2_idp_entityid = saml2_config.get("idp_entityid", None)
+
+        # IdP properties for Matrix clients
+        self.idp_name = saml2_config.get("idp_name", "SAML")
+        self.idp_icon = saml2_config.get("idp_icon")
+        self.idp_brand = saml2_config.get("idp_brand")
 
         # user_mapping_provider may be None if the key is present but has no value
         ump_dict = saml2_config.get("user_mapping_provider") or {}

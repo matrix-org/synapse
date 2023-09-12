@@ -38,5 +38,5 @@ class SQLTransactionLimitTestCase(unittest.HomeserverTestCase):
         db_pool = self.hs.get_datastores().databases[0]
 
         # force txn limit to roll over at least once
-        for _ in range(0, 1001):
+        for _ in range(1001):
             self.get_success_or_raise(db_pool.runInteraction("test_select", do_select))

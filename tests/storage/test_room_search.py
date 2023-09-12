@@ -119,7 +119,6 @@ class EventSearchInsertionTest(HomeserverTestCase):
             "content": {"msgtype": "m.text", "body": 2},
             "room_id": room_id,
             "sender": user_id,
-            "depth": prev_event.depth + 1,
             "prev_events": prev_event_ids,
             "origin_server_ts": self.clock.time_msec(),
         }
@@ -134,7 +133,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
                     prev_state_map,
                     for_verification=False,
                 ),
-                depth=event_dict["depth"],
+                depth=prev_event.depth + 1,
             )
         )
 
@@ -319,14 +318,14 @@ class MessageSearchTest(HomeserverTestCase):
             result = self.get_success(
                 store.search_msgs([self.room_id], query, ["content.body"])
             )
-            self.assertEquals(
+            self.assertEqual(
                 result["count"],
                 1 if expect_to_contain else 0,
                 f"expected '{query}' to match '{self.PHRASE}'"
                 if expect_to_contain
                 else f"'{query}' unexpectedly matched '{self.PHRASE}'",
             )
-            self.assertEquals(
+            self.assertEqual(
                 len(result["results"]),
                 1 if expect_to_contain else 0,
                 "results array length should match count",
@@ -337,14 +336,14 @@ class MessageSearchTest(HomeserverTestCase):
             result = self.get_success(
                 store.search_rooms([self.room_id], query, ["content.body"], 10)
             )
-            self.assertEquals(
+            self.assertEqual(
                 result["count"],
                 1 if expect_to_contain else 0,
                 f"expected '{query}' to match '{self.PHRASE}'"
                 if expect_to_contain
                 else f"'{query}' unexpectedly matched '{self.PHRASE}'",
             )
-            self.assertEquals(
+            self.assertEqual(
                 len(result["results"]),
                 1 if expect_to_contain else 0,
                 "results array length should match count",

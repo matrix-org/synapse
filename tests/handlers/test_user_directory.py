@@ -11,27 +11,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Tuple
-from unittest.mock import Mock, patch
+from typing import Any, Tuple
+from unittest.mock import AsyncMock, Mock, patch
 from urllib.parse import quote
 
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
+from synapse.api.errors import SynapseError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.appservice import ApplicationService
 from synapse.rest.client import login, register, room, user_directory
 from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import create_requester
+from synapse.types import JsonDict, UserProfile, create_requester
 from synapse.util import Clock
 
 from tests import unittest
 from tests.storage.test_user_directory import GetUserDirectoryTables
-from tests.test_utils import make_awaitable
+from tests.test_utils import event_injection
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import override_config
+
+
+# A spam checker which doesn't implement anything, so create a bare object.
+class UselessSpamChecker:
+    def __init__(self, config: Any):
+        pass
 
 
 class UserDirectoryTestCase(unittest.HomeserverTestCase):
@@ -185,6 +192,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         room = self.helper.create_room_as(user, is_public=True, tok=token)
         self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
         self._check_only_one_user_in_directory(user, room)
+
+    def test_search_term_with_colon_in_it_does_not_raise(self) -> None:
+        """
+        Regression test: Test that search terms with colons in them are acceptable.
+        """
+        u1 = self.register_user("user1", "pass")
+        self.get_success(self.handler.search_users(u1, "haha:paamayim-nekudotayim", 10))
 
     def test_user_not_in_users_table(self) -> None:
         """Unclear how it happens, but on matrix.org we've seen join events
@@ -342,7 +356,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 support_user_id, ProfileInfo("I love support me", None)
             )
         )
-        profile = self.get_success(self.store.get_user_in_directory(support_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(support_user_id))
         self.assertIsNone(profile)
         display_name = "display_name"
 
@@ -350,7 +364,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(
             self.handler.handle_local_profile_change(regular_user_id, profile_info)
         )
-        profile = self.get_success(self.store.get_user_in_directory(regular_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(regular_user_id))
         assert profile is not None
         self.assertTrue(profile["display_name"] == display_name)
 
@@ -369,7 +383,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is in directory
-        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(r_user_id))
         assert profile is not None
         self.assertTrue(profile["display_name"] == display_name)
 
@@ -378,7 +392,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
 
         # profile is not in directory
-        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(r_user_id))
         self.assertIsNone(profile)
 
         # update profile after deactivation
@@ -387,7 +401,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is furthermore not in directory
-        profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(r_user_id))
         self.assertIsNone(profile)
 
     def test_handle_local_profile_change_with_appservice_user(self) -> None:
@@ -397,7 +411,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is not in directory
-        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(as_user_id))
         self.assertIsNone(profile)
 
         # update profile
@@ -407,13 +421,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # profile is still not in directory
-        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
+        profile = self.get_success(self.store._get_user_in_directory(as_user_id))
         self.assertIsNone(profile)
 
     def test_handle_local_profile_change_with_appservice_sender(self) -> None:
         # profile is not in directory
         profile = self.get_success(
-            self.store.get_user_in_directory(self.appservice.sender)
+            self.store._get_user_in_directory(self.appservice.sender)
         )
         self.assertIsNone(profile)
 
@@ -427,11 +441,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is still not in directory
         profile = self.get_success(
-            self.store.get_user_in_directory(self.appservice.sender)
+            self.store._get_user_in_directory(self.appservice.sender)
         )
         self.assertIsNone(profile)
 
     def test_handle_user_deactivated_support_user(self) -> None:
+        """Ensure a support user doesn't get added to the user directory after deactivation."""
         s_user_id = "@support:test"
         self.get_success(
             self.store.register_user(
@@ -439,14 +454,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        mock_remove_from_user_dir = Mock(return_value=make_awaitable(None))
-        with patch.object(
-            self.store, "remove_from_user_dir", mock_remove_from_user_dir
-        ):
-            self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
-        # BUG: the correct spelling is assert_not_called, but that makes the test fail
-        # and it's not clear that this is actually the behaviour we want.
-        mock_remove_from_user_dir.not_called()
+        # The profile should not be in the directory.
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
+        self.assertIsNone(profile)
+
+        # Remove the user from the directory.
+        self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
+
+        # The profile should still not be in the user directory.
+        profile = self.get_success(self.store._get_user_in_directory(s_user_id))
+        self.assertIsNone(profile)
 
     def test_handle_user_deactivated_regular_user(self) -> None:
         r_user_id = "@regular:test"
@@ -454,7 +471,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
 
-        mock_remove_from_user_dir = Mock(return_value=make_awaitable(None))
+        mock_remove_from_user_dir = AsyncMock(return_value=None)
         with patch.object(
             self.store, "remove_from_user_dir", mock_remove_from_user_dir
         ):
@@ -773,12 +790,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
-        async def allow_all(user_profile: ProfileInfo) -> bool:
+        async def allow_all(user_profile: UserProfile) -> bool:
             # Allow all users.
             return False
 
         # Configure a spam checker that does not filter any users.
-        spam_checker = self.hs.get_spam_checker()
+        spam_checker = self.hs.get_module_api_callbacks().spam_checker
         spam_checker._check_username_for_spam_callbacks = [allow_all]
 
         # The results do not change:
@@ -787,7 +804,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        async def block_all(user_profile: ProfileInfo) -> bool:
+        async def block_all(user_profile: UserProfile) -> bool:
             # All users are spammy.
             return True
 
@@ -797,6 +814,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
+    @override_config(
+        {
+            "spam_checker": {
+                "module": "tests.handlers.test_user_directory.UselessSpamChecker"
+            }
+        }
+    )
     def test_legacy_spam_checker(self) -> None:
         """
         A spam checker without the expected method should be ignored.
@@ -824,11 +848,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
         self.assertEqual(public_users, set())
-
-        # Configure a spam checker.
-        spam_checker = self.hs.get_spam_checker()
-        # The spam checker doesn't need any methods, so create a bare object.
-        spam_checker.spam_checker = object()
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -949,13 +968,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = self.get_success(
+        event, unpersisted_context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(
-            self.hs.get_storage_controllers().persistence.persist_event(event, context)
-        )
+        context = self.get_success(unpersisted_context.persist(event))
+        persistence = self.hs.get_storage_controllers().persistence
+        assert persistence is not None
+        self.get_success(persistence.persist_event(event, context))
 
     def test_local_user_leaving_room_remains_in_user_directory(self) -> None:
         """We've chosen to simplify the user directory's implementation by
@@ -1087,3 +1107,185 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         )
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
+
+
+class UserDirectoryRemoteProfileTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        synapse.rest.admin.register_servlets,
+        register.register_servlets,
+        room.register_servlets,
+    ]
+
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        # Re-enables updating the user directory, as that functionality is needed below.
+        config["update_user_directory_from_worker"] = None
+        return config
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+        self.alice = self.register_user("alice", "alice123")
+        self.alice_tok = self.login("alice", "alice123")
+        self.user_dir_helper = GetUserDirectoryTables(self.store)
+        self.user_dir_handler = hs.get_user_directory_handler()
+        self.profile_handler = hs.get_profile_handler()
+
+        # Cancel the startup call: in the steady-state case we can't rely on it anyway.
+        assert self.user_dir_handler._refresh_remote_profiles_call_later is not None
+        self.user_dir_handler._refresh_remote_profiles_call_later.cancel()
+
+    def test_public_rooms_have_profiles_collected(self) -> None:
+        """
+        In a public room, member state events are treated as reflecting the user's
+        real profile and they are accepted.
+        (The main motivation for accepting this is to prevent having to query
+        *every* single profile change over federation.)
+        """
+        room_id = self.helper.create_room_as(
+            self.alice, is_public=True, tok=self.alice_tok
+        )
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs,
+                room_id,
+                "@bruce:remote",
+                "join",
+                "@bruce:remote",
+                extra_content={
+                    "displayname": "Bruce!",
+                    "avatar_url": "mxc://remote/123",
+                },
+            )
+        )
+        # Sending this event makes the streams move forward after the injection...
+        self.helper.send(room_id, "Test", tok=self.alice_tok)
+        self.pump(0.1)
+
+        profiles = self.get_success(
+            self.user_dir_helper.get_profiles_in_user_directory()
+        )
+        self.assertEqual(
+            profiles.get("@bruce:remote"),
+            ProfileInfo(display_name="Bruce!", avatar_url="mxc://remote/123"),
+        )
+
+    def test_private_rooms_do_not_have_profiles_collected(self) -> None:
+        """
+        In a private room, member state events are not pulled out and used to populate
+        the user directory.
+        """
+        room_id = self.helper.create_room_as(
+            self.alice, is_public=False, tok=self.alice_tok
+        )
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs,
+                room_id,
+                "@bruce:remote",
+                "join",
+                "@bruce:remote",
+                extra_content={
+                    "displayname": "super-duper bruce",
+                    "avatar_url": "mxc://remote/456",
+                },
+            )
+        )
+        # Sending this event makes the streams move forward after the injection...
+        self.helper.send(room_id, "Test", tok=self.alice_tok)
+        self.pump(0.1)
+
+        profiles = self.get_success(
+            self.user_dir_helper.get_profiles_in_user_directory()
+        )
+        self.assertNotIn("@bruce:remote", profiles)
+
+    def test_private_rooms_have_profiles_requested(self) -> None:
+        """
+        When a name changes in a private room, the homeserver instead requests
+        the user's global profile over federation.
+        """
+
+        async def get_remote_profile(
+            user_id: str, ignore_backoff: bool = True
+        ) -> JsonDict:
+            if user_id == "@bruce:remote":
+                return {
+                    "displayname": "Sir Bruce Bruceson",
+                    "avatar_url": "mxc://remote/789",
+                }
+            else:
+                raise ValueError(f"unable to fetch {user_id}")
+
+        with patch.object(self.profile_handler, "get_profile", get_remote_profile):
+            # Continue from the earlier test...
+            self.test_private_rooms_do_not_have_profiles_collected()
+
+            # Advance by a minute
+            self.reactor.advance(61.0)
+
+        profiles = self.get_success(
+            self.user_dir_helper.get_profiles_in_user_directory()
+        )
+        self.assertEqual(
+            profiles.get("@bruce:remote"),
+            ProfileInfo(
+                display_name="Sir Bruce Bruceson", avatar_url="mxc://remote/789"
+            ),
+        )
+
+    def test_profile_requests_are_retried(self) -> None:
+        """
+        When we fail to fetch the user's profile over federation,
+        we try again later.
+        """
+        has_failed_once = False
+
+        async def get_remote_profile(
+            user_id: str, ignore_backoff: bool = True
+        ) -> JsonDict:
+            nonlocal has_failed_once
+            if user_id == "@bruce:remote":
+                if not has_failed_once:
+                    has_failed_once = True
+                    raise SynapseError(502, "temporary network problem")
+
+                return {
+                    "displayname": "Sir Bruce Bruceson",
+                    "avatar_url": "mxc://remote/789",
+                }
+            else:
+                raise ValueError(f"unable to fetch {user_id}")
+
+        with patch.object(self.profile_handler, "get_profile", get_remote_profile):
+            # Continue from the earlier test...
+            self.test_private_rooms_do_not_have_profiles_collected()
+
+            # Advance by a minute
+            self.reactor.advance(61.0)
+
+            # The request has already failed once
+            self.assertTrue(has_failed_once)
+
+            # The profile has yet to be updated.
+            profiles = self.get_success(
+                self.user_dir_helper.get_profiles_in_user_directory()
+            )
+            self.assertNotIn(
+                "@bruce:remote",
+                profiles,
+            )
+
+            # Advance by five minutes, after the backoff has finished
+            self.reactor.advance(301.0)
+
+            # The profile should have been updated now
+            profiles = self.get_success(
+                self.user_dir_helper.get_profiles_in_user_directory()
+            )
+            self.assertEqual(
+                profiles.get("@bruce:remote"),
+                ProfileInfo(
+                    display_name="Sir Bruce Bruceson", avatar_url="mxc://remote/789"
+                ),
+            )

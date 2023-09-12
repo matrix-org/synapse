@@ -569,7 +569,7 @@ You should receive a response similar to the following. Make sure to save it.
 {"client_id":"someclientid_123","client_secret":"someclientsecret_123","id":"12345","name":"my_synapse_app","redirect_uri":"https://[synapse_public_baseurl]/_synapse/client/oidc/callback","website":null,"vapid_key":"somerandomvapidkey_123"}
 ```
 
-As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a `sub` property, an alternative `subject_claim` has to be set. Your Synapse configuration should include the following:
+As the Synapse login mechanism needs an attribute to uniquely identify users, and Mastodon's endpoint does not return a `sub` property, an alternative `subject_template` has to be set. Your Synapse configuration should include the following:
 
 ```yaml
 oidc_providers:
@@ -585,10 +585,53 @@ oidc_providers:
     scopes: ["read"]
     user_mapping_provider:
       config:
-        subject_claim: "id"
+        subject_template: "{{ user.id }}"
+        localpart_template: "{{ user.username }}"
+        display_name_template: "{{ user.display_name }}"
 ```
 
 Note that the fields `client_id` and `client_secret` are taken from the CURL response above.
+
+### Shibboleth with OIDC Plugin
+
+[Shibboleth](https://www.shibboleth.net/) is an open Standard IdP solution widely used by Universities.
+
+1. Shibboleth needs the [OIDC Plugin](https://shibboleth.atlassian.net/wiki/spaces/IDPPLUGINS/pages/1376878976/OIDC+OP) installed and working correctly.
+2. Create a new config on the IdP Side, ensure that the `client_id` and `client_secret`
+   are randomly generated data.
+```json
+{
+    "client_id": "SOME-CLIENT-ID",
+    "client_secret": "SOME-SUPER-SECRET-SECRET",
+    "response_types": ["code"],
+    "grant_types": ["authorization_code"],
+    "scope": "openid profile email",
+    "redirect_uris": ["https://[synapse public baseurl]/_synapse/client/oidc/callback"]
+}
+```
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  # Shibboleth IDP
+  #
+  - idp_id: shibboleth
+    idp_name: "Shibboleth Login"
+    discover: true
+    issuer: "https://YOUR-IDP-URL.TLD"
+    client_id: "YOUR_CLIENT_ID"
+    client_secret: "YOUR-CLIENT-SECRECT-FROM-YOUR-IDP"
+    scopes: ["openid", "profile", "email"]
+    allow_existing_users: true
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        subject_claim: "sub"
+        localpart_template: "{{ user.sub.split('@')[0] }}"
+        display_name_template: "{{ user.name }}"
+        email_template: "{{ user.email }}"
+```
 
 ### Twitch
 

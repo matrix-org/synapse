@@ -367,6 +367,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         f"/register/{LoginType.REGISTRATION_TOKEN}/validity",
         releases=("v1",),
     )
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -375,8 +376,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         self.ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.ratelimiting.rc_registration_token_validity.per_second,
-            burst_count=hs.config.ratelimiting.rc_registration_token_validity.burst_count,
+            cfg=hs.config.ratelimiting.rc_registration_token_validity,
         )
 
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
@@ -395,6 +395,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
 
 class RegisterRestServlet(RestServlet):
     PATTERNS = client_patterns("/register$")
+    CATEGORY = "Registration/login requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -460,9 +461,9 @@ class RegisterRestServlet(RestServlet):
         # the auth layer will store these in sessions.
         desired_username = None
         if "username" in body:
-            if not isinstance(body["username"], str) or len(body["username"]) > 512:
-                raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
+            if not isinstance(desired_username, str) or len(desired_username) > 512:
+                raise SynapseError(400, "Invalid username")
 
         # fork off as soon as possible for ASes which have completely
         # different registration flows to normal users
@@ -475,11 +476,6 @@ class RegisterRestServlet(RestServlet):
                     "Appservice token must be provided when using a type of m.login.application_service",
                 )
 
-            # Set the desired user according to the AS API (which uses the
-            # 'user' key not 'username'). Since this is a new addition, we'll
-            # fallback to 'username' if they gave one.
-            desired_username = body.get("user", desired_username)
-
             # XXX we should check that desired_username is valid. Currently
             # we give appservices carte blanche for any insanity in mxids,
             # because the IRC bridges rely on being able to register stupid
@@ -487,7 +483,8 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if not isinstance(desired_username, str):
+            # Desired username is either a string or None.
+            if desired_username is None:
                 raise SynapseError(400, "Desired Username is missing or not a string")
 
             result = await self._do_appservice_registration(
@@ -628,10 +625,12 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            desired_username = await (
-                self.password_auth_provider.get_username_for_registration(
-                    auth_result,
-                    params,
+            desired_username = (
+                await (
+                    self.password_auth_provider.get_username_for_registration(
+                        auth_result,
+                        params,
+                    )
                 )
             )
 
@@ -682,9 +681,11 @@ class RegisterRestServlet(RestServlet):
                 session_id
             )
 
-            display_name = await (
-                self.password_auth_provider.get_displayname_for_registration(
-                    auth_result, params
+            display_name = (
+                await (
+                    self.password_auth_provider.get_displayname_for_registration(
+                        auth_result, params
+                    )
                 )
             )
 
@@ -863,6 +864,74 @@ class RegisterRestServlet(RestServlet):
         return 200, result
 
 
+class RegisterAppServiceOnlyRestServlet(RestServlet):
+    """An alternative registration API endpoint that only allows ASes to register
+
+    This replaces the regular /register endpoint if MSC3861. There are two notable
+    differences with the regular /register endpoint:
+     - It only allows the `m.login.application_service` login type
+     - It does not create a device or access token for the just-registered user
+
+    Note that the exact behaviour of this endpoint is not yet finalised. It should be
+    just good enough to make most ASes work.
+    """
+
+    PATTERNS = client_patterns("/register$")
+    CATEGORY = "Registration/login requests"
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+
+        self.auth = hs.get_auth()
+        self.registration_handler = hs.get_registration_handler()
+        self.ratelimiter = hs.get_registration_ratelimiter()
+
+    @interactive_auth_handler
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        body = parse_json_object_from_request(request)
+
+        client_addr = request.getClientAddress().host
+
+        await self.ratelimiter.ratelimit(None, client_addr, update=False)
+
+        kind = parse_string(request, "kind", default="user")
+
+        if kind == "guest":
+            raise SynapseError(403, "Guest access is disabled")
+        elif kind != "user":
+            raise UnrecognizedRequestError(
+                f"Do not understand membership kind: {kind}",
+            )
+
+        # Pull out the provided username and do basic sanity checks early since
+        # the auth layer will store these in sessions.
+        desired_username = body.get("username")
+        if not isinstance(desired_username, str) or len(desired_username) > 512:
+            raise SynapseError(400, "Invalid username")
+
+        # Allow only ASes to use this API.
+        if body.get("type") != APP_SERVICE_REGISTRATION_TYPE:
+            raise SynapseError(403, "Non-application service registration type")
+
+        if not self.auth.has_access_token(request):
+            raise SynapseError(
+                400,
+                "Appservice token must be provided when using a type of m.login.application_service",
+            )
+
+        # XXX we should check that desired_username is valid. Currently
+        # we give appservices carte blanche for any insanity in mxids,
+        # because the IRC bridges rely on being able to register stupid
+        # IDs.
+
+        as_token = self.auth.get_access_token_from_request(request)
+
+        user_id = await self.registration_handler.appservice_register(
+            desired_username, as_token
+        )
+        return 200, {"user_id": user_id}
+
+
 def _calculate_registration_flows(
     config: HomeServerConfig, auth_handler: AuthHandler
 ) -> List[List[str]]:
@@ -949,10 +1018,14 @@ def _calculate_registration_flows(
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.experimental.msc3861.enabled:
+        RegisterAppServiceOnlyRestServlet(hs).register(http_server)
+        return
+
     if hs.config.worker.worker_app is None:
         EmailRegisterRequestTokenRestServlet(hs).register(http_server)
         MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
-        UsernameAvailabilityRestServlet(hs).register(http_server)
         RegistrationSubmitTokenServlet(hs).register(http_server)
+    UsernameAvailabilityRestServlet(hs).register(http_server)
     RegistrationTokenValidityRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)

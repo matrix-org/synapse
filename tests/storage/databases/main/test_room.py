@@ -27,7 +27,6 @@ from tests.unittest import HomeserverTestCase
 
 
 class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,

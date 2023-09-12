@@ -1,1 +1,0 @@
-Faster remote room joins (worker mode): do not populate external hosts-in-room cache when sending events as this requires blocking for full state.

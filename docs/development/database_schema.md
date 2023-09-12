@@ -155,42 +155,10 @@ def run_upgrade(
 Boolean columns require special treatment, since SQLite treats booleans the
 same as integers.
 
-There are three separate aspects to this:
-
- * Any new boolean column must be added to the `BOOLEAN_COLUMNS` list in
+Any new boolean column must be added to the `BOOLEAN_COLUMNS` list in
    `synapse/_scripts/synapse_port_db.py`. This tells the port script to cast
    the integer value from SQLite to a boolean before writing the value to the
    postgres database.
-
- * Before SQLite 3.23, `TRUE` and `FALSE` were not recognised as constants by
-   SQLite, and the `IS [NOT] TRUE`/`IS [NOT] FALSE` operators were not
-   supported. This makes it necessary to avoid using `TRUE` and `FALSE`
-   constants in SQL commands.
-
-   For example, to insert a `TRUE` value into the database, write:
-
-   ```python
-   txn.execute("INSERT INTO tbl(col) VALUES (?)", (True, ))
-   ```
-
- * Default values for new boolean columns present a particular
-   difficulty. Generally it is best to create separate schema files for
-   Postgres and SQLite. For example:
-
-   ```sql
-   # in 00delta.sql.postgres:
-   ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT FALSE;
-   ```
-
-   ```sql
-   # in 00delta.sql.sqlite:
-   ALTER TABLE tbl ADD COLUMN col BOOLEAN DEFAULT 0;
-   ```
-
-   Note that there is a particularly insidious failure mode here: the Postgres
-   flavour will be accepted by SQLite 3.22, but will give a column whose
-   default value is the **string** `"FALSE"` - which, when cast back to a boolean
-   in Python, evaluates to `True`.
 
 
 ## `event_id` global uniqueness

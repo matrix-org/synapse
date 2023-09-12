@@ -22,7 +22,6 @@ from ._base import Config
 
 
 class ConsentConfig(Config):
-
     section = "consent"
 
     def __init__(self, *args: Any):

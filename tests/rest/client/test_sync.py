@@ -41,7 +41,6 @@ from tests.server import TimedOutException
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
-
     user_id = "@apple:test"
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -191,7 +190,6 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
 
 
 class SyncTypingTests(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -294,9 +292,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             self.make_request("GET", sync_url % (access_token, next_batch))
 
 
-class SyncKnockTestCase(
-    unittest.HomeserverTestCase, KnockingStrippedStateEventHelperMixin
-):
+class SyncKnockTestCase(KnockingStrippedStateEventHelperMixin):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -894,7 +890,6 @@ class DeviceListSyncTestCase(unittest.HomeserverTestCase):
 
 
 class ExcludeRoomTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,

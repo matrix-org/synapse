@@ -35,8 +35,9 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.events import EventBase
-from synapse.types import JsonDict, Requester
+from synapse.types import JsonDict, Requester, StrCollection
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -94,7 +95,9 @@ class RoomSummaryHandler:
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
         self._ratelimiter = Ratelimiter(
-            store=self._store, clock=hs.get_clock(), rate_hz=5, burst_count=10
+            store=self._store,
+            clock=hs.get_clock(),
+            cfg=RatelimitSettings("<room summary>", per_second=5, burst_count=10),
         )
 
         # If a user tries to fetch the same page multiple times in quick succession,
@@ -521,8 +524,8 @@ class RoomSummaryHandler:
 
         It should return true if:
 
-        * The requester is joined or can join the room (per MSC3173).
-        * The origin server has any user that is joined or can join the room.
+        * The requesting user is joined or can join the room (per MSC3173); or
+        * The origin server has any user that is joined or can join the room; or
         * The history visibility is set to world readable.
 
         Args:
@@ -564,9 +567,9 @@ class RoomSummaryHandler:
             join_rule = join_rules_event.content.get("join_rule")
             if (
                 join_rule == JoinRules.PUBLIC
-                or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+                or (room_version.knock_join_rule and join_rule == JoinRules.KNOCK)
                 or (
-                    room_version.msc3787_knock_restricted_join_rule
+                    room_version.knock_restricted_join_rule
                     and join_rule == JoinRules.KNOCK_RESTRICTED
                 )
             ):
@@ -870,7 +873,7 @@ class _RoomQueueEntry:
     # The room ID of this entry.
     room_id: str
     # The server to query if the room is not known locally.
-    via: Sequence[str]
+    via: StrCollection
     # The minimum number of hops necessary to get to this room (compared to the
     # originally requested room).
     depth: int = 0

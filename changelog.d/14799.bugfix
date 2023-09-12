@@ -1,1 +1,0 @@
-Add index to improve performance of the `/timestamp_to_event` endpoint used for jumping to a specific date in the timeline of a room.

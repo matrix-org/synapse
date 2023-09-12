@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 # TODO: Needs unit testing
 class InitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/initialSync$", v1=True)
+    CATEGORY = "Sync requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

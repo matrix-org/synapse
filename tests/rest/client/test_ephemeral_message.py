@@ -26,7 +26,6 @@ from tests import unittest
 
 
 class EphemeralMessageTestCase(unittest.HomeserverTestCase):
-
     user_id = "@user:test"
 
     servlets = [

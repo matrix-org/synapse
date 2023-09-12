@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class GetFilterRestServlet(RestServlet):
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter/(?P<filter_id>[^/]*)")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -57,7 +58,7 @@ class GetFilterRestServlet(RestServlet):
 
         try:
             filter_collection = await self.filtering.get_user_filter(
-                user_localpart=target_user.localpart, filter_id=filter_id_int
+                user_id=target_user, filter_id=filter_id_int
             )
         except StoreError as e:
             if e.code != 404:
@@ -69,6 +70,7 @@ class GetFilterRestServlet(RestServlet):
 
 class CreateFilterRestServlet(RestServlet):
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/filter")
+    CATEGORY = "Encryption requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -79,7 +81,6 @@ class CreateFilterRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
 
@@ -93,7 +94,7 @@ class CreateFilterRestServlet(RestServlet):
         set_timeline_upper_limit(content, self.hs.config.server.filter_timeline_limit)
 
         filter_id = await self.filtering.add_user_filter(
-            user_localpart=target_user.localpart, user_filter=content
+            user_id=target_user, user_filter=content
         )
 
         return 200, {"filter_id": str(filter_id)}

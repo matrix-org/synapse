@@ -46,6 +46,9 @@ instead.
 
 If the authentication is unsuccessful, the module must return `None`.
 
+Note that the user is not automatically registered, the `register_user(..)` method of
+the [module API](writing_a_module.html) can be used to lazily create users.
+
 If multiple modules register an auth checker for the same login type but with different
 fields, Synapse will refuse to start.
 
@@ -102,6 +105,9 @@ async def on_logged_out(
 Called during a logout request for a user. It is passed the qualified user ID, the ID of the
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.
+
+Deleting the related pushers is done after calling `on_logged_out`, so you can rely on them
+to still be present.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 

@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class UserDirectorySearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/user_directory/search$")
+    CATEGORY = "User directory search requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

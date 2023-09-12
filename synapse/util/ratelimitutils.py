@@ -20,18 +20,20 @@ import typing
 from typing import (
     Any,
     Callable,
+    ContextManager,
     DefaultDict,
     Dict,
     Iterator,
     List,
     Mapping,
+    MutableSet,
     Optional,
     Set,
     Tuple,
 )
+from weakref import WeakSet
 
 from prometheus_client.core import Counter
-from typing_extensions import ContextManager
 
 from twisted.internet import defer
 
@@ -86,7 +88,9 @@ queue_wait_timer = Histogram(
 )
 
 
-_rate_limiter_instances: Set["FederationRateLimiter"] = set()
+# This must be a `WeakSet`, otherwise we indirectly hold on to entire `HomeServer`s
+# during trial test runs and leak a lot of memory.
+_rate_limiter_instances: MutableSet["FederationRateLimiter"] = WeakSet()
 # Protects the _rate_limiter_instances set from concurrent access
 _rate_limiter_instances_lock = threading.Lock()
 
@@ -287,7 +291,8 @@ class _PerHostRatelimiter:
             if self.metrics_name:
                 rate_limit_reject_counter.labels(self.metrics_name).inc()
             raise LimitExceededError(
-                retry_after_ms=int(self.window_size / self.sleep_limit)
+                limiter_name="rc_federation",
+                retry_after_ms=int(self.window_size / self.sleep_limit),
             )
 
         self.request_times.append(time_now)

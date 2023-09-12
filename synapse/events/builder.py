@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Tuple, Union
 
 import attr
 from signedjson.types import SigningKey
@@ -103,7 +103,7 @@ class EventBuilder:
 
     async def build(
         self,
-        prev_event_ids: List[str],
+        prev_event_ids: Collection[str],
         auth_event_ids: Optional[List[str]],
         depth: Optional[int] = None,
     ) -> EventBase:
@@ -136,7 +136,7 @@ class EventBuilder:
 
         format_version = self.room_version.event_format
         # The types of auth/prev events changes between event versions.
-        prev_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
+        prev_events: Union[Collection[str], List[Tuple[str, Dict[str, str]]]]
         auth_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         if format_version == EventFormatVersions.ROOM_V1_V2:
             auth_events = await self._store.add_event_hashes(auth_event_ids)
@@ -173,7 +173,9 @@ class EventBuilder:
         if self.is_state():
             event_dict["state_key"] = self._state_key
 
-        if self._redacts is not None:
+        # MSC2174 moves the redacts property to the content, it is invalid to
+        # provide it as a top-level property.
+        if self._redacts is not None and not self.room_version.updated_redaction_rules:
             event_dict["redacts"] = self._redacts
 
         if self._origin_server_ts is not None:

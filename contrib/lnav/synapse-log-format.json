@@ -1,0 +1,67 @@
+{
+  "$schema": "https://lnav.org/schemas/format-v1.schema.json",
+  "synapse": {
+    "title": "Synapse logs",
+    "description": "Logs output by Synapse, a Matrix homesever, under its default logging config.",
+    "regex": {
+      "log": {
+        "pattern": ".*(?<timestamp>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3}) - (?<logger>.+) - (?<lineno>\\d+) - (?<level>\\w+) - (?<context>.+) - (?<body>.*)"
+      }
+    },
+    "json": false,
+    "timestamp-field": "timestamp",
+    "timestamp-format": [
+      "%Y-%m-%d %H:%M:%S,%L"
+    ],
+    "level-field": "level",
+    "body-field": "body",
+    "opid-field": "context",
+    "level": {
+      "critical": "CRITICAL",
+      "error": "ERROR",
+      "warning": "WARNING",
+      "info": "INFO",
+      "debug": "DEBUG"
+    },
+    "sample": [
+      {
+        "line": "my-matrix-server-generic-worker-4 | 2023-01-27 09:47:09,818 - synapse.replication.tcp.client - 381 - ERROR - PUT-32992 - Timed out waiting for stream receipts",
+        "level": "error"
+      },
+      {
+        "line": "my-matrix-server-federation-sender-1 | 2023-01-25 20:56:20,995 - synapse.http.matrixfederationclient - 709 - WARNING - federation_transaction_transmission_loop-3 - {PUT-O-3} [example.com] Request failed: PUT matrix-federation://example.com/_matrix/federation/v1/send/1674680155797: HttpResponseException('403: Forbidden')",
+        "level": "warning"
+      },
+      {
+        "line": "my-matrix-server  | 2023-01-25 20:55:54,433 - synapse.storage.databases - 66 - INFO - main - [database config 'master']: Checking database server",
+        "level": "info"
+      },
+      {
+        "line": "my-matrix-server  | 2023-01-26 15:08:40,447 - synapse.access.http.8008 - 460 - INFO - PUT-74929 - 0.0.0.0 - 8008 - {@alice:example.com} Processed request: 0.011sec/0.000sec (0.000sec, 0.000sec) (0.001sec/0.008sec/3) 2B 200 \"PUT /_matrix/client/r0/user/%40alice%3Atexample.com/account_data/im.vector.setting.breadcrumbs HTTP/1.0\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Element/1.11.20 Chrome/108.0.5359.179 Electron/22.0.3 Safari/537.36\" [0 dbevts]",
+        "level": "info"
+      }
+    ],
+    "highlights": {
+      "user_id": {
+        "pattern": "(@|%40)[^:% ]+(:|%3A)[\\[\\]0-9a-zA-Z.\\-:]+(:\\d{1,5})?(?<!:)",
+        "underline": true
+      },
+      "room_id": {
+        "pattern": "(!|%21)[^:% ]+(:|%3A)[\\[\\]0-9a-zA-Z.\\-:]+(:\\d{1,5})?(?<!:)",
+        "underline": true
+      },
+      "room_alias": {
+        "pattern": "(#|%23)[^:% ]+(:|%3A)[\\[\\]0-9a-zA-Z.\\-:]+(:\\d{1,5})?(?<!:)",
+        "underline": true
+      },
+      "event_id_v1_v2": {
+        "pattern": "(\\$|%25)[^:% ]+(:|%3A)[\\[\\]0-9a-zA-Z.\\-:]+(:\\d{1,5})?(?<!:)",
+        "underline": true
+      },
+      "event_id_v3_plus": {
+        "pattern": "(\\$|%25)([A-Za-z0-9+/_]|-){43}",
+        "underline": true
+      }
+    }
+  }
+}

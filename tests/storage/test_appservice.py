@@ -15,7 +15,7 @@ import json
 import os
 import tempfile
 from typing import List, cast
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import yaml
 
@@ -35,12 +35,11 @@ from synapse.types import DeviceListUpdates
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(ApplicationServiceStoreTestCase, self).setUp()
+        super().setUp()
 
         self.as_yaml_files: List[str] = []
 
@@ -71,7 +70,7 @@ class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
             except Exception:
                 pass
 
-        super(ApplicationServiceStoreTestCase, self).tearDown()
+        super().tearDown()
 
     def _add_appservice(
         self, as_token: str, id: str, url: str, hs_token: str, sender: str
@@ -110,7 +109,7 @@ class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
 
 class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(ApplicationServiceTransactionStoreTestCase, self).setUp()
+        super().setUp()
         self.as_yaml_files: List[str] = []
 
         self.hs.config.appservice.app_service_config_files = self.as_yaml_files
@@ -339,7 +338,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
 
         # we aren't testing store._base stuff here, so mock this out
         # (ignore needed because Mypy won't allow us to assign to a method otherwise)
-        self.store.get_events_as_list = Mock(return_value=make_awaitable(events))  # type: ignore[assignment]
+        self.store.get_events_as_list = AsyncMock(return_value=events)  # type: ignore[method-assign]
 
         self.get_success(self._insert_txn(self.as_list[1]["id"], 9, other_events))
         self.get_success(self._insert_txn(service.id, 10, events))

@@ -19,7 +19,7 @@ from urllib import parse as urlparse
 import attr
 import pkg_resources
 
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrSequence
 
 from ._base import Config, ConfigError
 from ._util import validate_config
@@ -30,7 +30,7 @@ class OEmbedEndpointConfig:
     # The API endpoint to fetch.
     api_endpoint: str
     # The patterns to match.
-    url_patterns: List[Pattern]
+    url_patterns: List[Pattern[str]]
     # The supported formats.
     formats: Optional[List[str]]
 
@@ -80,7 +80,7 @@ class OembedConfig(Config):
             )
 
     def _parse_and_validate_provider(
-        self, providers: List[JsonDict], config_path: Iterable[str]
+        self, providers: List[JsonDict], config_path: StrSequence
     ) -> Iterable[OEmbedEndpointConfig]:
         # Ensure it is the proper form.
         validate_config(
@@ -112,7 +112,7 @@ class OembedConfig(Config):
                     api_endpoint, patterns, endpoint.get("formats")
                 )
 
-    def _glob_to_pattern(self, glob: str, config_path: Iterable[str]) -> Pattern:
+    def _glob_to_pattern(self, glob: str, config_path: StrSequence) -> Pattern:
         """
         Convert the glob into a sane regular expression to match against. The
         rules followed will be slightly different for the domain portion vs.

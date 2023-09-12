@@ -28,7 +28,6 @@ from tests import unittest
 
 
 class DeviceRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -291,7 +290,6 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
 
 class DevicesRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -415,7 +413,6 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
 
 class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,

@@ -12,32 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID, create_requester
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
         config["limit_remote_rooms"] = {"enabled": True, "complexity": 0.05}
         return config
 
-    def test_complexity_simple(self):
-
+    def test_complexity_simple(self) -> None:
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
 
@@ -56,7 +53,11 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Artificially raise the complexity
         store = self.hs.get_datastores().main
-        store.get_current_state_event_counts = lambda x: make_awaitable(500 * 1.23)
+
+        async def get_current_state_event_counts(room_id: str) -> int:
+            return int(500 * 1.23)
+
+        store.get_current_state_event_counts = get_current_state_event_counts  # type: ignore[method-assign]
 
         # Get the room complexity again -- make sure it's our artificial value
         channel = self.make_signed_federation_request(
@@ -66,21 +67,20 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         complexity = channel.json_body["v1"]
         self.assertEqual(complexity, 1.23)
 
-    def test_join_too_large(self):
-
+    def test_join_too_large(self) -> None:
         u1 = self.register_user("u1", "pass")
 
         handler = self.hs.get_room_member_handler()
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[method-assign]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[method-assign]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
@@ -95,7 +95,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_join_too_large_admin(self):
+    def test_join_too_large_admin(self) -> None:
         # Check whether an admin can join if option "admins_can_join" is undefined,
         # this option defaults to false, so the join should fail.
 
@@ -105,13 +105,13 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[method-assign]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[method-assign]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
@@ -126,8 +126,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_join_too_large_once_joined(self):
-
+    def test_join_too_large_once_joined(self) -> None:
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
 
@@ -143,18 +142,19 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable(None))
-        handler.federation_handler.do_invite_join = Mock(
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value=None)  # type: ignore[method-assign]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[method-assign]
+            return_value=("", 1)
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastores().main.get_current_state_event_counts = (
-            lambda x: make_awaitable(600)
-        )
+        async def get_current_state_event_counts(room_id: str) -> int:
+            return 600
+
+        self.hs.get_datastores().main.get_current_state_event_counts = get_current_state_event_counts  # type: ignore[method-assign]
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             room_1,
             UserID.from_string(u1),
@@ -180,7 +180,7 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
         config["limit_remote_rooms"] = {
             "enabled": True,
@@ -189,7 +189,7 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         }
         return config
 
-    def test_join_too_large_no_admin(self):
+    def test_join_too_large_no_admin(self) -> None:
         # A user which is not an admin should not be able to join a remote room
         # which is too complex.
 
@@ -199,13 +199,13 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[method-assign]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[method-assign]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
@@ -220,7 +220,7 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_join_too_large_admin(self):
+    def test_join_too_large_admin(self) -> None:
         # An admin should be able to join rooms where a complexity check fails.
 
         u1 = self.register_user("u1", "pass", admin=True)
@@ -229,13 +229,13 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=make_awaitable({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
-            return_value=make_awaitable(("", 1))
+        fed_transport.client.get_json = AsyncMock(return_value={"v1": 9999})  # type: ignore[method-assign]
+        handler.federation_handler.do_invite_join = AsyncMock(  # type: ignore[method-assign]
+            return_value=("", 1)
         )
 
         d = handler._remote_join(
-            None,
+            create_requester(u1),
             ["other.example.com"],
             "roomid",
             UserID.from_string(u1),

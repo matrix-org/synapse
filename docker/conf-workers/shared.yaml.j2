@@ -6,6 +6,9 @@
 {% if enable_redis %}
 redis:
     enabled: true
+    {% if using_unix_sockets %}
+    path: /tmp/redis.sock
+    {% endif %}
 {% endif %}
 
 {% if appservice_registrations is not none %}

@@ -61,9 +61,10 @@ from synapse.config import (  # noqa: F401
     voip,
     workers,
 )
+from synapse.types import StrSequence
 
 class ConfigError(Exception):
-    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+    def __init__(self, msg: str, path: Optional[StrSequence] = None):
         self.msg = msg
         self.path = path
 

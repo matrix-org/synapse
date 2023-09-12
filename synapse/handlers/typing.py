@@ -26,9 +26,10 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.replication.tcp.streams import TypingStream
 from synapse.streams import EventSource
-from synapse.types import JsonDict, Requester, StreamKeyType, UserID
+from synapse.types import JsonDict, Requester, StrCollection, StreamKeyType, UserID
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.metrics import Measure
+from synapse.util.retryutils import filter_destinations_by_retry_limiter
 from synapse.util.wheel_timer import WheelTimer
 
 if TYPE_CHECKING:
@@ -52,6 +53,11 @@ FEDERATION_TIMEOUT = 60 * 1000
 FEDERATION_PING_INTERVAL = 40 * 1000
 
 
+# How long to remember a typing notification happened in a room before
+# forgetting about it.
+FORGET_TIMEOUT = 10 * 60 * 1000
+
+
 class FollowerTypingHandler:
     """A typing handler on a different process than the writer that is updated
     via replication.
@@ -63,6 +69,7 @@ class FollowerTypingHandler:
         self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         self.federation = None
         if hs.should_send_federation():
@@ -83,7 +90,10 @@ class FollowerTypingHandler:
         self.wheel_timer: WheelTimer[RoomMember] = WheelTimer(bucket_size=5000)
         self._latest_room_serial = 0
 
+        self._rooms_updated: Set[str] = set()
+
         self.clock.looping_call(self._handle_timeouts, 5000)
+        self.clock.looping_call(self._prune_old_typing, FORGET_TIMEOUT)
 
     def _reset(self) -> None:
         """Reset the typing handler's data caches."""
@@ -91,6 +101,8 @@ class FollowerTypingHandler:
         self._room_serials = {}
         # map room IDs to sets of users currently typing
         self._room_typing = {}
+
+        self._rooms_updated = set()
 
         self._member_last_federation_poke = {}
         self.wheel_timer = WheelTimer(bucket_size=5000)
@@ -139,11 +151,18 @@ class FollowerTypingHandler:
                 now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
             )
 
-            hosts = await self._storage_controllers.state.get_current_hosts_in_room(
-                member.room_id
+            hosts: StrCollection = (
+                await self._storage_controllers.state.get_current_hosts_in_room(
+                    member.room_id
+                )
+            )
+            hosts = await filter_destinations_by_retry_limiter(
+                hosts,
+                clock=self.clock,
+                store=self.store,
             )
             for domain in hosts:
-                if domain != self.server_name:
+                if not self.is_mine_server_name(domain):
                     logger.debug("sending typing update to %s", domain)
                     self.federation.build_and_send_edu(
                         destination=domain,
@@ -178,6 +197,7 @@ class FollowerTypingHandler:
             prev_typing = self._room_typing.get(row.room_id, set())
             now_typing = set(row.user_ids)
             self._room_typing[row.room_id] = now_typing
+            self._rooms_updated.add(row.room_id)
 
             if self.federation:
                 run_as_background_process(
@@ -208,6 +228,19 @@ class FollowerTypingHandler:
 
     def get_current_token(self) -> int:
         return self._latest_room_serial
+
+    def _prune_old_typing(self) -> None:
+        """Prune rooms that haven't seen typing updates since last time.
+
+        This is safe to do as clients should time out old typing notifications.
+        """
+        stale_rooms = self._room_serials.keys() - self._rooms_updated
+
+        for room_id in stale_rooms:
+            self._room_serials.pop(room_id, None)
+            self._room_typing.pop(room_id, None)
+
+        self._rooms_updated = set()
 
 
 class TypingWriterHandler(FollowerTypingHandler):
@@ -388,6 +421,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         self._typing_stream_change_cache.entity_has_changed(
             member.room_id, self._latest_room_serial
         )
+        self._rooms_updated.add(member.room_id)
 
         self.notifier.on_new_event(
             StreamKeyType.TYPING, self._latest_room_serial, rooms=[member.room_id]

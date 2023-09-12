@@ -16,11 +16,11 @@
 This migration handles the process of changing the type of `room_depth.min_depth` to
 a BIGINT.
 """
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
-from synapse.storage.types import Cursor
 
 
-def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if not isinstance(database_engine, PostgresEngine):
         # this only applies to postgres - sqlite does not distinguish between big and
         # little ints.
@@ -64,7 +64,3 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs
             (6103, 'replace_room_depth_min_depth', '{}', 'populate_room_depth2')
         """
     )
-
-
-def run_upgrade(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs):
-    pass
