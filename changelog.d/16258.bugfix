@@ -1,1 +1,0 @@
-Revert [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) introspection cache, admin impersonation and account lock.
