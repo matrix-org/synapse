@@ -1,9 +1,17 @@
 # Synapse 1.92.1 (2023-09-12)
 
-Stop building Ubuntu Kinetic since it is EOL and repos seem to be dead.
+This minor release was needed only because of CI-related trouble on [v1.92.0](https://github.com/matrix-org/synapse/releases/tag/v1.92.0), which was never released.
+
+### Internal Changes
+
+- Stop building Ubuntu Kinetic since it is EOL and repos seem to be dead.
 
 
 # Synapse 1.92.0 (2023-09-12)
+
+This release includes the same [bugfix](https://github.com/matrix-org/synapse/issues/16258) as Synapse 1.91.2.
+
+This version was never released following a CI build failure, cf [v1.92.1 changelog](https://github.com/matrix-org/synapse/releases/tag/v1.92.1).
 
 ### Bugfixes
 
@@ -13,6 +21,13 @@ Stop building Ubuntu Kinetic since it is EOL and repos seem to be dead.
 
 - Fix incorrect docstring for `Ratelimiter`. ([\#16255](https://github.com/matrix-org/synapse/issues/16255))
 - Update the release script to work on macOS. ([\#16266](https://github.com/matrix-org/synapse/issues/16266))
+
+
+# Synapse 1.91.2 (2023-09-06)
+
+### Bugfixes
+
+- Revert [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) introspection cache, admin impersonation and account lock. ([\#16258](https://github.com/matrix-org/synapse/issues/16258))
 
 
 # Synapse 1.92.0rc1 (2023-09-05)
@@ -69,12 +84,6 @@ Stop building Ubuntu Kinetic since it is EOL and repos seem to be dead.
 * Bump serde_json from 1.0.104 to 1.0.105. ([\#16140](https://github.com/matrix-org/synapse/issues/16140))
 * Bump types-psycopg2 from 2.9.21.10 to 2.9.21.11. ([\#16200](https://github.com/matrix-org/synapse/issues/16200))
 * Bump types-pyyaml from 6.0.12.10 to 6.0.12.11. ([\#16199](https://github.com/matrix-org/synapse/issues/16199))
-
-# Synapse 1.91.2 (2023-09-06)
-
-### Bugfixes
-
-- Revert [MSC3861](https://github.com/matrix-org/matrix-spec-proposals/pull/3861) introspection cache, admin impersonation and account lock. ([\#16258](https://github.com/matrix-org/synapse/issues/16258))
 
 
 # Synapse 1.91.1 (2023-09-04)
