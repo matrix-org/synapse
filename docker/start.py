@@ -239,7 +239,7 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         log("Could not find %s, will not use" % (jemallocpath,))
 
     # if there are no config files passed to synapse, try adding the default file
-    if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
+    if not any(p.startswith(("--config-path", "-c")) for p in args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
         config_path = environ.get(
             "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"

@@ -510,7 +510,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         Args:
             number_destinations: Number of destinations to be created
         """
-        for i in range(0, number_destinations):
+        for i in range(number_destinations):
             dest = f"sub{i}.example.com"
             self._create_destination(dest, 50, 50, 50, 100)
 
@@ -690,7 +690,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
         self._check_fields(channel_desc.json_body["rooms"])
 
         # test that both lists have different directions
-        for i in range(0, number_rooms):
+        for i in range(number_rooms):
             self.assertEqual(
                 channel_asc.json_body["rooms"][i]["room_id"],
                 channel_desc.json_body["rooms"][number_rooms - 1 - i]["room_id"],
@@ -777,7 +777,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
         Args:
             number_rooms: Number of rooms to be created
         """
-        for _ in range(0, number_rooms):
+        for _ in range(number_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )

@@ -86,7 +86,7 @@ So we have stopped processing the request (and will probably go on to
 start processing the next), without clearing the logcontext.
 
 To circumvent this problem, synapse code assumes that, wherever you have
-an awaitable, you will want to `await` it. To that end, whereever
+an awaitable, you will want to `await` it. To that end, wherever
 functions return awaitables, we adopt the following conventions:
 
 **Rules for functions returning awaitables:**

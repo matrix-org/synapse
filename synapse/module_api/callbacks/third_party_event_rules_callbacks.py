@@ -40,7 +40,7 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
     [str, StateMap[EventBase], str], Awaitable[bool]
 ]
 ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
-CHECK_CAN_SHUTDOWN_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
+CHECK_CAN_SHUTDOWN_ROOM_CALLBACK = Callable[[Optional[str], str], Awaitable[bool]]
 CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
@@ -429,12 +429,17 @@ class ThirdPartyEventRulesModuleApiCallbacks:
                     "Failed to run module API callback %s: %s", callback, e
                 )
 
-    async def check_can_shutdown_room(self, user_id: str, room_id: str) -> bool:
+    async def check_can_shutdown_room(
+        self, user_id: Optional[str], room_id: str
+    ) -> bool:
         """Intercept requests to shutdown a room. If `False` is returned, the
          room must not be shut down.
 
         Args:
-            requester: The ID of the user requesting the shutdown.
+            user_id: The ID of the user requesting the shutdown.
+                If no user ID is supplied, then the room is being shut down through
+                some mechanism other than a user's request, e.g. through a module's
+                request.
             room_id: The ID of the room.
         """
         for callback in self._check_can_shutdown_room_callbacks:

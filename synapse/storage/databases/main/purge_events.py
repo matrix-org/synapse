@@ -450,10 +450,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "e2e_room_keys",
             "event_push_summary",
             "pusher_throttle",
-            "insertion_events",
-            "insertion_event_extremities",
-            "insertion_event_edges",
-            "batch_events",
             "room_account_data",
             "room_tags",
             # "rooms" happens last, to keep the foreign keys in the other tables

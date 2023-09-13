@@ -88,6 +88,14 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.93.0
+
+## Minimum supported Rust version
+The minimum supported Rust version has been increased from v1.60.0 to v1.61.0.
+Users building from source will need to ensure their `rustc` version is up to
+date.
+
+
 # Upgrading to v1.90.0
 
 ## App service query parameter authorization is now a configuration option
@@ -1344,7 +1352,7 @@ In line with our [deprecation policy](deprecation_policy.md),
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.
 
-This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or
+This release of Synapse requires Python 3.6+ and PostgreSQL 9.6+ or
 SQLite 3.22+.
 
 ## Removal of old List Accounts Admin API
@@ -2304,7 +2312,7 @@ for details.
 # Upgrading to v0.11.0
 
 This release includes the option to send anonymous usage stats to
-matrix.org, and requires that administrators explictly opt in or out by
+matrix.org, and requires that administrators explicitly opt in or out by
 setting the `report_stats` option to either `true` or `false`.
 
 We would really appreciate it if you could help our project out by
@@ -2408,7 +2416,7 @@ latest module, please run:
 
 # Upgrading to v0.5.0
 
-The webclient has been split out into a seperate repository/pacakage in
+The webclient has been split out into a separate repository/package in
 this release. Before you restart your homeserver you will need to pull
 in the webclient package by running:
 

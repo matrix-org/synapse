@@ -208,7 +208,7 @@ Improved Documentation
 ----------------------
 
 - Upload documentation PRs to Netlify. ([\#12947](https://github.com/matrix-org/synapse/issues/12947), [\#14370](https://github.com/matrix-org/synapse/issues/14370))
-- Add addtional TURN server configuration example based on [eturnal](https://github.com/processone/eturnal) and adjust general TURN server doc structure. ([\#14293](https://github.com/matrix-org/synapse/issues/14293))
+- Add additional TURN server configuration example based on [eturnal](https://github.com/processone/eturnal) and adjust general TURN server doc structure. ([\#14293](https://github.com/matrix-org/synapse/issues/14293))
 - Add example on how to load balance /sync requests. Contributed by [aceArt](https://aceart.de). ([\#14297](https://github.com/matrix-org/synapse/issues/14297))
 - Edit sample Nginx reverse proxy configuration to use HTTP/1.1. Contributed by Brad Jones. ([\#14414](https://github.com/matrix-org/synapse/issues/14414))
 
@@ -490,7 +490,7 @@ Internal Changes
 - When authenticating batched events, check for auth events in batch as well as DB. ([\#14214](https://github.com/matrix-org/synapse/issues/14214))
 - Update CI config to avoid GitHub Actions deprecation warnings. ([\#14216](https://github.com/matrix-org/synapse/issues/14216), [\#14224](https://github.com/matrix-org/synapse/issues/14224))
 - Update dependency requirements to allow building with poetry-core 1.3.2. ([\#14217](https://github.com/matrix-org/synapse/issues/14217))
-- Rename the `cache_memory` extra to `cache-memory`, for compatability with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14221](https://github.com/matrix-org/synapse/issues/14221))
+- Rename the `cache_memory` extra to `cache-memory`, for compatibility with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14221](https://github.com/matrix-org/synapse/issues/14221))
 - Specify dev-dependencies using lower bounds, to reduce the likelihood of a dependabot merge conflict. The lockfile continues to pin to specific versions. ([\#14227](https://github.com/matrix-org/synapse/issues/14227))
 
 
@@ -534,7 +534,7 @@ Bugfixes
 Internal Changes
 ----------------
 
-- Rename the `url_preview` extra to `url-preview`, for compatability with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14085](https://github.com/matrix-org/synapse/issues/14085))
+- Rename the `url_preview` extra to `url-preview`, for compatibility with poetry-core 1.3.0 and [PEP 685](https://peps.python.org/pep-0685/). From-source installations using this extra will need to install using the new name. ([\#14085](https://github.com/matrix-org/synapse/issues/14085))
 
 
 Synapse 1.69.0rc2 (2022-10-06)
@@ -719,7 +719,7 @@ Improved Documentation
 - Note that `libpq` is required on ARM-based Macs. ([\#13480](https://github.com/matrix-org/synapse/issues/13480))
 - Fix a mistake in the config manual introduced in Synapse 1.22.0: the `event_cache_size` _is_ scaled by `caches.global_factor`. ([\#13726](https://github.com/matrix-org/synapse/issues/13726))
 - Fix a typo in the documentation for the login ratelimiting configuration. ([\#13727](https://github.com/matrix-org/synapse/issues/13727))
-- Define Synapse's compatability policy for SQLite versions. ([\#13728](https://github.com/matrix-org/synapse/issues/13728))
+- Define Synapse's compatibility policy for SQLite versions. ([\#13728](https://github.com/matrix-org/synapse/issues/13728))
 - Add docs for the common fix of deleting the `matrix_synapse.egg-info/` directory for fixing Python dependency problems. ([\#13785](https://github.com/matrix-org/synapse/issues/13785))
 - Update request log format documentation to mention the format used when the authenticated user is controlling another user. ([\#13794](https://github.com/matrix-org/synapse/issues/13794))
 
@@ -2035,7 +2035,7 @@ Internal Changes
 - Add opentracing spans to calls to external cache. ([\#12380](https://github.com/matrix-org/synapse/issues/12380))
 - Lay groundwork for using `poetry` to manage Synapse's dependencies. ([\#12381](https://github.com/matrix-org/synapse/issues/12381), [\#12407](https://github.com/matrix-org/synapse/issues/12407), [\#12412](https://github.com/matrix-org/synapse/issues/12412), [\#12418](https://github.com/matrix-org/synapse/issues/12418))
 - Make missing `importlib_metadata` dependency explicit. ([\#12384](https://github.com/matrix-org/synapse/issues/12384), [\#12400](https://github.com/matrix-org/synapse/issues/12400))
-- Update type annotations for compatiblity with prometheus_client 0.14. ([\#12389](https://github.com/matrix-org/synapse/issues/12389))
+- Update type annotations for compatibility with prometheus_client 0.14. ([\#12389](https://github.com/matrix-org/synapse/issues/12389))
 - Remove support for the unstable identifiers specified in [MSC3288](https://github.com/matrix-org/matrix-doc/pull/3288). ([\#12398](https://github.com/matrix-org/synapse/issues/12398))
 - Add missing type hints to configuration classes. ([\#12402](https://github.com/matrix-org/synapse/issues/12402))
 - Add files used to build the Docker image used for complement testing into the Synapse repository. ([\#12404](https://github.com/matrix-org/synapse/issues/12404))
@@ -2207,7 +2207,7 @@ Deprecations and Removals
 
 - **Remove workaround introduced in Synapse 1.50.0 for Mjolnir compatibility. Breaks compatibility with Mjolnir 1.3.1 and earlier. ([\#11700](https://github.com/matrix-org/synapse/issues/11700))**
 - **`synctl` has been moved into into `synapse._scripts` and is exposed as an entry point; see [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#synctl-script-has-been-moved). ([\#12140](https://github.com/matrix-org/synapse/issues/12140))
-- Remove backwards compatibilty with pagination tokens from the `/relations` and `/aggregations` endpoints generated from Synapse < v1.52.0. ([\#12138](https://github.com/matrix-org/synapse/issues/12138))
+- Remove backwards compatibility with pagination tokens from the `/relations` and `/aggregations` endpoints generated from Synapse < v1.52.0. ([\#12138](https://github.com/matrix-org/synapse/issues/12138))
 - The groups/communities feature in Synapse has been deprecated. ([\#12200](https://github.com/matrix-org/synapse/issues/12200))
 
 
@@ -2586,10 +2586,10 @@ Bugfixes
 Improved Documentation
 ----------------------
 
-- Warn against using a Let's Encrypt certificate for TLS/DTLS TURN server client connections, and suggest using ZeroSSL certificate instead. This works around client-side connectivity errors caused by WebRTC libraries that reject Let's Encrypt certificates. Contibuted by @AndrewFerr. ([\#11686](https://github.com/matrix-org/synapse/issues/11686))
+- Warn against using a Let's Encrypt certificate for TLS/DTLS TURN server client connections, and suggest using ZeroSSL certificate instead. This works around client-side connectivity errors caused by WebRTC libraries that reject Let's Encrypt certificates. Contributed by @AndrewFerr. ([\#11686](https://github.com/matrix-org/synapse/issues/11686))
 - Document the new `SYNAPSE_TEST_PERSIST_SQLITE_DB` environment variable in the contributing guide. ([\#11715](https://github.com/matrix-org/synapse/issues/11715))
 - Document that the minimum supported PostgreSQL version is now 10. ([\#11725](https://github.com/matrix-org/synapse/issues/11725))
-- Fix typo in demo docs: differnt. ([\#11735](https://github.com/matrix-org/synapse/issues/11735))
+- Fix typo in demo docs: different. ([\#11735](https://github.com/matrix-org/synapse/issues/11735))
 - Update room spec URL in config files. ([\#11739](https://github.com/matrix-org/synapse/issues/11739))
 - Mention `python3-venv` and `libpq-dev` dependencies in the contribution guide. ([\#11740](https://github.com/matrix-org/synapse/issues/11740))
 - Update documentation for configuring login with Facebook. ([\#11755](https://github.com/matrix-org/synapse/issues/11755))
@@ -2707,7 +2707,7 @@ Improved Documentation
 
 - Update Synapse install command for FreeBSD as the package is now prefixed with `py38`. Contributed by @itchychips. ([\#11267](https://github.com/matrix-org/synapse/issues/11267))
 - Document the usage of refresh tokens. ([\#11427](https://github.com/matrix-org/synapse/issues/11427))
-- Add details for how to configure a TURN server when behind a NAT. Contibuted by @AndrewFerr. ([\#11553](https://github.com/matrix-org/synapse/issues/11553))
+- Add details for how to configure a TURN server when behind a NAT. Contributed by @AndrewFerr. ([\#11553](https://github.com/matrix-org/synapse/issues/11553))
 - Add references for using Postgres to the Docker documentation. ([\#11640](https://github.com/matrix-org/synapse/issues/11640))
 - Fix the documentation link in newly-generated configuration files. ([\#11678](https://github.com/matrix-org/synapse/issues/11678))
 - Correct the documentation for `nginx` to use a case-sensitive url pattern. Fixes an error introduced in v1.21.0. ([\#11680](https://github.com/matrix-org/synapse/issues/11680))

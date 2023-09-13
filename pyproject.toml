@@ -43,33 +43,39 @@ target-version = ['py38', 'py39', 'py310', 'py311']
 [tool.ruff]
 line-length = 88
 
-# See https://github.com/charliermarsh/ruff/#pycodestyle
+# See https://beta.ruff.rs/docs/rules/#error-e
 # for error codes. The ones we ignore are:
-#  E731: do not assign a lambda expression, use a def
 #  E501: Line too long (black enforces this for us)
+#  E731: do not assign a lambda expression, use a def
 #
 # flake8-bugbear compatible checks. Its error codes are described at
-# https://github.com/charliermarsh/ruff/#flake8-bugbear
-#  B019: Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
+# https://beta.ruff.rs/docs/rules/#flake8-bugbear-b
 #  B023: Functions defined inside a loop must not use variables redefined in the loop
-#  B024: Abstract base class with no abstract method.
 ignore = [
-    "B019",
     "B023",
-    "B024",
     "E501",
     "E731",
 ]
 select = [
-    # pycodestyle checks.
+    # pycodestyle
     "E",
     "W",
-    # pyflakes checks.
+    # pyflakes
     "F",
-    # flake8-bugbear checks.
+    # flake8-bugbear
     "B0",
-    # flake8-comprehensions checks.
+    # flake8-comprehensions
     "C4",
+    # flake8-2020
+    "YTT",
+    # flake8-slots
+    "SLOT",
+    # flake8-debugger
+    "T10",
+    # flake8-pie
+    "PIE",
+    # flake8-executable
+    "EXE",
 ]
 
 [tool.isort]
@@ -89,7 +95,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.92.0rc1"
+version = "1.92.1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -370,7 +376,7 @@ furo = ">=2022.12.7,<2024.0.0"
 # system changes.
 # We are happy to raise these upper bounds upon request,
 # provided we check that it's safe to do so (i.e. that CI passes).
-requires = ["poetry-core>=1.1.0,<=1.7.0", "setuptools_rust>=1.3,<=1.6.0"]
+requires = ["poetry-core>=1.1.0,<=1.7.0", "setuptools_rust>=1.3,<=1.7.0"]
 build-backend = "poetry.core.masonry.api"
 
 

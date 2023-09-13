@@ -759,18 +759,10 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             mapping of user_id -> device_id -> device_info.
         """
         unique_user_ids = user_ids | {user_id for user_id, _ in user_and_device_ids}
-        user_map = await self.get_device_list_last_stream_id_for_remotes(
-            list(unique_user_ids)
-        )
 
-        # We go and check if any of the users need to have their device lists
-        # resynced. If they do then we remove them from the cached list.
-        users_needing_resync = await self.get_user_ids_requiring_device_list_resync(
+        user_ids_in_cache = await self.get_users_whose_devices_are_cached(
             unique_user_ids
         )
-        user_ids_in_cache = {
-            user_id for user_id, stream_id in user_map.items() if stream_id
-        } - users_needing_resync
         user_ids_not_in_cache = unique_user_ids - user_ids_in_cache
 
         # First fetch all the users which all devices are to be returned.
@@ -791,6 +783,22 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         set_tag("not_in_cache", str(user_ids_not_in_cache))
 
         return user_ids_not_in_cache, results
+
+    async def get_users_whose_devices_are_cached(
+        self, user_ids: StrCollection
+    ) -> Set[str]:
+        """Checks which of the given users we have cached the devices for."""
+        user_map = await self.get_device_list_last_stream_id_for_remotes(user_ids)
+
+        # We go and check if any of the users need to have their device lists
+        # resynced. If they do then we remove them from the cached list.
+        users_needing_resync = await self.get_user_ids_requiring_device_list_resync(
+            user_ids
+        )
+        user_ids_in_cache = {
+            user_id for user_id, stream_id in user_map.items() if stream_id
+        } - users_needing_resync
+        return user_ids_in_cache
 
     @cached(num_args=2, tree=True)
     async def _get_cached_user_device(self, user_id: str, device_id: str) -> JsonDict:
@@ -1762,14 +1770,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 column="device_id",
                 values=device_ids,
                 keyvalues={"user_id": user_id, "hidden": False},
-            )
-
-            self.db_pool.simple_delete_many_txn(
-                txn,
-                table="device_inbox",
-                column="device_id",
-                values=device_ids,
-                keyvalues={"user_id": user_id},
             )
 
             self.db_pool.simple_delete_many_txn(
