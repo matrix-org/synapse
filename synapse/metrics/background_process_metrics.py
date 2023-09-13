@@ -329,7 +329,13 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
         super().start(rusage)
 
-        assert self._proc is not None
+        if self._proc is None:
+            logger.error(
+                "Background process re-entered without a proc: %s",
+                self.name,
+                stack_info=True,
+            )
+            return
 
         # We've become active again so we make sure we're in the list of active
         # procs. (Note that "start" here means we've become active, as opposed
@@ -347,7 +353,13 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
         super().__exit__(type, value, traceback)
 
-        assert self._proc is not None
+        if self._proc is None:
+            logger.error(
+                "Background process exited without a proc: %s",
+                self.name,
+                stack_info=True,
+            )
+            return
 
         # The background process has finished. We explicitly remove and manually
         # update the metrics here so that if nothing is scraping metrics the set
