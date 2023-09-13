@@ -984,7 +984,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         )
 
     @cached(iterable=True, max_entries=10000)
-    async def get_current_hosts_in_room_ordered(self, room_id: str) -> List[str]:
+    async def get_current_hosts_in_room_ordered(self, room_id: str) -> Tuple[str, ...]:
         """
         Get current hosts in room based on current state.
 
@@ -1013,12 +1013,14 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             # `get_users_in_room` rather than funky SQL.
 
             domains = await self.get_current_hosts_in_room(room_id)
-            return list(domains)
+            return tuple(domains)
 
         # For PostgreSQL we can use a regex to pull out the domains from the
         # joined users in `current_state_events` via regex.
 
-        def get_current_hosts_in_room_ordered_txn(txn: LoggingTransaction) -> List[str]:
+        def get_current_hosts_in_room_ordered_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[str, ...]:
             # Returns a list of servers currently joined in the room sorted by
             # longest in the room first (aka. with the lowest depth). The
             # heuristic of sorting by servers who have been in the room the
@@ -1043,7 +1045,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             """
             txn.execute(sql, (room_id,))
             # `server_domain` will be `NULL` for malformed MXIDs with no colons.
-            return [d for d, in txn if d is not None]
+            return tuple(d for d, in txn if d is not None)
 
         return await self.db_pool.runInteraction(
             "get_current_hosts_in_room_ordered", get_current_hosts_in_room_ordered_txn

@@ -1538,7 +1538,7 @@ class FederationEventHandler:
             logger.exception("Failed to resync device for %s", sender)
 
     async def backfill_event_id(
-        self, destinations: List[str], room_id: str, event_id: str
+        self, destinations: StrCollection, room_id: str, event_id: str
     ) -> PulledPduInfo:
         """Backfill a single event and persist it as a non-outlier which means
         we also pull in all of the state and auth events necessary for it.
