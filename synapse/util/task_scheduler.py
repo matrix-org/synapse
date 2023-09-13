@@ -283,6 +283,20 @@ class TaskScheduler:
             raise Exception(f"Task {id} is currently ACTIVE and can't be deleted")
         await self._store.delete_scheduled_task(id)
 
+    def launch_task_by_id(self, id: str) -> None:
+        """Try launching the task with the given ID."""
+        # Don't bother trying to launch new tasks if we're already at capacity.
+        if len(self._running_tasks) >= TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS:
+            return
+
+        run_as_background_process("launch_task_by_id", self._launch_task_by_id, id)
+
+    async def _launch_task_by_id(self, id: str) -> None:
+        """Helper async function for `launch_task_by_id`."""
+        task = await self.get_task(id)
+        if task:
+            await self._launch_task(task)
+
     @wrap_as_background_process("launch_scheduled_tasks")
     async def _launch_scheduled_tasks(self) -> None:
         """Retrieve and launch scheduled tasks that should be running at that time."""
