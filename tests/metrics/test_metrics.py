@@ -12,16 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing_extensions import Protocol
-
-try:
-    from importlib import metadata
-except ImportError:
-    import importlib_metadata as metadata  # type: ignore[no-redef]
-
+from importlib import metadata
+from typing import Dict, Tuple
 from unittest.mock import patch
 
 from pkg_resources import parse_version
+from prometheus_client.core import Sample
+from typing_extensions import Protocol
 
 from synapse.app._base import _set_prometheus_client_use_created_metrics
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
@@ -30,7 +27,7 @@ from synapse.util.caches.deferred_cache import DeferredCache
 from tests import unittest
 
 
-def get_sample_labels_value(sample):
+def get_sample_labels_value(sample: Sample) -> Tuple[Dict[str, str], float]:
     """Extract the labels and values of a sample.
 
     prometheus_client 0.5 changed the sample type to a named tuple with more
@@ -48,12 +45,15 @@ def get_sample_labels_value(sample):
         return sample.labels, sample.value
     # Otherwise fall back to treating it as a plain 3 tuple.
     else:
-        _, labels, value = sample
+        # In older versions of prometheus_client Sample was a 3-tuple.
+        labels: Dict[str, str]
+        value: float
+        _, labels, value = sample  # type: ignore[misc]
         return labels, value
 
 
 class TestMauLimit(unittest.TestCase):
-    def test_basic(self):
+    def test_basic(self) -> None:
         class MetricEntry(Protocol):
             foo: int
             bar: int
@@ -62,11 +62,11 @@ class TestMauLimit(unittest.TestCase):
             "test1", "", labels=["test_label"], sub_metrics=["foo", "bar"]
         )
 
-        def handle1(metrics):
+        def handle1(metrics: MetricEntry) -> None:
             metrics.foo += 2
             metrics.bar = max(metrics.bar, 5)
 
-        def handle2(metrics):
+        def handle2(metrics: MetricEntry) -> None:
             metrics.foo += 3
             metrics.bar = max(metrics.bar, 7)
 
@@ -116,7 +116,9 @@ class TestMauLimit(unittest.TestCase):
             self.get_metrics_from_gauge(gauge),
         )
 
-    def get_metrics_from_gauge(self, gauge):
+    def get_metrics_from_gauge(
+        self, gauge: InFlightGauge
+    ) -> Dict[str, Dict[Tuple[str, ...], float]]:
         results = {}
 
         for r in gauge.collect():
@@ -129,7 +131,7 @@ class TestMauLimit(unittest.TestCase):
 
 
 class BuildInfoTests(unittest.TestCase):
-    def test_get_build(self):
+    def test_get_build(self) -> None:
         """
         The synapse_build_info metric reports the OS version, Python version,
         and Synapse version.
@@ -147,7 +149,7 @@ class BuildInfoTests(unittest.TestCase):
 
 
 class CacheMetricsTests(unittest.HomeserverTestCase):
-    def test_cache_metric(self):
+    def test_cache_metric(self) -> None:
         """
         Caches produce metrics reflecting their state when scraped.
         """

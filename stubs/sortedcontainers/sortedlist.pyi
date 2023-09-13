@@ -2,10 +2,11 @@
 # https://github.com/grantjenks/python-sortedcontainers/blob/a419ffbd2b1c935b09f11f0971696e537fd0c510/sortedcontainers/sortedlist.pyi
 # (from https://github.com/grantjenks/python-sortedcontainers/pull/107)
 
+from __future__ import annotations
+
 from typing import (
     Any,
     Callable,
-    Generic,
     Iterable,
     Iterator,
     List,
@@ -28,7 +29,6 @@ _Repr = Callable[[], str]
 def recursive_repr(fillvalue: str = ...) -> Callable[[_Repr], _Repr]: ...
 
 class SortedList(MutableSequence[_T]):
-
     DEFAULT_LOAD_FACTOR: int = ...
     def __init__(
         self,

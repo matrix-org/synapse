@@ -18,6 +18,8 @@ import logging
 from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Tuple
 
 from synapse.api.constants import EventTypes
+from synapse.config._base import Config
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.tcp.streams import BackfillStream, CachesStream
 from synapse.replication.tcp.streams.events import (
     EventsStream,
@@ -45,6 +47,27 @@ logger = logging.getLogger(__name__)
 # This is a special cache name we use to batch multiple invalidations of caches
 # based on the current state when notifying workers over replication.
 CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
+
+# As above, but for invalidating event caches on history deletion
+PURGE_HISTORY_CACHE_NAME = "ph_cache_fake"
+
+# As above, but for invalidating room caches on room deletion
+DELETE_ROOM_CACHE_NAME = "dr_cache_fake"
+
+# How long between cache invalidation table cleanups, once we have caught up
+# with the backlog.
+REGULAR_CLEANUP_INTERVAL_MS = Config.parse_duration("1h")
+
+# How long between cache invalidation table cleanups, before we have caught
+# up with the backlog.
+CATCH_UP_CLEANUP_INTERVAL_MS = Config.parse_duration("1m")
+
+# Maximum number of cache invalidation rows to delete at once.
+CLEAN_UP_MAX_BATCH_SIZE = 20_000
+
+# Keep cache invalidations for 7 days
+# (This is likely to be quite excessive.)
+RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MS = Config.parse_duration("7d")
 
 
 class CacheInvalidationWorkerStore(SQLBaseStore):
@@ -75,6 +98,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._cache_id_gen = MultiWriterIdGenerator(
                 db_conn,
                 database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="caches",
                 instance_name=hs.get_instance_name(),
                 tables=[
@@ -90,6 +114,18 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
         else:
             self._cache_id_gen = None
+
+        # Occasionally clean up the cache invalidations stream table by deleting
+        # old rows.
+        # This is only applicable when Postgres is in use; this table is unused
+        # and not populated at all when SQLite is the active database engine.
+        if hs.config.worker.run_background_tasks and isinstance(
+            self.database_engine, PostgresEngine
+        ):
+            self.hs.get_clock().call_later(
+                CATCH_UP_CLEANUP_INTERVAL_MS / 1000,
+                self._clean_up_cache_invalidation_wrapper,
+            )
 
     async def get_all_updated_caches(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -164,9 +200,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     backfilled=True,
                 )
         elif stream_name == CachesStream.NAME:
-            if self._cache_id_gen:
-                self._cache_id_gen.advance(instance_name, token)
-
             for row in rows:
                 if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     if row.keys is None:
@@ -177,10 +210,35 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     room_id = row.keys[0]
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)
+                elif row.cache_func == PURGE_HISTORY_CACHE_NAME:
+                    if row.keys is None:
+                        raise Exception(
+                            "Can't send an 'invalidate all' for 'purge history' cache"
+                        )
+
+                    room_id = row.keys[0]
+                    self._invalidate_caches_for_room_events(room_id)
+                elif row.cache_func == DELETE_ROOM_CACHE_NAME:
+                    if row.keys is None:
+                        raise Exception(
+                            "Can't send an 'invalidate all' for 'delete room' cache"
+                        )
+
+                    room_id = row.keys[0]
+                    self._invalidate_caches_for_room_events(room_id)
+                    self._invalidate_caches_for_room(room_id)
                 else:
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == CachesStream.NAME:
+            if self._cache_id_gen:
+                self._cache_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)
 
     def _process_event_stream_row(self, token: int, row: EventsStreamRow) -> None:
         data = row.data
@@ -199,13 +257,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             )
         elif row.type == EventsStreamCurrentStateRow.TypeId:
             assert isinstance(data, EventsStreamCurrentStateRow)
-            self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)
+            self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)  # type: ignore[attr-defined]
 
             if data.type == EventTypes.Member:
-                self.get_rooms_for_user_with_stream_ordering.invalidate(
+                self.get_rooms_for_user_with_stream_ordering.invalidate(  # type: ignore[attr-defined]
                     (data.state_key,)
                 )
-                self.get_rooms_for_user.invalidate((data.state_key,))
+                self.get_rooms_for_user.invalidate((data.state_key,))  # type: ignore[attr-defined]
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
 
@@ -220,10 +278,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         relates_to: Optional[str],
         backfilled: bool,
     ) -> None:
+        # XXX: If you add something to this function make sure you add it to
+        # `_invalidate_caches_for_room_events` as well.
+
         # This invalidates any local in-memory cached event objects, the original
         # process triggering the invalidation is responsible for clearing any external
         # cached objects.
-        self._invalidate_local_get_event_cache(event_id)
+        self._invalidate_local_get_event_cache(event_id)  # type: ignore[attr-defined]
 
         self._attempt_to_invalidate_cache("have_seen_event", (room_id, event_id))
         self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
@@ -236,10 +297,10 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self._attempt_to_invalidate_cache("_get_membership_from_event_id", (event_id,))
 
         if not backfilled:
-            self._events_stream_cache.entity_has_changed(room_id, stream_ordering)
+            self._events_stream_cache.entity_has_changed(room_id, stream_ordering)  # type: ignore[attr-defined]
 
         if redacts:
-            self._invalidate_local_get_event_cache(redacts)
+            self._invalidate_local_get_event_cache(redacts)  # type: ignore[attr-defined]
             # Caches which might leak edits must be invalidated for the event being
             # redacted.
             self._attempt_to_invalidate_cache("get_relations_for_event", (redacts,))
@@ -248,7 +309,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._attempt_to_invalidate_cache("get_thread_id_for_receipts", (redacts,))
 
         if etype == EventTypes.Member:
-            self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
+            self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)  # type: ignore[attr-defined]
             self._attempt_to_invalidate_cache(
                 "get_invited_rooms_for_local_user", (state_key,)
             )
@@ -257,25 +318,135 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             )
             self._attempt_to_invalidate_cache("get_rooms_for_user", (state_key,))
 
+            self._attempt_to_invalidate_cache(
+                "did_forget",
+                (
+                    state_key,
+                    room_id,
+                ),
+            )
+            self._attempt_to_invalidate_cache(
+                "get_forgotten_rooms_for_user", (state_key,)
+            )
+
         if relates_to:
             self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
             self._attempt_to_invalidate_cache("get_references_for_event", (relates_to,))
-            self._attempt_to_invalidate_cache(
-                "get_aggregation_groups_for_event", (relates_to,)
-            )
             self._attempt_to_invalidate_cache("get_applicable_edit", (relates_to,))
             self._attempt_to_invalidate_cache("get_thread_summary", (relates_to,))
             self._attempt_to_invalidate_cache("get_thread_participated", (relates_to,))
             self._attempt_to_invalidate_cache("get_threads", (room_id,))
 
+    def _invalidate_caches_for_room_events_and_stream(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> None:
+        """Invalidate caches associated with events in a room, and stream to
+        replication.
+
+        Used when we delete events a room, but don't know which events we've
+        deleted.
+        """
+
+        self._send_invalidation_to_replication(txn, PURGE_HISTORY_CACHE_NAME, [room_id])
+        txn.call_after(self._invalidate_caches_for_room_events, room_id)
+
+    def _invalidate_caches_for_room_events(self, room_id: str) -> None:
+        """Invalidate caches associated with events in a room, and stream to
+        replication.
+
+        Used when we delete events in a room, but don't know which events we've
+        deleted.
+        """
+
+        self._invalidate_local_get_event_cache_all()  # type: ignore[attr-defined]
+
+        self._attempt_to_invalidate_cache("have_seen_event", (room_id,))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
+
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", None)
+        self._attempt_to_invalidate_cache("get_relations_for_event", None)
+        self._attempt_to_invalidate_cache("get_applicable_edit", None)
+        self._attempt_to_invalidate_cache("get_thread_id", None)
+        self._attempt_to_invalidate_cache("get_thread_id_for_receipts", None)
+        self._attempt_to_invalidate_cache("get_invited_rooms_for_local_user", None)
+        self._attempt_to_invalidate_cache(
+            "get_rooms_for_user_with_stream_ordering", None
+        )
+        self._attempt_to_invalidate_cache("get_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("did_forget", None)
+        self._attempt_to_invalidate_cache("get_forgotten_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("get_references_for_event", None)
+        self._attempt_to_invalidate_cache("get_thread_summary", None)
+        self._attempt_to_invalidate_cache("get_thread_participated", None)
+        self._attempt_to_invalidate_cache("get_threads", (room_id,))
+
+        self._attempt_to_invalidate_cache("_get_state_group_for_event", None)
+
+        self._attempt_to_invalidate_cache("get_event_ordering", None)
+        self._attempt_to_invalidate_cache("is_partial_state_event", None)
+        self._attempt_to_invalidate_cache("_get_joined_profile_from_event_id", None)
+
+    def _invalidate_caches_for_room_and_stream(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> None:
+        """Invalidate caches associated with rooms, and stream to replication.
+
+        Used when we delete rooms.
+        """
+
+        self._send_invalidation_to_replication(txn, DELETE_ROOM_CACHE_NAME, [room_id])
+        txn.call_after(self._invalidate_caches_for_room, room_id)
+
+    def _invalidate_caches_for_room(self, room_id: str) -> None:
+        """Invalidate caches associated with rooms.
+
+        Used when we delete rooms.
+        """
+
+        # If we've deleted the room then we also need to purge all event caches.
+        self._invalidate_caches_for_room_events(room_id)
+
+        self._attempt_to_invalidate_cache("get_account_data_for_room", None)
+        self._attempt_to_invalidate_cache("get_account_data_for_room_and_type", None)
+        self._attempt_to_invalidate_cache("get_aliases_for_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_latest_event_ids_in_room", (room_id,))
+        self._attempt_to_invalidate_cache("_get_forward_extremeties_for_room", None)
+        self._attempt_to_invalidate_cache(
+            "get_unread_event_push_actions_by_room_for_user", (room_id,)
+        )
+        self._attempt_to_invalidate_cache(
+            "_get_linearized_receipts_for_room", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("is_room_blocked", (room_id,))
+        self._attempt_to_invalidate_cache("get_retention_policy_for_room", (room_id,))
+        self._attempt_to_invalidate_cache(
+            "_get_partial_state_servers_at_join", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("is_partial_state_room", (room_id,))
+        self._attempt_to_invalidate_cache("get_invited_rooms_for_local_user", None)
+        self._attempt_to_invalidate_cache(
+            "get_current_hosts_in_room_ordered", (room_id,)
+        )
+        self._attempt_to_invalidate_cache("did_forget", None)
+        self._attempt_to_invalidate_cache("get_forgotten_rooms_for_user", None)
+        self._attempt_to_invalidate_cache("_get_membership_from_event_id", None)
+        self._attempt_to_invalidate_cache("get_room_version_id", (room_id,))
+
+        # And delete state caches.
+
+        self._invalidate_state_caches_all(room_id)
+
     async def invalidate_cache_and_stream(
         self, cache_name: str, keys: Tuple[Any, ...]
     ) -> None:
-        """Invalidates the cache and adds it to the cache stream so slaves
+        """Invalidates the cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
 
-        This should only be used to invalidate caches where slaves won't
-        otherwise know from other replication streams that the cache should
+        This should only be used to invalidate caches where other workers won't
+        otherwise have known from other replication streams that the cache should
         be invalidated.
         """
         cache_func = getattr(self, cache_name, None)
@@ -294,11 +465,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         cache_func: CachedFunction,
         keys: Tuple[Any, ...],
     ) -> None:
-        """Invalidates the cache and adds it to the cache stream so slaves
+        """Invalidates the cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
 
-        This should only be used to invalidate caches where slaves won't
-        otherwise know from other replication streams that the cache should
+        This should only be used to invalidate caches where other workers won't
+        otherwise have known from other replication streams that the cache should
         be invalidated.
         """
         txn.call_after(cache_func.invalidate, keys)
@@ -307,7 +478,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
     def _invalidate_all_cache_and_stream(
         self, txn: LoggingTransaction, cache_func: CachedFunction
     ) -> None:
-        """Invalidates the entire cache and adds it to the cache stream so slaves
+        """Invalidates the entire cache and adds it to the cache stream so other workers
         will know to invalidate their caches.
         """
 
@@ -374,7 +545,17 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 "Can't stream invalidate all with magic current state cache"
             )
 
+        if cache_name == PURGE_HISTORY_CACHE_NAME and keys is None:
+            raise Exception(
+                "Can't stream invalidate all with magic purge history cache"
+            )
+
+        if cache_name == DELETE_ROOM_CACHE_NAME and keys is None:
+            raise Exception("Can't stream invalidate all with magic delete room cache")
+
         if isinstance(self.database_engine, PostgresEngine):
+            assert self._cache_id_gen is not None
+
             # get_next() returns a context manager which is designed to wrap
             # the transaction. However, we want to only get an ID when we want
             # to use it, here, so we need to call __enter__ manually, and have
@@ -402,3 +583,104 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             return self._cache_id_gen.get_current_token_for_writer(instance_name)
         else:
             return 0
+
+    @wrap_as_background_process("clean_up_old_cache_invalidations")
+    async def _clean_up_cache_invalidation_wrapper(self) -> None:
+        """
+        Clean up cache invalidation stream table entries occasionally.
+        If we are behind (i.e. there are entries old enough to
+        be deleted but too many of them to be deleted in one go),
+        then we run slightly more frequently.
+        """
+        delete_up_to: int = (
+            self.hs.get_clock().time_msec() - RETENTION_PERIOD_OF_CACHE_INVALIDATIONS_MS
+        )
+
+        in_backlog = await self._clean_up_batch_of_old_cache_invalidations(delete_up_to)
+
+        # Vary how long we wait before calling again depending on whether we
+        # are still sifting through backlog or we have caught up.
+        if in_backlog:
+            next_interval = CATCH_UP_CLEANUP_INTERVAL_MS
+        else:
+            next_interval = REGULAR_CLEANUP_INTERVAL_MS
+
+        self.hs.get_clock().call_later(
+            next_interval / 1000, self._clean_up_cache_invalidation_wrapper
+        )
+
+    async def _clean_up_batch_of_old_cache_invalidations(
+        self, delete_up_to_millisec: int
+    ) -> bool:
+        """
+        Remove old rows from the `cache_invalidation_stream_by_instance` table automatically (this table is unused in SQLite).
+
+        Up to `CLEAN_UP_BATCH_SIZE` rows will be deleted at once.
+
+        Returns true if and only if we were limited by batch size (i.e. we are in backlog:
+        there are more things to clean up).
+        """
+
+        def _clean_up_batch_of_old_cache_invalidations_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            # First get the earliest stream ID
+            txn.execute(
+                """
+                SELECT stream_id FROM cache_invalidation_stream_by_instance
+                ORDER BY stream_id ASC
+                LIMIT 1
+                """
+            )
+            row = txn.fetchone()
+            if row is None:
+                return False
+            earliest_stream_id: int = row[0]
+
+            # Then find the last stream ID of the range we will delete
+            txn.execute(
+                """
+                SELECT stream_id FROM cache_invalidation_stream_by_instance
+                WHERE stream_id <= ? AND invalidation_ts <= ?
+                ORDER BY stream_id DESC
+                LIMIT 1
+                """,
+                (earliest_stream_id + CLEAN_UP_MAX_BATCH_SIZE, delete_up_to_millisec),
+            )
+            row = txn.fetchone()
+            if row is None:
+                return False
+            cutoff_stream_id: int = row[0]
+
+            # Determine whether we are caught up or still catching up
+            txn.execute(
+                """
+                SELECT invalidation_ts FROM cache_invalidation_stream_by_instance
+                WHERE stream_id > ?
+                ORDER BY stream_id ASC
+                LIMIT 1
+                """,
+                (cutoff_stream_id,),
+            )
+            row = txn.fetchone()
+            if row is None:
+                in_backlog = False
+            else:
+                # We are in backlog if the next row could have been deleted
+                # if we didn't have such a small batch size
+                in_backlog = row[0] <= delete_up_to_millisec
+
+            txn.execute(
+                """
+                DELETE FROM cache_invalidation_stream_by_instance
+                WHERE ? <= stream_id AND stream_id <= ?
+                """,
+                (earliest_stream_id, cutoff_stream_id),
+            )
+
+            return in_backlog
+
+        return await self.db_pool.runInteraction(
+            "clean_up_old_cache_invalidations",
+            _clean_up_batch_of_old_cache_invalidations_txn,
+        )

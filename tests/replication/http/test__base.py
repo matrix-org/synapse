@@ -44,7 +44,7 @@ class CancellableReplicationEndpoint(ReplicationEndpoint):
 
     @cancellable
     async def _handle_request(  # type: ignore[override]
-        self, request: Request
+        self, request: Request, content: JsonDict
     ) -> Tuple[int, JsonDict]:
         await self.clock.sleep(1.0)
         return HTTPStatus.OK, {"result": True}
@@ -54,6 +54,7 @@ class UncancellableReplicationEndpoint(ReplicationEndpoint):
     NAME = "uncancellable_sleep"
     PATH_ARGS = ()
     CACHE = False
+    WAIT_FOR_STREAMS = False
 
     def __init__(self, hs: HomeServer):
         super().__init__(hs)
@@ -64,7 +65,7 @@ class UncancellableReplicationEndpoint(ReplicationEndpoint):
         return {}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request
+        self, request: Request, content: JsonDict
     ) -> Tuple[int, JsonDict]:
         await self.clock.sleep(1.0)
         return HTTPStatus.OK, {"result": True}
@@ -73,7 +74,7 @@ class UncancellableReplicationEndpoint(ReplicationEndpoint):
 class ReplicationEndpointCancellationTestCase(unittest.HomeserverTestCase):
     """Tests for `ReplicationEndpoint` cancellation."""
 
-    def create_test_resource(self):
+    def create_test_resource(self) -> JsonResource:
         """Overrides `HomeserverTestCase.create_test_resource`."""
         resource = JsonResource(self.hs)
 
@@ -85,7 +86,7 @@ class ReplicationEndpointCancellationTestCase(unittest.HomeserverTestCase):
     def test_cancellable_disconnect(self) -> None:
         """Test that handlers with the `@cancellable` flag can be cancelled."""
         path = f"{REPLICATION_PREFIX}/{CancellableReplicationEndpoint.NAME}/"
-        channel = self.make_request("POST", path, await_result=False)
+        channel = self.make_request("POST", path, await_result=False, content={})
         test_disconnect(
             self.reactor,
             channel,
@@ -96,7 +97,7 @@ class ReplicationEndpointCancellationTestCase(unittest.HomeserverTestCase):
     def test_uncancellable_disconnect(self) -> None:
         """Test that handlers without the `@cancellable` flag cannot be cancelled."""
         path = f"{REPLICATION_PREFIX}/{UncancellableReplicationEndpoint.NAME}/"
-        channel = self.make_request("POST", path, await_result=False)
+        channel = self.make_request("POST", path, await_result=False, content={})
         test_disconnect(
             self.reactor,
             channel,

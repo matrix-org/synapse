@@ -37,8 +37,8 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
-    LimitExceededError,
     NotFoundError,
+    PartialStateConflictError,
     ShadowBanError,
     SynapseError,
     UnstableSpecAuthError,
@@ -49,19 +49,18 @@ from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import EventContext, UnpersistedEventContextBase
+from synapse.events.utils import SerializeEventConfig, maybe_upsert_event_field
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.replication.http.send_events import ReplicationSendEventsRestServlet
-from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
-    MutableStateMap,
     PersistedEventPosition,
     Requester,
     RoomAlias,
@@ -70,6 +69,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.types.state import StateFilter
 from synapse.util import json_decoder, json_encoder, log_failure, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -77,7 +77,6 @@ from synapse.util.metrics import measure_func
 from synapse.visibility import get_effective_room_visibility_from_state
 
 if TYPE_CHECKING:
-    from synapse.events.third_party_rules import ThirdPartyEventRules
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -245,8 +244,11 @@ class MessageHandler:
                 )
                 room_state = room_state_events[membership_event_id]
 
-        now = self.clock.time_msec()
-        events = self._event_serializer.serialize_events(room_state.values(), now)
+        events = self._event_serializer.serialize_events(
+            room_state.values(),
+            self.clock.time_msec(),
+            config=SerializeEventConfig(requester=requester),
+        )
         return events
 
     async def _user_can_see_state_at_event(
@@ -377,7 +379,7 @@ class MessageHandler:
         """
 
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
-        if not isinstance(expiry_ts, int) or event.is_state():
+        if type(expiry_ts) is not int or event.is_state():  # noqa: E721
             return
 
         # _schedule_expiry_for_event won't actually schedule anything if there's already
@@ -484,6 +486,7 @@ class EventCreationHandler:
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
         self._notifier = hs.get_notifier()
+        self._worker_lock_handler = hs.get_worker_locks_handler()
 
         self.room_prejoin_state_types = self.hs.config.api.room_prejoin_state
 
@@ -499,15 +502,15 @@ class EventCreationHandler:
 
         self.request_ratelimiter = hs.get_request_ratelimiter()
 
-        # We arbitrarily limit concurrent event creation for a room to 5.
-        # This is to stop us from diverging history *too* much.
-        self.limiter = Linearizer(max_count=5, name="room_event_creation_limit")
+        # We limit concurrent event creation for a room to 1. This prevents state resolution
+        # from occurring when sending bursts of events to a local room
+        self.limiter = Linearizer(max_count=1, name="room_event_creation_limit")
 
         self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
-        self.spam_checker = hs.get_spam_checker()
-        self.third_party_event_rules: "ThirdPartyEventRules" = (
-            self.hs.get_third_party_event_rules()
+        self._spam_checker_module_callbacks = hs.get_module_api_callbacks().spam_checker
+        self._third_party_event_rules = (
+            self.hs.get_module_api_callbacks().third_party_event_rules
         )
 
         self._block_events_without_consent_error = (
@@ -569,12 +572,11 @@ class EventCreationHandler:
         state_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
-        historical: bool = False,
         depth: Optional[int] = None,
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
         current_state_group: Optional[int] = None,
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         """
         Given a dict from a client, create a new event. If bool for_batch is true, will
         create an event using the prev_event_ids, and will create an event context for
@@ -595,7 +597,7 @@ class EventCreationHandler:
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids:
                 the forward extremities to use as the prev_events for the
                 new event.
@@ -610,13 +612,10 @@ class EventCreationHandler:
                 If non-None, prev_event_ids must also be provided.
 
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is with insertion events which float at
-                the beginning of a historical batch and don't have any `prev_events` to
-                derive from; we add all of these state events as the explicit state so the
-                rest of the historical batch can inherit the same state and state_group.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
 
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
@@ -624,10 +623,6 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
 
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
@@ -698,17 +693,22 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
+        # Save the access token ID, the device ID and the transaction ID in the event
+        # internal metadata. This is useful to determine if we should echo the
+        # transaction_id in events.
+        # See `synapse.events.utils.EventClientSerializer.serialize_event`
         if requester.access_token_id is not None:
             builder.internal_metadata.token_id = requester.access_token_id
+
+        if requester.device_id is not None:
+            builder.internal_metadata.device_id = requester.device_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
         builder.internal_metadata.outlier = outlier
 
-        builder.internal_metadata.historical = historical
-
-        event, context = await self.create_new_client_event(
+        event, unpersisted_context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
             allow_no_prev_events=allow_no_prev_events,
@@ -737,8 +737,8 @@ class EventCreationHandler:
                 assert state_map is not None
                 prev_event_id = state_map.get((EventTypes.Member, event.sender))
             else:
-                prev_state_ids = await context.get_prev_state_ids(
-                    StateFilter.from_types([(EventTypes.Member, None)])
+                prev_state_ids = await unpersisted_context.get_prev_state_ids(
+                    StateFilter.from_types([(EventTypes.Member, event.sender)])
                 )
                 prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
@@ -762,8 +762,7 @@ class EventCreationHandler:
                 )
 
         self.validator.validate_new(event, self.config)
-
-        return event, context
+        return event, unpersisted_context
 
     async def _is_exempt_from_privacy_policy(
         self, builder: EventBuilder, requester: Requester
@@ -861,7 +860,7 @@ class EventCreationHandler:
             return None
 
         prev_state_ids = await context.get_prev_state_ids(
-            StateFilter.from_types([(event.type, None)])
+            StateFilter.from_types([(event.type, event.state_key)])
         )
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
@@ -876,6 +875,40 @@ class EventCreationHandler:
             if prev_content == next_content:
                 return prev_event
         return None
+
+    async def get_event_id_from_transaction(
+        self,
+        requester: Requester,
+        txn_id: str,
+        room_id: str,
+    ) -> Optional[str]:
+        """For the given transaction ID and room ID, check if there is a matching event ID.
+
+        Args:
+            requester: The requester making the request in the context of which we want
+                to fetch the event.
+            txn_id: The transaction ID.
+            room_id: The room ID.
+
+        Returns:
+            An event ID if one could be found, None otherwise.
+        """
+        existing_event_id = None
+
+        # According to the spec, transactions are scoped to a user's device ID.
+        if requester.device_id:
+            existing_event_id = (
+                await self.store.get_event_id_from_transaction_id_and_device_id(
+                    room_id,
+                    requester.user.to_string(),
+                    requester.device_id,
+                    txn_id,
+                )
+            )
+            if existing_event_id:
+                return existing_event_id
+
+        return existing_event_id
 
     async def get_event_from_transaction(
         self,
@@ -895,16 +928,11 @@ class EventCreationHandler:
         Returns:
             An event if one could be found, None otherwise.
         """
-        if requester.access_token_id:
-            existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id,
-                requester.user.to_string(),
-                requester.access_token_id,
-                txn_id,
-            )
-            if existing_event_id:
-                return await self.store.get_event(existing_event_id)
-
+        existing_event_id = await self.get_event_id_from_transaction(
+            requester, txn_id, room_id
+        )
+        if existing_event_id:
+            return await self.store.get_event(existing_event_id)
         return None
 
     async def create_and_send_nonmember_event(
@@ -918,7 +946,6 @@ class EventCreationHandler:
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
         outlier: bool = False,
-        historical: bool = False,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
         """
@@ -932,19 +959,16 @@ class EventCreationHandler:
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids:
                 The event IDs to use as the prev events.
                 Should normally be left as None to automatically request them
                 from the database.
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is with insertion events which float at
-                the beginning of a historical batch and don't have any `prev_events` to
-                derive from; we add all of these state events as the explicit state so the
-                rest of the historical batch can inherit the same state and state_group.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -952,9 +976,6 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-            historical: Indicates whether the message is being inserted
-                back in time around some existing events. This is used to skip
-                a few checks and mark the event as backfilled.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -985,10 +1006,11 @@ class EventCreationHandler:
         # a situation where event persistence can't keep up, causing
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
-        async with self.limiter.queue(event_dict["room_id"]):
+        room_id = event_dict["room_id"]
+        async with self.limiter.queue(room_id):
             if txn_id:
                 event = await self.get_event_from_transaction(
-                    requester, txn_id, event_dict["room_id"]
+                    requester, txn_id, room_id
                 )
                 if event:
                     # we know it was persisted, so must have a stream ordering
@@ -998,60 +1020,120 @@ class EventCreationHandler:
                         event.internal_metadata.stream_ordering,
                     )
 
-            event, context = await self.create_event(
-                requester,
-                event_dict,
-                txn_id=txn_id,
+        async with self._worker_lock_handler.acquire_read_write_lock(
+            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
+        ):
+            return await self._create_and_send_nonmember_event_locked(
+                requester=requester,
+                event_dict=event_dict,
                 allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
                 state_event_ids=state_event_ids,
+                ratelimit=ratelimit,
+                txn_id=txn_id,
+                ignore_shadow_ban=ignore_shadow_ban,
                 outlier=outlier,
-                historical=historical,
                 depth=depth,
             )
 
-            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
-                event.sender,
+    async def _create_and_send_nonmember_event_locked(
+        self,
+        requester: Requester,
+        event_dict: dict,
+        allow_no_prev_events: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
+        ratelimit: bool = True,
+        txn_id: Optional[str] = None,
+        ignore_shadow_ban: bool = False,
+        outlier: bool = False,
+        depth: Optional[int] = None,
+    ) -> Tuple[EventBase, int]:
+        room_id = event_dict["room_id"]
+
+        # If we don't have any prev event IDs specified then we need to
+        # check that the host is in the room (as otherwise populating the
+        # prev events will fail), at which point we may as well check the
+        # local user is in the room.
+        if not prev_event_ids:
+            user_id = requester.user.to_string()
+            is_user_in_room = await self.store.check_local_user_in_room(
+                user_id, room_id
             )
+            if not is_user_in_room:
+                raise AuthError(403, f"User {user_id} not in room {room_id}")
 
-            spam_check_result = await self.spam_checker.check_event_for_spam(event)
-            if spam_check_result != self.spam_checker.NOT_SPAM:
-                if isinstance(spam_check_result, tuple):
-                    try:
-                        [code, dict] = spam_check_result
-                        raise SynapseError(
-                            403,
-                            "This message had been rejected as probable spam",
-                            code,
-                            dict,
-                        )
-                    except ValueError:
-                        logger.error(
-                            "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
-                            spam_check_result,
-                        )
+        # Try several times, it could fail with PartialStateConflictError
+        # in handle_new_client_event, cf comment in except block.
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                event, unpersisted_context = await self.create_event(
+                    requester,
+                    event_dict,
+                    txn_id=txn_id,
+                    allow_no_prev_events=allow_no_prev_events,
+                    prev_event_ids=prev_event_ids,
+                    state_event_ids=state_event_ids,
+                    outlier=outlier,
+                    depth=depth,
+                )
+                context = await unpersisted_context.persist(event)
 
-                        raise SynapseError(
-                            403,
-                            "This message has been rejected as probable spam",
-                            Codes.FORBIDDEN,
-                        )
-
-                # Backwards compatibility: if the return value is not an error code, it
-                # means the module returned an error message to be included in the
-                # SynapseError (which is now deprecated).
-                raise SynapseError(
-                    403,
-                    spam_check_result,
-                    Codes.FORBIDDEN,
+                assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+                    event.sender,
                 )
 
-            ev = await self.handle_new_client_event(
-                requester=requester,
-                events_and_context=[(event, context)],
-                ratelimit=ratelimit,
-                ignore_shadow_ban=ignore_shadow_ban,
-            )
+                spam_check_result = (
+                    await self._spam_checker_module_callbacks.check_event_for_spam(
+                        event
+                    )
+                )
+                if spam_check_result != self._spam_checker_module_callbacks.NOT_SPAM:
+                    if isinstance(spam_check_result, tuple):
+                        try:
+                            [code, dict] = spam_check_result
+                            raise SynapseError(
+                                403,
+                                "This message had been rejected as probable spam",
+                                code,
+                                dict,
+                            )
+                        except ValueError:
+                            logger.error(
+                                "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
+                                spam_check_result,
+                            )
+
+                            raise SynapseError(
+                                403,
+                                "This message has been rejected as probable spam",
+                                Codes.FORBIDDEN,
+                            )
+
+                    # Backwards compatibility: if the return value is not an error code, it
+                    # means the module returned an error message to be included in the
+                    # SynapseError (which is now deprecated).
+                    raise SynapseError(
+                        403,
+                        spam_check_result,
+                        Codes.FORBIDDEN,
+                    )
+
+                ev = await self.handle_new_client_event(
+                    requester=requester,
+                    events_and_context=[(event, context)],
+                    ratelimit=ratelimit,
+                    ignore_shadow_ban=ignore_shadow_ban,
+                )
+
+                break
+            except PartialStateConflictError as e:
+                # Persisting couldn't happen because the room got un-partial stated
+                # in the meantime and context needs to be recomputed, so let's do so.
+                if i == max_retries - 1:
+                    raise e
+                pass
 
         # we know it was persisted, so must have a stream ordering
         assert ev.internal_metadata.stream_ordering
@@ -1070,13 +1152,14 @@ class EventCreationHandler:
         state_map: Optional[StateMap[str]] = None,
         for_batch: bool = False,
         current_state_group: Optional[int] = None,
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         """Create a new event for a local client. If bool for_batch is true, will
         create an event using the prev_event_ids, and will create an event context for
         the event using the parameters state_map and current_state_group, thus these parameters
         must be provided in this case if for_batch is True. The subsequently created event
         and context are suitable for being batched up and bulk persisted to the database
-        with other similarly created events.
+        with other similarly created events. Note that this returns an UnpersistedEventContext,
+        which must be converted to an EventContext before it can be sent to the DB.
 
         Args:
             builder:
@@ -1084,7 +1167,7 @@ class EventCreationHandler:
             allow_no_prev_events: Whether to allow this event to be created an empty
                 list of prev_events. Normally this is prohibited just because most
                 events should have a prev_event and we should only use this in special
-                cases like MSC2716.
+                cases (previously useful for MSC2716).
             prev_event_ids:
                 the forward extremities to use as the prev_events for the
                 new event.
@@ -1097,13 +1180,10 @@ class EventCreationHandler:
                 based on the room state at the prev_events.
 
             state_event_ids:
-                The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint. One use case is with insertion events which float at
-                the beginning of a historical batch and don't have any `prev_events` to
-                derive from; we add all of these state events as the explicit state so the
-                rest of the historical batch can inherit the same state and state_group.
-                This should normally be left as None, which will cause the auth_event_ids
-                to be calculated based on the room state at the prev_events.
+                The full state at a given event. This was previously used particularly
+                by the MSC2716 /batch_send endpoint. This should normally be left as
+                None, which will cause the auth_event_ids to be calculated based on the
+                room state at the prev_events.
 
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
@@ -1118,7 +1198,7 @@ class EventCreationHandler:
                 batch persisting
 
         Returns:
-            Tuple of created event, context
+            Tuple of created event, UnpersistedEventContext
         """
         # Strip down the state_event_ids to only what we need to auth the event.
         # For example, we don't need extra m.room.member that don't match event.sender
@@ -1174,14 +1254,20 @@ class EventCreationHandler:
         if for_batch:
             assert prev_event_ids is not None
             assert state_map is not None
-            assert current_state_group is not None
             auth_ids = self._event_auth_handler.compute_auth_events(builder, state_map)
             event = await builder.build(
                 prev_event_ids=prev_event_ids, auth_event_ids=auth_ids, depth=depth
             )
-            context = await self.state.compute_event_context_for_batched(
-                event, state_map, current_state_group
+
+            context: UnpersistedEventContextBase = (
+                await self.state.calculate_context_info(
+                    event,
+                    state_ids_before_event=state_map,
+                    partial_state=False,
+                    state_group_before_event=current_state_group,
+                )
             )
+
         else:
             event = await builder.build(
                 prev_event_ids=prev_event_ids,
@@ -1194,58 +1280,13 @@ class EventCreationHandler:
             if builder.internal_metadata.outlier:
                 event.internal_metadata.outlier = True
                 context = EventContext.for_outlier(self._storage_controllers)
-            elif (
-                event.type == EventTypes.MSC2716_INSERTION
-                and state_event_ids
-                and builder.internal_metadata.is_historical()
-            ):
-                # Add explicit state to the insertion event so it has state to derive
-                # from even though it's floating with no `prev_events`. The rest of
-                # the batch can derive from this state and state_group.
-                #
-                # TODO(faster_joins): figure out how this works, and make sure that the
-                #   old state is complete.
-                #   https://github.com/matrix-org/synapse/issues/13003
-                metadata = await self.store.get_metadata_for_events(state_event_ids)
-
-                state_map_for_event: MutableStateMap[str] = {}
-                for state_id in state_event_ids:
-                    data = metadata.get(state_id)
-                    if data is None:
-                        # We're trying to persist a new historical batch of events
-                        # with the given state, e.g. via
-                        # `RoomBatchSendEventRestServlet`. The state can be inferred
-                        # by Synapse or set directly by the client.
-                        #
-                        # Either way, we should have persisted all the state before
-                        # getting here.
-                        raise Exception(
-                            f"State event {state_id} not found in DB,"
-                            " Synapse should have persisted it before using it."
-                        )
-
-                    if data.state_key is None:
-                        raise Exception(
-                            f"Trying to set non-state event {state_id} as state"
-                        )
-
-                    state_map_for_event[(data.event_type, data.state_key)] = state_id
-
-                context = await self.state.compute_event_context(
-                    event,
-                    state_ids_before_event=state_map_for_event,
-                    # TODO(faster_joins): check how MSC2716 works and whether we can have
-                    #   partial state here
-                    #   https://github.com/matrix-org/synapse/issues/13003
-                    partial_state=False,
-                )
             else:
-                context = await self.state.compute_event_context(event)
+                context = await self.state.calculate_context_info(event)
 
         if requester:
             context.app_service = requester.app_service
 
-        res, new_content = await self.third_party_event_rules.check_event_allowed(
+        res, new_content = await self._third_party_event_rules.check_event_allowed(
             event, context
         )
         if res is False:
@@ -1313,7 +1354,11 @@ class EventCreationHandler:
                 relation.parent_id, event.type, aggregation_key, event.sender
             )
             if already_exists:
-                raise SynapseError(400, "Can't send same reaction twice")
+                raise SynapseError(
+                    400,
+                    "Can't send same reaction twice",
+                    errcode=Codes.DUPLICATE_ANNOTATION,
+                )
 
         # Don't attempt to start a thread if the parent event is a relation.
         elif relation.rel_type == RelationTypes.THREAD:
@@ -1355,7 +1400,7 @@ class EventCreationHandler:
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
-            SynapseError(503) if attempting to persist a partial state event in
+            PartialStateConflictError if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
         extra_users = extra_users or []
@@ -1416,35 +1461,24 @@ class EventCreationHandler:
 
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
-        event, context = events_and_context[0]
-        try:
-            result, _ = await make_deferred_yieldable(
-                gather_results(
-                    (
-                        run_in_background(
-                            self._persist_events,
-                            requester=requester,
-                            events_and_context=events_and_context,
-                            ratelimit=ratelimit,
-                            extra_users=extra_users,
-                        ),
-                        run_in_background(
-                            self.cache_joined_hosts_for_events, events_and_context
-                        ).addErrback(
-                            log_failure, "cache_joined_hosts_for_event failed"
-                        ),
-                    ),
-                    consumeErrors=True,
-                )
-            ).addErrback(unwrapFirstError)
-        except PartialStateConflictError as e:
-            # The event context needs to be recomputed.
-            # Turn the error into a 429, as a hint to the client to try again.
-            logger.info(
-                "Room %s was un-partial stated while persisting client event.",
-                event.room_id,
-            )
-            raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
+        #
+        # Note: mypy gets confused if we inline dl and check with twisted#11770.
+        # Some kind of bug in mypy's deduction?
+        deferreds = (
+            run_in_background(
+                self._persist_events,
+                requester=requester,
+                events_and_context=events_and_context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+            ),
+            run_in_background(
+                self.cache_joined_hosts_for_events, events_and_context
+            ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
+        )
+        result, _ = await make_deferred_yieldable(
+            gather_results(deferreds, consumeErrors=True)
+        ).addErrback(unwrapFirstError)
 
         return result
 
@@ -1529,12 +1563,23 @@ class EventCreationHandler:
         external federation senders don't have to recalculate it themselves.
         """
 
-        for event, _ in events_and_context:
-            if not self._external_cache.is_enabled():
-                return
+        if not self._external_cache.is_enabled():
+            return
 
-            # If external cache is enabled we should always have this.
-            assert self._external_cache_joined_hosts_updates is not None
+        # If external cache is enabled we should always have this.
+        assert self._external_cache_joined_hosts_updates is not None
+
+        for event, event_context in events_and_context:
+            if event_context.partial_state:
+                # To populate the cache for a partial-state event, we either have to
+                # block until full state, which the code below does, or change the
+                # meaning of cache values to be the list of hosts to which we plan to
+                # send events and calculate that instead.
+                #
+                # The federation senders don't use the external cache when sending
+                # events in partial-state rooms anyway, so let's not bother populating
+                # the cache.
+                continue
 
             # We actually store two mappings, event ID -> prev state group,
             # state group -> joined hosts, which is much more space efficient
@@ -1561,12 +1606,11 @@ class EventCreationHandler:
                 if state_entry.state_group in self._external_cache_joined_hosts_updates:
                     return
 
-                state = await state_entry.get_state(
-                    self._storage_controllers.state, StateFilter.all()
-                )
                 with opentracing.start_active_span("get_joined_hosts"):
-                    joined_hosts = await self.store.get_joined_hosts(
-                        event.room_id, state, state_entry
+                    joined_hosts = (
+                        await self._storage_controllers.state.get_joined_hosts(
+                            event.room_id, state_entry
+                        )
                     )
 
                 # Note that the expiry times must be larger than the expiry time in
@@ -1739,12 +1783,15 @@ class EventCreationHandler:
 
             if event.type == EventTypes.Member:
                 if event.content["membership"] == Membership.INVITE:
-                    event.unsigned[
-                        "invite_room_state"
-                    ] = await self.store.get_stripped_room_state_from_event_context(
-                        context,
-                        self.room_prejoin_state_types,
-                        membership_user_id=event.sender,
+                    maybe_upsert_event_field(
+                        event,
+                        event.unsigned,
+                        "invite_room_state",
+                        await self.store.get_stripped_room_state_from_event_context(
+                            context,
+                            self.room_prejoin_state_types,
+                            membership_user_id=event.sender,
+                        ),
                     )
 
                     invitee = UserID.from_string(event.state_key)
@@ -1762,11 +1809,14 @@ class EventCreationHandler:
                         event.signatures.update(returned_invite.signatures)
 
                 if event.content["membership"] == Membership.KNOCK:
-                    event.unsigned[
-                        "knock_room_state"
-                    ] = await self.store.get_stripped_room_state_from_event_context(
-                        context,
-                        self.room_prejoin_state_types,
+                    maybe_upsert_event_field(
+                        event,
+                        event.unsigned,
+                        "knock_room_state",
+                        await self.store.get_stripped_room_state_from_event_context(
+                            context,
+                            self.room_prejoin_state_types,
+                        ),
                     )
 
             if event.type == EventTypes.Redaction:
@@ -1796,28 +1846,6 @@ class EventCreationHandler:
                     if original_event.type == EventTypes.ServerACL:
                         raise AuthError(
                             403, "Redacting server ACL events is not permitted"
-                        )
-
-                    # Add a little safety stop-gap to prevent people from trying to
-                    # redact MSC2716 related events when they're in a room version
-                    # which does not support it yet. We allow people to use MSC2716
-                    # events in existing room versions but only from the room
-                    # creator since it does not require any changes to the auth
-                    # rules and in effect, the redaction algorithm . In the
-                    # supported room version, we add the `historical` power level to
-                    # auth the MSC2716 related events and adjust the redaction
-                    # algorthim to keep the `historical` field around (redacting an
-                    # event should only strip fields which don't affect the
-                    # structural protocol level).
-                    is_msc2716_event = (
-                        original_event.type == EventTypes.MSC2716_INSERTION
-                        or original_event.type == EventTypes.MSC2716_BATCH
-                        or original_event.type == EventTypes.MSC2716_MARKER
-                    )
-                    if not room_version_obj.msc2716_historical and is_msc2716_event:
-                        raise AuthError(
-                            403,
-                            "Redacting MSC2716 events is not supported in this room version",
                         )
 
                 event_types = event_auth.auth_types_for_event(event.room_version, event)
@@ -1857,53 +1885,12 @@ class EventCreationHandler:
                 if prev_state_ids:
                     raise AuthError(403, "Changing the room create event is forbidden")
 
-            if event.type == EventTypes.MSC2716_INSERTION:
-                room_version = await self.store.get_room_version_id(event.room_id)
-                room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
-                create_event = await self.store.get_create_event_for_room(event.room_id)
-                room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
-
-                # Only check an insertion event if the room version
-                # supports it or the event is from the room creator.
-                if room_version_obj.msc2716_historical or (
-                    self.config.experimental.msc2716_enabled
-                    and event.sender == room_creator
-                ):
-                    next_batch_id = event.content.get(
-                        EventContentFields.MSC2716_NEXT_BATCH_ID
-                    )
-                    conflicting_insertion_event_id = None
-                    if next_batch_id:
-                        conflicting_insertion_event_id = (
-                            await self.store.get_insertion_event_id_by_batch_id(
-                                event.room_id, next_batch_id
-                            )
-                        )
-                    if conflicting_insertion_event_id is not None:
-                        # The current insertion event that we're processing is invalid
-                        # because an insertion event already exists in the room with the
-                        # same next_batch_id. We can't allow multiple because the batch
-                        # pointing will get weird, e.g. we can't determine which insertion
-                        # event the batch event is pointing to.
-                        raise SynapseError(
-                            HTTPStatus.BAD_REQUEST,
-                            "Another insertion event already exists with the same next_batch_id",
-                            errcode=Codes.INVALID_PARAM,
-                        )
-
-            # Mark any `m.historical` messages as backfilled so they don't appear
-            # in `/sync` and have the proper decrementing `stream_ordering` as we import
-            backfilled = False
-            if event.internal_metadata.is_historical():
-                backfilled = True
-
         assert self._storage_controllers.persistence is not None
         (
             persisted_events,
             max_stream_token,
         ) = await self._storage_controllers.persistence.persist_events(
-            events_and_context, backfilled=backfilled
+            events_and_context,
         )
 
         events_and_pos = []
@@ -1920,7 +1907,12 @@ class EventCreationHandler:
             if event.type == EventTypes.Message:
                 # We don't want to block sending messages on any presence code. This
                 # matters as sometimes presence code can take a while.
-                run_in_background(self._bump_active_time, requester.user)
+                run_as_background_process(
+                    "bump_presence_active_time",
+                    self._bump_active_time,
+                    requester.user,
+                    requester.device_id,
+                )
 
         async def _notify() -> None:
             try:
@@ -1956,10 +1948,10 @@ class EventCreationHandler:
         logger.info("maybe_kick_guest_users %r", current_state)
         await self.hs.get_room_member_handler().kick_guest_users(current_state)
 
-    async def _bump_active_time(self, user: UserID) -> None:
+    async def _bump_active_time(self, user: UserID, device_id: Optional[str]) -> None:
         try:
             presence = self.hs.get_presence_handler()
-            await presence.bump_presence_active_time(user)
+            await presence.bump_presence_active_time(user, device_id)
         except Exception:
             logger.exception("Error bumping presence active time")
 
@@ -1975,7 +1967,10 @@ class EventCreationHandler:
         )
 
         for room_id in room_ids:
-            dummy_event_sent = await self._send_dummy_event_for_room(room_id)
+            async with self._worker_lock_handler.acquire_read_write_lock(
+                NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
+            ):
+                dummy_event_sent = await self._send_dummy_event_for_room(room_id)
 
             if not dummy_event_sent:
                 # Did not find a valid user in the room, so remove from future attempts
@@ -2005,26 +2000,40 @@ class EventCreationHandler:
         for user_id in members:
             requester = create_requester(user_id, authenticated_entity=self.server_name)
             try:
-                event, context = await self.create_event(
-                    requester,
-                    {
-                        "type": EventTypes.Dummy,
-                        "content": {},
-                        "room_id": room_id,
-                        "sender": user_id,
-                    },
-                )
+                # Try several times, it could fail with PartialStateConflictError
+                # in handle_new_client_event, cf comment in except block.
+                max_retries = 5
+                for i in range(max_retries):
+                    try:
+                        event, unpersisted_context = await self.create_event(
+                            requester,
+                            {
+                                "type": EventTypes.Dummy,
+                                "content": {},
+                                "room_id": room_id,
+                                "sender": user_id,
+                            },
+                        )
+                        context = await unpersisted_context.persist(event)
 
-                event.internal_metadata.proactively_send = False
+                        event.internal_metadata.proactively_send = False
 
-                # Since this is a dummy-event it is OK if it is sent by a
-                # shadow-banned user.
-                await self.handle_new_client_event(
-                    requester,
-                    events_and_context=[(event, context)],
-                    ratelimit=False,
-                    ignore_shadow_ban=True,
-                )
+                        # Since this is a dummy-event it is OK if it is sent by a
+                        # shadow-banned user.
+                        await self.handle_new_client_event(
+                            requester,
+                            events_and_context=[(event, context)],
+                            ratelimit=False,
+                            ignore_shadow_ban=True,
+                        )
+
+                        break
+                    except PartialStateConflictError as e:
+                        # Persisting couldn't happen because the room got un-partial stated
+                        # in the meantime and context needs to be recomputed, so let's do so.
+                        if i == max_retries - 1:
+                            raise e
+                        pass
                 return True
             except AuthError:
                 logger.info(
@@ -2048,9 +2057,9 @@ class EventCreationHandler:
 
     async def _rebuild_event_after_third_party_rules(
         self, third_party_result: dict, original_event: EventBase
-    ) -> Tuple[EventBase, EventContext]:
+    ) -> Tuple[EventBase, UnpersistedEventContextBase]:
         # the third_party_event_rules want to replace the event.
-        # we do some basic checks, and then return the replacement event and context.
+        # we do some basic checks, and then return the replacement event.
 
         # Construct a new EventBuilder and validate it, which helps with the
         # rest of these checks.
@@ -2104,5 +2113,6 @@ class EventCreationHandler:
 
         # we rebuild the event context, to be on the safe side. If nothing else,
         # delta_ids might need an update.
-        context = await self.state.compute_event_context(event)
+        context = await self.state.calculate_context_info(event)
+
         return event, context

@@ -31,7 +31,6 @@ from tests.utils import MockClock
 
 
 class MediaRetentionTestCase(unittest.HomeserverTestCase):
-
     ONE_DAY_IN_MS = 24 * 60 * 60 * 1000
     THIRTY_DAYS_IN_MS = 30 * ONE_DAY_IN_MS
 

@@ -19,15 +19,18 @@ import collections
 import inspect
 import itertools
 import logging
+import typing
 from contextlib import asynccontextmanager
 from typing import (
     Any,
+    AsyncContextManager,
     AsyncIterator,
     Awaitable,
     Callable,
     Collection,
     Coroutine,
     Dict,
+    Generator,
     Generic,
     Hashable,
     Iterable,
@@ -42,7 +45,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import AsyncContextManager, Concatenate, Literal, ParamSpec
+from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
@@ -138,7 +141,7 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
             for observer in observers:
                 # This is a little bit of magic to correctly propagate stack
                 # traces when we `await` on one of the observer deferreds.
-                f.value.__failure__ = f  # type: ignore[union-attr]
+                f.value.__failure__ = f
                 try:
                     observer.errback(f)
                 except Exception as e:
@@ -205,7 +208,10 @@ T = TypeVar("T")
 
 
 async def concurrently_execute(
-    func: Callable[[T], Any], args: Iterable[T], limit: int
+    func: Callable[[T], Any],
+    args: Iterable[T],
+    limit: int,
+    delay_cancellation: bool = False,
 ) -> None:
     """Executes the function with each argument concurrently while limiting
     the number of concurrent executions.
@@ -215,6 +221,8 @@ async def concurrently_execute(
         args: List of arguments to pass to func, each invocation of func
             gets a single argument.
         limit: Maximum number of conccurent executions.
+        delay_cancellation: Whether to delay cancellation until after the invocations
+            have finished.
 
     Returns:
         None, when all function invocations have finished. The return values
@@ -233,9 +241,16 @@ async def concurrently_execute(
     # We use `itertools.islice` to handle the case where the number of args is
     # less than the limit, avoiding needlessly spawning unnecessary background
     # tasks.
-    await yieldable_gather_results(
-        _concurrently_execute_inner, (value for value in itertools.islice(it, limit))
-    )
+    if delay_cancellation:
+        await yieldable_gather_results_delaying_cancellation(
+            _concurrently_execute_inner,
+            (value for value in itertools.islice(it, limit)),
+        )
+    else:
+        await yieldable_gather_results(
+            _concurrently_execute_inner,
+            (value for value in itertools.islice(it, limit)),
+        )
 
 
 P = ParamSpec("P")
@@ -288,6 +303,41 @@ async def yieldable_gather_results(
 
         # suppress exception chaining, because the FirstError doesn't tell us anything
         # very interesting.
+        assert isinstance(dfe.subFailure.value, BaseException)
+        raise dfe.subFailure.value from None
+
+
+async def yieldable_gather_results_delaying_cancellation(
+    func: Callable[Concatenate[T, P], Awaitable[R]],
+    iter: Iterable[T],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> List[R]:
+    """Executes the function with each argument concurrently.
+    Cancellation is delayed until after all the results have been gathered.
+
+    See `yieldable_gather_results`.
+
+    Args:
+        func: Function to execute that returns a Deferred
+        iter: An iterable that yields items that get passed as the first
+            argument to the function
+        *args: Arguments to be passed to each call to func
+        **kwargs: Keyword arguments to be passed to each call to func
+
+    Returns
+        A list containing the results of the function
+    """
+    try:
+        return await make_deferred_yieldable(
+            delay_cancellation(
+                defer.gatherResults(
+                    [run_in_background(func, item, *args, **kwargs) for item in iter],  # type: ignore[arg-type]
+                    consumeErrors=True,
+                )
+            )
+        )
+    except defer.FirstError as dfe:
         assert isinstance(dfe.subFailure.value, BaseException)
         raise dfe.subFailure.value from None
 
@@ -350,7 +400,7 @@ class _LinearizerEntry:
     # The number of things executing.
     count: int
     # Deferreds for the things blocked from executing.
-    deferreds: collections.OrderedDict
+    deferreds: typing.OrderedDict["defer.Deferred[None]", Literal[1]]
 
 
 class Linearizer:
@@ -669,30 +719,25 @@ def timeout_deferred(
     return new_d
 
 
-# This class can't be generic because it uses slots with attrs.
-# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class DoneAwaitable:  # should be: Generic[R]
+class DoneAwaitable(Awaitable[R]):
     """Simple awaitable that returns the provided value."""
 
-    value: Any  # should be: R
+    value: R
 
-    def __await__(self) -> Any:
-        return self
-
-    def __iter__(self) -> "DoneAwaitable":
-        return self
-
-    def __next__(self) -> None:
-        raise StopIteration(self.value)
+    def __await__(self) -> Generator[Any, None, R]:
+        yield None
+        return self.value
 
 
 def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
     """Convert a value to an awaitable if not already an awaitable."""
     if inspect.isawaitable(value):
-        assert isinstance(value, Awaitable)
         return value
 
+    # For some reason mypy doesn't deduce that value is not Awaitable here, even though
+    # inspect.isawaitable returns a TypeGuard.
+    assert not isinstance(value, Awaitable)
     return DoneAwaitable(value)
 
 

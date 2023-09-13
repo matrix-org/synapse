@@ -103,7 +103,7 @@ class PusherConfig:
 
     id: Optional[str]
     user_name: str
-    access_token: Optional[int]
+
     profile_tag: str
     kind: str
     app_id: str
@@ -118,6 +118,11 @@ class PusherConfig:
     failing_since: Optional[int]
     enabled: bool
     device_id: Optional[str]
+
+    # XXX(quenting): The access_token is not persisted anymore for new pushers, but we
+    # keep it when reading from the database, so that we don't get stale pushers
+    # while the "set_device_id_for_pushers" background update is running.
+    access_token: Optional[int]
 
     def as_dict(self) -> Dict[str, Any]:
         """Information that can be retrieved about a pusher after creation."""

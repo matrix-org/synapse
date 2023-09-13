@@ -21,7 +21,7 @@ from tests.utils import default_config
 
 
 class RegistrationConfigTestCase(ConfigFileTestCase):
-    def test_session_lifetime_must_not_be_exceeded_by_smaller_lifetimes(self):
+    def test_session_lifetime_must_not_be_exceeded_by_smaller_lifetimes(self) -> None:
         """
         session_lifetime should logically be larger than, or at least as large as,
         all the different token lifetimes.
@@ -91,7 +91,7 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
             "",
         )
 
-    def test_refuse_to_start_if_open_registration_and_no_verification(self):
+    def test_refuse_to_start_if_open_registration_and_no_verification(self) -> None:
         self.generate_config()
         self.add_lines_to_config(
             [

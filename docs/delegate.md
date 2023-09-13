@@ -73,6 +73,15 @@ It is also possible to do delegation using a SRV DNS record. However, that is ge
 not recommended, as it can be difficult to configure the TLS certificates correctly in
 this case, and it offers little advantage over `.well-known` delegation.
 
+Please keep in mind that server delegation is a function of server-server communication,
+and as such using SRV DNS records will not cover use cases involving client-server comms.
+This means setting global client settings (such as a Jitsi endpoint, or disabling
+creating new rooms as encrypted by default, etc) will still require that you serve a file
+from the `https://<server_name>/.well-known/` endpoints defined in the spec! If you are
+considering using SRV DNS delegation to avoid serving files from this endpoint, consider
+the impact that you will not be able to change those client-based default values globally,
+and will be relegated to the featureset of the configuration of each individual client.
+
 However, if you really need it, you can find some documentation on what such a
 record should look like and how Synapse will use it in [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names).

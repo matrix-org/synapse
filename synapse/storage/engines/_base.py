@@ -112,6 +112,12 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
         """Gets a string giving the server version. For example: '3.22.0'"""
         ...
 
+    @property
+    @abc.abstractmethod
+    def row_id_name(self) -> str:
+        """Gets the literal name representing a row id for this engine."""
+        ...
+
     @abc.abstractmethod
     def in_transaction(self, conn: ConnectionType) -> bool:
         """Whether the connection is currently in a transaction."""
@@ -144,6 +150,10 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
         """Execute a chunk of SQL containing multiple semicolon-delimited statements.
 
         This is not provided by DBAPI2, and so needs engine-specific support.
+
+        Any ongoing transaction is committed before executing the script in its own
+        transaction. The script transaction is left open and it is the responsibility of
+        the caller to commit it.
         """
         ...
 
@@ -153,5 +163,5 @@ class BaseDatabaseEngine(Generic[ConnectionType, CursorType], metaclass=abc.ABCM
 
         This is not provided by DBAPI2, and so needs engine-specific support.
         """
-        with open(filepath, "rt") as f:
+        with open(filepath) as f:
             cls.executescript(cursor, f.read())

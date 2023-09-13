@@ -30,7 +30,6 @@ class TlsConfig(Config):
     section = "tls"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
 

@@ -1,12 +1,8 @@
 {% extends "_base.html" %}
 {% block title %}Authentication{% endblock %}
 
-{% block header %}
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-{% endblock %}
-
 {% block body %}
-<form id="registrationForm" method="post" action="{{ myurl }}">
+<form method="post" action="{{ myurl }}">
     <div>
         {% if error is defined %}
             <p class="error"><strong>Error: {{ error }}</strong></p>

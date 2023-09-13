@@ -117,6 +117,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             # to avoid importing authlib here.
             "enum": ["client_secret_basic", "client_secret_post", "none"],
         },
+        "pkce_method": {"type": "string", "enum": ["auto", "always", "never"]},
         "scopes": {"type": "array", "items": {"type": "string"}},
         "authorization_endpoint": {"type": "string"},
         "token_endpoint": {"type": "string"},
@@ -135,6 +136,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "type": "array",
             "items": SsoAttributeRequirement.JSON_SCHEMA,
         },
+        "enable_registration": {"type": "boolean"},
     },
 }
 
@@ -278,6 +280,20 @@ def _parse_oidc_config_dict(
         for x in oidc_config.get("attribute_requirements", [])
     ]
 
+    # Read from either `client_secret_path` or `client_secret`. If both exist, error.
+    client_secret = oidc_config.get("client_secret")
+    client_secret_path = oidc_config.get("client_secret_path")
+    if client_secret_path is not None:
+        if client_secret is None:
+            client_secret = read_file(
+                client_secret_path, config_path + ("client_secret_path",)
+            ).rstrip("\n")
+        else:
+            raise ConfigError(
+                "Cannot specify both client_secret and client_secret_path",
+                config_path + ("client_secret",),
+            )
+
     return OidcProviderConfig(
         idp_id=idp_id,
         idp_name=oidc_config.get("idp_name", "OIDC"),
@@ -286,9 +302,10 @@ def _parse_oidc_config_dict(
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
-        client_secret=oidc_config.get("client_secret"),
+        client_secret=client_secret,
         client_secret_jwt_key=client_secret_jwt_key,
         client_auth_method=oidc_config.get("client_auth_method", "client_secret_basic"),
+        pkce_method=oidc_config.get("pkce_method", "auto"),
         scopes=oidc_config.get("scopes", ["openid"]),
         authorization_endpoint=oidc_config.get("authorization_endpoint"),
         token_endpoint=oidc_config.get("token_endpoint"),
@@ -304,6 +321,7 @@ def _parse_oidc_config_dict(
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
         attribute_requirements=attribute_requirements,
+        enable_registration=oidc_config.get("enable_registration", True),
     )
 
 
@@ -357,6 +375,10 @@ class OidcProviderConfig:
     # 'none'.
     client_auth_method: str
 
+    # Whether to enable PKCE when exchanging the authorization & token.
+    # Valid values are 'auto', 'always', and 'never'.
+    pkce_method: str
+
     # list of scopes to request
     scopes: Collection[str]
 
@@ -399,3 +421,6 @@ class OidcProviderConfig:
 
     # required attributes to require in userinfo to allow login/registration
     attribute_requirements: List[SsoAttributeRequirement]
+
+    # Whether automatic registrations are enabled in the ODIC flow. Defaults to True
+    enable_registration: bool

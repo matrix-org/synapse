@@ -14,16 +14,19 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Awaitable, Callable, Collection, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
 
+from synapse.api.constants import AccountDataTypes
 from synapse.replication.http.account_data import (
+    ReplicationAddRoomAccountDataRestServlet,
     ReplicationAddTagRestServlet,
+    ReplicationAddUserAccountDataRestServlet,
+    ReplicationRemoveRoomAccountDataRestServlet,
     ReplicationRemoveTagRestServlet,
-    ReplicationRoomAccountDataRestServlet,
-    ReplicationUserAccountDataRestServlet,
+    ReplicationRemoveUserAccountDataRestServlet,
 )
 from synapse.streams import EventSource
-from synapse.types import JsonDict, StreamKeyType, UserID
+from synapse.types import JsonDict, StrCollection, StreamKeyType, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -41,8 +44,18 @@ class AccountDataHandler:
         self._instance_name = hs.get_instance_name()
         self._notifier = hs.get_notifier()
 
-        self._user_data_client = ReplicationUserAccountDataRestServlet.make_client(hs)
-        self._room_data_client = ReplicationRoomAccountDataRestServlet.make_client(hs)
+        self._add_user_data_client = (
+            ReplicationAddUserAccountDataRestServlet.make_client(hs)
+        )
+        self._remove_user_data_client = (
+            ReplicationRemoveUserAccountDataRestServlet.make_client(hs)
+        )
+        self._add_room_data_client = (
+            ReplicationAddRoomAccountDataRestServlet.make_client(hs)
+        )
+        self._remove_room_data_client = (
+            ReplicationRemoveRoomAccountDataRestServlet.make_client(hs)
+        )
         self._add_tag_client = ReplicationAddTagRestServlet.make_client(hs)
         self._remove_tag_client = ReplicationRemoveTagRestServlet.make_client(hs)
         self._account_data_writers = hs.config.worker.writers.account_data
@@ -112,12 +125,53 @@ class AccountDataHandler:
 
             return max_stream_id
         else:
-            response = await self._room_data_client(
+            response = await self._add_room_data_client(
                 instance_name=random.choice(self._account_data_writers),
                 user_id=user_id,
                 room_id=room_id,
                 account_data_type=account_data_type,
                 content=content,
+            )
+            return response["max_stream_id"]
+
+    async def remove_account_data_for_room(
+        self, user_id: str, room_id: str, account_data_type: str
+    ) -> Optional[int]:
+        """
+        Deletes the room account data for the given user and account data type.
+
+        "Deleting" account data merely means setting the content of the account data
+        to an empty JSON object: {}.
+
+        Args:
+            user_id: The user ID to remove room account data for.
+            room_id: The room ID to target.
+            account_data_type: The account data type to remove.
+
+        Returns:
+            The maximum stream ID, or None if the room account data item did not exist.
+        """
+        if self._instance_name in self._account_data_writers:
+            max_stream_id = await self._store.remove_account_data_for_room(
+                user_id, room_id, account_data_type
+            )
+
+            self._notifier.on_new_event(
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
+            )
+
+            # Notify Synapse modules that the content of the type has changed to an
+            # empty dictionary.
+            await self._notify_modules(user_id, room_id, account_data_type, {})
+
+            return max_stream_id
+        else:
+            response = await self._remove_room_data_client(
+                instance_name=random.choice(self._account_data_writers),
+                user_id=user_id,
+                room_id=room_id,
+                account_data_type=account_data_type,
+                content={},
             )
             return response["max_stream_id"]
 
@@ -127,9 +181,9 @@ class AccountDataHandler:
         """Add some global account_data for a user.
 
         Args:
-            user_id: The user to add a tag for.
+            user_id: The user to add some account data for.
             account_data_type: The type of account_data to add.
-            content: A json object to associate with the tag.
+            content: The content json dictionary.
 
         Returns:
             The maximum stream ID.
@@ -148,11 +202,46 @@ class AccountDataHandler:
 
             return max_stream_id
         else:
-            response = await self._user_data_client(
+            response = await self._add_user_data_client(
                 instance_name=random.choice(self._account_data_writers),
                 user_id=user_id,
                 account_data_type=account_data_type,
                 content=content,
+            )
+            return response["max_stream_id"]
+
+    async def remove_account_data_for_user(
+        self, user_id: str, account_data_type: str
+    ) -> Optional[int]:
+        """Removes a piece of global account_data for a user.
+
+        Args:
+            user_id: The user to remove account data for.
+            account_data_type: The type of account_data to remove.
+
+        Returns:
+            The maximum stream ID, or None if the room account data item did not exist.
+        """
+
+        if self._instance_name in self._account_data_writers:
+            max_stream_id = await self._store.remove_account_data_for_user(
+                user_id, account_data_type
+            )
+
+            self._notifier.on_new_event(
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
+            )
+
+            # Notify Synapse modules that the content of the type has changed to an
+            # empty dictionary.
+            await self._notify_modules(user_id, None, account_data_type, {})
+
+            return max_stream_id
+        else:
+            response = await self._remove_user_data_client(
+                instance_name=random.choice(self._account_data_writers),
+                user_id=user_id,
+                account_data_type=account_data_type,
             )
             return response["max_stream_id"]
 
@@ -218,7 +307,7 @@ class AccountDataEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
 
-    def get_current_key(self, direction: str = "f") -> int:
+    def get_current_key(self) -> int:
         return self.store.get_max_account_data_stream_id()
 
     async def get_new_events(
@@ -226,7 +315,7 @@ class AccountDataEventSource(EventSource[int, JsonDict]):
         user: UserID,
         from_key: int,
         limit: int,
-        room_ids: Collection[str],
+        room_ids: StrCollection,
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
@@ -240,13 +329,19 @@ class AccountDataEventSource(EventSource[int, JsonDict]):
 
         for room_id, room_tags in tags.items():
             results.append(
-                {"type": "m.tag", "content": {"tags": room_tags}, "room_id": room_id}
+                {
+                    "type": AccountDataTypes.TAG,
+                    "content": {"tags": room_tags},
+                    "room_id": room_id,
+                }
             )
 
-        (
-            account_data,
-            room_account_data,
-        ) = await self.store.get_updated_account_data_for_user(user_id, last_stream_id)
+        account_data = await self.store.get_updated_global_account_data_for_user(
+            user_id, last_stream_id
+        )
+        room_account_data = await self.store.get_updated_room_account_data_for_user(
+            user_id, last_stream_id
+        )
 
         for account_data_type, content in account_data.items():
             results.append({"type": account_data_type, "content": content})

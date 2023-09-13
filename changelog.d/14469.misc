@@ -1,1 +1,0 @@
-Remove option to skip locking of tables when performing emulated upserts, to avoid a class of bugs in future.

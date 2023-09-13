@@ -1,6 +1,7 @@
 # Using Postgres
 
-Synapse supports PostgreSQL versions 10 or later.
+The minimum supported version of PostgreSQL is determined by the [Dependency
+Deprecation Policy](deprecation_policy.md).
 
 ## Install postgres client libraries
 
@@ -15,7 +16,7 @@ connect to a postgres database.
 -   For other pre-built packages, please consult the documentation from
     the relevant package.
 -   If you installed synapse [in a
-    virtualenv](setup/installation.md#installing-from-source), you can install
+    virtualenv](setup/installation.md#installing-as-a-python-module-from-pypi), you can install
     the library with:
 
         ~/synapse/env/bin/pip install "matrix-synapse[postgres]"
@@ -248,7 +249,7 @@ of `COLLATE` and `CTYPE` unless the config flag `allow_unsafe_locale`, found in 
 underneath the database, or if a different version of the locale is used on any
 replicas.
 
-If you have a databse with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
+If you have a database with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
 the correct locale parameter (as shown above). It is also possible to change the
 parameters on a live database and run a `REINDEX` on the entire database,
 however extreme care must be taken to avoid database corruption.

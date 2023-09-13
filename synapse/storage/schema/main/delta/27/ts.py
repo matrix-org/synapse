@@ -14,6 +14,8 @@
 import json
 import logging
 
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ ALTER_TABLE = (
 )
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     for statement in get_statements(ALTER_TABLE.splitlines()):
         cur.execute(statement)
 
@@ -51,7 +53,3 @@ def run_create(cur, database_engine, *args, **kwargs):
         )
 
         cur.execute(sql, ("event_origin_server_ts", progress_json))
-
-
-def run_upgrade(*args, **kwargs):
-    pass

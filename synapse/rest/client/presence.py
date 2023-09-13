@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 class PresenceStatusRestServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
+    CATEGORY = "Presence requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -96,7 +97,7 @@ class PresenceStatusRestServlet(RestServlet):
             raise SynapseError(400, "Unable to parse state")
 
         if self._use_presence:
-            await self.presence_handler.set_state(user, state)
+            await self.presence_handler.set_state(user, requester.device_id, state)
 
         return 200, {}
 

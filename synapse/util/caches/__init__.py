@@ -98,7 +98,6 @@ class EvictionReason(Enum):
 
 @attr.s(slots=True, auto_attribs=True)
 class CacheMetric:
-
     _cache: Sized
     _cache_type: str
     _cache_name: str

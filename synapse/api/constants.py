@@ -17,7 +17,8 @@
 
 """Contains constants from the specification."""
 
-from typing_extensions import Final
+import enum
+from typing import Final
 
 # the max size of a (canonical-json-encoded) event
 MAX_PDU_SIZE = 65536
@@ -121,10 +122,6 @@ class EventTypes:
     SpaceChild: Final = "m.space.child"
     SpaceParent: Final = "m.space.parent"
 
-    MSC2716_INSERTION: Final = "org.matrix.msc2716.insertion"
-    MSC2716_BATCH: Final = "org.matrix.msc2716.batch"
-    MSC2716_MARKER: Final = "org.matrix.msc2716.marker"
-
     Reaction: Final = "m.reaction"
 
 
@@ -152,6 +149,7 @@ class EduTypes:
 
 class RejectedReason:
     AUTH_ERROR: Final = "auth_error"
+    OVERSIZED_EVENT: Final = "oversized_event"
 
 
 class RoomCreationPreset:
@@ -212,23 +210,21 @@ class EventContentFields:
     FEDERATE: Final = "m.federate"
 
     # The creator of the room, as used in `m.room.create` events.
+    #
+    # This is deprecated in MSC2175.
     ROOM_CREATOR: Final = "creator"
 
     # Used in m.room.guest_access events.
     GUEST_ACCESS: Final = "guest_access"
 
-    # Used on normal messages to indicate they were historically imported after the fact
-    MSC2716_HISTORICAL: Final = "org.matrix.msc2716.historical"
-    # For "insertion" events to indicate what the next batch ID should be in
-    # order to connect to it
-    MSC2716_NEXT_BATCH_ID: Final = "next_batch_id"
-    # Used on "batch" events to indicate which insertion event it connects to
-    MSC2716_BATCH_ID: Final = "batch_id"
-    # For "marker" events
-    MSC2716_INSERTION_EVENT_REFERENCE: Final = "insertion_event_reference"
-
     # The authorising user for joining a restricted room.
     AUTHORISING_USER: Final = "join_authorised_via_users_server"
+
+    # Use for mentioning users.
+    MENTIONS: Final = "m.mentions"
+
+    # an unspecced field added to to-device messages to identify them uniquely-ish
+    TO_DEVICE_MSGID: Final = "org.matrix.msgid"
 
 
 class RoomTypes:
@@ -245,6 +241,8 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT: Final = "m.direct"
     IGNORED_USER_LIST: Final = "m.ignored_user_list"
+    TAG: Final = "m.tag"
+    PUSH_RULES: Final = "m.push_rules"
 
 
 class HistoryVisibility:
@@ -285,3 +283,8 @@ class ApprovalNoticeMedium:
 
     NONE = "org.matrix.msc3866.none"
     EMAIL = "org.matrix.msc3866.email"
+
+
+class Direction(enum.Enum):
+    BACKWARDS = "b"
+    FORWARDS = "f"

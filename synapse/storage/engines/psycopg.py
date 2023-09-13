@@ -1,4 +1,4 @@
-# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Mapping, NoReturn, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple, cast
 
 import psycopg
 import psycopg.errors
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection]):
+class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection, psycopg.Cursor]):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(psycopg, database_config)
         # psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
@@ -71,11 +71,11 @@ class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection]):
         db_conn: psycopg.Connection,
         allow_outdated_version: bool = False,
     ) -> None:
-        # Get the version of PostgreSQL that we're using. As per the psycopg2
+        # Get the version of PostgreSQL that we're using. As per the psycopg
         # docs: The number is formed by converting the major, minor, and
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105
-        self._version = cast(int, db_conn.info.server_version)
+        self._version = db_conn.info.server_version
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
@@ -162,13 +162,6 @@ class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection]):
         db_conn.commit()
 
     @property
-    def can_native_upsert(self) -> bool:
-        """
-        Can we use native UPSERTs?
-        """
-        return True
-
-    @property
     def supports_using_any_list(self) -> bool:
         """Do we support using `a = ANY(?)` and passing a list"""
         return True
@@ -216,6 +209,10 @@ class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection]):
         else:
             return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
 
+    @property
+    def row_id_name(self) -> str:
+        return "ctid"
+
     def in_transaction(self, conn: psycopg.Connection) -> bool:
         return conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
 
@@ -232,3 +229,15 @@ class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection]):
         else:
             pg_isolation_level = self.isolation_level_map[isolation_level]
         conn.isolation_level = pg_isolation_level
+
+    @staticmethod
+    def executescript(cursor: psycopg.Cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Psycopg seems happy to do this in DBAPI2's `execute()` function.
+
+        For consistency with SQLite, any ongoing transaction is committed before
+        executing the script in its own transaction. The script transaction is
+        left open and it is the responsibility of the caller to commit it.
+        """
+        cursor.execute(f"COMMIT; BEGIN TRANSACTION; {script}")

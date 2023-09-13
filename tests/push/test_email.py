@@ -13,39 +13,44 @@
 # limitations under the License.
 import email.message
 import os
-from typing import Dict, List, Sequence, Tuple
+from http import HTTPStatus
+from typing import Any, Dict, List, Sequence, Tuple
 
 import attr
 import pkg_resources
+from parameterized import parameterized
 
 from twisted.internet.defer import Deferred
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.errors import Codes, SynapseError
+from synapse.push.emailpusher import EmailPusher
 from synapse.rest.client import login, room
+from synapse.rest.synapse.client.unsubscribe import UnsubscribeResource
+from synapse.server import HomeServer
+from synapse.util import Clock
 
+from tests.server import FakeSite, make_request
 from tests.unittest import HomeserverTestCase
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class _User:
     "Helper wrapper for user ID and access token"
-    id = attr.ib()
-    token = attr.ib()
+    id: str
+    token: str
 
 
 class EmailPusherTests(HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
-    user_id = True
     hijack_auth = False
 
-    def make_homeserver(self, reactor, clock):
-
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["email"] = {
             "enable_notifs": True,
@@ -66,24 +71,23 @@ class EmailPusherTests(HomeserverTestCase):
             "riot_base_url": None,
         }
         config["public_baseurl"] = "http://aaa"
-        config["start_pushers"] = True
 
         hs = self.setup_test_homeserver(config=config)
 
         # List[Tuple[Deferred, args, kwargs]]
         self.email_attempts: List[Tuple[Deferred, Sequence, Dict]] = []
 
-        def sendmail(*args, **kwargs):
+        def sendmail(*args: Any, **kwargs: Any) -> Deferred:
             # This mocks out synapse.reactor.send_email._sendmail.
-            d = Deferred()
+            d: Deferred = Deferred()
             self.email_attempts.append((d, args, kwargs))
             return d
 
-        hs.get_send_email_handler()._sendmail = sendmail
+        hs.get_send_email_handler()._sendmail = sendmail  # type: ignore[assignment]
 
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # Register the user who gets notified
         self.user_id = self.register_user("user", "pass")
         self.access_token = self.login("user", "pass")
@@ -104,7 +108,8 @@ class EmailPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastores().main.get_user_by_access_token(self.access_token)
         )
-        self.token_id = user_tuple.token_id
+        assert user_tuple is not None
+        self.device_id = user_tuple.device_id
 
         # We need to add email to account before we can create a pusher.
         self.get_success(
@@ -113,10 +118,10 @@ class EmailPusherTests(HomeserverTestCase):
             )
         )
 
-        self.pusher = self.get_success(
+        pusher = self.get_success(
             self.hs.get_pusherpool().add_or_update_pusher(
                 user_id=self.user_id,
-                access_token=self.token_id,
+                device_id=self.device_id,
                 kind="email",
                 app_id="m.email",
                 app_display_name="Email Notifications",
@@ -126,11 +131,13 @@ class EmailPusherTests(HomeserverTestCase):
                 data={},
             )
         )
+        assert isinstance(pusher, EmailPusher)
+        self.pusher = pusher
 
         self.auth_handler = hs.get_auth_handler()
         self.store = hs.get_datastores().main
 
-    def test_need_validated_email(self):
+    def test_need_validated_email(self) -> None:
         """Test that we can only add an email pusher if the user has validated
         their email.
         """
@@ -138,7 +145,7 @@ class EmailPusherTests(HomeserverTestCase):
             self.get_success_or_raise(
                 self.hs.get_pusherpool().add_or_update_pusher(
                     user_id=self.user_id,
-                    access_token=self.token_id,
+                    device_id=self.device_id,
                     kind="email",
                     app_id="m.email",
                     app_display_name="Email Notifications",
@@ -152,7 +159,7 @@ class EmailPusherTests(HomeserverTestCase):
         self.assertEqual(400, cm.exception.code)
         self.assertEqual(Codes.THREEPID_NOT_FOUND, cm.exception.errcode)
 
-    def test_simple_sends_email(self):
+    def test_simple_sends_email(self) -> None:
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
@@ -172,7 +179,58 @@ class EmailPusherTests(HomeserverTestCase):
 
         self._check_for_mail()
 
-    def test_invite_sends_email(self):
+    @parameterized.expand([(False,), (True,)])
+    def test_unsubscribe(self, use_post: bool) -> None:
+        # Create a simple room with two users
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.invite(
+            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
+        )
+        self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
+
+        # The other user sends a single message.
+        self.helper.send(room, body="Hi!", tok=self.others[0].token)
+
+        # We should get emailed about that message
+        args, kwargs = self._check_for_mail()
+
+        # That email should contain an unsubscribe link in the body and header.
+        msg: bytes = args[5]
+
+        # Multipart: plain text, base 64 encoded; html, base 64 encoded
+        multipart_msg = email.message_from_bytes(msg)
+        txt = multipart_msg.get_payload()[0].get_payload(decode=True).decode()
+        html = multipart_msg.get_payload()[1].get_payload(decode=True).decode()
+        self.assertIn("/_synapse/client/unsubscribe", txt)
+        self.assertIn("/_synapse/client/unsubscribe", html)
+
+        # The unsubscribe headers should exist.
+        assert multipart_msg.get("List-Unsubscribe") is not None
+        self.assertIsNotNone(multipart_msg.get("List-Unsubscribe-Post"))
+
+        # Open the unsubscribe link.
+        unsubscribe_link = multipart_msg["List-Unsubscribe"].strip("<>")
+        unsubscribe_resource = UnsubscribeResource(self.hs)
+        channel = make_request(
+            self.reactor,
+            FakeSite(unsubscribe_resource, self.reactor),
+            "POST" if use_post else "GET",
+            unsubscribe_link,
+            shorthand=False,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
+
+        # Ensure the pusher was removed.
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
+        )
+        self.assertEqual(pushers, [])
+
+    def test_invite_sends_email(self) -> None:
         # Create a room and invite the user to it
         room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
         self.helper.invite(
@@ -185,7 +243,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about the invite
         self._check_for_mail()
 
-    def test_invite_to_empty_room_sends_email(self):
+    def test_invite_to_empty_room_sends_email(self) -> None:
         # Create a room and invite the user to it
         room = self.helper.create_room_as(self.others[0].id, tok=self.others[0].token)
         self.helper.invite(
@@ -201,7 +259,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about the invite
         self._check_for_mail()
 
-    def test_multiple_members_email(self):
+    def test_multiple_members_email(self) -> None:
         # We want to test multiple notifications, so we pause processing of push
         # while we send messages.
         self.pusher._pause_processing()
@@ -228,7 +286,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
-    def test_multiple_rooms(self):
+    def test_multiple_rooms(self) -> None:
         # We want to test multiple notifications from multiple rooms, so we pause
         # processing of push while we send messages.
         self.pusher._pause_processing()
@@ -258,7 +316,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
-    def test_room_notifications_include_avatar(self):
+    def test_room_notifications_include_avatar(self) -> None:
         # Create a room and set its avatar.
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.send_state(
@@ -291,7 +349,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
         self.assertIn("_matrix/media/v1/thumbnail/DUMMY_MEDIA_ID", html)
 
-    def test_empty_room(self):
+    def test_empty_room(self) -> None:
         """All users leaving a room shouldn't cause the pusher to break."""
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
@@ -310,7 +368,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
-    def test_empty_room_multiple_messages(self):
+    def test_empty_room_multiple_messages(self) -> None:
         """All users leaving a room shouldn't cause the pusher to break."""
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
@@ -330,7 +388,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
-    def test_encrypted_message(self):
+    def test_encrypted_message(self) -> None:
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
             room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
@@ -343,7 +401,7 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
-    def test_no_email_sent_after_removed(self):
+    def test_no_email_sent_after_removed(self) -> None:
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
@@ -366,21 +424,22 @@ class EmailPusherTests(HomeserverTestCase):
 
         # disassociate the user's email address
         self.get_success(
-            self.auth_handler.delete_threepid(
-                user_id=self.user_id,
-                medium="email",
-                address="a@example.com",
+            self.auth_handler.delete_local_threepid(
+                user_id=self.user_id, medium="email", address="a@example.com"
             )
         )
 
         # check that the pusher for that email address has been deleted
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
-    def test_remove_unlinked_pushers_background_job(self):
+    def test_remove_unlinked_pushers_background_job(self) -> None:
         """Checks that all existing pushers associated with unlinked email addresses are removed
         upon running the remove_deleted_email_pushers background update.
         """
@@ -412,10 +471,13 @@ class EmailPusherTests(HomeserverTestCase):
         self.wait_for_background_updates()
 
         # Check that all pushers with unlinked addresses were deleted
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
     def _check_for_mail(self) -> Tuple[Sequence, Dict]:
@@ -427,10 +489,13 @@ class EmailPusherTests(HomeserverTestCase):
             that notification.
         """
         # Get the stream ordering before it gets sent
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         last_stream_ordering = pushers[0].last_stream_ordering
 
@@ -438,10 +503,13 @@ class EmailPusherTests(HomeserverTestCase):
         self.pump(10)
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual(last_stream_ordering, pushers[0].last_stream_ordering)
 
@@ -457,10 +525,13 @@ class EmailPusherTests(HomeserverTestCase):
         self.assertEqual(len(self.email_attempts), 1)
 
         # The stream ordering has increased
-        pushers = self.get_success(
-            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
+        pushers = list(
+            self.get_success(
+                self.hs.get_datastores().main.get_pushers_by(
+                    {"user_name": self.user_id}
+                )
+            )
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
 

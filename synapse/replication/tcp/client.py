@@ -14,98 +14,55 @@
 """A replication client for use by synapse workers.
 """
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Set, Tuple
 
+from sortedcontainers import SortedList
+
+from twisted.internet import defer
 from twisted.internet.defer import Deferred
-from twisted.internet.interfaces import IAddress, IConnector
-from twisted.internet.protocol import ReconnectingClientFactory
-from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership, ReceiptTypes
 from synapse.federation import send_queue
 from synapse.federation.sender import FederationSender
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
     PushersStream,
     PushRulesStream,
     ReceiptsStream,
-    TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
+    UnPartialStatedEventStream,
+    UnPartialStatedRoomStream,
 )
 from synapse.replication.tcp.streams.events import (
     EventsStream,
     EventsStreamEventRow,
     EventsStreamRow,
 )
+from synapse.replication.tcp.streams.partial_state import (
+    UnPartialStatedEventStreamRow,
+    UnPartialStatedRoomStreamRow,
+)
 from synapse.types import PersistedEventPosition, ReadReceipt, StreamKeyType, UserID
 from synapse.util.async_helpers import Linearizer, timeout_deferred
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
-    from synapse.replication.tcp.handler import ReplicationCommandHandler
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 # How long we allow callers to wait for replication updates before timing out.
-_WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 30
-
-
-class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
-    """Factory for building connections to the master. Will reconnect if the
-    connection is lost.
-
-    Accepts a handler that is passed to `ClientReplicationStreamProtocol`.
-    """
-
-    initialDelay = 0.1
-    maxDelay = 1  # Try at least once every N seconds
-
-    def __init__(
-        self,
-        hs: "HomeServer",
-        client_name: str,
-        command_handler: "ReplicationCommandHandler",
-    ):
-        self.client_name = client_name
-        self.command_handler = command_handler
-        self.server_name = hs.config.server.server_name
-        self.hs = hs
-        self._clock = hs.get_clock()  # As self.clock is defined in super class
-
-        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self.stopTrying)
-
-    def startedConnecting(self, connector: IConnector) -> None:
-        logger.info("Connecting to replication: %r", connector.getDestination())
-
-    def buildProtocol(self, addr: IAddress) -> ClientReplicationStreamProtocol:
-        logger.info("Connected to replication: %r", addr)
-        return ClientReplicationStreamProtocol(
-            self.hs,
-            self.client_name,
-            self.server_name,
-            self._clock,
-            self.command_handler,
-        )
-
-    def clientConnectionLost(self, connector: IConnector, reason: Failure) -> None:
-        logger.error("Lost replication conn: %r", reason)
-        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
-
-    def clientConnectionFailed(self, connector: IConnector, reason: Failure) -> None:
-        logger.error("Failed to connect to replication: %r", reason)
-        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+_WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 5
 
 
 class ReplicationDataHandler:
     """Handles incoming stream updates from replication.
 
-    This instance notifies the slave data store about updates. Can be subclassed
+    This instance notifies the data store about updates. Can be subclassed
     to handle updates in additional ways.
     """
 
@@ -117,6 +74,7 @@ class ReplicationDataHandler:
         self._streams = hs.get_replication_streams()
         self._instance_name = hs.get_instance_name()
         self._typing_handler = hs.get_typing_handler()
+        self._state_storage_controller = hs.get_storage_controllers().state
 
         self._notify_pushers = hs.config.worker.start_pushers
         self._pusher_pool = hs.get_pusherpool()
@@ -126,16 +84,18 @@ class ReplicationDataHandler:
         if hs.should_send_federation():
             self.send_handler = FederationSenderHandler(hs)
 
-        # Map from stream to list of deferreds waiting for the stream to
+        # Map from stream and instance to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
-        self._streams_to_waiters: Dict[str, List[Tuple[int, Deferred]]] = {}
+        self._streams_to_waiters: Dict[
+            Tuple[str, str], SortedList[Tuple[int, Deferred]]
+        ] = {}
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list
     ) -> None:
         """Called to handle a batch of replication data with a given stream token.
 
-        By default this just pokes the slave store. Can be overridden in subclasses to
+        By default, this just pokes the data store. Can be overridden in subclasses to
         handle more.
 
         Args:
@@ -145,6 +105,9 @@ class ReplicationDataHandler:
             rows: a list of Stream.ROW_TYPE objects as returned by Stream.parse_row.
         """
         self.store.process_replication_rows(stream_name, instance_name, token, rows)
+        # NOTE: this must be called after process_replication_rows to ensure any
+        # cache invalidations are first handled before any stream ID advances.
+        self.store.process_replication_position(stream_name, instance_name, token)
 
         if self.send_handler:
             await self.send_handler.process_replication_rows(stream_name, token, rows)
@@ -158,7 +121,7 @@ class ReplicationDataHandler:
             self.notifier.on_new_event(
                 StreamKeyType.PUSH_RULES, token, users=[row.user_id for row in rows]
             )
-        elif stream_name in (AccountDataStream.NAME, TagAccountDataStream.NAME):
+        elif stream_name in AccountDataStream.NAME:
             self.notifier.on_new_event(
                 StreamKeyType.ACCOUNT_DATA, token, users=[row.user_id for row in rows]
             )
@@ -178,7 +141,7 @@ class ReplicationDataHandler:
         elif stream_name == DeviceListsStream.NAME:
             all_room_ids: Set[str] = set()
             for row in rows:
-                if row.entity.startswith("@"):
+                if row.entity.startswith("@") and not row.is_signature:
                     room_ids = await self.store.get_rooms_for_user(row.entity)
                     all_room_ids.update(room_ids)
             self.notifier.on_new_event(
@@ -197,6 +160,12 @@ class ReplicationDataHandler:
             # we don't need to optimise this for multiple rows.
             for row in rows:
                 if row.type != EventsStreamEventRow.TypeId:
+                    # The row's data is an `EventsStreamCurrentStateRow`.
+                    # When we recompute the current state of a room based on forward
+                    # extremities (see `update_current_state`), no new events are
+                    # persisted, so we must poke the replication callbacks ourselves.
+                    # This functionality is used when finishing up a partial state join.
+                    self.notifier.notify_replication()
                     continue
                 assert isinstance(row, EventsStreamRow)
                 assert isinstance(row.data, EventsStreamEventRow)
@@ -236,6 +205,23 @@ class ReplicationDataHandler:
                     self.notifier.notify_user_joined_room(
                         row.data.event_id, row.data.room_id
                     )
+        elif stream_name == UnPartialStatedRoomStream.NAME:
+            for row in rows:
+                assert isinstance(row, UnPartialStatedRoomStreamRow)
+
+                # Wake up any tasks waiting for the room to be un-partial-stated.
+                self._state_storage_controller.notify_room_un_partial_stated(
+                    row.room_id
+                )
+                await self.notifier.on_un_partial_stated_room(row.room_id, token)
+        elif stream_name == UnPartialStatedEventStream.NAME:
+            for row in rows:
+                assert isinstance(row, UnPartialStatedEventStreamRow)
+
+                # Wake up any tasks waiting for the event to be un-partial-stated.
+                self._state_storage_controller.notify_event_un_partial_stated(
+                    row.event_id
+                )
 
         await self._presence_handler.process_replication_rows(
             stream_name, instance_name, token, rows
@@ -244,7 +230,9 @@ class ReplicationDataHandler:
         # Notify any waiting deferreds. The list is ordered by position so we
         # just iterate through the list until we reach a position that is
         # greater than the received row position.
-        waiting_list = self._streams_to_waiters.get(stream_name, [])
+        waiting_list = self._streams_to_waiters.get((stream_name, instance_name))
+        if not waiting_list:
+            return
 
         # Index of first item with a position after the current token, i.e we
         # have called all deferreds before this index. If not overwritten by
@@ -253,14 +241,13 @@ class ReplicationDataHandler:
         # `len(list)` works for both cases.
         index_of_first_deferred_not_called = len(waiting_list)
 
+        # We don't fire the deferreds until after we finish iterating over the
+        # list, to avoid the list changing when we fire the deferreds.
+        deferreds_to_callback = []
+
         for idx, (position, deferred) in enumerate(waiting_list):
             if position <= token:
-                try:
-                    with PreserveLoggingContext():
-                        deferred.callback(None)
-                except Exception:
-                    # The deferred has been cancelled or timed out.
-                    pass
+                deferreds_to_callback.append(deferred)
             else:
                 # The list is sorted by position so we don't need to continue
                 # checking any further entries in the list.
@@ -269,7 +256,15 @@ class ReplicationDataHandler:
 
         # Drop all entries in the waiting list that were called in the above
         # loop. (This maintains the order so no need to resort)
-        waiting_list[:] = waiting_list[index_of_first_deferred_not_called:]
+        del waiting_list[:index_of_first_deferred_not_called]
+
+        for deferred in deferreds_to_callback:
+            try:
+                with PreserveLoggingContext():
+                    deferred.callback(None)
+            except Exception:
+                # The deferred has been cancelled or timed out.
+                pass
 
     async def on_position(
         self, stream_name: str, instance_name: str, token: int
@@ -289,10 +284,18 @@ class ReplicationDataHandler:
             self.send_handler.wake_destination(server)
 
     async def wait_for_stream_position(
-        self, instance_name: str, stream_name: str, position: int
+        self,
+        instance_name: str,
+        stream_name: str,
+        position: int,
     ) -> None:
         """Wait until this instance has received updates up to and including
         the given stream position.
+
+        Args:
+            instance_name
+            stream_name
+            position
         """
 
         if instance_name == self._instance_name:
@@ -300,7 +303,7 @@ class ReplicationDataHandler:
             # anyway in that case we don't need to wait.
             return
 
-        current_position = self._streams[stream_name].current_token(self._instance_name)
+        current_position = self._streams[stream_name].current_token(instance_name)
         if position <= current_position:
             # We're already past the position
             return
@@ -312,17 +315,39 @@ class ReplicationDataHandler:
             deferred, _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS, self._reactor
         )
 
-        waiting_list = self._streams_to_waiters.setdefault(stream_name, [])
+        waiting_list = self._streams_to_waiters.setdefault(
+            (stream_name, instance_name), SortedList(key=lambda t: t[0])
+        )
 
-        waiting_list.append((position, deferred))
-        waiting_list.sort(key=lambda t: t[0])
+        waiting_list.add((position, deferred))
 
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):
-            logger.info("Waiting for repl stream %r to reach %s", stream_name, position)
-            await make_deferred_yieldable(deferred)
             logger.info(
-                "Finished waiting for repl stream %r to reach %s", stream_name, position
+                "Waiting for repl stream %r to reach %s (%s); currently at: %s",
+                stream_name,
+                position,
+                instance_name,
+                current_position,
+            )
+            try:
+                await make_deferred_yieldable(deferred)
+            except defer.TimeoutError:
+                logger.error(
+                    "Timed out waiting for repl stream %r to reach %s (%s)"
+                    "; currently at: %s",
+                    stream_name,
+                    position,
+                    instance_name,
+                    self._streams[stream_name].current_token(instance_name),
+                )
+                return
+
+            logger.info(
+                "Finished waiting for repl stream %r to reach %s (%s)",
+                stream_name,
+                position,
+                instance_name,
             )
 
     def stop_pusher(self, user_id: str, app_id: str, pushkey: str) -> None:
@@ -385,7 +410,7 @@ class FederationSenderHandler:
         # The federation stream contains things that we want to send out, e.g.
         # presence, typing, etc.
         if stream_name == "federation":
-            send_queue.process_rows_for_federation(self.federation_sender, rows)
+            await send_queue.process_rows_for_federation(self.federation_sender, rows)
             await self.update_token(token)
 
         # ... and when new receipts happen
@@ -397,17 +422,19 @@ class FederationSenderHandler:
             # The entities are either user IDs (starting with '@') whose devices
             # have changed, or remote servers that we need to tell about
             # changes.
-            hosts = {row.entity for row in rows if not row.entity.startswith("@")}
-            for host in hosts:
-                self.federation_sender.send_device_messages(host, immediate=False)
+            hosts = {
+                row.entity
+                for row in rows
+                if not row.entity.startswith("@") and not row.is_signature
+            }
+            await self.federation_sender.send_device_messages(hosts, immediate=False)
 
         elif stream_name == ToDeviceStream.NAME:
             # The to_device stream includes stuff to be pushed to both local
             # clients and remote servers, so we ignore entities that start with
             # '@' (since they'll be local users rather than destinations).
             hosts = {row.entity for row in rows if not row.entity.startswith("@")}
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
+            await self.federation_sender.send_device_messages(hosts)
 
     async def _on_new_receipts(
         self, rows: Iterable[ReceiptsStream.ReceiptsStreamRow]

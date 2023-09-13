@@ -14,14 +14,17 @@
 
 import os
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.rest.client import login, room, sync
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
 
 class ConsentNoticesTests(unittest.HomeserverTestCase):
-
     servlets = [
         sync.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -29,8 +32,7 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
-
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         tmpdir = self.mktemp()
         os.mkdir(tmpdir)
         self.consent_notice_message = "consent %(consent_uri)s"
@@ -53,15 +55,13 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
             "room_name": "Server Notices",
         }
 
-        hs = self.setup_test_homeserver(config=config)
+        return self.setup_test_homeserver(config=config)
 
-        return hs
-
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.user_id = self.register_user("bob", "abc123")
         self.access_token = self.login("bob", "abc123")
 
-    def test_get_sync_message(self):
+    def test_get_sync_message(self) -> None:
         """
         When user consent server notices are enabled, a sync will cause a notice
         to fire (in a room which the user is invited to). The notice contains

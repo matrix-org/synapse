@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, Optional, Tuple
 
 import attr
 
@@ -78,32 +78,29 @@ class RoomVersion:
     # MSC2209: Check 'notifications' key while verifying
     # m.room.power_levels auth rules.
     limit_notifications_power_levels: bool
-    # MSC2174/MSC2176: Apply updated redaction rules algorithm.
-    msc2176_redaction_rules: bool
-    # MSC3083: Support the 'restricted' join_rule.
-    msc3083_join_rules: bool
-    # MSC3375: Support for the proper redaction rules for MSC3083. This mustn't
-    #          be enabled if MSC3083 is not.
-    msc3375_redaction_rules: bool
-    # MSC2403: Allows join_rules to be set to 'knock', changes auth rules to allow sending
-    # m.room.membership event with membership 'knock'.
-    msc2403_knocking: bool
-    # MSC2716: Adds m.room.power_levels -> content.historical field to control
-    # whether "insertion", "chunk", "marker" events can be sent
-    msc2716_historical: bool
-    # MSC2716: Adds support for redacting "insertion", "chunk", and "marker" events
-    msc2716_redactions: bool
-    # MSC3787: Adds support for a `knock_restricted` join rule, mixing concepts of
-    # knocks and restricted join rules into the same join condition.
-    msc3787_knock_restricted_join_rule: bool
-    # MSC3667: Enforce integer power levels
-    msc3667_int_only_power_levels: bool
+    # No longer include the creator in m.room.create events.
+    implicit_room_creator: bool
+    # Apply updated redaction rules algorithm from room version 11.
+    updated_redaction_rules: bool
+    # Support the 'restricted' join rule.
+    restricted_join_rule: bool
+    # Support for the proper redaction rules for the restricted join rule. This requires
+    # restricted_join_rule to be enabled.
+    restricted_join_rule_fix: bool
+    # Support the 'knock' join rule.
+    knock_join_rule: bool
+    # MSC3389: Protect relation information from redaction.
+    msc3389_relation_redactions: bool
+    # Support the 'knock_restricted' join rule.
+    knock_restricted_join_rule: bool
+    # Enforce integer power levels
+    enforce_int_power_levels: bool
     # MSC3931: Adds a push rule condition for "room version feature flags", making
     # some push rules room version dependent. Note that adding a flag to this list
     # is not enough to mark it "supported": the push rule evaluator also needs to
     # support the flag. Unknown flags are ignored by the evaluator, making conditions
     # fail if used.
-    msc3931_push_features: List[str]  # values from PushRuleRoomFlag
+    msc3931_push_features: Tuple[str, ...]  # values from PushRuleRoomFlag
 
 
 class RoomVersions:
@@ -116,15 +113,15 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=False,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=False,
+        restricted_join_rule_fix=False,
+        knock_join_rule=False,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V2 = RoomVersion(
         "2",
@@ -135,15 +132,15 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=False,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=False,
+        restricted_join_rule_fix=False,
+        knock_join_rule=False,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V3 = RoomVersion(
         "3",
@@ -154,15 +151,15 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=False,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=False,
+        restricted_join_rule_fix=False,
+        knock_join_rule=False,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V4 = RoomVersion(
         "4",
@@ -173,15 +170,15 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=False,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=False,
+        restricted_join_rule_fix=False,
+        knock_join_rule=False,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V5 = RoomVersion(
         "5",
@@ -192,15 +189,15 @@ class RoomVersions:
         special_case_aliases_auth=True,
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=False,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=False,
+        restricted_join_rule_fix=False,
+        knock_join_rule=False,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V6 = RoomVersion(
         "6",
@@ -211,34 +208,15 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=False,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
-    )
-    MSC2176 = RoomVersion(
-        "org.matrix.msc2176",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.ROOM_V4_PLUS,
-        StateResolutionVersions.V2,
-        enforce_key_validity=True,
-        special_case_aliases_auth=False,
-        strict_canonicaljson=True,
-        limit_notifications_power_levels=True,
-        msc2176_redaction_rules=True,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=False,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=False,
+        restricted_join_rule_fix=False,
+        knock_join_rule=False,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V7 = RoomVersion(
         "7",
@@ -249,15 +227,15 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=True,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=False,
+        restricted_join_rule_fix=False,
+        knock_join_rule=True,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V8 = RoomVersion(
         "8",
@@ -268,15 +246,15 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=True,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=True,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=True,
+        restricted_join_rule_fix=False,
+        knock_join_rule=True,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V9 = RoomVersion(
         "9",
@@ -287,34 +265,15 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=True,
-        msc3375_redaction_rules=True,
-        msc2403_knocking=True,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
-    )
-    MSC3787 = RoomVersion(
-        "org.matrix.msc3787",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.ROOM_V4_PLUS,
-        StateResolutionVersions.V2,
-        enforce_key_validity=True,
-        special_case_aliases_auth=False,
-        strict_canonicaljson=True,
-        limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=True,
-        msc3375_redaction_rules=True,
-        msc2403_knocking=True,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=True,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=True,
+        restricted_join_rule_fix=True,
+        knock_join_rule=True,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=False,
+        enforce_int_power_levels=False,
+        msc3931_push_features=(),
     )
     V10 = RoomVersion(
         "10",
@@ -325,34 +284,15 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=True,
-        msc3375_redaction_rules=True,
-        msc2403_knocking=True,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=True,
-        msc3667_int_only_power_levels=True,
-        msc3931_push_features=[],
-    )
-    MSC2716v4 = RoomVersion(
-        "org.matrix.msc2716v4",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.ROOM_V4_PLUS,
-        StateResolutionVersions.V2,
-        enforce_key_validity=True,
-        special_case_aliases_auth=False,
-        strict_canonicaljson=True,
-        limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=False,
-        msc3375_redaction_rules=False,
-        msc2403_knocking=True,
-        msc2716_historical=True,
-        msc2716_redactions=True,
-        msc3787_knock_restricted_join_rule=False,
-        msc3667_int_only_power_levels=False,
-        msc3931_push_features=[],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=True,
+        restricted_join_rule_fix=True,
+        knock_join_rule=True,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=True,
+        enforce_int_power_levels=True,
+        msc3931_push_features=(),
     )
     MSC1767v10 = RoomVersion(
         # MSC1767 (Extensible Events) based on room version "10"
@@ -364,15 +304,34 @@ class RoomVersions:
         special_case_aliases_auth=False,
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
-        msc2176_redaction_rules=False,
-        msc3083_join_rules=True,
-        msc3375_redaction_rules=True,
-        msc2403_knocking=True,
-        msc2716_historical=False,
-        msc2716_redactions=False,
-        msc3787_knock_restricted_join_rule=True,
-        msc3667_int_only_power_levels=True,
-        msc3931_push_features=[PushRuleRoomFlag.EXTENSIBLE_EVENTS],
+        implicit_room_creator=False,
+        updated_redaction_rules=False,
+        restricted_join_rule=True,
+        restricted_join_rule_fix=True,
+        knock_join_rule=True,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=True,
+        enforce_int_power_levels=True,
+        msc3931_push_features=(PushRuleRoomFlag.EXTENSIBLE_EVENTS,),
+    )
+    V11 = RoomVersion(
+        "11",
+        RoomDisposition.STABLE,
+        EventFormatVersions.ROOM_V4_PLUS,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        implicit_room_creator=True,  # Used by MSC3820
+        updated_redaction_rules=True,  # Used by MSC3820
+        restricted_join_rule=True,
+        restricted_join_rule_fix=True,
+        knock_join_rule=True,
+        msc3389_relation_redactions=False,
+        knock_restricted_join_rule=True,
+        enforce_int_power_levels=True,
+        msc3931_push_features=(),
     )
 
 
@@ -385,13 +344,11 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V4,
         RoomVersions.V5,
         RoomVersions.V6,
-        RoomVersions.MSC2176,
         RoomVersions.V7,
         RoomVersions.V8,
         RoomVersions.V9,
-        RoomVersions.MSC3787,
         RoomVersions.V10,
-        RoomVersions.MSC2716v4,
+        RoomVersions.V11,
     )
 }
 
@@ -420,12 +377,12 @@ MSC3244_CAPABILITIES = {
         RoomVersionCapability(
             "knock",
             RoomVersions.V7,
-            lambda room_version: room_version.msc2403_knocking,
+            lambda room_version: room_version.knock_join_rule,
         ),
         RoomVersionCapability(
             "restricted",
             RoomVersions.V9,
-            lambda room_version: room_version.msc3083_join_rules,
+            lambda room_version: room_version.restricted_join_rule,
         ),
     )
 }

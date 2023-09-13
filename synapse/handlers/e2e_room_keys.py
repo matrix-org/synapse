@@ -188,7 +188,6 @@ class E2eRoomKeysHandler:
 
         # XXX: perhaps we should use a finer grained lock here?
         async with self._upload_linearizer.queue(user_id):
-
             # Check that the version we're trying to upload is the current version
             try:
                 version_info = await self.store.get_e2e_room_keys_version_info(user_id)

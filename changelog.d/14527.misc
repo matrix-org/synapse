@@ -1,1 +1,0 @@
-Speed-up `/messages` with `filter_events_for_client` optimizations.

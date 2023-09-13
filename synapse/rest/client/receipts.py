@@ -20,7 +20,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict
+from synapse.types import EventID, JsonDict, RoomID
 
 from ._base import client_patterns
 
@@ -36,6 +36,7 @@ class ReceiptRestServlet(RestServlet):
         "/receipt/(?P<receipt_type>[^/]*)"
         "/(?P<event_id>[^/]*)$"
     )
+    CATEGORY = "Receipts requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -55,6 +56,9 @@ class ReceiptRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
+
+        if not RoomID.is_valid(room_id) or not event_id.startswith(EventID.SIGIL):
+            raise SynapseError(400, "A valid room ID and event ID must be specified")
 
         if receipt_type not in self._known_receipt_types:
             raise SynapseError(
@@ -90,7 +94,9 @@ class ReceiptRestServlet(RestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
+        await self.presence_handler.bump_presence_active_time(
+            requester.user, requester.device_id
+        )
 
         if receipt_type == ReceiptTypes.FULLY_READ:
             await self.read_marker_handler.received_client_read_marker(

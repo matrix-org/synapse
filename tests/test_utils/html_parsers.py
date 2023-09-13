@@ -13,13 +13,13 @@
 # limitations under the License.
 
 from html.parser import HTMLParser
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, NoReturn, Optional, Tuple
 
 
 class TestHtmlParser(HTMLParser):
     """A generic HTML page parser which extracts useful things from the HTML"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         # a list of links found in the doc
@@ -48,5 +48,5 @@ class TestHtmlParser(HTMLParser):
                 assert input_name
                 self.hiddens[input_name] = attr_dict["value"]
 
-    def error(_, message):
+    def error(self, message: str) -> NoReturn:
         raise AssertionError(message)

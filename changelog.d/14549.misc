@@ -1,1 +1,0 @@
-Faster joins: use servers list approximation to send read receipts when in partial state instead of waiting for the full state of the room.

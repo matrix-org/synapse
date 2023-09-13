@@ -49,7 +49,7 @@ from synapse.api.presence import UserPresenceState
 from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.metrics import LaterGauge
 from synapse.replication.tcp.streams.federation import FederationStream
-from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
+from synapse.types import JsonDict, ReadReceipt, RoomStreamToken, StrCollection
 from synapse.util.metrics import Measure
 
 from .units import Edu
@@ -68,6 +68,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
+        self.is_mine_server_name = hs.is_mine_server_name
 
         # We may have multiple federation sender instances, so we need to track
         # their positions separately.
@@ -198,7 +199,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         key: Optional[Hashable] = None,
     ) -> None:
         """As per FederationSender"""
-        if destination == self.server_name:
+        if self.is_mine_server_name(destination):
             logger.info("Not sending EDU to ourselves")
             return
 
@@ -228,7 +229,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         """
         # nothing to do here: the replication listener will handle it.
 
-    def send_presence_to_destinations(
+    async def send_presence_to_destinations(
         self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """As per FederationSender
@@ -244,7 +245,9 @@ class FederationRemoteSendQueue(AbstractFederationSender):
 
         self.notifier.on_new_replication_data()
 
-    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
+    async def send_device_messages(
+        self, destinations: StrCollection, immediate: bool = True
+    ) -> None:
         """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.
@@ -314,7 +317,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # stream position.
         keyed_edus = {v: k for k, v in self.keyed_edu_changed.items()[i:j]}
 
-        for ((destination, edu_key), pos) in keyed_edus.items():
+        for (destination, edu_key), pos in keyed_edus.items():
             rows.append(
                 (
                     pos,
@@ -329,7 +332,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         j = self.edus.bisect_right(to_token) + 1
         edus = self.edus.items()[i:j]
 
-        for (pos, edu) in edus:
+        for pos, edu in edus:
             rows.append((pos, EduRow(edu)))
 
         # Sort rows based on pos
@@ -462,7 +465,7 @@ class ParsedFederationStreamData:
     edus: Dict[str, List[Edu]]
 
 
-def process_rows_for_federation(
+async def process_rows_for_federation(
     transaction_queue: FederationSender,
     rows: List[FederationStream.FederationStreamRow],
 ) -> None:
@@ -495,7 +498,7 @@ def process_rows_for_federation(
         parsed_row.add_to_buffer(buff)
 
     for state, destinations in buff.presence_destinations:
-        transaction_queue.send_presence_to_destinations(
+        await transaction_queue.send_presence_to_destinations(
             states=[state], destinations=destinations
         )
 

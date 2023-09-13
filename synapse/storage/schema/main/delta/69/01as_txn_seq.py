@@ -17,10 +17,11 @@
 Adds a postgres SEQUENCE for generating application service transaction IDs.
 """
 
-from synapse.storage.engines import PsycopgEngine
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine, PsycopgEngine
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if database_engine.supports_sequences:
         # If we already have some AS TXNs we want to start from the current
         # maximum value. There are two potential places this is stored - the
@@ -30,10 +31,12 @@ def run_create(cur, database_engine, *args, **kwargs):
 
         cur.execute("SELECT COALESCE(max(txn_id), 0) FROM application_services_txns")
         row = cur.fetchone()
+        assert row is not None
         txn_max = row[0]
 
         cur.execute("SELECT COALESCE(max(last_txn), 0) FROM application_services_state")
         row = cur.fetchone()
+        assert row is not None
         last_txn_max = row[0]
 
         start_val = max(last_txn_max, txn_max) + 1

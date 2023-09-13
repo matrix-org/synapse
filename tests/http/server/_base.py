@@ -556,6 +556,6 @@ def _get_stack_frame_method_name(frame_info: inspect.FrameInfo) -> str:
     return method_name
 
 
-def _hash_stack(stack: List[inspect.FrameInfo]):
+def _hash_stack(stack: List[inspect.FrameInfo]) -> Tuple[str, ...]:
     """Turns a stack into a hashable value that can be put into a set."""
     return tuple(_format_stack_frame(frame) for frame in stack)

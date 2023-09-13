@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, ShadowBanError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -60,6 +61,7 @@ class RoomUpgradeRestServlet(RestServlet):
         self._hs = hs
         self._room_creation_handler = hs.get_room_creation_handler()
         self._auth = hs.get_auth()
+        self._worker_lock_handler = hs.get_worker_locks_handler()
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str
@@ -78,9 +80,12 @@ class RoomUpgradeRestServlet(RestServlet):
             )
 
         try:
-            new_room_id = await self._room_creation_handler.upgrade_room(
-                requester, room_id, new_version
-            )
+            async with self._worker_lock_handler.acquire_read_write_lock(
+                NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
+            ):
+                new_room_id = await self._room_creation_handler.upgrade_room(
+                    requester, room_id, new_version
+                )
         except ShadowBanError:
             # Generate a random room ID.
             new_room_id = stringutils.random_string(18)

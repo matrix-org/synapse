@@ -19,7 +19,7 @@ from .. import unittest
 
 
 class TreeCacheTestCase(unittest.TestCase):
-    def test_get_set_onelevel(self):
+    def test_get_set_onelevel(self) -> None:
         cache = TreeCache()
         cache[("a",)] = "A"
         cache[("b",)] = "B"
@@ -27,7 +27,7 @@ class TreeCacheTestCase(unittest.TestCase):
         self.assertEqual(cache.get(("b",)), "B")
         self.assertEqual(len(cache), 2)
 
-    def test_pop_onelevel(self):
+    def test_pop_onelevel(self) -> None:
         cache = TreeCache()
         cache[("a",)] = "A"
         cache[("b",)] = "B"
@@ -36,7 +36,7 @@ class TreeCacheTestCase(unittest.TestCase):
         self.assertEqual(cache.get(("b",)), "B")
         self.assertEqual(len(cache), 1)
 
-    def test_get_set_twolevel(self):
+    def test_get_set_twolevel(self) -> None:
         cache = TreeCache()
         cache[("a", "a")] = "AA"
         cache[("a", "b")] = "AB"
@@ -46,7 +46,7 @@ class TreeCacheTestCase(unittest.TestCase):
         self.assertEqual(cache.get(("b", "a")), "BA")
         self.assertEqual(len(cache), 3)
 
-    def test_pop_twolevel(self):
+    def test_pop_twolevel(self) -> None:
         cache = TreeCache()
         cache[("a", "a")] = "AA"
         cache[("a", "b")] = "AB"
@@ -58,7 +58,7 @@ class TreeCacheTestCase(unittest.TestCase):
         self.assertEqual(cache.pop(("b", "a")), None)
         self.assertEqual(len(cache), 1)
 
-    def test_pop_mixedlevel(self):
+    def test_pop_mixedlevel(self) -> None:
         cache = TreeCache()
         cache[("a", "a")] = "AA"
         cache[("a", "b")] = "AB"
@@ -72,14 +72,14 @@ class TreeCacheTestCase(unittest.TestCase):
 
         self.assertEqual({"AA", "AB"}, set(iterate_tree_cache_entry(popped)))
 
-    def test_clear(self):
+    def test_clear(self) -> None:
         cache = TreeCache()
         cache[("a",)] = "A"
         cache[("b",)] = "B"
         cache.clear()
         self.assertEqual(len(cache), 0)
 
-    def test_contains(self):
+    def test_contains(self) -> None:
         cache = TreeCache()
         cache[("a",)] = "A"
         self.assertTrue(("a",) in cache)

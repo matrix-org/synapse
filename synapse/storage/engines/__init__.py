@@ -15,6 +15,7 @@ from typing import Any, Mapping, NoReturn, cast
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 
+
 # The classes `PostgresEngine` and `Sqlite3Engine` must always be importable, because
 # we use `isinstance(engine, PostgresEngine)` to write different queries for postgres
 # and sqlite. But the database driver modules are both optional: they may not be
@@ -22,9 +23,9 @@ from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 # still run `isinstance()` checks.
 def dummy_engine(name: str, module: str) -> BaseDatabaseEngine:
     class Engine(BaseDatabaseEngine):
-        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
+        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:
             raise RuntimeError(
-                f"Cannot create {name}Engine -- {module} module is not installed"
+                f"Cannot create {name} -- {module} module is not installed"
             )
 
     return cast(BaseDatabaseEngine, Engine)

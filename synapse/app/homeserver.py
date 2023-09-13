@@ -44,7 +44,7 @@ from synapse.app._base import (
 )
 from synapse.config._base import ConfigError, format_config_error
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.server import ListenerConfig
+from synapse.config.server import ListenerConfig, TCPListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import (
@@ -78,14 +78,13 @@ class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore
 
     def _listener_http(
-        self, config: HomeServerConfig, listener_config: ListenerConfig
+        self,
+        config: HomeServerConfig,
+        listener_config: ListenerConfig,
     ) -> Iterable[Port]:
-        port = listener_config.port
         # Must exist since this is an HTTP listener.
         assert listener_config.http_options is not None
-        site_tag = listener_config.http_options.tag
-        if site_tag is None:
-            site_tag = str(port)
+        site_tag = listener_config.get_site_tag()
 
         # We always include a health resource.
         resources: Dict[str, Resource] = {"/health": HealthResource()}
@@ -95,6 +94,9 @@ class SynapseHomeServer(HomeServer):
                 if name == "openid" and "federation" in res.names:
                     # Skip loading openid resource if federation is defined
                     # since federation resource will include openid
+                    continue
+                if name == "health":
+                    # Skip loading, health resource is always included
                     continue
                 resources.update(self._configure_named_resource(name, res.compress))
 
@@ -137,6 +139,7 @@ class SynapseHomeServer(HomeServer):
             root_resource = OptionsResource()
 
         ports = listen_http(
+            self,
             listener_config,
             create_resource_tree(resources, root_resource),
             self.version_string,
@@ -249,12 +252,17 @@ class SynapseHomeServer(HomeServer):
                     self._listener_http(self.config, listener)
                 )
             elif listener.type == "manhole":
-                _base.listen_manhole(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole_settings=self.config.server.manhole_settings,
-                    manhole_globals={"hs": self},
-                )
+                if isinstance(listener, TCPListenerConfig):
+                    _base.listen_manhole(
+                        listener.bind_addresses,
+                        listener.port,
+                        manhole_settings=self.config.server.manhole_settings,
+                        manhole_globals={"hs": self},
+                    )
+                else:
+                    raise ConfigError(
+                        "Can not use a unix socket for manhole at this time."
+                    )
             elif listener.type == "metrics":
                 if not self.config.metrics.enable_metrics:
                     logger.warning(
@@ -262,10 +270,16 @@ class SynapseHomeServer(HomeServer):
                         "enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(
-                        listener.bind_addresses,
-                        listener.port,
-                    )
+                    if isinstance(listener, TCPListenerConfig):
+                        _base.listen_metrics(
+                            listener.bind_addresses,
+                            listener.port,
+                        )
+                    else:
+                        raise ConfigError(
+                            "Can not use a unix socket for metrics at this time."
+                        )
+
             else:
                 # this shouldn't happen, as the listener type should have been checked
                 # during parsing
@@ -318,7 +332,6 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
             and not config.registration.registrations_require_3pid
             and not config.registration.registration_requires_token
         ):
-
             raise ConfigError(
                 "You have enabled open registration without any verification. This is a known vector for "
                 "spam and abuse. If you would like to allow public registration, please consider adding email, "

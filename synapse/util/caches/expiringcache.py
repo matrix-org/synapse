@@ -14,7 +14,7 @@
 
 import logging
 from collections import OrderedDict
-from typing import Any, Generic, Optional, TypeVar, Union, overload
+from typing import Any, Generic, Iterable, Optional, TypeVar, Union, overload
 
 import attr
 from typing_extensions import Literal
@@ -73,7 +73,7 @@ class ExpiringCache(Generic[KT, VT]):
         self._expiry_ms = expiry_ms
         self._reset_expiry_on_get = reset_expiry_on_get
 
-        self._cache: OrderedDict[KT, _CacheEntry] = OrderedDict()
+        self._cache: OrderedDict[KT, _CacheEntry[VT]] = OrderedDict()
 
         self.iterable = iterable
 
@@ -100,7 +100,10 @@ class ExpiringCache(Generic[KT, VT]):
         while self._max_size and len(self) > self._max_size:
             _key, value = self._cache.popitem(last=False)
             if self.iterable:
-                self.metrics.inc_evictions(EvictionReason.size, len(value.value))
+                # type-ignore, here and below: if self.iterable is true, then the value
+                # type VT should be Sized (i.e. have a __len__ method). We don't enforce
+                # this via the type system at present.
+                self.metrics.inc_evictions(EvictionReason.size, len(value.value))  # type: ignore[arg-type]
             else:
                 self.metrics.inc_evictions(EvictionReason.size)
 
@@ -134,7 +137,7 @@ class ExpiringCache(Generic[KT, VT]):
             return default
 
         if self.iterable:
-            self.metrics.inc_evictions(EvictionReason.invalidation, len(value.value))
+            self.metrics.inc_evictions(EvictionReason.invalidation, len(value.value))  # type: ignore[arg-type]
         else:
             self.metrics.inc_evictions(EvictionReason.invalidation)
 
@@ -182,7 +185,7 @@ class ExpiringCache(Generic[KT, VT]):
         for k in keys_to_delete:
             value = self._cache.pop(k)
             if self.iterable:
-                self.metrics.inc_evictions(EvictionReason.time, len(value.value))
+                self.metrics.inc_evictions(EvictionReason.time, len(value.value))  # type: ignore[arg-type]
             else:
                 self.metrics.inc_evictions(EvictionReason.time)
 
@@ -195,7 +198,8 @@ class ExpiringCache(Generic[KT, VT]):
 
     def __len__(self) -> int:
         if self.iterable:
-            return sum(len(entry.value) for entry in self._cache.values())
+            g: Iterable[int] = (len(entry.value) for entry in self._cache.values())  # type: ignore[arg-type]
+            return sum(g)
         else:
             return len(self._cache)
 
@@ -218,6 +222,6 @@ class ExpiringCache(Generic[KT, VT]):
 
 
 @attr.s(slots=True, auto_attribs=True)
-class _CacheEntry:
+class _CacheEntry(Generic[VT]):
     time: int
-    value: Any
+    value: VT

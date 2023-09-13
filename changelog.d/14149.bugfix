@@ -1,1 +1,0 @@
-Fix #12383: paginate room messages from the start if no from is given. Contributed by @gnunicorn .

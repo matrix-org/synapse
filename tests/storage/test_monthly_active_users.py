@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Any, Dict, List
-from unittest.mock import Mock
+from unittest.mock import AsyncMock
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -21,7 +21,6 @@ from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 from tests.unittest import default_config, override_config
 
 FORTY_DAYS = 40 * 24 * 60 * 60
@@ -53,7 +52,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(FORTY_DAYS)
 
     @override_config({"max_mau_value": 3, "mau_limit_reserved_threepids": gen_3pids(3)})
-    def test_initialise_reserved_users(self):
+    def test_initialise_reserved_users(self) -> None:
         threepids = self.hs.config.server.mau_limits_reserved_threepids
 
         # register three users, of which two have reserved 3pids, and a third
@@ -133,7 +132,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         active_count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(active_count, 3)
 
-    def test_can_insert_and_count_mau(self):
+    def test_can_insert_and_count_mau(self) -> None:
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, 0)
 
@@ -143,7 +142,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, 1)
 
-    def test_appservice_user_not_counted_in_mau(self):
+    def test_appservice_user_not_counted_in_mau(self) -> None:
         self.get_success(
             self.store.register_user(
                 user_id="@appservice_user:server", appservice_id="wibble"
@@ -158,7 +157,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, 0)
 
-    def test_user_last_seen_monthly_active(self):
+    def test_user_last_seen_monthly_active(self) -> None:
         user_id1 = "@user1:server"
         user_id2 = "@user2:server"
         user_id3 = "@user3:server"
@@ -177,7 +176,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(result)
 
     @override_config({"max_mau_value": 5})
-    def test_reap_monthly_active_users(self):
+    def test_reap_monthly_active_users(self) -> None:
         initial_users = 10
         for i in range(initial_users):
             self.get_success(
@@ -204,7 +203,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     # Note that below says mau_limit (no s), this is the name of the config
     # value, although it gets stored on the config object as mau_limits.
     @override_config({"max_mau_value": 5, "mau_limit_reserved_threepids": gen_3pids(5)})
-    def test_reap_monthly_active_users_reserved_users(self):
+    def test_reap_monthly_active_users_reserved_users(self) -> None:
         """Tests that reaping correctly handles reaping where reserved users are
         present"""
         threepids = self.hs.config.server.mau_limits_reserved_threepids
@@ -244,7 +243,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, self.hs.config.server.max_mau_value)
 
-    def test_populate_monthly_users_is_guest(self):
+    def test_populate_monthly_users_is_guest(self) -> None:
         # Test that guest users are not added to mau list
         user_id = "@user_id:host"
 
@@ -253,32 +252,30 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         )
         self.get_success(d)
 
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
         d = self.store.populate_monthly_active_users(user_id)
         self.get_success(d)
 
         self.store.upsert_monthly_active_user.assert_not_called()
 
-    def test_populate_monthly_users_should_update(self):
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
+    def test_populate_monthly_users_should_update(self) -> None:
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
-        self.store.is_trial_user = Mock(return_value=make_awaitable(False))  # type: ignore[assignment]
+        self.store.is_trial_user = AsyncMock(return_value=False)  # type: ignore[method-assign]
 
-        self.store.user_last_seen_monthly_active = Mock(
-            return_value=make_awaitable(None)
-        )
+        self.store.user_last_seen_monthly_active = AsyncMock(return_value=None)
         d = self.store.populate_monthly_active_users("user_id")
         self.get_success(d)
 
         self.store.upsert_monthly_active_user.assert_called_once()
 
-    def test_populate_monthly_users_should_not_update(self):
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
+    def test_populate_monthly_users_should_not_update(self) -> None:
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
-        self.store.is_trial_user = Mock(return_value=make_awaitable(False))  # type: ignore[assignment]
-        self.store.user_last_seen_monthly_active = Mock(
-            return_value=make_awaitable(self.hs.get_clock().time_msec())
+        self.store.is_trial_user = AsyncMock(return_value=False)  # type: ignore[method-assign]
+        self.store.user_last_seen_monthly_active = AsyncMock(
+            return_value=self.hs.get_clock().time_msec()
         )
 
         d = self.store.populate_monthly_active_users("user_id")
@@ -286,7 +283,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         self.store.upsert_monthly_active_user.assert_not_called()
 
-    def test_get_reserved_real_user_account(self):
+    def test_get_reserved_real_user_account(self) -> None:
         # Test no reserved users, or reserved threepids
         users = self.get_success(self.store.get_registered_reserved_users())
         self.assertEqual(len(users), 0)
@@ -326,7 +323,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         users = self.get_success(self.store.get_registered_reserved_users())
         self.assertEqual(len(users), len(threepids))
 
-    def test_support_user_not_add_to_mau_limits(self):
+    def test_support_user_not_add_to_mau_limits(self) -> None:
         support_user_id = "@support:test"
 
         count = self.get_success(self.store.get_monthly_active_count())
@@ -347,7 +344,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     @override_config(
         {"limit_usage_by_mau": False, "mau_stats_only": True, "max_mau_value": 1}
     )
-    def test_track_monthly_users_without_cap(self):
+    def test_track_monthly_users_without_cap(self) -> None:
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(0, count)
 
@@ -358,14 +355,14 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertEqual(2, count)
 
     @override_config({"limit_usage_by_mau": False, "mau_stats_only": False})
-    def test_no_users_when_not_tracking(self):
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
+    def test_no_users_when_not_tracking(self) -> None:
+        self.store.upsert_monthly_active_user = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
         self.get_success(self.store.populate_monthly_active_users("@user:sever"))
 
         self.store.upsert_monthly_active_user.assert_not_called()
 
-    def test_get_monthly_active_count_by_service(self):
+    def test_get_monthly_active_count_by_service(self) -> None:
         appservice1_user1 = "@appservice1_user1:example.com"
         appservice1_user2 = "@appservice1_user2:example.com"
 
@@ -413,7 +410,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertEqual(result[service2], 1)
         self.assertEqual(result[native], 1)
 
-    def test_get_monthly_active_users_by_service(self):
+    def test_get_monthly_active_users_by_service(self) -> None:
         # (No users, no filtering) -> empty result
         result = self.get_success(self.store.get_monthly_active_users_by_service())
 

@@ -402,6 +402,21 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert we can no longer peek into the room
         self._assert_peek(self.room_id, expect_code=403)
 
+    def test_room_delete_send(self) -> None:
+        """Test that sending into a deleted room returns a 403"""
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.helper.send(
+            self.room_id, "test message", expect_code=403, tok=self.other_user_tok
+        )
+
     def _is_blocked(self, room_id: str, expect: bool = True) -> None:
         """Assert that the room is blocked or not"""
         d = self.store.is_room_blocked(room_id)
@@ -1831,7 +1846,7 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
 
     def test_topo_token_is_accepted(self) -> None:
         """Test Topo Token is accepted."""
-        token = "t1-0_0_0_0_0_0_0_0_0"
+        token = "t1-0_0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/rooms/%s/messages?from=%s" % (self.room_id, token),
@@ -1845,7 +1860,7 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
 
     def test_stream_token_is_accepted_for_fwd_pagianation(self) -> None:
         """Test that stream token is accepted for forward pagination."""
-        token = "s0_0_0_0_0_0_0_0_0"
+        token = "s0_0_0_0_0_0_0_0_0_0"
         channel = self.make_request(
             "GET",
             "/_synapse/admin/v1/rooms/%s/messages?from=%s" % (self.room_id, token),
@@ -1990,7 +2005,6 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         room.register_servlets,

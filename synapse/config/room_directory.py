@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List
+from typing import Any, Collection
 
 from matrix_common.regex import glob_to_regex
 
@@ -70,7 +70,7 @@ class RoomDirectoryConfig(Config):
         return False
 
     def is_publishing_room_allowed(
-        self, user_id: str, room_id: str, aliases: List[str]
+        self, user_id: str, room_id: str, aliases: Collection[str]
     ) -> bool:
         """Checks if the given user is allowed to publish the room
 
@@ -122,7 +122,7 @@ class _RoomDirectoryRule:
         except Exception as e:
             raise ConfigError("Failed to parse glob into regex") from e
 
-    def matches(self, user_id: str, room_id: str, aliases: List[str]) -> bool:
+    def matches(self, user_id: str, room_id: str, aliases: Collection[str]) -> bool:
         """Tests if this rule matches the given user_id, room_id and aliases.
 
         Args:

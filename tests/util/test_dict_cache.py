@@ -19,10 +19,12 @@ from tests import unittest
 
 
 class DictCacheTestCase(unittest.TestCase):
-    def setUp(self):
-        self.cache = DictionaryCache("foobar", max_entries=10)
+    def setUp(self) -> None:
+        self.cache: DictionaryCache[str, str, str] = DictionaryCache(
+            "foobar", max_entries=10
+        )
 
-    def test_simple_cache_hit_full(self):
+    def test_simple_cache_hit_full(self) -> None:
         key = "test_simple_cache_hit_full"
 
         v = self.cache.get(key)
@@ -37,7 +39,7 @@ class DictCacheTestCase(unittest.TestCase):
         c = self.cache.get(key)
         self.assertEqual(test_value, c.value)
 
-    def test_simple_cache_hit_partial(self):
+    def test_simple_cache_hit_partial(self) -> None:
         key = "test_simple_cache_hit_partial"
 
         seq = self.cache.sequence
@@ -47,7 +49,7 @@ class DictCacheTestCase(unittest.TestCase):
         c = self.cache.get(key, ["test"])
         self.assertEqual(test_value, c.value)
 
-    def test_simple_cache_miss_partial(self):
+    def test_simple_cache_miss_partial(self) -> None:
         key = "test_simple_cache_miss_partial"
 
         seq = self.cache.sequence
@@ -57,7 +59,7 @@ class DictCacheTestCase(unittest.TestCase):
         c = self.cache.get(key, ["test2"])
         self.assertEqual({}, c.value)
 
-    def test_simple_cache_hit_miss_partial(self):
+    def test_simple_cache_hit_miss_partial(self) -> None:
         key = "test_simple_cache_hit_miss_partial"
 
         seq = self.cache.sequence
@@ -71,7 +73,7 @@ class DictCacheTestCase(unittest.TestCase):
         c = self.cache.get(key, ["test2"])
         self.assertEqual({"test2": "test_simple_cache_hit_miss_partial2"}, c.value)
 
-    def test_multi_insert(self):
+    def test_multi_insert(self) -> None:
         key = "test_simple_cache_hit_miss_partial"
 
         seq = self.cache.sequence
@@ -92,7 +94,7 @@ class DictCacheTestCase(unittest.TestCase):
         )
         self.assertEqual(c.full, False)
 
-    def test_invalidation(self):
+    def test_invalidation(self) -> None:
         """Test that the partial dict and full dicts get invalidated
         separately.
         """
@@ -106,7 +108,7 @@ class DictCacheTestCase(unittest.TestCase):
         # entry for "a" warm.
         for i in range(20):
             self.cache.get(key, ["a"])
-            self.cache.update(seq, f"key{i}", {1: 2})
+            self.cache.update(seq, f"key{i}", {"1": "2"})
 
         # We should have evicted the full dict...
         r = self.cache.get(key)

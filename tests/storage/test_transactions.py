@@ -12,30 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.server import HomeServer
 from synapse.storage.databases.main.transactions import DestinationRetryTimings
-from synapse.util.retryutils import MAX_RETRY_INTERVAL
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class TransactionStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.store = homeserver.get_datastores().main
 
-    def test_get_set_transactions(self):
+    def test_get_set_transactions(self) -> None:
         """Tests that we can successfully get a non-existent entry for
         destination retries, as well as testing tht we can set and get
         correctly.
         """
-        d = self.store.get_destination_retry_timings("example.com")
-        r = self.get_success(d)
+        r = self.get_success(self.store.get_destination_retry_timings("example.com"))
         self.assertIsNone(r)
 
-        d = self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
-        self.get_success(d)
+        self.get_success(
+            self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
+        )
 
-        d = self.store.get_destination_retry_timings("example.com")
-        r = self.get_success(d)
+        r = self.get_success(self.store.get_destination_retry_timings("example.com"))
 
         self.assertEqual(
             DestinationRetryTimings(
@@ -44,18 +48,24 @@ class TransactionStoreTestCase(HomeserverTestCase):
             r,
         )
 
-    def test_initial_set_transactions(self):
+    def test_initial_set_transactions(self) -> None:
         """Tests that we can successfully set the destination retries (there
         was a bug around invalidating the cache that broke this)
         """
         d = self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
         self.get_success(d)
 
-    def test_large_destination_retry(self):
+    def test_large_destination_retry(self) -> None:
+        max_retry_interval_ms = (
+            self.hs.config.federation.destination_max_retry_interval_ms
+        )
         d = self.store.set_destination_retry_timings(
-            "example.com", MAX_RETRY_INTERVAL, MAX_RETRY_INTERVAL, MAX_RETRY_INTERVAL
+            "example.com",
+            max_retry_interval_ms,
+            max_retry_interval_ms,
+            max_retry_interval_ms,
         )
         self.get_success(d)
 
-        d = self.store.get_destination_retry_timings("example.com")
-        self.get_success(d)
+        d2 = self.store.get_destination_retry_timings("example.com")
+        self.get_success(d2)
