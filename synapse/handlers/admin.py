@@ -76,7 +76,6 @@ class AdminHandler:
             "consent_ts",
             "user_type",
             "is_guest",
-            "last_seen_ts",
         }
 
         if self._msc3866_enabled:
@@ -104,6 +103,9 @@ class AdminHandler:
         user_info_dict["threepids"] = threepids
         user_info_dict["external_ids"] = external_ids
         user_info_dict["erased"] = await self._store.is_user_erased(user.to_string())
+
+        last_seen_ts = await self._store.get_last_seen_for_user_id(user.to_string())
+        user_info_dict["last_seen_ts"] = last_seen_ts
 
         return user_info_dict
 

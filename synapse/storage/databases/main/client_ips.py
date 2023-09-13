@@ -764,3 +764,14 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
                     }
 
         return list(results.values())
+
+    async def get_last_seen_for_user_id(self, user_id: str) -> Optional[int]:
+        """Get the last seen timestamp for a user, if we have it."""
+
+        return await self.db_pool.simple_select_one_onecol(
+            table="user_ips",
+            keyvalues={"user_id": user_id},
+            retcol="MAX(last_seen)",
+            allow_none=True,
+            desc="get_last_seen_for_user_id",
+        )
