@@ -234,6 +234,7 @@ class TaskScheduler:
         resource_id: Optional[str] = None,
         statuses: Optional[List[TaskStatus]] = None,
         max_timestamp: Optional[int] = None,
+        limit: Optional[int] = None,
     ) -> List[ScheduledTask]:
         """Get a list of tasks. Returns all the tasks if no args is provided.
 
@@ -247,6 +248,7 @@ class TaskScheduler:
             statuses: Limit the returned tasks to the specific statuses
             max_timestamp: Limit the returned tasks to the ones that have
                 a timestamp inferior to the specified one
+            limit: Only return `limit` number of rows if set.
 
         Returns
             A list of `ScheduledTask`, ordered by increasing timestamps
@@ -256,6 +258,7 @@ class TaskScheduler:
             resource_id=resource_id,
             statuses=statuses,
             max_timestamp=max_timestamp,
+            limit=limit,
         )
 
     async def delete_task(self, id: str) -> None:
@@ -280,10 +283,14 @@ class TaskScheduler:
 
     async def _launch_scheduled_tasks(self) -> None:
         """Retrieve and launch scheduled tasks that should be running at that time."""
-        for task in await self.get_tasks(statuses=[TaskStatus.ACTIVE]):
+        for task in await self.get_tasks(
+            statuses=[TaskStatus.ACTIVE], limit=self.MAX_CONCURRENT_RUNNING_TASKS
+        ):
             await self._launch_task(task)
         for task in await self.get_tasks(
-            statuses=[TaskStatus.SCHEDULED], max_timestamp=self._clock.time_msec()
+            statuses=[TaskStatus.SCHEDULED],
+            max_timestamp=self._clock.time_msec(),
+            limit=self.MAX_CONCURRENT_RUNNING_TASKS,
         ):
             await self._launch_task(task)
 
