@@ -385,4 +385,4 @@ class TaskScheduler:
 
         self._running_tasks.add(task.id)
         await self.update_task(task.id, status=TaskStatus.ACTIVE)
-        run_as_background_process(task.action, wrapper)
+        run_as_background_process(f"task-{task.action}", wrapper)
