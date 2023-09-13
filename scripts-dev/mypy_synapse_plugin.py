@@ -187,6 +187,11 @@ IMMUTABLE_VALUE_TYPES = {
     "builtins.bytes",
 }
 
+# Types defined in Synapse which are known to be immutable.
+IMMUTABLE_CUSTOM_TYPES = {
+    "synapse.synapse_rust.push.FilteredPushRules",
+}
+
 # Immutable containers only if the values are also immutable.
 IMMUTABLE_CONTAINER_TYPES_REQUIRING_IMMUTABLE_ELEMENTS = {
     "builtins.frozenset",
@@ -223,7 +228,10 @@ def is_cacheable(
         return True, ("may be mutable" if verbose else None)
 
     elif isinstance(rt, Instance):
-        if rt.type.fullname in IMMUTABLE_VALUE_TYPES:
+        if (
+            rt.type.fullname in IMMUTABLE_VALUE_TYPES
+            or rt.type.fullname in IMMUTABLE_CUSTOM_TYPES
+        ):
             return True, None
 
         elif rt.type.fullname == "typing.Mapping":
