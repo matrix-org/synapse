@@ -572,7 +572,7 @@ class ModuleApi:
         Returns:
             UserInfo object if a user was found, otherwise None
         """
-        return await self._store.get_userinfo_by_id(user_id)
+        return await self._store.get_user_by_id(user_id)
 
     async def get_user_by_req(
         self,
@@ -1878,7 +1878,7 @@ class AccountDataManager:
             raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
 
         # Ensure the user exists, so we don't just write to users that aren't there.
-        if await self._store.get_userinfo_by_id(user_id) is None:
+        if await self._store.get_user_by_id(user_id) is None:
             raise ValueError(f"User {user_id} does not exist on this server.")
 
         await self._handler.add_account_data_for_user(user_id, data_type, new_data)
