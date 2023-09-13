@@ -283,6 +283,10 @@ class TaskScheduler:
 
     async def _launch_scheduled_tasks(self) -> None:
         """Retrieve and launch scheduled tasks that should be running at that time."""
+        # Don't bother trying to launch new tasks if we're already at capacity.
+        if len(self._running_tasks) >= TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS:
+            return
+
         for task in await self.get_tasks(
             statuses=[TaskStatus.ACTIVE], limit=self.MAX_CONCURRENT_RUNNING_TASKS
         ):
