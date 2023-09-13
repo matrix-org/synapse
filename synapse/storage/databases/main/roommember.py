@@ -1069,6 +1069,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         )
         return {row["event_id"]: row["membership"] for row in rows}
 
+    # TODO This returns a mutable object, which is generally confusing when using a cache.
     @cached(max_entries=10000)
     def _get_joined_hosts_cache(self, room_id: str) -> "_JoinedHostsCache":
         return _JoinedHostsCache()

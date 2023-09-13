@@ -310,7 +310,7 @@ class RelationsHandler:
         event_ids = [eid for eid in events_by_id.keys() if eid not in relations_by_id]
 
         # Fetch thread summaries.
-        summaries = await self._main_store.get_thread_summaries(event_ids)
+        summaries = await self._main_store.get_thread_summaries(event_ids)  # type: ignore[synapse-@cached-mutable]
 
         # Limit fetching whether the requester has participated in a thread to
         # events which are thread roots.
@@ -504,7 +504,7 @@ class RelationsHandler:
             Note that there is no use in limiting edits by ignored users since the
             parent event should be ignored in the first place if the user is ignored.
             """
-            edits = await self._main_store.get_applicable_edits(
+            edits = await self._main_store.get_applicable_edits(  # type: ignore[synapse-@cached-mutable]
                 [
                     event_id
                     for event_id, event in events_by_id.items()

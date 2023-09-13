@@ -171,6 +171,7 @@ def check_is_cacheable(
         message += f" ({note})"
     message = message.replace("builtins.", "").replace("typing.", "")
 
+    # TODO The context is the context of the caller, not the method itself.
     if ok and note:
         ctx.api.note(message, ctx.context)  # type: ignore[attr-defined]
     elif not ok:
