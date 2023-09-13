@@ -57,6 +57,7 @@ from synapse.storage.roommember import MemberSummary
 from synapse.types import (
     DeviceListUpdates,
     JsonDict,
+    JsonMapping,
     MutableStateMap,
     Requester,
     RoomStreamToken,
@@ -1767,7 +1768,7 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
-            global_account_data = (
+            updated_global_account_data = (
                 await self.store.get_updated_global_account_data_for_user(
                     user_id, since_token.account_data_key
                 )
@@ -1778,19 +1779,23 @@ class SyncHandler:
             )
 
             if push_rules_changed:
-                global_account_data = dict(global_account_data)
-                global_account_data[
-                    AccountDataTypes.PUSH_RULES
-                ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
+                global_account_data: JsonMapping = {
+                    AccountDataTypes.PUSH_RULES: await self._push_rules_handler.push_rules_for_user(
+                        sync_config.user
+                    ),
+                    **updated_global_account_data,
+                }
         else:
             all_global_account_data = await self.store.get_global_account_data_for_user(
                 user_id
             )
 
-            global_account_data = dict(all_global_account_data)
-            global_account_data[
-                AccountDataTypes.PUSH_RULES
-            ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
+            global_account_data = {
+                AccountDataTypes.PUSH_RULES: await self._push_rules_handler.push_rules_for_user(
+                    sync_config.user
+                ),
+                **all_global_account_data,
+            }
 
         account_data_for_user = (
             await sync_config.filter_collection.filter_global_account_data(
@@ -1894,7 +1899,7 @@ class SyncHandler:
             blocks_all_rooms
             or sync_result_builder.sync_config.filter_collection.blocks_all_room_account_data()
         ):
-            account_data_by_room: Mapping[str, Mapping[str, JsonDict]] = {}
+            account_data_by_room: Mapping[str, Mapping[str, JsonMapping]] = {}
         elif since_token and not sync_result_builder.full_state:
             account_data_by_room = (
                 await self.store.get_updated_room_account_data_for_user(
@@ -2334,8 +2339,8 @@ class SyncHandler:
         sync_result_builder: "SyncResultBuilder",
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
-        tags: Optional[Mapping[str, Mapping[str, Any]]],
-        account_data: Mapping[str, JsonDict],
+        tags: Optional[Mapping[str, JsonMapping]],
+        account_data: Mapping[str, JsonMapping],
         always_include: bool = False,
     ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`
