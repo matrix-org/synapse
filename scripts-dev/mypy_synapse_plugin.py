@@ -31,6 +31,7 @@ from mypy.types import (
     NoneType,
     TupleType,
     TypeAliasType,
+    UninhabitedType,
     UnionType,
 )
 
@@ -188,6 +189,7 @@ IMMUTABLE_VALUE_TYPES = {
 # Immutable containers only if the values are also immutable.
 IMMUTABLE_CONTAINER_TYPES_REQUIRING_IMMUTABLE_ELEMENTS = {
     "builtins.frozenset",
+    "builtins.tuple",
     "typing.AbstractSet",
     "typing.Sequence",
 }
@@ -257,6 +259,11 @@ def is_cacheable(
 
     elif isinstance(rt, TypeAliasType):
         return is_cacheable(mypy.types.get_proper_type(rt), signature, verbose)
+
+    # The tests check what happens if you raise an Exception, so they don't return.
+    elif isinstance(rt, UninhabitedType) and rt.is_noreturn:
+        # There's no return value, just consider it cachable.
+        return True, None
 
     else:
         return False, f"Don't know how to handle {type(rt).__qualname__} return type"
