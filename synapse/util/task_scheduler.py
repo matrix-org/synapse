@@ -20,7 +20,10 @@ from prometheus_client import Gauge
 from twisted.python.failure import Failure
 
 from synapse.logging.context import nested_logging_context
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.types import JsonMapping, ScheduledTask, TaskStatus
 from synapse.util.stringutils import random_string
 
@@ -70,6 +73,8 @@ class TaskScheduler:
     # Precision of the scheduler, evaluation of tasks to run will only happen
     # every `SCHEDULE_INTERVAL_MS` ms
     SCHEDULE_INTERVAL_MS = 1 * 60 * 1000  # 1mn
+    # How often to clean up old tasks.
+    CLEANUP_INTERVAL_MS = 30 * 60 * 1000
     # Time before a complete or failed task is deleted from the DB
     KEEP_TASKS_FOR_MS = 7 * 24 * 60 * 60 * 1000  # 1 week
     # Maximum number of tasks that can run at the same time
@@ -94,10 +99,12 @@ class TaskScheduler:
 
         if self._run_background_tasks:
             self._clock.looping_call(
-                run_as_background_process,
+                self._launch_scheduled_tasks,
                 TaskScheduler.SCHEDULE_INTERVAL_MS,
-                "handle_scheduled_tasks",
-                self._handle_scheduled_tasks,
+            )
+            self._clock.looping_call(
+                self._clean_scheduled_tasks,
+                TaskScheduler.SCHEDULE_INTERVAL_MS,
             )
 
     def register_action(
@@ -276,11 +283,7 @@ class TaskScheduler:
             raise Exception(f"Task {id} is currently ACTIVE and can't be deleted")
         await self._store.delete_scheduled_task(id)
 
-    async def _handle_scheduled_tasks(self) -> None:
-        """Main loop taking care of launching tasks and cleaning up old ones."""
-        await self._launch_scheduled_tasks()
-        await self._clean_scheduled_tasks()
-
+    @wrap_as_background_process("launch_scheduled_tasks")
     async def _launch_scheduled_tasks(self) -> None:
         """Retrieve and launch scheduled tasks that should be running at that time."""
         # Don't bother trying to launch new tasks if we're already at capacity.
@@ -300,6 +303,7 @@ class TaskScheduler:
 
         running_tasks_gauge.set(len(self._running_tasks))
 
+    @wrap_as_background_process("clean_scheduled_tasks")
     async def _clean_scheduled_tasks(self) -> None:
         """Clean old complete or failed jobs to avoid clutter the DB."""
         now = self._clock.time_msec()
