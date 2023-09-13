@@ -21,7 +21,7 @@ from typing import Callable, Optional, Tuple, Type
 import mypy.types
 from mypy.erasetype import remove_instance_last_known_values
 from mypy.errorcodes import ErrorCode
-from mypy.nodes import ARG_NAMED_OPT
+from mypy.nodes import ARG_NAMED_OPT, Var
 from mypy.plugin import MethodSigContext, Plugin
 from mypy.typeops import bind_self
 from mypy.types import (
@@ -190,6 +190,8 @@ IMMUTABLE_VALUE_TYPES = {
 # Types defined in Synapse which are known to be immutable.
 IMMUTABLE_CUSTOM_TYPES = {
     "synapse.synapse_rust.push.FilteredPushRules",
+    # This is technically not immutable, but close enough.
+    "signedjson.types.VerifyKey",
 }
 
 # Immutable containers only if the values are also immutable.
@@ -198,6 +200,7 @@ IMMUTABLE_CONTAINER_TYPES_REQUIRING_IMMUTABLE_ELEMENTS = {
     "builtins.tuple",
     "typing.AbstractSet",
     "typing.Sequence",
+    "immutabledict.immutabledict",
 }
 
 MUTABLE_CONTAINER_TYPES = {
@@ -245,9 +248,17 @@ def is_cacheable(
             return False, None
 
         elif "attrs" in rt.type.metadata:
-            frozen = rt.type.metadata["attrs"].get("frozen", False)
+            frozen = rt.type.metadata["attrs"]["frozen"]
             if frozen:
-                # TODO: should really check that all of the fields are also cacheable
+                for attribute in rt.type.metadata["attrs"]["attributes"]:
+                    attribute_name = attribute["name"]
+                    symbol_node = rt.type.names[attribute_name].node
+                    assert isinstance(symbol_node, Var)
+                    assert symbol_node.type is not None
+                    ok, note = is_cacheable(symbol_node.type, signature, verbose)
+                    if not ok:
+                        return False, f"non-frozen attrs property: {attribute_name}"
+                # All attributes were frozen.
                 return True, None
             else:
                 return False, "non-frozen attrs class"

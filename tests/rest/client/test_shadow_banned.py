@@ -182,7 +182,7 @@ class RoomTestCase(_ShadowBannedBase):
 
         # It doesn't really matter what API we use here, we just want to assert
         # that the room doesn't exist.
-        summary = self.get_success(self.store.get_room_summary(new_room_id))
+        summary = self.get_success(self.store.get_room_summary(new_room_id))  # type: ignore[synapse-@cached-mutable]
         # The summary should be empty since the room doesn't exist.
         self.assertEqual(summary, {})
 

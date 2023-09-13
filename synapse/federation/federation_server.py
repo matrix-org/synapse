@@ -710,7 +710,7 @@ class FederationServer(FederationBase):
         state_event_ids: Collection[str]
         servers_in_room: Optional[Collection[str]]
         if caller_supports_partial_state:
-            summary = await self.store.get_room_summary(room_id)
+            summary = await self.store.get_room_summary(room_id)  # type: ignore[synapse-@cached-mutable]
             state_event_ids = _get_event_ids_for_partial_state_join(
                 event, prev_state_ids, summary
             )
