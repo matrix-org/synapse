@@ -291,16 +291,14 @@ class TaskScheduler:
 
     async def _clean_scheduled_tasks(self) -> None:
         """Clean old complete or failed jobs to avoid clutter the DB."""
+        now = self._clock.time_msec()
         for task in await self._store.get_scheduled_tasks(
-            statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE]
+            statuses=[TaskStatus.FAILED, TaskStatus.COMPLETE],
+            max_timestamp=now - TaskScheduler.KEEP_TASKS_FOR_MS,
         ):
             # FAILED and COMPLETE tasks should never be running
             assert task.id not in self._running_tasks
-            if (
-                self._clock.time_msec()
-                > task.timestamp + TaskScheduler.KEEP_TASKS_FOR_MS
-            ):
-                await self._store.delete_scheduled_task(task.id)
+            await self._store.delete_scheduled_task(task.id)
 
     async def _launch_task(self, task: ScheduledTask) -> None:
         """Launch a scheduled task now.
