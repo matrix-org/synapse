@@ -17,7 +17,7 @@ import logging
 import os
 import sys
 import tempfile
-from typing import List, Mapping, Optional
+from typing import List, Mapping, Optional, Sequence
 
 from twisted.internet import defer, task
 
@@ -57,7 +57,7 @@ from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
-from synapse.types import JsonDict, StateMap
+from synapse.types import JsonMapping, StateMap
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.logcontext import LoggingContext
 
@@ -198,7 +198,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             for event in state.values():
                 json.dump(event, fp=f)
 
-    def write_profile(self, profile: JsonDict) -> None:
+    def write_profile(self, profile: JsonMapping) -> None:
         user_directory = os.path.join(self.base_directory, "user_data")
         os.makedirs(user_directory, exist_ok=True)
         profile_file = os.path.join(user_directory, "profile")
@@ -206,7 +206,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
         with open(profile_file, "a") as f:
             json.dump(profile, fp=f)
 
-    def write_devices(self, devices: List[JsonDict]) -> None:
+    def write_devices(self, devices: Sequence[JsonMapping]) -> None:
         user_directory = os.path.join(self.base_directory, "user_data")
         os.makedirs(user_directory, exist_ok=True)
         device_file = os.path.join(user_directory, "devices")
@@ -215,7 +215,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             with open(device_file, "a") as f:
                 json.dump(device, fp=f)
 
-    def write_connections(self, connections: List[JsonDict]) -> None:
+    def write_connections(self, connections: Sequence[JsonMapping]) -> None:
         user_directory = os.path.join(self.base_directory, "user_data")
         os.makedirs(user_directory, exist_ok=True)
         connection_file = os.path.join(user_directory, "connections")
@@ -225,7 +225,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
                 json.dump(connection, fp=f)
 
     def write_account_data(
-        self, file_name: str, account_data: Mapping[str, JsonDict]
+        self, file_name: str, account_data: Mapping[str, JsonMapping]
     ) -> None:
         account_data_directory = os.path.join(
             self.base_directory, "user_data", "account_data"
@@ -237,7 +237,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
         with open(account_data_file, "a") as f:
             json.dump(account_data, fp=f)
 
-    def write_media_id(self, media_id: str, media_metadata: JsonDict) -> None:
+    def write_media_id(self, media_id: str, media_metadata: JsonMapping) -> None:
         file_directory = os.path.join(self.base_directory, "media_ids")
         os.makedirs(file_directory, exist_ok=True)
         media_id_file = os.path.join(file_directory, media_id)
