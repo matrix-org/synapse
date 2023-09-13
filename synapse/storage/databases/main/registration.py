@@ -272,7 +272,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             is_shadow_banned=bool(user_data["shadow_banned"]),
             user_id=UserID.from_string(user_data["name"]),
             user_type=user_data["user_type"],
-            last_seen_ts=user_data["last_seen_ts"],
         )
 
     async def is_trial_user(self, user_id: str) -> bool:
