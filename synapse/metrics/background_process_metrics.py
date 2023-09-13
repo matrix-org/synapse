@@ -33,7 +33,7 @@ from typing import (
 
 from prometheus_client import Metric
 from prometheus_client.core import REGISTRY, Counter, Gauge
-from typing_extensions import ParamSpec
+from typing_extensions import LiteralString, ParamSpec
 
 from twisted.internet import defer
 
@@ -191,7 +191,7 @@ R = TypeVar("R")
 
 
 def run_as_background_process(
-    desc: str,
+    desc: LiteralString,
     func: Callable[..., Awaitable[Optional[R]]],
     *args: Any,
     bg_start_span: bool = True,
@@ -259,7 +259,7 @@ P = ParamSpec("P")
 
 
 def wrap_as_background_process(
-    desc: str,
+    desc: LiteralString,
 ) -> Callable[
     [Callable[P, Awaitable[Optional[R]]]],
     Callable[P, "defer.Deferred[Optional[R]]"],
