@@ -19,6 +19,7 @@ from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     ReadReceipt,
     StreamKeyType,
     UserID,
@@ -182,15 +183,15 @@ class ReceiptsHandler:
             await self.federation_sender.send_read_receipt(receipt)
 
 
-class ReceiptEventSource(EventSource[int, JsonDict]):
+class ReceiptEventSource(EventSource[int, JsonMapping]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.config = hs.config
 
     @staticmethod
     def filter_out_private_receipts(
-        rooms: Sequence[JsonDict], user_id: str
-    ) -> List[JsonDict]:
+        rooms: Sequence[JsonMapping], user_id: str
+    ) -> List[JsonMapping]:
         """
         Filters a list of serialized receipts (as returned by /sync and /initialSync)
         and removes private read receipts of other users.
@@ -207,7 +208,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             The same as rooms, but filtered.
         """
 
-        result = []
+        result: List[JsonMapping] = []
 
         # Iterate through each room's receipt content.
         for room in rooms:
@@ -260,7 +261,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         room_ids: Iterable[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[JsonMapping], int]:
         from_key = int(from_key)
         to_key = self.get_current_key()
 
@@ -279,7 +280,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
     async def get_new_events_as(
         self, from_key: int, to_key: int, service: ApplicationService
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[JsonMapping], int]:
         """Returns a set of new read receipt events that an appservice
         may be interested in.
 
