@@ -25,7 +25,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -408,7 +407,7 @@ class EventBase(metaclass=abc.ABCMeta):
     def keys(self) -> Iterable[str]:
         return self._dict.keys()
 
-    def prev_event_ids(self) -> Sequence[str]:
+    def prev_event_ids(self) -> List[str]:
         """Returns the list of prev event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -553,7 +552,7 @@ class FrozenEventV2(EventBase):
         self._event_id = "$" + encode_base64(compute_event_reference_hash(self)[1])
         return self._event_id
 
-    def prev_event_ids(self) -> Sequence[str]:
+    def prev_event_ids(self) -> List[str]:
         """Returns the list of prev event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 

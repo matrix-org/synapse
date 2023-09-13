@@ -78,7 +78,7 @@ from synapse.http.replicationagent import ReplicationAgent
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
-from synapse.types import ISynapseReactor
+from synapse.types import ISynapseReactor, StrSequence
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 
@@ -108,10 +108,9 @@ RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValu
 # the value actually has to be a List, but List is invariant so we can't specify that
 # the entries can either be Lists or bytes.
 RawHeaderValue = Union[
-    List[str],
+    StrSequence,
     List[bytes],
     List[Union[str, bytes]],
-    Tuple[str, ...],
     Tuple[bytes, ...],
     Tuple[Union[str, bytes], ...],
 ]
