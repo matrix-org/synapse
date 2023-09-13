@@ -157,7 +157,7 @@ sudo pip install py-bcrypt
 
 #### Alpine Linux
 
-6543 maintains [Synapse packages for Alpine Linux]( (https://pkgs.alpinelinux.org/packages?name=synapse&branch=edge) in the community repository. Install with:
+6543 maintains [Synapse packages for Alpine Linux](https://pkgs.alpinelinux.org/packages?name=synapse&branch=edge) in the community repository. Install with:
 
 ```sh
 sudo apk add synapse
