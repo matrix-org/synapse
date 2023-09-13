@@ -13,7 +13,17 @@
 # limitations under the License.
 import enum
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, FrozenSet, Iterable, List, Optional
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+)
 
 import attr
 
@@ -245,7 +255,7 @@ class RelationsHandler:
 
     async def get_references_for_events(
         self, event_ids: Collection[str], ignored_users: FrozenSet[str] = frozenset()
-    ) -> Dict[str, List[_RelatedEvent]]:
+    ) -> Mapping[str, Sequence[_RelatedEvent]]:
         """Get a list of references to the given events.
 
         Args:
