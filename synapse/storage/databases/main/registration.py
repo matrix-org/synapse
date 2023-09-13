@@ -2327,9 +2327,9 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
         await self.db_pool.simple_update(
             "refresh_tokens",
-            {"user_id": user_id, "device_id": old_device_id},
-            {"device_id": device_id},
-            "set_device_for_refresh_token",
+            keyvalues={"user_id": user_id, "device_id": old_device_id},
+            updatevalues={"device_id": device_id},
+            desc="set_device_for_refresh_token",
         )
 
     def _set_device_for_access_token_txn(
