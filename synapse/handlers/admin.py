@@ -14,11 +14,11 @@
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set
 
 from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
-from synapse.types import JsonDict, RoomStreamToken, StateMap, UserID
+from synapse.types import JsonMapping, RoomStreamToken, StateMap, UserID
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class AdminHandler:
         self._state_storage_controller = self._storage_controllers.state
         self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
-    async def get_whois(self, user: UserID) -> JsonDict:
+    async def get_whois(self, user: UserID) -> JsonMapping:
         connections = []
 
         sessions = await self._store.get_user_ip_and_agents(user)
@@ -55,7 +55,7 @@ class AdminHandler:
 
         return ret
 
-    async def get_user(self, user: UserID) -> Optional[JsonDict]:
+    async def get_user(self, user: UserID) -> Optional[JsonMapping]:
         """Function to get user details"""
         user_info_dict = await self._store.get_user_by_id(user.to_string())
         if user_info_dict is None:
@@ -349,7 +349,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def write_profile(self, profile: JsonDict) -> None:
+    def write_profile(self, profile: JsonMapping) -> None:
         """Write the profile of a user.
 
         Args:
@@ -358,7 +358,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def write_devices(self, devices: List[JsonDict]) -> None:
+    def write_devices(self, devices: Sequence[JsonMapping]) -> None:
         """Write the devices of a user.
 
         Args:
@@ -367,7 +367,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def write_connections(self, connections: List[JsonDict]) -> None:
+    def write_connections(self, connections: Sequence[JsonMapping]) -> None:
         """Write the connections of a user.
 
         Args:
@@ -377,7 +377,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_account_data(
-        self, file_name: str, account_data: Mapping[str, JsonDict]
+        self, file_name: str, account_data: Mapping[str, JsonMapping]
     ) -> None:
         """Write the account data of a user.
 
@@ -388,7 +388,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def write_media_id(self, media_id: str, media_metadata: JsonDict) -> None:
+    def write_media_id(self, media_id: str, media_metadata: JsonMapping) -> None:
         """Write the media's metadata of a user.
         Exports only the metadata, as this can be fetched from the database via
         read only. In order to access the files, a connection to the correct
