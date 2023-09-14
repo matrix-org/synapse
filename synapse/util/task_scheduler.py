@@ -15,7 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
-from prometheus_client import Gauge
 
 from twisted.python.failure import Failure
 
