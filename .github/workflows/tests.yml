@@ -109,13 +109,13 @@ jobs:
 
       # Cribbed from
       # https://github.com/AustinScola/mypy-cache-github-action/blob/85ea4f2972abed39b33bd02c36e341b28ca59213/src/restore.ts#L10-L17
-#      - name: Restore/persist mypy's cache
-#        uses: actions/cache@v3
-#        with:
-#          path: |
-#            .mypy_cache
-#          key: mypy-cache-${{ github.context.sha }}
-#          restore-keys: mypy-cache-
+      - name: Restore/persist mypy's cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            .mypy_cache
+          key: mypy-cache-${{ github.context.sha }}
+          restore-keys: mypy-cache-
 
       - name: Run mypy
         run: poetry run mypy
