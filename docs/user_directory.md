@@ -1,8 +1,8 @@
 # User Directory API Implementation
 
 The user directory is maintained based on the 'visible' users of a homeserver -
-i.e. ones which are local to the server, ones which a local user shares a room
-with, or ones who are present in a publicly viewable room present on the server.
+i.e. ones which are local to the server and ones which any local user shares a
+room with.
 
 The directory info is stored in various tables, which can sometimes get out of
 sync (although this is considered a bug). If this happens, for now the
