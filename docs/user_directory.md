@@ -61,10 +61,55 @@ The information is not repeated here, but the options are mentioned below.
 
 ## Search algorithm
 
+If `search_all_users` is `false`, then results are limited to users who:
+
+1. Are found in the `users_in_public_rooms` table, or
+2. Are found in the `users_who_share_private_rooms` where `L` is the requesting
+   user and `M` is the search result.
+
+By default, locked users are not returned. If `show_locked_users` is `true` then
+no filtering on the locked status of a user is done.
+
+The user provided search term is lowercased and normalized using [NFKC](https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization),
+this treats the string as case-insensitive, canonicalizes different forms of the
+same text, and maps some "roughly equivalent" characters together.
+
+The search term is then split into words:
+
+* If [ICU](https://en.wikipedia.org/wiki/International_Components_for_Unicode) is
+  available, then the default locale will be used to break the search term into words.
+  (See the [installation instructions](setup/installation.md) for how to install ICU.)
+* If unavailable, then runs of ASCII characters, numbers, underscores, and hypens
+  are considered words.
+
 ### PostgreSQL
 
-TODO
+The above words are then transformed into two queries:
+
+1. "exact" which matches the parsed words exactly (using [`to_tsquery`](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES));
+2. "prefix" which matches the parsed words as prefixes (using `to_tsquery`).
+
+Results are sorted by a rank derived by:
+
+* 4x if a user ID exists.
+* 1.2x if the user has a display name set.
+* 1.2x if the user has an avatar set.
+* 3x by the full text search results using the [`ts_rank_cd` function](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-RANKING)
+  against the "exact" search query; this has four variables with the following weightings:
+  * `D`: 0.1 for the user ID's domain
+  * `C`: 0.1 for unused
+  * `B`: 0.9 for the user's display name (or an empty string if it is not set)
+  * `A`: 0.1 for the user ID's localpart
+* 1x by the full text search results using the `ts_rank_cd` function against the
+  "prefix" search query. (Using the same weightings as above.)
+* If `prefer_local_users` is `true`, then 2x if the user is local to the homeserver.
 
 ### SQLite
 
-TODO
+Results are sorted as follows:
+
+* By the [`rank`](https://www.sqlite.org/windowfunctions.html#built_in_window_functions)
+  of the full text search results using the [`matchinfo` function](https://www.sqlite.org/fts3.html#matchinfo).
+* If `prefer_local_users` is `true`, then if the user is local to the homeserver.
+* If the user has a display name set.
+* If the user has an avatar set.
