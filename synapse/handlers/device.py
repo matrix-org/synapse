@@ -388,7 +388,8 @@ class DeviceWorkerHandler:
             "Trying handling device list state for partial join: not supported on workers."
         )
 
-    DEVICE_MSGS_DELETE_BATCH_LIMIT = 100
+    DEVICE_MSGS_DELETE_BATCH_LIMIT = 1000
+    DEVICE_MSGS_DELETE_SLEEP_MS = 1000
 
     async def _delete_device_messages(
         self,
@@ -400,19 +401,19 @@ class DeviceWorkerHandler:
         device_id = task.params["device_id"]
         up_to_stream_id = task.params["up_to_stream_id"]
 
-        res = await self.store.delete_messages_for_device(
-            user_id=user_id,
-            device_id=device_id,
-            up_to_stream_id=up_to_stream_id,
-            limit=DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT,
-        )
+        # Delete the messages in batches to avoid too much DB load.
+        while True:
+            res = await self.store.delete_messages_for_device(
+                user_id=user_id,
+                device_id=device_id,
+                up_to_stream_id=up_to_stream_id,
+                limit=DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT,
+            )
 
-        if res < DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT:
-            return TaskStatus.COMPLETE, None, None
-        else:
-            # There is probably still device messages to be deleted, let's keep the task active and it will be run
-            # again in a subsequent scheduler loop run (probably the next one, if not too many tasks are running).
-            return TaskStatus.ACTIVE, None, None
+            if res < DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT:
+                return TaskStatus.COMPLETE, None, None
+
+            await self.clock.sleep(DeviceHandler.DEVICE_MSGS_DELETE_SLEEP_MS / 1000.0)
 
 
 class DeviceHandler(DeviceWorkerHandler):
@@ -758,12 +759,13 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # If the dehydrated device was successfully deleted (the device ID
         # matched the stored dehydrated device), then modify the access
-        # token to use the dehydrated device's ID and copy the old device
-        # display name to the dehydrated device, and destroy the old device
-        # ID
+        # token and refresh token to use the dehydrated device's ID and
+        # copy the old device display name to the dehydrated device,
+        # and destroy the old device ID
         old_device_id = await self.store.set_device_for_access_token(
             access_token, device_id
         )
+        await self.store.set_device_for_refresh_token(user_id, old_device_id, device_id)
         old_device = await self.store.get_device(user_id, old_device_id)
         if old_device is None:
             raise errors.NotFoundError()

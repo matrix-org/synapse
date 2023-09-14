@@ -27,9 +27,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Collection,
     Dict,
-    Iterable,
     List,
     NoReturn,
     Optional,
@@ -76,7 +74,7 @@ from synapse.module_api.callbacks.spamchecker_callbacks import load_legacy_spam_
 from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
     load_legacy_third_party_event_rules,
 )
-from synapse.types import ISynapseReactor
+from synapse.types import ISynapseReactor, StrCollection
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
@@ -278,7 +276,7 @@ def register_start(
     reactor.callWhenRunning(lambda: defer.ensureDeferred(wrapper()))
 
 
-def listen_metrics(bind_addresses: Iterable[str], port: int) -> None:
+def listen_metrics(bind_addresses: StrCollection, port: int) -> None:
     """
     Start Prometheus metrics server.
     """
@@ -315,7 +313,7 @@ def _set_prometheus_client_use_created_metrics(new_value: bool) -> None:
 
 
 def listen_manhole(
-    bind_addresses: Collection[str],
+    bind_addresses: StrCollection,
     port: int,
     manhole_settings: ManholeConfig,
     manhole_globals: dict,
@@ -339,7 +337,7 @@ def listen_manhole(
 
 
 def listen_tcp(
-    bind_addresses: Collection[str],
+    bind_addresses: StrCollection,
     port: int,
     factory: ServerFactory,
     reactor: IReactorTCP = reactor,
@@ -448,7 +446,7 @@ def listen_http(
 
 
 def listen_ssl(
-    bind_addresses: Collection[str],
+    bind_addresses: StrCollection,
     port: int,
     factory: ServerFactory,
     context_factory: IOpenSSLContextFactory,

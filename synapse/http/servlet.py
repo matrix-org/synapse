@@ -18,7 +18,6 @@ import logging
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
-    Iterable,
     List,
     Mapping,
     Optional,
@@ -38,7 +37,7 @@ from twisted.web.server import Request
 from synapse.api.errors import Codes, SynapseError
 from synapse.http import redact_uri
 from synapse.http.server import HttpServer
-from synapse.types import JsonDict, RoomAlias, RoomID
+from synapse.types import JsonDict, RoomAlias, RoomID, StrCollection
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -340,7 +339,7 @@ def parse_string(
     name: str,
     default: str,
     *,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> str:
     ...
@@ -352,7 +351,7 @@ def parse_string(
     name: str,
     *,
     required: Literal[True],
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> str:
     ...
@@ -365,7 +364,7 @@ def parse_string(
     *,
     default: Optional[str] = None,
     required: bool = False,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[str]:
     ...
@@ -376,7 +375,7 @@ def parse_string(
     name: str,
     default: Optional[str] = None,
     required: bool = False,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[str]:
     """
@@ -485,7 +484,7 @@ def parse_enum(
 
 def _parse_string_value(
     value: bytes,
-    allowed_values: Optional[Iterable[str]],
+    allowed_values: Optional[StrCollection],
     name: str,
     encoding: str,
 ) -> str:
@@ -511,7 +510,7 @@ def parse_strings_from_args(
     args: Mapping[bytes, Sequence[bytes]],
     name: str,
     *,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[List[str]]:
     ...
@@ -523,7 +522,7 @@ def parse_strings_from_args(
     name: str,
     default: List[str],
     *,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> List[str]:
     ...
@@ -535,7 +534,7 @@ def parse_strings_from_args(
     name: str,
     *,
     required: Literal[True],
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> List[str]:
     ...
@@ -548,7 +547,7 @@ def parse_strings_from_args(
     default: Optional[List[str]] = None,
     *,
     required: bool = False,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[List[str]]:
     ...
@@ -559,7 +558,7 @@ def parse_strings_from_args(
     name: str,
     default: Optional[List[str]] = None,
     required: bool = False,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[List[str]]:
     """
@@ -610,7 +609,7 @@ def parse_string_from_args(
     name: str,
     default: Optional[str] = None,
     *,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[str]:
     ...
@@ -623,7 +622,7 @@ def parse_string_from_args(
     default: Optional[str] = None,
     *,
     required: Literal[True],
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> str:
     ...
@@ -635,7 +634,7 @@ def parse_string_from_args(
     name: str,
     default: Optional[str] = None,
     required: bool = False,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[str]:
     ...
@@ -646,7 +645,7 @@ def parse_string_from_args(
     name: str,
     default: Optional[str] = None,
     required: bool = False,
-    allowed_values: Optional[Iterable[str]] = None,
+    allowed_values: Optional[StrCollection] = None,
     encoding: str = "ascii",
 ) -> Optional[str]:
     """
@@ -821,7 +820,7 @@ def parse_and_validate_json_object_from_request(
     return validate_json_object(content, model_type)
 
 
-def assert_params_in_dict(body: JsonDict, required: Iterable[str]) -> None:
+def assert_params_in_dict(body: JsonDict, required: StrCollection) -> None:
     absent = []
     for k in required:
         if k not in body:

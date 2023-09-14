@@ -672,14 +672,12 @@ class ReplicationCommandHandler:
             cmd.instance_name, cmd.lock_name, cmd.lock_key
         )
 
-    async def on_NEW_ACTIVE_TASK(
+    def on_NEW_ACTIVE_TASK(
         self, conn: IReplicationConnection, cmd: NewActiveTaskCommand
     ) -> None:
         """Called when get a new NEW_ACTIVE_TASK command."""
         if self._task_scheduler:
-            task = await self._task_scheduler.get_task(cmd.data)
-            if task:
-                await self._task_scheduler._launch_task(task)
+            self._task_scheduler.launch_task_by_id(cmd.data)
 
     def new_connection(self, connection: IReplicationConnection) -> None:
         """Called when we have a new connection."""

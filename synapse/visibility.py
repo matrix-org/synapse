@@ -36,7 +36,7 @@ from synapse.events.utils import prune_event
 from synapse.logging.opentracing import trace
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
-from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
+from synapse.types import RetentionPolicy, StateMap, StrCollection, get_domain_from_id
 from synapse.types.state import StateFilter
 from synapse.util import Clock
 
@@ -150,12 +150,12 @@ async def filter_events_for_client(
 
 async def filter_event_for_clients_with_state(
     store: DataStore,
-    user_ids: Collection[str],
+    user_ids: StrCollection,
     event: EventBase,
     context: EventContext,
     is_peeking: bool = False,
     filter_send_to_client: bool = True,
-) -> Collection[str]:
+) -> StrCollection:
     """
     Checks to see if an event is visible to the users in the list at the time of
     the event.

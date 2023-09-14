@@ -188,8 +188,11 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         app_service.is_interested_in_user = Mock(return_value=True)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        # This just needs to return a truth-y value.
-        self.store.get_user_by_id = AsyncMock(return_value={"is_guest": False})
+
+        class FakeUserInfo:
+            is_guest = False
+
+        self.store.get_user_by_id = AsyncMock(return_value=FakeUserInfo())
         self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
@@ -341,7 +344,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
 
     def test_get_guest_user_from_macaroon(self) -> None:
-        self.store.get_user_by_id = AsyncMock(return_value={"is_guest": True})
+        class FakeUserInfo:
+            is_guest = True
+
+        self.store.get_user_by_id = AsyncMock(return_value=FakeUserInfo())
         self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         user_id = "@baldrick:matrix.org"
