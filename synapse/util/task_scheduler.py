@@ -15,7 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
-
 from twisted.python.failure import Failure
 
 from synapse.logging.context import nested_logging_context
