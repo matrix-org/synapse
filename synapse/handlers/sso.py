@@ -653,6 +653,8 @@ class SsoHandler:
             remote_user_id=remote_user_id,
             display_name=attributes.display_name,
             emails=attributes.emails,
+            # Default to using all mapped emails. Will be overwritten in handle_submit_username_request.
+            emails_to_use=attributes.emails,
             client_redirect_url=client_redirect_url,
             expiry_time_ms=now + self._MAPPING_SESSION_VALIDITY_PERIOD_MS,
             extra_login_attributes=extra_login_attributes,
