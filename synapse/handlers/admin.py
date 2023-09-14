@@ -18,13 +18,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, 
 
 from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
-from synapse.types import (
-    JsonMapping,
-    RoomStreamToken,
-    StateMap,
-    UserID,
-    UserInfo,
-)
+from synapse.types import JsonMapping, RoomStreamToken, StateMap, UserID, UserInfo
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
