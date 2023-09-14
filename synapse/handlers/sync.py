@@ -1783,7 +1783,7 @@ class SyncHandler:
         since_token = sync_result_builder.since_token
 
         if since_token and not sync_result_builder.full_state:
-            updated_global_account_data = (
+            global_account_data = (
                 await self.store.get_updated_global_account_data_for_user(
                     user_id, since_token.account_data_key
                 )
@@ -1794,11 +1794,11 @@ class SyncHandler:
             )
 
             if push_rules_changed:
-                global_account_data: JsonMapping = {
+                global_account_data = {
                     AccountDataTypes.PUSH_RULES: await self._push_rules_handler.push_rules_for_user(
                         sync_config.user
                     ),
-                    **updated_global_account_data,
+                    **global_account_data,
                 }
         else:
             all_global_account_data = await self.store.get_global_account_data_for_user(
