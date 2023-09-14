@@ -37,6 +37,7 @@ class ReceiptsHandler:
         self.server_name = hs.config.server.server_name
         self.store = hs.get_datastores().main
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.event_handler = hs.get_event_handler()
 
         self.hs = hs
 
@@ -169,17 +170,22 @@ class ReceiptsHandler:
         self,
         room_id: str,
         receipt_type: str,
-        user_id: str,
+        user_id: UserID,
         event_id: str,
         thread_id: Optional[str],
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
+
+        # Ensure the room/event exists, this will raise an error if the user
+        # cannot view the event.
+        await self.event_handler.get_event(user_id, room_id, event_id)
+
         receipt = ReadReceipt(
             room_id=room_id,
             receipt_type=receipt_type,
-            user_id=user_id,
+            user_id=user_id.to_string(),
             event_ids=[event_id],
             thread_id=thread_id,
             data={"ts": int(self.clock.time_msec())},
