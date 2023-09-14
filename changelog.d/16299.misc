@@ -1,1 +1,1 @@
-Use a stricter isolation level on `receipts_graph` Postgres transactions to stop error messages.
+Refactor `receipts_graph` Postgres transactions to stop error messages.
