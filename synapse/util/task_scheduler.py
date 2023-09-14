@@ -97,6 +97,9 @@ class TaskScheduler:
         ] = {}
         self._run_background_tasks = hs.config.worker.run_background_tasks
 
+        # Flag to make sure we only try and launch new tasks once at a time.
+        self._launching_new_tasks = False
+
         if self._run_background_tasks:
             self._clock.looping_call(
                 self._launch_scheduled_tasks,
@@ -304,18 +307,26 @@ class TaskScheduler:
         if len(self._running_tasks) >= TaskScheduler.MAX_CONCURRENT_RUNNING_TASKS:
             return
 
-        for task in await self.get_tasks(
-            statuses=[TaskStatus.ACTIVE], limit=self.MAX_CONCURRENT_RUNNING_TASKS
-        ):
-            await self._launch_task(task)
-        for task in await self.get_tasks(
-            statuses=[TaskStatus.SCHEDULED],
-            max_timestamp=self._clock.time_msec(),
-            limit=self.MAX_CONCURRENT_RUNNING_TASKS,
-        ):
-            await self._launch_task(task)
+        if self._launching_new_tasks:
+            return
 
-        running_tasks_gauge.set(len(self._running_tasks))
+        self._launching_new_tasks = True
+
+        try:
+            for task in await self.get_tasks(
+                statuses=[TaskStatus.ACTIVE], limit=self.MAX_CONCURRENT_RUNNING_TASKS
+            ):
+                await self._launch_task(task)
+            for task in await self.get_tasks(
+                statuses=[TaskStatus.SCHEDULED],
+                max_timestamp=self._clock.time_msec(),
+                limit=self.MAX_CONCURRENT_RUNNING_TASKS,
+            ):
+                await self._launch_task(task)
+
+            running_tasks_gauge.set(len(self._running_tasks))
+        finally:
+            self._launching_new_tasks = False
 
     @wrap_as_background_process("clean_scheduled_tasks")
     async def _clean_scheduled_tasks(self) -> None:
