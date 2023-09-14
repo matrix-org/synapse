@@ -81,6 +81,17 @@ class ReceiptsHandler:
                 )
                 continue
 
+            # If the other server is not in the room, something odd is going on.
+            # Ignore the receipt.
+            is_in_room = await self.event_auth_handler.is_host_in_room(room_id, origin)
+            if not is_in_room:
+                logger.info(
+                    "Ignoring receipt for room %r from server %s as they're not in the room",
+                    room_id,
+                    origin,
+                )
+                continue
+
             for receipt_type, users in room_values.items():
                 for user_id, user_values in users.items():
                     if get_domain_from_id(user_id) != origin:
