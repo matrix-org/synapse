@@ -18,7 +18,13 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, 
 
 from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
-from synapse.types import JsonMapping, RoomStreamToken, StateMap, UserID
+from synapse.types import (
+    JsonMapping,
+    RoomStreamToken,
+    StateMap,
+    UserID,
+    UserInfo,
+)
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -57,38 +63,30 @@ class AdminHandler:
 
     async def get_user(self, user: UserID) -> Optional[JsonMapping]:
         """Function to get user details"""
-        user_info_dict = await self._store.get_user_by_id(user.to_string())
-        if user_info_dict is None:
+        user_info: Optional[UserInfo] = await self._store.get_user_by_id(
+            user.to_string()
+        )
+        if user_info is None:
             return None
 
-        # Restrict returned information to a known set of fields. This prevents additional
-        # fields added to get_user_by_id from modifying Synapse's external API surface.
-        user_info_to_return = {
-            "name",
-            "admin",
-            "deactivated",
-            "locked",
-            "shadow_banned",
-            "creation_ts",
-            "appservice_id",
-            "consent_server_notice_sent",
-            "consent_version",
-            "consent_ts",
-            "user_type",
-            "is_guest",
-            "last_seen_ts",
+        user_info_dict = {
+            "name": user.to_string(),
+            "admin": user_info.is_admin,
+            "deactivated": user_info.is_deactivated,
+            "locked": user_info.locked,
+            "shadow_banned": user_info.is_shadow_banned,
+            "creation_ts": user_info.creation_ts,
+            "appservice_id": user_info.appservice_id,
+            "consent_server_notice_sent": user_info.consent_server_notice_sent,
+            "consent_version": user_info.consent_version,
+            "consent_ts": user_info.consent_ts,
+            "user_type": user_info.user_type,
+            "is_guest": user_info.is_guest,
         }
 
         if self._msc3866_enabled:
             # Only include the approved flag if support for MSC3866 is enabled.
-            user_info_to_return.add("approved")
-
-        # Restrict returned keys to a known set.
-        user_info_dict = {
-            key: value
-            for key, value in user_info_dict.items()
-            if key in user_info_to_return
-        }
+            user_info_dict["approved"] = user_info.approved
 
         # Add additional user metadata
         profile = await self._store.get_profileinfo(user)
@@ -104,6 +102,9 @@ class AdminHandler:
         user_info_dict["threepids"] = threepids
         user_info_dict["external_ids"] = external_ids
         user_info_dict["erased"] = await self._store.is_user_erased(user.to_string())
+
+        last_seen_ts = await self._store.get_last_seen_for_user_id(user.to_string())
+        user_info_dict["last_seen_ts"] = last_seen_ts
 
         return user_info_dict
 

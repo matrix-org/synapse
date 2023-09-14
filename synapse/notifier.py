@@ -104,7 +104,7 @@ class _NotifierUserStream:
     def __init__(
         self,
         user_id: str,
-        rooms: Collection[str],
+        rooms: StrCollection,
         current_token: StreamToken,
         time_now_ms: int,
     ):
@@ -457,7 +457,7 @@ class Notifier:
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
         users: Optional[Collection[Union[str, UserID]]] = None,
-        rooms: Optional[Collection[str]] = None,
+        rooms: Optional[StrCollection] = None,
     ) -> None:
         """Used to inform listeners that something has happened event wise.
 
@@ -529,7 +529,7 @@ class Notifier:
         user_id: str,
         timeout: int,
         callback: Callable[[StreamToken, StreamToken], Awaitable[T]],
-        room_ids: Optional[Collection[str]] = None,
+        room_ids: Optional[StrCollection] = None,
         from_token: StreamToken = StreamToken.START,
     ) -> T:
         """Wait until the callback returns a non empty response or the
