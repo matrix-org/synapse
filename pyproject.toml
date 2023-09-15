@@ -370,6 +370,18 @@ myst-parser = {version = "^1.0.0", python = "^3.8"}
 furo = ">=2022.12.7,<2024.0.0"
 
 
+# LSP dependencies
+[tool.poetry.group.dev-lsp]
+optional = true
+
+[tool.poetry.group.dev-lsp.dependencies]
+python-lsp-server = {version = "^1.8.0"}
+python-lsp-ruff = {version = "^1.5.1"}
+pylsp-rope = {version = "^0.1.11"}
+pylsp-mypy = {version = "^0.6.7"}
+
+
+
 [build-system]
 # The upper bounds here are defensive, intended to prevent situations like
 # #13849 and #14079 where we see buildtime or runtime errors caused by build
