@@ -180,7 +180,8 @@ class ReceiptsHandler:
 
         # Ensure the room/event exists, this will raise an error if the user
         # cannot view the event.
-        await self.event_handler.get_event(user_id, room_id, event_id)
+        if not await self.event_handler.get_event(user_id, room_id, event_id):
+            return
 
         receipt = ReadReceipt(
             room_id=room_id,

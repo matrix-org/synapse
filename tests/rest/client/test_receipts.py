@@ -17,7 +17,7 @@ from typing import Optional
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import EduTypes, ReceiptTypes
+from synapse.api.constants import EduTypes, EventTypes, HistoryVisibility, ReceiptTypes
 from synapse.rest.client import login, receipts, room, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -54,13 +54,81 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
     def test_send_receipt(self) -> None:
+        # Send a message.
+        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
+
+        # Send a read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertNotEqual(self._get_read_receipt(), None)
+
+    def test_send_receipt_unknown_event(self) -> None:
+        """Receipts sent for unknown events are ignored."""
+        # Attempt to send a receipt to an unknown room.
         channel = self.make_request(
             "POST",
             "/rooms/!abc:beep/receipt/m.read/$def",
             content={},
-            access_token=self.tok,
+            access_token=self.tok2,
         )
         self.assertEqual(channel.code, 200, channel.result)
+        self.assertIsNone(self._get_read_receipt())
+
+        # Attempt to send a receipt to an unknown event.
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/m.read/$def",
+            content={},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertIsNone(self._get_read_receipt())
+
+    def test_send_receipt_unviewable_event(self) -> None:
+        """Receipts sent for unviewable events are errors."""
+        # Create a room where new users can't see events from before their join
+        # & send events into it.
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            tok=self.tok,
+            extra_content={
+                "preset": "private_chat",
+                "initial_state": [
+                    {
+                        "content": {"history_visibility": HistoryVisibility.JOINED},
+                        "state_key": "",
+                        "type": EventTypes.RoomHistoryVisibility,
+                    }
+                ],
+            },
+        )
+        res = self.helper.send(room_id, body="hello", tok=self.tok)
+
+        # Attempt to send a receipt from the wrong user.
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
+            content={},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
+
+        # Join the user to the room, but they still can't see the event.
+        self.helper.invite(room_id, self.user_id, self.user2, tok=self.tok)
+        self.helper.join(room=room_id, user=self.user2, tok=self.tok2)
+
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
+            content={},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
 
     def test_send_receipt_invalid_room_id(self) -> None:
         channel = self.make_request(
