@@ -19,6 +19,10 @@ from urllib import parse as urlparse
 from synapse.api.constants import Direction, EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.api.filtering import Filter
+from synapse.handlers.pagination import (
+    PURGE_ROOM_ACTION_NAME,
+    SHUTDOWN_AND_PURGE_ROOM_ACTION_NAME,
+)
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
@@ -36,7 +40,7 @@ from synapse.rest.admin._base import (
 )
 from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, RoomID, UserID, create_requester
+from synapse.types import JsonDict, RoomID, ScheduledTask, UserID, create_requester
 from synapse.types.state import StateFilter
 from synapse.util import json_decoder
 
@@ -117,18 +121,28 @@ class RoomRestV2Servlet(RestServlet):
                 403, "Shutdown of this room is forbidden", Codes.FORBIDDEN
             )
 
-        delete_id = self._pagination_handler.start_shutdown_and_purge_room(
+        delete_id = await self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
-            new_room_user_id=content.get("new_room_user_id"),
-            new_room_name=content.get("room_name"),
-            message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
-            block=block,
-            purge=purge,
-            force_purge=force_purge,
+            shutdown_params={
+                "new_room_user_id": content.get("new_room_user_id"),
+                "new_room_name": content.get("room_name"),
+                "message": content.get("message"),
+                "requester_user_id": requester.user.to_string(),
+                "block": block,
+                "purge": purge,
+                "force_purge": force_purge,
+            },
         )
 
         return HTTPStatus.OK, {"delete_id": delete_id}
+
+
+def _convert_delete_task_to_response(task: ScheduledTask) -> JsonDict:
+    return {
+        "delete_id": task.id,
+        "status": task.status,
+        "shutdown_room": task.result,
+    }
 
 
 class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
@@ -150,21 +164,16 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
             )
 
-        delete_ids = self._pagination_handler.get_delete_ids_by_room(room_id)
-        if delete_ids is None:
-            raise NotFoundError("No delete task for room_id '%s' found" % room_id)
+        delete_tasks = await self._pagination_handler.get_delete_tasks_by_room(room_id)
 
-        response = []
-        for delete_id in delete_ids:
-            delete = self._pagination_handler.get_delete_status(delete_id)
-            if delete:
-                response += [
-                    {
-                        "delete_id": delete_id,
-                        **delete.asdict(),
-                    }
-                ]
-        return HTTPStatus.OK, {"results": cast(JsonDict, response)}
+        if delete_tasks:
+            return HTTPStatus.OK, {
+                "results": [
+                    _convert_delete_task_to_response(task) for task in delete_tasks
+                ],
+            }
+        else:
+            raise NotFoundError("No delete task for room_id '%s' found" % room_id)
 
 
 class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
@@ -181,11 +190,14 @@ class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self._auth, request)
 
-        delete_status = self._pagination_handler.get_delete_status(delete_id)
-        if delete_status is None:
+        delete_task = await self._pagination_handler.get_delete_task(delete_id)
+        if delete_task is None or (
+            delete_task.action != PURGE_ROOM_ACTION_NAME
+            and delete_task.action != SHUTDOWN_AND_PURGE_ROOM_ACTION_NAME
+        ):
             raise NotFoundError("delete id '%s' not found" % delete_id)
 
-        return HTTPStatus.OK, cast(JsonDict, delete_status.asdict())
+        return HTTPStatus.OK, _convert_delete_task_to_response(delete_task)
 
 
 class ListRoomRestServlet(RestServlet):
@@ -349,11 +361,15 @@ class RoomRestServlet(RestServlet):
 
         ret = await room_shutdown_handler.shutdown_room(
             room_id=room_id,
-            new_room_user_id=content.get("new_room_user_id"),
-            new_room_name=content.get("room_name"),
-            message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
-            block=block,
+            params={
+                "new_room_user_id": content.get("new_room_user_id"),
+                "new_room_name": content.get("room_name"),
+                "message": content.get("message"),
+                "requester_user_id": requester.user.to_string(),
+                "block": block,
+                "purge": purge,
+                "force_purge": force_purge,
+            },
         )
 
         # Purge room
