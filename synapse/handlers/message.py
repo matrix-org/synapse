@@ -828,13 +828,13 @@ class EventCreationHandler:
 
         u = await self.store.get_user_by_id(user_id)
         assert u is not None
-        if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
+        if u.user_type in (UserTypes.SUPPORT, UserTypes.BOT):
             # support and bot users are not required to consent
             return
-        if u["appservice_id"] is not None:
+        if u.appservice_id is not None:
             # users registered by an appservice are exempt
             return
-        if u["consent_version"] == self.config.consent.user_consent_version:
+        if u.consent_version == self.config.consent.user_consent_version:
             return
 
         consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)

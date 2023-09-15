@@ -48,6 +48,9 @@ from synapse.metrics._types import Collector
 if TYPE_CHECKING:
     import resource
 
+    # Old versions don't have `LiteralString`
+    from typing_extensions import LiteralString
+
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +194,7 @@ R = TypeVar("R")
 
 
 def run_as_background_process(
-    desc: str,
+    desc: "LiteralString",
     func: Callable[..., Awaitable[Optional[R]]],
     *args: Any,
     bg_start_span: bool = True,
@@ -259,7 +262,7 @@ P = ParamSpec("P")
 
 
 def wrap_as_background_process(
-    desc: str,
+    desc: "LiteralString",
 ) -> Callable[
     [Callable[P, Awaitable[Optional[R]]]],
     Callable[P, "defer.Deferred[Optional[R]]"],

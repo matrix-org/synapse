@@ -1,3 +1,13 @@
+# Synapse 1.92.2 (2023-09-15)
+
+This is a Docker-only update to mitigate [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863), a critical vulnerability in `libwebp`. Server admins not using Docker should ensure that their `libwebp` is up to date (if installed). We encourage admins to upgrade as soon as possible.
+
+
+### Updates to the Docker image
+
+- Update docker image to use Debian bookworm as the base. ([\#16324](https://github.com/matrix-org/synapse/issues/16324))
+
+
 # Synapse 1.92.1 (2023-09-12)
 
 This minor release was needed only because of CI-related trouble on [v1.92.0](https://github.com/matrix-org/synapse/releases/tag/v1.92.0), which was never released.
