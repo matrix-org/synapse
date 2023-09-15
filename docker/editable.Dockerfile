@@ -33,7 +33,7 @@ RUN \
     gosu \
     libjpeg62-turbo \
     libpq5 \
-    libwebp6 \
+    libwebp7 \
     xmlsec1 \
     libjemalloc2 \
     && rm -rf /var/lib/apt/lists/*
