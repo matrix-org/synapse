@@ -1153,7 +1153,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         # Lock them
         self.get_success(self.store.set_user_locked_status(user_id, True))
 
-        # Locked user appears in the filtered locked=true API
+        # Locked user should appear in list users API
         channel = self.make_request(
             "GET",
             self.url + "?locked=true",
@@ -1163,7 +1163,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertIn(user_id, users)
         self.assertTrue(users[user_id]["locked"])
 
-        # Locked user should not appear in the filtered locked=false API
+        # Locked user should not appear in list users API
         channel = self.make_request(
             "GET",
             self.url + "?locked=false",

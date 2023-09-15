@@ -229,7 +229,7 @@ class DataStore(
                 filters.append("deactivated = 0")
 
             if not locked:
-                filters.append("locked = 0")
+                filters.append("locked IS FALSE")
 
             if admins is not None:
                 if admins:
