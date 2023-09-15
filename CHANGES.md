@@ -1,6 +1,6 @@
 # Synapse 1.92.2 (2023-09-15)
 
-This is a Docker only update to mitigate [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863), a critical vulnerability in `libewebp`. Server admins not using Docker should ensure that their `libwebp` is up to date (if installed). We encourage admins to upgrade as soon as possible.
+This is a Docker-only update to mitigate [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863), a critical vulnerability in `libwebp`. Server admins not using Docker should ensure that their `libwebp` is up to date (if installed). We encourage admins to upgrade as soon as possible.
 
 
 ### Updates to the Docker image
