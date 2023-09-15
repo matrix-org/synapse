@@ -965,6 +965,13 @@ still take up to 5 minutes to purge redacted events from the database.</p>
 <pre><code class="language-yaml">redaction_retention_period: 28d
 </code></pre>
 <hr />
+<h3 id="forgotten_room_retention_period"><a class="header" href="#forgotten_room_retention_period"><code>forgotten_room_retention_period</code></a></h3>
+<p>How long to keep locally forgotten rooms before purging them from the DB.</p>
+<p>Defaults to <code>null</code>, meaning it's disabled.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">forgotten_room_retention_period: 28d
+</code></pre>
+<hr />
 <h3 id="user_ips_max_age"><a class="header" href="#user_ips_max_age"><code>user_ips_max_age</code></a></h3>
 <p>How long to track users' last seen time and IPs in the database.</p>
 <p>Defaults to <code>28d</code>. Set to <code>null</code> to disable clearing out of old rows.</p>
