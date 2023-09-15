@@ -1,3 +1,13 @@
+# Synapse 1.92.2 (2023-09-15)
+
+This is a Docker only update to mitigate [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863), a critical vulnerability in `libewebp`. Server admins not using Docker should ensure that their `libwebp` is up to date (if installed). We encourage admins to upgrade as soon as possible.
+
+
+### Updates to the Docker image
+
+- Update docker image to use Debian bookworm as the base. ([\#16324](https://github.com/matrix-org/synapse/issues/16324))
+
+
 # Synapse 1.92.1 (2023-09-12)
 
 Stop building Ubuntu Kinetic since it is EOL and repos seem to be dead.
