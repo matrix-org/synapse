@@ -38,6 +38,7 @@ class ReceiptsHandler:
         self.store = hs.get_datastores().main
         self.event_auth_handler = hs.get_event_auth_handler()
         self.event_handler = hs.get_event_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.hs = hs
 
@@ -82,10 +83,13 @@ class ReceiptsHandler:
                 )
                 continue
 
-            # If the other server is not in the room, something odd is going on.
-            # Ignore the receipt.
-            is_in_room = await self.event_auth_handler.is_host_in_room(room_id, origin)
-            if not is_in_room:
+            # Let's check that the origin server is in the room before accepting the receipt.
+            # We don't want to block waiting on a partial state so take an
+            # approximation if needed.
+            domains = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+                room_id
+            )
+            if origin not in domains:
                 logger.info(
                     "Ignoring receipt for room %r from server %s as they're not in the room",
                     room_id,
