@@ -173,10 +173,10 @@ RUN \
   gosu \
   libjpeg62-turbo \
   libpq5 \
-  libwebp6 \
+  libwebp7 \
   xmlsec1 \
   libjemalloc2 \
-  libicu67 \
+  libicu72 \
   libssl-dev \
   openssl \
   && rm -rf /var/lib/apt/lists/*
