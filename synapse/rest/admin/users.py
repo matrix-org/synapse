@@ -66,6 +66,7 @@ class UsersRestServletV2(RestServlet):
     The parameter `deactivated` can be used to include deactivated users.
     The parameter `order_by` can be used to order the result.
     The parameter `not_user_type` can be used to exclude certain user types.
+    The parameter `locked` can be used to include locked users.
     Possible values are `bot`, `support` or "empty string".
     "empty string" here means to exclude users without a type.
     """
@@ -107,8 +108,9 @@ class UsersRestServletV2(RestServlet):
                 "The guests parameter is not supported when MSC3861 is enabled.",
                 errcode=Codes.INVALID_PARAM,
             )
-        deactivated = parse_boolean(request, "deactivated", default=False)
 
+        deactivated = parse_boolean(request, "deactivated", default=False)
+        locked = parse_boolean(request, "locked", default=False)
         admins = parse_boolean(request, "admins")
 
         # If support for MSC3866 is not enabled, apply no filtering based on the
@@ -133,6 +135,7 @@ class UsersRestServletV2(RestServlet):
                 UserSortOrder.SHADOW_BANNED.value,
                 UserSortOrder.CREATION_TS.value,
                 UserSortOrder.LAST_SEEN_TS.value,
+                UserSortOrder.LOCKED.value,
             ),
         )
 
@@ -154,6 +157,7 @@ class UsersRestServletV2(RestServlet):
             direction,
             approved,
             not_user_types,
+            locked,
         )
 
         # If support for MSC3866 is not enabled, don't show the approval flag.
