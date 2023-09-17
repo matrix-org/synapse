@@ -31,7 +31,7 @@ from typing import (
 )
 
 import attr
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine

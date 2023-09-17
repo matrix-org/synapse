@@ -13,7 +13,7 @@
 # limitations under the License.
 import unittest as stdlib_unittest
 
-from pydantic import BaseModel, ValidationError
+from pydantic.v1 import BaseModel, ValidationError
 from typing_extensions import Literal
 
 from synapse.rest.client.models import EmailRequestTokenBody

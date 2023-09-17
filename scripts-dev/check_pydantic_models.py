@@ -39,8 +39,14 @@ from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Set, Type, TypeVar
 
 from parameterized import parameterized
-from pydantic import BaseModel as PydanticBaseModel, conbytes, confloat, conint, constr
-from pydantic.typing import get_args
+from pydantic.v1 import (
+    BaseModel as PydanticBaseModel,
+    conbytes,
+    confloat,
+    conint,
+    constr,
+)
+from pydantic.v1.typing import get_args
 from typing_extensions import ParamSpec
 
 logger = logging.getLogger(__name__)

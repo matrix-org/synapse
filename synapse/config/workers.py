@@ -18,7 +18,7 @@ import logging
 from typing import Any, Dict, List, Optional, Union
 
 import attr
-from pydantic import BaseModel, Extra, StrictBool, StrictInt, StrictStr
+from pydantic.v1 import BaseModel, Extra, StrictBool, StrictInt, StrictStr
 
 from synapse.config._base import (
     Config,

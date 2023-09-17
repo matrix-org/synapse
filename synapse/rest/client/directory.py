@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from pydantic import StrictStr
+from pydantic.v1 import StrictStr
 from typing_extensions import Literal
 
 from twisted.web.server import Request

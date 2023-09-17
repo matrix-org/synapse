@@ -15,7 +15,7 @@ import collections.abc
 from typing import List, Type, Union, cast
 
 import jsonschema
-from pydantic import Field, StrictBool, StrictStr
+from pydantic.v1 import Field, StrictBool, StrictStr
 
 from synapse.api.constants import (
     MAX_ALIAS_LENGTH,
