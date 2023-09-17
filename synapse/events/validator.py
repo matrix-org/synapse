@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import List, Type, Union, cast
+from typing import TYPE_CHECKING, List, Type, Union, cast
 
 import jsonschema
-from pydantic import Field, StrictBool, StrictStr
+
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import Field, StrictBool, StrictStr
+else:
+    from pydantic import Field, StrictBool, StrictStr
 
 from synapse.api.constants import (
     MAX_ALIAS_LENGTH,

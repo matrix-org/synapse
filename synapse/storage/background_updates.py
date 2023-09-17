@@ -31,8 +31,8 @@ from typing import (
 )
 
 import attr
-from pydantic import BaseModel
 
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Connection, Cursor
@@ -40,6 +40,11 @@ from synapse.types import JsonDict
 from synapse.util import Clock, json_encoder
 
 from . import engines
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import BaseModel
+else:
+    from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
