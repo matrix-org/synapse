@@ -191,7 +191,12 @@ class ReplicationStreamer:
 
                         if updates:
                             logger.info(
-                                "Streaming: %s -> %s", stream.NAME, updates[-1][0]
+                                "Streaming: %s -> %s (limited: %s, updates: %s, max token: %s)",
+                                stream.NAME,
+                                updates[-1][0],
+                                limited,
+                                len(updates),
+                                current_token,
                             )
                             stream_updates_counter.labels(stream.NAME).inc(len(updates))
 
