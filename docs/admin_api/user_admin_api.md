@@ -54,7 +54,8 @@ It returns a JSON body like the following:
             "external_id": "<user_id_provider_2>"
         }
     ],
-    "user_type": null
+    "user_type": null,
+    "locked": false
 }
 ```
 
@@ -103,7 +104,8 @@ with a body of:
     ],
     "admin": false,
     "deactivated": false,
-    "user_type": null
+    "user_type": null,
+    "locked": false
 }
 ```
 
@@ -184,7 +186,8 @@ A response body like the following is returned:
             "shadow_banned": 0,
             "displayname": "<User One>",
             "avatar_url": null,
-            "creation_ts": 1560432668000
+            "creation_ts": 1560432668000,
+            "locked": false
         }, {
             "name": "<user_id2>",
             "is_guest": 0,
@@ -195,7 +198,8 @@ A response body like the following is returned:
             "shadow_banned": 0,
             "displayname": "<User Two>",
             "avatar_url": "<avatar_url>",
-            "creation_ts": 1561550621000
+            "creation_ts": 1561550621000,
+            "locked": false
         }
     ],
     "next_token": "100",
@@ -249,6 +253,8 @@ The following parameters should be set in the URL:
 - `not_user_type` - Exclude certain user types, such as bot users, from the request.
    Can be provided multiple times. Possible values are `bot`, `support` or "empty string".
    "empty string" here means to exclude users without a type.
+- `locked` - string representing a bool - Is optional and if `true` will **include** locked users.
+  Defaults to `false` to exclude locked users. Note: Introduced in v1.93.
 
 Caution. The database only has indexes on the columns `name` and `creation_ts`.
 This means that if a different sort order is used (`is_guest`, `admin`,
@@ -274,10 +280,11 @@ The following fields are returned in the JSON response body:
   - `avatar_url` - string -  The user's avatar URL if they have set one.
   - `creation_ts` - integer - The user's creation timestamp in ms.
   - `last_seen_ts` - integer - The user's last activity timestamp in ms.
-
+  - `locked` - bool - Status if that user has been marked as locked. Note: Introduced in v1.93.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
 
+*Added in Synapse 1.93:* the `locked` query parameter and response field.
 
 ## Query current sessions for a user
 
