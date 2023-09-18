@@ -68,7 +68,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         self.assertNotEqual(self._get_read_receipt(), None)
 
     def test_send_receipt_unknown_event(self) -> None:
-        """Receipts sent for unknown events are ignored."""
+        """Receipts sent for unknown events are ignored to not break message retention."""
         # Attempt to send a receipt to an unknown room.
         channel = self.make_request(
             "POST",
