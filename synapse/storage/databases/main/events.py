@@ -827,15 +827,7 @@ class PersistEventsStore:
                 "target_chain_id",
                 "target_sequence_number",
             ),
-            values=[
-                (source_id, source_seq, target_id, target_seq)
-                for (
-                    source_id,
-                    source_seq,
-                    target_id,
-                    target_seq,
-                ) in chain_links.get_additions()
-            ],
+            values=list(chain_links.get_additions()),
         )
 
     @staticmethod
