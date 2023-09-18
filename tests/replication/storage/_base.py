@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -47,24 +47,31 @@ class BaseWorkerStoreTestCase(BaseStreamTestCase):
         self.pump(0.1)
 
     def check(
-        self, method: str, args: Iterable[Any], expected_result: Optional[Any] = None
+        self,
+        method: str,
+        args: Iterable[Any],
+        expected_result: Optional[Any] = None,
+        asserter: Optional[Callable[[Any, Any, Optional[Any]], None]] = None,
     ) -> None:
+        if asserter is None:
+            asserter = self.assertEqual
+
         master_result = self.get_success(getattr(self.master_store, method)(*args))
         worker_result = self.get_success(getattr(self.worker_store, method)(*args))
         if expected_result is not None:
-            self.assertEqual(
+            asserter(
                 master_result,
                 expected_result,
                 "Expected master result to be %r but was %r"
                 % (expected_result, master_result),
             )
-            self.assertEqual(
+            asserter(
                 worker_result,
                 expected_result,
                 "Expected worker result to be %r but was %r"
                 % (expected_result, worker_result),
             )
-        self.assertEqual(
+        asserter(
             master_result,
             worker_result,
             "Worker result %r does not match master result %r"
