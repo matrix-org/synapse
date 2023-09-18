@@ -12,6 +12,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-signoff:
+    if: "github.event_name == 'pull_request'"
+    uses: "matrix-org/backend-meta/.github/workflows/sign-off.yml@v2"
+
   # Job to detect what has changed so we don't run e.g. Rust checks on PRs that
   # don't modify Rust code.
   changes:
@@ -225,6 +229,7 @@ jobs:
       - check-lockfile
       - lint-clippy
       - lint-rustfmt
+      - check-signoff
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -627,9 +632,10 @@ jobs:
         with:
           needs: ${{ toJSON(needs) }}
 
-          # The newsfile lint may be skipped on non PR builds
+          # The newsfile and signoff lints may be skipped on non PR builds
           # Cargo test is skipped if there is no changes on Rust code
           skippable: |
+            check-signoff
             lint-newsfile
             cargo-test
             cargo-bench
