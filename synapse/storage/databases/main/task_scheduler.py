@@ -53,6 +53,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         resource_id: Optional[str] = None,
         statuses: Optional[List[TaskStatus]] = None,
         max_timestamp: Optional[int] = None,
+        limit: Optional[int] = None,
     ) -> List[ScheduledTask]:
         """Get a list of scheduled tasks from the DB.
 
@@ -62,6 +63,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             statuses: Limit the returned tasks to the specific statuses
             max_timestamp: Limit the returned tasks to the ones that have
                 a timestamp inferior to the specified one
+            limit: Only return `limit` number of rows if set.
 
         Returns: a list of `ScheduledTask`, ordered by increasing timestamps
         """
@@ -93,6 +95,10 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
                 sql = sql + " WHERE " + " AND ".join(clauses)
 
             sql = sql + " ORDER BY timestamp"
+
+            if limit is not None:
+                sql += " LIMIT ?"
+                args.append(limit)
 
             txn.execute(sql, args)
             return self.db_pool.cursor_to_dict(txn)

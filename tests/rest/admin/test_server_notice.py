@@ -22,6 +22,7 @@ from synapse.server import HomeServer
 from synapse.storage.roommember import RoomsForUser
 from synapse.types import JsonDict
 from synapse.util import Clock
+from synapse.util.stringutils import random_string
 
 from tests import unittest
 from tests.unittest import override_config
@@ -413,11 +414,24 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(messages[0]["content"]["body"], "test msg one")
         self.assertEqual(messages[0]["sender"], "@notices:test")
 
+        random_string(16)
+
         # shut down and purge room
         self.get_success(
-            self.room_shutdown_handler.shutdown_room(first_room_id, self.admin_user)
+            self.room_shutdown_handler.shutdown_room(
+                first_room_id,
+                {
+                    "requester_user_id": self.admin_user,
+                    "new_room_user_id": None,
+                    "new_room_name": None,
+                    "message": None,
+                    "block": False,
+                    "purge": True,
+                    "force_purge": False,
+                },
+            )
         )
-        self.get_success(self.pagination_handler.purge_room(first_room_id))
+        self.get_success(self.pagination_handler.purge_room(first_room_id, force=False))
 
         # user is not member anymore
         self._check_invite_and_join_status(self.other_user, 0, 0)

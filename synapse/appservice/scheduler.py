@@ -200,9 +200,7 @@ class _ServiceQueuer:
         if service.id in self.requests_in_flight:
             return
 
-        run_as_background_process(
-            "as-sender-%s" % (service.id,), self._send_request, service
-        )
+        run_as_background_process("as-sender", self._send_request, service)
 
     async def _send_request(self, service: ApplicationService) -> None:
         # sanity-check: we shouldn't get here if this service already has a sender
@@ -478,14 +476,11 @@ class _Recoverer:
         self.backoff_counter = 1
 
     def recover(self) -> None:
-        def _retry() -> None:
-            run_as_background_process(
-                "as-recoverer-%s" % (self.service.id,), self.retry
-            )
-
         delay = 2**self.backoff_counter
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
-        self.clock.call_later(delay, _retry)
+        self.clock.call_later(
+            delay, run_as_background_process, "as-recoverer", self.retry
+        )
 
     def _backoff(self) -> None:
         # cap the backoff to be around 8.5min => (2^9) = 512 secs
