@@ -280,10 +280,11 @@ The following fields are returned in the JSON response body:
   - `avatar_url` - string -  The user's avatar URL if they have set one.
   - `creation_ts` - integer - The user's creation timestamp in ms.
   - `last_seen_ts` - integer - The user's last activity timestamp in ms.
-  - `locked` - bool - Status if that user has been marked as locked.
+  - `locked` - bool - Status if that user has been marked as locked. Note: Introduced in v1.93.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
 
+*Added in Synapse 1.93:* the `locked` query parameter and response field.
 
 ## Query current sessions for a user
 
