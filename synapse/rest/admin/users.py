@@ -39,7 +39,7 @@ from synapse.rest.admin._base import (
 from synapse.rest.client._base import client_patterns
 from synapse.storage.databases.main.registration import ExternalIDReuseException
 from synapse.storage.databases.main.stats import UserSortOrder
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -211,7 +211,7 @@ class UserRestServletV2(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -226,7 +226,7 @@ class UserRestServletV2(RestServlet):
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester)
 
@@ -658,7 +658,7 @@ class WhoisRestServlet(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
 

@@ -43,7 +43,7 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonMapping
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -119,7 +119,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     @cached()
     async def get_global_account_data_for_user(
         self, user_id: str
-    ) -> Mapping[str, JsonDict]:
+    ) -> Mapping[str, JsonMapping]:
         """
         Get all the global client account_data for a user.
 
@@ -164,7 +164,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     @cached()
     async def get_room_account_data_for_user(
         self, user_id: str
-    ) -> Mapping[str, Mapping[str, JsonDict]]:
+    ) -> Mapping[str, Mapping[str, JsonMapping]]:
         """
         Get all of the per-room client account_data for a user.
 
@@ -213,7 +213,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     @cached(num_args=2, max_entries=5000, tree=True)
     async def get_global_account_data_by_type_for_user(
         self, user_id: str, data_type: str
-    ) -> Optional[JsonDict]:
+    ) -> Optional[JsonMapping]:
         """
         Returns:
             The account data.
@@ -265,7 +265,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     @cached(num_args=2, tree=True)
     async def get_account_data_for_room(
         self, user_id: str, room_id: str
-    ) -> Mapping[str, JsonDict]:
+    ) -> Mapping[str, JsonMapping]:
         """Get all the client account_data for a user for a room.
 
         Args:
@@ -296,7 +296,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
     @cached(num_args=3, max_entries=5000, tree=True)
     async def get_account_data_for_room_and_type(
         self, user_id: str, room_id: str, account_data_type: str
-    ) -> Optional[JsonDict]:
+    ) -> Optional[JsonMapping]:
         """Get the client account_data of given type for a user for a room.
 
         Args:
@@ -394,7 +394,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
 
     async def get_updated_global_account_data_for_user(
         self, user_id: str, stream_id: int
-    ) -> Dict[str, JsonDict]:
+    ) -> Mapping[str, JsonMapping]:
         """Get all the global account_data that's changed for a user.
 
         Args:
