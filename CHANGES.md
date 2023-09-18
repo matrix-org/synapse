@@ -1,10 +1,12 @@
 # Synapse 1.92.3 (2023-09-18)
 
-This is again an update targeted at mitigating [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863).
+This is again a security update targeted at mitigating [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863).
 It turns out that libwebp is bundled statically in Pillow wheels so we need to update this dependency instead of
 libwebp package at the OS level.
 
-Unlike what was advertised in 1.92.2 changelog this release also impacts PyPI wheels and Debian packages.
+Unlike what was advertised in 1.92.2 changelog this release also impacts PyPI wheels and Debian packages from matrix.org.
+
+We encourage admins to upgrade as soon as possible.
 
 
 ### Internal Changes
