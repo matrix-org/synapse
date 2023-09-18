@@ -90,7 +90,7 @@ class EventsWorkerStoreTestCase(BaseWorkerStoreTestCase):
     def test_get_latest_event_ids_in_room(self) -> None:
         create = self.persist(type="m.room.create", key="", creator=USER_ID)
         self.replicate()
-        self.check("get_latest_event_ids_in_room", (ROOM_ID,), [create.event_id])
+        self.check("get_latest_event_ids_in_room", (ROOM_ID,), {create.event_id})
 
         join = self.persist(
             type="m.room.member",
@@ -99,7 +99,7 @@ class EventsWorkerStoreTestCase(BaseWorkerStoreTestCase):
             prev_events=[(create.event_id, {})],
         )
         self.replicate()
-        self.check("get_latest_event_ids_in_room", (ROOM_ID,), [join.event_id])
+        self.check("get_latest_event_ids_in_room", (ROOM_ID,), {join.event_id})
 
     def test_redactions(self) -> None:
         self.persist(type="m.room.create", key="", creator=USER_ID)
