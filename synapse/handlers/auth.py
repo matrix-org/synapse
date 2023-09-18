@@ -481,8 +481,9 @@ class AuthHandler:
 
         sid: Optional[str] = None
         authdict = clientdict.pop("auth", {})
-        if "session" in authdict:
-            sid = authdict["session"]
+        if authdict is not None:
+            if "session" in authdict:
+                sid = authdict["session"]
 
         # Convert the URI and method to strings.
         uri = request.uri.decode("utf-8")
