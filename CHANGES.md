@@ -1,3 +1,22 @@
+# Synapse 1.92.3 (2023-09-18)
+
+This is again a security update targeted at mitigating [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863).
+It turns out that libwebp is bundled statically in Pillow wheels so we need to update this dependency instead of
+libwebp package at the OS level.
+
+Unlike what was advertised in 1.92.2 changelog this release also impacts PyPI wheels and Debian packages from matrix.org.
+
+We encourage admins to upgrade as soon as possible.
+
+
+### Internal Changes
+
+- Pillow 10.0.1 is now mandatory because of libwebp CVE-2023-4863, since Pillow provides libwebp in the wheels. ([\#16347](https://github.com/matrix-org/synapse/issues/16347))
+
+### Updates to locked dependencies
+
+* Bump pillow from 10.0.0 to 10.0.1. ([\#16344](https://github.com/matrix-org/synapse/issues/16344))
+
 # Synapse 1.92.2 (2023-09-15)
 
 This is a Docker-only update to mitigate [CVE-2023-4863](https://cve.org/CVERecord?id=CVE-2023-4863), a critical vulnerability in `libwebp`. Server admins not using Docker should ensure that their `libwebp` is up to date (if installed). We encourage admins to upgrade as soon as possible.
