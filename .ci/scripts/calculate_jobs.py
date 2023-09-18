@@ -59,14 +59,15 @@ trial_postgres_tests = [
     }
 ]
 
-trial_postgres_tests.append(
-    {
-        "python-version": "3.11",
-        "database": "postgres",
-        "postgres-version": "16",
-        "extras": "all",
-    }
-)
+if not IS_PR:
+    trial_postgres_tests.append(
+        {
+            "python-version": "3.11",
+            "database": "postgres",
+            "postgres-version": "16",
+            "extras": "all",
+        }
+    )
 
 trial_no_extra_tests = [
     {
