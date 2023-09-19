@@ -13,7 +13,13 @@
 # limitations under the License.
 
 from packaging.version import Version
-from pydantic import __version__ as pydantic_version
+
+try:
+    from pydantic import __version__ as pydantic_version
+except ImportError:
+    import importlib.metadata
+
+    pydantic_version = importlib.metadata.version("pydantic")
 
 HAS_PYDANTIC_V2: bool = Version(pydantic_version).major == 2
 
