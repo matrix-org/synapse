@@ -1,1 +1,0 @@
-Add the ability to use `G` (GiB) and `T` (TiB) suffixes in configuration options that refer to numbers of bytes.

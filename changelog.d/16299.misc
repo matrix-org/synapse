@@ -1,1 +1,0 @@
-Refactor `receipts_graph` Postgres transactions to stop error messages.
