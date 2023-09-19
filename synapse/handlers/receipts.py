@@ -37,6 +37,8 @@ class ReceiptsHandler:
         self.server_name = hs.config.server.server_name
         self.store = hs.get_datastores().main
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.event_handler = hs.get_event_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.hs = hs
 
@@ -76,6 +78,20 @@ class ReceiptsHandler:
             if not is_in_room:
                 logger.info(
                     "Ignoring receipt for room %r from server %s as we're not in the room",
+                    room_id,
+                    origin,
+                )
+                continue
+
+            # Let's check that the origin server is in the room before accepting the receipt.
+            # We don't want to block waiting on a partial state so take an
+            # approximation if needed.
+            domains = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+                room_id
+            )
+            if origin not in domains:
+                logger.info(
+                    "Ignoring receipt for room %r from server %s as they're not in the room",
                     room_id,
                     origin,
                 )
@@ -158,17 +174,23 @@ class ReceiptsHandler:
         self,
         room_id: str,
         receipt_type: str,
-        user_id: str,
+        user_id: UserID,
         event_id: str,
         thread_id: Optional[str],
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
+
+        # Ensure the room/event exists, this will raise an error if the user
+        # cannot view the event.
+        if not await self.event_handler.get_event(user_id, room_id, event_id):
+            return
+
         receipt = ReadReceipt(
             room_id=room_id,
             receipt_type=receipt_type,
-            user_id=user_id,
+            user_id=user_id.to_string(),
             event_ids=[event_id],
             thread_id=thread_id,
             data={"ts": int(self.clock.time_msec())},
