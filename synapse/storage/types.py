@@ -53,22 +53,10 @@ class Cursor(Protocol):
     @property
     def description(
         self,
-    ) -> Optional[
-        Sequence[
-            # Note that this is an approximate typing based on sqlite3 and other
-            # drivers, and may not be entirely accurate.
-            # FWIW, the DBAPI 2 spec is: https://peps.python.org/pep-0249/#description
-            Tuple[
-                str,
-                Optional[Any],
-                Optional[int],
-                Optional[int],
-                Optional[int],
-                Optional[int],
-                Optional[int],
-            ]
-        ]
-    ]:
+    ) -> Optional[Sequence[Any]]:
+        # At the time of writing, Synapse only assumes that `column[0]: str` for each
+        # `column in description`. Since this is hard to express in the type system, and
+        # as this is rarely used in Synapse, we deem `column: Any` good enough.
         ...
 
     @property
