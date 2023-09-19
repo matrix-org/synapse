@@ -1,1 +1,0 @@
-Don't try refetching device lists for users on remote hosts that are marked as "down".

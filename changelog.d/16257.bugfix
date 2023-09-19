@@ -1,1 +1,0 @@
-Fix long-standing bug where we kept re-requesting a remote server's key repeatedly, potentially causing delays in receiving events over federation.

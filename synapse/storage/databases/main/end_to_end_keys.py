@@ -862,14 +862,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             their user ID will map to None.
 
         """
-        result = await self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_bare_e2e_cross_signing_keys_bulk",
             self._get_bare_e2e_cross_signing_keys_bulk_txn,
             user_ids,
         )
-
-        # The `Optional` comes from the `@cachedList` decorator.
-        return cast(Dict[str, Optional[Mapping[str, JsonMapping]]], result)
 
     def _get_bare_e2e_cross_signing_keys_bulk_txn(
         self,
