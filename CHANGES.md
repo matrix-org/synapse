@@ -2,12 +2,13 @@
 
 ### Features
 
-- Add automatic purge after all users have forgotten a room. Also restores purge/shutdown rooms after a Synapse restart. ([\#15488](https://github.com/matrix-org/synapse/issues/15488))
+- Add automatic purge after all users have forgotten a room. ([\#15488](https://github.com/matrix-org/synapse/issues/15488))
+- Restore room purge/shutdown after a Synapse restart. ([\#15488](https://github.com/matrix-org/synapse/issues/15488))
 - Support resolving homeservers using `matrix-fed` DNS SRV records from [MSC4040](https://github.com/matrix-org/matrix-spec-proposals/pull/4040). ([\#16137](https://github.com/matrix-org/synapse/issues/16137))
 - Add the ability to use `G` (GiB) and `T` (TiB) suffixes in configuration options that refer to numbers of bytes. ([\#16219](https://github.com/matrix-org/synapse/issues/16219))
 - Add span information to requests sent to appservices. Contributed by MTRNord. ([\#16227](https://github.com/matrix-org/synapse/issues/16227))
 - Add the ability to enable/disable registrations when using CAS. Contributed by Aurélien Grimpard. ([\#16262](https://github.com/matrix-org/synapse/issues/16262))
-- Allow `/notifications` endpoint to be routed to workers. ([\#16265](https://github.com/matrix-org/synapse/issues/16265))
+- Allow the `/notifications` endpoint to be routed to workers. ([\#16265](https://github.com/matrix-org/synapse/issues/16265))
 - Enable users to easily unsubscribe to notifications emails via the `List-Unsubscribe` header. ([\#16274](https://github.com/matrix-org/synapse/issues/16274))
 - Report whether a user is `locked` in the [List Accounts admin API](https://matrix-org.github.io/synapse/latest/admin_api/user_admin_api.html#list-accounts), and exclude locked users by default. ([\#16328](https://github.com/matrix-org/synapse/issues/16328))
 
@@ -21,6 +22,7 @@
 - Fix bug introduced in Synapse 1.49.0 when using dehydrated devices ([MSC2697](https://github.com/matrix-org/matrix-spec-proposals/pull/2697)) and refresh tokens. Contributed by Hanadi. ([\#16288](https://github.com/matrix-org/synapse/issues/16288))
 - Fix a long-standing bug where invalid receipts would be accepted. ([\#16327](https://github.com/matrix-org/synapse/issues/16327))
 - Use standard name for UTF-8 charset in emails. ([\#16329](https://github.com/matrix-org/synapse/issues/16329))
+- Don't try refetching device lists for users on remote hosts that are marked as "down". ([\#16298](https://github.com/matrix-org/synapse/issues/16298))
 
 ### Improved Documentation
 
@@ -45,10 +47,9 @@
 - Upgrade CI run of Python 3.12 from rc1 to rc2. ([\#16280](https://github.com/matrix-org/synapse/issues/16280))
 - Include values in SQL debug when using `execute_values` with Postgres. ([\#16281](https://github.com/matrix-org/synapse/issues/16281))
 - Enable additional linting checks. ([\#16283](https://github.com/matrix-org/synapse/issues/16283))
-- Don't try refetching device lists for users on remote hosts that are marked as "down". ([\#16298](https://github.com/matrix-org/synapse/issues/16298))
 - Refactor `receipts_graph` Postgres transactions to stop error messages. ([\#16299](https://github.com/matrix-org/synapse/issues/16299))
 - Small improvements to logging in replication code. ([\#16309](https://github.com/matrix-org/synapse/issues/16309))
-- Remove a reference cycle for in background processes. ([\#16314](https://github.com/matrix-org/synapse/issues/16314))
+- Remove a reference cycle in background processes. ([\#16314](https://github.com/matrix-org/synapse/issues/16314))
 - Only use literal strings for background process names. ([\#16315](https://github.com/matrix-org/synapse/issues/16315))
 - Refactor `get_user_by_id`. ([\#16316](https://github.com/matrix-org/synapse/issues/16316))
 - Speed up task to delete to-device messages. ([\#16318](https://github.com/matrix-org/synapse/issues/16318))
