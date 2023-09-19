@@ -1146,6 +1146,32 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         users = {user["name"]: user for user in channel.json_body["users"]}
         self.assertIs(users[user_id]["erased"], True)
 
+    def test_filter_locked(self) -> None:
+        # Create a new user.
+        user_id = self.register_user("lockme", "lockme")
+
+        # Lock them
+        self.get_success(self.store.set_user_locked_status(user_id, True))
+
+        # Locked user should appear in list users API
+        channel = self.make_request(
+            "GET",
+            self.url + "?locked=true",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertIn(user_id, users)
+        self.assertTrue(users[user_id]["locked"])
+
+        # Locked user should not appear in list users API
+        channel = self.make_request(
+            "GET",
+            self.url + "?locked=false",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertNotIn(user_id, users)
+
     def _order_test(
         self,
         expected_user_list: List[str],

@@ -15,24 +15,32 @@ import json
 import time
 import urllib.parse
 from typing import List, Optional
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from parameterized import parameterized
 
+from twisted.internet.task import deferLater
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
-from synapse.handlers.pagination import PaginationHandler, PurgeStatus
+from synapse.handlers.pagination import (
+    PURGE_ROOM_ACTION_NAME,
+    SHUTDOWN_AND_PURGE_ROOM_ACTION_NAME,
+)
 from synapse.rest.client import directory, events, login, room
 from synapse.server import HomeServer
+from synapse.types import UserID
 from synapse.util import Clock
-from synapse.util.stringutils import random_string
+from synapse.util.task_scheduler import TaskScheduler
 
 from tests import unittest
 
 """Tests admin REST events for /rooms paths."""
+
+
+ONE_HOUR_IN_S = 3600
 
 
 class DeleteRoomTestCase(unittest.HomeserverTestCase):
@@ -46,6 +54,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.task_scheduler = hs.get_task_scheduler()
         hs.config.consent.user_consent_version = "1"
 
         consent_uri_builder = Mock()
@@ -476,6 +485,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.task_scheduler = hs.get_task_scheduler()
         hs.config.consent.user_consent_version = "1"
 
         consent_uri_builder = Mock()
@@ -501,6 +511,9 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             f"/_synapse/admin/v2/rooms/{self.room_id}/delete_status"
         )
         self.url_status_by_delete_id = "/_synapse/admin/v2/rooms/delete_status/"
+
+        self.room_member_handler = hs.get_room_member_handler()
+        self.pagination_handler = hs.get_pagination_handler()
 
     @parameterized.expand(
         [
@@ -661,7 +674,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         delete_id1 = channel.json_body["delete_id"]
 
         # go ahead
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+        self.reactor.advance(TaskScheduler.KEEP_TASKS_FOR_MS / 1000 / 2)
 
         # second task
         channel = self.make_request(
@@ -686,12 +699,14 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(2, len(channel.json_body["results"]))
         self.assertEqual("complete", channel.json_body["results"][0]["status"])
         self.assertEqual("complete", channel.json_body["results"][1]["status"])
-        self.assertEqual(delete_id1, channel.json_body["results"][0]["delete_id"])
-        self.assertEqual(delete_id2, channel.json_body["results"][1]["delete_id"])
+        delete_ids = {delete_id1, delete_id2}
+        self.assertTrue(channel.json_body["results"][0]["delete_id"] in delete_ids)
+        delete_ids.remove(channel.json_body["results"][0]["delete_id"])
+        self.assertTrue(channel.json_body["results"][1]["delete_id"] in delete_ids)
 
         # get status after more than clearing time for first task
         # second task is not cleared
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+        self.reactor.advance(TaskScheduler.KEEP_TASKS_FOR_MS / 1000 / 2)
 
         channel = self.make_request(
             "GET",
@@ -705,7 +720,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(delete_id2, channel.json_body["results"][0]["delete_id"])
 
         # get status after more than clearing time for all tasks
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+        self.reactor.advance(TaskScheduler.KEEP_TASKS_FOR_MS / 1000 / 2)
 
         channel = self.make_request(
             "GET",
@@ -721,6 +736,13 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         body = {"new_room_user_id": self.admin_user}
 
+        # Mock PaginationHandler.purge_room to sleep for 100s, so we have time to do a second call
+        # before the purge is over. Note that it doesn't purge anymore, but we don't care.
+        async def purge_room(room_id: str, force: bool) -> None:
+            await deferLater(self.hs.get_reactor(), 100, lambda: None)
+
+        self.pagination_handler.purge_room = AsyncMock(side_effect=purge_room)  # type: ignore[method-assign]
+
         # first call to delete room
         # and do not wait for finish the task
         first_channel = self.make_request(
@@ -728,7 +750,6 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             self.url.encode("ascii"),
             content=body,
             access_token=self.admin_user_tok,
-            await_result=False,
         )
 
         # second call to delete room
@@ -742,7 +763,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, second_channel.code, msg=second_channel.json_body)
         self.assertEqual(Codes.UNKNOWN, second_channel.json_body["errcode"])
         self.assertEqual(
-            f"History purge already in progress for {self.room_id}",
+            f"Purge already in progress for {self.room_id}",
             second_channel.json_body["error"],
         )
 
@@ -750,6 +771,9 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         first_channel.await_result()
         self.assertEqual(200, first_channel.code, msg=first_channel.json_body)
         self.assertIn("delete_id", first_channel.json_body)
+
+        # wait for purge_room to finish
+        self.pump(1)
 
         # check status after finish the task
         self._test_result(
@@ -972,6 +996,115 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         # Assert we can no longer peek into the room
         self._assert_peek(self.room_id, expect_code=403)
 
+    @unittest.override_config({"forgotten_room_retention_period": "1d"})
+    def test_purge_forgotten_room(self) -> None:
+        # Create a test room
+        room_id = self.helper.create_room_as(
+            self.admin_user,
+            tok=self.admin_user_tok,
+        )
+
+        self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
+        self.get_success(
+            self.room_member_handler.forget(
+                UserID.from_string(self.admin_user), room_id
+            )
+        )
+
+        # Test that room is not yet purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(room_id)
+
+        # Advance 24 hours in the future, past the `forgotten_room_retention_period`
+        self.reactor.advance(24 * ONE_HOUR_IN_S)
+
+        self._is_purged(room_id)
+
+    def test_scheduled_purge_room(self) -> None:
+        # Create a test room
+        room_id = self.helper.create_room_as(
+            self.admin_user,
+            tok=self.admin_user_tok,
+        )
+        self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
+
+        # Schedule a purge 10 seconds in the future
+        self.get_success(
+            self.task_scheduler.schedule_task(
+                PURGE_ROOM_ACTION_NAME,
+                resource_id=room_id,
+                timestamp=self.clock.time_msec() + 10 * 1000,
+            )
+        )
+
+        # Test that room is not yet purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(room_id)
+
+        # Wait for next scheduler run
+        self.reactor.advance(TaskScheduler.SCHEDULE_INTERVAL_MS)
+
+        self._is_purged(room_id)
+
+    def test_schedule_shutdown_room(self) -> None:
+        # Create a test room
+        room_id = self.helper.create_room_as(
+            self.other_user,
+            tok=self.other_user_tok,
+        )
+
+        # Schedule a shutdown 10 seconds in the future
+        delete_id = self.get_success(
+            self.task_scheduler.schedule_task(
+                SHUTDOWN_AND_PURGE_ROOM_ACTION_NAME,
+                resource_id=room_id,
+                params={
+                    "requester_user_id": self.admin_user,
+                    "new_room_user_id": self.admin_user,
+                    "new_room_name": None,
+                    "message": None,
+                    "block": False,
+                    "purge": True,
+                    "force_purge": True,
+                },
+                timestamp=self.clock.time_msec() + 10 * 1000,
+            )
+        )
+
+        # Test that room is not yet shutdown
+        self._is_member(room_id, self.other_user)
+
+        # Test that room is not yet purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(room_id)
+
+        # Wait for next scheduler run
+        self.reactor.advance(TaskScheduler.SCHEDULE_INTERVAL_MS)
+
+        # Test that all users has been kicked (room is shutdown)
+        self._has_no_members(room_id)
+
+        self._is_purged(room_id)
+
+        # Retrieve delete results
+        result = self.make_request(
+            "GET",
+            self.url_status_by_delete_id + delete_id,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, result.code, msg=result.json_body)
+
+        # Check that the user is in kicked_users
+        self.assertIn(
+            self.other_user, result.json_body["shutdown_room"]["kicked_users"]
+        )
+
+        new_room_id = result.json_body["shutdown_room"]["new_room_id"]
+        self.assertTrue(new_room_id)
+
+        # Check that the user is actually in the new room
+        self._is_member(new_room_id, self.other_user)
+
     def _is_blocked(self, room_id: str, expect: bool = True) -> None:
         """Assert that the room is blocked or not"""
         d = self.store.is_room_blocked(room_id)
@@ -1034,7 +1167,6 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             kicked_user: a user_id which is kicked from the room
             expect_new_room: if we expect that a new room was created
         """
-
         # get information by room_id
         channel_room_id = self.make_request(
             "GET",
@@ -1957,11 +2089,8 @@ class RoomMessagesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
 
         # Purge every event before the second event.
-        purge_id = random_string(16)
-        pagination_handler._purges_by_id[purge_id] = PurgeStatus()
         self.get_success(
-            pagination_handler._purge_history(
-                purge_id=purge_id,
+            pagination_handler.purge_history(
                 room_id=self.room_id,
                 token=second_token_str,
                 delete_local_events=True,

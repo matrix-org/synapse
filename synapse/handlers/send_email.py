@@ -174,8 +174,8 @@ class SendEmailHandler:
         if raw_to == "":
             raise RuntimeError("Invalid 'to' address")
 
-        html_part = MIMEText(html, "html", "utf8")
-        text_part = MIMEText(text, "plain", "utf8")
+        html_part = MIMEText(html, "html", "utf-8")
+        text_part = MIMEText(text, "plain", "utf-8")
 
         multipart_msg = MIMEMultipart("alternative")
         multipart_msg["Subject"] = subject

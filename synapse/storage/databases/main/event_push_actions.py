@@ -1599,10 +1599,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn,
             table="event_push_summary",
             key_names=("user_id", "room_id", "thread_id"),
-            key_values=[
-                (user_id, room_id, thread_id)
-                for user_id, room_id, thread_id in summaries
-            ],
+            key_values=list(summaries),
             value_names=("notif_count", "unread_count", "stream_ordering"),
             value_values=[
                 (
