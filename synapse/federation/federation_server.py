@@ -92,6 +92,7 @@ from synapse.storage.roommember import MemberSummary
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
+from synapse.util.caches.descriptors import cached
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_server_name
 
@@ -1375,9 +1376,18 @@ class FederationServer(FederationBase):
             room_id, EventTypes.ServerACL, ""
         )
         if acl_event:
-            server_acl_evaluator = server_acl_evaluator_from_event(acl_event)
+            server_acl_evaluator = await self._get_server_acl_evaluator(
+                acl_event.event_id, acl_event
+            )
             if not server_acl_evaluator.server_matches_acl_event(server_name):
                 raise AuthError(code=403, msg="Server is banned from room")
+
+    @cached(uncached_args=("acl_event",))
+    def _get_server_acl_evaluator(
+        self, event_id: str, acl_event: EventBase
+    ) -> ServerAclEvaluator:
+        """Create a ServerAclEvaluator from an event, but cached on the event ID."""
+        return server_acl_evaluator_from_event(acl_event)
 
 
 def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator":
