@@ -43,7 +43,7 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonMapping
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -218,7 +218,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cached()
     async def _get_receipts_for_user_with_orderings(
         self, user_id: str, receipt_type: str
-    ) -> JsonDict:
+    ) -> JsonMapping:
         """
         Fetch receipts for all rooms that the given user is joined to.
 
@@ -258,7 +258,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     async def get_linearized_receipts_for_rooms(
         self, room_ids: Iterable[str], to_key: int, from_key: Optional[int] = None
-    ) -> List[dict]:
+    ) -> List[JsonMapping]:
         """Get receipts for multiple rooms for sending to clients.
 
         Args:
@@ -287,7 +287,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     async def get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
-    ) -> Sequence[JsonDict]:
+    ) -> Sequence[JsonMapping]:
         """Get receipts for a single room for sending to clients.
 
         Args:
@@ -310,7 +310,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
-    ) -> Sequence[JsonDict]:
+    ) -> Sequence[JsonMapping]:
         """See get_linearized_receipts_for_room"""
 
         def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
@@ -353,7 +353,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     async def _get_linearized_receipts_for_rooms(
         self, room_ids: Collection[str], to_key: int, from_key: Optional[int] = None
-    ) -> Dict[str, Sequence[JsonDict]]:
+    ) -> Mapping[str, Sequence[JsonMapping]]:
         if not room_ids:
             return {}
 
@@ -415,7 +415,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
-    ) -> Mapping[str, JsonDict]:
+    ) -> Mapping[str, JsonMapping]:
         """Get receipts for all rooms between two stream_ids, up
         to a limit of the latest 100 read receipts.
 

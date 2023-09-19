@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Tuple
 
 import attr
 from canonicaljson import encode_canonical_json
@@ -31,6 +31,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     UserID,
     get_domain_from_id,
     get_verify_key_from_cross_signing_key,
@@ -272,11 +273,7 @@ class E2eKeysHandler:
                 delay_cancellation=True,
             )
 
-            ret = {"device_keys": results, "failures": failures}
-
-            ret.update(cross_signing_keys)
-
-            return ret
+            return {"device_keys": results, "failures": failures, **cross_signing_keys}
 
     @trace
     async def _query_devices_for_destination(
@@ -408,7 +405,7 @@ class E2eKeysHandler:
     @cancellable
     async def get_cross_signing_keys_from_cache(
         self, query: Iterable[str], from_user_id: Optional[str]
-    ) -> Dict[str, Dict[str, dict]]:
+    ) -> Dict[str, Dict[str, JsonMapping]]:
         """Get cross-signing keys for users from the database
 
         Args:
@@ -551,16 +548,13 @@ class E2eKeysHandler:
                 self.config.federation.allow_device_name_lookup_over_federation
             ),
         )
-        ret = {"device_keys": res}
 
         # add in the cross-signing keys
         cross_signing_keys = await self.get_cross_signing_keys_from_cache(
             device_keys_query, None
         )
 
-        ret.update(cross_signing_keys)
-
-        return ret
+        return {"device_keys": res, **cross_signing_keys}
 
     async def claim_local_one_time_keys(
         self,
@@ -1127,7 +1121,7 @@ class E2eKeysHandler:
         user_id: str,
         master_key_id: str,
         signed_master_key: JsonDict,
-        stored_master_key: JsonDict,
+        stored_master_key: JsonMapping,
         devices: Dict[str, Dict[str, JsonDict]],
     ) -> List["SignatureListItem"]:
         """Check signatures of a user's master key made by their devices.
@@ -1278,7 +1272,7 @@ class E2eKeysHandler:
 
     async def _get_e2e_cross_signing_verify_key(
         self, user_id: str, key_type: str, from_user_id: Optional[str] = None
-    ) -> Tuple[JsonDict, str, VerifyKey]:
+    ) -> Tuple[JsonMapping, str, VerifyKey]:
         """Fetch locally or remotely query for a cross-signing public key.
 
         First, attempt to fetch the cross-signing public key from storage.
@@ -1333,7 +1327,7 @@ class E2eKeysHandler:
         self,
         user: UserID,
         desired_key_type: str,
-    ) -> Optional[Tuple[Dict[str, Any], str, VerifyKey]]:
+    ) -> Optional[Tuple[JsonMapping, str, VerifyKey]]:
         """Queries cross-signing keys for a remote user and saves them to the database
 
         Only the key specified by `key_type` will be returned, while all retrieved keys
@@ -1474,7 +1468,7 @@ def _check_device_signature(
     user_id: str,
     verify_key: VerifyKey,
     signed_device: JsonDict,
-    stored_device: JsonDict,
+    stored_device: JsonMapping,
 ) -> None:
     """Check that a signature on a device or cross-signing key is correct and
     matches the copy of the device/key that we have stored.  Throws an

@@ -131,7 +131,7 @@ class BulkPushRuleEvaluator:
     async def _get_rules_for_event(
         self,
         event: EventBase,
-    ) -> Dict[str, FilteredPushRules]:
+    ) -> Mapping[str, FilteredPushRules]:
         """Get the push rules for all users who may need to be notified about
         the event.
 

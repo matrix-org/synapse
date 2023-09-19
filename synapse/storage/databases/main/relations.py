@@ -519,7 +519,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")
     async def get_applicable_edits(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[EventBase]]:
+    ) -> Mapping[str, Optional[EventBase]]:
         """Get the most recent edit (if any) that has happened for the given
         events.
 
@@ -605,7 +605,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
     async def get_thread_summaries(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[Tuple[int, EventBase]]]:
+    ) -> Mapping[str, Optional[Tuple[int, EventBase]]]:
         """Get the number of threaded replies and the latest reply (if any) for the given events.
 
         Args:
@@ -779,7 +779,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_thread_participated", list_name="event_ids")
     async def get_threads_participated(
         self, event_ids: Collection[str], user_id: str
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Get whether the requesting user participated in the given threads.
 
         This is separate from get_thread_summaries since that can be cached across
