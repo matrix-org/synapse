@@ -33,7 +33,7 @@ from synapse.events.utils import (
     CANONICALJSON_MIN_INT,
     validate_canonicaljson,
 )
-from synapse.federation.federation_server import server_matches_acl_event
+from synapse.federation.federation_server import server_acl_evaluator_from_event
 from synapse.http.servlet import validate_json_object
 from synapse.rest.models import RequestBodyModel
 from synapse.types import EventID, JsonDict, RoomID, StrCollection, UserID
@@ -100,7 +100,10 @@ class EventValidator:
             self._validate_retention(event)
 
         elif event.type == EventTypes.ServerACL:
-            if not server_matches_acl_event(config.server.server_name, event):
+            server_acl_evaluator = server_acl_evaluator_from_event(event)
+            if not server_acl_evaluator.server_matches_acl_event(
+                config.server.server_name
+            ):
                 raise SynapseError(
                     400, "Can't create an ACL event that denies the local server"
                 )

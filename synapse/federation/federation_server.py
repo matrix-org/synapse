@@ -25,10 +25,13 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Pattern,
+    Sequence,
     Tuple,
     Union,
 )
 
+import attr
 from matrix_common.regex import glob_to_regex
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -124,6 +127,50 @@ last_pdu_ts_metric = Gauge(
 # The name of the lock to use when process events in a room received over
 # federation.
 _INBOUND_EVENT_HANDLING_LOCK_NAME = "federation_inbound_pdu"
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ServerAclEvaluator:
+    allow_ip_literals: bool
+    allow: Sequence[Pattern[str]]
+    deny: Sequence[Pattern[str]]
+
+    def server_matches_acl_event(self, server_name: str) -> bool:
+        """Check if the given server is allowed by the ACL event
+
+        Args:
+            server_name: name of server, without any port part
+
+        Returns:
+            True if this server is allowed by the ACLs
+        """
+
+        # first of all, check if literal IPs are blocked, and if so, whether the
+        # server name is a literal IP
+        if not self.allow_ip_literals:
+            # check for ipv6 literals. These start with '['.
+            if server_name[0] == "[":
+                return False
+
+            # check for ipv4 literals. We can just lift the routine from twisted.
+            if isIPAddress(server_name):
+                return False
+
+        # next,  check the deny list
+        for e in self.deny:
+            if e.match(server_name):
+                # logger.info("%s matched deny rule %s", server_name, e)
+                return False
+
+        # then the allow list.
+        for e in self.allow:
+            if e.match(server_name):
+                # logger.info("%s matched allow rule %s", server_name, e)
+                return True
+
+        # everything else should be rejected.
+        # logger.info("%s fell through", server_name)
+        return False
 
 
 class FederationServer(FederationBase):
@@ -1327,23 +1374,19 @@ class FederationServer(FederationBase):
         acl_event = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.ServerACL, ""
         )
-        if not acl_event or server_matches_acl_event(server_name, acl_event):
-            return
+        if acl_event:
+            server_acl_evaluator = server_acl_evaluator_from_event(acl_event)
+            if not server_acl_evaluator.server_matches_acl_event(server_name):
+                raise AuthError(code=403, msg="Server is banned from room")
 
-        raise AuthError(code=403, msg="Server is banned from room")
 
-
-def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
-    """Check if the given server is allowed by the ACL event
-
-    Args:
-        server_name: name of server, without any port part
-        acl_event: m.room.server_acl event
-
-    Returns:
-        True if this server is allowed by the ACLs
+def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator":
     """
-    logger.debug("Checking %s against acl %s", server_name, acl_event.content)
+    Create a ServerAclEvaluator from a m.room.server_acl event's content.
+
+    This does up-front parsing of the content to ignore bad data and pre-compile
+    regular expressions.
+    """
 
     # first of all, check if literal IPs are blocked, and if so, whether the
     # server name is a literal IP
@@ -1351,48 +1394,24 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     if not isinstance(allow_ip_literals, bool):
         logger.warning("Ignoring non-bool allow_ip_literals flag")
         allow_ip_literals = True
-    if not allow_ip_literals:
-        # check for ipv6 literals. These start with '['.
-        if server_name[0] == "[":
-            return False
-
-        # check for ipv4 literals. We can just lift the routine from twisted.
-        if isIPAddress(server_name):
-            return False
 
     # next,  check the deny list
     deny = acl_event.content.get("deny", [])
     if not isinstance(deny, (list, tuple)):
         logger.warning("Ignoring non-list deny ACL %s", deny)
         deny = []
-    for e in deny:
-        if _acl_entry_matches(server_name, e):
-            # logger.info("%s matched deny rule %s", server_name, e)
-            return False
+    else:
+        deny = [glob_to_regex(s) for s in deny if isinstance(s, str)]
 
     # then the allow list.
     allow = acl_event.content.get("allow", [])
     if not isinstance(allow, (list, tuple)):
         logger.warning("Ignoring non-list allow ACL %s", allow)
         allow = []
-    for e in allow:
-        if _acl_entry_matches(server_name, e):
-            # logger.info("%s matched allow rule %s", server_name, e)
-            return True
+    else:
+        allow = [glob_to_regex(s) for s in allow if isinstance(s, str)]
 
-    # everything else should be rejected.
-    # logger.info("%s fell through", server_name)
-    return False
-
-
-def _acl_entry_matches(server_name: str, acl_entry: Any) -> bool:
-    if not isinstance(acl_entry, str):
-        logger.warning(
-            "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
-        )
-        return False
-    regex = glob_to_regex(acl_entry)
-    return bool(regex.match(server_name))
+    return ServerAclEvaluator(allow_ip_literals, allow, deny)
 
 
 class FederationHandlerRegistry:
