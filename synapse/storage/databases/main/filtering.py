@@ -25,7 +25,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -145,7 +145,7 @@ class FilteringWorkerStore(SQLBaseStore):
     @cached(num_args=2)
     async def get_user_filter(
         self, user_id: UserID, filter_id: Union[int, str]
-    ) -> JsonDict:
+    ) -> JsonMapping:
         # filter_id is BIGINT UNSIGNED, so if it isn't a number, fail
         # with a coherent error message rather than 500 M_UNKNOWN.
         try:

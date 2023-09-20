@@ -465,7 +465,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_references_for_event", list_name="event_ids")
     async def get_references_for_events(
         self, event_ids: Collection[str]
-    ) -> Mapping[str, Optional[List[_RelatedEvent]]]:
+    ) -> Mapping[str, Optional[Sequence[_RelatedEvent]]]:
         """Get a list of references to the given events.
 
         Args:
@@ -931,7 +931,7 @@ class RelationsWorkerStore(SQLBaseStore):
         room_id: str,
         limit: int = 5,
         from_token: Optional[ThreadsNextBatch] = None,
-    ) -> Tuple[List[str], Optional[ThreadsNextBatch]]:
+    ) -> Tuple[Sequence[str], Optional[ThreadsNextBatch]]:
         """Get a list of thread IDs, ordered by topological ordering of their
         latest reply.
 
