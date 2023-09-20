@@ -48,6 +48,20 @@ logger = logging.getLogger(__name__)
 
 _next_request_seq = 0
 
+DEFAULT_CORS_HEADERS: dict[bytes, bytes] = {
+    b"Access-Control-Allow-Origin": b"*",
+    b"Access-Control-Allow-Methods": b"GET, HEAD, POST, PUT, DELETE, OPTIONS",
+    b"Access-Control-Allow-Headers": b"X-Requested-With, Content-Type, Authorization, Date",
+    b"Access-Control-Expose-Headers": b"Synapse-Trace-Id, Server",
+}
+
+EXPERIMENTAL_MSC3886_CORS_HEADERS: dict[bytes, bytes] = {
+    b"Access-Control-Allow-Origin": b"*",
+    b"Access-Control-Allow-Methods": b"GET, HEAD, POST, PUT, DELETE, OPTIONS",
+    b"Access-Control-Allow-Headers": b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
+    b"Access-Control-Expose-Headers": b"ETag, Location, X-Max-Bytes",
+}
+
 
 class SynapseRequest(Request):
     """Class which encapsulates an HTTP request to synapse.
@@ -87,8 +101,7 @@ class SynapseRequest(Request):
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
-        self.experimental_cors_msc3886 = site.experimental_cors_msc3886
-
+        self.cors_response_headers = site.cors_response_headers
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
         self._requester: Optional[Union[Requester, str]] = None
@@ -658,9 +671,15 @@ class SynapseSite(ProxySite):
 
         request_id_header = config.http_options.request_id_header
 
-        self.experimental_cors_msc3886: bool = (
-            config.http_options.experimental_cors_msc3886
-        )
+        # Use custom CORS headers if given
+        self.cors_response_headers = config.http_options.cors_response_headers
+        # Otherwise, use the default CORS headers
+        if self.cors_response_headers is None:
+            self.cors_response_headers = (
+                EXPERIMENTAL_MSC3886_CORS_HEADERS
+                if config.http_options.experimental_cors_msc3886
+                else DEFAULT_CORS_HEADERS
+            )
 
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(

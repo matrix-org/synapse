@@ -326,6 +326,7 @@ class FakeSite:
         self._resource = resource
         self.reactor = reactor
         self.experimental_cors_msc3886 = experimental_cors_msc3886
+        self.cors_response_headers = {}
 
     def getResourceFor(self, request: Request) -> IResource:
         return self._resource

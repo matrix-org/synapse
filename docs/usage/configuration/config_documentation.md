@@ -464,6 +464,13 @@ See the docs [request log format](../administration/request_log.md).
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
 
+* `cors_response_headers`: Only valid for an 'http' listener. A map of Cross-Origin Resource Sharing
+   headers to use in place of the default ones. You could choose to do this using a
+   [reverse-proxy](../../reverse_proxy.md) instead.
+
+   _Added in Synapse 1.94.0._
+
+http://localhost:8008
 Unix socket support (_Added in Synapse 1.89.0_):
 * `path`: A path and filename for a Unix socket. Make sure it is located in a
   directory with read and write permissions, and that it already exists (the directory

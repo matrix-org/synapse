@@ -211,6 +211,7 @@ class HttpListenerConfig:
     # If true, the listener will return CORS response headers compatible with MSC3886:
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3886
     experimental_cors_msc3886: bool = False
+    cors_response_headers: Optional[Dict[str, dict]] = None
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -989,6 +990,7 @@ def parse_listener_def(num: int, listener: Any) -> ListenerConfig:
             tag=listener.get("tag"),
             request_id_header=listener.get("request_id_header"),
             experimental_cors_msc3886=listener.get("experimental_cors_msc3886", False),
+            cors_response_headers=listener.get("cors_response_headers"),
         )
 
     if socket_path:

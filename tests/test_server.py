@@ -228,10 +228,16 @@ class OptionsResourceTests(unittest.TestCase):
         self.resource.putChild(b"res", DummyResource())
 
     def _make_request(
-        self, method: bytes, path: bytes, experimental_cors_msc3886: bool = False
+        self,
+        method: bytes,
+        path: bytes,
+        experimental_cors_msc3886: bool = False,
+        cors_response_headers: dict[str, str] = None,
     ) -> FakeChannel:
         """Create a request from the method/path and return a channel with the response."""
         # Create a site and query for the resource.
+        if cors_response_headers is None:
+            cors_response_headers = {}
         site = SynapseSite(
             "test",
             "site_tag",
@@ -241,6 +247,7 @@ class OptionsResourceTests(unittest.TestCase):
                     "type": "http",
                     "port": 0,
                     "experimental_cors_msc3886": experimental_cors_msc3886,
+                    "cors_response_headers": cors_response_headers,
                 },
             ),
             self.resource,
@@ -339,6 +346,55 @@ class OptionsResourceTests(unittest.TestCase):
         channel = self._make_request(b"GET", b"/res/")
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"/res/")
+
+    def test_custom_cors(self) -> None:
+        """An OPTIONS request to a known URL should return customised CORS headers."""
+        channel = self._make_request(
+            b"OPTIONS",
+            b"/res/",
+            cors_response_headers={
+                "Access-Control-Allow-Origin": "https://example.com"
+            },
+        )
+        self.assertEqual(channel.code, 204)
+        self.assertNotIn("body", channel.result)
+
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Origin"),
+            [b"https://example.com"],
+            "has correct CORS Origin header",
+        )
+
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
+            None,
+            "has correct CORS Expose Headers header",
+        )
+
+    def test_custom_cors_msc3886(self) -> None:
+        """An OPTIONS request to a known URL should return customised CORS headers even with MSC3886 enabled."""
+        channel = self._make_request(
+            b"OPTIONS",
+            b"/res/",
+            experimental_cors_msc3886=True,
+            cors_response_headers={
+                "Access-Control-Allow-Origin": "https://example.com"
+            },
+        )
+        self.assertEqual(channel.code, 204)
+        self.assertNotIn("body", channel.result)
+
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Allow-Origin"),
+            [b"https://example.com"],
+            "has correct CORS Origin header",
+        )
+
+        self.assertEqual(
+            channel.headers.getRawHeaders(b"Access-Control-Expose-Headers"),
+            None,
+            "has correct CORS Expose Headers header",
+        )
 
 
 class WrapHtmlRequestHandlerTests(unittest.TestCase):

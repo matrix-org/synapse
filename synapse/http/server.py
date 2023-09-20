@@ -899,28 +899,8 @@ def set_cors_headers(request: "SynapseRequest") -> None:
     Args:
         request: The http request to add CORS to.
     """
-    request.setHeader(b"Access-Control-Allow-Origin", b"*")
-    request.setHeader(
-        b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
-    )
-    if request.experimental_cors_msc3886:
-        request.setHeader(
-            b"Access-Control-Allow-Headers",
-            b"X-Requested-With, Content-Type, Authorization, Date, If-Match, If-None-Match",
-        )
-        request.setHeader(
-            b"Access-Control-Expose-Headers",
-            b"ETag, Location, X-Max-Bytes",
-        )
-    else:
-        request.setHeader(
-            b"Access-Control-Allow-Headers",
-            b"X-Requested-With, Content-Type, Authorization, Date",
-        )
-        request.setHeader(
-            b"Access-Control-Expose-Headers",
-            b"Synapse-Trace-Id, Server",
-        )
+    for k, v in request.cors_response_headers.items():
+        request.setHeader(k, v)
 
 
 def set_corp_headers(request: Request) -> None:
