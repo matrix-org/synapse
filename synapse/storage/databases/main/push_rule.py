@@ -216,7 +216,7 @@ class PushRulesWorkerStore(
     @cachedList(cached_method_name="get_push_rules_for_user", list_name="user_ids")
     async def bulk_get_push_rules(
         self, user_ids: Collection[str]
-    ) -> Dict[str, FilteredPushRules]:
+    ) -> Mapping[str, FilteredPushRules]:
         if not user_ids:
             return {}
 

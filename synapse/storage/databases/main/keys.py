@@ -16,7 +16,7 @@
 import itertools
 import json
 import logging
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Mapping, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -130,7 +130,7 @@ class KeyStore(CacheInvalidationWorkerStore):
     )
     async def get_server_keys_json(
         self, server_name_and_key_ids: Iterable[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], FetchKeyResult]:
+    ) -> Mapping[Tuple[str, str], FetchKeyResult]:
         """
         Args:
             server_name_and_key_ids:
@@ -200,7 +200,7 @@ class KeyStore(CacheInvalidationWorkerStore):
     )
     async def get_server_keys_json_for_remote(
         self, server_name: str, key_ids: Iterable[str]
-    ) -> Dict[str, Optional[FetchKeyResultForRemote]]:
+    ) -> Mapping[str, Optional[FetchKeyResultForRemote]]:
         """Fetch the cached keys for the given server/key IDs.
 
         If we have multiple entries for a given key ID, returns the most recent.

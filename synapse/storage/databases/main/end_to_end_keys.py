@@ -52,7 +52,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import StreamIdGenerator
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonMapping
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.cancellation import cancellable
@@ -125,7 +125,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
     async def get_e2e_device_keys_for_federation_query(
         self, user_id: str
-    ) -> Tuple[int, List[JsonDict]]:
+    ) -> Tuple[int, Sequence[JsonMapping]]:
         """Get all devices (with any device keys) for a user
 
         Returns:
@@ -174,7 +174,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @cached(iterable=True)
     async def _get_e2e_device_keys_for_federation_query_inner(
         self, user_id: str
-    ) -> List[JsonDict]:
+    ) -> Sequence[JsonMapping]:
         """Get all devices (with any device keys) for a user"""
 
         devices = await self.get_e2e_device_keys_and_signatures([(user_id, None)])
@@ -578,7 +578,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @cached(max_entries=10000)
     async def count_e2e_one_time_keys(
         self, user_id: str, device_id: str
-    ) -> Dict[str, int]:
+    ) -> Mapping[str, int]:
         """Count the number of one time keys the server has for a device
         Returns:
             A mapping from algorithm to number of keys for that algorithm.
@@ -812,7 +812,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
     async def get_e2e_cross_signing_key(
         self, user_id: str, key_type: str, from_user_id: Optional[str] = None
-    ) -> Optional[JsonDict]:
+    ) -> Optional[JsonMapping]:
         """Returns a user's cross-signing key.
 
         Args:
@@ -833,7 +833,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         return user_keys.get(key_type)
 
     @cached(num_args=1)
-    def _get_bare_e2e_cross_signing_keys(self, user_id: str) -> Mapping[str, JsonDict]:
+    def _get_bare_e2e_cross_signing_keys(
+        self, user_id: str
+    ) -> Mapping[str, JsonMapping]:
         """Dummy function.  Only used to make a cache for
         _get_bare_e2e_cross_signing_keys_bulk.
         """
@@ -846,7 +848,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     )
     async def _get_bare_e2e_cross_signing_keys_bulk(
         self, user_ids: Iterable[str]
-    ) -> Dict[str, Optional[Mapping[str, JsonDict]]]:
+    ) -> Mapping[str, Optional[Mapping[str, JsonMapping]]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if
         the signatures for the calling user need to be fetched.
@@ -860,14 +862,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             their user ID will map to None.
 
         """
-        result = await self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_bare_e2e_cross_signing_keys_bulk",
             self._get_bare_e2e_cross_signing_keys_bulk_txn,
             user_ids,
         )
-
-        # The `Optional` comes from the `@cachedList` decorator.
-        return cast(Dict[str, Optional[Mapping[str, JsonDict]]], result)
 
     def _get_bare_e2e_cross_signing_keys_bulk_txn(
         self,
@@ -1026,7 +1025,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
     @cancellable
     async def get_e2e_cross_signing_keys_bulk(
         self, user_ids: List[str], from_user_id: Optional[str] = None
-    ) -> Dict[str, Optional[Mapping[str, JsonDict]]]:
+    ) -> Mapping[str, Optional[Mapping[str, JsonMapping]]]:
         """Returns the cross-signing keys for a set of users.
 
         Args:
@@ -1043,7 +1042,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         if from_user_id:
             result = cast(
-                Dict[str, Optional[Mapping[str, JsonDict]]],
+                Dict[str, Optional[Mapping[str, JsonMapping]]],
                 await self.db_pool.runInteraction(
                     "get_e2e_cross_signing_signatures",
                     self._get_e2e_cross_signing_signatures_txn,

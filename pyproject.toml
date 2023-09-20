@@ -95,7 +95,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.92.2"
+version = "1.93.0rc1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -180,7 +180,9 @@ PyYAML = ">=3.13"
 pyasn1 = ">=0.1.9"
 pyasn1-modules = ">=0.0.7"
 bcrypt = ">=3.1.7"
-Pillow = ">=5.4.0"
+# 10.0.1 minimum is mandatory here because of libwebp CVE-2023-4863.
+# Packagers that already took care of libwebp can lower that down to 5.4.0.
+Pillow = ">=10.0.1"
 # We use SortedDict.peekitem(), which was added in sortedcontainers 1.5.2.
 sortedcontainers = ">=1.5.2"
 pymacaroons = ">=0.13.0"
@@ -318,7 +320,7 @@ all = [
 # This helps prevents merge conflicts when running a batch of dependabot updates.
 isort = ">=5.10.1"
 black = ">=22.7.0"
-ruff = "0.0.286"
+ruff = "0.0.290"
 
 # Typechecking
 lxml-stubs = ">=0.4.0"

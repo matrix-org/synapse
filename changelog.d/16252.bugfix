@@ -1,1 +1,0 @@
-Fix bug when using workers where Synapse could end up re-requesting the same remote device repeatedly.
