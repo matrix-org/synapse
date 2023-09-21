@@ -74,12 +74,12 @@ impl ServerAclEvaluator {
         // server name is a literal IP
         if !self.allow_ip_literals {
             // check for ipv6 literals. These start with '['.
-            if server_name.starts_with("[") {
+            if server_name.starts_with('[') {
                 return false;
             }
 
             // check for ipv4 literals. We can just lift the routine from std::net.
-            if let Ok(_) = Ipv4Addr::from_str(server_name) {
+            if Ipv4Addr::from_str(server_name).is_ok() {
                 return false;
             }
         }
