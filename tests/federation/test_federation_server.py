@@ -22,10 +22,10 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.events import EventBase, make_event_from_dict
-from synapse.federation.federation_server import server_acl_evaluator_from_event
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.storage.controllers.state import server_acl_evaluator_from_event
 from synapse.types import JsonDict
 from synapse.util import Clock
 

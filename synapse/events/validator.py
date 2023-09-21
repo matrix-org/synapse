@@ -33,9 +33,9 @@ from synapse.events.utils import (
     CANONICALJSON_MIN_INT,
     validate_canonicaljson,
 )
-from synapse.federation.federation_server import server_acl_evaluator_from_event
 from synapse.http.servlet import validate_json_object
 from synapse.rest.models import RequestBodyModel
+from synapse.storage.controllers.state import server_acl_evaluator_from_event
 from synapse.types import EventID, JsonDict, RoomID, StrCollection, UserID
 
 

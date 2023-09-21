@@ -1324,56 +1324,10 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        acl_event = await self._storage_controllers.state.get_current_state_event(
-            room_id, EventTypes.ServerACL, ""
-        )
-        if acl_event:
-            server_acl_evaluator = await self._get_server_acl_evaluator(
-                acl_event.event_id, acl_event
-            )
-            if not server_acl_evaluator.server_matches_acl_event(server_name):
+        server_acl_evaluator = await self._storage_controllers.state.get_server_acl_for_room(
+            room_id)
+        if server_acl_evaluator and not server_acl_evaluator.server_matches_acl_event(server_name):
                 raise AuthError(code=403, msg="Server is banned from room")
-
-    @cached(uncached_args=("acl_event",))
-    def _get_server_acl_evaluator(
-        self, event_id: str, acl_event: EventBase
-    ) -> ServerAclEvaluator:
-        """Create a ServerAclEvaluator from an event, but cached on the event ID."""
-        return server_acl_evaluator_from_event(acl_event)
-
-
-def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator":
-    """
-    Create a ServerAclEvaluator from a m.room.server_acl event's content.
-
-    This does up-front parsing of the content to ignore bad data and pre-compile
-    regular expressions.
-    """
-
-    # first of all, check if literal IPs are blocked, and if so, whether the
-    # server name is a literal IP
-    allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
-    if not isinstance(allow_ip_literals, bool):
-        logger.warning("Ignoring non-bool allow_ip_literals flag")
-        allow_ip_literals = True
-
-    # next,  check the deny list
-    deny = acl_event.content.get("deny", [])
-    if not isinstance(deny, (list, tuple)):
-        logger.warning("Ignoring non-list deny ACL %s", deny)
-        deny = []
-    else:
-        deny = [s for s in deny if isinstance(s, str)]
-
-    # then the allow list.
-    allow = acl_event.content.get("allow", [])
-    if not isinstance(allow, (list, tuple)):
-        logger.warning("Ignoring non-list allow ACL %s", allow)
-        allow = []
-    else:
-        allow = [s for s in allow if isinstance(s, str)]
-
-    return ServerAclEvaluator(allow_ip_literals, allow, deny)
 
 
 class FederationHandlerRegistry:
