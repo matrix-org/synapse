@@ -25,17 +25,12 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Pattern,
-    Sequence,
     Tuple,
     Union,
 )
 
-import attr
-from matrix_common.regex import glob_to_regex
 from prometheus_client import Counter, Gauge, Histogram
 
-from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
 from synapse.api.constants import (
@@ -89,6 +84,7 @@ from synapse.replication.http.federation import (
 from synapse.storage.databases.main.lock import Lock
 from synapse.storage.databases.main.roommember import extract_heroes_from_room_summary
 from synapse.storage.roommember import MemberSummary
+from synapse.synapse_rust.acl import ServerAclEvaluator
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
@@ -128,50 +124,6 @@ last_pdu_ts_metric = Gauge(
 # The name of the lock to use when process events in a room received over
 # federation.
 _INBOUND_EVENT_HANDLING_LOCK_NAME = "federation_inbound_pdu"
-
-
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class ServerAclEvaluator:
-    allow_ip_literals: bool
-    allow: Sequence[Pattern[str]]
-    deny: Sequence[Pattern[str]]
-
-    def server_matches_acl_event(self, server_name: str) -> bool:
-        """Check if the given server is allowed by the ACL event
-
-        Args:
-            server_name: name of server, without any port part
-
-        Returns:
-            True if this server is allowed by the ACLs
-        """
-
-        # first of all, check if literal IPs are blocked, and if so, whether the
-        # server name is a literal IP
-        if not self.allow_ip_literals:
-            # check for ipv6 literals. These start with '['.
-            if server_name[0] == "[":
-                return False
-
-            # check for ipv4 literals. We can just lift the routine from twisted.
-            if isIPAddress(server_name):
-                return False
-
-        # next,  check the deny list
-        for e in self.deny:
-            if e.match(server_name):
-                # logger.info("%s matched deny rule %s", server_name, e)
-                return False
-
-        # then the allow list.
-        for e in self.allow:
-            if e.match(server_name):
-                # logger.info("%s matched allow rule %s", server_name, e)
-                return True
-
-        # everything else should be rejected.
-        # logger.info("%s fell through", server_name)
-        return False
 
 
 class FederationServer(FederationBase):
@@ -1411,7 +1363,7 @@ def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator
         logger.warning("Ignoring non-list deny ACL %s", deny)
         deny = []
     else:
-        deny = [glob_to_regex(s) for s in deny if isinstance(s, str)]
+        deny = [s for s in deny if isinstance(s, str)]
 
     # then the allow list.
     allow = acl_event.content.get("allow", [])
@@ -1419,7 +1371,7 @@ def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator
         logger.warning("Ignoring non-list allow ACL %s", allow)
         allow = []
     else:
-        allow = [glob_to_regex(s) for s in allow if isinstance(s, str)]
+        allow = [s for s in allow if isinstance(s, str)]
 
     return ServerAclEvaluator(allow_ip_literals, allow, deny)
 
