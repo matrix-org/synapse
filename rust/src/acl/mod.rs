@@ -14,12 +14,14 @@
 
 //! An implementation of Matrix server ACL rules.
 
-use crate::push::utils::{glob_to_regex, GlobMatchType};
+use std::net::Ipv4Addr;
+use std::str::FromStr;
+
 use anyhow::Error;
 use pyo3::prelude::*;
 use regex::Regex;
-use std::net::Ipv4Addr;
-use std::str::FromStr;
+
+use crate::push::utils::{glob_to_regex, GlobMatchType};
 
 /// Called when registering modules with python.
 pub fn register_module(py: Python<'_>, m: &PyModule) -> PyResult<()> {
