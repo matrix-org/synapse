@@ -1324,10 +1324,13 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        server_acl_evaluator = await self._storage_controllers.state.get_server_acl_for_room(
-            room_id)
-        if server_acl_evaluator and not server_acl_evaluator.server_matches_acl_event(server_name):
-                raise AuthError(code=403, msg="Server is banned from room")
+        server_acl_evaluator = (
+            await self._storage_controllers.state.get_server_acl_for_room(room_id)
+        )
+        if server_acl_evaluator and not server_acl_evaluator.server_matches_acl_event(
+            server_name
+        ):
+            raise AuthError(code=403, msg="Server is banned from room")
 
 
 class FederationHandlerRegistry:

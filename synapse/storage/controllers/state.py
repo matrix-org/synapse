@@ -503,7 +503,9 @@ class StateStorageController:
         return event.content.get("alias")
 
     @cached()
-    async def get_server_acl_for_room(self, room_id: str) -> Optional[ServerAclEvaluator]:
+    async def get_server_acl_for_room(
+        self, room_id: str
+    ) -> Optional[ServerAclEvaluator]:
         """Get the server ACL evaluator for room, if any
 
         This does up-front parsing of the content to ignore bad data and pre-compile
