@@ -186,14 +186,14 @@ def add_file_headers(
 
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
 
-    # Use a Content-Disposition of attachment to force download of media.
-    disposition = "attachment"
-
-    # We allow a strict subset of content types to be inlined
-    # so that they may be viewed directly in a browser.
+    # A strict subset of content types is allowed to be inlined  so that they may
+    # be viewed directly in a browser. Other file types are forced to be downloads.
     if media_type.lower() in INLINE_CONTENT_TYPES:
         disposition = "inline"
-    elif upload_name:
+    else:
+        disposition = "attachment"
+
+    if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
         # `filename` is defined to be a `value`, which is defined by RFC2616
