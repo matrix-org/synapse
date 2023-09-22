@@ -143,7 +143,7 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         }
     )
     def test_unstable_support(self) -> None:
-        # TODO: remove support for unstable MSC3882 is no longer needed
+        # TODO: remove when unstable MSC3882 is no longer needed
 
         # check feature is advertised in versions response:
         channel = self.make_request(
@@ -166,3 +166,37 @@ class LoginTokenRequestServletTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["expires_in"], 15)
+
+    @override_config(
+        {
+            "login_via_existing_session": {
+                "enabled": True,
+                "require_ui_auth": False,
+                "token_timeout": "15s",
+            }
+        }
+    )
+    def test_unstable_revision1_support(self) -> None:
+        # TODO: remove when unstable MSC3882 is no longer needed
+
+        # check feature is advertised in versions response:
+        channel = self.make_request(
+            "GET", "/_matrix/client/versions", {}, access_token=None
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body["unstable_features"]["org.matrix.msc3882"], True
+        )
+
+        self.register_user(self.user, self.password)
+        token = self.login(self.user, self.password)
+
+        # check feature is available via the r1 unstable endpoint and returns an expires_in_ms value in milliseconds
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/unstable/org.matrix.msc3882/login/get_token",
+            {},
+            access_token=token,
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["expires_in_ms"], 15000)

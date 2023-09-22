@@ -53,7 +53,10 @@ class LoginTokenRequestServlet(RestServlet):
         *client_patterns(
             "/login/get_token$", releases=["v1"], v1=False, unstable=False
         ),
-        # TODO: this is no longer needed once unstable MSC3882 does not need to be supported:
+        # TODO: these are no longer needed once unstable MSC3882 does not need to be supported:
+        *client_patterns(
+            "/org.matrix.msc3882/login/get_token$", releases=[], v1=False, unstable=True
+        ),
         *client_patterns(
             "/org.matrix.msc3882/login/token$", releases=[], v1=False, unstable=True
         ),
