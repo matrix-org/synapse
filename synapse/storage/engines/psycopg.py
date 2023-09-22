@@ -13,27 +13,27 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Mapping, Optional
 
 import psycopg
 import psycopg.errors
 import psycopg.sql
 
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.engines._base import (
-    BaseDatabaseEngine,
-    IncorrectDatabaseSetup,
     IsolationLevel,
 )
-from synapse.storage.types import Cursor
 
 if TYPE_CHECKING:
-    from synapse.storage.database import LoggingDatabaseConnection
+    pass
 
 
 logger = logging.getLogger(__name__)
 
 
-class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection, psycopg.Cursor]):
+class PsycopgEngine(PostgresEngine[psycopg.Connection, psycopg.Cursor]):
+    OperationalError = psycopg.OperationalError
+
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(psycopg, database_config)
         # psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
@@ -43,143 +43,21 @@ class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection, psycopg.Cursor]):
         # def _disable_bytes_adapter(_: bytes) -> NoReturn:
         #     raise Exception("Passing bytes to DB is disabled.")
 
-        # psycopg2.extensions.register_adapter(bytes, _disable_bytes_adapter)
-        self.synchronous_commit: bool = database_config.get("synchronous_commit", True)
-        self._version: Optional[int] = None  # unknown as yet
-
         self.isolation_level_map: Mapping[int, psycopg.IsolationLevel] = {
             IsolationLevel.READ_COMMITTED: psycopg.IsolationLevel.READ_COMMITTED,
             IsolationLevel.REPEATABLE_READ: psycopg.IsolationLevel.REPEATABLE_READ,
             IsolationLevel.SERIALIZABLE: psycopg.IsolationLevel.SERIALIZABLE,
         }
         self.default_isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
-        self.config = database_config
 
-    @property
-    def single_threaded(self) -> bool:
-        return False
-
-    def get_db_locale(self, txn: Cursor) -> Tuple[str, str]:
-        txn.execute(
-            "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
-        )
-        collation, ctype = cast(Tuple[str, str], txn.fetchone())
-        return collation, ctype
-
-    def check_database(
-        self,
-        db_conn: psycopg.Connection,
-        allow_outdated_version: bool = False,
-    ) -> None:
-        # Get the version of PostgreSQL that we're using. As per the psycopg
-        # docs: The number is formed by converting the major, minor, and
-        # revision numbers into two-decimal-digit numbers and appending them
-        # together. For example, version 8.1.5 will be returned as 80105
-        self._version = db_conn.info.server_version
-        allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
-
-        # Are we on a supported PostgreSQL version?
-        if not allow_outdated_version and self._version < 100000:
-            raise RuntimeError("Synapse requires PostgreSQL 10 or above.")
-
-        with db_conn.cursor() as txn:
-            txn.execute("SHOW SERVER_ENCODING")
-            rows = txn.fetchall()
-            if rows and rows[0][0] != "UTF8":
-                raise IncorrectDatabaseSetup(
-                    "Database has incorrect encoding: '%s' instead of 'UTF8'\n"
-                    "See docs/postgres.md for more information." % (rows[0][0],)
-                )
-
-            collation, ctype = self.get_db_locale(txn)
-            if collation != "C":
-                logger.warning(
-                    "Database has incorrect collation of %r. Should be 'C'",
-                    collation,
-                )
-                if not allow_unsafe_locale:
-                    raise IncorrectDatabaseSetup(
-                        "Database has incorrect collation of %r. Should be 'C'\n"
-                        "See docs/postgres.md for more information. You can override this check by"
-                        "setting 'allow_unsafe_locale' to true in the database config.",
-                        collation,
-                    )
-
-            if ctype != "C":
-                if not allow_unsafe_locale:
-                    logger.warning(
-                        "Database has incorrect ctype of %r. Should be 'C'",
-                        ctype,
-                    )
-                    raise IncorrectDatabaseSetup(
-                        "Database has incorrect ctype of %r. Should be 'C'\n"
-                        "See docs/postgres.md for more information. You can override this check by"
-                        "setting 'allow_unsafe_locale' to true in the database config.",
-                        ctype,
-                    )
-
-    def check_new_database(self, txn: Cursor) -> None:
-        """Gets called when setting up a brand new database. This allows us to
-        apply stricter checks on new databases versus existing database.
-        """
-
-        collation, ctype = self.get_db_locale(txn)
-
-        errors = []
-
-        if collation != "C":
-            errors.append("    - 'COLLATE' is set to %r. Should be 'C'" % (collation,))
-
-        if ctype != "C":
-            errors.append("    - 'CTYPE' is set to %r. Should be 'C'" % (ctype,))
-
-        if errors:
-            raise IncorrectDatabaseSetup(
-                "Database is incorrectly configured:\n\n%s\n\n"
-                "See docs/postgres.md for more information." % ("\n".join(errors))
-            )
+    def get_server_version(self, db_conn: psycopg.Connection) -> int:
+        return db_conn.info.server_version
 
     def convert_param_style(self, sql: str) -> str:
         if isinstance(sql, psycopg.sql.Composed):
             return sql
 
         return sql.replace("?", "%s")
-
-    def on_new_connection(self, db_conn: "LoggingDatabaseConnection") -> None:
-        db_conn.set_isolation_level(self.default_isolation_level)
-
-        # Set the bytea output to escape, vs the default of hex
-        cursor = db_conn.cursor()
-        cursor.execute("SET bytea_output TO escape")
-
-        # Asynchronous commit, don't wait for the server to call fsync before
-        # ending the transaction.
-        # https://www.postgresql.org/docs/current/static/wal-async-commit.html
-        if not self.synchronous_commit:
-            cursor.execute("SET synchronous_commit TO OFF")
-
-        cursor.close()
-        db_conn.commit()
-
-    @property
-    def supports_using_any_list(self) -> bool:
-        """Do we support using `a = ANY(?)` and passing a list"""
-        return True
-
-    @property
-    def supports_returning(self) -> bool:
-        """Do we support the `RETURNING` clause in insert/update/delete?"""
-        return True
-
-    @property
-    def supports_select_distinct_on(self) -> bool:
-        """Do we support the `DISTINCT ON` clause in SELECT?"""
-        return True
-
-    @property
-    def supports_sequences(self) -> bool:
-        """Do we support the `CREATE SEQUENCE` clause?"""
-        return True
 
     def is_deadlock(self, error: Exception) -> bool:
         if isinstance(error, psycopg.errors.Error):
@@ -188,30 +66,6 @@ class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection, psycopg.Cursor]):
             # "40P01" deadlock_detected
             return error.sqlstate in ["40001", "40P01"]
         return False
-
-    def is_connection_closed(self, conn: psycopg.Connection) -> bool:
-        return bool(conn.closed)
-
-    def lock_table(self, txn: Cursor, table: str) -> None:
-        txn.execute("LOCK TABLE %s in EXCLUSIVE MODE" % (table,))
-
-    @property
-    def server_version(self) -> str:
-        """Returns a string giving the server version. For example: '8.1.5'."""
-        # note that this is a bit of a hack because it relies on check_database
-        # having been called. Still, that should be a safe bet here.
-        numver = self._version
-        assert numver is not None
-
-        # https://www.postgresql.org/docs/current/libpq-status.html#LIBPQ-PQSERVERVERSION
-        if numver >= 100000:
-            return "%i.%i" % (numver / 10000, numver % 10000)
-        else:
-            return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
-
-    @property
-    def row_id_name(self) -> str:
-        return "ctid"
 
     def in_transaction(self, conn: psycopg.Connection) -> bool:
         return conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
@@ -229,15 +83,3 @@ class PsycopgEngine(BaseDatabaseEngine[psycopg.Connection, psycopg.Cursor]):
         else:
             pg_isolation_level = self.isolation_level_map[isolation_level]
         conn.isolation_level = pg_isolation_level
-
-    @staticmethod
-    def executescript(cursor: psycopg.Cursor, script: str) -> None:
-        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
-
-        Psycopg seems happy to do this in DBAPI2's `execute()` function.
-
-        For consistency with SQLite, any ongoing transaction is committed before
-        executing the script in its own transaction. The script transaction is
-        left open and it is the responsibility of the caller to commit it.
-        """
-        cursor.execute(f"COMMIT; BEGIN TRANSACTION; {script}")

@@ -14,6 +14,7 @@
 from typing import Any, Mapping, NoReturn, cast
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from .postgres import PostgresEngine
 
 
 # The classes `PostgresEngine` and `Sqlite3Engine` must always be importable, because
@@ -32,9 +33,9 @@ def dummy_engine(name: str, module: str) -> BaseDatabaseEngine:
 
 
 try:
-    from .postgres import PostgresEngine
+    from .psycopg2 import Psycopg2Engine
 except ImportError:
-    PostgresEngine = dummy_engine("PostgresEngine", "psycopg2")  # type: ignore[misc,assignment]
+    Psycopg2Engine = dummy_engine("Psycopg2Engine", "psycopg2")  # type: ignore[misc,assignment]
 
 try:
     from .psycopg import PsycopgEngine
@@ -54,7 +55,7 @@ def create_engine(database_config: Mapping[str, Any]) -> BaseDatabaseEngine:
         return Sqlite3Engine(database_config)
 
     if name == "psycopg2":
-        return PostgresEngine(database_config)
+        return Psycopg2Engine(database_config)
 
     if name == "psycopg":
         return PsycopgEngine(database_config)

@@ -12,17 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import logging
-from typing import TYPE_CHECKING, Any, Mapping, NoReturn, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple, Type, cast
 
-import psycopg2.extensions
+from psycopg import sql
 
 from synapse.storage.engines._base import (
     BaseDatabaseEngine,
+    ConnectionType,
+    CursorType,
     IncorrectDatabaseSetup,
-    IsolationLevel,
 )
-from synapse.storage.types import Cursor
+from synapse.storage.types import Cursor, DBAPI2Module
 
 if TYPE_CHECKING:
     from synapse.storage.database import LoggingDatabaseConnection
@@ -31,19 +33,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(
-    BaseDatabaseEngine[psycopg2.extensions.connection, psycopg2.extensions.cursor]
-):
-    def __init__(self, database_config: Mapping[str, Any]):
-        super().__init__(psycopg2, database_config)
-        psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+class PostgresEngine(BaseDatabaseEngine[ConnectionType, CursorType], metaclass=abc.ABCMeta):
+    isolation_level_map: Mapping[int, int]
+    default_isolation_level: int
+    OperationalError: Type[Exception]
 
-        # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
-        # actually want to use bytes than wrap it in `bytearray`.
-        def _disable_bytes_adapter(_: bytes) -> NoReturn:
-            raise Exception("Passing bytes to DB is disabled.")
+    def __init__(self, module: DBAPI2Module, database_config: Mapping[str, Any]):
+        super().__init__(module, database_config)
 
-        psycopg2.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit: bool = database_config.get("synchronous_commit", True)
         # Set the statement timeout to 1 hour by default.
         # Any query taking more than 1 hour should probably be considered a bug;
@@ -56,15 +53,14 @@ class PostgresEngine(
         )
         self._version: Optional[int] = None  # unknown as yet
 
-        self.isolation_level_map: Mapping[int, int] = {
-            IsolationLevel.READ_COMMITTED: psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED,
-            IsolationLevel.REPEATABLE_READ: psycopg2.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
-            IsolationLevel.SERIALIZABLE: psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE,
-        }
-        self.default_isolation_level = (
-            psycopg2.extensions.ISOLATION_LEVEL_REPEATABLE_READ
-        )
         self.config = database_config
+
+    @abc.abstractmethod
+    def get_server_version(self, db_conn: ConnectionType) -> int:
+        """Gets called when setting up a brand new database. This allows us to
+        apply stricter checks on new databases versus existing database.
+        """
+        ...
 
     @property
     def single_threaded(self) -> bool:
@@ -79,14 +75,14 @@ class PostgresEngine(
 
     def check_database(
         self,
-        db_conn: psycopg2.extensions.connection,
+        db_conn: ConnectionType,
         allow_outdated_version: bool = False,
     ) -> None:
         # Get the version of PostgreSQL that we're using. As per the psycopg2
         # docs: The number is formed by converting the major, minor, and
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105
-        self._version = db_conn.server_version
+        self._version = self.get_server_version(db_conn)
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
@@ -154,7 +150,7 @@ class PostgresEngine(
         return sql.replace("?", "%s")
 
     def on_new_connection(self, db_conn: "LoggingDatabaseConnection") -> None:
-        db_conn.set_isolation_level(self.default_isolation_level)
+        self.attempt_to_set_isolation_level(db_conn.conn, self.default_isolation_level)
 
         # Set the bytea output to escape, vs the default of hex
         cursor = db_conn.cursor()
@@ -168,7 +164,8 @@ class PostgresEngine(
 
         # Abort really long-running statements and turn them into errors.
         if self.statement_timeout is not None:
-            cursor.execute("SET statement_timeout TO ?", (self.statement_timeout,))
+            cursor.execute(sql.SQL("SET statement_timeout TO {}").format(self.statement_timeout))
+            #cursor.execute("SELECT set_config( 'statement_timeout', ?, false)", (self.statement_timeout,))
 
         cursor.close()
         db_conn.commit()
@@ -193,15 +190,7 @@ class PostgresEngine(
         """Do we support the `CREATE SEQUENCE` clause?"""
         return True
 
-    def is_deadlock(self, error: Exception) -> bool:
-        if isinstance(error, psycopg2.DatabaseError):
-            # https://www.postgresql.org/docs/current/static/errcodes-appendix.html
-            # "40001" serialization_failure
-            # "40P01" deadlock_detected
-            return error.pgcode in ["40001", "40P01"]
-        return False
-
-    def is_connection_closed(self, conn: psycopg2.extensions.connection) -> bool:
+    def is_connection_closed(self, conn: ConnectionType) -> bool:
         return bool(conn.closed)
 
     def lock_table(self, txn: Cursor, table: str) -> None:
@@ -225,25 +214,8 @@ class PostgresEngine(
     def row_id_name(self) -> str:
         return "ctid"
 
-    def in_transaction(self, conn: psycopg2.extensions.connection) -> bool:
-        return conn.status != psycopg2.extensions.STATUS_READY
-
-    def attempt_to_set_autocommit(
-        self, conn: psycopg2.extensions.connection, autocommit: bool
-    ) -> None:
-        return conn.set_session(autocommit=autocommit)
-
-    def attempt_to_set_isolation_level(
-        self, conn: psycopg2.extensions.connection, isolation_level: Optional[int]
-    ) -> None:
-        if isolation_level is None:
-            isolation_level = self.default_isolation_level
-        else:
-            isolation_level = self.isolation_level_map[isolation_level]
-        return conn.set_isolation_level(isolation_level)
-
     @staticmethod
-    def executescript(cursor: psycopg2.extensions.cursor, script: str) -> None:
+    def executescript(cursor: CursorType, script: str) -> None:
         """Execute a chunk of SQL containing multiple semicolon-delimited statements.
 
         Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
