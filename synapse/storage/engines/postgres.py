@@ -164,8 +164,11 @@ class PostgresEngine(BaseDatabaseEngine[ConnectionType, CursorType], metaclass=a
 
         # Abort really long-running statements and turn them into errors.
         if self.statement_timeout is not None:
-            cursor.execute(sql.SQL("SET statement_timeout TO {}").format(self.statement_timeout))
-            #cursor.execute("SELECT set_config( 'statement_timeout', ?, false)", (self.statement_timeout,))
+            # TODO Avoid a circular import, this needs to be abstracted.
+            if self.__class__.__name__ == "Psycopg2Engine":
+                cursor.execute("SET statement_timeout TO ?", (self.statement_timeout,))
+            else:
+                cursor.execute(sql.SQL("SET statement_timeout TO {}").format(self.statement_timeout))
 
         cursor.close()
         db_conn.commit()

@@ -47,7 +47,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine, Psycopg2Engine
 from synapse.types import JsonDict, StrCollection
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -321,7 +321,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                     AND sequence_number <= max_seq
             """
 
-            rows = txn.execute_values(sql, chains.items())
+            if isinstance(self.database_engine, Psycopg2Engine):
+                rows = txn.execute_values(sql, chains.items())
+            else:
+                rows = txn.executemany(sql, chains.items())
             results.update(r for r, in rows)
         else:
             # For SQLite we just fall back to doing a noddy for loop.
@@ -597,7 +600,10 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 for chain_id, (min_no, max_no) in chain_to_gap.items()
             ]
 
-            rows = txn.execute_values(sql, args)
+            if isinstance(self.database_engine, Psycopg2Engine):
+                rows = txn.execute_values(sql, args)
+            else:
+                rows = txn.executemany(sql, args)
             result.update(r for r, in rows)
         else:
             # For SQLite we just fall back to doing a noddy for loop.

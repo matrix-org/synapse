@@ -62,7 +62,7 @@ from synapse.storage.engines import (
     BaseDatabaseEngine,
     PostgresEngine,
     PsycopgEngine,
-    Sqlite3Engine,
+    Sqlite3Engine, Psycopg2Engine,
 )
 from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
@@ -389,7 +389,7 @@ class LoggingTransaction:
         More efficient than `executemany` on PostgreSQL
         """
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(self.database_engine, Psycopg2Engine):
             from psycopg2.extras import execute_batch
 
             # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
@@ -398,6 +398,8 @@ class LoggingTransaction:
             self._do_execute(
                 lambda the_sql: execute_batch(self.txn, the_sql, args), sql
             )
+
+            # TODO Can psycopg3 do anything better?
         else:
             # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
             # https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#sqlite3.Cursor.executemany
@@ -422,7 +424,8 @@ class LoggingTransaction:
         The `template` is the snippet to merge to every item in argslist to
         compose the query.
         """
-        assert isinstance(self.database_engine, PostgresEngine)
+        assert isinstance(self.database_engine, Psycopg2Engine)
+
         from psycopg2.extras import execute_values
 
         return self._do_execute(
@@ -434,6 +437,14 @@ class LoggingTransaction:
             sql,
             values,
         )
+
+    def copy(
+        self,
+        sql: str, args: Iterable[Iterable[Any]]
+    ) -> None:
+        with self.txn.copy(sql) as copy:
+            for record in args:
+                copy.write_row(record)
 
     def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
         self._do_execute(self.txn.execute, sql, parameters)
@@ -1180,7 +1191,7 @@ class DatabasePool:
             values: for each row, a list of values in the same order as `keys`
         """
 
-        if isinstance(txn.database_engine, PostgresEngine):
+        if isinstance(txn.database_engine, Psycopg2Engine):
             # We use `execute_values` as it can be a lot faster than `execute_batch`,
             # but it's only available on postgres.
             sql = "INSERT INTO %s (%s) VALUES ?" % (
@@ -1189,6 +1200,13 @@ class DatabasePool:
             )
 
             txn.execute_values(sql, values, fetch=False)
+
+        elif isinstance(txn.database_engine, PsycopgEngine):
+            sql = "COPY %s (%s) FROM STDIN" % (
+                table, ", ".join(k for k in keys),
+            )
+            txn.copy(sql, values)
+
         else:
             sql = "INSERT INTO %s (%s) VALUES(%s)" % (
                 table,
@@ -1606,7 +1624,7 @@ class DatabasePool:
         for x, y in zip(key_values, value_values):
             args.append(tuple(x) + tuple(y))
 
-        if isinstance(txn.database_engine, PostgresEngine):
+        if isinstance(txn.database_engine, Psycopg2Engine):
             # We use `execute_values` as it can be a lot faster than `execute_batch`,
             # but it's only available on postgres.
             sql = "INSERT INTO %s (%s) VALUES ? ON CONFLICT (%s) DO %s" % (
@@ -2362,7 +2380,7 @@ class DatabasePool:
             values: for each row, a list of values in the same order as `keys`
         """
 
-        if isinstance(txn.database_engine, PostgresEngine):
+        if isinstance(txn.database_engine, Psycopg2Engine):
             # We use `execute_values` as it can be a lot faster than `execute_batch`,
             # but it's only available on postgres.
             sql = "DELETE FROM %s WHERE (%s) IN (VALUES ?)" % (

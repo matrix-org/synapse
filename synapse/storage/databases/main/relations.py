@@ -46,7 +46,7 @@ from synapse.storage.databases.main.stream import (
     generate_pagination_bounds,
     generate_pagination_where_clause,
 )
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Psycopg2Engine
 from synapse.types import JsonDict, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
@@ -139,7 +139,7 @@ class RelationsWorkerStore(SQLBaseStore):
             ON CONFLICT (room_id, thread_id)
             DO NOTHING
             """
-            if isinstance(txn.database_engine, PostgresEngine):
+            if isinstance(txn.database_engine, Psycopg2Engine):
                 txn.execute_values(sql % ("?",), rows, fetch=False)
             else:
                 txn.execute_batch(sql % ("(?, ?, ?, ?, ?)",), rows)

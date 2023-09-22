@@ -811,7 +811,7 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
             "agg": "GREATEST" if self._positive else "LEAST",
         }
 
-        pos = (self.get_current_token_for_writer(self._instance_name),)
+        pos = self.get_current_token_for_writer(self._instance_name)
         txn.execute(sql, (self._stream_name, self._instance_name, pos))
 
 

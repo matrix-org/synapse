@@ -960,11 +960,11 @@ def setup_test_homeserver(
         test_db = "synapse_test_%s" % uuid.uuid4().hex
 
         if USE_POSTGRES_FOR_TESTS == "psycopg":
-            name = "psycopg"
+            db_type = "psycopg"
         else:
-            name = "psycopg2"
+            db_type = "psycopg2"
         database_config = {
-            "name": name,
+            "name": db_type,
             "args": {
                 "dbname": test_db,
                 "host": POSTGRES_HOST,
