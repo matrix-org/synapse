@@ -112,7 +112,7 @@ async def main(reactor, loops):
     start = perf_counter()
 
     # Send a bunch of useful messages
-    for i in range(0, loops):
+    for i in range(loops):
         logger.info("test message %s", i)
 
         if len(handler._buffer) == handler.maximum_buffer:

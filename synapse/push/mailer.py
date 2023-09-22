@@ -298,20 +298,26 @@ class Mailer:
                 notifs_by_room, state_by_room, notif_events, reason
             )
 
+        unsubscribe_link = self._make_unsubscribe_link(user_id, app_id, email_address)
+
         template_vars: TemplateVars = {
             "user_display_name": user_display_name,
-            "unsubscribe_link": self._make_unsubscribe_link(
-                user_id, app_id, email_address
-            ),
+            "unsubscribe_link": unsubscribe_link,
             "summary_text": summary_text,
             "rooms": rooms,
             "reason": reason,
         }
 
-        await self.send_email(email_address, summary_text, template_vars)
+        await self.send_email(
+            email_address, summary_text, template_vars, unsubscribe_link
+        )
 
     async def send_email(
-        self, email_address: str, subject: str, extra_template_vars: TemplateVars
+        self,
+        email_address: str,
+        subject: str,
+        extra_template_vars: TemplateVars,
+        unsubscribe_link: Optional[str] = None,
     ) -> None:
         """Send an email with the given information and template text"""
         template_vars: TemplateVars = {
@@ -330,6 +336,23 @@ class Mailer:
             app_name=self.app_name,
             html=html_text,
             text=plain_text,
+            # Include the List-Unsubscribe header which some clients render in the UI.
+            # Per RFC 2369, this can be a URL or mailto URL. See
+            #     https://www.rfc-editor.org/rfc/rfc2369.html#section-3.2
+            #
+            # It is preferred to use email, but Synapse doesn't support incoming email.
+            #
+            # Also include the List-Unsubscribe-Post header from RFC 8058. See
+            #     https://www.rfc-editor.org/rfc/rfc8058.html#section-3.1
+            #
+            # Note that many email clients will not render the unsubscribe link
+            # unless DKIM, etc. is properly setup.
+            additional_headers={
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": f"<{unsubscribe_link}>",
+            }
+            if unsubscribe_link
+            else None,
         )
 
     async def _get_room_vars(

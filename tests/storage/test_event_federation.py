@@ -227,7 +227,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 (room_id, event_id),
             )
 
-        for i in range(0, 20):
+        for i in range(20):
             self.get_success(
                 self.store.db_pool.runInteraction("insert", insert_event, i)
             )
@@ -235,7 +235,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # this should get the last ten
         r = self.get_success(self.store.get_prev_events_for_room(room_id))
         self.assertEqual(10, len(r))
-        for i in range(0, 10):
+        for i in range(10):
             self.assertEqual("$event_%i:local" % (19 - i), r[i])
 
     def test_get_rooms_with_many_extremities(self) -> None:
@@ -277,7 +277,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 (room_id, event_id),
             )
 
-        for i in range(0, 20):
+        for i in range(20):
             self.get_success(
                 self.store.db_pool.runInteraction("insert", insert_event, i, room1)
             )

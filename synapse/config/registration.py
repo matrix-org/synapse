@@ -133,7 +133,16 @@ class RegistrationConfig(Config):
 
         self.enable_set_displayname = config.get("enable_set_displayname", True)
         self.enable_set_avatar_url = config.get("enable_set_avatar_url", True)
-        self.enable_3pid_changes = config.get("enable_3pid_changes", True)
+
+        # The default value of enable_3pid_changes is True, unless msc3861 is enabled.
+        msc3861_enabled = (
+            (config.get("experimental_features") or {})
+            .get("msc3861", {})
+            .get("enabled", False)
+        )
+        self.enable_3pid_changes = config.get(
+            "enable_3pid_changes", not msc3861_enabled
+        )
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False

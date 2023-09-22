@@ -76,7 +76,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             headers: Mapping[Union[str, bytes], Sequence[Union[str, bytes]]],
         ) -> List[JsonDict]:
             # Ensure the access token is passed as a header.
-            if not headers or not headers.get("Authorization"):
+            if not headers or not headers.get(b"Authorization"):
                 raise RuntimeError("Access token not provided")
             # ... and not as a query param
             if b"access_token" in args:
@@ -84,7 +84,9 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                     "Access token should not be passed as a query param."
                 )
 
-            self.assertEqual(headers.get("Authorization"), [f"Bearer {TOKEN}"])
+            self.assertEqual(
+                headers.get(b"Authorization"), [f"Bearer {TOKEN}".encode()]
+            )
             self.request_url = url
             if url == URL_USER:
                 return SUCCESS_RESULT_USER
@@ -96,7 +98,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                 )
 
         # We assign to a method, which mypy doesn't like.
-        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
+        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[method-assign]
 
         result = self.get_success(
             self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
@@ -152,11 +154,13 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             # Ensure the access token is passed as a both a query param and in the headers.
             if not args.get(b"access_token"):
                 raise RuntimeError("Access token should be provided in query params.")
-            if not headers or not headers.get("Authorization"):
+            if not headers or not headers.get(b"Authorization"):
                 raise RuntimeError("Access token should be provided in auth headers.")
 
             self.assertEqual(args.get(b"access_token"), TOKEN)
-            self.assertEqual(headers.get("Authorization"), [f"Bearer {TOKEN}"])
+            self.assertEqual(
+                headers.get(b"Authorization"), [f"Bearer {TOKEN}".encode()]
+            )
             self.request_url = url
             if url == URL_USER:
                 return SUCCESS_RESULT_USER
@@ -168,7 +172,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                 )
 
         # We assign to a method, which mypy doesn't like.
-        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
+        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[method-assign]
 
         result = self.get_success(
             self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
@@ -208,14 +212,16 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             headers: Mapping[Union[str, bytes], Sequence[Union[str, bytes]]],
         ) -> JsonDict:
             # Ensure the access token is passed as both a header and query arg.
-            if not headers.get("Authorization"):
+            if not headers.get(b"Authorization"):
                 raise RuntimeError("Access token not provided")
 
-            self.assertEqual(headers.get("Authorization"), [f"Bearer {TOKEN}"])
+            self.assertEqual(
+                headers.get(b"Authorization"), [f"Bearer {TOKEN}".encode()]
+            )
             return RESPONSE
 
         # We assign to a method, which mypy doesn't like.
-        self.api.post_json_get_json = Mock(side_effect=post_json_get_json)  # type: ignore[assignment]
+        self.api.post_json_get_json = Mock(side_effect=post_json_get_json)  # type: ignore[method-assign]
 
         MISSING_KEYS = [
             # Known user, known device, missing algorithm.

@@ -218,19 +218,17 @@ class AuthHandler:
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         # The number of seconds to keep a UI auth session active.
         self._ui_auth_session_timeout = hs.config.auth.ui_auth_session_timeout
 
-        # Ratelimitier for failed /login attempts
+        # Ratelimiter for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         self._clock = self.hs.get_clock()

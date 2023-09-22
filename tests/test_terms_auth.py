@@ -85,7 +85,9 @@ class TermsTestCase(unittest.HomeserverTestCase):
             }
         }
         self.assertIsInstance(channel.json_body["params"], dict)
-        self.assertDictContainsSubset(channel.json_body["params"], expected_params)
+        self.assertLessEqual(
+            channel.json_body["params"].items(), expected_params.items()
+        )
 
         # We have to complete the dummy auth stage before completing the terms stage
         request_data = {

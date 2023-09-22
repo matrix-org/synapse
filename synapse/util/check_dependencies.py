@@ -51,9 +51,9 @@ class DependencyException(Exception):
 
 
 DEV_EXTRAS = {"lint", "mypy", "test", "dev"}
-RUNTIME_EXTRAS = (
-    set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")) - DEV_EXTRAS
-)
+ALL_EXTRAS = metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")
+assert ALL_EXTRAS is not None
+RUNTIME_EXTRAS = set(ALL_EXTRAS) - DEV_EXTRAS
 VERSION = metadata.version(DISTRIBUTION_NAME)
 
 

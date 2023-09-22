@@ -1,5 +1,6 @@
 from synapse.api.ratelimiting import LimitExceededError, Ratelimiter
 from synapse.appservice import ApplicationService
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.types import create_requester
 
 from tests import unittest
@@ -10,8 +11,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=1,
+            cfg=RatelimitSettings(key="", per_second=0.1, burst_count=1),
         )
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", _time_now_s=0)
@@ -43,8 +43,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=1,
+            cfg=RatelimitSettings(
+                key="",
+                per_second=0.1,
+                burst_count=1,
+            ),
         )
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(as_requester, _time_now_s=0)
@@ -76,8 +79,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=1,
+            cfg=RatelimitSettings(
+                key="",
+                per_second=0.1,
+                burst_count=1,
+            ),
         )
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(as_requester, _time_now_s=0)
@@ -101,8 +107,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=1,
+            cfg=RatelimitSettings(key="", per_second=0.1, burst_count=1),
         )
 
         # Shouldn't raise
@@ -128,8 +133,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=1,
+            cfg=RatelimitSettings(key="", per_second=0.1, burst_count=1),
         )
 
         # First attempt should be allowed
@@ -177,8 +181,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=1,
+            cfg=RatelimitSettings(key="", per_second=0.1, burst_count=1),
         )
 
         # First attempt should be allowed
@@ -208,8 +211,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=1,
+            cfg=RatelimitSettings(key="", per_second=0.1, burst_count=1),
         )
         self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id_1", _time_now_s=0)
@@ -244,7 +246,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
             )
         )
 
-        limiter = Ratelimiter(store=store, clock=self.clock, rate_hz=0.1, burst_count=1)
+        limiter = Ratelimiter(
+            store=store,
+            clock=self.clock,
+            cfg=RatelimitSettings("", per_second=0.1, burst_count=1),
+        )
 
         # Shouldn't raise
         for _ in range(20):
@@ -254,8 +260,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=3,
+            cfg=RatelimitSettings(
+                key="",
+                per_second=0.1,
+                burst_count=3,
+            ),
         )
         # Test that 4 actions aren't allowed with a maximum burst of 3.
         allowed, time_allowed = self.get_success_or_raise(
@@ -321,8 +330,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=3,
+            cfg=RatelimitSettings("", per_second=0.1, burst_count=3),
         )
 
         def consume_at(time: float) -> bool:
@@ -346,8 +354,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=3,
+            cfg=RatelimitSettings(
+                "",
+                per_second=0.1,
+                burst_count=3,
+            ),
         )
 
         # Observe two actions, leaving room in the bucket for one more.
@@ -369,8 +380,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=3,
+            cfg=RatelimitSettings(
+                "",
+                per_second=0.1,
+                burst_count=3,
+            ),
         )
 
         # Observe three actions, filling up the bucket.
@@ -398,8 +412,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main,
             clock=self.clock,
-            rate_hz=0.1,
-            burst_count=3,
+            cfg=RatelimitSettings(
+                "",
+                per_second=0.1,
+                burst_count=3,
+            ),
         )
 
         # Observe four actions, exceeding the bucket.

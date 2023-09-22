@@ -264,7 +264,7 @@ But don't want to send out sensitive data in other HS's events in this way.
 Suppose we discover after resync that we shouldn't have sent out one our events (not a prev_event) to a target HS. Not much we can do.
 What about if we didn't send them an event but shouldn't've?
 E.g. what if someone joined from a new HS shortly after you did? We wouldn't talk to them.
-Could imagine sending out the "Missed" events after the resync but... painful to work out what they shuld have seen if they joined/left.
+Could imagine sending out the "Missed" events after the resync but... painful to work out what they should have seen if they joined/left.
 Instead, just send them the latest event (if they're still in the room after resync) and let them backfill.(?)
 - Don't do this currently.
 - If anyone who has received our messages sends a message to a HS we missed, they can backfill our messages

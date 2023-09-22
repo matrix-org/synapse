@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import Iterable, List, Type, Union, cast
+from typing import List, Type, Union, cast
 
 import jsonschema
 from pydantic import Field, StrictBool, StrictStr
@@ -36,7 +36,7 @@ from synapse.events.utils import (
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.http.servlet import validate_json_object
 from synapse.rest.models import RequestBodyModel
-from synapse.types import EventID, JsonDict, RoomID, UserID
+from synapse.types import EventID, JsonDict, RoomID, StrCollection, UserID
 
 
 class EventValidator:
@@ -151,7 +151,7 @@ class EventValidator:
         max_lifetime = event.content.get("max_lifetime")
 
         if min_lifetime is not None:
-            if type(min_lifetime) is not int:
+            if type(min_lifetime) is not int:  # noqa: E721
                 raise SynapseError(
                     code=400,
                     msg="'min_lifetime' must be an integer",
@@ -159,7 +159,7 @@ class EventValidator:
                 )
 
         if max_lifetime is not None:
-            if type(max_lifetime) is not int:
+            if type(max_lifetime) is not int:  # noqa: E721
                 raise SynapseError(
                     code=400,
                     msg="'max_lifetime' must be an integer",
@@ -225,7 +225,7 @@ class EventValidator:
 
             self._ensure_state_event(event)
 
-    def _ensure_strings(self, d: JsonDict, keys: Iterable[str]) -> None:
+    def _ensure_strings(self, d: JsonDict, keys: StrCollection) -> None:
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))

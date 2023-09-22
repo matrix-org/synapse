@@ -714,7 +714,7 @@ class StateTestCase(unittest.TestCase):
         store = _DummyStore()
         store.register_events(old_state_1)
         store.register_events(old_state_2)
-        self.dummy_store.get_events = store.get_events  # type: ignore[assignment]
+        self.dummy_store.get_events = store.get_events  # type: ignore[method-assign]
 
         context: EventContext
         context = yield self._get_context(
@@ -773,7 +773,7 @@ class StateTestCase(unittest.TestCase):
         store = _DummyStore()
         store.register_events(old_state_1)
         store.register_events(old_state_2)
-        self.dummy_store.get_events = store.get_events  # type: ignore[assignment]
+        self.dummy_store.get_events = store.get_events  # type: ignore[method-assign]
 
         context: EventContext
         context = yield self._get_context(

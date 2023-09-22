@@ -25,8 +25,10 @@ messages from the database after 5 minutes, rather than 5 months.
 
 In addition, configuration options referring to size use the following suffixes:
 
-* `M` = MiB, or 1,048,576 bytes
 * `K` = KiB, or 1024 bytes
+* `M` = MiB, or 1,048,576 bytes
+* `G` = GiB, or 1,073,741,824 bytes
+* `T` = TiB, or 1,099,511,627,776 bytes
 
 For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.
@@ -519,7 +521,7 @@ listeners:
 Example configuration #2:
 ```yaml
 listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -934,6 +936,17 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
+### `forgotten_room_retention_period`
+
+How long to keep locally forgotten rooms before purging them from the DB.
+
+Defaults to `null`, meaning it's disabled.
+
+Example configuration:
+```yaml
+forgotten_room_retention_period: 28d
+```
+---
 ### `user_ips_max_age`
 
 How long to track users' last seen time and IPs in the database.
@@ -1120,14 +1133,14 @@ federation_verify_certificates: false
 
 The minimum TLS version that will be used for outbound federation requests.
 
-Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
-that setting this value higher than `1.2` will prevent federation to most
-of the public Matrix network: only configure it to `1.3` if you have an
+Defaults to `"1"`. Configurable to `"1"`, `"1.1"`, `"1.2"`, or `"1.3"`. Note
+that setting this value higher than `"1.2"` will prevent federation to most
+of the public Matrix network: only configure it to `"1.3"` if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.
 
 Example configuration:
 ```yaml
-federation_client_minimum_tls_version: 1.2
+federation_client_minimum_tls_version: "1.2"
 ```
 ---
 ### `federation_certificate_verification_whitelist`
@@ -2943,7 +2956,7 @@ Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a `verify key`, which
 will make synapse check that the response is signed by that key.
 
-This setting supercedes an older setting named `perspectives`. The old format
+This setting supersedes an older setting named `perspectives`. The old format
 is still supported for backwards-compatibility, but it is deprecated.
 
 `trusted_key_servers` defaults to matrix.org, but using it will generate a
@@ -3420,6 +3433,7 @@ Has the following sub-options:
    to style the login flow according to the identity provider in question.
    See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
+* `protocol_version`: The CAS protocol version, defaults to none (version 3 is required if you want to use "required_attributes").
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
 * `required_attributes`:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3427,16 +3441,24 @@ Has the following sub-options:
    and the values must match the given value. Alternately if the given value
    is `None` then any value is allowed (the attribute just must exist).
    All of the listed attributes must match for the login to be permitted.
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the CAS SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
+   *Added in Synapse 1.93.0.*
 
 Example configuration:
 ```yaml
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: "staff"
     department: None
+  enable_registration: true
 ```
 ---
 ### `sso`
@@ -3864,6 +3886,19 @@ normally or via a kick or ban. Defaults to false.
 Example configuration:
 ```yaml
 forget_rooms_on_leave: false
+```
+---
+### `exclude_rooms_from_sync`
+A list of rooms to exclude from sync responses. This is useful for server
+administrators wishing to group users into a room without these users being able
+to see it from their client.
+
+By default, no room is excluded.
+
+Example configuration:
+```yaml
+exclude_rooms_from_sync:
+    - !foo:example.com
 ```
 
 ---

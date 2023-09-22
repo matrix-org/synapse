@@ -579,6 +579,11 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         device_id: Optional[str],
         now: Optional[int] = None,
     ) -> None:
+        # The sync proxy continuously triggers /sync even if the user is not
+        # present so should be excluded from user_ips entries.
+        if user_agent == "sync-v3-proxy-":
+            return
+
         if not now:
             now = int(self._clock.time_msec())
         key = (user_id, access_token, ip)
@@ -759,3 +764,14 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
                     }
 
         return list(results.values())
+
+    async def get_last_seen_for_user_id(self, user_id: str) -> Optional[int]:
+        """Get the last seen timestamp for a user, if we have it."""
+
+        return await self.db_pool.simple_select_one_onecol(
+            table="user_ips",
+            keyvalues={"user_id": user_id},
+            retcol="MAX(last_seen)",
+            allow_none=True,
+            desc="get_last_seen_for_user_id",
+        )

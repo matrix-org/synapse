@@ -62,7 +62,6 @@ class Constraint(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def make_check_clause(self, table: str) -> str:
         """Returns an SQL expression that checks the row passes the constraint."""
-        pass
 
     @abc.abstractmethod
     def make_constraint_clause_postgres(self) -> str:
@@ -70,7 +69,6 @@ class Constraint(metaclass=abc.ABCMeta):
 
         Only used on Postgres DBs
         """
-        pass
 
 
 @attr.s(auto_attribs=True)
@@ -405,14 +403,14 @@ class BackgroundUpdater:
                 try:
                     result = await self.do_next_background_update(sleep)
                     back_to_back_failures = 0
-                except Exception:
+                except Exception as e:
+                    logger.exception("Error doing update: %s", e)
                     back_to_back_failures += 1
                     if back_to_back_failures >= 5:
                         self._aborted = True
                         raise RuntimeError(
                             "5 back-to-back background update failures; aborting."
                         )
-                    logger.exception("Error doing update")
                 else:
                     if result:
                         logger.info(

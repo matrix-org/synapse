@@ -37,13 +37,13 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.handlers.pagination import PURGE_ROOM_ACTION_NAME
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging import opentracing
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.module_api import NOT_SPAM
 from synapse.types import (
     JsonDict,
     Requester,
@@ -112,8 +112,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._join_rate_limiter_local = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_joins_local.per_second,
-            burst_count=hs.config.ratelimiting.rc_joins_local.burst_count,
+            cfg=hs.config.ratelimiting.rc_joins_local,
         )
         # Tracks joins from local users to rooms this server isn't a member of.
         # I.e. joins this server makes by requesting /make_join /send_join from
@@ -121,8 +120,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._join_rate_limiter_remote = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_joins_remote.per_second,
-            burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
+            cfg=hs.config.ratelimiting.rc_joins_remote,
         )
         # TODO: find a better place to keep this Ratelimiter.
         #   It needs to be
@@ -135,8 +133,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._join_rate_per_room_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_joins_per_room.per_second,
-            burst_count=hs.config.ratelimiting.rc_joins_per_room.burst_count,
+            cfg=hs.config.ratelimiting.rc_joins_per_room,
         )
 
         # Ratelimiter for invites, keyed by room (across all issuers, all
@@ -144,8 +141,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._invites_per_room_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
-            burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
+            cfg=hs.config.ratelimiting.rc_invites_per_room,
         )
 
         # Ratelimiter for invites, keyed by recipient (across all rooms, all
@@ -153,8 +149,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._invites_per_recipient_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
-            burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
+            cfg=hs.config.ratelimiting.rc_invites_per_user,
         )
 
         # Ratelimiter for invites, keyed by issuer (across all rooms, all
@@ -162,19 +157,21 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self._invites_per_issuer_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_invites_per_issuer.per_second,
-            burst_count=hs.config.ratelimiting.rc_invites_per_issuer.burst_count,
+            cfg=hs.config.ratelimiting.rc_invites_per_issuer,
         )
 
         self._third_party_invite_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=hs.config.ratelimiting.rc_third_party_invite.per_second,
-            burst_count=hs.config.ratelimiting.rc_third_party_invite.burst_count,
+            cfg=hs.config.ratelimiting.rc_third_party_invite,
         )
 
         self.request_ratelimiter = hs.get_request_ratelimiter()
         hs.get_notifier().add_new_join_in_room_callback(self._on_user_joined_room)
+
+        self._forgotten_room_retention_period = (
+            hs.config.server.forgotten_room_retention_period
+        )
 
     def _on_user_joined_room(self, event_id: str, room_id: str) -> None:
         """Notify the rate limiter that a room join has occurred.
@@ -285,7 +282,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
-    async def forget(self, user: UserID, room_id: str) -> None:
+    async def forget(
+        self, user: UserID, room_id: str, do_not_schedule_purge: bool = False
+    ) -> None:
         user_id = user.to_string()
 
         member = await self._storage_controllers.state.get_current_state_event(
@@ -304,6 +303,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # `_background_remove_left_rooms` is deleting rows related to this room from
         # the table `current_state_events` and `get_current_state_events` is `None`.
         await self.store.forget(user_id, room_id)
+
+        # If everyone locally has left the room, then there is no reason for us to keep the
+        # room around and we automatically purge room after a little bit
+        if (
+            not do_not_schedule_purge
+            and self._forgotten_room_retention_period
+            and await self.store.is_locally_forgotten_room(room_id)
+        ):
+            await self.hs.get_task_scheduler().schedule_task(
+                PURGE_ROOM_ACTION_NAME,
+                resource_id=room_id,
+                timestamp=self.clock.time_msec()
+                + self._forgotten_room_retention_period,
+            )
 
     async def ratelimit_multiple_invites(
         self,
@@ -811,7 +824,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 spam_check = await self._spam_checker_module_callbacks.user_may_invite(
                     requester.user.to_string(), target_id, room_id
                 )
-                if spam_check != NOT_SPAM:
+                if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                     logger.info("Blocking invite due to spam checker")
                     block_invite_result = spam_check
 
@@ -946,7 +959,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         target.to_string(), room_id, is_invited=inviter is not None
                     )
                 )
-                if spam_check != NOT_SPAM:
+                if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                     raise SynapseError(
                         403,
                         "Not allowed to join this room",
@@ -1564,7 +1577,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     room_id=room_id,
                 )
             )
-            if spam_check != NOT_SPAM:
+            if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                 raise SynapseError(
                     403,
                     "Cannot send threepid invite",

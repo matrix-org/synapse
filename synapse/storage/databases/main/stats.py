@@ -107,6 +107,8 @@ class UserSortOrder(Enum):
     AVATAR_URL = "avatar_url"
     SHADOW_BANNED = "shadow_banned"
     CREATION_TS = "creation_ts"
+    LAST_SEEN_TS = "last_seen_ts"
+    LOCKED = "locked"
 
 
 class StatsStore(StateDeltasStore):
