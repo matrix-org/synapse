@@ -936,6 +936,17 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
+### `forgotten_room_retention_period`
+
+How long to keep locally forgotten rooms before purging them from the DB.
+
+Defaults to `null`, meaning it's disabled.
+
+Example configuration:
+```yaml
+forgotten_room_retention_period: 28d
+```
+---
 ### `user_ips_max_age`
 
 How long to track users' last seen time and IPs in the database.
@@ -1122,14 +1133,14 @@ federation_verify_certificates: false
 
 The minimum TLS version that will be used for outbound federation requests.
 
-Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
-that setting this value higher than `1.2` will prevent federation to most
-of the public Matrix network: only configure it to `1.3` if you have an
+Defaults to `"1"`. Configurable to `"1"`, `"1.1"`, `"1.2"`, or `"1.3"`. Note
+that setting this value higher than `"1.2"` will prevent federation to most
+of the public Matrix network: only configure it to `"1.3"` if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.
 
 Example configuration:
 ```yaml
-federation_client_minimum_tls_version: 1.2
+federation_client_minimum_tls_version: "1.2"
 ```
 ---
 ### `federation_certificate_verification_whitelist`

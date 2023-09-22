@@ -23,7 +23,7 @@ from synapse.storage._base import db_to_json
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonMapping
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
@@ -34,7 +34,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
     @cached()
     async def get_tags_for_user(
         self, user_id: str
-    ) -> Mapping[str, Mapping[str, JsonDict]]:
+    ) -> Mapping[str, Mapping[str, JsonMapping]]:
         """Get all the tags for a user.
 
 
@@ -109,7 +109,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
 
     async def get_updated_tags(
         self, user_id: str, stream_id: int
-    ) -> Mapping[str, Mapping[str, JsonDict]]:
+    ) -> Mapping[str, Mapping[str, JsonMapping]]:
         """Get all the tags for the rooms where the tags have changed since the
         given version
 
