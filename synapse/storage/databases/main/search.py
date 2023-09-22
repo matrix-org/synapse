@@ -272,7 +272,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
             # we have to set autocommit, because postgres refuses to
             # CREATE INDEX CONCURRENTLY without it.
-            conn.set_session(autocommit=True)
+            conn.engine.attempt_to_set_autocommit(conn.conn, True)
 
             try:
                 c = conn.cursor()
@@ -298,7 +298,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                 # we should now be able to delete the GIST index.
                 c.execute("DROP INDEX IF EXISTS event_search_fts_idx_gist")
             finally:
-                conn.set_session(autocommit=False)
+                conn.engine.attempt_to_set_autocommit(conn.conn, False)
 
         if isinstance(self.database_engine, PostgresEngine):
             await self.db_pool.runWithConnection(create_index)
@@ -320,7 +320,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
             def create_index(conn: LoggingDatabaseConnection) -> None:
                 conn.rollback()
-                conn.set_session(autocommit=True)
+                conn.attempt_to_set_autocommit(True)
                 c = conn.cursor()
 
                 # We create with NULLS FIRST so that when we search *backwards*
@@ -337,7 +337,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                     ON event_search(origin_server_ts NULLS FIRST, stream_ordering NULLS FIRST)
                     """
                 )
-                conn.set_session(autocommit=False)
+                conn.attempt_to_set_autocommit(False)
 
             await self.db_pool.runWithConnection(create_index)
 

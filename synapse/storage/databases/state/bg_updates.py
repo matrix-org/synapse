@@ -479,7 +479,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             conn.rollback()
             if isinstance(self.database_engine, PostgresEngine):
                 # postgres insists on autocommit for the index
-                conn.set_session(autocommit=True)
+                conn.engine.attempt_to_set_autocommit(conn.conn, True)
                 try:
                     txn = conn.cursor()
                     txn.execute(
@@ -488,7 +488,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                     )
                     txn.execute("DROP INDEX IF EXISTS state_groups_state_id")
                 finally:
-                    conn.set_session(autocommit=False)
+                    conn.engine.attempt_to_set_autocommit(conn.conn, False)
             else:
                 txn = conn.cursor()
                 txn.execute(
