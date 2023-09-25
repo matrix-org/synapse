@@ -1858,7 +1858,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
 
         event = self.get_success(
-            builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
+            builder.build(prev_event_ids=list(prev_event_ids), auth_event_ids=None)
         )
 
         self.get_success(self.federation_event_handler.on_receive_pdu(hostname, event))

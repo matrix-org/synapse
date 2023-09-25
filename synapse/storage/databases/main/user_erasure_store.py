@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Iterable
+from typing import Iterable, Mapping
 
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
@@ -40,7 +40,7 @@ class UserErasureWorkerStore(CacheInvalidationWorkerStore):
         return bool(result)
 
     @cachedList(cached_method_name="is_user_erased", list_name="user_ids")
-    async def are_users_erased(self, user_ids: Iterable[str]) -> Dict[str, bool]:
+    async def are_users_erased(self, user_ids: Iterable[str]) -> Mapping[str, bool]:
         """
         Checks which users in a list have requested erasure
 
