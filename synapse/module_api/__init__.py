@@ -31,13 +31,15 @@ from typing import (
 
 import attr
 import jinja2
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IDelayedCall
 from twisted.web.resource import Resource
 
 from synapse.api import errors
 from synapse.api.errors import SynapseError
+from synapse.config import ConfigError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
     GET_INTERESTED_USERS_CALLBACK,
@@ -79,6 +81,7 @@ from synapse.module_api.callbacks.account_validity_callbacks import (
 )
 from synapse.module_api.callbacks.spamchecker_callbacks import (
     CHECK_EVENT_FOR_SPAM_CALLBACK,
+    CHECK_LOGIN_FOR_SPAM_CALLBACK,
     CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
     CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
@@ -121,6 +124,7 @@ from synapse.types import (
     JsonMapping,
     Requester,
     RoomAlias,
+    RoomID,
     StateMap,
     UserID,
     UserInfo,
@@ -252,6 +256,7 @@ class ModuleApi:
         self._device_handler = hs.get_device_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
         self._callbacks = hs.get_module_api_callbacks()
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
         try:
             app_name = self._hs.config.email.email_app_name
@@ -299,6 +304,7 @@ class ModuleApi:
             CHECK_REGISTRATION_FOR_SPAM_CALLBACK
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
+        check_login_for_spam: Optional[CHECK_LOGIN_FOR_SPAM_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for spam checking capabilities.
 
@@ -316,6 +322,7 @@ class ModuleApi:
             check_username_for_spam=check_username_for_spam,
             check_registration_for_spam=check_registration_for_spam,
             check_media_file_for_spam=check_media_file_for_spam,
+            check_login_for_spam=check_login_for_spam,
         )
 
     def register_account_validity_callbacks(
@@ -419,6 +426,11 @@ class ModuleApi:
 
         Added in Synapse v1.46.0.
         """
+        if self.msc3861_oauth_delegation_enabled:
+            raise ConfigError(
+                "Cannot use password auth provider callbacks when OAuth delegation is enabled"
+            )
+
         return self._password_auth_provider.register_password_auth_provider_callbacks(
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,
@@ -560,7 +572,7 @@ class ModuleApi:
         Returns:
             UserInfo object if a user was found, otherwise None
         """
-        return await self._store.get_userinfo_by_id(user_id)
+        return await self._store.get_user_by_id(user_id)
 
     async def get_user_by_req(
         self,
@@ -647,7 +659,9 @@ class ModuleApi:
         Returns:
             The profile information (i.e. display name and avatar URL).
         """
-        return await self._store.get_profileinfo(localpart)
+        server_name = self._hs.hostname
+        user_id = UserID.from_string(f"@{localpart}:{server_name}")
+        return await self._store.get_profileinfo(user_id)
 
     async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
         """Look up the threepids (email addresses and phone numbers) associated with the
@@ -871,7 +885,7 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[P, T],
+        func: Callable[Concatenate[LoggingTransaction, P], T],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
@@ -1166,7 +1180,7 @@ class ModuleApi:
 
             # Send to remote destinations.
             destination = UserID.from_string(user).domain
-            presence_handler.get_federation_queue().send_presence_to_destinations(
+            await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events, [destination]
             )
 
@@ -1216,6 +1230,58 @@ class ModuleApi:
                 "Not running looping call %s as the configuration forbids it",
                 f,
             )
+
+    def should_run_background_tasks(self) -> bool:
+        """
+        Return true if and only if the current worker is configured to run
+        background tasks.
+        There should only be one worker configured to run background tasks, so
+        this is helpful when you need to only run a task on one worker but don't
+        have any other good way to choose which one.
+
+        Added in Synapse v1.89.0.
+        """
+        return self._hs.config.worker.run_background_tasks
+
+    def delayed_background_call(
+        self,
+        msec: float,
+        f: Callable,
+        *args: object,
+        desc: Optional[str] = None,
+        **kwargs: object,
+    ) -> IDelayedCall:
+        """Wraps a function as a background process and calls it in a given number of milliseconds.
+
+        The scheduled call is not persistent: if the current Synapse instance is
+        restarted before the call is made, the call will not be made.
+
+        Added in Synapse v1.90.0.
+
+        Args:
+            msec: How long to wait before calling, in milliseconds.
+            f: The function to call once. f can be either synchronous or
+                asynchronous, and must follow Synapse's logcontext rules.
+                More info about logcontexts is available at
+                https://matrix-org.github.io/synapse/latest/log_contexts.html
+            *args: Positional arguments to pass to function.
+            desc: The background task's description. Default to the function's name.
+            **kwargs: Keyword arguments to pass to function.
+
+        Returns:
+            IDelayedCall handle from twisted, which allows to cancel the delayed call if desired.
+        """
+
+        if desc is None:
+            desc = f.__name__
+
+        return self._clock.call_later(
+            # convert ms to seconds as needed by call_later.
+            msec * 0.001,
+            run_as_background_process,
+            desc,
+            lambda: maybe_awaitable(f(*args, **kwargs)),
+        )
 
     async def sleep(self, seconds: float) -> None:
         """Sleeps for the given number of seconds.
@@ -1563,6 +1629,32 @@ class ModuleApi:
             start_timestamp, end_timestamp
         )
 
+    async def get_canonical_room_alias(self, room_id: RoomID) -> Optional[RoomAlias]:
+        """
+        Retrieve the given room's current canonical alias.
+
+        A room may declare an alias as "canonical", meaning that it is the
+        preferred alias to use when referring to the room. This function
+        retrieves that alias from the room's state.
+
+        Added in Synapse v1.86.0.
+
+        Args:
+            room_id: The Room ID to find the alias of.
+
+        Returns:
+            None if the room ID does not exist, or if the room exists but has no canonical alias.
+            Otherwise, the parsed room alias.
+        """
+        room_alias_str = (
+            await self._storage_controllers.state.get_canonical_alias_for_room(
+                room_id.to_string()
+            )
+        )
+        if room_alias_str:
+            return RoomAlias.from_string(room_alias_str)
+        return None
+
     async def lookup_room_alias(self, room_alias: str) -> Tuple[str, List[str]]:
         """
         Get the room ID associated with a room alias.
@@ -1637,6 +1729,30 @@ class ModuleApi:
         )
         room_alias_str = room_alias.to_string() if room_alias else None
         return room_id, room_alias_str
+
+    async def delete_room(self, room_id: str) -> None:
+        """
+        Schedules the deletion of a room from Synapse's database.
+
+        If the room is already being deleted, this method does nothing.
+        This method does not wait for the room to be deleted.
+
+        Added in Synapse v1.89.0.
+        """
+        # Future extensions to this method might want to e.g. allow use of `force_purge`.
+        # TODO In the future we should make sure this is persistent.
+        await self._hs.get_pagination_handler().start_shutdown_and_purge_room(
+            room_id,
+            {
+                "new_room_user_id": None,
+                "new_room_name": None,
+                "message": None,
+                "requester_user_id": None,
+                "block": False,
+                "purge": True,
+                "force_purge": False,
+            },
+        )
 
     async def set_displayname(
         self,
@@ -1773,7 +1889,7 @@ class AccountDataManager:
             raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
 
         # Ensure the user exists, so we don't just write to users that aren't there.
-        if await self._store.get_userinfo_by_id(user_id) is None:
+        if await self._store.get_user_by_id(user_id) is None:
             raise ValueError(f"User {user_id} does not exist on this server.")
 
         await self._handler.add_account_data_for_user(user_id, data_type, new_data)

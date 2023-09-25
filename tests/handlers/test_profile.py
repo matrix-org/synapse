@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Any, Awaitable, Callable, Dict
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from parameterized import parameterized
 
@@ -26,7 +26,6 @@ from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class ProfileTestCase(unittest.HomeserverTestCase):
@@ -35,7 +34,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     servlets = [admin.register_servlets]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        self.mock_federation = Mock()
+        self.mock_federation = AsyncMock()
         self.mock_registry = Mock()
 
         self.query_handlers: Dict[str, Callable[[dict], Awaitable[JsonDict]]] = {}
@@ -80,11 +79,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank Jr.",
         )
 
@@ -96,11 +91,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank",
         )
 
@@ -112,7 +103,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            self.get_success(self.store.get_profile_displayname(self.frank.localpart))
+            self.get_success(self.store.get_profile_displayname(self.frank))
         )
 
     def test_set_my_name_if_disabled(self) -> None:
@@ -122,11 +113,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.set_profile_displayname(self.frank, "Frank"))
 
         self.assertEqual(
-            (
-                self.get_success(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_displayname(self.frank))),
             "Frank",
         )
 
@@ -147,9 +134,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_get_other_name(self) -> None:
-        self.mock_federation.make_query.return_value = make_awaitable(
-            {"displayname": "Alice"}
-        )
+        self.mock_federation.make_query.return_value = {"displayname": "Alice"}
 
         displayname = self.get_success(self.handler.get_displayname(self.alice))
 
@@ -191,6 +176,16 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual("http://my.server/me.png", avatar_url)
 
+    def test_get_profile_empty_displayname(self) -> None:
+        self.get_success(self.store.set_profile_displayname(self.frank, None))
+        self.get_success(
+            self.store.set_profile_avatar_url(self.frank, "http://my.server/me.png")
+        )
+
+        profile = self.get_success(self.handler.get_profile(self.frank.to_string()))
+
+        self.assertEqual("http://my.server/me.png", profile["avatar_url"])
+
     def test_set_my_avatar(self) -> None:
         self.get_success(
             self.handler.set_avatar_url(
@@ -201,7 +196,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/pic.gif",
         )
 
@@ -215,7 +210,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/me.png",
         )
 
@@ -229,7 +224,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertIsNone(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
         )
 
     def test_set_my_avatar_if_disabled(self) -> None:
@@ -241,7 +236,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank))),
             "http://my.server/me.png",
         )
 

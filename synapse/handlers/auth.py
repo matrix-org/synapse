@@ -218,19 +218,17 @@ class AuthHandler:
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         # The number of seconds to keep a UI auth session active.
         self._ui_auth_session_timeout = hs.config.auth.ui_auth_session_timeout
 
-        # Ratelimitier for failed /login attempts
+        # Ratelimiter for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_failed_attempts,
         )
 
         self._clock = self.hs.get_clock()
@@ -273,6 +271,8 @@ class AuthHandler:
         # A mapping of user ID to extra attributes to include in the login
         # response.
         self._extra_attributes: Dict[str, SsoLoginExtraAttributes] = {}
+
+        self.msc3861_oauth_delegation_enabled = hs.config.experimental.msc3861.enabled
 
     async def validate_user_via_ui_auth(
         self,
@@ -322,8 +322,12 @@ class AuthHandler:
 
             LimitExceededError if the ratelimiter's failed request count for this
                 user is too high to proceed
-
         """
+        if self.msc3861_oauth_delegation_enabled:
+            raise SynapseError(
+                HTTPStatus.INTERNAL_SERVER_ERROR, "UIA shouldn't be used with MSC3861"
+            )
+
         if not requester.access_token_id:
             raise ValueError("Cannot validate a user without an access token")
         if can_skip_ui_auth and self._ui_auth_session_timeout:
@@ -1753,7 +1757,7 @@ class AuthHandler:
             return
 
         user_profile_data = await self.store.get_profileinfo(
-            UserID.from_string(registered_user_id).localpart
+            UserID.from_string(registered_user_id)
         )
 
         # Store any extra attributes which will be passed in the login response.

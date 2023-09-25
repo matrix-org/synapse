@@ -48,7 +48,6 @@ from synapse.rest.client import (
     rendezvous,
     report_event,
     room,
-    room_batch,
     room_keys,
     room_upgrade_rest_servlet,
     sendtodevice,
@@ -124,7 +123,7 @@ class ClientRestResource(JsonResource):
         if is_main_process:
             report_event.register_servlets(hs, client_resource)
             openid.register_servlets(hs, client_resource)
-            notifications.register_servlets(hs, client_resource)
+        notifications.register_servlets(hs, client_resource)
         devices.register_servlets(hs, client_resource)
         if is_main_process:
             thirdparty.register_servlets(hs, client_resource)
@@ -132,7 +131,6 @@ class ClientRestResource(JsonResource):
         user_directory.register_servlets(hs, client_resource)
         if is_main_process:
             room_upgrade_rest_servlet.register_servlets(hs, client_resource)
-        room_batch.register_servlets(hs, client_resource)
         capabilities.register_servlets(hs, client_resource)
         if is_main_process:
             account_validity.register_servlets(hs, client_resource)

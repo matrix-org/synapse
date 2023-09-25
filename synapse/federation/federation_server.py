@@ -63,6 +63,7 @@ from synapse.federation.federation_base import (
 )
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -137,6 +138,7 @@ class FederationServer(FederationBase):
         self._event_auth_handler = hs.get_event_auth_handler()
         self._room_member_handler = hs.get_room_member_handler()
         self._e2e_keys_handler = hs.get_e2e_keys_handler()
+        self._worker_lock_handler = hs.get_worker_locks_handler()
 
         self._state_storage_controller = hs.get_storage_controllers().state
 
@@ -515,7 +517,7 @@ class FederationServer(FederationBase):
                     logger.error(
                         "Failed to handle PDU %s",
                         event_id,
-                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                        exc_info=(f.type, f.value, f.getTracebackObject()),
                     )
                     return {"error": str(e)}
 
@@ -806,7 +808,7 @@ class FederationServer(FederationBase):
             raise IncompatibleRoomVersionError(room_version=room_version.identifier)
 
         # Check that this room supports knocking as defined by its room version
-        if not room_version.msc2403_knocking:
+        if not room_version.knock_join_rule:
             raise SynapseError(
                 403,
                 "This room version does not support knocking",
@@ -909,7 +911,7 @@ class FederationServer(FederationBase):
                 errcode=Codes.NOT_FOUND,
             )
 
-        if membership_type == Membership.KNOCK and not room_version.msc2403_knocking:
+        if membership_type == Membership.KNOCK and not room_version.knock_join_rule:
             raise SynapseError(
                 403,
                 "This room version does not support knocking",
@@ -933,7 +935,7 @@ class FederationServer(FederationBase):
         # the event is valid to be sent into the room. Currently this is only done
         # if the user is being joined via restricted join rules.
         if (
-            room_version.msc3083_join_rules
+            room_version.restricted_join_rule
             and event.membership == Membership.JOIN
             and EventContentFields.AUTHORISING_USER in event.content
         ):
@@ -944,7 +946,7 @@ class FederationServer(FederationBase):
             if not self._is_mine_server_name(authorising_server):
                 raise SynapseError(
                     400,
-                    f"Cannot authorise request from resident server: {authorising_server}",
+                    f"Cannot authorise membership event for {authorising_server}. We can only authorise requests from our own homeserver",
                 )
 
             event.signatures.update(
@@ -1016,7 +1018,9 @@ class FederationServer(FederationBase):
             for user_id, device_keys in result.items():
                 for device_id, keys in device_keys.items():
                     for key_id, key in keys.items():
-                        json_result.setdefault(user_id, {})[device_id] = {key_id: key}
+                        json_result.setdefault(user_id, {}).setdefault(device_id, {})[
+                            key_id
+                        ] = key
 
         logger.info(
             "Claimed one-time-keys: %s",
@@ -1234,9 +1238,18 @@ class FederationServer(FederationBase):
                 logger.info("handling received PDU in room %s: %s", room_id, event)
                 try:
                     with nested_logging_context(event.event_id):
-                        await self._federation_event_handler.on_receive_pdu(
-                            origin, event
-                        )
+                        # We're taking out a lock within a lock, which could
+                        # lead to deadlocks if we're not careful. However, it is
+                        # safe on this occasion as we only ever take a write
+                        # lock when deleting a room, which we would never do
+                        # while holding the `_INBOUND_EVENT_HANDLING_LOCK_NAME`
+                        # lock.
+                        async with self._worker_lock_handler.acquire_read_write_lock(
+                            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
+                        ):
+                            await self._federation_event_handler.on_receive_pdu(
+                                origin, event
+                            )
                 except FederationError as e:
                     # XXX: Ideally we'd inform the remote we failed to process
                     # the event, but we can't return an error in the transaction
@@ -1247,7 +1260,7 @@ class FederationServer(FederationBase):
                     logger.error(
                         "Failed to handle PDU %s",
                         event.event_id,
-                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                        exc_info=(f.type, f.value, f.getTracebackObject()),
                     )
 
                 received_ts = await self.store.remove_received_event_from_staging(
@@ -1290,9 +1303,6 @@ class FederationServer(FederationBase):
             if not new_lock:
                 return
             lock = new_lock
-
-    def __str__(self) -> str:
-        return "<ReplicationLayer(%s)>" % self.server_name
 
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: Dict

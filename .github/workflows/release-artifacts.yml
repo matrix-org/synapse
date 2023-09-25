@@ -27,13 +27,14 @@ jobs:
     name: "Calculate list of debian distros"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
       - id: set-distros
         run: |
           # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
+          # NOTE: inside the actual Dockerfile-dhvirtualenv, the image name is expanded into its full image path
           dists='["debian:sid"]'
           if [[ $GITHUB_REF == refs/tags/* ]]; then
               dists=$(scripts-dev/build_debian_packages.py --show-dists-json)
@@ -54,13 +55,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: src
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           install: true
 
@@ -120,7 +121,7 @@ jobs:
             arch: aarch64
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v4
         with:
@@ -133,7 +134,7 @@ jobs:
 
       - name: Set up QEMU to emulate aarch64
         if: matrix.arch == 'aarch64'
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
 
@@ -143,7 +144,7 @@ jobs:
 
       - name: Only build a single wheel on PR
         if: startsWith(github.ref, 'refs/pull/')
-        run: echo "CIBW_BUILD="cp37-manylinux_${{ matrix.arch }}"" >> $GITHUB_ENV
+        run: echo "CIBW_BUILD="cp38-manylinux_${{ matrix.arch }}"" >> $GITHUB_ENV
 
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
@@ -166,7 +167,7 @@ jobs:
     if: ${{ !startsWith(github.ref, 'refs/pull/') }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'

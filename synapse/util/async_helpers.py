@@ -19,15 +19,18 @@ import collections
 import inspect
 import itertools
 import logging
+import typing
 from contextlib import asynccontextmanager
 from typing import (
     Any,
+    AsyncContextManager,
     AsyncIterator,
     Awaitable,
     Callable,
     Collection,
     Coroutine,
     Dict,
+    Generator,
     Generic,
     Hashable,
     Iterable,
@@ -42,7 +45,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import AsyncContextManager, Concatenate, Literal, ParamSpec
+from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
@@ -138,7 +141,7 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
             for observer in observers:
                 # This is a little bit of magic to correctly propagate stack
                 # traces when we `await` on one of the observer deferreds.
-                f.value.__failure__ = f  # type: ignore[union-attr]
+                f.value.__failure__ = f
                 try:
                     observer.errback(f)
                 except Exception as e:
@@ -397,7 +400,7 @@ class _LinearizerEntry:
     # The number of things executing.
     count: int
     # Deferreds for the things blocked from executing.
-    deferreds: collections.OrderedDict
+    deferreds: typing.OrderedDict["defer.Deferred[None]", Literal[1]]
 
 
 class Linearizer:
@@ -716,30 +719,25 @@ def timeout_deferred(
     return new_d
 
 
-# This class can't be generic because it uses slots with attrs.
-# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class DoneAwaitable:  # should be: Generic[R]
+class DoneAwaitable(Awaitable[R]):
     """Simple awaitable that returns the provided value."""
 
-    value: Any  # should be: R
+    value: R
 
-    def __await__(self) -> Any:
-        return self
-
-    def __iter__(self) -> "DoneAwaitable":
-        return self
-
-    def __next__(self) -> None:
-        raise StopIteration(self.value)
+    def __await__(self) -> Generator[Any, None, R]:
+        yield None
+        return self.value
 
 
 def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
     """Convert a value to an awaitable if not already an awaitable."""
     if inspect.isawaitable(value):
-        assert isinstance(value, Awaitable)
         return value
 
+    # For some reason mypy doesn't deduce that value is not Awaitable here, even though
+    # inspect.isawaitable returns a TypeGuard.
+    assert not isinstance(value, Awaitable)
     return DoneAwaitable(value)
 
 

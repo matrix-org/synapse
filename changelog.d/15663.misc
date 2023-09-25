@@ -1,1 +1,0 @@
-Add requesting user id parameter to key claim methods in `TransportLayerClient`.

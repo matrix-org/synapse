@@ -31,6 +31,7 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
@@ -90,7 +91,6 @@ from synapse.handlers.room import (
     RoomShutdownHandler,
     TimestampLookupHandler,
 )
-from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import (
     RoomForgetterHandler,
@@ -107,6 +107,7 @@ from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
+from synapse.handlers.worker_lock import WorkerLocksHandler
 from synapse.http.client import (
     InsecureInterceptableContextFactory,
     ReplicationClient,
@@ -141,6 +142,7 @@ from synapse.util.distributor import Distributor
 from synapse.util.macaroons import MacaroonGenerator
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
+from synapse.util.task_scheduler import TaskScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -359,6 +361,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
             getattr(self, "get_" + i + "_handler")()
+        self.get_task_scheduler()
 
     def get_reactor(self) -> ISynapseReactor:
         """
@@ -405,8 +408,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Ratelimiter(
             store=self.get_datastores().main,
             clock=self.get_clock(),
-            rate_hz=self.config.ratelimiting.rc_registration.per_second,
-            burst_count=self.config.ratelimiting.rc_registration.burst_count,
+            cfg=self.config.ratelimiting.rc_registration,
         )
 
     @cache_in_self
@@ -427,7 +429,11 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_auth(self) -> Auth:
-        return Auth(self)
+        if self.config.experimental.msc3861.enabled:
+            from synapse.api.auth.msc3861_delegated import MSC3861DelegatedAuth
+
+            return MSC3861DelegatedAuth(self)
+        return InternalAuth(self)
 
     @cache_in_self
     def get_auth_blocking(self) -> AuthBlocking:
@@ -486,10 +492,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
         return RoomCreationHandler(self)
-
-    @cache_in_self
-    def get_room_batch_handler(self) -> RoomBatchHandler:
-        return RoomBatchHandler(self)
 
     @cache_in_self
     def get_room_shutdown_handler(self) -> RoomShutdownHandler:
@@ -784,9 +786,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer(
-            msc3970_enabled=self.config.experimental.msc3970_enabled
-        )
+        return EventClientSerializer()
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -912,3 +912,11 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_common_usage_metrics_manager(self) -> CommonUsageMetricsManager:
         """Usage metrics shared between phone home stats and the prometheus exporter."""
         return CommonUsageMetricsManager(self)
+
+    @cache_in_self
+    def get_worker_locks_handler(self) -> WorkerLocksHandler:
+        return WorkerLocksHandler(self)
+
+    @cache_in_self
+    def get_task_scheduler(self) -> TaskScheduler:
+        return TaskScheduler(self)

@@ -28,6 +28,7 @@ from synapse.http.servlet import (
     parse_integer,
     parse_json_object_from_request,
     parse_string,
+    parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
@@ -38,7 +39,7 @@ from synapse.rest.admin._base import (
 from synapse.rest.client._base import client_patterns
 from synapse.storage.databases.main.registration import ExternalIDReuseException
 from synapse.storage.databases.main.stats import UserSortOrder
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -64,6 +65,10 @@ class UsersRestServletV2(RestServlet):
     The parameter `guests` can be used to exclude guest users.
     The parameter `deactivated` can be used to include deactivated users.
     The parameter `order_by` can be used to order the result.
+    The parameter `not_user_type` can be used to exclude certain user types.
+    The parameter `locked` can be used to include locked users.
+    Possible values are `bot`, `support` or "empty string".
+    "empty string" here means to exclude users without a type.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -71,6 +76,7 @@ class UsersRestServletV2(RestServlet):
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
         self._msc3866_enabled = hs.config.experimental.msc3866.enabled
+        self._msc3861_enabled = hs.config.experimental.msc3861.enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
@@ -94,8 +100,18 @@ class UsersRestServletV2(RestServlet):
 
         user_id = parse_string(request, "user_id")
         name = parse_string(request, "name")
+
         guests = parse_boolean(request, "guests", default=True)
+        if self._msc3861_enabled and guests:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "The guests parameter is not supported when MSC3861 is enabled.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
         deactivated = parse_boolean(request, "deactivated", default=False)
+        locked = parse_boolean(request, "locked", default=False)
+        admins = parse_boolean(request, "admins")
 
         # If support for MSC3866 is not enabled, apply no filtering based on the
         # `approved` column.
@@ -118,10 +134,16 @@ class UsersRestServletV2(RestServlet):
                 UserSortOrder.AVATAR_URL.value,
                 UserSortOrder.SHADOW_BANNED.value,
                 UserSortOrder.CREATION_TS.value,
+                UserSortOrder.LAST_SEEN_TS.value,
+                UserSortOrder.LOCKED.value,
             ),
         )
 
         direction = parse_enum(request, "dir", Direction, default=Direction.FORWARDS)
+
+        # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+        not_user_types = parse_strings_from_args(args, "not_user_type")
 
         users, total = await self.store.get_users_paginate(
             start,
@@ -130,9 +152,12 @@ class UsersRestServletV2(RestServlet):
             name,
             guests,
             deactivated,
+            admins,
             order_by,
             direction,
             approved,
+            not_user_types,
+            locked,
         )
 
         # If support for MSC3866 is not enabled, don't show the approval flag.
@@ -190,7 +215,7 @@ class UserRestServletV2(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
@@ -205,7 +230,7 @@ class UserRestServletV2(RestServlet):
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester)
 
@@ -261,6 +286,17 @@ class UserRestServletV2(RestServlet):
         if not isinstance(deactivate, bool):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "'deactivated' parameter is not of type boolean"
+            )
+
+        lock = body.get("locked", False)
+        if not isinstance(lock, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "'locked' parameter is not of type boolean"
+            )
+
+        if deactivate and lock:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "An user can't be deactivated and locked"
             )
 
         approved: Optional[bool] = None
@@ -379,6 +415,12 @@ class UserRestServletV2(RestServlet):
                     await self.deactivate_account_handler.activate_account(
                         target_user.to_string()
                     )
+
+            if "locked" in body:
+                if lock and not user["locked"]:
+                    await self.store.set_user_locked_status(user_id, True)
+                elif not lock and user["locked"]:
+                    await self.store.set_user_locked_status(user_id, False)
 
             if "user_type" in body:
                 await self.store.set_user_type(target_user, user_type)
@@ -620,7 +662,7 @@ class WhoisRestServlet(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         target_user = UserID.from_string(user_id)
         requester = await self.auth.get_user_by_req(request)
 
@@ -1135,14 +1177,17 @@ class RateLimitRestServlet(RestServlet):
         messages_per_second = body.get("messages_per_second", 0)
         burst_count = body.get("burst_count", 0)
 
-        if type(messages_per_second) is not int or messages_per_second < 0:
+        if (
+            type(messages_per_second) is not int  # noqa: E721
+            or messages_per_second < 0
+        ):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (messages_per_second,),
                 errcode=Codes.INVALID_PARAM,
             )
 
-        if type(burst_count) is not int or burst_count < 0:
+        if type(burst_count) is not int or burst_count < 0:  # noqa: E721
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "%r parameter must be a positive int" % (burst_count,),

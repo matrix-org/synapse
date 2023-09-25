@@ -16,7 +16,7 @@
 import logging
 import random
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 import attr
 
@@ -192,8 +192,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             )
 
     @cached()
-    async def get_user_by_id(self, user_id: str) -> Optional[Mapping[str, Any]]:
-        """Deprecated: use get_userinfo_by_id instead"""
+    async def get_user_by_id(self, user_id: str) -> Optional[UserInfo]:
+        """Returns info about the user account, if it exists."""
 
         def get_user_by_id_txn(txn: LoggingTransaction) -> Optional[Dict[str, Any]]:
             # We could technically use simple_select_one here, but it would not perform
@@ -202,10 +202,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             txn.execute(
                 """
                 SELECT
-                    name, password_hash, is_guest, admin, consent_version, consent_ts,
+                    name, is_guest, admin, consent_version, consent_ts,
                     consent_server_notice_sent, appservice_id, creation_ts, user_type,
                     deactivated, COALESCE(shadow_banned, FALSE) AS shadow_banned,
-                    COALESCE(approved, TRUE) AS approved
+                    COALESCE(approved, TRUE) AS approved,
+                    COALESCE(locked, FALSE) AS locked
                 FROM users
                 WHERE name = ?
                 """,
@@ -223,45 +224,23 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="get_user_by_id",
             func=get_user_by_id_txn,
         )
-
-        if row is not None:
-            # If we're using SQLite our boolean values will be integers. Because we
-            # present some of this data as is to e.g. server admins via REST APIs, we
-            # want to make sure we're returning the right type of data.
-            # Note: when adding a column name to this list, be wary of NULLable columns,
-            # since NULL values will be turned into False.
-            boolean_columns = ["admin", "deactivated", "shadow_banned", "approved"]
-            for column in boolean_columns:
-                if not isinstance(row[column], bool):
-                    row[column] = bool(row[column])
-
-        return row
-
-    async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
-        """Get a UserInfo object for a user by user ID.
-
-        Note! Currently uses the cache of `get_user_by_id`. Once that deprecated method is removed,
-        this method should be cached.
-
-        Args:
-             user_id: The user to fetch user info for.
-        Returns:
-            `UserInfo` object if user found, otherwise `None`.
-        """
-        user_data = await self.get_user_by_id(user_id)
-        if not user_data:
+        if row is None:
             return None
+
         return UserInfo(
-            appservice_id=user_data["appservice_id"],
-            consent_server_notice_sent=user_data["consent_server_notice_sent"],
-            consent_version=user_data["consent_version"],
-            creation_ts=user_data["creation_ts"],
-            is_admin=bool(user_data["admin"]),
-            is_deactivated=bool(user_data["deactivated"]),
-            is_guest=bool(user_data["is_guest"]),
-            is_shadow_banned=bool(user_data["shadow_banned"]),
-            user_id=UserID.from_string(user_data["name"]),
-            user_type=user_data["user_type"],
+            appservice_id=row["appservice_id"],
+            consent_server_notice_sent=row["consent_server_notice_sent"],
+            consent_version=row["consent_version"],
+            consent_ts=row["consent_ts"],
+            creation_ts=row["creation_ts"],
+            is_admin=bool(row["admin"]),
+            is_deactivated=bool(row["deactivated"]),
+            is_guest=bool(row["is_guest"]),
+            is_shadow_banned=bool(row["shadow_banned"]),
+            user_id=UserID.from_string(row["name"]),
+            user_type=row["user_type"],
+            approved=bool(row["approved"]),
+            locked=bool(row["locked"]),
         )
 
     async def is_trial_user(self, user_id: str) -> bool:
@@ -279,10 +258,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         now = self._clock.time_msec()
         days = self.config.server.mau_appservice_trial_days.get(
-            info["appservice_id"], self.config.server.mau_trial_days
+            info.appservice_id, self.config.server.mau_trial_days
         )
         trial_duration_ms = days * 24 * 60 * 60 * 1000
-        is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
+        is_trial = (now - info.creation_ts * 1000) < trial_duration_ms
         return is_trial
 
     @cached()
@@ -454,9 +433,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         ) -> List[Tuple[str, int]]:
             sql = (
                 "SELECT user_id, expiration_ts_ms FROM account_validity"
-                " WHERE email_sent = ? AND (expiration_ts_ms - ?) <= ?"
+                " WHERE email_sent = FALSE AND (expiration_ts_ms - ?) <= ?"
             )
-            values = [False, now_ms, renew_at]
+            values = [now_ms, renew_at]
             txn.execute(sql, values)
             return cast(List[Tuple[str, int]], txn.fetchall())
 
@@ -1115,6 +1094,27 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         # Convert the integer into a boolean.
         return res == 1
+
+    @cached()
+    async def get_user_locked_status(self, user_id: str) -> bool:
+        """Retrieve the value for the `locked` property for the provided user.
+
+        Args:
+            user_id: The ID of the user to retrieve the status for.
+
+        Returns:
+            True if the user was locked, false if the user is still active.
+        """
+
+        res = await self.db_pool.simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="locked",
+            desc="get_user_locked_status",
+        )
+
+        # Convert the potential integer into a boolean.
+        return bool(res)
 
     async def get_threepid_validation_session(
         self,
@@ -2111,6 +2111,33 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
+    async def set_user_locked_status(self, user_id: str, locked: bool) -> None:
+        """Set the `locked` property for the provided user to the provided value.
+
+        Args:
+            user_id: The ID of the user to set the status for.
+            locked: The value to set for `locked`.
+        """
+
+        await self.db_pool.runInteraction(
+            "set_user_locked_status",
+            self.set_user_locked_status_txn,
+            user_id,
+            locked,
+        )
+
+    def set_user_locked_status_txn(
+        self, txn: LoggingTransaction, user_id: str, locked: bool
+    ) -> None:
+        self.db_pool.simple_update_one_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            updatevalues={"locked": locked},
+        )
+        self._invalidate_cache_and_stream(txn, self.get_user_locked_status, (user_id,))
+        self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+
     def update_user_approval_status_txn(
         self, txn: LoggingTransaction, user_id: str, approved: bool
     ) -> None:
@@ -2252,6 +2279,26 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         )
 
         return next_id
+
+    async def set_device_for_refresh_token(
+        self, user_id: str, old_device_id: str, device_id: str
+    ) -> None:
+        """Moves refresh tokens from old device to current device
+
+        Args:
+            user_id: The user of the devices.
+            old_device_id: The old device.
+            device_id: The new device ID.
+        Returns:
+            None
+        """
+
+        await self.db_pool.simple_update(
+            "refresh_tokens",
+            keyvalues={"user_id": user_id, "device_id": old_device_id},
+            updatevalues={"device_id": device_id},
+            desc="set_device_for_refresh_token",
+        )
 
     def _set_device_for_access_token_txn(
         self, txn: LoggingTransaction, token: str, device_id: str

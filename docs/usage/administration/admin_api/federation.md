@@ -77,7 +77,7 @@ The following fields are returned in the JSON response body:
     remote server, in ms. This is `0` if the last attempt to communicate with the
     remote server was successful.
   - `retry_interval` - integer - How long since the last time Synapse tried to reach
-    the remote server before trying again, in ms. This is `0` if no further retrying occuring.
+    the remote server before trying again, in ms. This is `0` if no further retrying occurring.
   - `failure_ts` - nullable integer - The first time Synapse tried and failed to reach the
     remote server, in ms. This is `null` if communication with the remote server has never failed.
   - `last_successful_stream_ordering` - nullable integer - The stream ordering of the most

@@ -104,7 +104,7 @@ class _NotifierUserStream:
     def __init__(
         self,
         user_id: str,
-        rooms: Collection[str],
+        rooms: StrCollection,
         current_token: StreamToken,
         time_now_ms: int,
     ):
@@ -233,6 +233,9 @@ class Notifier:
         self._federation_client = hs.get_federation_http_client()
 
         self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
+
+        # List of callbacks to be notified when a lock is released
+        self._lock_released_callback: List[Callable[[str, str, str], None]] = []
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
@@ -454,7 +457,7 @@ class Notifier:
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
         users: Optional[Collection[Union[str, UserID]]] = None,
-        rooms: Optional[Collection[str]] = None,
+        rooms: Optional[StrCollection] = None,
     ) -> None:
         """Used to inform listeners that something has happened event wise.
 
@@ -526,7 +529,7 @@ class Notifier:
         user_id: str,
         timeout: int,
         callback: Callable[[StreamToken, StreamToken], Awaitable[T]],
-        room_ids: Optional[Collection[str]] = None,
+        room_ids: Optional[StrCollection] = None,
         from_token: StreamToken = StreamToken.START,
     ) -> T:
         """Wait until the callback returns a non empty response or the
@@ -784,6 +787,19 @@ class Notifier:
         # Tell the federation client about the fact the server is back up, so
         # that any in flight requests can be immediately retried.
         self._federation_client.wake_destination(server)
+
+    def add_lock_released_callback(
+        self, callback: Callable[[str, str, str], None]
+    ) -> None:
+        """Add a function to be called whenever we are notified about a released lock."""
+        self._lock_released_callback.append(callback)
+
+    def notify_lock_released(
+        self, instance_name: str, lock_name: str, lock_key: str
+    ) -> None:
+        """Notify the callbacks that a lock has been released."""
+        for cb in self._lock_released_callback:
+            cb(instance_name, lock_name, lock_key)
 
 
 @attr.s(auto_attribs=True)

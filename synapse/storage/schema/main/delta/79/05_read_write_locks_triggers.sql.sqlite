@@ -1,0 +1,65 @@
+/* Copyright 2023 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- Fix up the triggers that were in `78/04_read_write_locks_triggers.sql`
+
+-- Add a trigger to UPSERT into `worker_read_write_locks_mode` whenever we try
+-- and acquire a lock, i.e. insert into `worker_read_write_locks`,
+DROP TRIGGER IF EXISTS upsert_read_write_lock_parent_trigger;
+CREATE TRIGGER IF NOT EXISTS upsert_read_write_lock_parent_trigger
+BEFORE INSERT ON worker_read_write_locks
+FOR EACH ROW
+BEGIN
+    -- First ensure that `worker_read_write_locks_mode` doesn't have stale
+    -- entries in it, as on SQLite we don't have the foreign key constraint to
+    -- enforce this.
+    DELETE FROM worker_read_write_locks_mode
+        WHERE lock_name = NEW.lock_name AND lock_key = NEW.lock_key
+        AND NOT EXISTS (
+            SELECT 1 FROM worker_read_write_locks
+            WHERE lock_name = NEW.lock_name AND lock_key = NEW.lock_key
+        );
+
+    INSERT INTO worker_read_write_locks_mode (lock_name, lock_key, write_lock, token)
+        VALUES (NEW.lock_name, NEW.lock_key, NEW.write_lock, NEW.token)
+        ON CONFLICT (lock_name, lock_key)
+        DO UPDATE SET write_lock = NEW.write_lock, token = NEW.token;
+END;
+
+-- Ensure that we keep `worker_read_write_locks_mode` up to date whenever a lock
+-- is released (i.e. a row deleted from `worker_read_write_locks`). Either we
+-- update the `worker_read_write_locks_mode.token` to match another instance
+-- that has currently acquired the lock, or we delete the row if nobody has
+-- currently acquired a lock.
+DROP TRIGGER IF EXISTS delete_read_write_lock_parent_trigger;
+CREATE TRIGGER IF NOT EXISTS delete_read_write_lock_parent_trigger
+AFTER DELETE ON worker_read_write_locks
+FOR EACH ROW
+BEGIN
+    DELETE FROM worker_read_write_locks_mode
+        WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key
+            AND token = OLD.token
+        AND NOT EXISTS (
+            SELECT 1 FROM worker_read_write_locks
+            WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key
+        );
+
+    UPDATE worker_read_write_locks_mode
+        SET token = (
+            SELECT token FROM worker_read_write_locks
+            WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key
+        )
+        WHERE lock_name = OLD.lock_name AND lock_key = OLD.lock_key;
+END;

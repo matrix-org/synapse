@@ -24,7 +24,7 @@ from tests.unittest import override_config
 try:
     import lxml
 except ImportError:
-    lxml = None
+    lxml = None  # type: ignore[assignment]
 
 
 class URLPreviewTests(unittest.HomeserverTestCase):

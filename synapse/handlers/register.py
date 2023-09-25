@@ -143,15 +143,10 @@ class RegistrationHandler:
         assigned_user_id: Optional[str] = None,
         inhibit_user_in_use_error: bool = False,
     ) -> None:
-        if types.contains_invalid_mxid_characters(
-            localpart, self.hs.config.experimental.msc4009_e164_mxids
-        ):
-            extra_chars = (
-                "=_-./+" if self.hs.config.experimental.msc4009_e164_mxids else "=_-./"
-            )
+        if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                f"User ID can only contain characters a-z, 0-9, or '{extra_chars}'",
+                "User ID can only contain characters a-z, 0-9, or '=_-./+'",
                 Codes.INVALID_USERNAME,
             )
 
@@ -315,7 +310,7 @@ class RegistrationHandler:
                 approved=approved,
             )
 
-            profile = await self.store.get_profileinfo(localpart)
+            profile = await self.store.get_profileinfo(user)
             await self.user_directory_handler.handle_local_profile_change(
                 user_id, profile
             )

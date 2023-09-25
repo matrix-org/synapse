@@ -14,7 +14,7 @@
 
 from http import HTTPStatus
 from typing import Any, Generator, Tuple, cast
-from unittest.mock import Mock, call
+from unittest.mock import AsyncMock, Mock, call
 
 from twisted.internet import defer, reactor as _reactor
 
@@ -24,7 +24,6 @@ from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 from tests.utils import MockClock
 
 reactor = cast(ISynapseReactor, _reactor)
@@ -53,7 +52,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
     def test_executes_given_function(
         self,
     ) -> Generator["defer.Deferred[Any]", object, None]:
-        cb = Mock(return_value=make_awaitable(self.mock_http_response))
+        cb = AsyncMock(return_value=self.mock_http_response)
         res = yield self.cache.fetch_or_execute_request(
             self.mock_request, self.mock_requester, cb, "some_arg", keyword="arg"
         )
@@ -64,7 +63,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
     def test_deduplicates_based_on_key(
         self,
     ) -> Generator["defer.Deferred[Any]", object, None]:
-        cb = Mock(return_value=make_awaitable(self.mock_http_response))
+        cb = AsyncMock(return_value=self.mock_http_response)
         for i in range(3):  # invoke multiple times
             res = yield self.cache.fetch_or_execute_request(
                 self.mock_request,
@@ -168,7 +167,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_cleans_up(self) -> Generator["defer.Deferred[Any]", object, None]:
-        cb = Mock(return_value=make_awaitable(self.mock_http_response))
+        cb = AsyncMock(return_value=self.mock_http_response)
         yield self.cache.fetch_or_execute_request(
             self.mock_request, self.mock_requester, cb, "an arg"
         )

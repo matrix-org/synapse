@@ -30,9 +30,10 @@ class SynapsePlugin(Plugin):
         self, fullname: str
     ) -> Optional[Callable[[MethodSigContext], CallableType]]:
         if fullname.startswith(
-            "synapse.util.caches.descriptors.CachedFunction.__call__"
-        ) or fullname.startswith(
-            "synapse.util.caches.descriptors._LruCachedFunction.__call__"
+            (
+                "synapse.util.caches.descriptors.CachedFunction.__call__",
+                "synapse.util.caches.descriptors._LruCachedFunction.__call__",
+            )
         ):
             return cached_function_method_signature
         return None

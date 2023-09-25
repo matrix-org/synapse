@@ -1,0 +1,72 @@
+/* Copyright 2023 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+-- c.f. the postgres version for context. The tables and constraints are the
+-- same, however they need to be defined slightly differently to work around how
+-- each database handles circular foreign key references.
+
+
+
+-- A table to track whether a lock is currently acquired, and if so whether its
+-- in read or write mode.
+CREATE TABLE IF NOT EXISTS worker_read_write_locks_mode (
+    lock_name TEXT NOT NULL,
+    lock_key TEXT NOT NULL,
+    -- Whether this lock is in read (false) or write (true) mode
+    write_lock BOOLEAN NOT NULL,
+    -- A token that has currently acquired the lock. We need this so that we can
+    -- add a foreign constraint from this table to `worker_read_write_locks`.
+    token TEXT NOT NULL,
+    -- Add a foreign key constraint to ensure that if a lock is in
+    -- `worker_read_write_locks_mode` then there must be a corresponding row in
+    -- `worker_read_write_locks` (i.e. we don't accidentally end up with a row in
+    -- `worker_read_write_locks_mode` when the lock is not currently acquired).
+    FOREIGN KEY (lock_name, lock_key, token) REFERENCES worker_read_write_locks(lock_name, lock_key, token) DEFERRABLE INITIALLY DEFERRED
+);
+
+-- Ensure that we can only have one row per lock
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_mode_key ON worker_read_write_locks_mode (lock_name, lock_key);
+-- We need this (redundant) constraint so that we can have a foreign key
+-- constraint against this table.
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_mode_type ON worker_read_write_locks_mode (lock_name, lock_key, write_lock);
+
+
+-- A table to track who has currently acquired a given lock.
+CREATE TABLE IF NOT EXISTS worker_read_write_locks (
+    lock_name TEXT NOT NULL,
+    lock_key TEXT NOT NULL,
+    -- We write the instance name to ease manual debugging, we don't ever read
+    -- from it.
+    -- Note: instance names aren't guarenteed to be unique.
+    instance_name TEXT NOT NULL,
+    -- Whether the process has taken out a "read" or a "write" lock.
+    write_lock BOOLEAN NOT NULL,
+    -- A random string generated each time an instance takes out a lock. Used by
+    -- the instance to tell whether the lock is still held by it (e.g. in the
+    -- case where the process stalls for a long time the lock may time out and
+    -- be taken out by another instance, at which point the original instance
+    -- can tell it no longer holds the lock as the tokens no longer match).
+    token TEXT NOT NULL,
+    last_renewed_ts BIGINT NOT NULL,
+
+    -- This constraint ensures that a given lock has only been acquired in read
+    -- xor write mode, but not both.
+    FOREIGN KEY (lock_name, lock_key, write_lock) REFERENCES worker_read_write_locks_mode (lock_name, lock_key, write_lock)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_key ON worker_read_write_locks (lock_name, lock_key, token);
+-- Ensures that only one instance can acquire a lock in write mode at a time.
+CREATE UNIQUE INDEX IF NOT EXISTS worker_read_write_locks_write ON worker_read_write_locks (lock_name, lock_key) WHERE write_lock;

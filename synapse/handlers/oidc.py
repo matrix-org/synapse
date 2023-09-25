@@ -1354,7 +1354,7 @@ class OidcProvider:
         finish_request(request)
 
 
-class LogoutToken(JWTClaims):
+class LogoutToken(JWTClaims):  # type: ignore[misc]
     """
     Holds and verify claims of a logout token, as per
     https://openid.net/specs/openid-connect-backchannel-1_0.html#LogoutToken

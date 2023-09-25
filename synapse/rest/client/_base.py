@@ -20,14 +20,14 @@ from typing import Any, Awaitable, Callable, Iterable, Pattern, Tuple, TypeVar, 
 
 from synapse.api.errors import InteractiveAuthIncompleteError
 from synapse.api.urls import CLIENT_API_PREFIX
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrCollection
 
 logger = logging.getLogger(__name__)
 
 
 def client_patterns(
     path_regex: str,
-    releases: Iterable[str] = ("r0", "v3"),
+    releases: StrCollection = ("r0", "v3"),
     unstable: bool = True,
     v1: bool = False,
 ) -> Iterable[Pattern]:

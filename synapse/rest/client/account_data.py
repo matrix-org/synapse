@@ -20,7 +20,7 @@ from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, RoomID
+from synapse.types import JsonDict, JsonMapping, RoomID
 
 from ._base import client_patterns
 
@@ -95,7 +95,7 @@ class AccountDataServlet(RestServlet):
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str, account_data_type: str
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
@@ -106,7 +106,7 @@ class AccountDataServlet(RestServlet):
             and account_data_type == AccountDataTypes.PUSH_RULES
         ):
             account_data: Optional[
-                JsonDict
+                JsonMapping
             ] = await self._push_rules_handler.push_rules_for_user(requester.user)
         else:
             account_data = await self.store.get_global_account_data_by_type_for_user(
@@ -236,7 +236,7 @@ class RoomAccountDataServlet(RestServlet):
         user_id: str,
         room_id: str,
         account_data_type: str,
-    ) -> Tuple[int, JsonDict]:
+    ) -> Tuple[int, JsonMapping]:
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
@@ -253,7 +253,7 @@ class RoomAccountDataServlet(RestServlet):
             self._hs.config.experimental.msc4010_push_rules_account_data
             and account_data_type == AccountDataTypes.PUSH_RULES
         ):
-            account_data: Optional[JsonDict] = {}
+            account_data: Optional[JsonMapping] = {}
         else:
             account_data = await self.store.get_account_data_for_room_and_type(
                 user_id, room_id, account_data_type

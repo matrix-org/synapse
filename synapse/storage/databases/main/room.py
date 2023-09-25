@@ -936,11 +936,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             JOIN event_json USING (room_id, event_id)
             WHERE room_id = ?
                 %(where_clause)s
-                AND contains_url = ? AND outlier = ?
+                AND contains_url = TRUE AND outlier = FALSE
             ORDER BY stream_ordering DESC
             LIMIT ?
         """
-        txn.execute(sql % {"where_clause": ""}, (room_id, True, False, 100))
+        txn.execute(sql % {"where_clause": ""}, (room_id, 100))
 
         local_media_mxcs = []
         remote_media_mxcs = []
@@ -976,7 +976,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             txn.execute(
                 sql % {"where_clause": "AND stream_ordering < ?"},
-                (room_id, next_token, True, False, 100),
+                (room_id, next_token, 100),
             )
 
         return local_media_mxcs, remote_media_mxcs
@@ -1086,9 +1086,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         # set quarantine
         if quarantined_by is not None:
-            sql += "AND safe_from_quarantine = ?"
+            sql += "AND safe_from_quarantine = FALSE"
             txn.executemany(
-                sql, [(quarantined_by, media_id, False) for media_id in local_mxcs]
+                sql, [(quarantined_by, media_id) for media_id in local_mxcs]
             )
         # remove from quarantine
         else:
@@ -2136,7 +2136,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             raise StoreError(400, "No create event in state")
 
         # Before MSC2175, the room creator was a separate field.
-        if not room_version.msc2175_implicit_room_creator:
+        if not room_version.implicit_room_creator:
             room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
 
             if not isinstance(room_creator, str):

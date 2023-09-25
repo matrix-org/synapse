@@ -19,6 +19,8 @@ from typing import Optional, Tuple, Type
 
 from PIL import Image
 
+from synapse.logging.opentracing import trace
+
 logger = logging.getLogger(__name__)
 
 EXIF_ORIENTATION_TAG = 0x0112
@@ -76,12 +78,13 @@ class Thumbnailer:
             image_exif = self.image._getexif()  # type: ignore
             if image_exif is not None:
                 image_orientation = image_exif.get(EXIF_ORIENTATION_TAG)
-                assert type(image_orientation) is int
+                assert type(image_orientation) is int  # noqa: E721
                 self.transpose_method = EXIF_TRANSPOSE_MAPPINGS.get(image_orientation)
         except Exception as e:
             # A lot of parsing errors can happen when parsing EXIF
             logger.info("Error parsing image EXIF information: %s", e)
 
+    @trace
     def transpose(self) -> Tuple[int, int]:
         """Transpose the image using its EXIF Orientation tag
 
@@ -131,8 +134,9 @@ class Thumbnailer:
             else:
                 with self.image:
                     self.image = self.image.convert("RGB")
-        return self.image.resize((width, height), Image.ANTIALIAS)
+        return self.image.resize((width, height), Image.LANCZOS)
 
+    @trace
     def scale(self, width: int, height: int, output_type: str) -> BytesIO:
         """Rescales the image to the given dimensions.
 
@@ -142,6 +146,7 @@ class Thumbnailer:
         with self._resize(width, height) as scaled:
             return self._encode_image(scaled, output_type)
 
+    @trace
     def crop(self, width: int, height: int, output_type: str) -> BytesIO:
         """Rescales and crops the image to the given dimensions preserving
         aspect::

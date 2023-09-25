@@ -45,7 +45,7 @@ class UserFiltersStoreTestCase(unittest.HomeserverTestCase):
 
             self.get_success(self.store.db_pool.runInteraction("", f))
 
-        for i in range(0, 70):
+        for i in range(70):
             self.get_success(
                 self.store.db_pool.simple_insert(
                     "user_filters",
@@ -82,7 +82,7 @@ class UserFiltersStoreTestCase(unittest.HomeserverTestCase):
         )
 
         expected_values = []
-        for i in range(0, 70):
+        for i in range(70):
             expected_values.append((f"@hello{i:02}:{self.hs.hostname}",))
 
         res = self.get_success(

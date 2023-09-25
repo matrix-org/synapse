@@ -178,7 +178,7 @@ class SyncRestServlet(RestServlet):
         else:
             try:
                 filter_collection = await self.filtering.get_user_filter(
-                    user.localpart, filter_id
+                    user, filter_id
                 )
             except StoreError as err:
                 if err.code != 404:
@@ -205,6 +205,7 @@ class SyncRestServlet(RestServlet):
 
         context = await self.presence_handler.user_syncing(
             user.to_string(),
+            requester.device_id,
             affect_presence=affect_presence,
             presence_state=set_presence,
         )

@@ -27,9 +27,9 @@ from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
 from synapse.types import (
+    MXID_LOCALPART_ALLOWED_CHARACTERS,
     UserID,
     map_username_to_mxid_localpart,
-    mxid_localpart_allowed_characters,
 )
 from synapse.util.iterutils import chunk_seq
 
@@ -74,12 +74,13 @@ class SamlHandler:
         self.idp_id = "saml"
 
         # user-facing name of this auth provider
-        self.idp_name = "SAML"
+        self.idp_name = hs.config.saml2.idp_name
 
-        # we do not currently support icons/brands for SAML auth, but this is required by
-        # the SsoIdentityProvider protocol type.
-        self.idp_icon = None
-        self.idp_brand = None
+        # MXC URI for icon for this auth provider
+        self.idp_icon = hs.config.saml2.idp_icon
+
+        # optional brand identifier for this auth provider
+        self.idp_brand = hs.config.saml2.idp_brand
 
         # a map from saml session id to Saml2SessionData object
         self._outstanding_requests_dict: Dict[str, Saml2SessionData] = {}
@@ -371,7 +372,7 @@ class SamlHandler:
 
 
 DOT_REPLACE_PATTERN = re.compile(
-    "[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),)
+    "[^%s]" % (re.escape("".join(MXID_LOCALPART_ALLOWED_CHARACTERS)),)
 )
 
 

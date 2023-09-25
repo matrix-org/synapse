@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Optional, Tuple, Union, cast
 
 from canonicaljson import encode_canonical_json
-from typing_extensions import TYPE_CHECKING
 
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -26,7 +25,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, JsonMapping, UserID
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -71,7 +70,7 @@ class FilteringWorkerStore(SQLBaseStore):
                     SELECT user_id FROM user_filters
                     WHERE user_id > ?
                     ORDER BY user_id
-                    LIMIT 1 OFFSET 50
+                    LIMIT 1 OFFSET 1000
                   """
             txn.execute(sql, (lower_bound_id,))
             res = txn.fetchone()
@@ -145,8 +144,8 @@ class FilteringWorkerStore(SQLBaseStore):
 
     @cached(num_args=2)
     async def get_user_filter(
-        self, user_localpart: str, filter_id: Union[int, str]
-    ) -> JsonDict:
+        self, user_id: UserID, filter_id: Union[int, str]
+    ) -> JsonMapping:
         # filter_id is BIGINT UNSIGNED, so if it isn't a number, fail
         # with a coherent error message rather than 500 M_UNKNOWN.
         try:
@@ -156,7 +155,7 @@ class FilteringWorkerStore(SQLBaseStore):
 
         def_json = await self.db_pool.simple_select_one_onecol(
             table="user_filters",
-            keyvalues={"user_id": user_localpart, "filter_id": filter_id},
+            keyvalues={"full_user_id": user_id.to_string(), "filter_id": filter_id},
             retcol="filter_json",
             allow_none=False,
             desc="get_user_filter",
@@ -172,15 +171,15 @@ class FilteringWorkerStore(SQLBaseStore):
         def _do_txn(txn: LoggingTransaction) -> int:
             sql = (
                 "SELECT filter_id FROM user_filters "
-                "WHERE user_id = ? AND filter_json = ?"
+                "WHERE full_user_id = ? AND filter_json = ?"
             )
-            txn.execute(sql, (user_id.localpart, bytearray(def_json)))
+            txn.execute(sql, (user_id.to_string(), bytearray(def_json)))
             filter_id_response = txn.fetchone()
             if filter_id_response is not None:
                 return filter_id_response[0]
 
-            sql = "SELECT MAX(filter_id) FROM user_filters WHERE user_id = ?"
-            txn.execute(sql, (user_id.localpart,))
+            sql = "SELECT MAX(filter_id) FROM user_filters WHERE full_user_id = ?"
+            txn.execute(sql, (user_id.to_string(),))
             max_id = cast(Tuple[Optional[int]], txn.fetchone())[0]
             if max_id is None:
                 filter_id = 0
