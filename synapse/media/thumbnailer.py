@@ -51,7 +51,7 @@ class Thumbnailer:
         self._closed = False
 
         try:
-            self.image = Image.open(input_path, formats=["jpeg", "gif", "png"])
+            self.image = Image.open(input_path)
         except OSError as e:
             # If an error occurs opening the image, a thumbnail won't be able to
             # be generated.
