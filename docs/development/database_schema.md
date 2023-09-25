@@ -213,7 +213,7 @@ based on data from an old column and then drop the old column.
 We are aiming for semantic equivalence to:
 
 ```sql
-ALTER TABLE mytable ADD COLUMN INTEGER;
+ALTER TABLE mytable ADD COLUMN new_column INTEGER;
 UPDATE mytable SET new_column = old_column * 100;
 ALTER TABLE mytable ALTER COLUMN new_column ADD CONSTRAINT NOT NULL;
 ALTER TABLE mytable DROP COLUMN old_column;
@@ -248,14 +248,14 @@ SCHEMA_COMPAT_VERSION = ... # unimportant at this stage
 2. `new_column` is written to by Synapse.
 
 **Notes:**
-1. `new_column` can't have a `NOT NULL NOT VALID` constraint yet, because the previous Synapse version is not written to write into the column.
+1. `new_column` can't have a `NOT NULL NOT VALID` constraint yet, because the previous Synapse version did not write to the new column (since we haven't bumped the `SCHEMA_COMPAT_VERSION` yet, we still need to be compatible with the previous version).
 
 
 #### Synapse version `N + 2`
 
 ```python
 SCHEMA_VERSION = S + 2
-SCHEMA_COMPAT_VERSION = S + 1 # we can't roll back to a time before new_column existed
+SCHEMA_COMPAT_VERSION = S + 1 # this signals that we can't roll back to a time before new_column existed
 ```
 
 **Changes:**
@@ -281,7 +281,7 @@ SCHEMA_COMPAT_VERSION = S + 1 # we can't roll back to a time before new_column e
 
 **Notes:**
 1. If you wish, you can convert the `CHECK (new_column IS NOT NULL)` to a `NOT NULL` constraint free of charge in Postgres by adding the `NOT NULL` constraint and then dropping the `CHECK` constraint, because Postgres can statically verify that the `NOT NULL` constraint is implied by the `CHECK` constraint without performing a table scan.
-
+2. It might be tempting to make version `N + 2` redundant by moving the background update to `N + 1` and delaying adding the `NOT NULL` constraint to `N + 3`, but that would mean the constraint would always be validated in the foreground in `N + 3`. Whereas if the `N + 2` step is kept, the migration in `N + 3` would be fast in the happy case.
 
 #### Synapse version `N + 3`
 
