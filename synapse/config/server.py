@@ -293,6 +293,7 @@ class ServerConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
+        self.hide_python_version = config.get("hide_python_version", False)
 
         try:
             parse_and_validate_server_name(self.server_name)
