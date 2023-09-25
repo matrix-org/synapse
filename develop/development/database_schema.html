@@ -295,6 +295,140 @@ purged (no need to use sub-<code>select</code> query or join from the <code>even
 two events with the same <code>event_id</code> (in the same or different rooms). After room
 version <code>3</code>, that can only happen with a hash collision, which we basically hope
 will never happen (SHA256 has a massive big key space).</p>
+<h2 id="worked-examples-of-gradual-migrations"><a class="header" href="#worked-examples-of-gradual-migrations">Worked examples of gradual migrations</a></h2>
+<p>Some migrations need to be performed gradually. A prime example of this is anything
+which would need to do a large table scan — including adding columns, indices or
+<code>NOT NULL</code> constraints to non-empty tables — such a migration should be done as a
+background update where possible, at least on Postgres.
+We can afford to be more relaxed about SQLite databases since they are usually
+used on smaller deployments and SQLite does not support the same concurrent
+DDL operations as Postgres.</p>
+<p>We also typically insist on having at least one Synapse version's worth of
+backwards compatibility, so that administrators can roll back Synapse if an upgrade
+did not go smoothly.</p>
+<p>This sometimes results in having to plan a migration across multiple versions
+of Synapse.</p>
+<p>This section includes an example and may include more in the future.</p>
+<h3 id="transforming-a-column-into-another-one-with-not-null-constraints"><a class="header" href="#transforming-a-column-into-another-one-with-not-null-constraints">Transforming a column into another one, with <code>NOT NULL</code> constraints</a></h3>
+<p>This example illustrates how you would introduce a new column, write data into it
+based on data from an old column and then drop the old column.</p>
+<p>We are aiming for semantic equivalence to:</p>
+<pre><code class="language-sql">ALTER TABLE mytable ADD COLUMN new_column INTEGER;
+UPDATE mytable SET new_column = old_column * 100;
+ALTER TABLE mytable ALTER COLUMN new_column ADD CONSTRAINT NOT NULL;
+ALTER TABLE mytable DROP COLUMN old_column;
+</code></pre>
+<h4 id="synapse-version-n"><a class="header" href="#synapse-version-n">Synapse version <code>N</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S
+SCHEMA_COMPAT_VERSION = ... # unimportant at this stage
+</code></pre>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is read by Synapse and written to by Synapse.</li>
+</ol>
+<h4 id="synapse-version-n--1"><a class="header" href="#synapse-version-n--1">Synapse version <code>N + 1</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 1
+SCHEMA_COMPAT_VERSION = ... # unimportant at this stage
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>
+<pre><code class="language-sql">ALTER TABLE mytable ADD COLUMN new_column INTEGER;
+</code></pre>
+</li>
+</ol>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is read by Synapse and written to by Synapse.</li>
+<li><code>new_column</code> is written to by Synapse.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><code>new_column</code> can't have a <code>NOT NULL NOT VALID</code> constraint yet, because the previous Synapse version did not write to the new column (since we haven't bumped the <code>SCHEMA_COMPAT_VERSION</code> yet, we still need to be compatible with the previous version).</li>
+</ol>
+<h4 id="synapse-version-n--2"><a class="header" href="#synapse-version-n--2">Synapse version <code>N + 2</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 2
+SCHEMA_COMPAT_VERSION = S + 1 # this signals that we can't roll back to a time before new_column existed
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>On Postgres, add a <code>NOT VALID</code> constraint to ensure new rows are compliant. <em>SQLite does not have such a construct, but it would be unnecessary anyway since there is no way to concurrently perform this migration on SQLite.</em>
+<pre><code class="language-sql">ALTER TABLE mytable ADD CONSTRAINT CHECK new_column_not_null (new_column IS NOT NULL) NOT VALID;
+</code></pre>
+</li>
+<li>Start a background update to perform migration: it should gradually run e.g.
+<pre><code class="language-sql">UPDATE mytable SET new_column = old_column * 100 WHERE 0 &lt; mytable_id AND mytable_id &lt;= 5;
+</code></pre>
+This background update is technically pointless on SQLite, but you must schedule it anyway so that the <code>portdb</code> script to migrate to Postgres still works.</li>
+<li>Upon completion of the background update, you should run <code>VALIDATE CONSTRAINT</code> on Postgres to turn the <code>NOT VALID</code> constraint into a valid one.
+<pre><code class="language-sql">ALTER TABLE mytable VALIDATE CONSTRAINT new_column_not_null;
+</code></pre>
+This will take some time but does <strong>NOT</strong> hold an exclusive lock over the table.</li>
+</ol>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is read by Synapse and written to by Synapse.</li>
+<li><code>new_column</code> is written to by Synapse and new rows always have a non-<code>NULL</code> value in this field.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li>If you wish, you can convert the <code>CHECK (new_column IS NOT NULL)</code> to a <code>NOT NULL</code> constraint free of charge in Postgres by adding the <code>NOT NULL</code> constraint and then dropping the <code>CHECK</code> constraint, because Postgres can statically verify that the <code>NOT NULL</code> constraint is implied by the <code>CHECK</code> constraint without performing a table scan.</li>
+<li>It might be tempting to make version <code>N + 2</code> redundant by moving the background update to <code>N + 1</code> and delaying adding the <code>NOT NULL</code> constraint to <code>N + 3</code>, but that would mean the constraint would always be validated in the foreground in <code>N + 3</code>. Whereas if the <code>N + 2</code> step is kept, the migration in <code>N + 3</code> would be fast in the happy case.</li>
+</ol>
+<h4 id="synapse-version-n--3"><a class="header" href="#synapse-version-n--3">Synapse version <code>N + 3</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 3
+SCHEMA_COMPAT_VERSION = S + 1 # we can't roll back to a time before new_column existed
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>(Postgres) Update the table to populate values of <code>new_column</code> in case the background update had not completed. Additionally, <code>VALIDATE CONSTRAINT</code> to make the check fully valid.
+<pre><code class="language-sql">-- you ideally want an index on `new_column` or e.g. `(new_column) WHERE new_column IS NULL` first, or perhaps you can find a way to skip this if the `NOT NULL` constraint has already been validated.
+UPDATE mytable SET new_column = old_column * 100 WHERE new_column IS NULL;
+
+-- this is a no-op if it already ran as part of the background update
+ALTER TABLE mytable VALIDATE CONSTRAINT new_column_not_null;
+</code></pre>
+</li>
+<li>(SQLite) Recreate the table by precisely following <a href="https://www.sqlite.org/lang_altertable.html#otheralter">the 12-step procedure for SQLite table schema changes</a>.
+During this table rewrite, you should recreate <code>new_column</code> as <code>NOT NULL</code> and populate any outstanding <code>NULL</code> values at the same time.
+Unfortunately, you can't drop <code>old_column</code> yet because it must be present for compatibility with the Postgres schema, as needed by <code>portdb</code>.
+(Otherwise you could do this all in one go with SQLite!)</li>
+</ol>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is written to by Synapse (but no longer read by Synapse!).</li>
+<li><code>new_column</code> is read by Synapse and written to by Synapse. Moreover, all rows have a non-<code>NULL</code> value in this field, as guaranteed by a schema constraint.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li>We can't drop <code>old_column</code> yet, or even stop writing to it, because that would break a rollback to the previous version of Synapse.</li>
+<li>Application code can now rely on <code>new_column</code> being populated. The remaining steps are only motivated by the wish to clean-up old columns.</li>
+</ol>
+<h4 id="synapse-version-n--4"><a class="header" href="#synapse-version-n--4">Synapse version <code>N + 4</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 4
+SCHEMA_COMPAT_VERSION = S + 3 # we can't roll back to a time before new_column was entirely non-NULL
+</code></pre>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> exists but is not written to or read from by Synapse.</li>
+<li><code>new_column</code> is read by Synapse and written to by Synapse. Moreover, all rows have a non-<code>NULL</code> value in this field, as guaranteed by a schema constraint.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li>We can't drop <code>old_column</code> yet because that would break a rollback to the previous version of Synapse. <br />
+<strong>TODO:</strong> It may be possible to relax this and drop the column straight away as long as the previous version of Synapse detected a rollback occurred and stopped attempting to write to the column. This could possibly be done by checking whether the database's schema compatibility version was <code>S + 3</code>.</li>
+</ol>
+<h4 id="synapse-version-n--5"><a class="header" href="#synapse-version-n--5">Synapse version <code>N + 5</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 5
+SCHEMA_COMPAT_VERSION = S + 4 # we can't roll back to a time before old_column was no longer being touched
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>
+<pre><code class="language-sql">ALTER TABLE mytable DROP COLUMN old_column;
+</code></pre>
+</li>
+</ol>
 
                     </main>
 
