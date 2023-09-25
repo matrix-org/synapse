@@ -266,7 +266,7 @@ The easiest way to do so is to run Postgres via a docker container. In one
 terminal:
 
 ```shell
-docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 postgres:14
 ```
 
 If you see an error like

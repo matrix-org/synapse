@@ -20,7 +20,7 @@ import random
 import string
 from collections import OrderedDict
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 import attr
 from typing_extensions import TypedDict
@@ -54,11 +54,11 @@ from synapse.events import EventBase
 from synapse.events.snapshot import UnpersistedEventContext
 from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.handlers.relations import BundledAggregations
-from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     MutableStateMap,
     Requester,
     RoomAlias,
@@ -454,7 +454,7 @@ class RoomCreationHandler:
         spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
             user_id
         )
-        if spam_check != NOT_SPAM:
+        if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
             raise SynapseError(
                 403,
                 "You are not permitted to create rooms",
@@ -768,7 +768,7 @@ class RoomCreationHandler:
             spam_check = await self._spam_checker_module_callbacks.user_may_create_room(
                 user_id
             )
-            if spam_check != NOT_SPAM:
+            if spam_check != self._spam_checker_module_callbacks.NOT_SPAM:
                 raise SynapseError(
                     403,
                     "You are not permitted to create rooms",
@@ -1750,6 +1750,45 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         return self.store.get_current_room_stream_token_for_room_id(room_id)
 
 
+class ShutdownRoomParams(TypedDict):
+    """
+    Attributes:
+        requester_user_id:
+            User who requested the action. Will be recorded as putting the room on the
+            blocking list.
+        new_room_user_id:
+            If set, a new room will be created with this user ID
+            as the creator and admin, and all users in the old room will be
+            moved into that room. If not set, no new room will be created
+            and the users will just be removed from the old room.
+        new_room_name:
+            A string representing the name of the room that new users will
+            be invited to. Defaults to `Content Violation Notification`
+        message:
+            A string containing the first message that will be sent as
+            `new_room_user_id` in the new room. Ideally this will clearly
+            convey why the original room was shut down.
+            Defaults to `Sharing illegal content on this server is not
+            permitted and rooms in violation will be blocked.`
+        block:
+            If set to `true`, this room will be added to a blocking list,
+            preventing future attempts to join the room. Defaults to `false`.
+        purge:
+            If set to `true`, purge the given room from the database.
+        force_purge:
+            If set to `true`, the room will be purged from database
+            even if there are still users joined to the room.
+    """
+
+    requester_user_id: Optional[str]
+    new_room_user_id: Optional[str]
+    new_room_name: Optional[str]
+    message: Optional[str]
+    block: bool
+    purge: bool
+    force_purge: bool
+
+
 class ShutdownRoomResponse(TypedDict):
     """
     Attributes:
@@ -1787,12 +1826,12 @@ class RoomShutdownHandler:
     async def shutdown_room(
         self,
         room_id: str,
-        requester_user_id: str,
-        new_room_user_id: Optional[str] = None,
-        new_room_name: Optional[str] = None,
-        message: Optional[str] = None,
-        block: bool = False,
-    ) -> ShutdownRoomResponse:
+        params: ShutdownRoomParams,
+        result: Optional[ShutdownRoomResponse] = None,
+        update_result_fct: Optional[
+            Callable[[Optional[JsonMapping]], Awaitable[None]]
+        ] = None,
+    ) -> Optional[ShutdownRoomResponse]:
         """
         Shuts down a room. Moves all local users and room aliases automatically
         to a new room if `new_room_user_id` is set. Otherwise local users only
@@ -1808,48 +1847,23 @@ class RoomShutdownHandler:
 
         Args:
             room_id: The ID of the room to shut down.
-            requester_user_id:
-                User who requested the action and put the room on the
-                blocking list.
-            new_room_user_id:
-                If set, a new room will be created with this user ID
-                as the creator and admin, and all users in the old room will be
-                moved into that room. If not set, no new room will be created
-                and the users will just be removed from the old room.
-            new_room_name:
-                A string representing the name of the room that new users will
-                be invited to. Defaults to `Content Violation Notification`
-            message:
-                A string containing the first message that will be sent as
-                `new_room_user_id` in the new room. Ideally this will clearly
-                convey why the original room was shut down.
-                Defaults to `Sharing illegal content on this server is not
-                permitted and rooms in violation will be blocked.`
-            block:
-                If set to `True`, users will be prevented from joining the old
-                room. This option can also be used to pre-emptively block a room,
-                even if it's unknown to this homeserver. In this case, the room
-                will be blocked, and no further action will be taken. If `False`,
-                attempting to delete an unknown room is invalid.
+            delete_id: The delete ID identifying this delete request
+            params: parameters for the shutdown, cf `ShutdownRoomParams`
+            result: current status of the shutdown, if it was interrupted
+            update_result_fct: function called when `result` is updated locally
 
-                Defaults to `False`.
-
-        Returns: a dict containing the following keys:
-            kicked_users: An array of users (`user_id`) that were kicked.
-            failed_to_kick_users:
-                An array of users (`user_id`) that that were not kicked.
-            local_aliases:
-                An array of strings representing the local aliases that were
-                migrated from the old room to the new.
-            new_room_id:
-                A string representing the room ID of the new room, or None if
-                no such room was created.
+        Returns: a dict matching `ShutdownRoomResponse`.
         """
+        requester_user_id = params["requester_user_id"]
+        new_room_user_id = params["new_room_user_id"]
+        block = params["block"]
 
-        if not new_room_name:
-            new_room_name = self.DEFAULT_ROOM_NAME
-        if not message:
-            message = self.DEFAULT_MESSAGE
+        new_room_name = (
+            params["new_room_name"]
+            if params["new_room_name"]
+            else self.DEFAULT_ROOM_NAME
+        )
+        message = params["message"] if params["message"] else self.DEFAULT_MESSAGE
 
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
@@ -1861,22 +1875,33 @@ class RoomShutdownHandler:
                 403, "Shutdown of this room is forbidden", Codes.FORBIDDEN
             )
 
+        result = (
+            result
+            if result
+            else {
+                "kicked_users": [],
+                "failed_to_kick_users": [],
+                "local_aliases": [],
+                "new_room_id": None,
+            }
+        )
+
         # Action the block first (even if the room doesn't exist yet)
         if block:
+            if requester_user_id is None:
+                raise ValueError(
+                    "shutdown_room: block=True not allowed when requester_user_id is None."
+                )
             # This will work even if the room is already blocked, but that is
             # desirable in case the first attempt at blocking the room failed below.
             await self.store.block_room(room_id, requester_user_id)
 
         if not await self.store.get_room(room_id):
             # if we don't know about the room, there is nothing left to do.
-            return {
-                "kicked_users": [],
-                "failed_to_kick_users": [],
-                "local_aliases": [],
-                "new_room_id": None,
-            }
+            return result
 
-        if new_room_user_id is not None:
+        new_room_id = result.get("new_room_id")
+        if new_room_user_id is not None and new_room_id is None:
             if not self.hs.is_mine_id(new_room_user_id):
                 raise SynapseError(
                     400, "User must be our own: %s" % (new_room_user_id,)
@@ -1896,6 +1921,10 @@ class RoomShutdownHandler:
                 ratelimit=False,
             )
 
+            result["new_room_id"] = new_room_id
+            if update_result_fct:
+                await update_result_fct(result)
+
             logger.info(
                 "Shutting down room %r, joining to new room: %r", room_id, new_room_id
             )
@@ -1909,12 +1938,9 @@ class RoomShutdownHandler:
                 stream_id,
             )
         else:
-            new_room_id = None
             logger.info("Shutting down room %r", room_id)
 
         users = await self.store.get_users_in_room(room_id)
-        kicked_users = []
-        failed_to_kick_users = []
         for user_id in users:
             if not self.hs.is_mine_id(user_id):
                 continue
@@ -1943,7 +1969,9 @@ class RoomShutdownHandler:
                     stream_id,
                 )
 
-                await self.room_member_handler.forget(target_requester.user, room_id)
+                await self.room_member_handler.forget(
+                    target_requester.user, room_id, do_not_schedule_purge=True
+                )
 
                 # Join users to new room
                 if new_room_user_id:
@@ -1958,15 +1986,23 @@ class RoomShutdownHandler:
                         require_consent=False,
                     )
 
-                kicked_users.append(user_id)
+                result["kicked_users"].append(user_id)
+                if update_result_fct:
+                    await update_result_fct(result)
             except Exception:
                 logger.exception(
                     "Failed to leave old room and join new room for %r", user_id
                 )
-                failed_to_kick_users.append(user_id)
+                result["failed_to_kick_users"].append(user_id)
+                if update_result_fct:
+                    await update_result_fct(result)
 
         # Send message in new room and move aliases
         if new_room_user_id:
+            room_creator_requester = create_requester(
+                new_room_user_id, authenticated_entity=requester_user_id
+            )
+
             await self.event_creation_handler.create_and_send_nonmember_event(
                 room_creator_requester,
                 {
@@ -1978,18 +2014,15 @@ class RoomShutdownHandler:
                 ratelimit=False,
             )
 
-            aliases_for_room = await self.store.get_aliases_for_room(room_id)
+            result["local_aliases"] = list(
+                await self.store.get_aliases_for_room(room_id)
+            )
 
             assert new_room_id is not None
             await self.store.update_aliases_for_room(
                 room_id, new_room_id, requester_user_id
             )
         else:
-            aliases_for_room = []
+            result["local_aliases"] = []
 
-        return {
-            "kicked_users": kicked_users,
-            "failed_to_kick_users": failed_to_kick_users,
-            "local_aliases": list(aliases_for_room),
-            "new_room_id": new_room_id,
-        }
+        return result

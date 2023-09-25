@@ -21,6 +21,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
+from synapse.handlers.pagination import PURGE_HISTORY_ACTION_NAME
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -47,7 +48,6 @@ from synapse.rest.admin.federation import (
     ListDestinationsRestServlet,
 )
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
-from synapse.rest.admin.oidc import OIDCTokenRevocationRestServlet
 from synapse.rest.admin.registration_tokens import (
     ListRegistrationTokensRestServlet,
     NewRegistrationTokenRestServlet,
@@ -94,7 +94,7 @@ from synapse.rest.admin.users import (
     UserTokenRestServlet,
     WhoisRestServlet,
 )
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, TaskStatus
 from synapse.util import SYNAPSE_VERSION
 
 if TYPE_CHECKING:
@@ -197,7 +197,7 @@ class PurgeHistoryRestServlet(RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = self.pagination_handler.start_purge_history(
+        purge_id = await self.pagination_handler.start_purge_history(
             room_id, token, delete_local_events=delete_local_events
         )
 
@@ -216,11 +216,20 @@ class PurgeHistoryStatusRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        purge_status = self.pagination_handler.get_purge_status(purge_id)
-        if purge_status is None:
+        purge_task = await self.pagination_handler.get_delete_task(purge_id)
+        if purge_task is None or purge_task.action != PURGE_HISTORY_ACTION_NAME:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        return HTTPStatus.OK, purge_status.asdict()
+        result: JsonDict = {
+            "status": purge_task.status
+            if purge_task.status == TaskStatus.COMPLETE
+            or purge_task.status == TaskStatus.FAILED
+            else "active",
+        }
+        if purge_task.error:
+            result["error"] = purge_task.error
+
+        return HTTPStatus.OK, result
 
 
 ########################################################################################
@@ -298,8 +307,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     BackgroundUpdateRestServlet(hs).register(http_server)
     BackgroundUpdateStartJobRestServlet(hs).register(http_server)
     ExperimentalFeaturesRestServlet(hs).register(http_server)
-    if hs.config.experimental.msc3861.enabled:
-        OIDCTokenRevocationRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(

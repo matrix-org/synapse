@@ -20,7 +20,7 @@ from twisted.web.server import Request
 from synapse.http.server import HttpServer
 from synapse.logging.opentracing import active_span
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonMapping
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -82,7 +82,7 @@ class ReplicationMultiUserDevicesResyncRestServlet(ReplicationEndpoint):
 
     async def _handle_request(  # type: ignore[override]
         self, request: Request, content: JsonDict
-    ) -> Tuple[int, Dict[str, Optional[JsonDict]]]:
+    ) -> Tuple[int, Dict[str, Optional[JsonMapping]]]:
         user_ids: List[str] = content["user_ids"]
 
         logger.info("Resync for %r", user_ids)

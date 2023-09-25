@@ -38,6 +38,10 @@ class UnsubscribeResource(DirectServeHtmlResource):
         self.macaroon_generator = hs.get_macaroon_generator()
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
+        """
+        Handle a user opening an unsubscribe link in the browser, either via an
+        HTML/Text email or via the List-Unsubscribe header.
+        """
         token = parse_string(request, "access_token", required=True)
         app_id = parse_string(request, "app_id", required=True)
         pushkey = parse_string(request, "pushkey", required=True)
@@ -62,3 +66,16 @@ class UnsubscribeResource(DirectServeHtmlResource):
             200,
             UnsubscribeResource.SUCCESS_HTML,
         )
+
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
+        """
+        Handle a mail user agent POSTing to the unsubscribe URL via the
+        List-Unsubscribe & List-Unsubscribe-Post headers.
+        """
+
+        # TODO Assert that the body has a single field
+
+        # Assert the body has form encoded key/value pair of
+        # List-Unsubscribe=One-Click.
+
+        await self._async_render_GET(request)

@@ -32,6 +32,7 @@ from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     Requester,
     RoomStreamToken,
     StreamKeyType,
@@ -454,7 +455,7 @@ class InitialSyncHandler:
                 for s in states
             ]
 
-        async def get_receipts() -> List[JsonDict]:
+        async def get_receipts() -> List[JsonMapping]:
             receipts = await self.store.get_linearized_receipts_for_room(
                 room_id, to_key=now_token.receipt_key
             )

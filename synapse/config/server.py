@@ -486,6 +486,17 @@ class ServerConfig(Config):
         else:
             self.redaction_retention_period = None
 
+        # How long to keep locally forgotten rooms before purging them from the DB.
+        forgotten_room_retention_period = config.get(
+            "forgotten_room_retention_period", None
+        )
+        if forgotten_room_retention_period is not None:
+            self.forgotten_room_retention_period: Optional[int] = self.parse_duration(
+                forgotten_room_retention_period
+            )
+        else:
+            self.forgotten_room_retention_period = None
+
         # How long to keep entries in the `users_ips` table.
         user_ips_max_age = config.get("user_ips_max_age", "28d")
         if user_ips_max_age is not None:

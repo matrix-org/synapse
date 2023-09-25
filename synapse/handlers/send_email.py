@@ -17,7 +17,7 @@ import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from pkg_resources import parse_version
 
@@ -151,6 +151,7 @@ class SendEmailHandler:
         app_name: str,
         html: str,
         text: str,
+        additional_headers: Optional[Dict[str, str]] = None,
     ) -> None:
         """Send a multipart email with the given information.
 
@@ -160,6 +161,7 @@ class SendEmailHandler:
             app_name: The app name to include in the From header.
             html: The HTML content to include in the email.
             text: The plain text content to include in the email.
+            additional_headers: A map of additional headers to include.
         """
         try:
             from_string = self._from % {"app": app_name}
@@ -172,8 +174,8 @@ class SendEmailHandler:
         if raw_to == "":
             raise RuntimeError("Invalid 'to' address")
 
-        html_part = MIMEText(html, "html", "utf8")
-        text_part = MIMEText(text, "plain", "utf8")
+        html_part = MIMEText(html, "html", "utf-8")
+        text_part = MIMEText(text, "plain", "utf-8")
 
         multipart_msg = MIMEMultipart("alternative")
         multipart_msg["Subject"] = subject
@@ -181,6 +183,7 @@ class SendEmailHandler:
         multipart_msg["To"] = email_address
         multipart_msg["Date"] = email.utils.formatdate()
         multipart_msg["Message-ID"] = email.utils.make_msgid()
+
         # Discourage automatic responses to Synapse's emails.
         # Per RFC 3834, automatic responses should not be sent if the "Auto-Submitted"
         # header is present with any value other than "no". See
@@ -194,6 +197,11 @@ class SendEmailHandler:
         #    https://stackoverflow.com/a/25324691/5252017
         #    https://stackoverflow.com/a/61646381/5252017
         multipart_msg["X-Auto-Response-Suppress"] = "All"
+
+        if additional_headers:
+            for header, value in additional_headers.items():
+                multipart_msg[header] = value
+
         multipart_msg.attach(text_part)
         multipart_msg.attach(html_part)
 

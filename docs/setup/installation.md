@@ -37,7 +37,7 @@ Dockerfile to automate a synapse server in a single Docker image, at
 <https://hub.docker.com/r/avhost/docker-matrix/tags/>
 
 Slavi Pantaleev has created an Ansible playbook,
-which installs the offical Docker image of Matrix Synapse
+which installs the official Docker image of Matrix Synapse
 along with many other Matrix-related services (Postgres database, Element, coturn,
 ma1sd, SSL support, etc.).
 For more details, see
@@ -93,7 +93,7 @@ For `bookworm` and `sid`, it can be installed simply with:
 sudo apt install matrix-synapse
 ```
 
-Synapse is also avaliable in `bullseye-backports`.  Please
+Synapse is also available in `bullseye-backports`.  Please
 see the [Debian documentation](https://backports.debian.org/Instructions/)
 for information on how to use backports.
 
@@ -153,6 +153,14 @@ installing under virtualenv):
 ```sh
 sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
+```
+
+#### Alpine Linux
+
+6543 maintains [Synapse packages for Alpine Linux](https://pkgs.alpinelinux.org/packages?name=synapse&branch=edge) in the community repository. Install with:
+
+```sh
+sudo apk add synapse
 ```
 
 #### Void Linux

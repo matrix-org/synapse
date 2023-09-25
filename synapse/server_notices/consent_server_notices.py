@@ -79,15 +79,15 @@ class ConsentServerNotices:
             if u is None:
                 return
 
-            if u["is_guest"] and not self._send_to_guests:
+            if u.is_guest and not self._send_to_guests:
                 # don't send to guests
                 return
 
-            if u["consent_version"] == self._current_consent_version:
+            if u.consent_version == self._current_consent_version:
                 # user has already consented
                 return
 
-            if u["consent_server_notice_sent"] == self._current_consent_version:
+            if u.consent_server_notice_sent == self._current_consent_version:
                 # we've already sent a notice to the user
                 return
 

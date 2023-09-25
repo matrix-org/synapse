@@ -572,7 +572,7 @@ class ModuleApi:
         Returns:
             UserInfo object if a user was found, otherwise None
         """
-        return await self._store.get_userinfo_by_id(user_id)
+        return await self._store.get_user_by_id(user_id)
 
     async def get_user_by_req(
         self,
@@ -1730,6 +1730,30 @@ class ModuleApi:
         room_alias_str = room_alias.to_string() if room_alias else None
         return room_id, room_alias_str
 
+    async def delete_room(self, room_id: str) -> None:
+        """
+        Schedules the deletion of a room from Synapse's database.
+
+        If the room is already being deleted, this method does nothing.
+        This method does not wait for the room to be deleted.
+
+        Added in Synapse v1.89.0.
+        """
+        # Future extensions to this method might want to e.g. allow use of `force_purge`.
+        # TODO In the future we should make sure this is persistent.
+        await self._hs.get_pagination_handler().start_shutdown_and_purge_room(
+            room_id,
+            {
+                "new_room_user_id": None,
+                "new_room_name": None,
+                "message": None,
+                "requester_user_id": None,
+                "block": False,
+                "purge": True,
+                "force_purge": False,
+            },
+        )
+
     async def set_displayname(
         self,
         user_id: UserID,
@@ -1865,7 +1889,7 @@ class AccountDataManager:
             raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
 
         # Ensure the user exists, so we don't just write to users that aren't there.
-        if await self._store.get_userinfo_by_id(user_id) is None:
+        if await self._store.get_user_by_id(user_id) is None:
             raise ValueError(f"User {user_id} does not exist on this server.")
 
         await self._handler.add_account_data_for_user(user_id, data_type, new_data)

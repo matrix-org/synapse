@@ -24,6 +24,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     MutableMapping,
     Optional,
     Set,
@@ -1633,7 +1634,7 @@ class EventsWorkerStore(SQLBaseStore):
         self,
         room_id: str,
         event_ids: Collection[str],
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Helper for have_seen_events
 
         Returns:
@@ -2325,7 +2326,7 @@ class EventsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="is_partial_state_event", list_name="event_ids")
     async def get_partial_state_events(
         self, event_ids: Collection[str]
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Checks which of the given events have partial state
 
         Args:

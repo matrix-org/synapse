@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 class NotificationsServlet(RestServlet):
     PATTERNS = client_patterns("/notifications$")
 
+    CATEGORY = "Client API requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.store = hs.get_datastores().main
