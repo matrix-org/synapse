@@ -37,7 +37,7 @@ jobs:
   check-sampleconfig:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
@@ -52,7 +52,7 @@ jobs:
   check-schema-delta:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -62,7 +62,7 @@ jobs:
   check-lockfile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Poetry
         uses: matrix-org/setup-python-poetry@v1
@@ -94,7 +94,7 @@ jobs:
     name: Typechecking
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -127,7 +127,7 @@ jobs:
   lint-crlf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check line endings
         run: scripts-dev/check_line_terminators.sh
 
@@ -135,7 +135,7 @@ jobs:
     if: ${{ (github.base_ref == 'develop'  || contains(github.base_ref, 'release-')) && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
@@ -150,7 +150,7 @@ jobs:
   lint-pydantic:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Install Rust
@@ -168,7 +168,7 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -186,7 +186,7 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -203,7 +203,7 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -239,7 +239,7 @@ jobs:
     needs: linting-done
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -258,7 +258,7 @@ jobs:
         job:  ${{ fromJson(needs.calculate-test-jobs.outputs.trial_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
         if: ${{ matrix.job.postgres-version }}
@@ -310,7 +310,7 @@ jobs:
     needs: linting-done
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -371,7 +371,7 @@ jobs:
         extras: ["all"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Install libs necessary for PyPy to build binary wheels for dependencies
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
       - uses: matrix-org/setup-python-poetry@v1
@@ -416,7 +416,7 @@ jobs:
         job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
 
@@ -461,7 +461,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -503,7 +503,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Add PostgreSQL apt repository
         # We need a version of pg_dump that can handle the version of
         # PostgreSQL being tested against. The Ubuntu package repository lags
@@ -555,8 +555,8 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v3 for synapse
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for synapse
+        uses: actions/checkout@v4
         with:
           path: synapse
 
@@ -586,7 +586,7 @@ jobs:
       - changes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -604,7 +604,7 @@ jobs:
       - changes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
