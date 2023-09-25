@@ -50,7 +50,7 @@ jobs:
     needs:
       - pre
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup mdbook
         uses: peaceiris/actions-mdbook@adeb05db28a0c0004681db83893d56c0388ea9ea # v1.2.0
@@ -80,7 +80,7 @@ jobs:
     needs:
       - pre
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: "Set up Sphinx"
         uses: matrix-org/setup-python-poetry@v1

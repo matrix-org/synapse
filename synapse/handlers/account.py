@@ -102,7 +102,7 @@ class AccountHandler:
         """
         status = {"exists": False}
 
-        userinfo = await self._main_store.get_userinfo_by_id(user_id.to_string())
+        userinfo = await self._main_store.get_user_by_id(user_id.to_string())
 
         if userinfo is not None:
             status = {

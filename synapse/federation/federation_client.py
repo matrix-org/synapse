@@ -64,7 +64,7 @@ from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.client import is_unknown_endpoint
 from synapse.http.types import QueryParams
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, tag_args, trace
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, StrCollection, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -1704,7 +1704,7 @@ class FederationClient(FederationBase):
     async def timestamp_to_event(
         self,
         *,
-        destinations: List[str],
+        destinations: StrCollection,
         room_id: str,
         timestamp: int,
         direction: Direction,

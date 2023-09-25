@@ -103,7 +103,7 @@ class EventBuilder:
 
     async def build(
         self,
-        prev_event_ids: StrCollection,
+        prev_event_ids: List[str],
         auth_event_ids: Optional[List[str]],
         depth: Optional[int] = None,
     ) -> EventBase:
