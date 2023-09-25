@@ -11,10 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar
 
 import jsonschema
-from pydantic import BaseModel, ValidationError, parse_obj_as
+
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import BaseModel, ValidationError, parse_obj_as
+else:
+    from pydantic import BaseModel, ValidationError, parse_obj_as
 
 from synapse.config._base import ConfigError
 from synapse.types import JsonDict, StrSequence
