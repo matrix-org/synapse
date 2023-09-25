@@ -694,6 +694,19 @@ This setting has the following sub-options:
      * `password_reset`: Subject to use when sending a password reset email. Defaults to "[%(server_name)s] Password reset"
      * `email_validation`: Subject to use when sending a verification email to assert an address's
         ownership. Defaults to "[%(server_name)s] Validate your email"
+---
+### `hide_python_version`
+
+This option controls whether or not the current Python version of the homeserver is displayed [here](../../admin_api/version_api.md).
+
+The default is False, which means that the homeserver will display the Python version.
+
+**Note:** This option does not affect the Python-related information exposed by [Metrics](#Metrics).
+
+Example configuration:
+```yaml
+hide_python_version: True
+```
 
 Example configuration:
 
