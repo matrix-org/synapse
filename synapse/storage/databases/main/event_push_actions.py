@@ -1599,10 +1599,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn,
             table="event_push_summary",
             key_names=("user_id", "room_id", "thread_id"),
-            key_values=[
-                (user_id, room_id, thread_id)
-                for user_id, room_id, thread_id in summaries
-            ],
+            key_values=list(summaries),
             value_names=("notif_count", "unread_count", "stream_ordering"),
             value_values=[
                 (
@@ -1740,42 +1737,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             # We sleep to ensure that we don't overwhelm the DB.
             await self._clock.sleep(1.0)
 
-
-class EventPushActionsStore(EventPushActionsWorkerStore):
-    EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
-
-    def __init__(
-        self,
-        database: DatabasePool,
-        db_conn: LoggingDatabaseConnection,
-        hs: "HomeServer",
-    ):
-        super().__init__(database, db_conn, hs)
-
-        self.db_pool.updates.register_background_index_update(
-            self.EPA_HIGHLIGHT_INDEX,
-            index_name="event_push_actions_u_highlight",
-            table="event_push_actions",
-            columns=["user_id", "stream_ordering"],
-        )
-
-        self.db_pool.updates.register_background_index_update(
-            "event_push_actions_highlights_index",
-            index_name="event_push_actions_highlights_index",
-            table="event_push_actions",
-            columns=["user_id", "room_id", "topological_ordering", "stream_ordering"],
-            where_clause="highlight=1",
-        )
-
-        # Add index to make deleting old push actions faster.
-        self.db_pool.updates.register_background_index_update(
-            "event_push_actions_stream_highlight_index",
-            index_name="event_push_actions_stream_highlight_index",
-            table="event_push_actions",
-            columns=["highlight", "stream_ordering"],
-            where_clause="highlight=0",
-        )
-
     async def get_push_actions_for_user(
         self,
         user_id: str,
@@ -1832,6 +1793,42 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             )
             for row in push_actions
         ]
+
+
+class EventPushActionsStore(EventPushActionsWorkerStore):
+    EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
+
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_index_update(
+            self.EPA_HIGHLIGHT_INDEX,
+            index_name="event_push_actions_u_highlight",
+            table="event_push_actions",
+            columns=["user_id", "stream_ordering"],
+        )
+
+        self.db_pool.updates.register_background_index_update(
+            "event_push_actions_highlights_index",
+            index_name="event_push_actions_highlights_index",
+            table="event_push_actions",
+            columns=["user_id", "room_id", "topological_ordering", "stream_ordering"],
+            where_clause="highlight=1",
+        )
+
+        # Add index to make deleting old push actions faster.
+        self.db_pool.updates.register_background_index_update(
+            "event_push_actions_stream_highlight_index",
+            index_name="event_push_actions_stream_highlight_index",
+            table="event_push_actions",
+            columns=["highlight", "stream_ordering"],
+            where_clause="highlight=0",
+        )
 
 
 def _action_has_highlight(actions: Collection[Union[Mapping, str]]) -> bool:

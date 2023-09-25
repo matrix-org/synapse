@@ -8,9 +8,9 @@ ARG PYTHON_VERSION=3.9
 ###
 ### Stage 0: generate requirements.txt
 ###
-# We hardcode the use of Debian bullseye here because this could change upstream
-# and other Dockerfiles used for testing are expecting bullseye.
-FROM docker.io/library/python:${PYTHON_VERSION}-slim-bullseye
+# We hardcode the use of Debian bookworm here because this could change upstream
+# and other Dockerfiles used for testing are expecting bookworm.
+FROM docker.io/library/python:${PYTHON_VERSION}-slim-bookworm
 
 # Install Rust and other dependencies (stolen from normal Dockerfile)
 # install the OS build deps
@@ -33,7 +33,7 @@ RUN \
     gosu \
     libjpeg62-turbo \
     libpq5 \
-    libwebp6 \
+    libwebp7 \
     xmlsec1 \
     libjemalloc2 \
     && rm -rf /var/lib/apt/lists/*

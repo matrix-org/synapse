@@ -14,7 +14,7 @@
 import enum
 import logging
 import threading
-from typing import Any, Dict, Generic, Iterable, Optional, Set, Tuple, TypeVar, Union
+from typing import Dict, Generic, Iterable, Optional, Set, Tuple, TypeVar, Union
 
 import attr
 from typing_extensions import Literal
@@ -33,10 +33,8 @@ DKT = TypeVar("DKT")
 DV = TypeVar("DV")
 
 
-# This class can't be generic because it uses slots with attrs.
-# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class DictionaryEntry:  # should be: Generic[DKT, DV].
+class DictionaryEntry(Generic[DKT, DV]):
     """Returned when getting an entry from the cache
 
     If `full` is true then `known_absent` will be the empty set.
@@ -50,8 +48,8 @@ class DictionaryEntry:  # should be: Generic[DKT, DV].
     """
 
     full: bool
-    known_absent: Set[Any]  # should be: Set[DKT]
-    value: Dict[Any, Any]  # should be: Dict[DKT, DV]
+    known_absent: Set[DKT]
+    value: Dict[DKT, DV]
 
     def __len__(self) -> int:
         return len(self.value)

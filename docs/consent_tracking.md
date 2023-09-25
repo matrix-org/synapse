@@ -8,9 +8,9 @@ to the server until they have.
 There are several parts to this functionality; each requires some specific
 configuration in `homeserver.yaml` to be enabled.
 
-Note that various parts of the configuation and this document refer to the
+Note that various parts of the configuration and this document refer to the
 "privacy policy": agreement with a privacy policy is one particular use of this
-feature, but of course adminstrators can specify other terms and conditions
+feature, but of course administrators can specify other terms and conditions
 unrelated to "privacy" per se.
 
 Collecting policy agreement from a user

@@ -933,33 +933,37 @@ def get_verify_key_from_cross_signing_key(
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
 class UserInfo:
-    """Holds information about a user. Result of get_userinfo_by_id.
+    """Holds information about a user. Result of get_user_by_id.
 
     Attributes:
         user_id:  ID of the user.
         appservice_id:  Application service ID that created this user.
         consent_server_notice_sent:  Version of policy documents the user has been sent.
         consent_version:  Version of policy documents the user has consented to.
+        consent_ts: Time the user consented
         creation_ts:  Creation timestamp of the user.
         is_admin:  True if the user is an admin.
         is_deactivated:  True if the user has been deactivated.
         is_guest:  True if the user is a guest user.
         is_shadow_banned:  True if the user has been shadow-banned.
         user_type:  User type (None for normal user, 'support' and 'bot' other options).
-        last_seen_ts:  Last activity timestamp of the user.
+        approved: If the user has been "approved" to register on the server.
+        locked: Whether the user's account has been locked
     """
 
     user_id: UserID
     appservice_id: Optional[int]
     consent_server_notice_sent: Optional[str]
     consent_version: Optional[str]
+    consent_ts: Optional[int]
     user_type: Optional[str]
     creation_ts: int
     is_admin: bool
     is_deactivated: bool
     is_guest: bool
     is_shadow_banned: bool
-    last_seen_ts: Optional[int]
+    approved: bool
+    locked: bool
 
 
 class UserProfile(TypedDict):

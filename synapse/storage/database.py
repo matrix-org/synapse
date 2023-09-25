@@ -422,10 +422,11 @@ class LoggingTransaction:
         return self._do_execute(
             # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
             # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
-            lambda the_sql: execute_values(
-                self.txn, the_sql, values, template=template, fetch=fetch
+            lambda the_sql, the_values: execute_values(
+                self.txn, the_sql, the_values, template=template, fetch=fetch
             ),
             sql,
+            values,
         )
 
     def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
@@ -1192,6 +1193,7 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
+        where_clause: Optional[str] = None,
         desc: str = "simple_upsert",
     ) -> bool:
         """Insert a row with values + insertion_values; on conflict, update with values.
@@ -1242,6 +1244,7 @@ class DatabasePool:
             keyvalues: The unique key columns and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            where_clause: An index predicate to apply to the upsert.
             desc: description of the transaction, for logging and metrics
         Returns:
             Returns True if a row was inserted or updated (i.e. if `values` is
@@ -1262,6 +1265,7 @@ class DatabasePool:
                     keyvalues,
                     values,
                     insertion_values,
+                    where_clause,
                     db_autocommit=autocommit,
                 )
             except self.engine.module.IntegrityError as e:

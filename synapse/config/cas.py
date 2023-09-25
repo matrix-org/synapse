@@ -57,6 +57,8 @@ class CasConfig(Config):
                 required_attributes
             )
 
+            self.cas_enable_registration = cas_config.get("enable_registration", True)
+
             self.idp_name = cas_config.get("idp_name", "CAS")
             self.idp_icon = cas_config.get("idp_icon")
             self.idp_brand = cas_config.get("idp_brand")
@@ -67,6 +69,7 @@ class CasConfig(Config):
             self.cas_protocol_version = None
             self.cas_displayname_attribute = None
             self.cas_required_attributes = []
+            self.cas_enable_registration = False
 
 
 # CAS uses a legacy required attributes mapping, not the one provided by

@@ -26,7 +26,6 @@ from textwrap import dedent
 from typing import (
     Any,
     ClassVar,
-    Collection,
     Dict,
     Iterable,
     Iterator,
@@ -384,7 +383,7 @@ class RootConfig:
 
     config_classes: List[Type[Config]] = []
 
-    def __init__(self, config_files: Collection[str] = ()):
+    def __init__(self, config_files: StrSequence = ()):
         # Capture absolute paths here, so we can reload config after we daemonize.
         self.config_files = [os.path.abspath(path) for path in config_files]
 

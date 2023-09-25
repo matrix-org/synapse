@@ -222,7 +222,7 @@ class PersistEventsStore:
 
             for room_id, latest_event_ids in new_forward_extremities.items():
                 self.store.get_latest_event_ids_in_room.prefill(
-                    (room_id,), list(latest_event_ids)
+                    (room_id,), frozenset(latest_event_ids)
                 )
 
     async def _get_events_which_are_prevs(self, event_ids: Iterable[str]) -> List[str]:
@@ -827,15 +827,7 @@ class PersistEventsStore:
                 "target_chain_id",
                 "target_sequence_number",
             ),
-            values=[
-                (source_id, source_seq, target_id, target_seq)
-                for (
-                    source_id,
-                    source_seq,
-                    target_id,
-                    target_seq,
-                ) in chain_links.get_additions()
-            ],
+            values=list(chain_links.get_additions()),
         )
 
     @staticmethod

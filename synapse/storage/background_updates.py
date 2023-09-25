@@ -31,8 +31,8 @@ from typing import (
 )
 
 import attr
-from pydantic import BaseModel
 
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Connection, Cursor
@@ -40,6 +40,11 @@ from synapse.types import JsonDict
 from synapse.util import Clock, json_encoder
 
 from . import engines
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import BaseModel
+else:
+    from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -62,7 +67,6 @@ class Constraint(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def make_check_clause(self, table: str) -> str:
         """Returns an SQL expression that checks the row passes the constraint."""
-        pass
 
     @abc.abstractmethod
     def make_constraint_clause_postgres(self) -> str:
@@ -70,7 +74,6 @@ class Constraint(metaclass=abc.ABCMeta):
 
         Only used on Postgres DBs
         """
-        pass
 
 
 @attr.s(auto_attribs=True)

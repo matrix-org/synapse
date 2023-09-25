@@ -300,7 +300,7 @@ class MSC3861DelegatedAuth(BaseAuth):
             user_id = UserID(username, self._hostname)
 
             # First try to find a user from the username claim
-            user_info = await self.store.get_userinfo_by_id(user_id=user_id.to_string())
+            user_info = await self.store.get_user_by_id(user_id=user_id.to_string())
             if user_info is None:
                 # If the user does not exist, we should create it on the fly
                 # TODO: we could use SCIM to provision users ahead of time and listen

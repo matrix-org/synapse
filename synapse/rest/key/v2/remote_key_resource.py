@@ -16,7 +16,13 @@ import logging
 import re
 from typing import TYPE_CHECKING, Dict, Mapping, Optional, Set, Tuple
 
-from pydantic import Extra, StrictInt, StrictStr
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import Extra, StrictInt, StrictStr
+else:
+    from pydantic import StrictInt, StrictStr, Extra
+
 from signedjson.sign import sign_json
 
 from twisted.web.server import Request
