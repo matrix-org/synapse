@@ -18,7 +18,12 @@ import random
 from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from pydantic import StrictBool, StrictStr, constr
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import StrictBool, StrictStr, constr
+else:
+    from pydantic import StrictBool, StrictStr, constr
 from typing_extensions import Literal
 
 from twisted.web.server import Request
