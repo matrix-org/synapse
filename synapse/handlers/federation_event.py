@@ -2342,6 +2342,12 @@ class FederationEventHandler:
             # TODO retrieve the previous state, and exclude join -> join transitions
             self._notifier.notify_user_joined_room(event.event_id, event.room_id)
 
+        # If this is a server ACL event, clear the cache in the storage controller.
+        if event.type == EventTypes.ServerACL:
+            self._state_storage_controller.get_server_acl_for_room.invalidate(
+                (event.room_id,)
+            )
+
     def _sanity_check_event(self, ev: EventBase) -> None:
         """
         Do some early sanity checks of a received event

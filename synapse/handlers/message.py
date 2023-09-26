@@ -1730,6 +1730,11 @@ class EventCreationHandler:
                         event.event_id, event.room_id
                     )
 
+            if event.type == EventTypes.ServerACL:
+                self._storage_controllers.state.get_server_acl_for_room.invalidate(
+                    (event.room_id,)
+                )
+
             await self._maybe_kick_guest_users(event, context)
 
             if event.type == EventTypes.CanonicalAlias:
