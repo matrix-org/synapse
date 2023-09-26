@@ -702,6 +702,7 @@ jobs:
             trial-olddeps
             sytest
             portdb
+            export-data
             complement
             check-signoff
             lint-newsfile
