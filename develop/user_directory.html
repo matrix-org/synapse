@@ -147,40 +147,40 @@
                         </div>
 
                         <h1 id="user-directory-api-implementation"><a class="header" href="#user-directory-api-implementation">User Directory API Implementation</a></h1>
-<p>The user directory is currently maintained based on the 'visible' users
-on this particular server - i.e. ones which your account shares a room with, or
-who are present in a publicly viewable room present on the server.</p>
-<p>The directory info is stored in various tables, which can (typically after
-DB corruption) get stale or out of sync. If this happens, for now the
+<p>The user directory is maintained based on users that are 'visible' to the homeserver -
+i.e. ones which are local to the server and ones which any local user shares a
+room with.</p>
+<p>The directory info is stored in various tables, which can sometimes get out of
+sync (although this is considered a bug). If this happens, for now the
 solution to fix it is to use the <a href="usage/administration/admin_api/background_updates.html#run">admin API</a>
 and execute the job <code>regenerate_directory</code>. This should then start a background task to
-flush the current tables and regenerate the directory.</p>
+flush the current tables and regenerate the directory. Depending on the size
+of your homeserver (number of users and rooms) this can take a while.</p>
 <h2 id="data-model"><a class="header" href="#data-model">Data model</a></h2>
 <p>There are five relevant tables that collectively form the &quot;user directory&quot;.
-Three of them track a master list of all the users we could search for.
-The last two (collectively called the &quot;search tables&quot;) track who can
-see who.</p>
+Three of them track a list of all known users. The last two (collectively called
+the &quot;search tables&quot;) track which users are visible to each other.</p>
 <p>From all of these tables we exclude three types of local user:</p>
 <ul>
 <li>support users</li>
 <li>appservice users</li>
 <li>deactivated users</li>
 </ul>
+<p>A description of each table follows:</p>
 <ul>
 <li>
-<p><code>user_directory</code>. This contains the user_id, display name and avatar we'll
-return when you search the directory.</p>
+<p><code>user_directory</code>. This contains the user ID, display name and avatar of each user.</p>
 <ul>
-<li>Because there's only one directory entry per user, it's important that we only
-ever put publicly visible names here. Otherwise we might leak a private
+<li>Because there is only one directory entry per user, it is important that it
+only contain publicly visible information. Otherwise, this will leak the
 nickname or avatar used in a private room.</li>
 <li>Indexed on rooms. Indexed on users.</li>
 </ul>
 </li>
 <li>
 <p><code>user_directory_search</code>. To be joined to <code>user_directory</code>. It contains an extra
-column that enables full text search based on user ids and display names.
-Different schemas for SQLite and Postgres with different code paths to match.</p>
+column that enables full text search based on user IDs and display names.
+Different schemas for SQLite and Postgres are used.</p>
 <ul>
 <li>Indexed on the full text search data. Indexed on users.</li>
 </ul>
@@ -189,18 +189,93 @@ Different schemas for SQLite and Postgres with different code paths to match.</p
 <p><code>user_directory_stream_pos</code>. When the initial background update to populate
 the directory is complete, we record a stream position here. This indicates
 that synapse should now listen for room changes and incrementally update
-the directory where necessary.</p>
+the directory where necessary. (See <a href="development/synapse_architecture/streams.html">stream positions</a>.)</p>
 </li>
 <li>
-<p><code>users_in_public_rooms</code>. Contains associations between users and the public rooms they're in.
-Used to determine which users are in public rooms and should be publicly visible in the directory.</p>
+<p><code>users_in_public_rooms</code>. Contains associations between users and the public
+rooms they're in.  Used to determine which users are in public rooms and should
+be publicly visible in the directory. Both local and remote users are tracked.</p>
 </li>
 <li>
 <p><code>users_who_share_private_rooms</code>. Rows are triples <code>(L, M, room id)</code> where <code>L</code>
 is a local user and <code>M</code> is a local or remote user. <code>L</code> and <code>M</code> should be
 different, but this isn't enforced by a constraint.</p>
+<p>Note that if two local users share a room then there will be two entries:
+<code>(user1, user2, !room_id)</code> and <code>(user2, user1, !room_id)</code>.</p>
 </li>
 </ul>
+<h2 id="configuration-options"><a class="header" href="#configuration-options">Configuration options</a></h2>
+<p>The exact way user search works can be tweaked via some server-level
+<a href="usage/configuration/config_documentation.html#user_directory">configuration options</a>.</p>
+<p>The information is not repeated here, but the options are mentioned below.</p>
+<h2 id="search-algorithm"><a class="header" href="#search-algorithm">Search algorithm</a></h2>
+<p>If <code>search_all_users</code> is <code>false</code>, then results are limited to users who:</p>
+<ol>
+<li>Are found in the <code>users_in_public_rooms</code> table, or</li>
+<li>Are found in the <code>users_who_share_private_rooms</code> where <code>L</code> is the requesting
+user and <code>M</code> is the search result.</li>
+</ol>
+<p>Otherwise, if <code>search_all_users</code> is <code>true</code>, no such limits are placed and all
+users known to the server (matching the search query) will be returned.</p>
+<p>By default, locked users are not returned. If <code>show_locked_users</code> is <code>true</code> then
+no filtering on the locked status of a user is done.</p>
+<p>The user provided search term is lowercased and normalized using <a href="https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization">NFKC</a>,
+this treats the string as case-insensitive, canonicalizes different forms of the
+same text, and maps some &quot;roughly equivalent&quot; characters together.</p>
+<p>The search term is then split into words:</p>
+<ul>
+<li>If <a href="https://en.wikipedia.org/wiki/International_Components_for_Unicode">ICU</a> is
+available, then the system's <a href="https://unicode-org.github.io/icu/userguide/locale/#default-locales">default locale</a>
+will be used to break the search term into words. (See the
+<a href="setup/installation.html">installation instructions</a> for how to install ICU.)</li>
+<li>If unavailable, then runs of ASCII characters, numbers, underscores, and hypens
+are considered words.</li>
+</ul>
+<p>The queries for PostgreSQL and SQLite are detailed below, by their overall goal
+is to find matching users, preferring users who are &quot;real&quot; (e.g. not bots,
+not deactivated). It is assumed that real users will have an display name and
+avatar set.</p>
+<h3 id="postgresql"><a class="header" href="#postgresql">PostgreSQL</a></h3>
+<p>The above words are then transformed into two queries:</p>
+<ol>
+<li>&quot;exact&quot; which matches the parsed words exactly (using <a href="https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES"><code>to_tsquery</code></a>);</li>
+<li>&quot;prefix&quot; which matches the parsed words as prefixes (using <code>to_tsquery</code>).</li>
+</ol>
+<p>Results are composed of all rows in the <code>user_directory_search</code> table whose information
+matches one (or both) of these queries. Results are ordered by calculating a weighted
+score for each result, higher scores are returned first:</p>
+<ul>
+<li>4x if a user ID exists.</li>
+<li>1.2x if the user has a display name set.</li>
+<li>1.2x if the user has an avatar set.</li>
+<li>0x-3x by the full text search results using the <a href="https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-RANKING"><code>ts_rank_cd</code> function</a>
+against the &quot;exact&quot; search query; this has four variables with the following weightings:
+<ul>
+<li><code>D</code>: 0.1 for the user ID's domain</li>
+<li><code>C</code>: 0.1 for unused</li>
+<li><code>B</code>: 0.9 for the user's display name (or an empty string if it is not set)</li>
+<li><code>A</code>: 0.1 for the user ID's localpart</li>
+</ul>
+</li>
+<li>0x-1x by the full text search results using the <code>ts_rank_cd</code> function against the
+&quot;prefix&quot; search query. (Using the same weightings as above.)</li>
+<li>If <code>prefer_local_users</code> is <code>true</code>, then 2x if the user is local to the homeserver.</li>
+</ul>
+<p>Note that <code>ts_rank_cd</code> returns a weight between 0 and 1. The initial weighting of
+all results is 1.</p>
+<h3 id="sqlite"><a class="header" href="#sqlite">SQLite</a></h3>
+<p>Results are composed of all rows in the <code>user_directory_search</code> whose information
+matches the query. Results are ordered by the following information, with each
+subsequent column used as a tiebreaker, for each result:</p>
+<ol>
+<li>By the <a href="https://www.sqlite.org/windowfunctions.html#built_in_window_functions"><code>rank</code></a>
+of the full text search results using the <a href="https://www.sqlite.org/fts3.html#matchinfo"><code>matchinfo</code> function</a>. Higher
+ranks are returned first.</li>
+<li>If <code>prefer_local_users</code> is <code>true</code>, then users local to the homeserver are
+returned first.</li>
+<li>Users with a display name set are returned first.</li>
+<li>Users with an avatar set are returned first.</li>
+</ol>
 
                     </main>
 
