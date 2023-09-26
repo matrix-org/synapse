@@ -499,8 +499,8 @@ jobs:
             /logs/**/*.log*
 
   export-data:
-    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
-    needs: [linting-done, portdb]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true'}} # Allow previous steps to be skipped, but not fail
+    needs: [linting-done, portdb, changes]
     runs-on: ubuntu-latest
     env:
       TOP: ${{ github.workspace }}
