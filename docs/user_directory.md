@@ -43,7 +43,7 @@ A description of each table follows:
 
 * `users_in_public_rooms`. Contains associations between users and the public
   rooms they're in.  Used to determine which users are in public rooms and should
-  be publicly visible in the directory.
+  be publicly visible in the directory. Both local and remote users are tracked.
 
 * `users_who_share_private_rooms`. Rows are triples `(L, M, room id)` where `L`
    is a local user and `M` is a local or remote user. `L` and `M` should be
@@ -67,6 +67,9 @@ If `search_all_users` is `false`, then results are limited to users who:
 2. Are found in the `users_who_share_private_rooms` where `L` is the requesting
    user and `M` is the search result.
 
+Otherwise, if `search_all_users` is `true`, no such limits are placed and all
+users known to the server (matching the search query) will be returned.
+
 By default, locked users are not returned. If `show_locked_users` is `true` then
 no filtering on the locked status of a user is done.
 
@@ -77,10 +80,16 @@ same text, and maps some "roughly equivalent" characters together.
 The search term is then split into words:
 
 * If [ICU](https://en.wikipedia.org/wiki/International_Components_for_Unicode) is
-  available, then the default locale will be used to break the search term into words.
-  (See the [installation instructions](setup/installation.md) for how to install ICU.)
+  available, then the system's [default locale](https://unicode-org.github.io/icu/userguide/locale/#default-locales)
+  will be used to break the search term into words. (See the
+  [installation instructions](setup/installation.md) for how to install ICU.)
 * If unavailable, then runs of ASCII characters, numbers, underscores, and hypens
   are considered words.
+
+The queries for PostgreSQL and SQLite are detailed below, by their overall goal
+is to find matching users, preferring users who are "real" (e.g. not bots,
+not deactivated). It is assumed that real users will have an display name and
+avatar set.
 
 ### PostgreSQL
 
@@ -89,7 +98,9 @@ The above words are then transformed into two queries:
 1. "exact" which matches the parsed words exactly (using [`to_tsquery`](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES));
 2. "prefix" which matches the parsed words as prefixes (using `to_tsquery`).
 
-Results are sorted by a rank derived by:
+Results are composed of all rows in the `user_directory_search` table whose information
+matches one (or both) of these queries. Results are ordered by calculating a weighted
+score for each result, higher scores are returned first:
 
 * 4x if a user ID exists.
 * 1.2x if the user has a display name set.
@@ -104,12 +115,19 @@ Results are sorted by a rank derived by:
   "prefix" search query. (Using the same weightings as above.)
 * If `prefer_local_users` is `true`, then 2x if the user is local to the homeserver.
 
+Note that `ts_rank_cd` returns a weight between 0 and 1. The initial weighting of
+all results is 1.
+
 ### SQLite
 
-Results are sorted as follows:
+Results are composed of all rows in the `user_directory_search` whose information
+matches the query. Results are ordered by the following information, with each
+subsequent column used as a tiebreaker, for each result:
 
-* By the [`rank`](https://www.sqlite.org/windowfunctions.html#built_in_window_functions)
-  of the full text search results using the [`matchinfo` function](https://www.sqlite.org/fts3.html#matchinfo).
-* If `prefer_local_users` is `true`, then if the user is local to the homeserver.
-* If the user has a display name set.
-* If the user has an avatar set.
+1. By the [`rank`](https://www.sqlite.org/windowfunctions.html#built_in_window_functions)
+   of the full text search results using the [`matchinfo` function](https://www.sqlite.org/fts3.html#matchinfo). Higher
+   ranks are returned first.
+2. If `prefer_local_users` is `true`, then users local to the homeserver are
+   returned first.
+3. Users with a display name set are returned first.
+4. Users with an avatar set are returned first.
