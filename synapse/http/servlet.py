@@ -28,8 +28,15 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel, MissingError, PydanticValueError, ValidationError
-from pydantic.error_wrappers import ErrorWrapper
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import BaseModel, MissingError, PydanticValueError, ValidationError
+    from pydantic.v1.error_wrappers import ErrorWrapper
+else:
+    from pydantic import BaseModel, MissingError, PydanticValueError, ValidationError
+    from pydantic.error_wrappers import ErrorWrapper
+
 from typing_extensions import Literal
 
 from twisted.web.server import Request
