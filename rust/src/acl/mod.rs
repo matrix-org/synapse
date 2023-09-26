@@ -86,7 +86,7 @@ impl ServerAclEvaluator {
             }
         }
 
-        // next,  check the deny list
+        // next, check the deny list
         if self.deny.iter().any(|e| e.is_match(server_name)) {
             return false;
         }

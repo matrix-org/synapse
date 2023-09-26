@@ -792,18 +792,17 @@ def server_acl_evaluator_from_event(acl_event: EventBase) -> "ServerAclEvaluator
     """
     Create a ServerAclEvaluator from a m.room.server_acl event's content.
 
-    This does up-front parsing of the content to ignore bad data and pre-compile
-    regular expressions.
+    This does up-front parsing of the content to ignore bad data. It then creates
+    the ServerAclEvaluator which will pre-compile regular expressions from the globs.
     """
 
-    # first of all, check if literal IPs are blocked, and if so, whether the
-    # server name is a literal IP
+    # first of all, parse if literal IPs are blocked.
     allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
     if not isinstance(allow_ip_literals, bool):
         logger.warning("Ignoring non-bool allow_ip_literals flag")
         allow_ip_literals = True
 
-    # next,  check the deny list
+    # next, parse the deny list by ignoring any non-strings.
     deny = acl_event.content.get("deny", [])
     if not isinstance(deny, (list, tuple)):
         logger.warning("Ignoring non-list deny ACL %s", deny)
