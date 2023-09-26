@@ -105,13 +105,13 @@ score for each result, higher scores are returned first:
 * 4x if a user ID exists.
 * 1.2x if the user has a display name set.
 * 1.2x if the user has an avatar set.
-* 3x by the full text search results using the [`ts_rank_cd` function](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-RANKING)
+* 0x-3x by the full text search results using the [`ts_rank_cd` function](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-RANKING)
   against the "exact" search query; this has four variables with the following weightings:
   * `D`: 0.1 for the user ID's domain
   * `C`: 0.1 for unused
   * `B`: 0.9 for the user's display name (or an empty string if it is not set)
   * `A`: 0.1 for the user ID's localpart
-* 1x by the full text search results using the `ts_rank_cd` function against the
+* 0x-1x by the full text search results using the `ts_rank_cd` function against the
   "prefix" search query. (Using the same weightings as above.)
 * If `prefer_local_users` is `true`, then 2x if the user is local to the homeserver.
 
