@@ -1,6 +1,6 @@
 # User Directory API Implementation
 
-The user directory is maintained based on the 'visible' users of a homeserver -
+The user directory is maintained based on users that are 'visible' to the homeserver -
 i.e. ones which are local to the server and ones which any local user shares a
 room with.
 
