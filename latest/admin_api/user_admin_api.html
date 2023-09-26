@@ -193,7 +193,8 @@ for a server admin: see <a href="../usage/administration/admin_api/">Admin API</
             &quot;external_id&quot;: &quot;&lt;user_id_provider_2&gt;&quot;
         }
     ],
-    &quot;user_type&quot;: null
+    &quot;user_type&quot;: null,
+    &quot;locked&quot;: false
 }
 </code></pre>
 <p>URL parameters:</p>
@@ -234,7 +235,8 @@ specific <code>user_id</code>.</p>
     ],
     &quot;admin&quot;: false,
     &quot;deactivated&quot;: false,
-    &quot;user_type&quot;: null
+    &quot;user_type&quot;: null,
+    &quot;locked&quot;: false
 }
 </code></pre>
 <p>Returns HTTP status code:</p>
@@ -333,7 +335,8 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User One&gt;&quot;,
             &quot;avatar_url&quot;: null,
-            &quot;creation_ts&quot;: 1560432668000
+            &quot;creation_ts&quot;: 1560432668000,
+            &quot;locked&quot;: false
         }, {
             &quot;name&quot;: &quot;&lt;user_id2&gt;&quot;,
             &quot;is_guest&quot;: 0,
@@ -344,7 +347,8 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User Two&gt;&quot;,
             &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
-            &quot;creation_ts&quot;: 1561550621000
+            &quot;creation_ts&quot;: 1561550621000,
+            &quot;locked&quot;: false
         }
     ],
     &quot;next_token&quot;: &quot;100&quot;,
@@ -414,6 +418,10 @@ Setting this value to <code>b</code> will reverse the above sort order. Defaults
 Can be provided multiple times. Possible values are <code>bot</code>, <code>support</code> or &quot;empty string&quot;.
 &quot;empty string&quot; here means to exclude users without a type.</p>
 </li>
+<li>
+<p><code>locked</code> - string representing a bool - Is optional and if <code>true</code> will <strong>include</strong> locked users.
+Defaults to <code>false</code> to exclude locked users. Note: Introduced in v1.93.</p>
+</li>
 </ul>
 <p>Caution. The database only has indexes on the columns <code>name</code> and <code>creation_ts</code>.
 This means that if a different sort order is used (<code>is_guest</code>, <code>admin</code>,
@@ -438,6 +446,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <li><code>avatar_url</code> - string -  The user's avatar URL if they have set one.</li>
 <li><code>creation_ts</code> - integer - The user's creation timestamp in ms.</li>
 <li><code>last_seen_ts</code> - integer - The user's last activity timestamp in ms.</li>
+<li><code>locked</code> - bool - Status if that user has been marked as locked. Note: Introduced in v1.93.</li>
 </ul>
 </li>
 <li>
@@ -447,6 +456,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <p><code>total</code> - integer - Total number of media.</p>
 </li>
 </ul>
+<p><em>Added in Synapse 1.93:</em> the <code>locked</code> query parameter and response field.</p>
 <h2 id="query-current-sessions-for-a-user"><a class="header" href="#query-current-sessions-for-a-user">Query current sessions for a user</a></h2>
 <p>This API returns information about the active sessions for a specific user.</p>
 <p>The endpoints are:</p>

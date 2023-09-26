@@ -257,7 +257,7 @@ on hub.docker.com.</p>
 Dockerfile to automate a synapse server in a single Docker image, at
 <a href="https://hub.docker.com/r/avhost/docker-matrix/tags/">https://hub.docker.com/r/avhost/docker-matrix/tags/</a></p>
 <p>Slavi Pantaleev has created an Ansible playbook,
-which installs the offical Docker image of Matrix Synapse
+which installs the official Docker image of Matrix Synapse
 along with many other Matrix-related services (Postgres database, Element, coturn,
 ma1sd, SSL support, etc.).
 For more details, see
@@ -296,7 +296,7 @@ the Debian repositories.
 For <code>bookworm</code> and <code>sid</code>, it can be installed simply with:</p>
 <pre><code class="language-sh">sudo apt install matrix-synapse
 </code></pre>
-<p>Synapse is also avaliable in <code>bullseye-backports</code>.  Please
+<p>Synapse is also available in <code>bullseye-backports</code>.  Please
 see the <a href="https://backports.debian.org/Instructions/">Debian documentation</a>
 for information on how to use backports.</p>
 <p><code>matrix-synapse</code> is no longer maintained for <code>buster</code> and older.</p>
@@ -332,6 +332,10 @@ compile it under the right architecture. (This should not be needed if
 installing under virtualenv):</p>
 <pre><code class="language-sh">sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
+</code></pre>
+<h4 id="alpine-linux"><a class="header" href="#alpine-linux">Alpine Linux</a></h4>
+<p>6543 maintains <a href="https://pkgs.alpinelinux.org/packages?name=synapse&amp;branch=edge">Synapse packages for Alpine Linux</a> in the community repository. Install with:</p>
+<pre><code class="language-sh">sudo apk add synapse
 </code></pre>
 <h4 id="void-linux"><a class="header" href="#void-linux">Void Linux</a></h4>
 <p>Synapse can be found in the void repositories as
@@ -850,7 +854,7 @@ of <code>COLLATE</code> and <code>CTYPE</code> unless the config flag <code>allo
 <code>database</code> section of the config, is set to true. Using different locales can cause issues if the locale library is updated from
 underneath the database, or if a different version of the locale is used on any
 replicas.</p>
-<p>If you have a databse with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
+<p>If you have a database with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
 the correct locale parameter (as shown above). It is also possible to change the
 parameters on a live database and run a <code>REINDEX</code> on the entire database,
 however extreme care must be taken to avoid database corruption.</p>
@@ -1175,7 +1179,7 @@ TURN server.</p>
 </ul>
 <h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
 <p>For TURN relaying to work, the TURN service must be hosted on a server/endpoint with a public IP.</p>
-<p>Hosting TURN behind NAT requires port forwaring and for the NAT gateway to have a public IP.
+<p>Hosting TURN behind NAT requires port forwarding and for the NAT gateway to have a public IP.
 However, even with appropriate configuration, NAT is known to cause issues and to often not work.</p>
 <p>Afterwards, the homeserver needs some further configuration.</p>
 <h2 id="synapse-setup"><a class="header" href="#synapse-setup">Synapse setup</a></h2>
@@ -1779,6 +1783,11 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1930"><a class="header" href="#upgrading-to-v1930">Upgrading to v1.93.0</a></h1>
+<h2 id="minimum-supported-rust-version"><a class="header" href="#minimum-supported-rust-version">Minimum supported Rust version</a></h2>
+<p>The minimum supported Rust version has been increased from v1.60.0 to v1.61.0.
+Users building from source will need to ensure their <code>rustc</code> version is up to
+date.</p>
 <h1 id="upgrading-to-v1900"><a class="header" href="#upgrading-to-v1900">Upgrading to v1.90.0</a></h1>
 <h2 id="app-service-query-parameter-authorization-is-now-a-configuration-option"><a class="header" href="#app-service-query-parameter-authorization-is-now-a-configuration-option">App service query parameter authorization is now a configuration option</a></h2>
 <p>Synapse v1.81.0 deprecated application service authorization via query parameters as this is
@@ -1815,7 +1824,7 @@ are being removed in this release of Synapse:</p>
 administrators of single-process (monolith) installations don't need to do anything.</p>
 <p>For an illustrative example, please see <a href="upgrade.html#upgrading-to-v1840">Upgrading to v1.84.0</a> below.</p>
 <h1 id="upgrading-to-v1860"><a class="header" href="#upgrading-to-v1860">Upgrading to v1.86.0</a></h1>
-<h2 id="minimum-supported-rust-version"><a class="header" href="#minimum-supported-rust-version">Minimum supported Rust version</a></h2>
+<h2 id="minimum-supported-rust-version-1"><a class="header" href="#minimum-supported-rust-version-1">Minimum supported Rust version</a></h2>
 <p>The minimum supported Rust version has been increased from v1.58.1 to v1.60.0.
 Users building from source will need to ensure their <code>rustc</code> version is up to
 date.</p>
@@ -2668,7 +2677,7 @@ Instructions for doing so are provided
 <p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.</p>
-<p>This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or
+<p>This release of Synapse requires Python 3.6+ and PostgreSQL 9.6+ or
 SQLite 3.22+.</p>
 <h2 id="removal-of-old-list-accounts-admin-api"><a class="header" href="#removal-of-old-list-accounts-admin-api">Removal of old List Accounts Admin API</a></h2>
 <p>The deprecated v1 &quot;list accounts&quot; admin API
@@ -3449,7 +3458,7 @@ in the config and update your dependencies dependencies. See README.rst
 for details.</p>
 <h1 id="upgrading-to-v0110"><a class="header" href="#upgrading-to-v0110">Upgrading to v0.11.0</a></h1>
 <p>This release includes the option to send anonymous usage stats to
-matrix.org, and requires that administrators explictly opt in or out by
+matrix.org, and requires that administrators explicitly opt in or out by
 setting the <code>report_stats</code> option to either <code>true</code> or <code>false</code>.</p>
 <p>We would really appreciate it if you could help our project out by
 reporting anonymized usage statistics from your homeserver. Only very
@@ -3529,7 +3538,7 @@ latest module, please run:</p>
 <pre><code>$ pip uninstall syweb
 </code></pre>
 <h1 id="upgrading-to-v050"><a class="header" href="#upgrading-to-v050">Upgrading to v0.5.0</a></h1>
-<p>The webclient has been split out into a seperate repository/pacakage in
+<p>The webclient has been split out into a separate repository/package in
 this release. Before you restart your homeserver you will need to pull
 in the webclient package by running:</p>
 <pre><code>python setup.py develop --user
@@ -3706,8 +3715,10 @@ followed by a letter. Letters have the following meanings:</p>
 messages from the database after 5 minutes, rather than 5 months.</p>
 <p>In addition, configuration options referring to size use the following suffixes:</p>
 <ul>
-<li><code>M</code> = MiB, or 1,048,576 bytes</li>
 <li><code>K</code> = KiB, or 1024 bytes</li>
+<li><code>M</code> = MiB, or 1,048,576 bytes</li>
+<li><code>G</code> = GiB, or 1,073,741,824 bytes</li>
+<li><code>T</code> = TiB, or 1,099,511,627,776 bytes</li>
 </ul>
 <p>For example, setting <code>max_avatar_size: 10M</code> means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.</p>
@@ -4129,7 +4140,7 @@ for <a href="usage/configuration/../../workers.html">workers</a> and containers 
 </code></pre>
 <p>Example configuration #2:</p>
 <pre><code class="language-yaml">listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -4500,6 +4511,13 @@ still take up to 5 minutes to purge redacted events from the database.</p>
 <pre><code class="language-yaml">redaction_retention_period: 28d
 </code></pre>
 <hr />
+<h3 id="forgotten_room_retention_period"><a class="header" href="#forgotten_room_retention_period"><code>forgotten_room_retention_period</code></a></h3>
+<p>How long to keep locally forgotten rooms before purging them from the DB.</p>
+<p>Defaults to <code>null</code>, meaning it's disabled.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">forgotten_room_retention_period: 28d
+</code></pre>
+<hr />
 <h3 id="user_ips_max_age"><a class="header" href="#user_ips_max_age"><code>user_ips_max_age</code></a></h3>
 <p>How long to track users' last seen time and IPs in the database.</p>
 <p>Defaults to <code>28d</code>. Set to <code>null</code> to disable clearing out of old rows.</p>
@@ -4650,12 +4668,12 @@ any intermediate certificates (for instance, if using certbot, use
 <hr />
 <h3 id="federation_client_minimum_tls_version"><a class="header" href="#federation_client_minimum_tls_version"><code>federation_client_minimum_tls_version</code></a></h3>
 <p>The minimum TLS version that will be used for outbound federation requests.</p>
-<p>Defaults to <code>1</code>. Configurable to <code>1</code>, <code>1.1</code>, <code>1.2</code>, or <code>1.3</code>. Note
-that setting this value higher than <code>1.2</code> will prevent federation to most
-of the public Matrix network: only configure it to <code>1.3</code> if you have an
+<p>Defaults to <code>&quot;1&quot;</code>. Configurable to <code>&quot;1&quot;</code>, <code>&quot;1.1&quot;</code>, <code>&quot;1.2&quot;</code>, or <code>&quot;1.3&quot;</code>. Note
+that setting this value higher than <code>&quot;1.2&quot;</code> will prevent federation to most
+of the public Matrix network: only configure it to <code>&quot;1.3&quot;</code> if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">federation_client_minimum_tls_version: 1.2
+<pre><code class="language-yaml">federation_client_minimum_tls_version: &quot;1.2&quot;
 </code></pre>
 <hr />
 <h3 id="federation_certificate_verification_whitelist"><a class="header" href="#federation_certificate_verification_whitelist"><code>federation_certificate_verification_whitelist</code></a></h3>
@@ -6109,7 +6127,7 @@ are still valid. Defaults to 1d.</p>
 <p>Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a <code>verify key</code>, which
 will make synapse check that the response is signed by that key.</p>
-<p>This setting supercedes an older setting named <code>perspectives</code>. The old format
+<p>This setting supersedes an older setting named <code>perspectives</code>. The old format
 is still supported for backwards-compatibility, but it is deprecated.</p>
 <p><code>trusted_key_servers</code> defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set
@@ -6595,27 +6613,50 @@ claim MUST contain &quot;admin&quot;.</p>
 <p>Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>: Set this to true to enable authorization against a CAS server.
-Defaults to false.</li>
-<li><code>idp_name</code>: A user-facing name for this identity provider, which is used to
-offer the user a choice of login mechanisms.</li>
-<li><code>idp_icon</code>: An optional icon for this identity provider, which is presented
+<li>
+<p><code>enabled</code>: Set this to true to enable authorization against a CAS server.
+Defaults to false.</p>
+</li>
+<li>
+<p><code>idp_name</code>: A user-facing name for this identity provider, which is used to
+offer the user a choice of login mechanisms.</p>
+</li>
+<li>
+<p><code>idp_icon</code>: An optional icon for this identity provider, which is presented
 by clients and Synapse's own IdP picker page. If given, must be an
 MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
 obtain such an MXC URI is to upload an image to an (unencrypted) room
-and then copy the &quot;url&quot; from the source of the event.)</li>
-<li><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
+and then copy the &quot;url&quot; from the source of the event.)</p>
+</li>
+<li>
+<p><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
 to style the login flow according to the identity provider in question.
-See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
-<li><code>server_url</code>: The URL of the CAS authorization endpoint.</li>
-<li><code>protocol_version</code>: The CAS protocol version, defaults to none (version 3 is required if you want to use &quot;required_attributes&quot;).</li>
-<li><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
-If no name is given here, no displayname will be set.</li>
-<li><code>required_attributes</code>:  It is possible to configure Synapse to only allow logins if CAS attributes
+See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</p>
+</li>
+<li>
+<p><code>server_url</code>: The URL of the CAS authorization endpoint.</p>
+</li>
+<li>
+<p><code>protocol_version</code>: The CAS protocol version, defaults to none (version 3 is required if you want to use &quot;required_attributes&quot;).</p>
+</li>
+<li>
+<p><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
+If no name is given here, no displayname will be set.</p>
+</li>
+<li>
+<p><code>required_attributes</code>:  It is possible to configure Synapse to only allow logins if CAS attributes
 match particular values. All of the keys given below must exist
 and the values must match the given value. Alternately if the given value
 is <code>None</code> then any value is allowed (the attribute just must exist).
-All of the listed attributes must match for the login to be permitted.</li>
+All of the listed attributes must match for the login to be permitted.</p>
+</li>
+<li>
+<p><code>enable_registration</code>: set to 'false' to disable automatic registration of new
+users. This allows the CAS SSO flow to be limited to sign in only, rather than
+automatically registering users that have a valid SSO login but do not have
+a pre-registered account. Defaults to true.</p>
+<p><em>Added in Synapse 1.93.0.</em></p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">cas_config:
@@ -6626,6 +6667,7 @@ All of the listed attributes must match for the login to be permitted.</li>
   required_attributes:
     userGroup: &quot;staff&quot;
     department: None
+  enable_registration: true
 </code></pre>
 <hr />
 <h3 id="sso"><a class="header" href="#sso"><code>sso</code></a></h3>
@@ -9254,9 +9296,9 @@ terms and conditions set by the administrator of a server - and blocking access
 to the server until they have.</p>
 <p>There are several parts to this functionality; each requires some specific
 configuration in <code>homeserver.yaml</code> to be enabled.</p>
-<p>Note that various parts of the configuation and this document refer to the
+<p>Note that various parts of the configuration and this document refer to the
 &quot;privacy policy&quot;: agreement with a privacy policy is one particular use of this
-feature, but of course adminstrators can specify other terms and conditions
+feature, but of course administrators can specify other terms and conditions
 unrelated to &quot;privacy&quot; per se.</p>
 <h2 id="collecting-policy-agreement-from-a-user"><a class="header" href="#collecting-policy-agreement-from-a-user">Collecting policy agreement from a user</a></h2>
 <p>Synapse can be configured to serve the user a simple policy form with an
@@ -11122,6 +11164,7 @@ information.</p>
 ^/_matrix/client/(r0|v3|unstable)/user/.*/filter(/|$)
 ^/_matrix/client/(api/v1|r0|v3|unstable)/directory/room/.*$
 ^/_matrix/client/(r0|v3|unstable)/capabilities$
+^/_matrix/client/(r0|v3|unstable)/notifications$
 
 # Encryption requests
 ^/_matrix/client/(r0|v3|unstable)/keys/query$
@@ -13837,7 +13880,8 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api/">A
             &quot;external_id&quot;: &quot;&lt;user_id_provider_2&gt;&quot;
         }
     ],
-    &quot;user_type&quot;: null
+    &quot;user_type&quot;: null,
+    &quot;locked&quot;: false
 }
 </code></pre>
 <p>URL parameters:</p>
@@ -13878,7 +13922,8 @@ specific <code>user_id</code>.</p>
     ],
     &quot;admin&quot;: false,
     &quot;deactivated&quot;: false,
-    &quot;user_type&quot;: null
+    &quot;user_type&quot;: null,
+    &quot;locked&quot;: false
 }
 </code></pre>
 <p>Returns HTTP status code:</p>
@@ -13977,7 +14022,8 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User One&gt;&quot;,
             &quot;avatar_url&quot;: null,
-            &quot;creation_ts&quot;: 1560432668000
+            &quot;creation_ts&quot;: 1560432668000,
+            &quot;locked&quot;: false
         }, {
             &quot;name&quot;: &quot;&lt;user_id2&gt;&quot;,
             &quot;is_guest&quot;: 0,
@@ -13988,7 +14034,8 @@ By default, the response is ordered by ascending user ID.</p>
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User Two&gt;&quot;,
             &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
-            &quot;creation_ts&quot;: 1561550621000
+            &quot;creation_ts&quot;: 1561550621000,
+            &quot;locked&quot;: false
         }
     ],
     &quot;next_token&quot;: &quot;100&quot;,
@@ -14058,6 +14105,10 @@ Setting this value to <code>b</code> will reverse the above sort order. Defaults
 Can be provided multiple times. Possible values are <code>bot</code>, <code>support</code> or &quot;empty string&quot;.
 &quot;empty string&quot; here means to exclude users without a type.</p>
 </li>
+<li>
+<p><code>locked</code> - string representing a bool - Is optional and if <code>true</code> will <strong>include</strong> locked users.
+Defaults to <code>false</code> to exclude locked users. Note: Introduced in v1.93.</p>
+</li>
 </ul>
 <p>Caution. The database only has indexes on the columns <code>name</code> and <code>creation_ts</code>.
 This means that if a different sort order is used (<code>is_guest</code>, <code>admin</code>,
@@ -14082,6 +14133,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <li><code>avatar_url</code> - string -  The user's avatar URL if they have set one.</li>
 <li><code>creation_ts</code> - integer - The user's creation timestamp in ms.</li>
 <li><code>last_seen_ts</code> - integer - The user's last activity timestamp in ms.</li>
+<li><code>locked</code> - bool - Status if that user has been marked as locked. Note: Introduced in v1.93.</li>
 </ul>
 </li>
 <li>
@@ -14091,6 +14143,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <p><code>total</code> - integer - Total number of media.</p>
 </li>
 </ul>
+<p><em>Added in Synapse 1.93:</em> the <code>locked</code> query parameter and response field.</p>
 <h2 id="query-current-sessions-for-a-user"><a class="header" href="#query-current-sessions-for-a-user">Query current sessions for a user</a></h2>
 <p>This API returns information about the active sessions for a specific user.</p>
 <p>The endpoints are:</p>
@@ -14981,7 +15034,7 @@ Destination objects contain the following fields:
 remote server, in ms. This is <code>0</code> if the last attempt to communicate with the
 remote server was successful.</li>
 <li><code>retry_interval</code> - integer - How long since the last time Synapse tried to reach
-the remote server before trying again, in ms. This is <code>0</code> if no further retrying occuring.</li>
+the remote server before trying again, in ms. This is <code>0</code> if no further retrying occurring.</li>
 <li><code>failure_ts</code> - nullable integer - The first time Synapse tried and failed to reach the
 remote server, in ms. This is <code>null</code> if communication with the remote server has never failed.</li>
 <li><code>last_successful_stream_ordering</code> - nullable integer - The stream ordering of the most
@@ -16223,7 +16276,7 @@ useful to reproduce this locally.</p>
 <h4 id="using-docker"><a class="header" href="#using-docker">Using Docker</a></h4>
 <p>The easiest way to do so is to run Postgres via a docker container. In one
 terminal:</p>
-<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 postgres:14
 </code></pre>
 <p>If you see an error like</p>
 <pre><code>docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
@@ -17732,7 +17785,7 @@ blocking operation, and returns an awaitable:</p>
 <p>So we have stopped processing the request (and will probably go on to
 start processing the next), without clearing the logcontext.</p>
 <p>To circumvent this problem, synapse code assumes that, wherever you have
-an awaitable, you will want to <code>await</code> it. To that end, whereever
+an awaitable, you will want to <code>await</code> it. To that end, wherever
 functions return awaitables, we adopt the following conventions:</p>
 <p><strong>Rules for functions returning awaitables:</strong></p>
 <blockquote>
@@ -18147,7 +18200,7 @@ noted when manually using the protocol:</p>
 been disabled on the main process.</li>
 <li>The server will only time connections out that have sent a <code>PING</code>
 command. If a ping is sent then the connection will be closed if no
-further commands are receieved within 15s. Both the client and
+further commands are received within 15s. Both the client and
 server protocol implementations will send an initial PING on
 connection and ensure at least one command every 5s is sent (not
 necessarily <code>PING</code>).</li>
@@ -18218,7 +18271,7 @@ received for each stream so that on reconnection it can start streaming
 from the correct place. Note: not all RDATA have valid tokens due to
 batching. See <code>RdataCommand</code> for more details.</p>
 <h3 id="example-5"><a class="header" href="#example-5">Example</a></h3>
-<p>An example iteraction is shown below. Each line is prefixed with '&gt;'
+<p>An example interaction is shown below. Each line is prefixed with '&gt;'
 or '&lt;' to indicate which side is sending, these are <em>not</em> included on
 the wire:</p>
 <pre><code>* connection established *
@@ -18546,7 +18599,7 @@ But don't want to send out sensitive data in other HS's events in this way.</p>
 <p>Suppose we discover after resync that we shouldn't have sent out one our events (not a prev_event) to a target HS. Not much we can do.
 What about if we didn't send them an event but shouldn't've?
 E.g. what if someone joined from a new HS shortly after you did? We wouldn't talk to them.
-Could imagine sending out the &quot;Missed&quot; events after the resync but... painful to work out what they shuld have seen if they joined/left.
+Could imagine sending out the &quot;Missed&quot; events after the resync but... painful to work out what they should have seen if they joined/left.
 Instead, just send them the latest event (if they're still in the room after resync) and let them backfill.(?)</p>
 <ul>
 <li>Don't do this currently.</li>

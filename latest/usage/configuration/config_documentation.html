@@ -169,8 +169,10 @@ followed by a letter. Letters have the following meanings:</p>
 messages from the database after 5 minutes, rather than 5 months.</p>
 <p>In addition, configuration options referring to size use the following suffixes:</p>
 <ul>
-<li><code>M</code> = MiB, or 1,048,576 bytes</li>
 <li><code>K</code> = KiB, or 1024 bytes</li>
+<li><code>M</code> = MiB, or 1,048,576 bytes</li>
+<li><code>G</code> = GiB, or 1,073,741,824 bytes</li>
+<li><code>T</code> = TiB, or 1,099,511,627,776 bytes</li>
 </ul>
 <p>For example, setting <code>max_avatar_size: 10M</code> means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.</p>
@@ -592,7 +594,7 @@ for <a href="../../workers.html">workers</a> and containers without listener e.g
 </code></pre>
 <p>Example configuration #2:</p>
 <pre><code class="language-yaml">listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -963,6 +965,13 @@ still take up to 5 minutes to purge redacted events from the database.</p>
 <pre><code class="language-yaml">redaction_retention_period: 28d
 </code></pre>
 <hr />
+<h3 id="forgotten_room_retention_period"><a class="header" href="#forgotten_room_retention_period"><code>forgotten_room_retention_period</code></a></h3>
+<p>How long to keep locally forgotten rooms before purging them from the DB.</p>
+<p>Defaults to <code>null</code>, meaning it's disabled.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">forgotten_room_retention_period: 28d
+</code></pre>
+<hr />
 <h3 id="user_ips_max_age"><a class="header" href="#user_ips_max_age"><code>user_ips_max_age</code></a></h3>
 <p>How long to track users' last seen time and IPs in the database.</p>
 <p>Defaults to <code>28d</code>. Set to <code>null</code> to disable clearing out of old rows.</p>
@@ -1113,12 +1122,12 @@ any intermediate certificates (for instance, if using certbot, use
 <hr />
 <h3 id="federation_client_minimum_tls_version"><a class="header" href="#federation_client_minimum_tls_version"><code>federation_client_minimum_tls_version</code></a></h3>
 <p>The minimum TLS version that will be used for outbound federation requests.</p>
-<p>Defaults to <code>1</code>. Configurable to <code>1</code>, <code>1.1</code>, <code>1.2</code>, or <code>1.3</code>. Note
-that setting this value higher than <code>1.2</code> will prevent federation to most
-of the public Matrix network: only configure it to <code>1.3</code> if you have an
+<p>Defaults to <code>&quot;1&quot;</code>. Configurable to <code>&quot;1&quot;</code>, <code>&quot;1.1&quot;</code>, <code>&quot;1.2&quot;</code>, or <code>&quot;1.3&quot;</code>. Note
+that setting this value higher than <code>&quot;1.2&quot;</code> will prevent federation to most
+of the public Matrix network: only configure it to <code>&quot;1.3&quot;</code> if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">federation_client_minimum_tls_version: 1.2
+<pre><code class="language-yaml">federation_client_minimum_tls_version: &quot;1.2&quot;
 </code></pre>
 <hr />
 <h3 id="federation_certificate_verification_whitelist"><a class="header" href="#federation_certificate_verification_whitelist"><code>federation_certificate_verification_whitelist</code></a></h3>
@@ -2572,7 +2581,7 @@ are still valid. Defaults to 1d.</p>
 <p>Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a <code>verify key</code>, which
 will make synapse check that the response is signed by that key.</p>
-<p>This setting supercedes an older setting named <code>perspectives</code>. The old format
+<p>This setting supersedes an older setting named <code>perspectives</code>. The old format
 is still supported for backwards-compatibility, but it is deprecated.</p>
 <p><code>trusted_key_servers</code> defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set
@@ -3058,27 +3067,50 @@ claim MUST contain &quot;admin&quot;.</p>
 <p>Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>: Set this to true to enable authorization against a CAS server.
-Defaults to false.</li>
-<li><code>idp_name</code>: A user-facing name for this identity provider, which is used to
-offer the user a choice of login mechanisms.</li>
-<li><code>idp_icon</code>: An optional icon for this identity provider, which is presented
+<li>
+<p><code>enabled</code>: Set this to true to enable authorization against a CAS server.
+Defaults to false.</p>
+</li>
+<li>
+<p><code>idp_name</code>: A user-facing name for this identity provider, which is used to
+offer the user a choice of login mechanisms.</p>
+</li>
+<li>
+<p><code>idp_icon</code>: An optional icon for this identity provider, which is presented
 by clients and Synapse's own IdP picker page. If given, must be an
 MXC URI of the format <code>mxc://&lt;server-name&gt;/&lt;media-id&gt;</code>. (An easy way to
 obtain such an MXC URI is to upload an image to an (unencrypted) room
-and then copy the &quot;url&quot; from the source of the event.)</li>
-<li><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
+and then copy the &quot;url&quot; from the source of the event.)</p>
+</li>
+<li>
+<p><code>idp_brand</code>: An optional brand for this identity provider, allowing clients
 to style the login flow according to the identity provider in question.
-See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</li>
-<li><code>server_url</code>: The URL of the CAS authorization endpoint.</li>
-<li><code>protocol_version</code>: The CAS protocol version, defaults to none (version 3 is required if you want to use &quot;required_attributes&quot;).</li>
-<li><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
-If no name is given here, no displayname will be set.</li>
-<li><code>required_attributes</code>:  It is possible to configure Synapse to only allow logins if CAS attributes
+See the <a href="https://spec.matrix.org/latest/">spec</a> for possible options here.</p>
+</li>
+<li>
+<p><code>server_url</code>: The URL of the CAS authorization endpoint.</p>
+</li>
+<li>
+<p><code>protocol_version</code>: The CAS protocol version, defaults to none (version 3 is required if you want to use &quot;required_attributes&quot;).</p>
+</li>
+<li>
+<p><code>displayname_attribute</code>: The attribute of the CAS response to use as the display name.
+If no name is given here, no displayname will be set.</p>
+</li>
+<li>
+<p><code>required_attributes</code>:  It is possible to configure Synapse to only allow logins if CAS attributes
 match particular values. All of the keys given below must exist
 and the values must match the given value. Alternately if the given value
 is <code>None</code> then any value is allowed (the attribute just must exist).
-All of the listed attributes must match for the login to be permitted.</li>
+All of the listed attributes must match for the login to be permitted.</p>
+</li>
+<li>
+<p><code>enable_registration</code>: set to 'false' to disable automatic registration of new
+users. This allows the CAS SSO flow to be limited to sign in only, rather than
+automatically registering users that have a valid SSO login but do not have
+a pre-registered account. Defaults to true.</p>
+<p><em>Added in Synapse 1.93.0.</em></p>
+</li>
 </ul>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">cas_config:
@@ -3089,6 +3121,7 @@ All of the listed attributes must match for the login to be permitted.</li>
   required_attributes:
     userGroup: &quot;staff&quot;
     department: None
+  enable_registration: true
 </code></pre>
 <hr />
 <h3 id="sso"><a class="header" href="#sso"><code>sso</code></a></h3>
