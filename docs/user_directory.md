@@ -39,7 +39,7 @@ A description of each table follows:
 * `user_directory_stream_pos`. When the initial background update to populate
   the directory is complete, we record a stream position here. This indicates
   that synapse should now listen for room changes and incrementally update
-  the directory where necessary.
+  the directory where necessary. (See [stream positions](development/synapse_architecture/streams.html).)
 
 * `users_in_public_rooms`. Contains associations between users and the public
   rooms they're in.  Used to determine which users are in public rooms and should
