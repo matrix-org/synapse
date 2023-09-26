@@ -329,11 +329,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 "get_forgotten_rooms_for_user", (state_key,)
             )
 
-        if etype == EventTypes.ServerACL:
-            self.hs.get_storage_controllers().state.get_server_acl_for_room.invalidate(
-                (room_id,)
-            )
-
         if relates_to:
             self._attempt_to_invalidate_cache("get_relations_for_event", (relates_to,))
             self._attempt_to_invalidate_cache("get_references_for_event", (relates_to,))
@@ -387,10 +382,6 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
         self._attempt_to_invalidate_cache("get_thread_summary", None)
         self._attempt_to_invalidate_cache("get_thread_participated", None)
         self._attempt_to_invalidate_cache("get_threads", (room_id,))
-
-        self.hs.get_storage_controllers().state.get_server_acl_for_room.invalidate(
-            (room_id,)
-        )
 
         self._attempt_to_invalidate_cache("_get_state_group_for_event", None)
 
