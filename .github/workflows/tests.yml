@@ -535,7 +535,7 @@ jobs:
 
 
   portdb:
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.linting == 'true' }} # Allow previous steps to be skipped, but not fail
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true'}} # Allow previous steps to be skipped, but not fail
     needs:
       - linting-done
       - changes
