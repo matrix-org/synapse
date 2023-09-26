@@ -22,10 +22,10 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.events import EventBase, make_event_from_dict
-from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.storage.controllers.state import server_acl_evaluator_from_event
 from synapse.types import JsonDict
 from synapse.util import Clock
 
@@ -67,37 +67,46 @@ class ServerACLsTestCase(unittest.TestCase):
         e = _create_acl_event({"allow": ["*"], "deny": ["evil.com"]})
         logging.info("ACL event: %s", e.content)
 
-        self.assertFalse(server_matches_acl_event("evil.com", e))
-        self.assertFalse(server_matches_acl_event("EVIL.COM", e))
+        server_acl_evalutor = server_acl_evaluator_from_event(e)
 
-        self.assertTrue(server_matches_acl_event("evil.com.au", e))
-        self.assertTrue(server_matches_acl_event("honestly.not.evil.com", e))
+        self.assertFalse(server_acl_evalutor.server_matches_acl_event("evil.com"))
+        self.assertFalse(server_acl_evalutor.server_matches_acl_event("EVIL.COM"))
+
+        self.assertTrue(server_acl_evalutor.server_matches_acl_event("evil.com.au"))
+        self.assertTrue(
+            server_acl_evalutor.server_matches_acl_event("honestly.not.evil.com")
+        )
 
     def test_block_ip_literals(self) -> None:
         e = _create_acl_event({"allow_ip_literals": False, "allow": ["*"]})
         logging.info("ACL event: %s", e.content)
 
-        self.assertFalse(server_matches_acl_event("1.2.3.4", e))
-        self.assertTrue(server_matches_acl_event("1a.2.3.4", e))
-        self.assertFalse(server_matches_acl_event("[1:2::]", e))
-        self.assertTrue(server_matches_acl_event("1:2:3:4", e))
+        server_acl_evalutor = server_acl_evaluator_from_event(e)
+
+        self.assertFalse(server_acl_evalutor.server_matches_acl_event("1.2.3.4"))
+        self.assertTrue(server_acl_evalutor.server_matches_acl_event("1a.2.3.4"))
+        self.assertFalse(server_acl_evalutor.server_matches_acl_event("[1:2::]"))
+        self.assertTrue(server_acl_evalutor.server_matches_acl_event("1:2:3:4"))
 
     def test_wildcard_matching(self) -> None:
         e = _create_acl_event({"allow": ["good*.com"]})
+
+        server_acl_evalutor = server_acl_evaluator_from_event(e)
+
         self.assertTrue(
-            server_matches_acl_event("good.com", e),
+            server_acl_evalutor.server_matches_acl_event("good.com"),
             "* matches 0 characters",
         )
         self.assertTrue(
-            server_matches_acl_event("GOOD.COM", e),
+            server_acl_evalutor.server_matches_acl_event("GOOD.COM"),
             "pattern is case-insensitive",
         )
         self.assertTrue(
-            server_matches_acl_event("good.aa.com", e),
+            server_acl_evalutor.server_matches_acl_event("good.aa.com"),
             "* matches several characters, including '.'",
         )
         self.assertFalse(
-            server_matches_acl_event("ishgood.com", e),
+            server_acl_evalutor.server_matches_acl_event("ishgood.com"),
             "pattern does not allow prefixes",
         )
 
