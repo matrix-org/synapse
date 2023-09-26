@@ -52,17 +52,17 @@ impl ServerAclEvaluator {
     #[new]
     pub fn py_new(
         allow_ip_literals: bool,
-        allow: Vec<String>,
-        deny: Vec<String>,
+        allow: Vec<&str>,
+        deny: Vec<&str>,
     ) -> Result<Self, Error> {
         let allow = allow
             .iter()
-            .map(|s| glob_to_regex(s, GlobMatchType::Whole).unwrap())
-            .collect();
+            .map(|s| glob_to_regex(s, GlobMatchType::Whole))
+            .collect::<Result<_, _>>()?;
         let deny = deny
             .iter()
-            .map(|s| glob_to_regex(s, GlobMatchType::Whole).unwrap())
-            .collect();
+            .map(|s| glob_to_regex(s, GlobMatchType::Whole))
+            .collect::<Result<_, _>>()?;
 
         Ok(ServerAclEvaluator {
             allow_ip_literals,
