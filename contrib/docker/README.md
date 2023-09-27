@@ -40,6 +40,10 @@ You just choose one of the following options.
 
 Open `http://localhost:8008` in your browser, and it's successful if you see the welcome page.
 
+## Next
+
+Set up a reverse proxy to expose the port and host the tls certificates. See [reverse proxy](https://matrix-org.github.io/synapse/latest/reverse_proxy.html)
+
 ### More information
 
 For more information on required environment variables and mounts, see the main docker documentation at [/docker/README.md](../../docker/README.md)
