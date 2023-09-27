@@ -88,6 +88,7 @@ def _load_rules(
         msc1767_enabled=experimental_config.msc1767_enabled,
         msc3664_enabled=experimental_config.msc3664_enabled,
         msc3381_polls_enabled=experimental_config.msc3381_polls_enabled,
+        msc4028_push_encrypted_events=experimental_config.msc4028_push_encrypted_events,
     )
 
     return filtered_rules
@@ -216,7 +217,7 @@ class PushRulesWorkerStore(
     @cachedList(cached_method_name="get_push_rules_for_user", list_name="user_ids")
     async def bulk_get_push_rules(
         self, user_ids: Collection[str]
-    ) -> Dict[str, FilteredPushRules]:
+    ) -> Mapping[str, FilteredPushRules]:
         if not user_ids:
             return {}
 

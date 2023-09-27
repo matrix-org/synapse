@@ -33,7 +33,6 @@ from typing_extensions import Literal
 
 from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, StoreError
-from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.opentracing import (
     get_active_span_text_map,
     set_tag,
@@ -56,7 +55,12 @@ from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, StrCollection, get_verify_key_from_cross_signing_key
+from synapse.types import (
+    JsonDict,
+    JsonMapping,
+    StrCollection,
+    get_verify_key_from_cross_signing_key,
+)
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
@@ -747,7 +751,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     @cancellable
     async def get_user_devices_from_cache(
         self, user_ids: Set[str], user_and_device_ids: List[Tuple[str, str]]
-    ) -> Tuple[Set[str], Dict[str, Mapping[str, JsonDict]]]:
+    ) -> Tuple[Set[str], Dict[str, Mapping[str, JsonMapping]]]:
         """Get the devices (and keys if any) for remote users from the cache.
 
         Args:
@@ -760,28 +764,20 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
             mapping of user_id -> device_id -> device_info.
         """
         unique_user_ids = user_ids | {user_id for user_id, _ in user_and_device_ids}
-        user_map = await self.get_device_list_last_stream_id_for_remotes(
-            list(unique_user_ids)
-        )
 
-        # We go and check if any of the users need to have their device lists
-        # resynced. If they do then we remove them from the cached list.
-        users_needing_resync = await self.get_user_ids_requiring_device_list_resync(
+        user_ids_in_cache = await self.get_users_whose_devices_are_cached(
             unique_user_ids
         )
-        user_ids_in_cache = {
-            user_id for user_id, stream_id in user_map.items() if stream_id
-        } - users_needing_resync
         user_ids_not_in_cache = unique_user_ids - user_ids_in_cache
 
         # First fetch all the users which all devices are to be returned.
-        results: Dict[str, Mapping[str, JsonDict]] = {}
+        results: Dict[str, Mapping[str, JsonMapping]] = {}
         for user_id in user_ids:
             if user_id in user_ids_in_cache:
                 results[user_id] = await self.get_cached_devices_for_user(user_id)
         # Then fetch all device-specific requests, but skip users we've already
         # fetched all devices for.
-        device_specific_results: Dict[str, Dict[str, JsonDict]] = {}
+        device_specific_results: Dict[str, Dict[str, JsonMapping]] = {}
         for user_id, device_id in user_and_device_ids:
             if user_id in user_ids_in_cache and user_id not in user_ids:
                 device = await self._get_cached_user_device(user_id, device_id)
@@ -793,8 +789,26 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
 
         return user_ids_not_in_cache, results
 
+    async def get_users_whose_devices_are_cached(
+        self, user_ids: StrCollection
+    ) -> Set[str]:
+        """Checks which of the given users we have cached the devices for."""
+        user_map = await self.get_device_list_last_stream_id_for_remotes(user_ids)
+
+        # We go and check if any of the users need to have their device lists
+        # resynced. If they do then we remove them from the cached list.
+        users_needing_resync = await self.get_user_ids_requiring_device_list_resync(
+            user_ids
+        )
+        user_ids_in_cache = {
+            user_id for user_id, stream_id in user_map.items() if stream_id
+        } - users_needing_resync
+        return user_ids_in_cache
+
     @cached(num_args=2, tree=True)
-    async def _get_cached_user_device(self, user_id: str, device_id: str) -> JsonDict:
+    async def _get_cached_user_device(
+        self, user_id: str, device_id: str
+    ) -> JsonMapping:
         content = await self.db_pool.simple_select_one_onecol(
             table="device_lists_remote_cache",
             keyvalues={"user_id": user_id, "device_id": device_id},
@@ -804,7 +818,9 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         return db_to_json(content)
 
     @cached()
-    async def get_cached_devices_for_user(self, user_id: str) -> Mapping[str, JsonDict]:
+    async def get_cached_devices_for_user(
+        self, user_id: str
+    ) -> Mapping[str, JsonMapping]:
         devices = await self.db_pool.simple_select_list(
             table="device_lists_remote_cache",
             keyvalues={"user_id": user_id},
@@ -1035,7 +1051,7 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
     )
     async def get_device_list_last_stream_id_for_remotes(
         self, user_ids: Iterable[str]
-    ) -> Dict[str, Optional[str]]:
+    ) -> Mapping[str, Optional[str]]:
         rows = await self.db_pool.simple_select_many_batch(
             table="device_lists_remote_extremeties",
             column="user_id",
@@ -1664,7 +1680,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self.device_id_exists_cache: LruCache[
             Tuple[str, str], Literal[True]
         ] = LruCache(cache_name="device_id_exists", max_size=10000)
-        self.config: HomeServerConfig = hs.config
 
     async def store_device(
         self,
@@ -1777,13 +1792,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
-
-        # TODO: don't nuke the entire cache once there is a way to associate
-        #  device_id -> introspection_token
-        if self.config.experimental.msc3861.enabled:
-            # mypy ignore - the token cache is defined on MSC3861DelegatedAuth
-            self.auth._token_cache.invalidate_all()  # type: ignore[attr-defined]
-            await self.stream_introspection_token_invalidation((None,))
 
     async def update_device(
         self, user_id: str, device_id: str, new_display_name: Optional[str] = None

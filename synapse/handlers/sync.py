@@ -57,6 +57,7 @@ from synapse.storage.roommember import MemberSummary
 from synapse.types import (
     DeviceListUpdates,
     JsonDict,
+    JsonMapping,
     MutableStateMap,
     Requester,
     RoomStreamToken,
@@ -234,7 +235,7 @@ class SyncResult:
     archived: List[ArchivedSyncResult]
     to_device: List[JsonDict]
     device_lists: DeviceListUpdates
-    device_one_time_keys_count: JsonDict
+    device_one_time_keys_count: JsonMapping
     device_unused_fallback_key_types: List[str]
 
     def __bool__(self) -> bool:
@@ -362,20 +363,35 @@ class SyncHandler:
         # (since we now know that the device has received them)
         if since_token is not None:
             since_stream_id = since_token.to_device_key
-            # Delete device messages asynchronously and in batches using the task scheduler
-            await self._task_scheduler.schedule_task(
-                DELETE_DEVICE_MSGS_TASK_NAME,
-                resource_id=sync_config.device_id,
-                params={
-                    "user_id": sync_config.user.to_string(),
-                    "device_id": sync_config.device_id,
-                    "up_to_stream_id": since_stream_id,
-                },
+            # Fast path: delete a limited number of to-device messages up front.
+            # We do this to avoid the overhead of scheduling a task for every
+            # sync.
+            device_deletion_limit = 100
+            deleted = await self.store.delete_messages_for_device(
+                sync_config.user.to_string(),
+                sync_config.device_id,
+                since_stream_id,
+                limit=device_deletion_limit,
             )
             logger.debug(
-                "Deletion of to-device messages up to %d scheduled",
-                since_stream_id,
+                "Deleted %d to-device messages up to %d", deleted, since_stream_id
             )
+
+            # If we hit the limit, schedule a background task to delete the rest.
+            if deleted >= device_deletion_limit:
+                await self._task_scheduler.schedule_task(
+                    DELETE_DEVICE_MSGS_TASK_NAME,
+                    resource_id=sync_config.device_id,
+                    params={
+                        "user_id": sync_config.user.to_string(),
+                        "device_id": sync_config.device_id,
+                        "up_to_stream_id": since_stream_id,
+                    },
+                )
+                logger.debug(
+                    "Deletion of to-device messages up to %d scheduled",
+                    since_stream_id,
+                )
 
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
@@ -1542,7 +1558,7 @@ class SyncHandler:
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
-        one_time_keys_count: JsonDict = {}
+        one_time_keys_count: JsonMapping = {}
         unused_fallback_key_types: List[str] = []
         if device_id:
             # TODO: We should have a way to let clients differentiate between the states of:
@@ -1778,19 +1794,23 @@ class SyncHandler:
             )
 
             if push_rules_changed:
-                global_account_data = dict(global_account_data)
-                global_account_data[
-                    AccountDataTypes.PUSH_RULES
-                ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
+                global_account_data = {
+                    AccountDataTypes.PUSH_RULES: await self._push_rules_handler.push_rules_for_user(
+                        sync_config.user
+                    ),
+                    **global_account_data,
+                }
         else:
             all_global_account_data = await self.store.get_global_account_data_for_user(
                 user_id
             )
 
-            global_account_data = dict(all_global_account_data)
-            global_account_data[
-                AccountDataTypes.PUSH_RULES
-            ] = await self._push_rules_handler.push_rules_for_user(sync_config.user)
+            global_account_data = {
+                AccountDataTypes.PUSH_RULES: await self._push_rules_handler.push_rules_for_user(
+                    sync_config.user
+                ),
+                **all_global_account_data,
+            }
 
         account_data_for_user = (
             await sync_config.filter_collection.filter_global_account_data(
@@ -1894,7 +1914,7 @@ class SyncHandler:
             blocks_all_rooms
             or sync_result_builder.sync_config.filter_collection.blocks_all_room_account_data()
         ):
-            account_data_by_room: Mapping[str, Mapping[str, JsonDict]] = {}
+            account_data_by_room: Mapping[str, Mapping[str, JsonMapping]] = {}
         elif since_token and not sync_result_builder.full_state:
             account_data_by_room = (
                 await self.store.get_updated_room_account_data_for_user(
@@ -2334,8 +2354,8 @@ class SyncHandler:
         sync_result_builder: "SyncResultBuilder",
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
-        tags: Optional[Mapping[str, Mapping[str, Any]]],
-        account_data: Mapping[str, JsonDict],
+        tags: Optional[Mapping[str, JsonMapping]],
+        account_data: Mapping[str, JsonMapping],
         always_include: bool = False,
     ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`

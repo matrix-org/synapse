@@ -55,7 +55,6 @@ class UnpersistedEventContextBase(ABC):
         A method to convert an UnpersistedEventContext to an EventContext, suitable for
         sending to the database with the associated event.
         """
-        pass
 
     @abstractmethod
     async def get_prev_state_ids(
@@ -69,7 +68,6 @@ class UnpersistedEventContextBase(ABC):
             state_filter: specifies the type of state event to fetch from DB, example:
             EventTypes.JoinRules
         """
-        pass
 
 
 @attr.s(slots=True, auto_attribs=True)

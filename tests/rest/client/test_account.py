@@ -31,6 +31,7 @@ from synapse.rest import admin
 from synapse.rest.client import account, login, register, room
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
 from synapse.server import HomeServer
+from synapse.storage._base import db_to_json
 from synapse.types import JsonDict, UserID
 from synapse.util import Clock
 
@@ -133,6 +134,18 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
         # Assert we can't log in with the old password
         self.attempt_wrong_password_login("kermit", old_password)
+
+        # Check that the UI Auth information doesn't store the password in the database.
+        #
+        # Note that we don't have the UI Auth session ID, so just pull out the single
+        # row.
+        ui_auth_data = self.get_success(
+            self.store.db_pool.simple_select_one(
+                "ui_auth_sessions", keyvalues={}, retcols=("clientdict",)
+            )
+        )
+        client_dict = db_to_json(ui_auth_data["clientdict"])
+        self.assertNotIn("new_password", client_dict)
 
     @override_config({"rc_3pid_validation": {"burst_count": 3}})
     def test_ratelimit_by_email(self) -> None:
@@ -562,7 +575,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
         # create a bunch of users and add keys for them
         users = []
-        for i in range(0, 20):
+        for i in range(20):
             user_id = self.register_user("missPiggy" + str(i), "test")
             users.append((user_id,))
 

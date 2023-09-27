@@ -723,12 +723,11 @@ class FederationEventHandler:
         if not prevs - seen:
             return
 
-        latest_list = await self._store.get_latest_event_ids_in_room(room_id)
+        latest_frozen = await self._store.get_latest_event_ids_in_room(room_id)
 
         # We add the prev events that we have seen to the latest
         # list to ensure the remote server doesn't give them to us
-        latest = set(latest_list)
-        latest |= seen
+        latest = seen | latest_frozen
 
         logger.info(
             "Requesting missing events between %s and %s",
@@ -1539,7 +1538,7 @@ class FederationEventHandler:
             logger.exception("Failed to resync device for %s", sender)
 
     async def backfill_event_id(
-        self, destinations: List[str], room_id: str, event_id: str
+        self, destinations: StrCollection, room_id: str, event_id: str
     ) -> PulledPduInfo:
         """Backfill a single event and persist it as a non-outlier which means
         we also pull in all of the state and auth events necessary for it.
@@ -1976,8 +1975,7 @@ class FederationEventHandler:
             # partial and full state and may not be accurate.
             return
 
-        extrem_ids_list = await self._store.get_latest_event_ids_in_room(event.room_id)
-        extrem_ids = set(extrem_ids_list)
+        extrem_ids = await self._store.get_latest_event_ids_in_room(event.room_id)
         prev_event_ids = set(event.prev_event_ids())
 
         if extrem_ids == prev_event_ids:
@@ -2343,6 +2341,12 @@ class FederationEventHandler:
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             # TODO retrieve the previous state, and exclude join -> join transitions
             self._notifier.notify_user_joined_room(event.event_id, event.room_id)
+
+        # If this is a server ACL event, clear the cache in the storage controller.
+        if event.type == EventTypes.ServerACL:
+            self._state_storage_controller.get_server_acl_for_room.invalidate(
+                (event.room_id,)
+            )
 
     def _sanity_check_event(self, ev: EventBase) -> None:
         """

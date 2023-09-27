@@ -23,7 +23,7 @@ from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import DeviceListUpdates, JsonDict, UserID
+from synapse.types import DeviceListUpdates, JsonDict, JsonMapping, UserID
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -379,8 +379,8 @@ class AppServiceTransaction:
         service: ApplicationService,
         id: int,
         events: Sequence[EventBase],
-        ephemeral: List[JsonDict],
-        to_device_messages: List[JsonDict],
+        ephemeral: List[JsonMapping],
+        to_device_messages: List[JsonMapping],
         one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,

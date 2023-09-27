@@ -261,7 +261,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
 
         builder = factory.for_room_version(room_version, event_dict)
         join_event = self.get_success(
-            builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
+            builder.build(prev_event_ids=list(prev_event_ids), auth_event_ids=None)
         )
 
         self.get_success(federation.on_send_membership_event(remote_server, join_event))

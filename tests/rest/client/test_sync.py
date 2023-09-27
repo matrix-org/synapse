@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-from http import HTTPStatus
-from typing import List, Optional
+from typing import List
 
 from parameterized import parameterized
 
@@ -22,7 +21,6 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
-    EduTypes,
     EventContentFields,
     EventTypes,
     ReceiptTypes,
@@ -374,156 +372,6 @@ class SyncKnockTestCase(KnockingStrippedStateEventHelperMixin):
         self.check_knock_room_state_against_room_state(
             room_state_events, self.expected_room_state
         )
-
-
-class ReadReceiptsTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets,
-        login.register_servlets,
-        receipts.register_servlets,
-        room.register_servlets,
-        sync.register_servlets,
-    ]
-
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        config = self.default_config()
-
-        return self.setup_test_homeserver(config=config)
-
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.url = "/sync?since=%s"
-        self.next_batch = "s0"
-
-        # Register the first user
-        self.user_id = self.register_user("kermit", "monkey")
-        self.tok = self.login("kermit", "monkey")
-
-        # Create the room
-        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
-
-        # Register the second user
-        self.user2 = self.register_user("kermit2", "monkey")
-        self.tok2 = self.login("kermit2", "monkey")
-
-        # Join the second user
-        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
-
-    def test_private_read_receipts(self) -> None:
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a private read receipt to tell the server the first user's message was read
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Test that the first user can't see the other user's private read receipt
-        self.assertIsNone(self._get_read_receipt())
-
-    def test_public_receipt_can_override_private(self) -> None:
-        """
-        Sending a public read receipt to the same event which has a private read
-        receipt should cause that receipt to become public.
-        """
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a private read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-        self.assertIsNone(self._get_read_receipt())
-
-        # Send a public read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Test that we did override the private read receipt
-        self.assertNotEqual(self._get_read_receipt(), None)
-
-    def test_private_receipt_cannot_override_public(self) -> None:
-        """
-        Sending a private read receipt to the same event which has a public read
-        receipt should cause no change.
-        """
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a public read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-        self.assertNotEqual(self._get_read_receipt(), None)
-
-        # Send a private read receipt
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
-            {},
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Test that we didn't override the public read receipt
-        self.assertIsNone(self._get_read_receipt())
-
-    def test_read_receipt_with_empty_body_is_rejected(self) -> None:
-        # Send a message as the first user
-        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
-
-        # Send a read receipt for this message with an empty body
-        channel = self.make_request(
-            "POST",
-            f"/rooms/{self.room_id}/receipt/m.read/{res['event_id']}",
-            access_token=self.tok2,
-        )
-        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST)
-        self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON", channel.json_body)
-
-    def _get_read_receipt(self) -> Optional[JsonDict]:
-        """Syncs and returns the read receipt."""
-
-        # Checks if event is a read receipt
-        def is_read_receipt(event: JsonDict) -> bool:
-            return event["type"] == EduTypes.RECEIPT
-
-        # Sync
-        channel = self.make_request(
-            "GET",
-            self.url % self.next_batch,
-            access_token=self.tok,
-        )
-        self.assertEqual(channel.code, 200)
-
-        # Store the next batch for the next request.
-        self.next_batch = channel.json_body["next_batch"]
-
-        if channel.json_body.get("rooms", None) is None:
-            return None
-
-        # Return the read receipt
-        ephemeral_events = channel.json_body["rooms"]["join"][self.room_id][
-            "ephemeral"
-        ]["events"]
-        receipt_event = filter(is_read_receipt, ephemeral_events)
-        return next(receipt_event, None)
 
 
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):

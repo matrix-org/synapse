@@ -12,11 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import unittest as stdlib_unittest
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ValidationError
 from typing_extensions import Literal
 
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
 from synapse.rest.client.models import EmailRequestTokenBody
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import BaseModel, ValidationError
+else:
+    from pydantic import BaseModel, ValidationError
 
 
 class ThreepidMediumEnumTestCase(stdlib_unittest.TestCase):

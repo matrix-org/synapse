@@ -28,7 +28,6 @@ from synapse.logging.context import PreserveLoggingContext, make_deferred_yielda
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.streams import (
     AccountDataStream,
-    CachesStream,
     DeviceListsStream,
     PushersStream,
     PushRulesStream,
@@ -76,7 +75,6 @@ class ReplicationDataHandler:
         self._instance_name = hs.get_instance_name()
         self._typing_handler = hs.get_typing_handler()
         self._state_storage_controller = hs.get_storage_controllers().state
-        self.auth = hs.get_auth()
 
         self._notify_pushers = hs.config.worker.start_pushers
         self._pusher_pool = hs.get_pusherpool()
@@ -207,6 +205,12 @@ class ReplicationDataHandler:
                     self.notifier.notify_user_joined_room(
                         row.data.event_id, row.data.room_id
                     )
+
+                # If this is a server ACL event, clear the cache in the storage controller.
+                if row.data.type == EventTypes.ServerACL:
+                    self._state_storage_controller.get_server_acl_for_room.invalidate(
+                        (row.data.room_id,)
+                    )
         elif stream_name == UnPartialStatedRoomStream.NAME:
             for row in rows:
                 assert isinstance(row, UnPartialStatedRoomStreamRow)
@@ -224,16 +228,6 @@ class ReplicationDataHandler:
                 self._state_storage_controller.notify_event_un_partial_stated(
                     row.event_id
                 )
-        # invalidate the introspection token cache
-        elif stream_name == CachesStream.NAME:
-            for row in rows:
-                if row.cache_func == "introspection_token_invalidation":
-                    if row.keys[0] is None:
-                        # invalidate the whole cache
-                        # mypy ignore - the token cache is defined on MSC3861DelegatedAuth
-                        self.auth.invalidate_token_cache()  # type: ignore[attr-defined]
-                    else:
-                        self.auth.invalidate_cached_tokens(row.keys)  # type: ignore[attr-defined]
 
         await self._presence_handler.process_replication_rows(
             stream_name, instance_name, token, rows

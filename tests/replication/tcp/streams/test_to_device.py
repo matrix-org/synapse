@@ -49,7 +49,7 @@ class ToDeviceStreamTestCase(BaseStreamTestCase):
 
         # add messages to the device inbox for user1 up until the
         # limit defined for a stream update batch
-        for i in range(0, _STREAM_UPDATE_TARGET_ROW_COUNT):
+        for i in range(_STREAM_UPDATE_TARGET_ROW_COUNT):
             msg["content"] = {"device": {}}
             messages = {user1: {"device": msg}}
 

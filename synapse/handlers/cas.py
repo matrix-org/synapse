@@ -70,6 +70,7 @@ class CasHandler:
         self._cas_protocol_version = hs.config.cas.cas_protocol_version
         self._cas_displayname_attribute = hs.config.cas.cas_displayname_attribute
         self._cas_required_attributes = hs.config.cas.cas_required_attributes
+        self._cas_enable_registration = hs.config.cas.cas_enable_registration
 
         self._http_client = hs.get_proxied_http_client()
 
@@ -395,4 +396,5 @@ class CasHandler:
             client_redirect_url,
             cas_response_to_user_attributes,
             grandfather_existing_users,
+            registration_enabled=self._cas_enable_registration,
         )

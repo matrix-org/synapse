@@ -176,10 +176,10 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_ratelimiting_per_address(self) -> None:
         # Create different users so we're sure not to be bothered by the per-user
         # ratelimiter.
-        for i in range(0, 6):
+        for i in range(6):
             self.register_user("kermit" + str(i), "monkey")
 
-        for i in range(0, 6):
+        for i in range(6):
             params = {
                 "type": "m.login.password",
                 "identifier": {"type": "m.id.user", "user": "kermit" + str(i)},
@@ -228,7 +228,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_ratelimiting_per_account(self) -> None:
         self.register_user("kermit", "monkey")
 
-        for i in range(0, 6):
+        for i in range(6):
             params = {
                 "type": "m.login.password",
                 "identifier": {"type": "m.id.user", "user": "kermit"},
@@ -277,7 +277,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_ratelimiting_per_account_failed_attempts(self) -> None:
         self.register_user("kermit", "monkey")
 
-        for i in range(0, 6):
+        for i in range(6):
             params = {
                 "type": "m.login.password",
                 "identifier": {"type": "m.id.user", "user": "kermit"},

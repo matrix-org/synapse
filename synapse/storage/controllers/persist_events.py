@@ -19,6 +19,7 @@ import logging
 from collections import deque
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Any,
     Awaitable,
     Callable,
@@ -154,21 +155,19 @@ class _UpdateCurrentStateTask:
 
 
 _EventPersistQueueTask = Union[_PersistEventsTask, _UpdateCurrentStateTask]
+_PersistResult = TypeVar("_PersistResult")
 
 
 @attr.s(auto_attribs=True, slots=True)
-class _EventPersistQueueItem:
+class _EventPersistQueueItem(Generic[_PersistResult]):
     task: _EventPersistQueueTask
-    deferred: ObservableDeferred
+    deferred: ObservableDeferred[_PersistResult]
 
     parent_opentracing_span_contexts: List = attr.ib(factory=list)
     """A list of opentracing spans waiting for this batch"""
 
     opentracing_span_context: Any = None
     """The opentracing span under which the persistence actually happened"""
-
-
-_PersistResult = TypeVar("_PersistResult")
 
 
 class _EventPeristenceQueue(Generic[_PersistResult]):
@@ -620,7 +619,7 @@ class EventsPersistenceStorageController:
                         )
 
                     for room_id, ev_ctx_rm in events_by_room.items():
-                        latest_event_ids = set(
+                        latest_event_ids = (
                             await self.main_store.get_latest_event_ids_in_room(room_id)
                         )
                         new_latest_event_ids = await self._calculate_new_extremities(
@@ -742,7 +741,7 @@ class EventsPersistenceStorageController:
         self,
         room_id: str,
         event_contexts: List[Tuple[EventBase, EventContext]],
-        latest_event_ids: Collection[str],
+        latest_event_ids: AbstractSet[str],
     ) -> Set[str]:
         """Calculates the new forward extremities for a room given events to
         persist.
@@ -759,8 +758,6 @@ class EventsPersistenceStorageController:
             and not ctx.rejected
             and not event.internal_metadata.is_soft_failed()
         ]
-
-        latest_event_ids = set(latest_event_ids)
 
         # start with the existing forward extremities
         result = set(latest_event_ids)
@@ -800,7 +797,7 @@ class EventsPersistenceStorageController:
         self,
         room_id: str,
         events_context: List[Tuple[EventBase, EventContext]],
-        old_latest_event_ids: Set[str],
+        old_latest_event_ids: AbstractSet[str],
         new_latest_event_ids: Set[str],
     ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]], Set[str]]:
         """Calculate the current state dict after adding some new events to

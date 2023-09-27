@@ -244,11 +244,17 @@ def _prepare() -> None:
     else:
         debian_version = new_version
 
-    run_until_successful(
-        f'dch -M -v {debian_version} "New Synapse release {new_version}."',
-        shell=True,
-    )
-    run_until_successful('dch -M -r -D stable ""', shell=True)
+    if sys.platform == "darwin":
+        run_until_successful(
+            f"docker run --rm -v .:/synapse ubuntu:latest /synapse/scripts-dev/docker_update_debian_changelog.sh {new_version}",
+            shell=True,
+        )
+    else:
+        run_until_successful(
+            f'dch -M -v {debian_version} "New Synapse release {new_version}."',
+            shell=True,
+        )
+        run_until_successful('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
     synapse_repo.git.add("-u")
@@ -566,19 +572,27 @@ def _notify(message: str) -> None:
     # for this.
     click.echo(f"\a{message}")
 
+    app_name = "Synapse Release Script"
+
     # Try and run notify-send, but don't raise an Exception if this fails
     # (This is best-effort)
-    # TODO Support other platforms?
-    subprocess.run(
-        [
-            "notify-send",
-            "--app-name",
-            "Synapse Release Script",
-            "--expire-time",
-            "3600000",
-            message,
-        ]
-    )
+    if sys.platform == "darwin":
+        # See https://developer.apple.com/library/archive/documentation/AppleScript/Conceptual/AppleScriptLangGuide/reference/ASLR_cmds.html#//apple_ref/doc/uid/TP40000983-CH216-SW224
+        subprocess.run(
+            f"""osascript -e 'display notification "{message}" with title "{app_name}"'""",
+            shell=True,
+        )
+    else:
+        subprocess.run(
+            [
+                "notify-send",
+                "--app-name",
+                app_name,
+                "--expire-time",
+                "3600000",
+                message,
+            ]
+        )
 
 
 @cli.command()

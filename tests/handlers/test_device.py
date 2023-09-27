@@ -223,7 +223,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
         # queue a bunch of messages in the inbox
         requester = create_requester(sender, device_id=DEVICE_ID)
-        for i in range(0, DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT + 10):
+        for i in range(DeviceHandler.DEVICE_MSGS_DELETE_BATCH_LIMIT + 10):
             self.get_success(
                 self.device_message_handler.send_device_message(
                     requester, "message_type", {receiver: {"*": {"val": i}}}
@@ -461,6 +461,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.message_handler = hs.get_device_message_handler()
         self.registration = hs.get_registration_handler()
         self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
         self.store = hs.get_datastores().main
         return hs
 
@@ -487,11 +488,12 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(device_data, {"device_data": {"foo": "bar"}})
 
         # Create a new login for the user and dehydrated the device
-        device_id, access_token, _expiration_time, _refresh_token = self.get_success(
+        device_id, access_token, _expiration_time, refresh_token = self.get_success(
             self.registration.register_device(
                 user_id=user_id,
                 device_id=None,
                 initial_display_name="new device",
+                should_issue_refresh_token=True,
             )
         )
 
@@ -521,6 +523,12 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         user_info = self.get_success(self.auth.get_user_by_access_token(access_token))
 
         self.assertEqual(user_info.device_id, retrieved_device_id)
+
+        # make sure the user device has the refresh token
+        assert refresh_token is not None
+        self.get_success(
+            self.auth_handler.refresh_token(refresh_token, 5 * 60 * 1000, 5 * 60 * 1000)
+        )
 
         # make sure the device has the display name that was set from the login
         res = self.get_success(self.handler.get_device(user_id, retrieved_device_id))

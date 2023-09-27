@@ -78,11 +78,11 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
         logger = self.get_logger(handler)
 
         # Send some debug messages
-        for i in range(0, 3):
+        for i in range(3):
             logger.debug("debug %s" % (i,))
 
         # Send a bunch of useful messages
-        for i in range(0, 7):
+        for i in range(7):
             logger.info("info %s" % (i,))
 
         # The last debug message pushes it past the maximum buffer
@@ -108,15 +108,15 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
         logger = self.get_logger(handler)
 
         # Send some debug messages
-        for i in range(0, 3):
+        for i in range(3):
             logger.debug("debug %s" % (i,))
 
         # Send a bunch of useful messages
-        for i in range(0, 10):
+        for i in range(10):
             logger.warning("warn %s" % (i,))
 
         # Send a bunch of info messages
-        for i in range(0, 3):
+        for i in range(3):
             logger.info("info %s" % (i,))
 
         # The last debug message pushes it past the maximum buffer
@@ -144,7 +144,7 @@ class RemoteHandlerTestCase(LoggerCleanupMixin, TestCase):
         logger = self.get_logger(handler)
 
         # Send a bunch of useful messages
-        for i in range(0, 20):
+        for i in range(20):
             logger.warning("warn %s" % (i,))
 
         # Allow the reconnection

@@ -169,7 +169,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting_guest(self) -> None:
-        for i in range(0, 6):
+        for i in range(6):
             url = self.url + b"?kind=guest"
             channel = self.make_request(b"POST", url, b"{}")
 
@@ -187,7 +187,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting(self) -> None:
-        for i in range(0, 6):
+        for i in range(6):
             request_data = {
                 "username": "kermit" + str(i),
                 "password": "monkey",
@@ -1223,7 +1223,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
     def test_GET_ratelimiting(self) -> None:
         token = "1234"
 
-        for i in range(0, 6):
+        for i in range(6):
             channel = self.make_request(
                 b"GET",
                 f"{self.url}?token={token}",

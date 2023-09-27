@@ -43,7 +43,7 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonMapping
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -218,7 +218,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cached()
     async def _get_receipts_for_user_with_orderings(
         self, user_id: str, receipt_type: str
-    ) -> JsonDict:
+    ) -> JsonMapping:
         """
         Fetch receipts for all rooms that the given user is joined to.
 
@@ -258,7 +258,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     async def get_linearized_receipts_for_rooms(
         self, room_ids: Iterable[str], to_key: int, from_key: Optional[int] = None
-    ) -> List[dict]:
+    ) -> List[JsonMapping]:
         """Get receipts for multiple rooms for sending to clients.
 
         Args:
@@ -287,7 +287,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     async def get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
-    ) -> Sequence[JsonDict]:
+    ) -> Sequence[JsonMapping]:
         """Get receipts for a single room for sending to clients.
 
         Args:
@@ -310,7 +310,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
-    ) -> Sequence[JsonDict]:
+    ) -> Sequence[JsonMapping]:
         """See get_linearized_receipts_for_room"""
 
         def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
@@ -353,7 +353,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     async def _get_linearized_receipts_for_rooms(
         self, room_ids: Collection[str], to_key: int, from_key: Optional[int] = None
-    ) -> Dict[str, Sequence[JsonDict]]:
+    ) -> Mapping[str, Sequence[JsonMapping]]:
         if not room_ids:
             return {}
 
@@ -415,7 +415,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     )
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
-    ) -> Mapping[str, JsonDict]:
+    ) -> Mapping[str, JsonMapping]:
         """Get receipts for all rooms between two stream_ids, up
         to a limit of the latest 100 read receipts.
 
@@ -795,9 +795,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             now - event_ts,
         )
 
-        await self.db_pool.runInteraction(
-            "insert_graph_receipt",
-            self._insert_graph_receipt_txn,
+        await self._insert_graph_receipt(
             room_id,
             receipt_type,
             user_id,
@@ -810,9 +808,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return stream_id, max_persisted_id
 
-    def _insert_graph_receipt_txn(
+    async def _insert_graph_receipt(
         self,
-        txn: LoggingTransaction,
         room_id: str,
         receipt_type: str,
         user_id: str,
@@ -821,13 +818,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         data: JsonDict,
     ) -> None:
         assert self._can_write_to_receipts
-
-        txn.call_after(
-            self._get_receipts_for_user_with_orderings.invalidate,
-            (user_id, receipt_type),
-        )
-        # FIXME: This shouldn't invalidate the whole cache
-        txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
         keyvalues = {
             "room_id": room_id,
@@ -840,8 +830,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         else:
             keyvalues["thread_id"] = thread_id
 
-        self.db_pool.simple_upsert_txn(
-            txn,
+        await self.db_pool.simple_upsert(
+            desc="insert_graph_receipt",
             table="receipts_graph",
             keyvalues=keyvalues,
             values={
@@ -850,6 +840,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
             },
             where_clause=where_clause,
         )
+
+        self._get_receipts_for_user_with_orderings.invalidate((user_id, receipt_type))
+
+        # FIXME: This shouldn't invalidate the whole cache
+        self._get_linearized_receipts_for_room.invalidate((room_id,))
 
 
 class ReceiptsBackgroundUpdateStore(SQLBaseStore):
