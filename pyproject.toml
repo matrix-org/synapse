@@ -92,6 +92,7 @@ skip_gitignore = true
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"
+module-name = "synapse.synapse_rust"
 
 [tool.poetry]
 name = "matrix-synapse"
