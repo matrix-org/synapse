@@ -16,7 +16,7 @@ name = "synapse"
 crate-type = ["lib", "cdylib"]
 
 # This is deprecated, see tool.maturin in pyproject.toml.
-# It is left here for compatibilty with old maturin installs.
+# It is left here for compatibilty with maturin < 0.15.
 [package.metadata.maturin]
 # This is where we tell maturin where to place the built library.
 name = "synapse.synapse_rust"
