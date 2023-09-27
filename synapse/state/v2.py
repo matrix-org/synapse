@@ -23,7 +23,6 @@ from typing import (
     Generator,
     Iterable,
     List,
-    Mapping,
     Optional,
     Sequence,
     Set,
@@ -269,7 +268,7 @@ async def _get_power_level_for_sender(
 
 async def _get_auth_chain_difference(
     room_id: str,
-    state_sets: Sequence[Mapping[Any, str]],
+    state_sets: Sequence[StateMap[str]],
     unpersisted_events: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
 ) -> Set[str]:
@@ -405,7 +404,7 @@ def _seperate(
 
     # mypy doesn't understand that discarding None above means that conflicted
     # state is StateMap[Set[str]], not StateMap[Set[Optional[Str]]].
-    return unconflicted_state, conflicted_state  # type: ignore
+    return unconflicted_state, conflicted_state  # type: ignore[return-value]
 
 
 def _is_power_event(event: EventBase) -> bool:
