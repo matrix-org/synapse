@@ -133,10 +133,6 @@ exclude = [
     { path = "synapse/*.so", format = "sdist"}
 ]
 
-[tool.poetry.build]
-script = "build_rust.py"
-generate-setup-file = true
-
 [tool.poetry.scripts]
 synapse_homeserver = "synapse.app.homeserver:main"
 synapse_worker = "synapse.app.generic_worker:main"
@@ -382,7 +378,16 @@ furo = ">=2022.12.7,<2024.0.0"
 # provided we check that it's safe to do so (i.e. that CI passes).
 requires = ["poetry-core>=1.1.0,<=1.7.0", "setuptools_rust>=1.3,<=1.7.0"]
 build-backend = "poetry.core.masonry.api"
+# Should this now be build-backend = "setuptools.build_meta"?
 
+[[tool.setuptools-rust.ext-modules]]
+target = "synapse.synapse_rust"
+path = "rust/Cargo.toml"
+binding = "PyO3"
+py-limited-api = true
+# We force always building in release mode, as we can't tell the
+# difference between using `poetry` in development vs production.
+debug = false
 
 [tool.cibuildwheel]
 # Skip unsupported platforms (by us or by Rust).
