@@ -12,12 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-signoff:
+    if: "github.event_name == 'pull_request'"
+    uses: "matrix-org/backend-meta/.github/workflows/sign-off.yml@v2"
+
   # Job to detect what has changed so we don't run e.g. Rust checks on PRs that
   # don't modify Rust code.
   changes:
     runs-on: ubuntu-latest
     outputs:
       rust: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.rust }}
+      trial: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.trial }}
+      integration: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.integration }}
+      linting: ${{ !startsWith(github.ref, 'refs/pull/') || steps.filter.outputs.linting }}
     steps:
     - uses: dorny/paths-filter@v2
       id: filter
@@ -29,11 +36,47 @@ jobs:
             - 'rust/**'
             - 'Cargo.toml'
             - 'Cargo.lock'
+            - '.rustfmt.toml'
+
+          trial:
+            - 'synapse/**'
+            - 'tests/**'
+            - 'rust/**'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+            - 'pyproject.toml'
+            - 'poetry.lock'
+
+          integration:
+            - 'synapse/**'
+            - 'rust/**'
+            - 'docker/**'
+            - 'Cargo.toml'
+            - 'Cargo.lock'
+            - 'pyproject.toml'
+            - 'poetry.lock'
+            - 'docker/**'
+
+          linting:
+            - 'synapse/**'
+            - 'docker/**'
+            - 'tests/**'
+            - 'scripts-dev/**'
+            - 'contrib/**'
+            - 'synmark/**'
+            - 'stubs/**'
+            - '.ci/**'
+            - 'mypy.ini'
+            - 'pyproject.toml'
+            - 'poetry.lock'
 
   check-sampleconfig:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
       - uses: Swatinem/rust-cache@v2
@@ -47,8 +90,11 @@ jobs:
 
   check-schema-delta:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -58,7 +104,7 @@ jobs:
   check-lockfile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -66,9 +112,12 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Poetry
         uses: matrix-org/setup-python-poetry@v1
@@ -88,9 +137,12 @@ jobs:
   lint-mypy:
     runs-on: ubuntu-latest
     name: Typechecking
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -123,7 +175,7 @@ jobs:
   lint-crlf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check line endings
         run: scripts-dev/check_line_terminators.sh
 
@@ -131,7 +183,7 @@ jobs:
     if: ${{ (github.base_ref == 'develop'  || contains(github.base_ref, 'release-')) && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
@@ -145,8 +197,11 @@ jobs:
 
   lint-pydantic:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.linting == 'true' }}
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Install Rust
@@ -164,7 +219,7 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -182,7 +237,7 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -199,7 +254,7 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -225,6 +280,7 @@ jobs:
       - check-lockfile
       - lint-clippy
       - lint-rustfmt
+      - check-signoff
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -234,7 +290,7 @@ jobs:
     needs: linting-done
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
@@ -245,15 +301,17 @@ jobs:
       sytest_test_matrix: ${{ steps.get-matrix.outputs.sytest_test_matrix }}
 
   trial:
-    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: calculate-test-jobs
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.trial == 'true' }} # Allow previous steps to be skipped, but not fail
+    needs:
+      - calculate-test-jobs
+      - changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
         job:  ${{ fromJson(needs.calculate-test-jobs.outputs.trial_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1
       - name: Set up PostgreSQL ${{ matrix.job.postgres-version }}
         if: ${{ matrix.job.postgres-version }}
@@ -301,11 +359,13 @@ jobs:
 
   trial-olddeps:
     # Note: sqlite only; no postgres
-    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: linting-done
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.trial == 'true' }} # Allow previous steps to be skipped, but not fail
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -357,8 +417,10 @@ jobs:
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
     # Note: sqlite only; no postgres. Completely untested since poetry move.
-    if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() }}
-    needs: linting-done
+    if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() && needs.changes.outputs.trial == 'true' }}
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -366,7 +428,7 @@ jobs:
         extras: ["all"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Install libs necessary for PyPy to build binary wheels for dependencies
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
       - uses: matrix-org/setup-python-poetry@v1
@@ -389,8 +451,10 @@ jobs:
           || true
 
   sytest:
-    if: ${{ !failure() && !cancelled() }}
-    needs: calculate-test-jobs
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true' }}
+    needs:
+      - calculate-test-jobs
+      - changes
     runs-on: ubuntu-latest
     container:
       image: matrixdotorg/sytest-synapse:${{ matrix.job.sytest-tag }}
@@ -411,7 +475,7 @@ jobs:
         job: ${{ fromJson(needs.calculate-test-jobs.outputs.sytest_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare test blacklist
         run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
 
@@ -435,8 +499,8 @@ jobs:
             /logs/**/*.log*
 
   export-data:
-    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
-    needs: [linting-done, portdb]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true'}} # Allow previous steps to be skipped, but not fail
+    needs: [linting-done, portdb, changes]
     runs-on: ubuntu-latest
     env:
       TOP: ${{ github.workspace }}
@@ -456,7 +520,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get -qq install xmlsec1 postgresql-client
       - uses: matrix-org/setup-python-poetry@v1
         with:
@@ -471,8 +535,10 @@ jobs:
 
 
   portdb:
-    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
-    needs: linting-done
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true'}} # Allow previous steps to be skipped, but not fail
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -498,7 +564,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Add PostgreSQL apt repository
         # We need a version of pg_dump that can handle the version of
         # PostgreSQL being tested against. The Ubuntu package repository lags
@@ -532,8 +598,10 @@ jobs:
             schema_diff
 
   complement:
-    if: "${{ !failure() && !cancelled() }}"
-    needs: linting-done
+    if: "${{ !failure() && !cancelled() && needs.changes.outputs.integration == 'true' }}"
+    needs:
+      - linting-done
+      - changes
     runs-on: ubuntu-latest
 
     strategy:
@@ -550,8 +618,8 @@ jobs:
             database: Postgres
 
     steps:
-      - name: Run actions/checkout@v3 for synapse
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v4 for synapse
+        uses: actions/checkout@v4
         with:
           path: synapse
 
@@ -581,7 +649,7 @@ jobs:
       - changes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.61.0
@@ -599,7 +667,7 @@ jobs:
       - changes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -627,9 +695,16 @@ jobs:
         with:
           needs: ${{ toJSON(needs) }}
 
-          # The newsfile lint may be skipped on non PR builds
-          # Cargo test is skipped if there is no changes on Rust code
+          # Various bits are skipped if there was no applicable changes.
+          # The newsfile and signoff lint may be skipped on non PR builds.
           skippable: |
+            trial
+            trial-olddeps
+            sytest
+            portdb
+            export-data
+            complement
+            check-signoff
             lint-newsfile
             cargo-test
             cargo-bench

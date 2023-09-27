@@ -95,7 +95,7 @@ manifest-path = "rust/Cargo.toml"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.93.0rc1"
+version = "1.93.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -209,11 +209,11 @@ cryptography = ">=3.4.7"
 # ijson 3.1.4 fixes a bug with "." in property names
 ijson = ">=3.1.4"
 matrix-common = "^1.3.0"
-# We need packaging.requirements.Requirement, added in 16.1.
-packaging = ">=16.1"
-# This is the most recent version of Pydantic with available on common distros.
-# We are currently incompatible with >=2.0.0: (https://github.com/matrix-org/synapse/issues/15858)
-pydantic = "^1.7.4"
+# We need packaging.verison.Version(...).major added in 20.0.
+packaging = ">=20.0"
+# We support pydantic v1 and pydantic v2 via the pydantic.v1 compat module.
+# See https://github.com/matrix-org/synapse/issues/15858
+pydantic = ">=1.7.4, <3"
 
 # This is for building the rust components during "poetry install", which
 # currently ignores the `build-system.requires` directive (c.f.
@@ -321,6 +321,8 @@ all = [
 isort = ">=5.10.1"
 black = ">=22.7.0"
 ruff = "0.0.290"
+# Type checking only works with the pydantic.v1 compat module from pydantic v2
+pydantic = "^2"
 
 # Typechecking
 lxml-stubs = ">=0.4.0"

@@ -1,3 +1,23 @@
+# Synapse 1.93.0 (2023-09-26)
+
+No significant changes since 1.93.0rc1.
+
+
+## Security advisory
+
+The following issues are fixed in 1.93.0 (and RCs).
+
+- [GHSA-4f74-84v3-j9q5](https://github.com/matrix-org/synapse/security/advisories/GHSA-4f74-84v3-j9q5) / [CVE-2023-41335](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-41335) — Low Severity
+
+  Temporary storage of plaintext passwords during password changes.
+
+- [GHSA-7565-cq32-vx2x](https://github.com/matrix-org/synapse/security/advisories/GHSA-7565-cq32-vx2x) / [CVE-2023-42453](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-42453) — Low Severity
+
+  Improper validation of receipts allows forged read receipts.
+
+See the advisories for more details. If you have any questions, email security@matrix.org.
+
+
 # Synapse 1.93.0rc1 (2023-09-19)
 
 ### Features

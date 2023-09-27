@@ -17,7 +17,12 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from pydantic import Extra, StrictStr
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import Extra, StrictStr
+else:
+    from pydantic import Extra, StrictStr
 
 from synapse.api import errors
 from synapse.api.errors import NotFoundError, SynapseError, UnrecognizedRequestError
