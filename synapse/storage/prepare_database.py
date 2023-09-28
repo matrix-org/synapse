@@ -25,6 +25,7 @@ from typing import (
     Optional,
     TextIO,
     Tuple,
+    cast,
 )
 
 import attr
@@ -732,7 +733,7 @@ def _get_or_create_schema_state(
     applied_deltas = tuple(d for d, in txn)
 
     txn.execute("SELECT update_name, ordering FROM background_updates")
-    background_Updates = tuple(txn)
+    background_Updates = cast(Tuple[Tuple[str, int], ...], tuple(txn))
 
     return _SchemaState(
         current_version=current_version,
