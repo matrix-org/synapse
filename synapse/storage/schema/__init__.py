@@ -143,4 +143,7 @@ BACKGROUND_UPDATES_COMPAT_VERSION = (
 This value is checked on startup against any pending background updates. If there
 are any pending background updates less than BACKGROUND_UPDATES_COMPAT_VERSION, then
 Synapse will refuse to start.
+
+In order to work with *new* databases this *must* be smaller than the latest full
+dump of the database.
 """
