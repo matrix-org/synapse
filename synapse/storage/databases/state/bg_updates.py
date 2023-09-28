@@ -94,6 +94,18 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         groups: List[int],
         state_filter: Optional[StateFilter] = None,
     ) -> Mapping[int, StateMap[str]]:
+        """
+        Given a number of state groups, fetch the latest state for each group.
+
+        Args:
+            txn: The transaction object.
+            groups: The given state groups that you want to fetch the latest state for.
+            state_filter: The state filter to apply the state we fetch state from the database.
+
+        Returns:
+            Map from state_group to a StateMap at that point.
+        """
+
         state_filter = state_filter or StateFilter.all()
 
         results: Dict[int, MutableStateMap[str]] = {group: {} for group in groups}
@@ -206,8 +218,10 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             if where_clause:
                 where_clause = " AND (%s)" % (where_clause,)
 
-            # We don't use WITH RECURSIVE on sqlite3 as there are distributions
-            # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
+            # XXX: We could `WITH RECURSIVE` here since it's supported on SQLite 3.8.3
+            # or higher and our minimum supported version is greater than that.
+            #
+            # We just haven't put in the time to refactor this.
             for group in groups:
                 next_group: Optional[int] = group
 

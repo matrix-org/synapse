@@ -205,6 +205,12 @@ class ReplicationDataHandler:
                     self.notifier.notify_user_joined_room(
                         row.data.event_id, row.data.room_id
                     )
+
+                # If this is a server ACL event, clear the cache in the storage controller.
+                if row.data.type == EventTypes.ServerACL:
+                    self._state_storage_controller.get_server_acl_for_room.invalidate(
+                        (row.data.room_id,)
+                    )
         elif stream_name == UnPartialStatedRoomStream.NAME:
             for row in rows:
                 assert isinstance(row, UnPartialStatedRoomStreamRow)
