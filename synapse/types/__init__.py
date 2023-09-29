@@ -860,7 +860,9 @@ class StreamToken:
     )
     presence_key: int
     typing_key: int
-    receipt_key: int
+    receipt_key: MultiWriterStreamToken = attr.ib(
+        validator=attr.validators.instance_of(MultiWriterStreamToken)
+    )
     account_data_key: int
     push_rules_key: int
     to_device_key: int
@@ -883,8 +885,31 @@ class StreamToken:
             while len(keys) < len(attr.fields(cls)):
                 # i.e. old token from before receipt_key
                 keys.append("0")
+
+            (
+                room_key,
+                presence_key,
+                typing_key,
+                receipt_key,
+                account_data_key,
+                push_rules_key,
+                to_device_key,
+                device_list_key,
+                groups_key,
+                un_partial_stated_rooms_key,
+            ) = keys
+
             return cls(
-                await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
+                room_key=await RoomStreamToken.parse(store, room_key),
+                presence_key=int(presence_key),
+                typing_key=int(typing_key),
+                receipt_key=await MultiWriterStreamToken.parse(store, receipt_key),
+                account_data_key=int(account_data_key),
+                push_rules_key=int(push_rules_key),
+                to_device_key=int(to_device_key),
+                device_list_key=int(device_list_key),
+                groups_key=int(groups_key),
+                un_partial_stated_rooms_key=int(un_partial_stated_rooms_key),
             )
         except CancelledError:
             raise
@@ -897,7 +922,7 @@ class StreamToken:
                 await self.room_key.to_string(store),
                 str(self.presence_key),
                 str(self.typing_key),
-                str(self.receipt_key),
+                await self.receipt_key.to_string(store),
                 str(self.account_data_key),
                 str(self.push_rules_key),
                 str(self.to_device_key),
@@ -923,6 +948,11 @@ class StreamToken:
         if key == StreamKeyType.ROOM:
             new_token = self.copy_and_replace(
                 StreamKeyType.ROOM, self.room_key.copy_and_advance(new_value)
+            )
+            return new_token
+        elif key == StreamKeyType.RECEIPT:
+            new_token = self.copy_and_replace(
+                StreamKeyType.RECEIPT, self.receipt_key.copy_and_advance(new_value)
             )
             return new_token
 
@@ -967,7 +997,9 @@ class StreamToken:
         return getattr(self, key.value)
 
 
-StreamToken.START = StreamToken(RoomStreamToken(stream=0), 0, 0, 0, 0, 0, 0, 0, 0, 0)
+StreamToken.START = StreamToken(
+    RoomStreamToken(stream=0), 0, 0, MultiWriterStreamToken(stream=0), 0, 0, 0, 0, 0, 0
+)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
