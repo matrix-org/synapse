@@ -469,7 +469,7 @@ class _CacheContext:
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True)
-class _CachedFunctionDescriptor(Generic[F]):
+class _CachedFunctionDescriptor:
     """Helper for `@cached`, we name it so that we can hook into it with mypy
     plugin."""
 
@@ -521,7 +521,7 @@ def cached(
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True)
-class _CachedListFunctionDescriptor(Generic[F]):
+class _CachedListFunctionDescriptor:
     """Helper for `@cachedList`, we name it so that we can hook into it with mypy
     plugin."""
 
