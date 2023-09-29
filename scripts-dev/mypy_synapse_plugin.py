@@ -57,6 +57,25 @@ class SynapsePlugin(Plugin):
         return None
 
 
+def _get_true_return_type(signature: CallableType) -> mypy.types.Type:
+    """Get the "final" return type of a maybe async/Deferred."""
+    if isinstance(signature.ret_type, Instance):
+        # If a coroutine, unwrap the coroutine's return type.
+        if signature.ret_type.type.fullname == "typing.Coroutine":
+            return signature.ret_type.args[2]
+
+        # If an awaitable, unwrap the awaitable's final value.
+        elif signature.ret_type.type.fullname == "typing.Awaitable":
+            return signature.ret_type.args[0]
+
+        # If a Deferred, unwrap the Deferred's final value.
+        elif signature.ret_type.type.fullname == "twisted.internet.defer.Deferred":
+            return signature.ret_type.args[0]
+
+    # Otherwise, return the raw value of the function.
+    return signature.ret_type
+
+
 def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     """Fixes the `CachedFunction.__call__` signature to be correct.
 
@@ -113,34 +132,15 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     arg_kinds.append(ARG_NAMED_OPT)  # Arg is an optional kwarg.
 
     # 4. Ensure the return type is a Deferred.
-    if (
-        isinstance(signature.ret_type, Instance)
-        and signature.ret_type.type.fullname == "twisted.internet.defer.Deferred"
-    ):
-        # If it is already a Deferred, nothing to do.
-        ret_type = signature.ret_type
-    else:
-        ret_arg = None
-        if isinstance(signature.ret_type, Instance):
-            # If a coroutine, wrap the coroutine's return type in a Deferred.
-            if signature.ret_type.type.fullname == "typing.Coroutine":
-                ret_arg = signature.ret_type.args[2]
+    ret_arg = _get_true_return_type(signature)
 
-            # If an awaitable, wrap the awaitable's final value in a Deferred.
-            elif signature.ret_type.type.fullname == "typing.Awaitable":
-                ret_arg = signature.ret_type.args[0]
-
-        # Otherwise, wrap the return value in a Deferred.
-        if ret_arg is None:
-            ret_arg = signature.ret_type
-
-        # This should be able to use ctx.api.named_generic_type, but that doesn't seem
-        # to find the correct symbol for anything more than 1 module deep.
-        #
-        # modules is not part of CheckerPluginInterface. The following is a combination
-        # of TypeChecker.named_generic_type and TypeChecker.lookup_typeinfo.
-        sym = ctx.api.modules["twisted.internet.defer"].names.get("Deferred")  # type: ignore[attr-defined]
-        ret_type = Instance(sym.node, [remove_instance_last_known_values(ret_arg)])
+    # This should be able to use ctx.api.named_generic_type, but that doesn't seem
+    # to find the correct symbol for anything more than 1 module deep.
+    #
+    # modules is not part of CheckerPluginInterface. The following is a combination
+    # of TypeChecker.named_generic_type and TypeChecker.lookup_typeinfo.
+    sym = ctx.api.modules["twisted.internet.defer"].names.get("Deferred")  # type: ignore[attr-defined]
+    ret_type = Instance(sym.node, [remove_instance_last_known_values(ret_arg)])
 
     signature = signature.copy_modified(
         arg_types=arg_types,
@@ -164,29 +164,9 @@ def check_is_cacheable_wrapper(ctx: MethodSigContext) -> CallableType:
         ctx.api.fail("Cached 'function' is not a callable", ctx.context)
         return signature
 
-    ret_arg = None
-    if isinstance(orig_sig.ret_type, Instance):
-        # If a coroutine, wrap the coroutine's return type in a Deferred.
-        if orig_sig.ret_type.type.fullname == "typing.Coroutine":
-            ret_arg = orig_sig.ret_type.args[2]
-
-        # If an awaitable, wrap the awaitable's final value in a Deferred.
-        elif orig_sig.ret_type.type.fullname == "typing.Awaitable":
-            ret_arg = orig_sig.ret_type.args[0]
-
-        elif orig_sig.ret_type.type.fullname == "twisted.internet.defer.Deferred":
-            ret_arg = orig_sig.ret_type.args[0]
-
-    if ret_arg is None:
-        ret_arg = orig_sig.ret_type
-
-    assert ret_arg is not None
-
-    check_is_cacheable(
-        orig_sig,
-        ctx,
-        ret_arg,
-    )
+    # Unwrap the true return type from the cached function.
+    ret_arg = _get_true_return_type(orig_sig)
+    check_is_cacheable(orig_sig, ctx, ret_arg)
 
     return signature
 
