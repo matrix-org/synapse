@@ -308,7 +308,7 @@ class FederationKnockingTestCase(
         self.assertEqual(200, channel.code, channel.result)
 
         # Check that we got the stripped room state in return
-        room_state_events = channel.json_body["knock_state_events"]
+        room_state_events = channel.json_body["knock_room_state"]
 
         # Validate the stripped room state events
         self.check_knock_room_state_against_room_state(
