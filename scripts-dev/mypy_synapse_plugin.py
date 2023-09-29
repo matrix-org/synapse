@@ -255,19 +255,28 @@ def is_cacheable(
             rt.type.fullname in IMMUTABLE_VALUE_TYPES
             or rt.type.fullname in IMMUTABLE_CUSTOM_TYPES
         ):
+            # "Simple" types are generally immutable.
             return True, None
 
         elif rt.type.fullname == "typing.Mapping":
-            return is_cacheable(rt.args[1], signature, verbose)
+            # Generally mapping keys are immutable, but they only *have* to be
+            # hashable, which doesn't imply immutability. E.g. Mapping[K, V]
+            # is cachable iff K and V are cachable.
+            return is_cacheable(rt.args[0], signature, verbose) and is_cacheable(
+                rt.args[1], signature, verbose
+            )
 
         elif rt.type.fullname in IMMUTABLE_CONTAINER_TYPES_REQUIRING_IMMUTABLE_ELEMENTS:
             # E.g. Collection[T] is cachable iff T is cachable.
             return is_cacheable(rt.args[0], signature, verbose)
 
         elif rt.type.fullname in MUTABLE_CONTAINER_TYPES:
+            # Mutable containers are mutable regardless of their underlying type.
             return False, None
 
         elif "attrs" in rt.type.metadata:
+            # attrs classes are only cachable iff it is frozen (immutable itself)
+            # and all attributes are cachable.
             frozen = rt.type.metadata["attrs"]["frozen"]
             if frozen:
                 for attribute in rt.type.metadata["attrs"]["attributes"]:
@@ -284,12 +293,16 @@ def is_cacheable(
                 return False, "non-frozen attrs class"
 
         else:
-            return False, f"Don't know how to handle {rt.type.fullname}"
+            # Ensure we fail for unknown types, these generally means that the
+            # above code is not complete.
+            return False, f"Don't know how to handle {rt.type.fullname} return type instance"
 
     elif isinstance(rt, NoneType):
+        # None is cachable.
         return True, None
 
     elif isinstance(rt, (TupleType, UnionType)):
+        # Tuples and unions are cachable iff all their items are cachable.
         for item in rt.items:
             ok, note = is_cacheable(item, signature, verbose)
             if not ok:
@@ -298,14 +311,17 @@ def is_cacheable(
         return True, None
 
     elif isinstance(rt, TypeAliasType):
+        # For a type alias, check if the underlying real type is cachable.
         return is_cacheable(mypy.types.get_proper_type(rt), signature, verbose)
 
-    # The tests check what happens if you raise an Exception, so they don't return.
     elif isinstance(rt, UninhabitedType) and rt.is_noreturn:
-        # There's no return value, just consider it cachable.
+        # There is no return value, just consider it cachable. This is only used
+        # in tests.
         return True, None
 
     else:
+        # Ensure we fail for unknown types, these generally means that the
+        # above code is not complete.
         return False, f"Don't know how to handle {type(rt).__qualname__} return type"
 
 
