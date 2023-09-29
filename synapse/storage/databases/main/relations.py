@@ -517,7 +517,7 @@ class RelationsWorkerStore(SQLBaseStore):
         raise NotImplementedError()
 
     # TODO: This returns a mutable object, which is generally bad.
-    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")
+    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_applicable_edits(
         self, event_ids: Collection[str]
     ) -> Mapping[str, Optional[EventBase]]:
@@ -604,7 +604,7 @@ class RelationsWorkerStore(SQLBaseStore):
         raise NotImplementedError()
 
     # TODO: This returns a mutable object, which is generally bad.
-    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
+    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_thread_summaries(
         self, event_ids: Collection[str]
     ) -> Mapping[str, Optional[Tuple[int, EventBase]]]:

@@ -50,6 +50,7 @@ class SynapsePlugin(Plugin):
 
         if fullname in (
             "synapse.util.caches.descriptors._CachedFunctionDescriptor.__call__",
+            "synapse.util.caches.descriptors._CachedListFunctionDescriptor.__call__",
         ):
             return check_is_cacheable_wrapper
 
