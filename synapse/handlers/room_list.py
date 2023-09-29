@@ -33,7 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.types import JsonDict, ThirdPartyInstanceID, JsonMapping
+from synapse.types import JsonDict, JsonMapping, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
