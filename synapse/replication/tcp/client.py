@@ -339,7 +339,7 @@ class ReplicationDataHandler:
             try:
                 await make_deferred_yieldable(deferred)
             except defer.TimeoutError:
-                logger.error(
+                logger.warning(
                     "Timed out waiting for repl stream %r to reach %s (%s)"
                     "; currently at: %s",
                     stream_name,

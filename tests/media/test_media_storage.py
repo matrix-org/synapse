@@ -129,6 +129,8 @@ class _TestImage:
             a 404/400 is expected.
         unable_to_thumbnail: True if we expect the thumbnailing to fail (400), or
             False if the thumbnailing should succeed or a normal 404 is expected.
+        is_inline: True if we expect the file to be served using an inline
+            Content-Disposition or False if we expect an attachment.
     """
 
     data: bytes
@@ -138,6 +140,7 @@ class _TestImage:
     expected_scaled: Optional[bytes] = None
     expected_found: bool = True
     unable_to_thumbnail: bool = False
+    is_inline: bool = True
 
 
 @parameterized_class(
@@ -196,6 +199,25 @@ class _TestImage:
                 b".gif",
                 expected_found=False,
                 unable_to_thumbnail=True,
+            ),
+        ),
+        # An SVG.
+        (
+            _TestImage(
+                b"""<?xml version="1.0"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="400" height="400">
+  <circle cx="100" cy="100" r="50" stroke="black"
+    stroke-width="5" fill="red" />
+</svg>""",
+                b"image/svg",
+                b".svg",
+                expected_found=False,
+                unable_to_thumbnail=True,
+                is_inline=False,
             ),
         ),
     ],
@@ -339,7 +361,11 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
-            [b"attachment; filename=out" + self.test_image.extension],
+            [
+                (b"inline" if self.test_image.is_inline else b"attachment")
+                + b"; filename=out"
+                + self.test_image.extension
+            ],
         )
 
     def test_disposition_filenamestar_utf8escaped(self) -> None:
@@ -359,7 +385,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
-            [b"attachment; filename*=utf-8''" + filename + self.test_image.extension],
+            [
+                (b"inline" if self.test_image.is_inline else b"attachment")
+                + b"; filename*=utf-8''"
+                + filename
+                + self.test_image.extension
+            ],
         )
 
     def test_disposition_none(self) -> None:
@@ -373,7 +404,10 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
         )
-        self.assertEqual(headers.getRawHeaders(b"Content-Disposition"), [b"attachment"])
+        self.assertEqual(
+            headers.getRawHeaders(b"Content-Disposition"),
+            [b"inline" if self.test_image.is_inline else b"attachment"],
+        )
 
     def test_thumbnail_crop(self) -> None:
         """Test that a cropped remote thumbnail is available."""
