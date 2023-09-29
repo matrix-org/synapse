@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import itertools
 import logging
 import time
 import types
@@ -62,7 +63,7 @@ from synapse.storage.engines import (
     BaseDatabaseEngine,
     Psycopg2Engine,
     PsycopgEngine,
-    Sqlite3Engine,
+    Sqlite3Engine, PostgresEngine,
 )
 from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
@@ -399,7 +400,7 @@ class LoggingTransaction:
     def execute_values(
         self,
         sql: str,
-        values: Iterable[Iterable[Any]],
+        values: Sequence[Sequence[Any]],
         template: Optional[str] = None,
         fetch: bool = True,
     ) -> List[Tuple]:
@@ -412,19 +413,43 @@ class LoggingTransaction:
         The `template` is the snippet to merge to every item in argslist to
         compose the query.
         """
-        assert isinstance(self.database_engine, Psycopg2Engine)
+        assert isinstance(self.database_engine, PostgresEngine)
 
-        from psycopg2.extras import execute_values
+        if isinstance(self.database_engine, Psycopg2Engine):
 
-        return self._do_execute(
-            # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
-            # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
-            lambda the_sql, the_values: execute_values(
-                self.txn, the_sql, the_values, template=template, fetch=fetch
-            ),
-            sql,
-            values,
-        )
+            from psycopg2.extras import execute_values
+
+            return self._do_execute(
+                # TODO: is it safe for values to be Iterable[Iterable[Any]] here?
+                # https://www.psycopg.org/docs/extras.html?highlight=execute_batch#psycopg2.extras.execute_values says values should be Sequence[Sequence]
+                lambda the_sql, the_values: execute_values(
+                    self.txn, the_sql, the_values, template=template, fetch=fetch
+                ),
+                sql,
+                values,
+            )
+        else:
+            # We use fetch = False to mean a writable query. You *might* be able
+            # to morph that into a COPY (...) FROM STDIN, but it isn't worth the
+            # effort for the few places we set fetch = False.
+            assert fetch is True
+
+            # execute_values requires a single replacement, but we need to expand it
+            # for COPY. This assumes all inner sequences are the same length.
+            value_str = "(" + ", ".join("?" for _ in next(iter(values))) + ")"
+            sql = sql.replace("?", ", ".join(value_str for _ in values))
+
+            # Wrap the SQL in the COPY statement.
+            sql = f"COPY ({sql}) TO STDOUT"
+
+            def f(
+                the_sql: str, the_args: Sequence[Sequence[Any]]
+            ) -> Iterable[Tuple[Any, ...]]:
+                with self.txn.copy(the_sql, the_args) as copy:
+                    yield from copy.rows()
+
+            # Flatten the values.
+            return self._do_execute(f, sql, list(itertools.chain.from_iterable(values)))
 
     def copy_write(
         self, sql: str, args: Iterable[Any], values: Iterable[Iterable[Any]]
@@ -440,20 +465,6 @@ class LoggingTransaction:
                     copy.write_row(record)
 
         self._do_execute(f, sql, args, values)
-
-    def copy_read(
-        self, sql: str, args: Iterable[Iterable[Any]]
-    ) -> Iterable[Tuple[Any, ...]]:
-        """Corresponds to a PostgreSQL COPY (...) TO STDOUT call."""
-        assert isinstance(self.database_engine, PsycopgEngine)
-
-        def f(
-            the_sql: str, the_args: Iterable[Iterable[Any]]
-        ) -> Iterable[Tuple[Any, ...]]:
-            with self.txn.copy(the_sql, the_args) as copy:
-                yield from copy.rows()
-
-        return self._do_execute(f, sql, args)
 
     def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
         self._do_execute(self.txn.execute, sql, parameters)
@@ -1187,7 +1198,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         keys: Collection[str],
-        values: Iterable[Iterable[Any]],
+        values: Sequence[Sequence[Any]],
     ) -> None:
         """Executes an INSERT query on the named table.
 

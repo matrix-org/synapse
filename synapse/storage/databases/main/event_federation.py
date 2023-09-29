@@ -311,34 +311,16 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             results = set()
 
         if isinstance(self.database_engine, PostgresEngine):
-            if isinstance(self.database_engine, Psycopg2Engine):
-                # We can use `execute_values` to efficiently fetch the gaps when
-                # using postgres.
-                sql = """
-                    SELECT event_id
-                    FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, max_seq)
-                    WHERE
-                        c.chain_id = l.chain_id
-                        AND sequence_number <= max_seq
-                """
-                rows = txn.execute_values(sql, chains.items())
-            else:
-                sql = """
-                COPY (
-                    SELECT event_id
-                    FROM event_auth_chains AS c, (VALUES %s) AS l(chain_id, max_seq)
-                    WHERE
-                        c.chain_id = l.chain_id
-                        AND sequence_number <= max_seq
-                    )
-                TO STDOUT
-                """ % (
-                    ", ".join("(?, ?)" for _ in chains)
-                )
-                # Flatten the arguments.
-                rows = txn.copy_read(
-                    sql, list(itertools.chain.from_iterable(chains.items()))
-                )
+            # We can use `execute_values` to efficiently fetch the gaps when
+            # using postgres.
+            sql = """
+                SELECT event_id
+                FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, max_seq)
+                WHERE
+                    c.chain_id = l.chain_id
+                    AND sequence_number <= max_seq
+            """
+            rows = txn.execute_values(sql, chains.items())
             results.update(r for r, in rows)
         else:
             # For SQLite we just fall back to doing a noddy for loop.
@@ -599,38 +581,22 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             return result
 
         if isinstance(self.database_engine, PostgresEngine):
+            # We can use `execute_values` to efficiently fetch the gaps when
+            # using postgres.
+            sql = """
+                SELECT event_id
+                FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, min_seq, max_seq)
+                WHERE
+                    c.chain_id = l.chain_id
+                    AND min_seq < sequence_number AND sequence_number <= max_seq
+            """
+
             args = [
                 (chain_id, min_no, max_no)
                 for chain_id, (min_no, max_no) in chain_to_gap.items()
             ]
 
-            if isinstance(self.database_engine, Psycopg2Engine):
-                # We can use `execute_values` to efficiently fetch the gaps when
-                # using postgres.
-                sql = """
-                    SELECT event_id
-                    FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, min_seq, max_seq)
-                    WHERE
-                        c.chain_id = l.chain_id
-                        AND min_seq < sequence_number AND sequence_number <= max_seq
-                """
-
-                rows = txn.execute_values(sql, args)
-            else:
-                sql = """
-                COPY (
-                    SELECT event_id
-                    FROM event_auth_chains AS c, (VALUES %s) AS l(chain_id, min_seq, max_seq)
-                    WHERE
-                        c.chain_id = l.chain_id
-                        AND min_seq < sequence_number AND sequence_number <= max_seq
-                    )
-                TO STDOUT
-                """ % (
-                    ", ".join("(?, ?, ?)" for _ in args)
-                )
-                # Flatten the arguments.
-                rows = txn.copy_read(sql, list(itertools.chain.from_iterable(args)))
+            rows = txn.execute_values(sql, args)
             result.update(r for r, in rows)
         else:
             # For SQLite we just fall back to doing a noddy for loop.
