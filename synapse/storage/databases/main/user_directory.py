@@ -719,18 +719,21 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             # We weight the localpart most highly, then display name and finally
             # server name
 
-            sql = """
-                INSERT INTO user_directory_search(user_id, vector)
-                VALUES 
-                (
-                    ?,
-                    setweight(to_tsvector('simple', ?), 'A')
-                    || setweight(to_tsvector('simple', ?), 'D')
-                    || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
-                )
-                ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
-            """
             if isinstance(self.database_engine, Psycopg2Engine):
+                template = """
+                    (
+                        %s,
+                        setweight(to_tsvector('simple', %s), 'A')
+                        || setweight(to_tsvector('simple', %s), 'D')
+                        || setweight(to_tsvector('simple', COALESCE(%s, '')), 'B')
+                    )
+                """
+
+                sql = """
+                        INSERT INTO user_directory_search(user_id, vector)
+                        VALUES ? ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
+                    """
+
                 txn.execute_values(
                     sql,
                     [
@@ -744,9 +747,22 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         )
                         for p in profiles
                     ],
+                    template=template,
                     fetch=False,
                 )
-            if isinstance(self.database_engine, PsycopgEngine):
+            elif isinstance(self.database_engine, PsycopgEngine):
+                sql = """
+                    INSERT INTO user_directory_search(user_id, vector)
+                    VALUES
+                    (
+                        ?,
+                        setweight(to_tsvector('simple', ?), 'A')
+                        || setweight(to_tsvector('simple', ?), 'D')
+                        || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
+                    )
+                    ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
+                """
+
                 txn.executemany(
                     sql,
                     [

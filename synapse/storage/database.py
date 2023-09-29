@@ -426,13 +426,23 @@ class LoggingTransaction:
             values,
         )
 
-    def copy(
+    def copy_write(
         self,
         sql: str, args: Iterable[Iterable[Any]]
     ) -> None:
+        # TODO use _do_execute
         with self.txn.copy(sql) as copy:
             for record in args:
                 copy.write_row(record)
+
+    def copy_read(
+        self,
+        sql: str, args: Iterable[Iterable[Any]]
+    ) -> Iterable[Tuple[Any, ...]]:
+        # TODO use _do_execute
+        sql = self.database_engine.convert_param_style(sql)
+        with self.txn.copy(sql, args) as copy:
+            yield from copy.rows()
 
     def execute(self, sql: str, parameters: SQLQueryParameters = ()) -> None:
         self._do_execute(self.txn.execute, sql, parameters)
@@ -1193,7 +1203,7 @@ class DatabasePool:
             sql = "COPY %s (%s) FROM STDIN" % (
                 table, ", ".join(k for k in keys),
             )
-            txn.copy(sql, values)
+            txn.copy_write(sql, values)
 
         else:
             sql = "INSERT INTO %s (%s) VALUES(%s)" % (
