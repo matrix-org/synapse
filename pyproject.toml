@@ -293,7 +293,7 @@ all = [
     # matrix-synapse-ldap3
     "matrix-synapse-ldap3",
     # postgres
-    "psycopg2", "psycopg2cffi", "psycopg2cffi-compat",
+    "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "psycopg",
     # saml2
     "pysaml2",
     # oidc and jwt

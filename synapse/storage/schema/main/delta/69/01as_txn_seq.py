@@ -47,8 +47,7 @@ def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> 
 
         if isinstance(database_engine, PsycopgEngine):
             import psycopg.sql
-            cur.execute(
-                psycopg.sql.SQL(sql).format(args)
-            )
+
+            cur.execute(psycopg.sql.SQL(sql).format(args))
         else:
             cur.execute(sql, args)

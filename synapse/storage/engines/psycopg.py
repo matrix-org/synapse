@@ -22,9 +22,7 @@ import psycopg.sql
 from twisted.enterprise.adbapi import Connection as TxConnection
 
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.engines._base import (
-    IsolationLevel,
-)
+from synapse.storage.engines._base import IsolationLevel
 
 if TYPE_CHECKING:
     pass

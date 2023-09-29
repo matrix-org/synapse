@@ -60,9 +60,9 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import (
     BaseDatabaseEngine,
-    PostgresEngine,
+    Psycopg2Engine,
     PsycopgEngine,
-    Sqlite3Engine, Psycopg2Engine,
+    Sqlite3Engine,
 )
 from synapse.storage.types import Connection, Cursor, SQLQueryParameters
 from synapse.util.async_helpers import delay_cancellation
@@ -426,18 +426,14 @@ class LoggingTransaction:
             values,
         )
 
-    def copy_write(
-        self,
-        sql: str, args: Iterable[Iterable[Any]]
-    ) -> None:
+    def copy_write(self, sql: str, args: Iterable[Iterable[Any]]) -> None:
         # TODO use _do_execute
         with self.txn.copy(sql) as copy:
             for record in args:
                 copy.write_row(record)
 
     def copy_read(
-        self,
-        sql: str, args: Iterable[Iterable[Any]]
+        self, sql: str, args: Iterable[Iterable[Any]]
     ) -> Iterable[Tuple[Any, ...]]:
         # TODO use _do_execute
         sql = self.database_engine.convert_param_style(sql)
@@ -466,6 +462,7 @@ class LoggingTransaction:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
         if isinstance(self.database_engine, PsycopgEngine):
             import psycopg.sql
+
             if isinstance(sql, psycopg.sql.Composed):
                 return sql.as_string(None)
 
@@ -1201,7 +1198,8 @@ class DatabasePool:
 
         elif isinstance(txn.database_engine, PsycopgEngine):
             sql = "COPY %s (%s) FROM STDIN" % (
-                table, ", ".join(k for k in keys),
+                table,
+                ", ".join(k for k in keys),
             )
             txn.copy_write(sql, values)
 

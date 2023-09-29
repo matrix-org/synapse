@@ -33,7 +33,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine[ConnectionType, CursorType], metaclass=abc.ABCMeta):
+class PostgresEngine(
+    BaseDatabaseEngine[ConnectionType, CursorType], metaclass=abc.ABCMeta
+):
     isolation_level_map: Mapping[int, int]
     default_isolation_level: int
     OperationalError: Type[Exception]
@@ -168,7 +170,11 @@ class PostgresEngine(BaseDatabaseEngine[ConnectionType, CursorType], metaclass=a
             if self.__class__.__name__ == "Psycopg2Engine":
                 cursor.execute("SET statement_timeout TO ?", (self.statement_timeout,))
             else:
-                cursor.execute(sql.SQL("SET statement_timeout TO {}").format(self.statement_timeout))
+                cursor.execute(
+                    sql.SQL("SET statement_timeout TO {}").format(
+                        self.statement_timeout
+                    )
+                )
 
         cursor.close()
         db_conn.commit()

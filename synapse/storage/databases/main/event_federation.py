@@ -47,7 +47,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine, Psycopg2Engine
+from synapse.storage.engines import PostgresEngine, Psycopg2Engine, Sqlite3Engine
 from synapse.types import JsonDict, StrCollection
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -332,9 +332,13 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                         AND sequence_number <= max_seq
                     )
                 TO STDOUT
-                """ % (", ".join("(?, ?)" for _ in chains))
+                """ % (
+                    ", ".join("(?, ?)" for _ in chains)
+                )
                 # Flatten the arguments.
-                rows = txn.copy_read(sql, list(itertools.chain.from_iterable(chains.items())))
+                rows = txn.copy_read(
+                    sql, list(itertools.chain.from_iterable(chains.items()))
+                )
             results.update(r for r, in rows)
         else:
             # For SQLite we just fall back to doing a noddy for loop.
@@ -622,7 +626,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                         AND min_seq < sequence_number AND sequence_number <= max_seq
                     )
                 TO STDOUT
-                """ % (", ".join("(?, ?, ?)" for _ in args))
+                """ % (
+                    ", ".join("(?, ?, ?)" for _ in args)
+                )
                 # Flatten the arguments.
                 rows = txn.copy_read(sql, list(itertools.chain.from_iterable(args)))
             result.update(r for r, in rows)

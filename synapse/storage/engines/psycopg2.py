@@ -18,9 +18,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional
 import psycopg2.extensions
 
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.engines._base import (
-    IsolationLevel,
-)
+from synapse.storage.engines._base import IsolationLevel
 
 if TYPE_CHECKING:
     pass
