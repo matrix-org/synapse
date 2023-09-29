@@ -811,7 +811,7 @@ class SyncHandler:
         )
 
         # this is heavily cached, thus: fast.
-        details = await self.store.get_room_summary(room_id)  # type: ignore[synapse-@cached-mutable]
+        details = await self.store.get_room_summary(room_id)
 
         name_id = state_ids.get((EventTypes.Name, ""))
         canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ""))
@@ -1336,7 +1336,7 @@ class SyncHandler:
             return RoomNotifCounts.empty()
 
         with Measure(self.clock, "unread_notifs_for_room_id"):
-            return await self.store.get_unread_event_push_actions_by_room_for_user(  # type: ignore[synapse-@cached-mutable]
+            return await self.store.get_unread_event_push_actions_by_room_for_user(
                 room_id,
                 sync_config.user.to_string(),
             )

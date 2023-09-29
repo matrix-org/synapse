@@ -682,7 +682,7 @@ class StateStorageController:
         # `get_joined_hosts` is called with the "current" state group for the
         # room, and so consecutive calls will be for consecutive state groups
         # which point to the previous state group.
-        cache = await self.stores.main._get_joined_hosts_cache(room_id)  # type: ignore[synapse-@cached-mutable]
+        cache = await self.stores.main._get_joined_hosts_cache(room_id)
 
         # If the state group in the cache matches, we already have the data we need.
         if state_entry.state_group == cache.state_group:

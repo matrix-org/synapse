@@ -438,7 +438,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
 
         # It doesn't really matter what API we use here, we just want to assert
         # that the room doesn't exist.
-        summary = self.get_success(self.store.get_room_summary(first_room_id))  # type: ignore[synapse-@cached-mutable]
+        summary = self.get_success(self.store.get_room_summary(first_room_id))
         # The summary should be empty since the room doesn't exist.
         self.assertEqual(summary, {})
 
