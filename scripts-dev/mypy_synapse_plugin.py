@@ -295,7 +295,10 @@ def is_cacheable(
         else:
             # Ensure we fail for unknown types, these generally means that the
             # above code is not complete.
-            return False, f"Don't know how to handle {rt.type.fullname} return type instance"
+            return (
+                False,
+                f"Don't know how to handle {rt.type.fullname} return type instance",
+            )
 
     elif isinstance(rt, NoneType):
         # None is cachable.
