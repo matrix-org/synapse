@@ -484,7 +484,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         return room_to_count
 
-    @cached(tree=True, max_entries=5000, iterable=True)
+    @cached(tree=True, max_entries=5000, iterable=True)  # type: ignore[synapse-@cached-mutable]
     async def get_unread_event_push_actions_by_room_for_user(
         self,
         room_id: str,
