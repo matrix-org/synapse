@@ -43,7 +43,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(
-            {"server_version", "python_version"}, set(channel.json_body.keys())
+            {"server_version"}, set(channel.json_body.keys())
         )
 
 
