@@ -502,7 +502,7 @@ class StateStorageController:
 
         return event.content.get("alias")
 
-    @cached()  # type: ignore[synapse-@cached-mutable]
+    @cached()
     async def get_server_acl_for_room(
         self, room_id: str
     ) -> Optional[ServerAclEvaluator]:
