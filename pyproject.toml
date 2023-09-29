@@ -92,10 +92,11 @@ skip_gitignore = true
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"
+module-name = "synapse.synapse_rust"
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.93.0rc1"
+version = "1.93.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
