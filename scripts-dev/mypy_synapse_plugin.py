@@ -16,13 +16,13 @@
 can crop up, e.g the cache descriptors.
 """
 
-from typing import Callable, Optional, Tuple, Type
+from typing import Callable, Optional, Tuple, Type, Union
 
 import mypy.types
 from mypy.erasetype import remove_instance_last_known_values
 from mypy.errorcodes import ErrorCode
-from mypy.nodes import ARG_NAMED_OPT, Var
-from mypy.plugin import MethodSigContext, Plugin
+from mypy.nodes import ARG_NAMED_OPT, TempNode, Var
+from mypy.plugin import FunctionSigContext, MethodSigContext, Plugin
 from mypy.typeops import bind_self
 from mypy.types import (
     AnyType,
@@ -47,6 +47,12 @@ class SynapsePlugin(Plugin):
             )
         ):
             return cached_function_method_signature
+
+        if fullname in (
+            "synapse.util.caches.descriptors._CachedFunctionDescriptor.__call__",
+        ):
+            return check_is_cacheable_wrapper
+
         return None
 
 
@@ -142,21 +148,53 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         ret_type=ret_type,
     )
 
-    # 5. Complain loudly if we are returning something mutable
-    check_is_cacheable(signature, ctx, ret_type)
+    return signature
+
+
+def check_is_cacheable_wrapper(ctx: MethodSigContext) -> CallableType:
+    signature: CallableType = ctx.default_signature
+
+    if not isinstance(ctx.args[0][0], TempNode):
+        ctx.api.note("Cached function is not a TempNode?!", ctx.context)  # type: ignore[attr-defined]
+        return signature
+
+    orig_sig = ctx.args[0][0].type
+    if not isinstance(orig_sig, CallableType):
+        ctx.api.fail("Cached 'function' is not a callable", ctx.context)
+        return signature
+
+    ret_arg = None
+    if isinstance(orig_sig.ret_type, Instance):
+        # If a coroutine, wrap the coroutine's return type in a Deferred.
+        if orig_sig.ret_type.type.fullname == "typing.Coroutine":
+            ret_arg = orig_sig.ret_type.args[2]
+
+        # If an awaitable, wrap the awaitable's final value in a Deferred.
+        elif orig_sig.ret_type.type.fullname == "typing.Awaitable":
+            ret_arg = orig_sig.ret_type.args[0]
+
+        elif orig_sig.ret_type.type.fullname == "twisted.internet.defer.Deferred":
+            ret_arg = orig_sig.ret_type.args[0]
+
+    if ret_arg is None:
+        ret_arg = orig_sig.ret_type
+
+    assert ret_arg is not None
+
+    check_is_cacheable(
+        orig_sig,
+        ctx,
+        ret_arg,
+    )
 
     return signature
 
 
 def check_is_cacheable(
     signature: CallableType,
-    ctx: MethodSigContext,
-    deferred_return_type: Instance,
+    ctx: Union[MethodSigContext, FunctionSigContext],
+    return_type: mypy.types.Type,
 ) -> None:
-    # The previous code wraps the return type into a Deferred.
-    assert deferred_return_type.type.fullname == "twisted.internet.defer.Deferred"
-    return_type = deferred_return_type.args[0]
-
     verbose = ctx.api.options.verbosity >= 1
     # TODO Technically a cachedList only needs immutable values, but forcing them
     # to return Mapping instead of Dict is fine.
