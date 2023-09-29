@@ -1,0 +1,30 @@
+/* Copyright 2022 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- Add a nullable column for thread ID to the receipts table; this allows a
+-- receipt per user, per room, as well as an unthreaded receipt (corresponding
+-- to a null thread ID).
+
+ALTER TABLE receipts_linearized ADD COLUMN thread_id TEXT;
+ALTER TABLE receipts_graph ADD COLUMN thread_id TEXT;
+
+-- Rebuild the unique constraint with the thread_id.
+ALTER TABLE receipts_linearized
+    ADD CONSTRAINT receipts_linearized_uniqueness_thread
+        UNIQUE (room_id, receipt_type, user_id, thread_id);
+
+ALTER TABLE receipts_graph
+    ADD CONSTRAINT receipts_graph_uniqueness_thread
+        UNIQUE (room_id, receipt_type, user_id, thread_id);

@@ -12,14 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import cast
+from typing import Collection, Optional, cast
 from unittest import TestCase
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+from twisted.internet.defer import Deferred
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.federation_base import event_from_pdu_json
@@ -28,11 +35,12 @@ from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils import event_injection
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +57,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        hs = self.setup_test_homeserver(federation_http_client=None)
+        hs = self.setup_test_homeserver()
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastores().main
         return hs
@@ -254,7 +262,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             if (ev.type, ev.state_key)
             in {("m.room.create", ""), ("m.room.member", remote_server_user_id)}
         ]
-        for _ in range(0, 8):
+        for _ in range(8):
             event = make_event_from_dict(
                 self.add_hashes_and_signatures_from_other_server(
                     {
@@ -322,6 +330,102 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             )
         self.get_success(d)
 
+    def test_backfill_ignores_known_events(self) -> None:
+        """
+        Tests that events that we already know about are ignored when backfilling.
+        """
+        # Set up users
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+
+        other_server = "otherserver"
+        other_user = "@otheruser:" + other_server
+
+        # Create a room to backfill events into
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(self.store.get_room_version(room_id))
+
+        # Build an event to backfill
+        event = event_from_pdu_json(
+            {
+                "type": EventTypes.Message,
+                "content": {"body": "hello world", "msgtype": "m.text"},
+                "room_id": room_id,
+                "sender": other_user,
+                "depth": 32,
+                "prev_events": [],
+                "auth_events": [],
+                "origin_server_ts": self.clock.time_msec(),
+            },
+            room_version,
+        )
+
+        # Ensure the event is not already in the DB
+        self.get_failure(
+            self.store.get_event(event.event_id),
+            NotFoundError,
+        )
+
+        # Backfill the event and check that it has entered the DB.
+
+        # We mock out the FederationClient.backfill method, to pretend that a remote
+        # server has returned our fake event.
+        federation_client_backfill_mock = AsyncMock(return_value=[event])
+        self.hs.get_federation_client().backfill = federation_client_backfill_mock  # type: ignore[method-assign]
+
+        # We also mock the persist method with a side effect of itself. This allows us
+        # to track when it has been called while preserving its function.
+        persist_events_and_notify_mock = Mock(
+            side_effect=self.hs.get_federation_event_handler().persist_events_and_notify
+        )
+        self.hs.get_federation_event_handler().persist_events_and_notify = (  # type: ignore[method-assign]
+            persist_events_and_notify_mock
+        )
+
+        # Small side-tangent. We populate the event cache with the event, even though
+        # it is not yet in the DB. This is an invalid scenario that can currently occur
+        # due to not properly invalidating the event cache.
+        # See https://github.com/matrix-org/synapse/issues/13476.
+        #
+        # As a result, backfill should not rely on the event cache to check whether
+        # we already have an event in the DB.
+        # TODO: Remove this bit when the event cache is properly invalidated.
+        cache_entry = EventCacheEntry(
+            event=event,
+            redacted_event=None,
+        )
+        self.store._get_event_cache.set_local((event.event_id,), cache_entry)
+
+        # We now call FederationEventHandler.backfill (a separate method) to trigger
+        # a backfill request. It should receive the fake event.
+        self.get_success(
+            self.hs.get_federation_event_handler().backfill(
+                other_user,
+                room_id,
+                limit=10,
+                extremities=[],
+            )
+        )
+
+        # Check that our fake event was persisted.
+        persist_events_and_notify_mock.assert_called_once()
+        persist_events_and_notify_mock.reset_mock()
+
+        # Now we repeat the backfill, having the homeserver receive the fake event
+        # again.
+        self.get_success(
+            self.hs.get_federation_event_handler().backfill(
+                other_user,
+                room_id,
+                limit=10,
+                extremities=[],
+            ),
+        )
+
+        # This time, we expect no event persistence to have occurred, as we already
+        # have this event.
+        persist_events_and_notify_mock.assert_not_called()
+
     @unittest.override_config(
         {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
     )
@@ -336,7 +440,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
-        def create_invite():
+        def create_invite() -> EventBase:
             room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
             room_version = self.get_success(self.store.get_room_version(room_id))
             return event_from_pdu_json(
@@ -471,26 +575,6 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
         fed_client = fed_handler.federation_client
 
         room_id = "!room:example.com"
-        membership_event = make_event_from_dict(
-            {
-                "room_id": room_id,
-                "type": "m.room.member",
-                "sender": "@alice:test",
-                "state_key": "@alice:test",
-                "content": {"membership": "join"},
-            },
-            RoomVersions.V10,
-        )
-
-        mock_make_membership_event = Mock(
-            return_value=make_awaitable(
-                (
-                    "example.com",
-                    membership_event,
-                    RoomVersions.V10,
-                )
-            )
-        )
 
         EVENT_CREATE = make_event_from_dict(
             {
@@ -536,24 +620,40 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
             },
             room_version=RoomVersions.V10,
         )
-        mock_send_join = Mock(
-            return_value=make_awaitable(
-                SendJoinResult(
-                    membership_event,
-                    "example.com",
-                    state=[
-                        EVENT_CREATE,
-                        EVENT_CREATOR_MEMBERSHIP,
-                        EVENT_INVITATION_MEMBERSHIP,
-                    ],
-                    auth_chain=[
-                        EVENT_CREATE,
-                        EVENT_CREATOR_MEMBERSHIP,
-                        EVENT_INVITATION_MEMBERSHIP,
-                    ],
-                    partial_state=True,
-                    servers_in_room=["example.com"],
-                )
+        membership_event = make_event_from_dict(
+            {
+                "room_id": room_id,
+                "type": "m.room.member",
+                "sender": "@alice:test",
+                "state_key": "@alice:test",
+                "content": {"membership": "join"},
+                "prev_events": [EVENT_INVITATION_MEMBERSHIP.event_id],
+            },
+            RoomVersions.V10,
+        )
+        mock_make_membership_event = AsyncMock(
+            return_value=(
+                "example.com",
+                membership_event,
+                RoomVersions.V10,
+            )
+        )
+        mock_send_join = AsyncMock(
+            return_value=SendJoinResult(
+                membership_event,
+                "example.com",
+                state=[
+                    EVENT_CREATE,
+                    EVENT_CREATOR_MEMBERSHIP,
+                    EVENT_INVITATION_MEMBERSHIP,
+                ],
+                auth_chain=[
+                    EVENT_CREATE,
+                    EVENT_CREATOR_MEMBERSHIP,
+                    EVENT_INVITATION_MEMBERSHIP,
+                ],
+                partial_state=True,
+                servers_in_room={"example.com"},
             )
         )
 
@@ -576,3 +676,112 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
             f"Stale partial-stated room flag left over for {room_id} after a"
             f" failed do_invite_join!",
         )
+
+    def test_duplicate_partial_state_room_syncs(self) -> None:
+        """
+        Tests that concurrent partial state syncs are not started for the same room.
+        """
+        is_partial_state = True
+        end_sync: "Deferred[None]" = Deferred()
+
+        async def is_partial_state_room(room_id: str) -> bool:
+            return is_partial_state
+
+        async def sync_partial_state_room(
+            initial_destination: Optional[str],
+            other_destinations: Collection[str],
+            room_id: str,
+        ) -> None:
+            nonlocal end_sync
+            try:
+                await end_sync
+            finally:
+                end_sync = Deferred()
+
+        mock_is_partial_state_room = Mock(side_effect=is_partial_state_room)
+        mock_sync_partial_state_room = Mock(side_effect=sync_partial_state_room)
+
+        fed_handler = self.hs.get_federation_handler()
+        store = self.hs.get_datastores().main
+
+        with patch.object(
+            fed_handler, "_sync_partial_state_room", mock_sync_partial_state_room
+        ), patch.object(store, "is_partial_state_room", mock_is_partial_state_room):
+            # Start the partial state sync.
+            fed_handler._start_partial_state_room_sync("hs1", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # Try to start another partial state sync.
+            # Nothing should happen.
+            fed_handler._start_partial_state_room_sync("hs3", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # End the partial state sync
+            is_partial_state = False
+            end_sync.callback(None)
+
+            # The partial state sync should not be restarted.
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # The next attempt to start the partial state sync should work.
+            is_partial_state = True
+            fed_handler._start_partial_state_room_sync("hs3", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 2)
+
+    def test_partial_state_room_sync_restart(self) -> None:
+        """
+        Tests that partial state syncs are restarted when a second partial state sync
+        was deduplicated and the first partial state sync fails.
+        """
+        is_partial_state = True
+        end_sync: "Deferred[None]" = Deferred()
+
+        async def is_partial_state_room(room_id: str) -> bool:
+            return is_partial_state
+
+        async def sync_partial_state_room(
+            initial_destination: Optional[str],
+            other_destinations: Collection[str],
+            room_id: str,
+        ) -> None:
+            nonlocal end_sync
+            try:
+                await end_sync
+            finally:
+                end_sync = Deferred()
+
+        mock_is_partial_state_room = Mock(side_effect=is_partial_state_room)
+        mock_sync_partial_state_room = Mock(side_effect=sync_partial_state_room)
+
+        fed_handler = self.hs.get_federation_handler()
+        store = self.hs.get_datastores().main
+
+        with patch.object(
+            fed_handler, "_sync_partial_state_room", mock_sync_partial_state_room
+        ), patch.object(store, "is_partial_state_room", mock_is_partial_state_room):
+            # Start the partial state sync.
+            fed_handler._start_partial_state_room_sync("hs1", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # Fail the partial state sync.
+            # The partial state sync should not be restarted.
+            end_sync.errback(Exception("Failed to request /state_ids"))
+            self.assertEqual(mock_sync_partial_state_room.call_count, 1)
+
+            # Start the partial state sync again.
+            fed_handler._start_partial_state_room_sync("hs1", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 2)
+
+            # Deduplicate another partial state sync.
+            fed_handler._start_partial_state_room_sync("hs3", {"hs2"}, "room_id")
+            self.assertEqual(mock_sync_partial_state_room.call_count, 2)
+
+            # Fail the partial state sync.
+            # It should restart with the latest parameters.
+            end_sync.errback(Exception("Failed to request /state_ids"))
+            self.assertEqual(mock_sync_partial_state_room.call_count, 3)
+            mock_sync_partial_state_room.assert_called_with(
+                initial_destination="hs3",
+                other_destinations={"hs2"},
+                room_id="room_id",
+            )

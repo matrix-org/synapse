@@ -1,0 +1,74 @@
+# This task does not run complement tests, see tests.yaml instead.
+# This task does not build docker images for synapse for use on docker hub, see docker.yaml instead
+
+name: Store complement-synapse image in ghcr.io
+on:
+  push:
+    branches: [ "master" ]
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      branch:
+        required: true
+        default: 'develop'
+        type: choice
+        options:
+          - develop
+          - master
+
+# Only run this action once per pull request/branch; restart if a new commit arrives.
+# C.f. https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency
+# and https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions#github-context
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and push complement image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout specific branch (debug build)
+        uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          ref: ${{ inputs.branch }}
+      - name: Checkout clean copy of develop (scheduled build)
+        uses: actions/checkout@v4
+        if: github.event_name == 'schedule'
+        with:
+          ref: develop
+      - name: Checkout clean copy of master (on-push)
+        uses: actions/checkout@v4
+        if: github.event_name == 'push'
+        with:
+          ref: master
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Work out labels for complement image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/complement-synapse
+          tags: |
+            type=schedule,pattern=nightly,enable=${{ github.event_name == 'schedule'}}
+            type=raw,value=develop,enable=${{ github.event_name == 'schedule' || inputs.branch == 'develop' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' || inputs.branch == 'master' }}
+            type=sha,format=long
+      - name: Run scripts-dev/complement.sh to generate complement-synapse:latest image.
+        run: scripts-dev/complement.sh --build-only
+      - name: Tag and push generated image
+        run: |
+          for TAG in ${{ join(fromJson(steps.meta.outputs.json).tags, ' ') }}; do 
+            echo "tag and push $TAG"
+            docker tag complement-synapse $TAG
+            docker push $TAG
+          done

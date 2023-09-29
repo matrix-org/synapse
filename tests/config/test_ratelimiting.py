@@ -12,13 +12,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.ratelimiting import RatelimitSettings
 
 from tests.unittest import TestCase
 from tests.utils import default_config
 
 
+class ParseRatelimitSettingsTestcase(TestCase):
+    def test_depth_1(self) -> None:
+        cfg = {
+            "a": {
+                "per_second": 5,
+                "burst_count": 10,
+            }
+        }
+        parsed = RatelimitSettings.parse(cfg, "a")
+        self.assertEqual(parsed, RatelimitSettings("a", 5, 10))
+
+    def test_depth_2(self) -> None:
+        cfg = {
+            "a": {
+                "b": {
+                    "per_second": 5,
+                    "burst_count": 10,
+                },
+            }
+        }
+        parsed = RatelimitSettings.parse(cfg, "a.b")
+        self.assertEqual(parsed, RatelimitSettings("a.b", 5, 10))
+
+    def test_missing(self) -> None:
+        parsed = RatelimitSettings.parse(
+            {}, "a", defaults={"per_second": 5, "burst_count": 10}
+        )
+        self.assertEqual(parsed, RatelimitSettings("a", 5, 10))
+
+
 class RatelimitConfigTestCase(TestCase):
-    def test_parse_rc_federation(self):
+    def test_parse_rc_federation(self) -> None:
         config_dict = default_config("test")
         config_dict["rc_federation"] = {
             "window_size": 20000,

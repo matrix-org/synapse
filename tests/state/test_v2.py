@@ -719,7 +719,10 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
         persisted_events = {a.event_id: a, b.event_id: b}
         unpersited_events = {c.event_id: c}
 
-        state_sets = [{"a": a.event_id, "b": b.event_id}, {"c": c.event_id}]
+        state_sets = [
+            {("a", ""): a.event_id, ("b", ""): b.event_id},
+            {("c", ""): c.event_id},
+        ]
 
         store = TestStateResolutionStore(persisted_events)
 
@@ -774,8 +777,8 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
         unpersited_events = {c.event_id: c, d.event_id: d}
 
         state_sets = [
-            {"a": a.event_id, "b": b.event_id},
-            {"c": c.event_id, "d": d.event_id},
+            {("a", ""): a.event_id, ("b", ""): b.event_id},
+            {("c", ""): c.event_id, ("d", ""): d.event_id},
         ]
 
         store = TestStateResolutionStore(persisted_events)
@@ -841,8 +844,8 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
         unpersited_events = {c.event_id: c, d.event_id: d, e.event_id: e}
 
         state_sets = [
-            {"a": a.event_id, "b": b.event_id, "e": e.event_id},
-            {"c": c.event_id, "d": d.event_id},
+            {("a", ""): a.event_id, ("b", ""): b.event_id, ("e", ""): e.event_id},
+            {("c", ""): c.event_id, ("d", ""): d.event_id},
         ]
 
         store = TestStateResolutionStore(persisted_events)

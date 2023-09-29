@@ -25,7 +25,6 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,
@@ -47,12 +46,9 @@ from twisted.python.threadpool import ThreadPool
 # This module is imported for its side effects; flake8 needn't warn that it's unused.
 import synapse.metrics._reactor_metrics  # noqa: F401
 from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
-from synapse.metrics._legacy_exposition import (
-    MetricsResource,
-    generate_latest,
-    start_http_server,
-)
+from synapse.metrics._twisted_exposition import MetricsResource, generate_latest
 from synapse.metrics._types import Collector
+from synapse.types import StrSequence
 from synapse.util import SYNAPSE_VERSION
 
 logger = logging.getLogger(__name__)
@@ -81,9 +77,11 @@ RegistryProxy = cast(CollectorRegistry, _RegistryProxy)
 
 @attr.s(slots=True, hash=True, auto_attribs=True)
 class LaterGauge(Collector):
+    """A Gauge which periodically calls a user-provided callback to produce metrics."""
+
     name: str
     desc: str
-    labels: Optional[Sequence[str]] = attr.ib(hash=False)
+    labels: Optional[StrSequence] = attr.ib(hash=False)
     # callback: should either return a value (if there are no labels for this metric),
     # or dict mapping from a label tuple to a value
     caller: Callable[
@@ -91,7 +89,6 @@ class LaterGauge(Collector):
     ]
 
     def collect(self) -> Iterable[Metric]:
-
         g = GaugeMetricFamily(self.name, self.desc, labels=self.labels)
 
         try:
@@ -146,8 +143,8 @@ class InFlightGauge(Generic[MetricsEntry], Collector):
         self,
         name: str,
         desc: str,
-        labels: Sequence[str],
-        sub_metrics: Sequence[str],
+        labels: StrSequence,
+        sub_metrics: StrSequence,
     ):
         self.name = name
         self.desc = desc
@@ -474,7 +471,6 @@ __all__ = [
     "Collector",
     "MetricsResource",
     "generate_latest",
-    "start_http_server",
     "LaterGauge",
     "InFlightGauge",
     "GaugeBucketCollector",

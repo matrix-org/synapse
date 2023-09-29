@@ -11,6 +11,5 @@
 sqlite3 "$1" <<'EOF' >table-save.sql
 .dump users
 .dump access_tokens
-.dump presence
 .dump profiles
 EOF

@@ -9,6 +9,8 @@
   - [Configuring a Reverse Proxy](reverse_proxy.md)
   - [Configuring a Forward/Outbound Proxy](setup/forward_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
+    - [coturn TURN server](setup/turn/coturn.md)
+    - [eturnal TURN server](setup/turn/eturnal.md)
   - [Delegation](delegate.md)
 
 # Upgrading
@@ -55,6 +57,7 @@
       - [Account Validity](admin_api/account_validity.md)
       - [Background Updates](usage/administration/admin_api/background_updates.md)
       - [Event Reports](admin_api/event_reports.md)
+      - [Experimental Features](admin_api/experimental_features.md)
       - [Media](admin_api/media_admin_api.md)
       - [Purge History](admin_api/purge_history_api.md)
       - [Register Users](admin_api/register_api.md)
@@ -94,7 +97,9 @@
     - [Cancellation](development/synapse_architecture/cancellation.md)
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
+    - [Streams](development/synapse_architecture/streams.md)
     - [TCP Replication](tcp_replication.md)
+    - [Faster remote joins](development/synapse_architecture/faster_joins.md)
   - [Internal Documentation](development/internal_documentation/README.md)
     - [Single Sign-On]()
       - [SAML](development/saml.md)

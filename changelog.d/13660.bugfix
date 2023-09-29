@@ -1,1 +1,0 @@
-Fix bug where we wedge media plugins if clients disconnect early. Introduced in v1.22.0.

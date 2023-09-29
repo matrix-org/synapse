@@ -94,10 +94,8 @@ VT = TypeVar("VT")
 # a general type var, distinct from either KT or VT
 T = TypeVar("T")
 
-P = TypeVar("P")
 
-
-class _TimedListNode(ListNode[P]):
+class _TimedListNode(ListNode[T]):
     """A `ListNode` that tracks last access time."""
 
     __slots__ = ["last_access_ts_secs"]
@@ -390,11 +388,11 @@ class LruCache(Generic[KT, VT]):
             cache_name: The name of this cache, for the prometheus metrics. If unset,
                 no metrics will be reported on this cache.
 
-            cache_type (type):
+            cache_type:
                 type of underlying cache to be used. Typically one of dict
                 or TreeCache.
 
-            size_callback (func(V) -> int | None):
+            size_callback:
 
             metrics_collection_callback:
                 metrics collection callback. This is called early in the metrics
@@ -404,7 +402,7 @@ class LruCache(Generic[KT, VT]):
 
                 Ignored if cache_name is None.
 
-            apply_cache_factor_from_config (bool): If true, `max_size` will be
+            apply_cache_factor_from_config: If true, `max_size` will be
                 multiplied by a cache factor derived from the homeserver config
 
             clock:
@@ -784,26 +782,21 @@ class LruCache(Generic[KT, VT]):
     def __contains__(self, key: KT) -> bool:
         return self.contains(key)
 
-    def set_cache_factor(self, factor: float) -> bool:
+    def set_cache_factor(self, factor: float) -> None:
         """
         Set the cache factor for this individual cache.
 
         This will trigger a resize if it changes, which may require evicting
         items from the cache.
-
-        Returns:
-            bool: Whether the cache changed size or not.
         """
         if not self.apply_cache_factor_from_config:
-            return False
+            return
 
         new_size = int(self._original_max_size * factor)
         if new_size != self.max_size:
             self.max_size = new_size
             if self._on_resize:
                 self._on_resize()
-            return True
-        return False
 
     def __del__(self) -> None:
         # We're about to be deleted, so we make sure to clear up all the nodes
@@ -822,7 +815,7 @@ class AsyncLruCache(Generic[KT, VT]):
     utilize external cache systems that require await behaviour to be created.
     """
 
-    def __init__(self, *args, **kwargs):  # type: ignore
+    def __init__(self, *args: Any, **kwargs: Any):
         self._lru_cache: LruCache[KT, VT] = LruCache(*args, **kwargs)
 
     async def get(
@@ -845,7 +838,13 @@ class AsyncLruCache(Generic[KT, VT]):
         return self._lru_cache.get(key, update_metrics=update_metrics)
 
     async def set(self, key: KT, value: VT) -> None:
-        self._lru_cache.set(key, value)
+        # This will add the entries in the correct order, local first external second
+        self.set_local(key, value)
+        await self.set_external(key, value)
+
+    async def set_external(self, key: KT, value: VT) -> None:
+        # This method should add an entry to any configured external cache, in this case noop.
+        pass
 
     def set_local(self, key: KT, value: VT) -> None:
         self._lru_cache.set(key, value)
@@ -865,5 +864,5 @@ class AsyncLruCache(Generic[KT, VT]):
     async def contains(self, key: KT) -> bool:
         return self._lru_cache.contains(key)
 
-    async def clear(self) -> None:
+    def clear(self) -> None:
         self._lru_cache.clear()

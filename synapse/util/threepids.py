@@ -48,7 +48,7 @@ async def check_3pid_allowed(
         registration: whether we want to bind the 3PID as part of registering a new user.
 
     Returns:
-        bool: whether the 3PID medium/address is allowed to be added to this HS
+        whether the 3PID medium/address is allowed to be added to this HS
     """
     if not await hs.get_password_auth_provider().is_3pid_allowed(
         medium, address, registration

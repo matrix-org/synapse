@@ -17,7 +17,7 @@ import logging
 import os
 import sys
 import tempfile
-from typing import List, Optional
+from typing import List, Mapping, Optional, Sequence
 
 from twisted.internet import defer, task
 
@@ -28,10 +28,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
-from synapse.replication.slave.storage.devices import SlavedDeviceStore
-from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.replication.slave.storage.filtering import SlavedFilteringStore
-from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.server import HomeServer
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
@@ -39,31 +35,59 @@ from synapse.storage.databases.main.appservice import (
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
 )
+from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
+from synapse.storage.databases.main.devices import DeviceWorkerStore
+from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
+from synapse.storage.databases.main.event_push_actions import (
+    EventPushActionsWorkerStore,
+)
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.filtering import FilteringWorkerStore
+from synapse.storage.databases.main.media_repository import MediaRepositoryStore
+from synapse.storage.databases.main.profile import ProfileWorkerStore
+from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.registration import RegistrationWorkerStore
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
+from synapse.storage.databases.main.signatures import SignatureWorkerStore
+from synapse.storage.databases.main.state import StateGroupWorkerStore
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.tags import TagsWorkerStore
-from synapse.types import StateMap
+from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
+from synapse.types import JsonMapping, StateMap
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger("synapse.app.admin_cmd")
 
 
-class AdminCmdSlavedStore(
-    SlavedFilteringStore,
-    SlavedDeviceStore,
-    SlavedPushRuleStore,
-    SlavedEventStore,
+class AdminCmdStore(
+    FilteringWorkerStore,
+    ClientIpWorkerStore,
+    DeviceWorkerStore,
     TagsWorkerStore,
     DeviceInboxWorkerStore,
     AccountDataWorkerStore,
+    PushRulesWorkerStore,
     ApplicationServiceTransactionWorkerStore,
     ApplicationServiceWorkerStore,
-    RegistrationWorkerStore,
+    RoomMemberWorkerStore,
+    RelationsWorkerStore,
+    EventFederationWorkerStore,
+    EventPushActionsWorkerStore,
+    StateGroupWorkerStore,
+    SignatureWorkerStore,
+    UserErasureWorkerStore,
     ReceiptsWorkerStore,
+    StreamWorkerStore,
+    EventsWorkerStore,
+    RegistrationWorkerStore,
     RoomWorkerStore,
+    ProfileWorkerStore,
+    MediaRepositoryStore,
 ):
     def __init__(
         self,
@@ -79,7 +103,7 @@ class AdminCmdSlavedStore(
 
 
 class AdminCmdServer(HomeServer):
-    DATASTORE_CLASS = AdminCmdSlavedStore  # type: ignore
+    DATASTORE_CLASS = AdminCmdStore  # type: ignore
 
 
 async def export_data_command(hs: HomeServer, args: argparse.Namespace) -> None:
@@ -127,7 +151,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(events_file, "a") as f:
             for event in events:
-                print(json.dumps(event.get_pdu_json()), file=f)
+                json.dump(event.get_pdu_json(), fp=f)
 
     def write_state(
         self, room_id: str, event_id: str, state: StateMap[EventBase]
@@ -140,7 +164,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(event_file, "a") as f:
             for event in state.values():
-                print(json.dumps(event.get_pdu_json()), file=f)
+                json.dump(event.get_pdu_json(), fp=f)
 
     def write_invite(
         self, room_id: str, event: EventBase, state: StateMap[EventBase]
@@ -156,7 +180,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(invite_state, "a") as f:
             for event in state.values():
-                print(json.dumps(event), file=f)
+                json.dump(event, fp=f)
 
     def write_knock(
         self, room_id: str, event: EventBase, state: StateMap[EventBase]
@@ -172,7 +196,54 @@ class FileExfiltrationWriter(ExfiltrationWriter):
 
         with open(knock_state, "a") as f:
             for event in state.values():
-                print(json.dumps(event), file=f)
+                json.dump(event, fp=f)
+
+    def write_profile(self, profile: JsonMapping) -> None:
+        user_directory = os.path.join(self.base_directory, "user_data")
+        os.makedirs(user_directory, exist_ok=True)
+        profile_file = os.path.join(user_directory, "profile")
+
+        with open(profile_file, "a") as f:
+            json.dump(profile, fp=f)
+
+    def write_devices(self, devices: Sequence[JsonMapping]) -> None:
+        user_directory = os.path.join(self.base_directory, "user_data")
+        os.makedirs(user_directory, exist_ok=True)
+        device_file = os.path.join(user_directory, "devices")
+
+        for device in devices:
+            with open(device_file, "a") as f:
+                json.dump(device, fp=f)
+
+    def write_connections(self, connections: Sequence[JsonMapping]) -> None:
+        user_directory = os.path.join(self.base_directory, "user_data")
+        os.makedirs(user_directory, exist_ok=True)
+        connection_file = os.path.join(user_directory, "connections")
+
+        for connection in connections:
+            with open(connection_file, "a") as f:
+                json.dump(connection, fp=f)
+
+    def write_account_data(
+        self, file_name: str, account_data: Mapping[str, JsonMapping]
+    ) -> None:
+        account_data_directory = os.path.join(
+            self.base_directory, "user_data", "account_data"
+        )
+        os.makedirs(account_data_directory, exist_ok=True)
+
+        account_data_file = os.path.join(account_data_directory, file_name)
+
+        with open(account_data_file, "a") as f:
+            json.dump(account_data, fp=f)
+
+    def write_media_id(self, media_id: str, media_metadata: JsonMapping) -> None:
+        file_directory = os.path.join(self.base_directory, "media_ids")
+        os.makedirs(file_directory, exist_ok=True)
+        media_id_file = os.path.join(file_directory, media_id)
+
+        with open(media_id_file, "w") as f:
+            json.dump(media_metadata, fp=f)
 
     def finished(self) -> str:
         return self.base_directory

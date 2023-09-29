@@ -1,1 +1,0 @@
-Avoid raising an error due to malformed user IDs in `get_current_hosts_in_room`. Malformed user IDs cannot currently join a room, so this error would not be hit.

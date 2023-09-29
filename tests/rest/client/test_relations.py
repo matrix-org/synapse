@@ -15,7 +15,7 @@
 
 import urllib.parse
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -28,8 +28,8 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeChannel
-from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import inject_event
+from tests.unittest import override_config
 
 
 class BaseRelationsTestCase(unittest.HomeserverTestCase):
@@ -128,7 +128,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
             f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         return [ev["event_id"] for ev in channel.json_body["chunk"]]
 
     def _get_bundled_aggregations(self) -> JsonDict:
@@ -141,7 +141,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
             f"/_matrix/client/v3/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
-        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(200, channel.code, channel.json_body)
         return channel.json_body["unsigned"].get("m.relations", {})
 
     def _find_event_in_chunk(self, events: List[JsonDict]) -> JsonDict:
@@ -263,7 +263,8 @@ class RelationsTestCase(BaseRelationsTestCase):
         # Disable the validation to pretend this came over federation.
         with patch(
             "synapse.handlers.message.EventCreationHandler._validate_event_relation",
-            new=lambda self, event: make_awaitable(None),
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             # Generate a various relations from a different room.
             self.get_success(
@@ -355,29 +356,66 @@ class RelationsTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
         self.assertNotIn("m.relations", channel.json_body["unsigned"])
 
+    def _assert_edit_bundle(
+        self, event_json: JsonDict, edit_event_id: str, edit_event_content: JsonDict
+    ) -> None:
+        """
+        Assert that the given event has a correctly-serialised edit event in its
+        bundled aggregations
+
+        Args:
+            event_json: the serialised event to be checked
+            edit_event_id: the ID of the edit event that we expect to be bundled
+            edit_event_content: the content of that event, excluding the 'm.relates_to`
+               property
+        """
+        relations_dict = event_json["unsigned"].get("m.relations")
+        self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+        m_replace_dict = relations_dict[RelationTypes.REPLACE]
+        for key in [
+            "event_id",
+            "sender",
+            "origin_server_ts",
+            "content",
+            "type",
+            "unsigned",
+        ]:
+            self.assertIn(key, m_replace_dict)
+
+        expected_edit_content = {
+            "m.relates_to": {
+                "event_id": event_json["event_id"],
+                "rel_type": "m.replace",
+            }
+        }
+        expected_edit_content.update(edit_event_content)
+
+        self.assert_dict(
+            {
+                "event_id": edit_event_id,
+                "sender": self.user_id,
+                "content": expected_edit_content,
+                "type": "m.room.message",
+            },
+            m_replace_dict,
+        )
+
     def test_edit(self) -> None:
         """Test that a simple edit works."""
-
+        orig_body = {"body": "Hi!", "msgtype": "m.text"}
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
+        edit_event_content = {
+            "msgtype": "m.text",
+            "body": "foo",
+            "m.new_content": new_body,
+        }
         channel = self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
-            content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
+            content=edit_event_content,
         )
         edit_event_id = channel.json_body["event_id"]
-
-        def assert_bundle(event_json: JsonDict) -> None:
-            """Assert the expected values of the bundled aggregations."""
-            relations_dict = event_json["unsigned"].get("m.relations")
-            self.assertIn(RelationTypes.REPLACE, relations_dict)
-
-            m_replace_dict = relations_dict[RelationTypes.REPLACE]
-            for key in ["event_id", "sender", "origin_server_ts"]:
-                self.assertIn(key, m_replace_dict)
-
-            self.assert_dict(
-                {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
-            )
 
         # /event should return the *original* event
         channel = self.make_request(
@@ -386,10 +424,8 @@ class RelationsTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(
-            channel.json_body["content"], {"body": "Hi!", "msgtype": "m.text"}
-        )
-        assert_bundle(channel.json_body)
+        self.assertEqual(channel.json_body["content"], orig_body)
+        self._assert_edit_bundle(channel.json_body, edit_event_id, edit_event_content)
 
         # Request the room messages.
         channel = self.make_request(
@@ -398,18 +434,24 @@ class RelationsTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        assert_bundle(self._find_event_in_chunk(channel.json_body["chunk"]))
+        self._assert_edit_bundle(
+            self._find_event_in_chunk(channel.json_body["chunk"]),
+            edit_event_id,
+            edit_event_content,
+        )
 
         # Request the room context.
-        # /context should return the edited event.
+        # /context should return the event.
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/context/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        assert_bundle(channel.json_body["event"])
-        self.assertEqual(channel.json_body["event"]["content"], new_body)
+        self._assert_edit_bundle(
+            channel.json_body["event"], edit_event_id, edit_event_content
+        )
+        self.assertEqual(channel.json_body["event"]["content"], orig_body)
 
         # Request sync, but limit the timeline so it becomes limited (and includes
         # bundled aggregations).
@@ -420,7 +462,11 @@ class RelationsTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
-        assert_bundle(self._find_event_in_chunk(room_timeline["events"]))
+        self._assert_edit_bundle(
+            self._find_event_in_chunk(room_timeline["events"]),
+            edit_event_id,
+            edit_event_content,
+        )
 
         # Request search.
         channel = self.make_request(
@@ -437,13 +483,17 @@ class RelationsTestCase(BaseRelationsTestCase):
                 "results"
             ]
         ]
-        assert_bundle(self._find_event_in_chunk(chunk))
+        self._assert_edit_bundle(
+            self._find_event_in_chunk(chunk),
+            edit_event_id,
+            edit_event_content,
+        )
 
     def test_multi_edit(self) -> None:
         """Test that multiple edits, including attempts by people who
         shouldn't be allowed, are correctly handled.
         """
-
+        orig_body = orig_body = {"body": "Hi!", "msgtype": "m.text"}
         self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
@@ -455,10 +505,15 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
+        edit_event_content = {
+            "msgtype": "m.text",
+            "body": "foo",
+            "m.new_content": new_body,
+        }
         channel = self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
-            content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
+            content=edit_event_content,
         )
         edit_event_id = channel.json_body["event_id"]
 
@@ -479,17 +534,9 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
-        self.assertEqual(channel.json_body["event"]["content"], new_body)
-
-        relations_dict = channel.json_body["event"]["unsigned"].get("m.relations")
-        self.assertIn(RelationTypes.REPLACE, relations_dict)
-
-        m_replace_dict = relations_dict[RelationTypes.REPLACE]
-        for key in ["event_id", "sender", "origin_server_ts"]:
-            self.assertIn(key, m_replace_dict)
-
-        self.assert_dict(
-            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+        self.assertEqual(channel.json_body["event"]["content"], orig_body)
+        self._assert_edit_bundle(
+            channel.json_body["event"], edit_event_id, edit_event_content
         )
 
     def test_edit_reply(self) -> None:
@@ -502,11 +549,15 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
         reply = channel.json_body["event_id"]
 
-        new_body = {"msgtype": "m.text", "body": "I've been edited!"}
+        edit_event_content = {
+            "msgtype": "m.text",
+            "body": "foo",
+            "m.new_content": {"msgtype": "m.text", "body": "I've been edited!"},
+        }
         channel = self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
-            content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
+            content=edit_event_content,
             parent_id=reply,
         )
         edit_event_id = channel.json_body["event_id"]
@@ -519,7 +570,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
         event_result = channel.json_body
-        self.assertDictContainsSubset(original_body, event_result["content"])
+        self.assertLessEqual(original_body.items(), event_result["content"].items())
 
         # also check /context, which returns the *edited* event
         channel = self.make_request(
@@ -536,41 +587,36 @@ class RelationsTestCase(BaseRelationsTestCase):
             (context_result, "/context"),
         ):
             # The reference metadata should still be intact.
-            self.assertDictContainsSubset(
+            self.assertLessEqual(
                 {
                     "m.relates_to": {
                         "event_id": self.parent_id,
                         "rel_type": "m.reference",
                     }
-                },
-                result_event_dict["content"],
+                }.items(),
+                result_event_dict["content"].items(),
                 desc,
             )
 
             # We expect that the edit relation appears in the unsigned relations
             # section.
-            relations_dict = result_event_dict["unsigned"].get("m.relations")
-            self.assertIn(RelationTypes.REPLACE, relations_dict, desc)
-
-            m_replace_dict = relations_dict[RelationTypes.REPLACE]
-            for key in ["event_id", "sender", "origin_server_ts"]:
-                self.assertIn(key, m_replace_dict, desc)
-
-            self.assert_dict(
-                {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+            self._assert_edit_bundle(
+                result_event_dict, edit_event_id, edit_event_content
             )
 
     def test_edit_edit(self) -> None:
         """Test that an edit cannot be edited."""
+        orig_body = {"body": "Hi!", "msgtype": "m.text"}
         new_body = {"msgtype": "m.text", "body": "Initial edit"}
+        edit_event_content = {
+            "msgtype": "m.text",
+            "body": "Wibble",
+            "m.new_content": new_body,
+        }
         channel = self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
-            content={
-                "msgtype": "m.text",
-                "body": "Wibble",
-                "m.new_content": new_body,
-            },
+            content=edit_event_content,
         )
         edit_event_id = channel.json_body["event_id"]
 
@@ -594,15 +640,12 @@ class RelationsTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(
-            channel.json_body["content"], {"body": "Hi!", "msgtype": "m.text"}
-        )
+        self.assertEqual(channel.json_body["content"], orig_body)
 
         # The relations information should not include the edit to the edit.
-        relations_dict = channel.json_body["unsigned"].get("m.relations")
-        self.assertIn(RelationTypes.REPLACE, relations_dict)
+        self._assert_edit_bundle(channel.json_body, edit_event_id, edit_event_content)
 
-        # /context should return the event updated for the *first* edit
+        # /context should return the bundled edit for the *first* edit
         # (The edit to the edit should be ignored.)
         channel = self.make_request(
             "GET",
@@ -610,14 +653,9 @@ class RelationsTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(channel.json_body["event"]["content"], new_body)
-
-        m_replace_dict = relations_dict[RelationTypes.REPLACE]
-        for key in ["event_id", "sender", "origin_server_ts"]:
-            self.assertIn(key, m_replace_dict)
-
-        self.assert_dict(
-            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+        self.assertEqual(channel.json_body["event"]["content"], orig_body)
+        self._assert_edit_bundle(
+            channel.json_body["event"], edit_event_id, edit_event_content
         )
 
         # Directly requesting the edit should not have the edit to the edit applied.
@@ -654,6 +692,14 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
 
         # We also expect to get the original event (the id of which is self.parent_id)
+        # when requesting the unstable endpoint.
+        self.assertNotIn("original_event", channel.json_body)
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
         self.assertEqual(
             channel.json_body["original_event"]["event_id"], self.parent_id
         )
@@ -728,7 +774,6 @@ class RelationsTestCase(BaseRelationsTestCase):
 
 
 class RelationPaginationTestCase(BaseRelationsTestCase):
-    @unittest.override_config({"experimental_features": {"msc3715_enabled": True}})
     def test_basic_paginate_relations(self) -> None:
         """Tests that calling pagination API correctly the latest relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
@@ -756,11 +801,6 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             channel.json_body["chunk"][0],
         )
 
-        # We also expect to get the original event (the id of which is self.parent_id)
-        self.assertEqual(
-            channel.json_body["original_event"]["event_id"], self.parent_id
-        )
-
         # Make sure next_batch has something in it that looks like it could be a
         # valid token.
         self.assertIsInstance(
@@ -771,7 +811,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/_matrix/client/v1/rooms/{self.room}/relations"
-            f"/{self.parent_id}?limit=1&org.matrix.msc3715.dir=f",
+            f"/{self.parent_id}?limit=1&dir=f",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -809,7 +849,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
             channel = self.make_request(
                 "GET",
-                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=1{from_token}",
+                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=3{from_token}",
                 access_token=self.user_token,
             )
             self.assertEqual(200, channel.code, channel.json_body)
@@ -825,6 +865,32 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
         # We paginated backwards, so reverse
         found_event_ids.reverse()
+        self.assertEqual(found_event_ids, expected_event_ids)
+
+        # Test forward pagination.
+        prev_token = ""
+        found_event_ids = []
+        for _ in range(20):
+            from_token = ""
+            if prev_token:
+                from_token = "&from=" + prev_token
+
+            channel = self.make_request(
+                "GET",
+                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?dir=f&limit=3{from_token}",
+                access_token=self.user_token,
+            )
+            self.assertEqual(200, channel.code, channel.json_body)
+
+            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
+            next_batch = channel.json_body.get("next_batch")
+
+            self.assertNotEqual(prev_token, next_batch)
+            prev_token = next_batch
+
+            if not prev_token:
+                break
+
         self.assertEqual(found_event_ids, expected_event_ids)
 
     def test_pagination_from_sync_and_messages(self) -> None:
@@ -882,6 +948,125 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             self.assertIn(
                 annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
             )
+
+
+class RecursiveRelationTestCase(BaseRelationsTestCase):
+    @override_config({"experimental_features": {"msc3981_recurse_relations": True}})
+    def test_recursive_relations(self) -> None:
+        """Generate a complex, multi-level relationship tree and query it."""
+        # Create a thread with a few messages in it.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_2 = channel.json_body["event_id"]
+
+        # Add annotations.
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_2
+        )
+        annotation_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "b", parent_id=thread_1
+        )
+        annotation_2 = channel.json_body["event_id"]
+
+        # Add a reference to part of the thread, then edit the reference and annotate it.
+        channel = self._send_relation(
+            RelationTypes.REFERENCE, "m.room.test", parent_id=thread_2
+        )
+        reference_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "c", parent_id=reference_1
+        )
+        annotation_3 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.test",
+            parent_id=reference_1,
+        )
+        edit = channel.json_body["event_id"]
+
+        # Also more events off the root.
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "d")
+        annotation_4 = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}"
+            "?dir=f&limit=20&org.matrix.msc3981.recurse=true",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # The above events should be returned in creation order.
+        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(
+            event_ids,
+            [
+                thread_1,
+                thread_2,
+                annotation_1,
+                annotation_2,
+                reference_1,
+                annotation_3,
+                edit,
+                annotation_4,
+            ],
+        )
+
+    @override_config({"experimental_features": {"msc3981_recurse_relations": True}})
+    def test_recursive_relations_with_filter(self) -> None:
+        """The event_type and rel_type still apply."""
+        # Create a thread with a few messages in it.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_1 = channel.json_body["event_id"]
+
+        # Add annotations.
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "b", parent_id=thread_1
+        )
+        annotation_1 = channel.json_body["event_id"]
+
+        # Add a reference to part of the thread, then edit the reference and annotate it.
+        channel = self._send_relation(
+            RelationTypes.REFERENCE, "m.room.test", parent_id=thread_1
+        )
+        reference_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "org.matrix.reaction", "c", parent_id=reference_1
+        )
+        annotation_2 = channel.json_body["event_id"]
+
+        # Fetch only annotations, but recursively.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}/{RelationTypes.ANNOTATION}"
+            "?dir=f&limit=20&org.matrix.msc3981.recurse=true",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # The above events should be returned in creation order.
+        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(event_ids, [annotation_1, annotation_2])
+
+        # Fetch only m.reactions, but recursively.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}/{RelationTypes.ANNOTATION}/m.reaction"
+            "?dir=f&limit=20&org.matrix.msc3981.recurse=true",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # The above events should be returned in creation order.
+        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(event_ids, [annotation_1])
 
 
 class BundledAggregationsTestCase(BaseRelationsTestCase):
@@ -977,48 +1162,6 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         ]
         assert_bundle(self._find_event_in_chunk(chunk))
 
-    def test_annotation(self) -> None:
-        """
-        Test that annotations get correctly bundled.
-        """
-        # Setup by sending a variety of relations.
-        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
-        )
-        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
-
-        def assert_annotations(bundled_aggregations: JsonDict) -> None:
-            self.assertEqual(
-                {
-                    "chunk": [
-                        {"type": "m.reaction", "key": "a", "count": 2},
-                        {"type": "m.reaction", "key": "b", "count": 1},
-                    ]
-                },
-                bundled_aggregations,
-            )
-
-        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 7)
-
-    def test_annotation_to_annotation(self) -> None:
-        """Any relation to an annotation should be ignored."""
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        event_id = channel.json_body["event_id"]
-        self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", "b", parent_id=event_id
-        )
-
-        # Fetch the initial annotation event to see if it has bundled aggregations.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/v3/rooms/{self.room}/event/{event_id}",
-            access_token=self.user_token,
-        )
-        self.assertEquals(200, channel.code, channel.json_body)
-        # The first annotationt should not have any bundled aggregations.
-        self.assertNotIn("m.relations", channel.json_body["unsigned"])
-
     def test_reference(self) -> None:
         """
         Test that references get correctly bundled.
@@ -1035,7 +1178,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations,
             )
 
-        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 7)
+        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 6)
 
     def test_thread(self) -> None:
         """
@@ -1080,7 +1223,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         # The "user" sent the root event and is making queries for the bundled
         # aggregations: they have participated.
-        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 9)
+        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 6)
         # The "user2" sent replies in the thread and is making queries for the
         # bundled aggregations: they have participated.
         #
@@ -1105,9 +1248,10 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
         thread_2 = channel.json_body["event_id"]
 
-        self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_2
+        channel = self._send_relation(
+            RelationTypes.REFERENCE, "org.matrix.test", parent_id=thread_2
         )
+        reference_event_id = channel.json_body["event_id"]
 
         def assert_thread(bundled_aggregations: JsonDict) -> None:
             self.assertEqual(2, bundled_aggregations.get("count"))
@@ -1132,17 +1276,15 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             self.assert_dict(
                 {
                     "m.relations": {
-                        RelationTypes.ANNOTATION: {
-                            "chunk": [
-                                {"type": "m.reaction", "key": "a", "count": 1},
-                            ]
+                        RelationTypes.REFERENCE: {
+                            "chunk": [{"event_id": reference_event_id}]
                         },
                     }
                 },
                 bundled_aggregations["latest_event"].get("unsigned"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 9)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 6)
 
     def test_nested_thread(self) -> None:
         """
@@ -1158,7 +1300,8 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         # not an event the Client-Server API will allow..
         with patch(
             "synapse.handlers.message.EventCreationHandler._validate_event_relation",
-            new=lambda self, event: make_awaitable(None),
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             # Create a sub-thread off the thread, which is not allowed.
             self._send_relation(
@@ -1227,12 +1370,13 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         thread_summary = relations_dict[RelationTypes.THREAD]
         self.assertIn("latest_event", thread_summary)
         latest_event_in_thread = thread_summary["latest_event"]
-        self.assertEqual(latest_event_in_thread["content"]["body"], "I've been edited!")
         # The latest event in the thread should have the edit appear under the
         # bundled aggregations.
-        self.assertDictContainsSubset(
-            {"event_id": edit_event_id, "sender": "@alice:test"},
-            latest_event_in_thread["unsigned"]["m.relations"][RelationTypes.REPLACE],
+        self.assertLessEqual(
+            {"event_id": edit_event_id, "sender": "@alice:test"}.items(),
+            latest_event_in_thread["unsigned"]["m.relations"][
+                RelationTypes.REPLACE
+            ].items(),
         )
 
     def test_aggregation_get_event_for_annotation(self) -> None:
@@ -1260,10 +1404,11 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
         thread_id = channel.json_body["event_id"]
 
-        # Annotate the thread.
-        self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_id
+        # Make a reference to the thread.
+        channel = self._send_relation(
+            RelationTypes.REFERENCE, "org.matrix.test", parent_id=thread_id
         )
+        reference_event_id = channel.json_body["event_id"]
 
         channel = self.make_request(
             "GET",
@@ -1274,9 +1419,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         self.assertEqual(
             channel.json_body["unsigned"].get("m.relations"),
             {
-                RelationTypes.ANNOTATION: {
-                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
-                },
+                RelationTypes.REFERENCE: {"chunk": [{"event_id": reference_event_id}]},
             },
         )
 
@@ -1293,9 +1436,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         self.assertEqual(
             thread_message["unsigned"].get("m.relations"),
             {
-                RelationTypes.ANNOTATION: {
-                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
-                },
+                RelationTypes.REFERENCE: {"chunk": [{"event_id": reference_event_id}]},
             },
         )
 
@@ -1307,7 +1448,8 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         Note that the spec allows for a server to return additional fields beyond
         what is specified.
         """
-        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        channel = self._send_relation(RelationTypes.REFERENCE, "org.matrix.test")
+        reference_event_id = channel.json_body["event_id"]
 
         # Note that the sync filter does not include "unsigned" as a field.
         filter = urllib.parse.quote_plus(
@@ -1325,7 +1467,12 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         # Ensure there's bundled aggregations on it.
         self.assertIn("unsigned", parent_event)
-        self.assertIn("m.relations", parent_event["unsigned"])
+        self.assertEqual(
+            parent_event["unsigned"].get("m.relations"),
+            {
+                RelationTypes.REFERENCE: {"chunk": [{"event_id": reference_event_id}]},
+            },
+        )
 
 
 class RelationIgnoredUserTestCase(BaseRelationsTestCase):
@@ -1372,53 +1519,8 @@ class RelationIgnoredUserTestCase(BaseRelationsTestCase):
 
         return before_aggregations[relation_type], after_aggregations[relation_type]
 
-    def test_annotation(self) -> None:
-        """Annotations should ignore"""
-        # Send 2 from us, 2 from the to be ignored user.
-        allowed_event_ids = []
-        ignored_event_ids = []
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
-        allowed_event_ids.append(channel.json_body["event_id"])
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="b")
-        allowed_event_ids.append(channel.json_body["event_id"])
-        channel = self._send_relation(
-            RelationTypes.ANNOTATION,
-            "m.reaction",
-            key="a",
-            access_token=self.user2_token,
-        )
-        ignored_event_ids.append(channel.json_body["event_id"])
-        channel = self._send_relation(
-            RelationTypes.ANNOTATION,
-            "m.reaction",
-            key="c",
-            access_token=self.user2_token,
-        )
-        ignored_event_ids.append(channel.json_body["event_id"])
-
-        before_aggregations, after_aggregations = self._test_ignored_user(
-            RelationTypes.ANNOTATION, allowed_event_ids, ignored_event_ids
-        )
-
-        self.assertCountEqual(
-            before_aggregations["chunk"],
-            [
-                {"type": "m.reaction", "key": "a", "count": 2},
-                {"type": "m.reaction", "key": "b", "count": 1},
-                {"type": "m.reaction", "key": "c", "count": 1},
-            ],
-        )
-
-        self.assertCountEqual(
-            after_aggregations["chunk"],
-            [
-                {"type": "m.reaction", "key": "a", "count": 1},
-                {"type": "m.reaction", "key": "b", "count": 1},
-            ],
-        )
-
     def test_reference(self) -> None:
-        """Annotations should ignore"""
+        """Aggregations should exclude reference relations from ignored users"""
         channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
         allowed_event_ids = [channel.json_body["event_id"]]
 
@@ -1441,7 +1543,7 @@ class RelationIgnoredUserTestCase(BaseRelationsTestCase):
         )
 
     def test_thread(self) -> None:
-        """Annotations should ignore"""
+        """Aggregations should exclude thread releations from ignored users"""
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
         allowed_event_ids = [channel.json_body["event_id"]]
 
@@ -1495,42 +1597,25 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
-    def test_redact_relation_annotation(self) -> None:
-        """
-        Test that annotations of an event are properly handled after the
-        annotation is redacted.
-
-        The redacted relation should not be included in bundled aggregations or
-        the response to relations.
-        """
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        to_redact_event_id = channel.json_body["event_id"]
-
-        channel = self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
+    def _get_threads(self) -> List[Tuple[str, str]]:
+        """Request the threads in the room and returns a list of thread ID and latest event ID."""
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
         )
-        unredacted_event_id = channel.json_body["event_id"]
-
-        # Both relations should exist.
-        event_ids = self._get_related_events()
-        relations = self._get_bundled_aggregations()
-        self.assertCountEqual(event_ids, [to_redact_event_id, unredacted_event_id])
-        self.assertEquals(
-            relations["m.annotation"],
-            {"chunk": [{"type": "m.reaction", "key": "a", "count": 2}]},
-        )
-
-        # Redact one of the reactions.
-        self._redact(to_redact_event_id)
-
-        # The unredacted relation should still exist.
-        event_ids = self._get_related_events()
-        relations = self._get_bundled_aggregations()
-        self.assertEquals(event_ids, [unredacted_event_id])
-        self.assertEquals(
-            relations["m.annotation"],
-            {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
-        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        threads = channel.json_body["chunk"]
+        return [
+            (
+                t["event_id"],
+                t["unsigned"]["m.relations"][RelationTypes.THREAD]["latest_event"][
+                    "event_id"
+                ],
+            )
+            for t in threads
+        ]
 
     def test_redact_relation_thread(self) -> None:
         """
@@ -1539,58 +1624,82 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         The redacted event should not be included in bundled aggregations or
         the response to relations.
         """
-        channel = self._send_relation(
-            RelationTypes.THREAD,
-            EventTypes.Message,
-            content={"body": "reply 1", "msgtype": "m.text"},
-        )
-        unredacted_event_id = channel.json_body["event_id"]
+        # Create a thread with a few events in it.
+        thread_replies = []
+        for i in range(3):
+            channel = self._send_relation(
+                RelationTypes.THREAD,
+                EventTypes.Message,
+                content={"body": f"reply {i}", "msgtype": "m.text"},
+            )
+            thread_replies.append(channel.json_body["event_id"])
 
-        # Note that the *last* event in the thread is redacted, as that gets
-        # included in the bundled aggregation.
-        channel = self._send_relation(
-            RelationTypes.THREAD,
-            EventTypes.Message,
-            content={"body": "reply 2", "msgtype": "m.text"},
-        )
-        to_redact_event_id = channel.json_body["event_id"]
-
-        # Both relations exist.
-        event_ids = self._get_related_events()
+        ##################################################
+        # Check the test data is configured as expected. #
+        ##################################################
+        self.assertEqual(self._get_related_events(), list(reversed(thread_replies)))
         relations = self._get_bundled_aggregations()
-        self.assertEquals(event_ids, [to_redact_event_id, unredacted_event_id])
-        self.assertDictContainsSubset(
-            {
-                "count": 2,
-                "current_user_participated": True,
-            },
-            relations[RelationTypes.THREAD],
+        self.assertLessEqual(
+            {"count": 3, "current_user_participated": True}.items(),
+            relations[RelationTypes.THREAD].items(),
         )
-        # And the latest event returned is the event that will be redacted.
+        # The latest event is the last sent event.
         self.assertEqual(
             relations[RelationTypes.THREAD]["latest_event"]["event_id"],
-            to_redact_event_id,
+            thread_replies[-1],
         )
 
-        # Redact one of the reactions.
-        self._redact(to_redact_event_id)
+        # There should be one thread, the latest event is the event that will be redacted.
+        self.assertEqual(self._get_threads(), [(self.parent_id, thread_replies[-1])])
 
-        # The unredacted relation should still exist.
-        event_ids = self._get_related_events()
+        ##########################
+        # Redact the last event. #
+        ##########################
+        self._redact(thread_replies.pop())
+
+        # The thread should still exist, but the latest event should be updated.
+        self.assertEqual(self._get_related_events(), list(reversed(thread_replies)))
         relations = self._get_bundled_aggregations()
-        self.assertEquals(event_ids, [unredacted_event_id])
-        self.assertDictContainsSubset(
-            {
-                "count": 1,
-                "current_user_participated": True,
-            },
-            relations[RelationTypes.THREAD],
+        self.assertLessEqual(
+            {"count": 2, "current_user_participated": True}.items(),
+            relations[RelationTypes.THREAD].items(),
         )
-        # And the latest event is now the unredacted event.
+        # And the latest event is the last unredacted event.
         self.assertEqual(
             relations[RelationTypes.THREAD]["latest_event"]["event_id"],
-            unredacted_event_id,
+            thread_replies[-1],
         )
+        self.assertEqual(self._get_threads(), [(self.parent_id, thread_replies[-1])])
+
+        ###########################################
+        # Redact the *first* event in the thread. #
+        ###########################################
+        self._redact(thread_replies.pop(0))
+
+        # Nothing should have changed (except the thread count).
+        self.assertEqual(self._get_related_events(), thread_replies)
+        relations = self._get_bundled_aggregations()
+        self.assertLessEqual(
+            {"count": 1, "current_user_participated": True}.items(),
+            relations[RelationTypes.THREAD].items(),
+        )
+        # And the latest event is the last unredacted event.
+        self.assertEqual(
+            relations[RelationTypes.THREAD]["latest_event"]["event_id"],
+            thread_replies[-1],
+        )
+        self.assertEqual(self._get_threads(), [(self.parent_id, thread_replies[-1])])
+
+        ####################################
+        # Redact the last remaining event. #
+        ####################################
+        self._redact(thread_replies.pop(0))
+        self.assertEqual(thread_replies, [])
+
+        # The event should no longer be considered a thread.
+        self.assertEqual(self._get_related_events(), [])
+        self.assertEqual(self._get_bundled_aggregations(), {})
+        self.assertEqual(self._get_threads(), [])
 
     def test_redact_parent_edit(self) -> None:
         """Test that edits of an event are redacted when the original event
@@ -1628,14 +1737,14 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         is redacted.
         """
         # Add a relation
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
+        channel = self._send_relation(RelationTypes.REFERENCE, "org.matrix.test")
         related_event_id = channel.json_body["event_id"]
 
         # The relations should exist.
         event_ids = self._get_related_events()
         relations = self._get_bundled_aggregations()
         self.assertEqual(len(event_ids), 1)
-        self.assertIn(RelationTypes.ANNOTATION, relations)
+        self.assertIn(RelationTypes.REFERENCE, relations)
 
         # Redact the original event.
         self._redact(self.parent_id)
@@ -1643,13 +1752,12 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # The relations are returned.
         event_ids = self._get_related_events()
         relations = self._get_bundled_aggregations()
-        self.assertEquals(event_ids, [related_event_id])
-        self.assertEquals(
-            relations["m.annotation"],
-            {"chunk": [{"type": "m.reaction", "key": "👍", "count": 1}]},
+        self.assertEqual(event_ids, [related_event_id])
+        self.assertEqual(
+            relations[RelationTypes.REFERENCE],
+            {"chunk": [{"event_id": related_event_id}]},
         )
 
-    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_redact_parent_thread(self) -> None:
         """
         Test that thread replies are still available when the root event is redacted.
@@ -1667,15 +1775,177 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # The unredacted relation should still exist.
         event_ids = self._get_related_events()
         relations = self._get_bundled_aggregations()
-        self.assertEquals(len(event_ids), 1)
-        self.assertDictContainsSubset(
+        self.assertEqual(len(event_ids), 1)
+        self.assertLessEqual(
             {
                 "count": 1,
                 "current_user_participated": True,
-            },
-            relations[RelationTypes.THREAD],
+            }.items(),
+            relations[RelationTypes.THREAD].items(),
         )
         self.assertEqual(
             relations[RelationTypes.THREAD]["latest_event"]["event_id"],
             related_event_id,
         )
+
+
+class ThreadsTestCase(BaseRelationsTestCase):
+    def _get_threads(self, body: JsonDict) -> List[Tuple[str, str]]:
+        return [
+            (
+                ev["event_id"],
+                ev["unsigned"]["m.relations"]["m.thread"]["latest_event"]["event_id"],
+            )
+            for ev in body["chunk"]
+        ]
+
+    def test_threads(self) -> None:
+        """Create threads and ensure the ordering is due to their latest event."""
+        # Create 2 threads.
+        thread_1 = self.parent_id
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user_token)
+        thread_2 = res["event_id"]
+
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_1 = channel.json_body["event_id"]
+        channel = self._send_relation(
+            RelationTypes.THREAD, "m.room.test", parent_id=thread_2
+        )
+        reply_2 = channel.json_body["event_id"]
+
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_2, reply_2), (thread_1, reply_1)])
+
+        # Update the first thread, the ordering should swap.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_3 = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        # Tuple of (thread ID, latest event ID) for each thread.
+        threads = self._get_threads(channel.json_body)
+        self.assertEqual(threads, [(thread_1, reply_3), (thread_2, reply_2)])
+
+    def test_pagination(self) -> None:
+        """Create threads and paginate through them."""
+        # Create 2 threads.
+        thread_1 = self.parent_id
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user_token)
+        thread_2 = res["event_id"]
+
+        self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Request the threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_2])
+
+        # Make sure next_batch has something in it that looks like it could be a
+        # valid token.
+        next_batch = channel.json_body.get("next_batch")
+        self.assertIsInstance(next_batch, str, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?limit=1&from={next_batch}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_1], channel.json_body)
+
+        self.assertNotIn("next_batch", channel.json_body, channel.json_body)
+
+    def test_include(self) -> None:
+        """Filtering threads to all or participated in should work."""
+        # Thread 1 has the user as the root event.
+        thread_1 = self.parent_id
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+
+        # Thread 2 has the user replying.
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user2_token)
+        thread_2 = res["event_id"]
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Thread 3 has the user not participating in.
+        res = self.helper.send(self.room, body="Another thread!", tok=self.user2_token)
+        thread_3 = res["event_id"]
+        self._send_relation(
+            RelationTypes.THREAD,
+            "m.room.test",
+            access_token=self.user2_token,
+            parent_id=thread_3,
+        )
+
+        # All threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(
+            thread_roots, [thread_3, thread_2, thread_1], channel.json_body
+        )
+
+        # Only participated threads.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads?include=participated",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_2, thread_1], channel.json_body)
+
+    def test_ignored_user(self) -> None:
+        """Events from ignored users should be ignored."""
+        # Thread 1 has a reply from an ignored user.
+        thread_1 = self.parent_id
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+
+        # Thread 2 is created by an ignored user.
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user2_token)
+        thread_2 = res["event_id"]
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Ignore user2.
+        self.get_success(
+            self.store.add_account_data_for_user(
+                self.user_id,
+                AccountDataTypes.IGNORED_USER_LIST,
+                {"ignored_users": {self.user2_id: {}}},
+            )
+        )
+
+        # Only thread 1 is returned.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v1/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_1], channel.json_body)

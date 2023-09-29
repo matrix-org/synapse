@@ -26,8 +26,8 @@ for most users.
 #### Docker images and Ansible playbooks
 
 There is an official synapse image available at
-<https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
-the docker-compose file available at
+<https://hub.docker.com/r/matrixdotorg/synapse> or at [`ghcr.io/matrix-org/synapse`](https://ghcr.io/matrix-org/synapse)
+which can be used with the docker-compose file available at
 [contrib/docker](https://github.com/matrix-org/synapse/tree/develop/contrib/docker).
 Further information on this including configuration options is available in the README
 on hub.docker.com.
@@ -37,7 +37,7 @@ Dockerfile to automate a synapse server in a single Docker image, at
 <https://hub.docker.com/r/avhost/docker-matrix/tags/>
 
 Slavi Pantaleev has created an Ansible playbook,
-which installs the offical Docker image of Matrix Synapse
+which installs the official Docker image of Matrix Synapse
 along with many other Matrix-related services (Postgres database, Element, coturn,
 ma1sd, SSL support, etc.).
 For more details, see
@@ -84,14 +84,16 @@ file when you upgrade the Debian package to a later version.
 
 ##### Downstream Debian packages
 
-Andrej Shadura maintains a `matrix-synapse` package in the Debian repositories.
+Andrej Shadura maintains a
+[`matrix-synapse`](https://packages.debian.org/sid/matrix-synapse) package in
+the Debian repositories.
 For `bookworm` and `sid`, it can be installed simply with:
 
 ```sh
 sudo apt install matrix-synapse
 ```
 
-Synapse is also avaliable in `bullseye-backports`.  Please
+Synapse is also available in `bullseye-backports`.  Please
 see the [Debian documentation](https://backports.debian.org/Instructions/)
 for information on how to use backports.
 
@@ -100,23 +102,27 @@ for information on how to use backports.
 ##### Downstream Ubuntu packages
 
 We do not recommend using the packages in the default Ubuntu repository
-at this time, as they are old and suffer from known security vulnerabilities.
+at this time, as they are [old and suffer from known security vulnerabilities](
+    https://bugs.launchpad.net/ubuntu/+source/matrix-synapse/+bug/1848709
+).
 The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
 
 #### Fedora
 
-Synapse is in the Fedora repositories as `matrix-synapse`:
+Synapse is in the Fedora repositories as
+[`matrix-synapse`](https://src.fedoraproject.org/rpms/matrix-synapse):
 
 ```sh
 sudo dnf install matrix-synapse
 ```
 
-Oleg Girko provides Fedora RPMs at
+Additionally, Oleg Girko provides Fedora RPMs at
 <https://obs.infoserver.lv/project/monitor/matrix-synapse>
 
 #### OpenSUSE
 
-Synapse is in the OpenSUSE repositories as `matrix-synapse`:
+Synapse is in the OpenSUSE repositories as
+[`matrix-synapse`](https://software.opensuse.org/package/matrix-synapse):
 
 ```sh
 sudo zypper install matrix-synapse
@@ -129,8 +135,8 @@ Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 reposi
 
 #### ArchLinux
 
-The quickest way to get up and running with ArchLinux is probably with the community package
-<https://www.archlinux.org/packages/community/any/matrix-synapse/>, which should pull in most of
+The quickest way to get up and running with ArchLinux is probably with the package provided by ArchLinux
+<https://archlinux.org/packages/extra/x86_64/matrix-synapse/>, which should pull in most of
 the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
@@ -149,9 +155,18 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
+#### Alpine Linux
+
+6543 maintains [Synapse packages for Alpine Linux](https://pkgs.alpinelinux.org/packages?name=synapse&branch=edge) in the community repository. Install with:
+
+```sh
+sudo apk add synapse
+```
+
 #### Void Linux
 
-Synapse can be found in the void repositories as 'synapse':
+Synapse can be found in the void repositories as
+['synapse'](https://github.com/void-linux/void-packages/tree/master/srcpkgs/synapse):
 
 ```sh
 xbps-install -Su
@@ -181,7 +196,7 @@ doas pkg_add synapse
 #### NixOS
 
 Robin Lambertz has packaged Synapse for NixOS at:
-<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
+<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/matrix/synapse.nix>
 
 
 ### Installing as a Python module from PyPI
@@ -193,7 +208,7 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.7 or later, up to Python 3.10.
+- Python 3.8 or later, up to Python 3.11.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 If building on an uncommon architecture for which pre-built wheels are
@@ -271,7 +286,7 @@ Installing prerequisites on Ubuntu or Debian:
 ```sh
 sudo apt install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev libicu-dev
 ```
 
 ##### ArchLinux
@@ -280,7 +295,7 @@ Installing prerequisites on ArchLinux:
 
 ```sh
 sudo pacman -S base-devel python python-pip \
-               python-setuptools python-virtualenv sqlite3
+               python-setuptools python-virtualenv sqlite3 icu
 ```
 
 ##### CentOS/Fedora
@@ -290,7 +305,8 @@ Installing prerequisites on CentOS or Fedora Linux:
 ```sh
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  libwebp-devel libxml2-devel libxslt-devel libpq-devel \
-                 python3-virtualenv libffi-devel openssl-devel python3-devel
+                 python3-virtualenv libffi-devel openssl-devel python3-devel \
+                 libicu-devel
 sudo dnf groupinstall "Development Tools"
 ```
 
@@ -303,9 +319,14 @@ You may need to install the latest Xcode developer tools:
 xcode-select --install
 ```
 
-On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):
+Some extra dependencies may be needed. You can use Homebrew (https://brew.sh) for them.
+
+You may need to install icu, and make the icu binaries and libraries accessible.
+Please follow [the official instructions of PyICU](https://pypi.org/project/PyICU/) to do so.
+
+On ARM-based Macs you may also need to install libjpeg and libpq:
 ```sh
- brew install jpeg
+ brew install jpeg libpq
  ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
@@ -324,7 +345,8 @@ Installing prerequisites on openSUSE:
 ```sh
 sudo zypper in -t pattern devel_basis
 sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
-               python-devel libffi-devel libopenssl-devel libjpeg62-devel
+               python-devel libffi-devel libopenssl-devel libjpeg62-devel \
+               libicu-devel
 ```
 
 ##### OpenBSD

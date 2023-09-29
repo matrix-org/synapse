@@ -14,17 +14,20 @@
 
 from typing import TYPE_CHECKING
 
-from twisted.web.resource import Resource
-
-from .local_key_resource import LocalKey
-from .remote_key_resource import RemoteKey
+from synapse.http.server import HttpServer, JsonResource
+from synapse.rest.key.v2.local_key_resource import LocalKey
+from synapse.rest.key.v2.remote_key_resource import RemoteKey
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class KeyApiV2Resource(Resource):
+class KeyResource(JsonResource):
     def __init__(self, hs: "HomeServer"):
-        Resource.__init__(self)
-        self.putChild(b"server", LocalKey(hs))
-        self.putChild(b"query", RemoteKey(hs))
+        super().__init__(hs, canonical_json=True)
+        self.register_servlets(self, hs)
+
+    @staticmethod
+    def register_servlets(http_server: HttpServer, hs: "HomeServer") -> None:
+        LocalKey(hs).register(http_server)
+        RemoteKey(hs).register(http_server)

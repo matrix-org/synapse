@@ -13,15 +13,29 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Set
+import re
+from typing import TYPE_CHECKING, Dict, Mapping, Optional, Set, Tuple
+
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import Extra, StrictInt, StrictStr
+else:
+    from pydantic import StrictInt, StrictStr, Extra
 
 from signedjson.sign import sign_json
 
-from synapse.api.errors import Codes, SynapseError
+from twisted.web.server import Request
+
 from synapse.crypto.keyring import ServerKeyFetcher
-from synapse.http.server import DirectServeJsonResource, respond_with_json
-from synapse.http.servlet import parse_integer, parse_json_object_from_request
-from synapse.http.site import SynapseRequest
+from synapse.http.server import HttpServer
+from synapse.http.servlet import (
+    RestServlet,
+    parse_and_validate_json_object_from_request,
+    parse_integer,
+)
+from synapse.rest.models import RequestBodyModel
+from synapse.storage.keys import FetchKeyResultForRemote
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import yieldable_gather_results
@@ -32,7 +46,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RemoteKey(DirectServeJsonResource):
+class _KeyQueryCriteriaDataModel(RequestBodyModel):
+    class Config:
+        extra = Extra.allow
+
+    minimum_valid_until_ts: Optional[StrictInt]
+
+
+class RemoteKey(RestServlet):
     """HTTP resource for retrieving the TLS certificate and NACL signature
     verification keys for a collection of servers. Checks that the reported
     X.509 TLS certificate matches the one used in the HTTPS connection. Checks
@@ -88,11 +109,12 @@ class RemoteKey(DirectServeJsonResource):
     }
     """
 
-    isLeaf = True
+    CATEGORY = "Federation requests"
+
+    class PostBody(RequestBodyModel):
+        server_keys: Dict[StrictStr, Dict[StrictStr, _KeyQueryCriteriaDataModel]]
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__()
-
         self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
@@ -101,73 +123,106 @@ class RemoteKey(DirectServeJsonResource):
         )
         self.config = hs.config
 
-    async def _async_render_GET(self, request: SynapseRequest) -> None:
-        assert request.postpath is not None
-        if len(request.postpath) == 1:
-            (server,) = request.postpath
-            query: dict = {server.decode("ascii"): {}}
-        elif len(request.postpath) == 2:
-            server, key_id = request.postpath
+    def register(self, http_server: HttpServer) -> None:
+        http_server.register_paths(
+            "GET",
+            (
+                re.compile(
+                    "^/_matrix/key/v2/query/(?P<server>[^/]*)(/(?P<key_id>[^/]*))?$"
+                ),
+            ),
+            self.on_GET,
+            self.__class__.__name__,
+        )
+        http_server.register_paths(
+            "POST",
+            (re.compile("^/_matrix/key/v2/query$"),),
+            self.on_POST,
+            self.__class__.__name__,
+        )
+
+    async def on_GET(
+        self, request: Request, server: str, key_id: Optional[str] = None
+    ) -> Tuple[int, JsonDict]:
+        if server and key_id:
+            # Matrix 1.6 drops support for passing the key_id, this is incompatible
+            # with earlier versions and is allowed in order to support both.
+            # A warning is issued to help determine when it is safe to drop this.
+            logger.warning(
+                "Request for remote server key with deprecated key ID (logging to determine usage level for future removal): %s / %s",
+                server,
+                key_id,
+            )
+
             minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
-            arguments = {}
-            if minimum_valid_until_ts is not None:
-                arguments["minimum_valid_until_ts"] = minimum_valid_until_ts
-            query = {server.decode("ascii"): {key_id.decode("ascii"): arguments}}
+            query = {
+                server: {
+                    key_id: _KeyQueryCriteriaDataModel(
+                        minimum_valid_until_ts=minimum_valid_until_ts
+                    )
+                }
+            }
         else:
-            raise SynapseError(404, "Not found %r" % request.postpath, Codes.NOT_FOUND)
+            query = {server: {}}
 
-        await self.query_keys(request, query, query_remote_on_cache_miss=True)
+        return 200, await self.query_keys(query, query_remote_on_cache_miss=True)
 
-    async def _async_render_POST(self, request: SynapseRequest) -> None:
-        content = parse_json_object_from_request(request)
+    async def on_POST(self, request: Request) -> Tuple[int, JsonDict]:
+        content = parse_and_validate_json_object_from_request(request, self.PostBody)
 
-        query = content["server_keys"]
+        query = content.server_keys
 
-        await self.query_keys(request, query, query_remote_on_cache_miss=True)
+        return 200, await self.query_keys(query, query_remote_on_cache_miss=True)
 
     async def query_keys(
         self,
-        request: SynapseRequest,
-        query: JsonDict,
+        query: Dict[str, Dict[str, _KeyQueryCriteriaDataModel]],
         query_remote_on_cache_miss: bool = False,
-    ) -> None:
+    ) -> JsonDict:
         logger.info("Handling query for keys %r", query)
 
-        store_queries = []
+        server_keys: Dict[Tuple[str, str], Optional[FetchKeyResultForRemote]] = {}
         for server_name, key_ids in query.items():
-            if not key_ids:
-                key_ids = (None,)
-            for key_id in key_ids:
-                store_queries.append((server_name, key_id, None))
+            if key_ids:
+                results: Mapping[
+                    str, Optional[FetchKeyResultForRemote]
+                ] = await self.store.get_server_keys_json_for_remote(
+                    server_name, key_ids
+                )
+            else:
+                results = await self.store.get_all_server_keys_json_for_remote(
+                    server_name
+                )
 
-        cached = await self.store.get_server_keys_json(store_queries)
+            server_keys.update(
+                ((server_name, key_id), res) for key_id, res in results.items()
+            )
 
         json_results: Set[bytes] = set()
 
         time_now_ms = self.clock.time_msec()
 
-        # Map server_name->key_id->int. Note that the value of the init is unused.
+        # Map server_name->key_id->int. Note that the value of the int is unused.
         # XXX: why don't we just use a set?
         cache_misses: Dict[str, Dict[str, int]] = {}
-        for (server_name, key_id, _), key_results in cached.items():
-            results = [(result["ts_added_ms"], result) for result in key_results]
-
-            if key_id is None:
+        for (server_name, key_id), key_result in server_keys.items():
+            if not query[server_name]:
                 # all keys were requested. Just return what we have without worrying
                 # about validity
-                for _, result in results:
-                    # Cast to bytes since postgresql returns a memoryview.
-                    json_results.add(bytes(result["key_json"]))
+                if key_result:
+                    json_results.add(key_result.key_json)
                 continue
 
             miss = False
-            if not results:
+            if key_result is None:
                 miss = True
             else:
-                ts_added_ms, most_recent_result = max(results)
-                ts_valid_until_ms = most_recent_result["ts_valid_until_ms"]
-                req_key = query.get(server_name, {}).get(key_id, {})
-                req_valid_until = req_key.get("minimum_valid_until_ts")
+                ts_added_ms = key_result.added_ts
+                ts_valid_until_ms = key_result.valid_until_ts
+                req_key = query.get(server_name, {}).get(
+                    key_id, _KeyQueryCriteriaDataModel(minimum_valid_until_ts=None)
+                )
+                req_valid_until = req_key.minimum_valid_until_ts
                 if req_valid_until is not None:
                     if ts_valid_until_ms < req_valid_until:
                         logger.debug(
@@ -211,8 +266,8 @@ class RemoteKey(DirectServeJsonResource):
                         ts_valid_until_ms,
                         time_now_ms,
                     )
-                # Cast to bytes since postgresql returns a memoryview.
-                json_results.add(bytes(most_recent_result["key_json"]))
+
+                json_results.add(key_result.key_json)
 
             if miss and query_remote_on_cache_miss:
                 # only bother attempting to fetch keys from servers on our whitelist
@@ -232,7 +287,7 @@ class RemoteKey(DirectServeJsonResource):
                     for server_name, keys in cache_misses.items()
                 ),
             )
-            await self.query_keys(request, query, query_remote_on_cache_miss=False)
+            return await self.query_keys(query, query_remote_on_cache_miss=False)
         else:
             signed_keys = []
             for key_json_raw in json_results:
@@ -244,6 +299,4 @@ class RemoteKey(DirectServeJsonResource):
 
                 signed_keys.append(key_json)
 
-            response = {"server_keys": signed_keys}
-
-            respond_with_json(request, 200, response, canonical_json=True)
+            return {"server_keys": signed_keys}

@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class ReadMarkerRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
+    CATEGORY = "Receipts requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -51,7 +52,9 @@ class ReadMarkerRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
+        await self.presence_handler.bump_presence_active_time(
+            requester.user, requester.device_id
+        )
 
         body = parse_json_object_from_request(request)
 
@@ -81,8 +84,10 @@ class ReadMarkerRestServlet(RestServlet):
                 await self.receipts_handler.received_client_receipt(
                     room_id,
                     receipt_type,
-                    user_id=requester.user.to_string(),
+                    user_id=requester.user,
                     event_id=event_id,
+                    # Setting the thread ID is not possible with the /read_markers endpoint.
+                    thread_id=None,
                 )
 
         return 200, {}

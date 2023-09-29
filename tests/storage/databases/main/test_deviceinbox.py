@@ -12,24 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.rest import admin
 from synapse.rest.client import devices
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 
 class DeviceInboxBackgroundUpdateStoreTestCase(HomeserverTestCase):
-
     servlets = [
         admin.register_servlets,
         devices.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
 
-    def test_background_remove_deleted_devices_from_device_inbox(self):
+    def test_background_remove_deleted_devices_from_device_inbox(self) -> None:
         """Test that the background task to delete old device_inboxes works properly."""
 
         # create a valid device
@@ -89,7 +92,7 @@ class DeviceInboxBackgroundUpdateStoreTestCase(HomeserverTestCase):
         self.assertEqual(1, len(res))
         self.assertEqual(res[0], "cur_device")
 
-    def test_background_remove_hidden_devices_from_device_inbox(self):
+    def test_background_remove_hidden_devices_from_device_inbox(self) -> None:
         """Test that the background task to delete hidden devices
         from device_inboxes works properly."""
 

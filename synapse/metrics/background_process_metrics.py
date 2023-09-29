@@ -48,6 +48,9 @@ from synapse.metrics._types import Collector
 if TYPE_CHECKING:
     import resource
 
+    # Old versions don't have `LiteralString`
+    from typing_extensions import LiteralString
+
 
 logger = logging.getLogger(__name__)
 
@@ -174,8 +177,10 @@ class _BackgroundProcess:
             diff = new_stats - self._reported_stats
         self._reported_stats = new_stats
 
-        _background_process_ru_utime.labels(self.desc).inc(diff.ru_utime)
-        _background_process_ru_stime.labels(self.desc).inc(diff.ru_stime)
+        # For unknown reasons, the difference in times can be negative. See comment in
+        # synapse.http.request_metrics.RequestMetrics.update_metrics.
+        _background_process_ru_utime.labels(self.desc).inc(max(diff.ru_utime, 0))
+        _background_process_ru_stime.labels(self.desc).inc(max(diff.ru_stime, 0))
         _background_process_db_txn_count.labels(self.desc).inc(diff.db_txn_count)
         _background_process_db_txn_duration.labels(self.desc).inc(
             diff.db_txn_duration_sec
@@ -189,7 +194,7 @@ R = TypeVar("R")
 
 
 def run_as_background_process(
-    desc: str,
+    desc: "LiteralString",
     func: Callable[..., Awaitable[Optional[R]]],
     *args: Any,
     bg_start_span: bool = True,
@@ -257,7 +262,7 @@ P = ParamSpec("P")
 
 
 def wrap_as_background_process(
-    desc: str,
+    desc: "LiteralString",
 ) -> Callable[
     [Callable[P, Awaitable[Optional[R]]]],
     Callable[P, "defer.Deferred[Optional[R]]"],
@@ -320,12 +325,20 @@ class BackgroundProcessLoggingContext(LoggingContext):
         if instance_id is None:
             instance_id = id(self)
         super().__init__("%s-%s" % (name, instance_id))
-        self._proc = _BackgroundProcess(name, self)
+        self._proc: Optional[_BackgroundProcess] = _BackgroundProcess(name, self)
 
     def start(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """Log context has started running (again)."""
 
         super().start(rusage)
+
+        if self._proc is None:
+            logger.error(
+                "Background process re-entered without a proc: %s",
+                self.name,
+                stack_info=True,
+            )
+            return
 
         # We've become active again so we make sure we're in the list of active
         # procs. (Note that "start" here means we've become active, as opposed
@@ -343,6 +356,14 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
         super().__exit__(type, value, traceback)
 
+        if self._proc is None:
+            logger.error(
+                "Background process exited without a proc: %s",
+                self.name,
+                stack_info=True,
+            )
+            return
+
         # The background process has finished. We explicitly remove and manually
         # update the metrics here so that if nothing is scraping metrics the set
         # doesn't infinitely grow.
@@ -350,3 +371,6 @@ class BackgroundProcessLoggingContext(LoggingContext):
             _background_processes_active_since_last_scrape.discard(self._proc)
 
         self._proc.update_metrics()
+
+        # Set proc to None to break the reference cycle.
+        self._proc = None

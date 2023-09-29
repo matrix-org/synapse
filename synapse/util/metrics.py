@@ -15,7 +15,7 @@
 import logging
 from functools import wraps
 from types import TracebackType
-from typing import Awaitable, Callable, Generator, List, Optional, Type, TypeVar
+from typing import Awaitable, Callable, Dict, Generator, Optional, Type, TypeVar
 
 from prometheus_client import CollectorRegistry, Counter, Metric
 from typing_extensions import Concatenate, ParamSpec, Protocol
@@ -220,21 +220,21 @@ class DynamicCollectorRegistry(CollectorRegistry):
 
     def __init__(self) -> None:
         super().__init__()
-        self._pre_update_hooks: List[Callable[[], None]] = []
+        self._pre_update_hooks: Dict[str, Callable[[], None]] = {}
 
     def collect(self) -> Generator[Metric, None, None]:
         """
         Collects metrics, calling pre-update hooks first.
         """
 
-        for pre_update_hook in self._pre_update_hooks:
+        for pre_update_hook in self._pre_update_hooks.values():
             pre_update_hook()
 
         yield from super().collect()
 
-    def register_hook(self, hook: Callable[[], None]) -> None:
+    def register_hook(self, metric_name: str, hook: Callable[[], None]) -> None:
         """
         Registers a hook that is called before metric collection.
         """
 
-        self._pre_update_hooks.append(hook)
+        self._pre_update_hooks[metric_name] = hook

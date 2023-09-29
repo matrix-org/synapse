@@ -18,7 +18,13 @@ import random
 from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from pydantic import StrictBool, StrictStr, constr
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import StrictBool, StrictStr, constr
+else:
+    from pydantic import StrictBool, StrictStr, constr
+from typing_extensions import Literal
 
 from twisted.web.server import Request
 
@@ -26,6 +32,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
+    NotFoundError,
     SynapseError,
     ThreepidValidationError,
 )
@@ -43,6 +50,7 @@ from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
 from synapse.rest.client.models import (
     AuthenticationData,
+    ClientSecretStr,
     EmailRequestTokenBody,
     MsisdnRequestTokenBody,
 )
@@ -176,85 +184,81 @@ class PasswordRestServlet(RestServlet):
         #
         # In the second case, we require a password to confirm their identity.
 
-        requester = None
-        if self.auth.has_access_token(request):
-            requester = await self.auth.get_user_by_req(request)
-            try:
+        try:
+            requester = None
+            if self.auth.has_access_token(request):
+                requester = await self.auth.get_user_by_req(request)
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
                     requester,
                     request,
-                    body.dict(exclude_unset=True),
+                    body.dict(exclude_unset=True, exclude={"new_password"}),
                     "modify your account password",
                 )
-            except InteractiveAuthIncompleteError as e:
-                # The user needs to provide more steps to complete auth, but
-                # they're not required to provide the password again.
-                #
-                # If a password is available now, hash the provided password and
-                # store it for later.
-                if new_password:
-                    new_password_hash = await self.auth_handler.hash(new_password)
-                    await self.auth_handler.set_session_data(
-                        e.session_id,
-                        UIAuthSessionDataConstants.PASSWORD_HASH,
-                        new_password_hash,
-                    )
-                raise
-            user_id = requester.user.to_string()
-        else:
-            try:
+                user_id = requester.user.to_string()
+            else:
                 result, params, session_id = await self.auth_handler.check_ui_auth(
                     [[LoginType.EMAIL_IDENTITY]],
                     request,
-                    body.dict(exclude_unset=True),
+                    body.dict(exclude_unset=True, exclude={"new_password"}),
                     "modify your account password",
                 )
-            except InteractiveAuthIncompleteError as e:
-                # The user needs to provide more steps to complete auth, but
-                # they're not required to provide the password again.
-                #
-                # If a password is available now, hash the provided password and
-                # store it for later.
-                if new_password:
-                    new_password_hash = await self.auth_handler.hash(new_password)
-                    await self.auth_handler.set_session_data(
-                        e.session_id,
-                        UIAuthSessionDataConstants.PASSWORD_HASH,
-                        new_password_hash,
+
+                if LoginType.EMAIL_IDENTITY in result:
+                    threepid = result[LoginType.EMAIL_IDENTITY]
+                    if "medium" not in threepid or "address" not in threepid:
+                        raise SynapseError(500, "Malformed threepid")
+                    if threepid["medium"] == "email":
+                        # For emails, canonicalise the address.
+                        # We store all email addresses canonicalised in the DB.
+                        # (See add_threepid in synapse/handlers/auth.py)
+                        try:
+                            threepid["address"] = validate_email(threepid["address"])
+                        except ValueError as e:
+                            raise SynapseError(400, str(e))
+                    # if using email, we must know about the email they're authing with!
+                    threepid_user_id = await self.datastore.get_user_id_by_threepid(
+                        threepid["medium"], threepid["address"]
                     )
+                    if not threepid_user_id:
+                        raise SynapseError(
+                            404, "Email address not found", Codes.NOT_FOUND
+                        )
+                    user_id = threepid_user_id
+                else:
+                    logger.error("Auth succeeded but no known type! %r", result.keys())
+                    raise SynapseError(500, "", Codes.UNKNOWN)
+
+        except InteractiveAuthIncompleteError as e:
+            # The user needs to provide more steps to complete auth, but
+            # they're not required to provide the password again.
+            #
+            # If a password is available now, hash the provided password and
+            # store it for later. We only do this if we don't already have the
+            # password hash stored, to avoid repeatedly hashing the password.
+
+            if not new_password:
                 raise
 
-            if LoginType.EMAIL_IDENTITY in result:
-                threepid = result[LoginType.EMAIL_IDENTITY]
-                if "medium" not in threepid or "address" not in threepid:
-                    raise SynapseError(500, "Malformed threepid")
-                if threepid["medium"] == "email":
-                    # For emails, canonicalise the address.
-                    # We store all email addresses canonicalised in the DB.
-                    # (See add_threepid in synapse/handlers/auth.py)
-                    try:
-                        threepid["address"] = validate_email(threepid["address"])
-                    except ValueError as e:
-                        raise SynapseError(400, str(e))
-                # if using email, we must know about the email they're authing with!
-                threepid_user_id = await self.datastore.get_user_id_by_threepid(
-                    threepid["medium"], threepid["address"]
-                )
-                if not threepid_user_id:
-                    raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
-                user_id = threepid_user_id
-            else:
-                logger.error("Auth succeeded but no known type! %r", result.keys())
-                raise SynapseError(500, "", Codes.UNKNOWN)
+            existing_session_password_hash = await self.auth_handler.get_session_data(
+                e.session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
+            )
+            if existing_session_password_hash:
+                raise
+
+            new_password_hash = await self.auth_handler.hash(new_password)
+            await self.auth_handler.set_session_data(
+                e.session_id,
+                UIAuthSessionDataConstants.PASSWORD_HASH,
+                new_password_hash,
+            )
+            raise
 
         # If we have a password in this request, prefer it. Otherwise, use the
         # password hash from an earlier request.
         if new_password:
             password_hash: Optional[str] = await self.auth_handler.hash(new_password)
         elif session_id is not None:
-            password_hash = await self.auth_handler.get_session_data(
-                session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
-            )
+            password_hash = existing_session_password_hash
         else:
             # UI validation was skipped, but the request did not include a new
             # password.
@@ -336,6 +340,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        if not self.hs.config.registration.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         if not self.config.email.can_verify_email:
             logger.warning(
                 "Adding emails have been disabled due to lack of an email config"
@@ -408,6 +417,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             request, MsisdnRequestTokenBody
         )
         msisdn = phone_number_to_msisdn(body.country, body.phone_number)
+        logger.info("Request #%s to verify ownership of %s", body.send_attempt, msisdn)
 
         if not await check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -437,6 +447,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
+            logger.info("MSISDN %s is already in use by %s", msisdn, existing_user_id)
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.registration.account_threepid_delegate_msisdn:
@@ -461,6 +472,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         threepid_send_requests.labels(type="msisdn", reason="add_threepid").observe(
             body.send_attempt
         )
+        logger.info("MSISDN %s: got response from identity server: %s", msisdn, ret)
 
         return 200, ret
 
@@ -532,6 +544,11 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
         "/add_threepid/msisdn/submit_token$", releases=(), unstable=True
     )
 
+    class PostBody(RequestBodyModel):
+        client_secret: ClientSecretStr
+        sid: StrictStr
+        token: StrictStr
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.config = hs.config
@@ -547,22 +564,23 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
                 "instead.",
             )
 
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["client_secret", "sid", "token"])
-        assert_valid_client_secret(body["client_secret"])
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         # Proxy submit_token request to msisdn threepid delegate
         response = await self.identity_handler.proxy_msisdn_submit_token(
             self.config.registration.account_threepid_delegate_msisdn,
-            body["client_secret"],
-            body["sid"],
-            body["token"],
+            body.client_secret,
+            body.sid,
+            body.token,
         )
         return 200, response
 
 
 class ThreepidRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid$")
+    # This is used as a proxy for all the 3pid endpoints.
+
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -579,7 +597,14 @@ class ThreepidRestServlet(RestServlet):
 
         return 200, {"threepids": threepids}
 
+    # NOTE(dmr): I have chosen not to use Pydantic to parse this request's body, because
+    # the endpoint is deprecated. (If you really want to, you could do this by reusing
+    # ThreePidBindRestServelet.PostBody with an `alias_generator` to handle
+    # `threePidCreds` versus `three_pid_creds`.
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        if self.hs.config.experimental.msc3861.enabled:
+            raise NotFoundError(errcode=Codes.UNRECOGNIZED)
+
         if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
                 400, "3PID changes are disabled on this server", Codes.FORBIDDEN
@@ -627,6 +652,11 @@ class ThreepidAddRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
+    class PostBody(RequestBodyModel):
+        auth: Optional[AuthenticationData] = None
+        client_secret: ClientSecretStr
+        sid: StrictStr
+
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:
@@ -636,22 +666,17 @@ class ThreepidAddRestServlet(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
-        body = parse_json_object_from_request(request)
-
-        assert_params_in_dict(body, ["client_secret", "sid"])
-        sid = body["sid"]
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         await self.auth_handler.validate_user_via_ui_auth(
             requester,
             request,
-            body,
+            body.dict(exclude_unset=True),
             "add a third-party identifier to your account",
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(
-            client_secret, sid
+            body.client_secret, body.sid
         )
         if validation_session:
             await self.auth_handler.add_threepid(
@@ -676,23 +701,20 @@ class ThreepidBindRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        body = parse_json_object_from_request(request)
+    class PostBody(RequestBodyModel):
+        client_secret: ClientSecretStr
+        id_access_token: StrictStr
+        id_server: StrictStr
+        sid: StrictStr
 
-        assert_params_in_dict(
-            body, ["id_server", "sid", "id_access_token", "client_secret"]
-        )
-        id_server = body["id_server"]
-        sid = body["sid"]
-        id_access_token = body["id_access_token"]
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         await self.identity_handler.bind_threepid(
-            client_secret, sid, user_id, id_server, id_access_token
+            body.client_secret, body.sid, user_id, body.id_server, body.id_access_token
         )
 
         return 200, {}
@@ -708,23 +730,22 @@ class ThreepidUnbindRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.datastore = self.hs.get_datastores().main
 
+    class PostBody(RequestBodyModel):
+        address: StrictStr
+        id_server: Optional[StrictStr] = None
+        medium: Literal["email", "msisdn"]
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Unbind the given 3pid from a specific identity server, or identity servers that are
         known to have this 3pid bound
         """
         requester = await self.auth.get_user_by_req(request)
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["medium", "address"])
-
-        medium = body.get("medium")
-        address = body.get("address")
-        id_server = body.get("id_server")
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         # Attempt to unbind the threepid from an identity server. If id_server is None, try to
         # unbind from all identity servers this threepid has been added to in the past
         result = await self.identity_handler.try_unbind_threepid(
-            requester.user.to_string(),
-            {"address": address, "medium": medium, "id_server": id_server},
+            requester.user.to_string(), body.medium, body.address, body.id_server
         )
         return 200, {"id_server_unbind_result": "success" if result else "no-support"}
 
@@ -738,21 +759,27 @@ class ThreepidDeleteRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
+    class PostBody(RequestBodyModel):
+        address: StrictStr
+        id_server: Optional[StrictStr] = None
+        medium: Literal["email", "msisdn"]
+
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
                 400, "3PID changes are disabled on this server", Codes.FORBIDDEN
             )
 
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["medium", "address"])
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         try:
-            ret = await self.auth_handler.delete_threepid(
-                user_id, body["medium"], body["address"], body.get("id_server")
+            # Attempt to remove any known bindings of this third-party ID
+            # and user ID from identity servers.
+            ret = await self.hs.get_identity_handler().try_unbind_threepid(
+                user_id, body.medium, body.address, body.id_server
             )
         except Exception:
             # NB. This endpoint should succeed if there is nothing to
@@ -765,6 +792,11 @@ class ThreepidDeleteRestServlet(RestServlet):
             id_server_unbind_result = "success"
         else:
             id_server_unbind_result = "no-support"
+
+        # Delete the local association of this user ID and third-party ID.
+        await self.auth_handler.delete_local_threepid(
+            user_id, body.medium, body.address
+        )
 
         return 200, {"id_server_unbind_result": id_server_unbind_result}
 
@@ -810,6 +842,7 @@ def assert_valid_next_link(hs: "HomeServer", next_link: str) -> None:
 
 class WhoamiRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/whoami$")
+    CATEGORY = "Client API requests"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -861,19 +894,23 @@ class AccountStatusRestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    EmailPasswordRequestTokenRestServlet(hs).register(http_server)
-    PasswordRestServlet(hs).register(http_server)
-    DeactivateAccountRestServlet(hs).register(http_server)
-    EmailThreepidRequestTokenRestServlet(hs).register(http_server)
-    MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
-    AddThreepidEmailSubmitTokenServlet(hs).register(http_server)
-    AddThreepidMsisdnSubmitTokenServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        if not hs.config.experimental.msc3861.enabled:
+            EmailPasswordRequestTokenRestServlet(hs).register(http_server)
+            DeactivateAccountRestServlet(hs).register(http_server)
+            PasswordRestServlet(hs).register(http_server)
+            EmailThreepidRequestTokenRestServlet(hs).register(http_server)
+            MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
+            AddThreepidEmailSubmitTokenServlet(hs).register(http_server)
+            AddThreepidMsisdnSubmitTokenServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
-    ThreepidAddRestServlet(hs).register(http_server)
-    ThreepidBindRestServlet(hs).register(http_server)
-    ThreepidUnbindRestServlet(hs).register(http_server)
-    ThreepidDeleteRestServlet(hs).register(http_server)
+    if hs.config.worker.worker_app is None:
+        ThreepidBindRestServlet(hs).register(http_server)
+        ThreepidUnbindRestServlet(hs).register(http_server)
+        if not hs.config.experimental.msc3861.enabled:
+            ThreepidAddRestServlet(hs).register(http_server)
+            ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
 
-    if hs.config.experimental.msc3720_enabled:
+    if hs.config.worker.worker_app is None and hs.config.experimental.msc3720_enabled:
         AccountStatusRestServlet(hs).register(http_server)

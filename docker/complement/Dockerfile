@@ -7,35 +7,31 @@
 # https://github.com/matrix-org/synapse/blob/develop/docker/README-testing.md#testing-with-postgresql-and-single-or-multi-process-synapse
 
 ARG SYNAPSE_VERSION=latest
+# This is an intermediate image, to be built locally (not pulled from a registry).
+ARG FROM=matrixdotorg/synapse-workers:$SYNAPSE_VERSION
 
-# first of all, we create a base image with a postgres server and database,
-# which we can copy into the target image. For repeated rebuilds, this is
-# much faster than apt installing postgres each time.
-#
-# This trick only works because (a) the Synapse image happens to have all the
-# shared libraries that postgres wants, (b) we use a postgres image based on
-# the same debian version as Synapse's docker image (so the versions of the
-# shared libraries match).
+FROM $FROM
+    # First of all, we copy postgres server from the official postgres image,
+    # since for repeated rebuilds, this is much faster than apt installing
+    # postgres each time.
 
-FROM postgres:13-bullseye AS postgres_base
-    # initialise the database cluster in /var/lib/postgresql
+    # This trick only works because (a) the Synapse image happens to have all the
+    # shared libraries that postgres wants, (b) we use a postgres image based on
+    # the same debian version as Synapse's docker image (so the versions of the
+    # shared libraries match).
+    RUN adduser --system --uid 999 postgres --home /var/lib/postgresql
+    COPY --from=docker.io/library/postgres:13-bookworm /usr/lib/postgresql /usr/lib/postgresql
+    COPY --from=docker.io/library/postgres:13-bookworm /usr/share/postgresql /usr/share/postgresql
+    RUN mkdir /var/run/postgresql && chown postgres /var/run/postgresql
+    ENV PATH="${PATH}:/usr/lib/postgresql/13/bin"
+    ENV PGDATA=/var/lib/postgresql/data
+
+    # We also initialize the database at build time, rather than runtime, so that it's faster to spin up the image.
     RUN gosu postgres initdb --locale=C --encoding=UTF-8 --auth-host password
 
     # Configure a password and create a database for Synapse
     RUN echo "ALTER USER postgres PASSWORD 'somesecret'" | gosu postgres postgres --single
     RUN echo "CREATE DATABASE synapse" | gosu postgres postgres --single
-
-# now build the final image, based on the Synapse image.
-
-FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
-    # copy the postgres installation over from the image we built above
-    RUN adduser --system --uid 999 postgres --home /var/lib/postgresql
-    COPY --from=postgres_base /var/lib/postgresql /var/lib/postgresql
-    COPY --from=postgres_base /usr/lib/postgresql /usr/lib/postgresql
-    COPY --from=postgres_base /usr/share/postgresql /usr/share/postgresql
-    RUN mkdir /var/run/postgresql && chown postgres /var/run/postgresql
-    ENV PATH="${PATH}:/usr/lib/postgresql/13/bin"
-    ENV PGDATA=/var/lib/postgresql/data
 
     # Extend the shared homeserver config to disable rate-limiting,
     # set Complement's static shared secret, enable registration, amongst other

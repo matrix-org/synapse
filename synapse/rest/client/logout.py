@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
+from synapse.handlers.device import DeviceHandler
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
@@ -34,10 +35,14 @@ class LogoutRestServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
-        self._device_handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self._device_handler = handler
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_expired=True)
+        requester = await self.auth.get_user_by_req(
+            request, allow_expired=True, allow_locked=True
+        )
 
         if requester.device_id is None:
             # The access token wasn't associated with a device.
@@ -59,10 +64,14 @@ class LogoutAllRestServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
-        self._device_handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self._device_handler = handler
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_expired=True)
+        requester = await self.auth.get_user_by_req(
+            request, allow_expired=True, allow_locked=True
+        )
         user_id = requester.user.to_string()
 
         # first delete all of the user's devices
@@ -75,5 +84,8 @@ class LogoutAllRestServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.experimental.msc3861.enabled:
+        return
+
     LogoutRestServlet(hs).register(http_server)
     LogoutAllRestServlet(hs).register(http_server)

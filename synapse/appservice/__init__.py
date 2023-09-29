@@ -16,14 +16,14 @@
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern, Sequence
 
 import attr
 from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import DeviceListUpdates, JsonDict, UserID
+from synapse.types import DeviceListUpdates, JsonDict, JsonMapping, UserID
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -32,9 +32,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Type for the `device_one_time_key_counts` field in an appservice transaction
+# Type for the `device_one_time_keys_count` field in an appservice transaction
 #   user ID -> {device ID -> {algorithm -> count}}
-TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
+TransactionOneTimeKeysCount = Dict[str, Dict[str, Dict[str, int]]]
 
 # Type for the `device_unused_fallback_key_types` field in an appservice transaction
 #   user ID -> {device ID -> [algorithm]}
@@ -86,6 +86,7 @@ class ApplicationService:
             url.rstrip("/") if isinstance(url, str) else None
         )  # url must not end with a slash
         self.hs_token = hs_token
+        # The full Matrix ID for this application service's sender.
         self.sender = sender
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
@@ -172,12 +173,24 @@ class ApplicationService:
         Returns:
             True if this service would like to know about this room.
         """
-        member_list = await store.get_users_in_room(
+        # We can use `get_local_users_in_room(...)` here because an application service
+        # can only be interested in local users of the server it's on (ignore any remote
+        # users that might match the user namespace regex).
+        #
+        # In the future, we can consider re-using
+        # `store.get_app_service_users_in_room` which is very similar to this
+        # function but has a slightly worse performance than this because we
+        # have an early escape-hatch if we find a single user that the
+        # appservice is interested in. The juice would be worth the squeeze if
+        # `store.get_app_service_users_in_room` was used in more places besides
+        # an experimental MSC. But for now we can avoid doing more work and
+        # barely using it later.
+        local_user_ids = await store.get_local_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
 
         # check joined member events
-        for user_id in member_list:
+        for user_id in local_user_ids:
             if self.is_interested_in_user(user_id):
                 return True
         return False
@@ -200,7 +213,7 @@ class ApplicationService:
             True if the application service is interested in the user, False if not.
         """
         return (
-            # User is the appservice's sender_localpart user
+            # User is the appservice's configured sender_localpart user
             user_id == self.sender
             # User is in the appservice's user namespace
             or self.is_user_in_namespace(user_id)
@@ -233,7 +246,9 @@ class ApplicationService:
             return True
 
         # likewise with the room's aliases (if it has any)
-        alias_list = await store.get_aliases_for_room(room_id)
+        alias_list = await store.get_aliases_for_room(
+            room_id, on_invalidate=cache_context.invalidate
+        )
         for alias in alias_list:
             if self.is_room_alias_in_namespace(alias):
                 return True
@@ -299,7 +314,9 @@ class ApplicationService:
         # Find all the rooms the sender is in
         if self.is_interested_in_user(user_id.to_string()):
             return True
-        room_ids = await store.get_rooms_for_user(user_id.to_string())
+        room_ids = await store.get_rooms_for_user(
+            user_id.to_string(), on_invalidate=cache_context.invalidate
+        )
 
         # Then find out if the appservice is interested in any of those rooms
         for room_id in room_ids:
@@ -361,10 +378,10 @@ class AppServiceTransaction:
         self,
         service: ApplicationService,
         id: int,
-        events: List[EventBase],
-        ephemeral: List[JsonDict],
-        to_device_messages: List[JsonDict],
-        one_time_key_counts: TransactionOneTimeKeyCounts,
+        events: Sequence[EventBase],
+        ephemeral: List[JsonMapping],
+        to_device_messages: List[JsonMapping],
+        one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,
     ):
@@ -373,7 +390,7 @@ class AppServiceTransaction:
         self.events = events
         self.ephemeral = ephemeral
         self.to_device_messages = to_device_messages
-        self.one_time_key_counts = one_time_key_counts
+        self.one_time_keys_count = one_time_keys_count
         self.unused_fallback_keys = unused_fallback_keys
         self.device_list_summary = device_list_summary
 
@@ -390,7 +407,7 @@ class AppServiceTransaction:
             events=self.events,
             ephemeral=self.ephemeral,
             to_device_messages=self.to_device_messages,
-            one_time_key_counts=self.one_time_key_counts,
+            one_time_keys_count=self.one_time_keys_count,
             unused_fallback_keys=self.unused_fallback_keys,
             device_list_summary=self.device_list_summary,
             txn_id=self.id,

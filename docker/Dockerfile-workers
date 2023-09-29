@@ -1,12 +1,13 @@
 # syntax=docker/dockerfile:1
 
 ARG SYNAPSE_VERSION=latest
+ARG FROM=matrixdotorg/synapse:$SYNAPSE_VERSION
 
 # first of all, we create a base image with an nginx which we can copy into the
 # target image. For repeated rebuilds, this is much faster than apt installing
 # each time.
 
-FROM debian:bullseye-slim AS deps_base
+FROM docker.io/library/debian:bookworm-slim AS deps_base
     RUN \
        --mount=type=cache,target=/var/cache/apt,sharing=locked \
        --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -20,10 +21,10 @@ FROM debian:bullseye-slim AS deps_base
 # which makes it much easier to copy (but we need to make sure we use an image
 # based on the same debian version as the synapse image, to make sure we get
 # the expected version of libc.
-FROM redis:6-bullseye AS redis_base
+FROM docker.io/library/redis:7-bookworm AS redis_base
 
 # now build the final image, based on the the regular Synapse docker image
-FROM matrixdotorg/synapse:$SYNAPSE_VERSION
+FROM $FROM
 
     # Install supervisord with pip instead of apt, to avoid installing a second
     # copy of python.
@@ -40,7 +41,11 @@ FROM matrixdotorg/synapse:$SYNAPSE_VERSION
     COPY --from=deps_base /etc/nginx /etc/nginx
     RUN rm /etc/nginx/sites-enabled/default
     RUN mkdir /var/log/nginx /var/lib/nginx
-    RUN chown www-data /var/log/nginx /var/lib/nginx
+    RUN chown www-data /var/lib/nginx
+
+    # have nginx log to stderr/out
+    RUN ln -sf /dev/stdout /var/log/nginx/access.log
+    RUN ln -sf /dev/stderr /var/log/nginx/error.log
 
     # Copy Synapse worker, nginx and supervisord configuration template files
     COPY ./docker/conf-workers/* /conf/

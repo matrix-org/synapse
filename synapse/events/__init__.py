@@ -25,7 +25,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -39,7 +38,7 @@ from unpaddedbase64 import encode_base64
 
 from synapse.api.constants import RelationTypes
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StrCollection
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
@@ -198,9 +197,15 @@ class _EventInternalMetadata:
     soft_failed: DictProperty[bool] = DictProperty("soft_failed")
     proactively_send: DictProperty[bool] = DictProperty("proactively_send")
     redacted: DictProperty[bool] = DictProperty("redacted")
+
     txn_id: DictProperty[str] = DictProperty("txn_id")
+    """The transaction ID, if it was set when the event was created."""
+
     token_id: DictProperty[int] = DictProperty("token_id")
-    historical: DictProperty[bool] = DictProperty("historical")
+    """The access token ID of the user who sent this event, if any."""
+
+    device_id: DictProperty[str] = DictProperty("device_id")
+    """The device ID of the user who sent this event, if any."""
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
@@ -281,13 +286,9 @@ class _EventInternalMetadata:
         """
         return self._dict.get("redacted", False)
 
-    def is_historical(self) -> bool:
-        """Whether this is a historical message.
-        This is used by the batchsend historical message endpoint and
-        is needed to and mark the event as backfilled and skip some checks
-        like push notifications.
-        """
-        return self._dict.get("historical", False)
+    def is_notifiable(self) -> bool:
+        """Whether this event can trigger a push notification"""
+        return not self.is_outlier() or self.is_out_of_band_membership()
 
 
 class EventBase(metaclass=abc.ABCMeta):
@@ -322,7 +323,6 @@ class EventBase(metaclass=abc.ABCMeta):
     hashes: DictProperty[Dict[str, str]] = DictProperty("hashes")
     origin: DictProperty[str] = DictProperty("origin")
     origin_server_ts: DictProperty[int] = DictProperty("origin_server_ts")
-    redacts: DefaultDictProperty[Optional[str]] = DefaultDictProperty("redacts", None)
     room_id: DictProperty[str] = DictProperty("room_id")
     sender: DictProperty[str] = DictProperty("sender")
     # TODO state_key should be Optional[str]. This is generally asserted in Synapse
@@ -341,6 +341,13 @@ class EventBase(metaclass=abc.ABCMeta):
     @property
     def membership(self) -> str:
         return self.content["membership"]
+
+    @property
+    def redacts(self) -> Optional[str]:
+        """MSC2176 moved the redacts field into the content."""
+        if self.room_version.updated_redaction_rules:
+            return self.content.get("redacts")
+        return self.get("redacts")
 
     def is_state(self) -> bool:
         return self.get_state_key() is not None
@@ -400,7 +407,7 @@ class EventBase(metaclass=abc.ABCMeta):
     def keys(self) -> Iterable[str]:
         return self._dict.keys()
 
-    def prev_event_ids(self) -> Sequence[str]:
+    def prev_event_ids(self) -> List[str]:
         """Returns the list of prev event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -409,7 +416,7 @@ class EventBase(metaclass=abc.ABCMeta):
         """
         return [e for e, _ in self._dict["prev_events"]]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -458,7 +465,7 @@ class FrozenEvent(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -506,7 +513,7 @@ class FrozenEventV2(EventBase):
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
-            name: {sig_id: sig for sig_id, sig in sigs.items()}
+            name: dict(sigs.items())
             for name, sigs in event_dict.pop("signatures", {}).items()
         }
 
@@ -545,7 +552,7 @@ class FrozenEventV2(EventBase):
         self._event_id = "$" + encode_base64(compute_event_reference_hash(self)[1])
         return self._event_id
 
-    def prev_event_ids(self) -> Sequence[str]:
+    def prev_event_ids(self) -> List[str]:
         """Returns the list of prev event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -554,7 +561,7 @@ class FrozenEventV2(EventBase):
         """
         return self._dict["prev_events"]
 
-    def auth_event_ids(self) -> Sequence[str]:
+    def auth_event_ids(self) -> StrCollection:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
@@ -593,8 +600,7 @@ def _event_type_from_format_version(
         format_version: The event format version
 
     Returns:
-        type: A type that can be initialized as per the initializer of
-        `FrozenEvent`
+        A type that can be initialized as per the initializer of `FrozenEvent`
     """
 
     if format_version == EventFormatVersions.ROOM_V1_V2:

@@ -19,12 +19,10 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Collection,
     Dict,
     Generator,
     Iterable,
     List,
-    Mapping,
     Optional,
     Sequence,
     Set,
@@ -39,7 +37,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateMap, StrCollection
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +54,7 @@ class StateResolutionStore(Protocol):
     # This is usually synapse.state.StateResolutionStore, but it's replaced with a
     # TestStateResolutionStore in tests.
     def get_events(
-        self, event_ids: Collection[str], allow_rejected: bool = False
+        self, event_ids: StrCollection, allow_rejected: bool = False
     ) -> Awaitable[Dict[str, EventBase]]:
         ...
 
@@ -270,7 +268,7 @@ async def _get_power_level_for_sender(
 
 async def _get_auth_chain_difference(
     room_id: str,
-    state_sets: Sequence[Mapping[Any, str]],
+    state_sets: Sequence[StateMap[str]],
     unpersisted_events: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
 ) -> Set[str]:
@@ -366,7 +364,7 @@ async def _get_auth_chain_difference(
         union = unpersisted_set_ids[0].union(*unpersisted_set_ids[1:])
         intersection = unpersisted_set_ids[0].intersection(*unpersisted_set_ids[1:])
 
-        auth_difference_unpersisted_part: Collection[str] = union - intersection
+        auth_difference_unpersisted_part: StrCollection = union - intersection
     else:
         auth_difference_unpersisted_part = ()
         state_sets_ids = [set(state_set.values()) for state_set in state_sets]
@@ -406,7 +404,7 @@ def _seperate(
 
     # mypy doesn't understand that discarding None above means that conflicted
     # state is StateMap[Set[str]], not StateMap[Set[Optional[Str]]].
-    return unconflicted_state, conflicted_state  # type: ignore
+    return unconflicted_state, conflicted_state  # type: ignore[return-value]
 
 
 def _is_power_event(event: EventBase) -> bool:
@@ -577,6 +575,21 @@ async def _iterative_auth_checks(
                 if ev.rejected_reason is None:
                     auth_events[key] = event_map[ev_id]
 
+        if event.rejected_reason is not None:
+            # Do not admit previously rejected events into state.
+            # TODO: This isn't spec compliant. Events that were previously rejected due
+            #       to failing auth checks at their state, but pass auth checks during
+            #       state resolution should be accepted. Synapse does not handle the
+            #       change of rejection status well, so we preserve the previous
+            #       rejection status for now.
+            #
+            #       Note that events rejected for non-state reasons, such as having the
+            #       wrong auth events, should remain rejected.
+            #
+            #       https://spec.matrix.org/v1.2/rooms/v9/#rejected-events
+            #       https://github.com/matrix-org/synapse/issues/13797
+            continue
+
         try:
             event_auth.check_state_dependent_auth_rules(
                 event,
@@ -652,7 +665,7 @@ async def _mainline_sort(
     order_map = {}
     for idx, ev_id in enumerate(event_ids, start=1):
         depth = await _get_mainline_depth_for_event(
-            event_map[ev_id], mainline_map, event_map, state_res_store
+            clock, event_map[ev_id], mainline_map, event_map, state_res_store
         )
         order_map[ev_id] = (depth, event_map[ev_id].origin_server_ts, ev_id)
 
@@ -667,6 +680,7 @@ async def _mainline_sort(
 
 
 async def _get_mainline_depth_for_event(
+    clock: Clock,
     event: EventBase,
     mainline_map: Dict[str, int],
     event_map: Dict[str, EventBase],
@@ -689,6 +703,7 @@ async def _get_mainline_depth_for_event(
 
     # We do an iterative search, replacing `event with the power level in its
     # auth events (if any)
+    idx = 0
     while tmp_event:
         depth = mainline_map.get(tmp_event.event_id)
         if depth is not None:
@@ -704,6 +719,11 @@ async def _get_mainline_depth_for_event(
             if aev and (aev.type, aev.state_key) == (EventTypes.PowerLevels, ""):
                 tmp_event = aev
                 break
+
+        idx += 1
+
+        if idx % _AWAIT_AFTER_ITERATIONS == 0:
+            await clock.sleep(0)
 
     # Didn't find a power level auth event, so we just return 0
     return 0

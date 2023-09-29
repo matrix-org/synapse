@@ -1,0 +1,24 @@
+on:
+  push:
+    branches: ["develop", "release-*"]
+    paths:
+      - poetry.lock
+  pull_request:
+    paths:
+      - poetry.lock
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-sdists:
+    name: "Check locked dependencies have sdists"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - run: pip install tomli
+      - run: ./scripts-dev/check_locked_deps_have_sdists.py

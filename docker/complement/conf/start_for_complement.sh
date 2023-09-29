@@ -6,7 +6,7 @@ set -e
 
 echo "Complement Synapse launcher"
 echo "  Args: $@"
-echo "  Env: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE SYNAPSE_COMPLEMENT_USE_WORKERS=$SYNAPSE_COMPLEMENT_USE_WORKERS"
+echo "  Env: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE SYNAPSE_COMPLEMENT_USE_WORKERS=$SYNAPSE_COMPLEMENT_USE_WORKERS SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR=$SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR"
 
 function log {
     d=$(date +"%Y-%m-%d %H:%M:%S,%3N")
@@ -45,9 +45,13 @@ esac
 
 if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
   # Specify the workers to test with
-  export SYNAPSE_WORKER_TYPES="\
-      event_persister, \
-      event_persister, \
+  # Allow overriding by explicitly setting SYNAPSE_WORKER_TYPES outside, while still
+  # utilizing WORKERS=1 for backwards compatibility.
+  # -n True if the length of string is non-zero.
+  # -z True if the length of string is zero.
+  if [[ -z "$SYNAPSE_WORKER_TYPES" ]]; then
+    export SYNAPSE_WORKER_TYPES="\
+      event_persister:2, \
       background_worker, \
       frontend_proxy, \
       event_creator, \
@@ -57,14 +61,29 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       federation_reader, \
       federation_sender, \
       synchrotron, \
+      client_reader, \
       appservice, \
-      pusher"
+      pusher, \
+      stream_writers=account_data+presence+receipts+to_device+typing"
 
+  fi
+  log "Workers requested: $SYNAPSE_WORKER_TYPES"
   # Improve startup times by using a launcher based on fork()
   export SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER=1
 else
   # Empty string here means 'main process only'
   export SYNAPSE_WORKER_TYPES=""
+fi
+
+
+if [[ -n "$SYNAPSE_COMPLEMENT_USE_ASYNCIO_REACTOR" ]]; then
+  if [[ -n "$SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER" ]]; then
+    export SYNAPSE_COMPLEMENT_FORKING_LAUNCHER_ASYNC_IO_REACTOR="1"
+  else
+    export SYNAPSE_ASYNC_IO_REACTOR="1"
+  fi
+else
+  export SYNAPSE_ASYNC_IO_REACTOR="0"
 fi
 
 

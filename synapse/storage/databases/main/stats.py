@@ -16,19 +16,29 @@
 import logging
 from enum import Enum
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
-
-from typing_extensions import Counter
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Counter,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from twisted.internet.defer import DeferredLock
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
+from synapse.storage.databases.main.events_worker import InvalidEventError
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
@@ -97,6 +107,8 @@ class UserSortOrder(Enum):
     AVATAR_URL = "avatar_url"
     SHADOW_BANNED = "shadow_banned"
     CREATION_TS = "creation_ts"
+    LAST_SEEN_TS = "last_seen_ts"
+    LOCKED = "locked"
 
 
 class StatsStore(StateDeltasStore):
@@ -460,7 +472,7 @@ class StatsStore(StateDeltasStore):
         insert_cols = []
         qargs = []
 
-        for (key, val) in chain(
+        for key, val in chain(
             keyvalues.items(), absolutes.items(), additive_relatives.items()
         ):
             insert_cols.append(key)
@@ -522,7 +534,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (room_id,),
             )
-            membership_counts = {membership: cnt for membership, cnt in txn}
+            membership_counts = dict(cast(Iterable[Tuple[str, int]], txn))
 
             txn.execute(
                 """
@@ -554,7 +566,17 @@ class StatsStore(StateDeltasStore):
             "get_initial_state_for_room", _fetch_current_state_stats
         )
 
-        state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
+        try:
+            state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
+        except InvalidEventError as e:
+            # If an exception occurs fetching events then the room is broken;
+            # skip process it to avoid being stuck on a room.
+            logger.warning(
+                "Failed to fetch events for room %s, skipping stats calculation: %r.",
+                room_id,
+                e,
+            )
+            return
 
         room_state: Dict[str, Union[None, bool, str]] = {
             "join_rules": None,
@@ -652,7 +674,7 @@ class StatsStore(StateDeltasStore):
         from_ts: Optional[int] = None,
         until_ts: Optional[int] = None,
         order_by: Optional[str] = UserSortOrder.USER_ID.value,
-        direction: Optional[str] = "f",
+        direction: Direction = Direction.FORWARDS,
         search_term: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users and their uploaded local media
@@ -676,7 +698,7 @@ class StatsStore(StateDeltasStore):
             txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
             filters = []
-            args = [self.hs.config.server.server_name]
+            args: list = []
 
             if search_term:
                 filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")
@@ -703,7 +725,7 @@ class StatsStore(StateDeltasStore):
                     500, "Incorrect value for order_by provided: %s" % order_by
                 )
 
-            if direction == "b":
+            if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
                 order = "ASC"
@@ -712,7 +734,7 @@ class StatsStore(StateDeltasStore):
 
             sql_base = """
                 FROM local_media_repository as lmr
-                LEFT JOIN profiles AS p ON lmr.user_id = '@' || p.user_id || ':' || ?
+                LEFT JOIN profiles AS p ON lmr.user_id = p.full_user_id
                 {}
                 GROUP BY lmr.user_id, displayname
             """.format(

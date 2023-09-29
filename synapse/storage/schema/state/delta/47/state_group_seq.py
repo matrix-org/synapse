@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 
 
-def run_create(cur, database_engine, *args, **kwargs):
+def run_create(cur: LoggingTransaction, database_engine: BaseDatabaseEngine) -> None:
     if isinstance(database_engine, PostgresEngine):
         # if we already have some state groups, we want to start making new
         # ones with a higher id.
         cur.execute("SELECT max(id) FROM state_groups")
         row = cur.fetchone()
+        assert row is not None
 
         if row[0] is None:
             start_val = 1
@@ -28,7 +30,3 @@ def run_create(cur, database_engine, *args, **kwargs):
             start_val = row[0] + 1
 
         cur.execute("CREATE SEQUENCE state_group_id_seq START WITH %s", (start_val,))
-
-
-def run_upgrade(*args, **kwargs):
-    pass

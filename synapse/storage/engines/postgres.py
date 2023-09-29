@@ -31,7 +31,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
+class PostgresEngine(
+    BaseDatabaseEngine[psycopg2.extensions.connection, psycopg2.extensions.cursor]
+):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(psycopg2, database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
@@ -43,6 +45,15 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
 
         psycopg2.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit: bool = database_config.get("synchronous_commit", True)
+        # Set the statement timeout to 1 hour by default.
+        # Any query taking more than 1 hour should probably be considered a bug;
+        # most of the time this is a sign that work needs to be split up or that
+        # some degenerate query plan has been created and the client has probably
+        # timed out/walked off anyway.
+        # This is in milliseconds.
+        self.statement_timeout: Optional[int] = database_config.get(
+            "statement_timeout", 60 * 60 * 1000
+        )
         self._version: Optional[int] = None  # unknown as yet
 
         self.isolation_level_map: Mapping[int, int] = {
@@ -75,12 +86,12 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         # docs: The number is formed by converting the major, minor, and
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105
-        self._version = cast(int, db_conn.server_version)
+        self._version = db_conn.server_version
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
-        if not allow_outdated_version and self._version < 100000:
-            raise RuntimeError("Synapse requires PostgreSQL 10 or above.")
+        if not allow_outdated_version and self._version < 110000:
+            raise RuntimeError("Synapse requires PostgreSQL 11 or above.")
 
         with db_conn.cursor() as txn:
             txn.execute("SHOW SERVER_ENCODING")
@@ -155,6 +166,10 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         if not self.synchronous_commit:
             cursor.execute("SET synchronous_commit TO OFF")
 
+        # Abort really long-running statements and turn them into errors.
+        if self.statement_timeout is not None:
+            cursor.execute("SET statement_timeout TO ?", (self.statement_timeout,))
+
         cursor.close()
         db_conn.commit()
 
@@ -196,6 +211,10 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         else:
             return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
 
+    @property
+    def row_id_name(self) -> str:
+        return "ctid"
+
     def in_transaction(self, conn: psycopg2.extensions.connection) -> bool:
         return conn.status != psycopg2.extensions.STATUS_READY
 
@@ -212,3 +231,15 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
         else:
             isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)
+
+    @staticmethod
+    def executescript(cursor: psycopg2.extensions.cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Psycopg2 seems happy to do this in DBAPI2's `execute()` function.
+
+        For consistency with SQLite, any ongoing transaction is committed before
+        executing the script in its own transaction. The script transaction is
+        left open and it is the responsibility of the caller to commit it.
+        """
+        cursor.execute(f"COMMIT; BEGIN TRANSACTION; {script}")

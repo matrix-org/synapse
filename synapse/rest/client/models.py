@@ -13,7 +13,12 @@
 # limitations under the License.
 from typing import TYPE_CHECKING, Dict, Optional
 
-from pydantic import Extra, StrictInt, StrictStr, constr, validator
+from synapse._pydantic_compat import HAS_PYDANTIC_V2
+
+if TYPE_CHECKING or HAS_PYDANTIC_V2:
+    from pydantic.v1 import Extra, StrictInt, StrictStr, constr, validator
+else:
+    from pydantic import Extra, StrictInt, StrictStr, constr, validator
 
 from synapse.rest.models import RequestBodyModel
 from synapse.util.threepids import validate_email
@@ -36,18 +41,20 @@ class AuthenticationData(RequestBodyModel):
     type: Optional[StrictStr] = None
 
 
-class ThreePidRequestTokenBody(RequestBodyModel):
-    if TYPE_CHECKING:
-        client_secret: StrictStr
-    else:
-        # See also assert_valid_client_secret()
-        client_secret: constr(
-            regex="[0-9a-zA-Z.=_-]",  # noqa: F722
-            min_length=0,
-            max_length=255,
-            strict=True,
-        )
+if TYPE_CHECKING:
+    ClientSecretStr = StrictStr
+else:
+    # See also assert_valid_client_secret()
+    ClientSecretStr = constr(
+        regex="[0-9a-zA-Z.=_-]",  # noqa: F722
+        min_length=1,
+        max_length=255,
+        strict=True,
+    )
 
+
+class ThreepidRequestTokenBody(RequestBodyModel):
+    client_secret: ClientSecretStr
     id_server: Optional[StrictStr]
     id_access_token: Optional[StrictStr]
     next_link: Optional[StrictStr]
@@ -62,7 +69,7 @@ class ThreePidRequestTokenBody(RequestBodyModel):
         return token
 
 
-class EmailRequestTokenBody(ThreePidRequestTokenBody):
+class EmailRequestTokenBody(ThreepidRequestTokenBody):
     email: StrictStr
 
     # Canonicalise the email address. The addresses are all stored canonicalised
@@ -80,6 +87,6 @@ else:
     ISO3116_1_Alpha_2 = constr(regex="[A-Z]{2}", strict=True)
 
 
-class MsisdnRequestTokenBody(ThreePidRequestTokenBody):
+class MsisdnRequestTokenBody(ThreepidRequestTokenBody):
     country: ISO3116_1_Alpha_2
     phone_number: StrictStr

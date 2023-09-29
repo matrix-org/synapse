@@ -17,6 +17,9 @@ from typing import TYPE_CHECKING
 
 from twisted.web.resource import Resource
 
+from synapse.rest.synapse.client.oidc.backchannel_logout_resource import (
+    OIDCBackchannelLogoutResource,
+)
 from synapse.rest.synapse.client.oidc.callback_resource import OIDCCallbackResource
 
 if TYPE_CHECKING:
@@ -29,6 +32,7 @@ class OIDCResource(Resource):
     def __init__(self, hs: "HomeServer"):
         Resource.__init__(self)
         self.putChild(b"callback", OIDCCallbackResource(hs))
+        self.putChild(b"backchannel_logout", OIDCBackchannelLogoutResource(hs))
 
 
 __all__ = ["OIDCResource"]

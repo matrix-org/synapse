@@ -19,6 +19,7 @@ import itertools
 import logging
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Awaitable,
     Callable,
     Collection,
@@ -37,7 +38,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import Direction, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -60,9 +61,10 @@ from synapse.federation.federation_base import (
     event_from_pdu_json,
 )
 from synapse.federation.transport.client import SendJoinResponse
+from synapse.http.client import is_unknown_endpoint
 from synapse.http.types import QueryParams
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, tag_args, trace
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, StrCollection, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -78,6 +80,18 @@ sent_queries_counter = Counter("synapse_federation_client_sent_queries", "", ["t
 PDU_RETRY_TIME_MS = 1 * 60 * 1000
 
 T = TypeVar("T")
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class PulledPduInfo:
+    """
+    A result object that stores the PDU and info about it like which homeserver we
+    pulled it from (`pull_origin`)
+    """
+
+    pdu: EventBase
+    # Which homeserver we pulled the PDU from
+    pull_origin: str
 
 
 class InvalidResponseError(RuntimeError):
@@ -98,8 +112,9 @@ class SendJoinResult:
     # True if 'state' elides non-critical membership events
     partial_state: bool
 
-    # if 'partial_state' is set, a list of the servers in the room (otherwise empty)
-    servers_in_room: List[str]
+    # If 'partial_state' is set, a set of the servers in the room (otherwise empty).
+    # Always contains the server we joined off.
+    servers_in_room: AbstractSet[str]
 
 
 class FederationClient(FederationBase):
@@ -114,7 +129,9 @@ class FederationClient(FederationBase):
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
 
-        self._get_pdu_cache: ExpiringCache[str, EventBase] = ExpiringCache(
+        # Cache mapping `event_id` to a tuple of the event itself and the `pull_origin`
+        # (which server we pulled the event from)
+        self._get_pdu_cache: ExpiringCache[str, Tuple[EventBase, str]] = ExpiringCache(
             cache_name="get_pdu_cache",
             clock=self._clock,
             max_len=1000,
@@ -218,11 +235,16 @@ class FederationClient(FederationBase):
         )
 
     async def claim_client_keys(
-        self, destination: str, content: JsonDict, timeout: Optional[int]
+        self,
+        user: UserID,
+        destination: str,
+        query: Dict[str, Dict[str, Dict[str, int]]],
+        timeout: Optional[int],
     ) -> JsonDict:
         """Claims one-time keys for a device hosted on a remote server.
 
         Args:
+            user: The user id of the requesting user
             destination: Domain name of the remote homeserver
             content: The query content.
 
@@ -230,8 +252,55 @@ class FederationClient(FederationBase):
             The JSON object from the response
         """
         sent_queries_counter.labels("client_one_time_keys").inc()
+
+        # Convert the query with counts into a stable and unstable query and check
+        # if attempting to claim more than 1 OTK.
+        content: Dict[str, Dict[str, str]] = {}
+        unstable_content: Dict[str, Dict[str, List[str]]] = {}
+        use_unstable = False
+        for user_id, one_time_keys in query.items():
+            for device_id, algorithms in one_time_keys.items():
+                # If more than one algorithm is requested, attempt to use the unstable
+                # endpoint.
+                if sum(algorithms.values()) > 1:
+                    use_unstable = True
+                if algorithms:
+                    # For the stable query, choose only the first algorithm.
+                    content.setdefault(user_id, {})[device_id] = next(iter(algorithms))
+                    # For the unstable query, repeat each algorithm by count, then
+                    # splat those into chain to get a flattened list of all algorithms.
+                    #
+                    # Converts from {"algo1": 2, "algo2": 2} to ["algo1", "algo1", "algo2"].
+                    unstable_content.setdefault(user_id, {})[device_id] = list(
+                        itertools.chain(
+                            *(
+                                itertools.repeat(algorithm, count)
+                                for algorithm, count in algorithms.items()
+                            )
+                        )
+                    )
+
+        if use_unstable:
+            try:
+                return await self.transport_layer.claim_client_keys_unstable(
+                    user, destination, unstable_content, timeout
+                )
+            except HttpResponseException as e:
+                # If an error is received that is due to an unrecognised endpoint,
+                # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
+                # and raise.
+                if not is_unknown_endpoint(e):
+                    raise
+
+            logger.debug(
+                "Couldn't claim client keys with the unstable API, falling back to the v1 API"
+            )
+        else:
+            logger.debug("Skipping unstable claim client keys API")
+
+        # TODO Potentially attempt multiple queries and combine the results?
         return await self.transport_layer.claim_client_keys(
-            destination, content, timeout
+            user, destination, content, timeout
         )
 
     @trace
@@ -263,22 +332,18 @@ class FederationClient(FederationBase):
         logger.debug("backfill transaction_data=%r", transaction_data)
 
         if not isinstance(transaction_data, dict):
-            # TODO we probably want an exception type specific to federation
-            # client validation.
-            raise TypeError("Backfill transaction_data is not a dict.")
+            raise InvalidResponseError("Backfill transaction_data is not a dict.")
 
         transaction_data_pdus = transaction_data.get("pdus")
         if not isinstance(transaction_data_pdus, list):
-            # TODO we probably want an exception type specific to federation
-            # client validation.
-            raise TypeError("transaction_data.pdus is not a list.")
+            raise InvalidResponseError("transaction_data.pdus is not a list.")
 
         room_version = await self.store.get_room_version(room_id)
 
         pdus = [event_from_pdu_json(p, room_version) for p in transaction_data_pdus]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
-        pdus[:] = await self._check_sigs_and_hash_and_fetch(
+        pdus[:] = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             dest, pdus, room_version=room_version
         )
 
@@ -328,7 +393,17 @@ class FederationClient(FederationBase):
 
             # Check signatures are correct.
             try:
-                signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+
+                async def _record_failure_callback(
+                    event: EventBase, cause: str
+                ) -> None:
+                    await self.store.record_event_failed_pull_attempt(
+                        event.room_id, event.event_id, cause
+                    )
+
+                signed_pdu = await self._check_sigs_and_hash(
+                    room_version, pdu, _record_failure_callback
+                )
             except InvalidEventSignatureError as e:
                 errmsg = f"event id {pdu.event_id}: {e}"
                 logger.warning("%s", errmsg)
@@ -342,11 +417,11 @@ class FederationClient(FederationBase):
     @tag_args
     async def get_pdu(
         self,
-        destinations: Iterable[str],
+        destinations: Collection[str],
         event_id: str,
         room_version: RoomVersion,
         timeout: Optional[int] = None,
-    ) -> Optional[EventBase]:
+    ) -> Optional[PulledPduInfo]:
         """Requests the PDU with given origin and ID from the remote home
         servers.
 
@@ -361,11 +436,11 @@ class FederationClient(FederationBase):
                 moving to the next destination. None indicates no timeout.
 
         Returns:
-            The requested PDU, or None if we were unable to find it.
+            The requested PDU wrapped in `PulledPduInfo`, or None if we were unable to find it.
         """
 
         logger.debug(
-            "get_pdu: event_id=%s from destinations=%s", event_id, destinations
+            "get_pdu(event_id=%s): from destinations=%s", event_id, destinations
         )
 
         # TODO: Rate limit the number of times we try and get the same event.
@@ -374,19 +449,25 @@ class FederationClient(FederationBase):
         # it gets persisted to the database), so we cache the results of the lookup.
         # Note that this is separate to the regular get_event cache which caches
         # events once they have been persisted.
-        event = self._get_pdu_cache.get(event_id)
+        get_pdu_cache_entry = self._get_pdu_cache.get(event_id)
 
+        event = None
+        pull_origin = None
+        if get_pdu_cache_entry:
+            event, pull_origin = get_pdu_cache_entry
         # If we don't see the event in the cache, go try to fetch it from the
         # provided remote federated destinations
-        if not event:
+        else:
             pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
+            # TODO: We can probably refactor this to use `_try_destination_list`
             for destination in destinations:
                 now = self._clock.time_msec()
                 last_attempt = pdu_attempts.get(destination, 0)
                 if last_attempt + PDU_RETRY_TIME_MS > now:
                     logger.debug(
-                        "get_pdu: skipping destination=%s because we tried it recently last_attempt=%s and we only check every %s (now=%s)",
+                        "get_pdu(event_id=%s): skipping destination=%s because we tried it recently last_attempt=%s and we only check every %s (now=%s)",
+                        event_id,
                         destination,
                         last_attempt,
                         PDU_RETRY_TIME_MS,
@@ -401,43 +482,48 @@ class FederationClient(FederationBase):
                         room_version=room_version,
                         timeout=timeout,
                     )
+                    pull_origin = destination
 
                     pdu_attempts[destination] = now
 
                     if event:
                         # Prime the cache
-                        self._get_pdu_cache[event.event_id] = event
+                        self._get_pdu_cache[event.event_id] = (event, pull_origin)
 
                         # Now that we have an event, we can break out of this
                         # loop and stop asking other destinations.
                         break
 
+                except NotRetryingDestination as e:
+                    logger.info("get_pdu(event_id=%s): %s", event_id, e)
+                    continue
+                except FederationDeniedError:
+                    logger.info(
+                        "get_pdu(event_id=%s): Not attempting to fetch PDU from %s because the homeserver is not on our federation whitelist",
+                        event_id,
+                        destination,
+                    )
+                    continue
                 except SynapseError as e:
                     logger.info(
-                        "Failed to get PDU %s from %s because %s",
+                        "get_pdu(event_id=%s): Failed to get PDU from %s because %s",
                         event_id,
                         destination,
                         e,
                     )
-                    continue
-                except NotRetryingDestination as e:
-                    logger.info(str(e))
-                    continue
-                except FederationDeniedError as e:
-                    logger.info(str(e))
                     continue
                 except Exception as e:
                     pdu_attempts[destination] = now
 
                     logger.info(
-                        "Failed to get PDU %s from %s because %s",
+                        "get_pdu(event_id=%s): Failed to get PDU from %s because %s",
                         event_id,
                         destination,
                         e,
                     )
                     continue
 
-        if not event:
+        if not event or not pull_origin:
             return None
 
         # `event` now refers to an object stored in `get_pdu_cache`. Our
@@ -449,7 +535,7 @@ class FederationClient(FederationBase):
             event.room_version,
         )
 
-        return event_copy
+        return PulledPduInfo(event_copy, pull_origin)
 
     @trace
     @tag_args
@@ -547,24 +633,28 @@ class FederationClient(FederationBase):
             len(auth_event_map),
         )
 
-        valid_auth_events = await self._check_sigs_and_hash_and_fetch(
+        valid_auth_events = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             destination, auth_event_map.values(), room_version
         )
 
-        valid_state_events = await self._check_sigs_and_hash_and_fetch(
-            destination, state_event_map.values(), room_version
+        valid_state_events = (
+            await self._check_sigs_and_hash_for_pulled_events_and_fetch(
+                destination, state_event_map.values(), room_version
+            )
         )
 
         return valid_state_events, valid_auth_events
 
     @trace
-    async def _check_sigs_and_hash_and_fetch(
+    async def _check_sigs_and_hash_for_pulled_events_and_fetch(
         self,
         origin: str,
         pdus: Collection[EventBase],
         room_version: RoomVersion,
     ) -> List[EventBase]:
-        """Checks the signatures and hashes of a list of events.
+        """
+        Checks the signatures and hashes of a list of pulled events we got from
+        federation and records any signature failures as failed pull attempts.
 
         If a PDU fails its signature check then we check if we have it in
         the database, and if not then request it from the sender's server (if that
@@ -597,11 +687,17 @@ class FederationClient(FederationBase):
 
         valid_pdus: List[EventBase] = []
 
+        async def _record_failure_callback(event: EventBase, cause: str) -> None:
+            await self.store.record_event_failed_pull_attempt(
+                event.room_id, event.event_id, cause
+            )
+
         async def _execute(pdu: EventBase) -> None:
             valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                 pdu=pdu,
                 origin=origin,
                 room_version=room_version,
+                record_failure_callback=_record_failure_callback,
             )
 
             if valid_pdu:
@@ -618,6 +714,9 @@ class FederationClient(FederationBase):
         pdu: EventBase,
         origin: str,
         room_version: RoomVersion,
+        record_failure_callback: Optional[
+            Callable[[EventBase, str], Awaitable[None]]
+        ] = None,
     ) -> Optional[EventBase]:
         """Takes a PDU and checks its signatures and hashes.
 
@@ -634,6 +733,11 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
+            record_failure_callback: A callback to run whenever the given event
+                fails signature or hash checks. This includes exceptions
+                that would be normally be thrown/raised but also things like
+                checking for event tampering where we just return the redacted
+                event.
 
         Returns:
             The PDU (possibly redacted) if it has valid signatures and hashes.
@@ -641,7 +745,9 @@ class FederationClient(FederationBase):
         """
 
         try:
-            return await self._check_sigs_and_hash(room_version, pdu)
+            return await self._check_sigs_and_hash(
+                room_version, pdu, record_failure_callback
+            )
         except InvalidEventSignatureError as e:
             logger.warning(
                 "Signature on retrieved event %s was invalid (%s). "
@@ -669,12 +775,14 @@ class FederationClient(FederationBase):
         pdu_origin = get_domain_from_id(pdu.sender)
         if not res and pdu_origin != origin:
             try:
-                res = await self.get_pdu(
+                pulled_pdu_info = await self.get_pdu(
                     destinations=[pdu_origin],
                     event_id=pdu.event_id,
                     room_version=room_version,
                     timeout=10000,
                 )
+                if pulled_pdu_info is not None:
+                    res = pulled_pdu_info.pdu
             except SynapseError:
                 pass
 
@@ -694,37 +802,11 @@ class FederationClient(FederationBase):
 
         auth_chain = [event_from_pdu_json(p, room_version) for p in res["auth_chain"]]
 
-        signed_auth = await self._check_sigs_and_hash_and_fetch(
+        signed_auth = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
             destination, auth_chain, room_version=room_version
         )
 
         return signed_auth
-
-    def _is_unknown_endpoint(
-        self, e: HttpResponseException, synapse_error: Optional[SynapseError] = None
-    ) -> bool:
-        """
-        Returns true if the response was due to an endpoint being unimplemented.
-
-        Args:
-            e: The error response received from the remote server.
-            synapse_error: The above error converted to a SynapseError. This is
-                automatically generated if not provided.
-
-        """
-        if synapse_error is None:
-            synapse_error = e.to_synapse_error()
-        # There is no good way to detect an "unknown" endpoint.
-        #
-        # Dendrite returns a 404 (with a body of "404 page not found");
-        # Conduit returns a 404 (with no body); and Synapse returns a 400
-        # with M_UNRECOGNIZED.
-        #
-        # This needs to be rather specific as some endpoints truly do return 404
-        # errors.
-        return (
-            e.code == 404 and (not e.response or e.response == b"404 page not found")
-        ) or (e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED)
 
     async def _try_destination_list(
         self,
@@ -776,7 +858,8 @@ class FederationClient(FederationBase):
             )
 
         for destination in destinations:
-            if destination == self.server_name:
+            # We don't want to ask our own server for information we don't have
+            if self._is_mine_server_name(destination):
                 continue
 
             try:
@@ -784,9 +867,21 @@ class FederationClient(FederationBase):
             except (
                 RequestSendFailed,
                 InvalidResponseError,
-                NotRetryingDestination,
             ) as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
+                # Skip to the next homeserver in the list to try.
+                continue
+            except NotRetryingDestination as e:
+                logger.info("%s: %s", description, e)
+                continue
+            except FederationDeniedError:
+                logger.info(
+                    "%s: Not attempting to %s from %s because the homeserver is not on our federation whitelist",
+                    description,
+                    description,
+                    destination,
+                )
+                continue
             except UnsupportedRoomVersionError:
                 raise
             except HttpResponseException as e:
@@ -801,10 +896,10 @@ class FederationClient(FederationBase):
                 if 500 <= e.code < 600:
                     failover = True
 
-                elif e.code == 400 and synapse_error.errcode in failover_errcodes:
+                elif 400 <= e.code < 500 and synapse_error.errcode in failover_errcodes:
                     failover = True
 
-                elif failover_on_unknown_endpoint and self._is_unknown_endpoint(
+                elif failover_on_unknown_endpoint and is_unknown_endpoint(
                     e, synapse_error
                 ):
                     failover = True
@@ -888,7 +983,7 @@ class FederationClient(FederationBase):
             if not room_version:
                 raise UnsupportedRoomVersionError()
 
-            if not room_version.msc2403_knocking and membership == Membership.KNOCK:
+            if not room_version.knock_join_rule and membership == Membership.KNOCK:
                 raise SynapseError(
                     400,
                     "This room version does not support knocking",
@@ -906,9 +1001,6 @@ class FederationClient(FederationBase):
             # The protoevent received over the JSON wire may not have all
             # the required fields. Lets just gloss over that because
             # there's some we never care about
-            if "prev_state" not in pdu_dict:
-                pdu_dict["prev_state"] = []
-
             ev = builder.create_local_event_from_event_dict(
                 self._clock,
                 self.hostname,
@@ -919,14 +1011,13 @@ class FederationClient(FederationBase):
 
             return destination, ev, room_version
 
+        failover_errcodes = {Codes.NOT_FOUND}
         # MSC3083 defines additional error codes for room joins. Unfortunately
         # we do not yet know the room version, assume these will only be returned
         # by valid room versions.
-        failover_errcodes = (
-            (Codes.UNABLE_AUTHORISE_JOIN, Codes.UNABLE_TO_GRANT_JOIN)
-            if membership == Membership.JOIN
-            else None
-        )
+        if membership == Membership.JOIN:
+            failover_errcodes.add(Codes.UNABLE_AUTHORISE_JOIN)
+            failover_errcodes.add(Codes.UNABLE_TO_GRANT_JOIN)
 
         return await self._try_destination_list(
             "make_" + membership,
@@ -936,7 +1027,11 @@ class FederationClient(FederationBase):
         )
 
     async def send_join(
-        self, destinations: Iterable[str], pdu: EventBase, room_version: RoomVersion
+        self,
+        destinations: Iterable[str],
+        pdu: EventBase,
+        room_version: RoomVersion,
+        partial_state: bool = True,
     ) -> SendJoinResult:
         """Sends a join event to one of a list of homeservers.
 
@@ -949,6 +1044,10 @@ class FederationClient(FederationBase):
             pdu: event to be sent
             room_version: the version of the room (according to the server that
                 did the make_join)
+            partial_state: whether to ask the remote server to omit membership state
+                events from the response. If the remote server complies,
+                `partial_state` in the send join result will be set. Defaults to
+                `True`.
 
         Returns:
             The result of the send join request.
@@ -959,7 +1058,9 @@ class FederationClient(FederationBase):
         """
 
         async def send_request(destination: str) -> SendJoinResult:
-            response = await self._do_send_join(room_version, destination, pdu)
+            response = await self._do_send_join(
+                room_version, destination, pdu, omit_members=partial_state
+            )
 
             # If an event was returned (and expected to be returned):
             #
@@ -968,7 +1069,7 @@ class FederationClient(FederationBase):
             # * Ensure the signatures are good.
             #
             # Otherwise, fallback to the provided event.
-            if room_version.msc3083_join_rules and response.event:
+            if room_version.restricted_join_rule and response.event:
                 event = response.event
 
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
@@ -1064,23 +1165,37 @@ class FederationClient(FederationBase):
                     % (auth_chain_create_events,)
                 )
 
-            if response.partial_state and not response.servers_in_room:
-                raise InvalidResponseError(
-                    "partial_state was set, but no servers were listed in the room"
-                )
+            servers_in_room = None
+            if response.servers_in_room is not None:
+                servers_in_room = set(response.servers_in_room)
+
+            if response.members_omitted:
+                if not servers_in_room:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but no servers were listed in the room"
+                    )
+
+                if not partial_state:
+                    raise InvalidResponseError(
+                        "members_omitted was set, but we asked for full state"
+                    )
+
+                # `servers_in_room` is supposed to be a complete list.
+                # Fix things up in case the remote homeserver is badly behaved.
+                servers_in_room.add(destination)
 
             return SendJoinResult(
                 event=event,
                 state=signed_state,
                 auth_chain=signed_auth,
                 origin=destination,
-                partial_state=response.partial_state,
-                servers_in_room=response.servers_in_room or [],
+                partial_state=response.members_omitted,
+                servers_in_room=servers_in_room or frozenset(),
             )
 
         # MSC3083 defines additional error codes for room joins.
         failover_errcodes = None
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             failover_errcodes = (
                 Codes.UNABLE_AUTHORISE_JOIN,
                 Codes.UNABLE_TO_GRANT_JOIN,
@@ -1099,7 +1214,11 @@ class FederationClient(FederationBase):
         )
 
     async def _do_send_join(
-        self, room_version: RoomVersion, destination: str, pdu: EventBase
+        self,
+        room_version: RoomVersion,
+        destination: str,
+        pdu: EventBase,
+        omit_members: bool,
     ) -> SendJoinResponse:
         time_now = self._clock.time_msec()
 
@@ -1110,12 +1229,13 @@ class FederationClient(FederationBase):
                 room_id=pdu.room_id,
                 event_id=pdu.event_id,
                 content=pdu.get_pdu_json(time_now),
+                omit_members=omit_members,
             )
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
-            if not self._is_unknown_endpoint(e):
+            if not is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
@@ -1189,7 +1309,7 @@ class FederationClient(FederationBase):
             # fallback to the v1 endpoint if the room uses old-style event IDs.
             # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
-            if self._is_unknown_endpoint(e, err):
+            if is_unknown_endpoint(e, err):
                 if room_version.event_format != EventFormatVersions.ROOM_V1_V2:
                     raise SynapseError(
                         400,
@@ -1250,7 +1370,7 @@ class FederationClient(FederationBase):
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
-            if not self._is_unknown_endpoint(e):
+            if not is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_leave with the v2 API, falling back to the v1 API")
@@ -1267,7 +1387,7 @@ class FederationClient(FederationBase):
         return resp[1]
 
     async def send_knock(self, destinations: List[str], pdu: EventBase) -> JsonDict:
-        """Attempts to send a knock event to given a list of servers. Iterates
+        """Attempts to send a knock event to a given list of servers. Iterates
         through the list until one attempt succeeds.
 
         Doing so will cause the remote server to add the event to the graph,
@@ -1404,7 +1524,7 @@ class FederationClient(FederationBase):
                 event_from_pdu_json(e, room_version) for e in content.get("events", [])
             ]
 
-            signed_events = await self._check_sigs_and_hash_and_fetch(
+            signed_events = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
                 destination, events, room_version=room_version
             )
         except HttpResponseException as e:
@@ -1421,7 +1541,7 @@ class FederationClient(FederationBase):
         self, destinations: Iterable[str], room_id: str, event_dict: JsonDict
     ) -> None:
         for destination in destinations:
-            if destination == self.server_name:
+            if self._is_mine_server_name(destination):
                 continue
 
             try:
@@ -1521,7 +1641,7 @@ class FederationClient(FederationBase):
                 # If an error is received that is due to an unrecognised endpoint,
                 # fallback to the unstable endpoint. Otherwise, consider it a
                 # legitimate error and raise.
-                if not self._is_unknown_endpoint(e):
+                if not is_unknown_endpoint(e):
                     raise
 
                 logger.debug(
@@ -1582,7 +1702,70 @@ class FederationClient(FederationBase):
         return result
 
     async def timestamp_to_event(
-        self, destination: str, room_id: str, timestamp: int, direction: str
+        self,
+        *,
+        destinations: StrCollection,
+        room_id: str,
+        timestamp: int,
+        direction: Direction,
+    ) -> Optional["TimestampToEventResponse"]:
+        """
+        Calls each remote federating server from `destinations` asking for their closest
+        event to the given timestamp in the given direction until we get a response.
+        Also validates the response to always return the expected keys or raises an
+        error.
+
+        Args:
+            destinations: The domains of homeservers to try fetching from
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: indicates whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            A parsed TimestampToEventResponse including the closest event_id
+            and origin_server_ts or None if no destination has a response.
+        """
+
+        async def _timestamp_to_event_from_destination(
+            destination: str,
+        ) -> TimestampToEventResponse:
+            return await self._timestamp_to_event_from_destination(
+                destination, room_id, timestamp, direction
+            )
+
+        try:
+            # Loop through each homeserver candidate until we get a succesful response
+            timestamp_to_event_response = await self._try_destination_list(
+                "timestamp_to_event",
+                destinations,
+                # TODO: The requested timestamp may lie in a part of the
+                #   event graph that the remote server *also* didn't have,
+                #   in which case they will have returned another event
+                #   which may be nowhere near the requested timestamp. In
+                #   the future, we may need to reconcile that gap and ask
+                #   other homeservers, and/or extend `/timestamp_to_event`
+                #   to return events on *both* sides of the timestamp to
+                #   help reconcile the gap faster.
+                _timestamp_to_event_from_destination,
+                # Since this endpoint is new, we should try other servers before giving up.
+                # We can safely remove this in a year (remove after 2023-11-16).
+                failover_on_unknown_endpoint=True,
+            )
+            return timestamp_to_event_response
+        except SynapseError as e:
+            logger.warn(
+                "timestamp_to_event(room_id=%s, timestamp=%s, direction=%s): encountered error when trying to fetch from destinations: %s",
+                room_id,
+                timestamp,
+                direction,
+                e,
+            )
+            return None
+
+    async def _timestamp_to_event_from_destination(
+        self, destination: str, room_id: str, timestamp: int, direction: Direction
     ) -> "TimestampToEventResponse":
         """
         Calls a remote federating server at `destination` asking for their
@@ -1595,7 +1778,7 @@ class FederationClient(FederationBase):
             room_id: Room to fetch the event from
             timestamp: The point in time (inclusive) we should navigate from in
                 the given direction to find the closest event.
-            direction: ["f"|"b"] to indicate whether we should navigate forward
+            direction: indicates whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
         Returns:
@@ -1708,7 +1891,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if not isinstance(origin_server_ts, int):
+        if type(origin_server_ts) is not int:  # noqa: E721
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

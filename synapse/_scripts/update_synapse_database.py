@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,6 @@
 
 import argparse
 import logging
-import sys
 from typing import cast
 
 import yaml
@@ -39,7 +37,7 @@ class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore [assignment]
 
     def __init__(self, config: HomeServerConfig):
-        super(MockHomeserver, self).__init__(
+        super().__init__(
             hostname=config.server.server_name,
             config=config,
             reactor=reactor,
@@ -48,10 +46,13 @@ class MockHomeserver(HomeServer):
 
 
 def run_background_updates(hs: HomeServer) -> None:
-    store = hs.get_datastores().main
+    main = hs.get_datastores().main
+    state = hs.get_datastores().state
 
     async def run_background_updates() -> None:
-        await store.db_pool.updates.run_background_updates(sleep=False)
+        await main.db_pool.updates.run_background_updates(sleep=False)
+        if state:
+            await state.db_pool.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
@@ -96,10 +97,6 @@ def main() -> None:
 
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)
-
-    if "database" not in hs_config:
-        sys.stderr.write("The configuration file must have a 'database' section.\n")
-        sys.exit(4)
 
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")

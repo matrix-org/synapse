@@ -11,8 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    cast,
+)
 
 from synapse.api.presence import PresenceState, UserPresenceState
 from synapse.replication.tcp.streams import PresenceStream
@@ -24,6 +33,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines._base import IsolationLevel
 from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
@@ -77,6 +87,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
             self._presence_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
+                notifier=hs.get_replication_notifier(),
                 stream_name="presence_stream",
                 instance_name=self._instance_name,
                 tables=[("presence_stream", "instance_name", "stream_id")],
@@ -85,7 +96,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
             )
         else:
             self._presence_id_gen = StreamIdGenerator(
-                db_conn, "presence_stream", "stream_id"
+                db_conn, hs.get_replication_notifier(), "presence_stream", "stream_id"
             )
 
         self.hs = hs
@@ -114,11 +125,16 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         )
 
         async with stream_ordering_manager as stream_orderings:
+            # Run the interaction with an isolation level of READ_COMMITTED to avoid
+            # serialization errors(and rollbacks) in the database. This way it will
+            # ignore new rows during the DELETE, but will pick them up the next time
+            # this is run. Currently, that is between 5-60 seconds.
             await self.db_pool.runInteraction(
                 "update_presence",
                 self._update_presence_txn,
                 stream_orderings,
                 presence_states,
+                isolation_level=IsolationLevel.READ_COMMITTED,
             )
 
         return stream_orderings[-1], self._presence_id_gen.get_current_token()
@@ -243,7 +259,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
     )
     async def get_presence_for_users(
         self, user_ids: Iterable[str]
-    ) -> Dict[str, UserPresenceState]:
+    ) -> Mapping[str, UserPresenceState]:
         rows = await self.db_pool.simple_select_many_batch(
             table="presence_stream",
             column="user_id",
@@ -439,8 +455,14 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         rows: Iterable[Any],
     ) -> None:
         if stream_name == PresenceStream.NAME:
-            self._presence_id_gen.advance(instance_name, token)
             for row in rows:
                 self.presence_stream_cache.entity_has_changed(row.user_id, token)
                 self._get_presence_for_user.invalidate((row.user_id,))
         return super().process_replication_rows(stream_name, instance_name, token, rows)
+
+    def process_replication_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
+        if stream_name == PresenceStream.NAME:
+            self._presence_id_gen.advance(instance_name, token)
+        super().process_replication_position(stream_name, instance_name, token)

@@ -54,6 +54,10 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
     PATH_ARGS = ("stream_name",)
     METHOD = "GET"
 
+    # We don't want to wait for replication streams to catch up, as this gets
+    # called in the process of catching replication streams up.
+    WAIT_FOR_STREAMS = False
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
@@ -67,7 +71,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         return {"from_token": from_token, "upto_token": upto_token}
 
     async def _handle_request(  # type: ignore[override]
-        self, request: Request, stream_name: str
+        self, request: Request, content: JsonDict, stream_name: str
     ) -> Tuple[int, JsonDict]:
         stream = self.streams.get(stream_name)
         if stream is None:

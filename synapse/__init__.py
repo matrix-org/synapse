@@ -1,5 +1,6 @@
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018-9 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2023 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,38 +14,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix homeserver.
+""" This is an implementation of a Matrix homeserver.
 """
 
-import json
 import os
 import sys
+from typing import Any, Dict
+
+from PIL import ImageFile
+
+from synapse.util.rust import check_rust_lib_up_to_date
+from synapse.util.stringutils import strtobool
+
+# Allow truncated JPEG images to be thumbnailed.
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Check that we're not running on an unsupported Python version.
-if sys.version_info < (3, 7):
-    print("Synapse requires Python 3.7 or above.")
+#
+# Note that we use an (unneeded) variable here so that pyupgrade doesn't nuke the
+# if-statement completely.
+py_version = sys.version_info
+if py_version < (3, 8):
+    print("Synapse requires Python 3.8 or above.")
     sys.exit(1)
 
 # Allow using the asyncio reactor via env var.
-if bool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", False)):
-    try:
-        from incremental import Version
+if strtobool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", "0")):
+    from incremental import Version
 
-        import twisted
+    import twisted
 
-        # We need a bugfix that is included in Twisted 21.2.0:
-        # https://twistedmatrix.com/trac/ticket/9787
-        if twisted.version < Version("Twisted", 21, 2, 0):
-            print("Using asyncio reactor requires Twisted>=21.2.0")
-            sys.exit(1)
+    # We need a bugfix that is included in Twisted 21.2.0:
+    # https://twistedmatrix.com/trac/ticket/9787
+    if twisted.version < Version("Twisted", 21, 2, 0):
+        print("Using asyncio reactor requires Twisted>=21.2.0")
+        sys.exit(1)
 
-        import asyncio
+    import asyncio
 
-        from twisted.internet import asyncioreactor
+    from twisted.internet import asyncioreactor
 
-        asyncioreactor.install(asyncio.get_event_loop())
-    except ImportError:
-        pass
+    asyncioreactor.install(asyncio.get_event_loop())
 
 # Twisted and canonicaljson will fail to import when this file is executed to
 # get the __version__ during a fresh install. That's OK and subsequent calls to
@@ -60,15 +70,24 @@ try:
 except ImportError:
     pass
 
-# Use the standard library json implementation instead of simplejson.
+# Teach canonicaljson how to serialise immutabledicts.
 try:
-    from canonicaljson import set_json_library
+    from canonicaljson import register_preserialisation_callback
+    from immutabledict import immutabledict
 
-    set_json_library(json)
+    def _immutabledict_cb(d: immutabledict) -> Dict[str, Any]:
+        try:
+            return d._dict
+        except Exception:
+            # Paranoia: fall back to a `dict()` call, in case a future version of
+            # immutabledict removes `_dict` from the implementation.
+            return dict(d)
+
+    register_preserialisation_callback(immutabledict, _immutabledict_cb)
 except ImportError:
     pass
 
-import synapse.util
+import synapse.util  # noqa: E402
 
 __version__ = synapse.util.SYNAPSE_VERSION
 
@@ -78,3 +97,6 @@ if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     from synapse.util.patch_inline_callbacks import do_patch
 
     do_patch()
+
+
+check_rust_lib_up_to_date()

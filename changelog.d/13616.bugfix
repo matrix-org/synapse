@@ -1,1 +1,0 @@
-Fix a longstanding bug in `register_new_matrix_user` which meant it was always necessary to explicitly give a server URL.

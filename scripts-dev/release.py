@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +26,7 @@ import time
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
-from typing import Any, List, Optional, cast
+from typing import Any, List, Match, Optional, Union
 
 import attr
 import click
@@ -174,9 +173,7 @@ def _prepare() -> None:
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    # Cast safety: parse() won't return a version.LegacyVersion from our
-    # version string format.
-    parsed_new_version = cast(version.Version, version.parse(new_version))
+    parsed_new_version = version.parse(new_version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
     assert not parsed_new_version.is_devrelease
@@ -219,9 +216,7 @@ def _prepare() -> None:
                 update_branch(repo)
 
             # Create the new release branch
-            # Type ignore will no longer be needed after GitPython 3.1.28.
-            # See https://github.com/gitpython-developers/GitPython/pull/1419
-            repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            repo.create_head(release_branch_name, commit=base_branch)
 
         # Special-case SyTest: we don't actually prepare any files so we may
         # as well push it now (and only when we create a release branch;
@@ -237,7 +232,7 @@ def _prepare() -> None:
     subprocess.check_output(["poetry", "version", new_version])
 
     # Generate changelogs.
-    generate_and_write_changelog(current_version, new_version)
+    generate_and_write_changelog(synapse_repo, current_version, new_version)
 
     # Generate debian changelogs
     if parsed_new_version.pre is not None:
@@ -249,11 +244,17 @@ def _prepare() -> None:
     else:
         debian_version = new_version
 
-    run_until_successful(
-        f'dch -M -v {debian_version} "New Synapse release {new_version}."',
-        shell=True,
-    )
-    run_until_successful('dch -M -r -D stable ""', shell=True)
+    if sys.platform == "darwin":
+        run_until_successful(
+            f"docker run --rm -v .:/synapse ubuntu:latest /synapse/scripts-dev/docker_update_debian_changelog.sh {new_version}",
+            shell=True,
+        )
+    else:
+        run_until_successful(
+            f'dch -M -v {debian_version} "New Synapse release {new_version}."',
+            shell=True,
+        )
+        run_until_successful('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
     synapse_repo.git.add("-u")
@@ -284,7 +285,7 @@ def _prepare() -> None:
     )
 
     print("Opening the changelog in your browser...")
-    print("Please ask others to give it a check.")
+    print("Please ask #synapse-dev to give it a check.")
     click.launch(
         f"https://github.com/matrix-org/synapse/blob/{synapse_repo.active_branch.name}/CHANGES.md"
     )
@@ -427,11 +428,12 @@ def _publish(gh_token: str) -> None:
 
 
 @cli.command()
-def upload() -> None:
-    _upload()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=False)
+def upload(gh_token: Optional[str]) -> None:
+    _upload(gh_token)
 
 
-def _upload() -> None:
+def _upload(gh_token: Optional[str]) -> None:
     """Upload release to pypi."""
 
     current_version = get_package_version()
@@ -441,21 +443,43 @@ def _upload() -> None:
     repo = get_repo_and_check_clean_checkout()
     tag = repo.tag(f"refs/tags/{tag_name}")
     if repo.head.commit != tag.commit:
-        click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
+        click.echo(f"Tag {tag_name} ({tag.commit}) is not currently checked out!")
         click.get_current_context().abort()
 
-    pypi_asset_names = [
-        f"matrix_synapse-{current_version}-py3-none-any.whl",
-        f"matrix-synapse-{current_version}.tar.gz",
-    ]
+    # Query all the assets corresponding to this release.
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("matrix-org/synapse")
+    gh_release = gh_repo.get_release(tag_name)
+
+    all_assets = set(gh_release.get_assets())
+
+    # Only accept the wheels and sdist.
+    # Notably: we don't care about debs.tar.xz.
+    asset_names_and_urls = sorted(
+        (asset.name, asset.browser_download_url)
+        for asset in all_assets
+        if asset.name.endswith((".whl", ".tar.gz"))
+    )
+
+    # Print out what we've determined.
+    print("Found relevant assets:")
+    for asset_name, _ in asset_names_and_urls:
+        print(f" - {asset_name}")
+
+    ignored_asset_names = sorted(
+        {asset.name for asset in all_assets}
+        - {asset_name for asset_name, _ in asset_names_and_urls}
+    )
+    print("\nIgnoring irrelevant assets:")
+    for asset_name in ignored_asset_names:
+        print(f" - {asset_name}")
 
     with TemporaryDirectory(prefix=f"synapse_upload_{tag_name}_") as tmpdir:
-        for name in pypi_asset_names:
+        for name, asset_download_url in asset_names_and_urls:
             filename = path.join(tmpdir, name)
-            url = f"https://github.com/matrix-org/synapse/releases/download/{tag_name}/{name}"
 
             click.echo(f"Downloading {name} into {filename}")
-            urllib.request.urlretrieve(url, filename=filename)
+            urllib.request.urlretrieve(asset_download_url, filename=filename)
 
         if click.confirm("Upload to PyPI?", default=True):
             subprocess.run("twine upload *", shell=True, cwd=tmpdir)
@@ -548,19 +572,27 @@ def _notify(message: str) -> None:
     # for this.
     click.echo(f"\a{message}")
 
+    app_name = "Synapse Release Script"
+
     # Try and run notify-send, but don't raise an Exception if this fails
     # (This is best-effort)
-    # TODO Support other platforms?
-    subprocess.run(
-        [
-            "notify-send",
-            "--app-name",
-            "Synapse Release Script",
-            "--expire-time",
-            "3600000",
-            message,
-        ]
-    )
+    if sys.platform == "darwin":
+        # See https://developer.apple.com/library/archive/documentation/AppleScript/Conceptual/AppleScriptLangGuide/reference/ASLR_cmds.html#//apple_ref/doc/uid/TP40000983-CH216-SW224
+        subprocess.run(
+            f"""osascript -e 'display notification "{message}" with title "{app_name}"'""",
+            shell=True,
+        )
+    else:
+        subprocess.run(
+            [
+                "notify-send",
+                "--app-name",
+                app_name,
+                "--expire-time",
+                "3600000",
+                message,
+            ]
+        )
 
 
 @cli.command()
@@ -672,7 +704,7 @@ def full(gh_token: str) -> None:
     _publish(gh_token)
 
     click.echo("\n*** upload ***")
-    _upload()
+    _upload(gh_token)
 
     click.echo("\n*** merge back ***")
     _merge_back()
@@ -795,7 +827,7 @@ def get_changes_for_version(wanted_version: version.Version) -> str:
 
 
 def generate_and_write_changelog(
-    current_version: version.Version, new_version: str
+    repo: Repo, current_version: version.Version, new_version: str
 ) -> None:
     # We do this by getting a draft so that we can edit it before writing to the
     # changelog.
@@ -807,6 +839,10 @@ def generate_and_write_changelog(
     new_changes = result.stdout.decode("utf-8")
     new_changes = new_changes.replace(
         "No significant changes.", f"No significant changes since {current_version}."
+    )
+    new_changes += build_dependabot_changelog(
+        repo,
+        current_version,
     )
 
     # Prepend changes to changelog
@@ -820,6 +856,50 @@ def generate_and_write_changelog(
     # Remove all the news fragments
     for filename in glob.iglob("changelog.d/*.*"):
         os.remove(filename)
+
+
+def build_dependabot_changelog(repo: Repo, current_version: version.Version) -> str:
+    """Summarise dependabot commits between `current_version` and `release_branch`.
+
+    Returns an empty string if there have been no such commits; otherwise outputs a
+    third-level markdown header followed by an unordered list."""
+    last_release_commit = repo.tag("v" + str(current_version)).commit
+    rev_spec = f"{last_release_commit.hexsha}.."
+    commits = list(git.objects.Commit.iter_items(repo, rev_spec))
+    messages = []
+    for commit in reversed(commits):
+        if commit.author.name == "dependabot[bot]":
+            message: Union[str, bytes] = commit.message
+            if isinstance(message, bytes):
+                message = message.decode("utf-8")
+            messages.append(message.split("\n", maxsplit=1)[0])
+
+    if not messages:
+        print(f"No dependabot commits in range {rev_spec}", file=sys.stderr)
+        return ""
+
+    messages.sort()
+
+    def replacer(match: Match[str]) -> str:
+        desc = match.group(1)
+        number = match.group(2)
+        return f"* {desc}. ([\\#{number}](https://github.com/matrix-org/synapse/issues/{number}))"
+
+    for i, message in enumerate(messages):
+        messages[i] = re.sub(r"(.*) \(#(\d+)\)$", replacer, message)
+    messages.insert(0, "### Updates to locked dependencies\n")
+    # Add an extra blank line to the bottom of the section
+    messages.append("")
+    return "\n".join(messages)
+
+
+@cli.command()
+@click.argument("since")
+def test_dependabot_changelog(since: str) -> None:
+    """Test building the dependabot changelog.
+
+    Summarises all dependabot commits between the SINCE tag and the current git HEAD."""
+    print(build_dependabot_changelog(git.Repo("."), version.Version(since)))
 
 
 if __name__ == "__main__":

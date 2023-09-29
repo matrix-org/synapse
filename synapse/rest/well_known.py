@@ -18,6 +18,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import Request
 
 from synapse.http.server import set_cors_headers
+from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.stringutils import parse_server_name
@@ -43,6 +44,16 @@ class WellKnownBuilder:
                 "base_url": self._config.registration.default_identity_server
             }
 
+        # We use the MSC3861 values as they are used by multiple MSCs
+        if self._config.experimental.msc3861.enabled:
+            result["org.matrix.msc2965.authentication"] = {
+                "issuer": self._config.experimental.msc3861.issuer
+            }
+            if self._config.experimental.msc3861.account_management_url is not None:
+                result["org.matrix.msc2965.authentication"][
+                    "account"
+                ] = self._config.experimental.msc3861.account_management_url
+
         if self._config.server.extra_well_known_client_content:
             for (
                 key,
@@ -63,7 +74,7 @@ class ClientWellKnownResource(Resource):
         Resource.__init__(self)
         self._well_known_builder = WellKnownBuilder(hs)
 
-    def render_GET(self, request: Request) -> bytes:
+    def render_GET(self, request: SynapseRequest) -> bytes:
         set_cors_headers(request)
         r = self._well_known_builder.get_well_known()
         if not r:

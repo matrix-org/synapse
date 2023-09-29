@@ -1,1 +1,0 @@
-Remove redundant `_get_joined_users_from_context` cache. Contributed by Nick @ Beeper (@fizzadar).

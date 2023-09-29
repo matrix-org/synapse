@@ -21,14 +21,13 @@ import socket
 import sys
 import traceback
 import warnings
+from textwrap import indent
 from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
-    Collection,
     Dict,
-    Iterable,
     List,
     NoReturn,
     Optional,
@@ -41,12 +40,18 @@ from typing_extensions import ParamSpec
 
 import twisted
 from twisted.internet import defer, error, reactor as _reactor
-from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorSSL, IReactorTCP
+from twisted.internet.interfaces import (
+    IOpenSSLContextFactory,
+    IReactorSSL,
+    IReactorTCP,
+    IReactorUNIX,
+)
 from twisted.internet.protocol import ServerFactory
 from twisted.internet.tcp import Port
 from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.python.threadpool import ThreadPool
+from twisted.web.resource import Resource
 
 import synapse.util.caches
 from synapse.api.constants import MAX_PDU_SIZE
@@ -55,18 +60,21 @@ from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config import ConfigError
 from synapse.config._base import format_config_error
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.server import ManholeConfig
+from synapse.config.server import ListenerConfig, ManholeConfig, TCPListenerConfig
 from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
-from synapse.events.spamcheck import load_legacy_spam_checkers
-from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
+from synapse.http.site import SynapseSite
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.opentracing import init_tracer
 from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
-from synapse.types import ISynapseReactor
+from synapse.module_api.callbacks.spamchecker_callbacks import load_legacy_spam_checkers
+from synapse.module_api.callbacks.third_party_event_rules_callbacks import (
+    load_legacy_third_party_event_rules,
+)
+from synapse.types import ISynapseReactor, StrCollection
 from synapse.util import SYNAPSE_VERSION
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
@@ -98,9 +106,7 @@ def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) 
         func: Function to be called when sent a SIGHUP signal.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    # This type-ignore should be redundant once we use a mypy release with
-    # https://github.com/python/mypy/pull/12668.
-    _sighup_callbacks.append((func, args, kwargs))  # type: ignore[arg-type]
+    _sighup_callbacks.append((func, args, kwargs))
 
 
 def start_worker_reactor(
@@ -205,15 +211,19 @@ def handle_startup_exception(e: Exception) -> NoReturn:
     # Exceptions that occur between setting up the logging and forking or starting
     # the reactor are written to the logs, followed by a summary to stderr.
     logger.exception("Exception during startup")
+
+    error_string = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    indented_error_string = indent(error_string, "    ")
+
     quit_with_error(
-        f"Error during initialisation:\n   {e}\nThere may be more information in the logs."
+        f"Error during initialisation:\n{indented_error_string}\nThere may be more information in the logs."
     )
 
 
 def redirect_stdio_to_logs() -> None:
     streams = [("stdout", LogLevel.info), ("stderr", LogLevel.error)]
 
-    for (stream, level) in streams:
+    for stream, level in streams:
         oldStream = getattr(sys, stream)
         loggingFile = LoggingFile(
             logger=twisted.logger.Logger(namespace=stream),
@@ -266,26 +276,18 @@ def register_start(
     reactor.callWhenRunning(lambda: defer.ensureDeferred(wrapper()))
 
 
-def listen_metrics(
-    bind_addresses: Iterable[str], port: int, enable_legacy_metric_names: bool
-) -> None:
+def listen_metrics(bind_addresses: StrCollection, port: int) -> None:
     """
     Start Prometheus metrics server.
     """
     from prometheus_client import start_http_server as start_http_server_prometheus
 
-    from synapse.metrics import (
-        RegistryProxy,
-        start_http_server as start_http_server_legacy,
-    )
+    from synapse.metrics import RegistryProxy
 
     for host in bind_addresses:
         logger.info("Starting metrics listener on %s:%d", host, port)
-        if enable_legacy_metric_names:
-            start_http_server_legacy(port, addr=host, registry=RegistryProxy)
-        else:
-            _set_prometheus_client_use_created_metrics(False)
-            start_http_server_prometheus(port, addr=host, registry=RegistryProxy)
+        _set_prometheus_client_use_created_metrics(False)
+        start_http_server_prometheus(port, addr=host, registry=RegistryProxy)
 
 
 def _set_prometheus_client_use_created_metrics(new_value: bool) -> None:
@@ -311,7 +313,7 @@ def _set_prometheus_client_use_created_metrics(new_value: bool) -> None:
 
 
 def listen_manhole(
-    bind_addresses: Collection[str],
+    bind_addresses: StrCollection,
     port: int,
     manhole_settings: ManholeConfig,
     manhole_globals: dict,
@@ -335,7 +337,7 @@ def listen_manhole(
 
 
 def listen_tcp(
-    bind_addresses: Collection[str],
+    bind_addresses: StrCollection,
     port: int,
     factory: ServerFactory,
     reactor: IReactorTCP = reactor,
@@ -359,8 +361,92 @@ def listen_tcp(
     return r  # type: ignore[return-value]
 
 
+def listen_unix(
+    path: str,
+    mode: int,
+    factory: ServerFactory,
+    reactor: IReactorUNIX = reactor,
+    backlog: int = 50,
+) -> List[Port]:
+    """
+    Create a UNIX socket for a given path and 'mode' permission
+
+    Returns:
+        list of twisted.internet.tcp.Port listening for TCP connections
+    """
+    wantPID = True
+
+    return [
+        # IReactorUNIX returns an object implementing IListeningPort from listenUNIX,
+        # but we know it will be a Port instance.
+        cast(Port, reactor.listenUNIX(path, factory, backlog, mode, wantPID))
+    ]
+
+
+def listen_http(
+    hs: "HomeServer",
+    listener_config: ListenerConfig,
+    root_resource: Resource,
+    version_string: str,
+    max_request_body_size: int,
+    context_factory: Optional[IOpenSSLContextFactory],
+    reactor: ISynapseReactor = reactor,
+) -> List[Port]:
+    assert listener_config.http_options is not None
+
+    site_tag = listener_config.get_site_tag()
+
+    site = SynapseSite(
+        "synapse.access.%s.%s"
+        % ("https" if listener_config.is_tls() else "http", site_tag),
+        site_tag,
+        listener_config,
+        root_resource,
+        version_string,
+        max_request_body_size=max_request_body_size,
+        reactor=reactor,
+        hs=hs,
+    )
+
+    if isinstance(listener_config, TCPListenerConfig):
+        if listener_config.is_tls():
+            # refresh_certificate should have been called before this.
+            assert context_factory is not None
+            ports = listen_ssl(
+                listener_config.bind_addresses,
+                listener_config.port,
+                site,
+                context_factory,
+                reactor=reactor,
+            )
+            logger.info(
+                "Synapse now listening on TCP port %d (TLS)", listener_config.port
+            )
+        else:
+            ports = listen_tcp(
+                listener_config.bind_addresses,
+                listener_config.port,
+                site,
+                reactor=reactor,
+            )
+            logger.info("Synapse now listening on TCP port %d", listener_config.port)
+
+    else:
+        ports = listen_unix(
+            listener_config.path, listener_config.mode, site, reactor=reactor
+        )
+        # getHost() returns a UNIXAddress which contains an instance variable of 'name'
+        # encoded as a byte string. Decode as utf-8 so pretty.
+        logger.info(
+            "Synapse now listening on Unix Socket at: "
+            f"{ports[0].getHost().name.decode('utf-8')}"
+        )
+
+    return ports
+
+
 def listen_ssl(
-    bind_addresses: Collection[str],
+    bind_addresses: StrCollection,
     port: int,
     factory: ServerFactory,
     context_factory: IOpenSSLContextFactory,
@@ -560,7 +646,7 @@ def reload_cache_config(config: HomeServerConfig) -> None:
             logger.warning(f)
     else:
         logger.debug(
-            "New cache config. Was:\n %s\nNow:\n",
+            "New cache config. Was:\n %s\nNow:\n %s",
             previous_cache_config.__dict__,
             config.caches.__dict__,
         )

@@ -20,11 +20,11 @@ from tests import unittest
 
 
 class CacheTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.mock_timer = Mock(side_effect=lambda: 100.0)
-        self.cache = TTLCache("test_cache", self.mock_timer)
+        self.cache: TTLCache[str, str] = TTLCache("test_cache", self.mock_timer)
 
-    def test_get(self):
+    def test_get(self) -> None:
         """simple set/get tests"""
         self.cache.set("one", "1", 10)
         self.cache.set("two", "2", 20)
@@ -59,7 +59,7 @@ class CacheTestCase(unittest.TestCase):
         self.assertEqual(self.cache._metrics.hits, 4)
         self.assertEqual(self.cache._metrics.misses, 5)
 
-    def test_expiry(self):
+    def test_expiry(self) -> None:
         self.cache.set("one", "1", 10)
         self.cache.set("two", "2", 20)
         self.cache.set("three", "3", 30)

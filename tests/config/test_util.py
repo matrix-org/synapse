@@ -21,7 +21,7 @@ from tests.unittest import TestCase
 class ValidateConfigTestCase(TestCase):
     """Test cases for synapse.config._util.validate_config"""
 
-    def test_bad_object_in_array(self):
+    def test_bad_object_in_array(self) -> None:
         """malformed objects within an array should be validated correctly"""
 
         # consider a structure:

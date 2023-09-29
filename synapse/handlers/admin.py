@@ -14,11 +14,11 @@
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Set
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Direction, Membership
 from synapse.events import EventBase
-from synapse.types import JsonDict, RoomStreamToken, StateMap, UserID
+from synapse.types import JsonMapping, RoomStreamToken, StateMap, UserID, UserInfo
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -29,14 +29,16 @@ logger = logging.getLogger(__name__)
 
 class AdminHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastores().main
+        self._store = hs.get_datastores().main
+        self._device_handler = hs.get_device_handler()
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
+        self._msc3866_enabled = hs.config.experimental.msc3866.enabled
 
-    async def get_whois(self, user: UserID) -> JsonDict:
+    async def get_whois(self, user: UserID) -> JsonMapping:
         connections = []
 
-        sessions = await self.store.get_user_ip_and_agents(user)
+        sessions = await self._store.get_user_ip_and_agents(user)
         for session in sessions:
             connections.append(
                 {
@@ -53,41 +55,39 @@ class AdminHandler:
 
         return ret
 
-    async def get_user(self, user: UserID) -> Optional[JsonDict]:
+    async def get_user(self, user: UserID) -> Optional[JsonMapping]:
         """Function to get user details"""
-        user_info_dict = await self.store.get_user_by_id(user.to_string())
-        if user_info_dict is None:
+        user_info: Optional[UserInfo] = await self._store.get_user_by_id(
+            user.to_string()
+        )
+        if user_info is None:
             return None
 
-        # Restrict returned information to a known set of fields. This prevents additional
-        # fields added to get_user_by_id from modifying Synapse's external API surface.
-        user_info_to_return = {
-            "name",
-            "admin",
-            "deactivated",
-            "shadow_banned",
-            "creation_ts",
-            "appservice_id",
-            "consent_server_notice_sent",
-            "consent_version",
-            "consent_ts",
-            "user_type",
-            "is_guest",
+        user_info_dict = {
+            "name": user.to_string(),
+            "admin": user_info.is_admin,
+            "deactivated": user_info.is_deactivated,
+            "locked": user_info.locked,
+            "shadow_banned": user_info.is_shadow_banned,
+            "creation_ts": user_info.creation_ts,
+            "appservice_id": user_info.appservice_id,
+            "consent_server_notice_sent": user_info.consent_server_notice_sent,
+            "consent_version": user_info.consent_version,
+            "consent_ts": user_info.consent_ts,
+            "user_type": user_info.user_type,
+            "is_guest": user_info.is_guest,
         }
 
-        # Restrict returned keys to a known set.
-        user_info_dict = {
-            key: value
-            for key, value in user_info_dict.items()
-            if key in user_info_to_return
-        }
+        if self._msc3866_enabled:
+            # Only include the approved flag if support for MSC3866 is enabled.
+            user_info_dict["approved"] = user_info.approved
 
         # Add additional user metadata
-        profile = await self.store.get_profileinfo(user.localpart)
-        threepids = await self.store.user_get_threepids(user.to_string())
+        profile = await self._store.get_profileinfo(user)
+        threepids = await self._store.user_get_threepids(user.to_string())
         external_ids = [
             ({"auth_provider": auth_provider, "external_id": external_id})
-            for auth_provider, external_id in await self.store.get_external_ids_by_user(
+            for auth_provider, external_id in await self._store.get_external_ids_by_user(
                 user.to_string()
             )
         ]
@@ -95,6 +95,10 @@ class AdminHandler:
         user_info_dict["avatar_url"] = profile.avatar_url
         user_info_dict["threepids"] = threepids
         user_info_dict["external_ids"] = external_ids
+        user_info_dict["erased"] = await self._store.is_user_erased(user.to_string())
+
+        last_seen_ts = await self._store.get_last_seen_for_user_id(user.to_string())
+        user_info_dict["last_seen_ts"] = last_seen_ts
 
         return user_info_dict
 
@@ -110,7 +114,7 @@ class AdminHandler:
             The returned value is that returned by `writer.finished()`.
         """
         # Get all rooms the user is in or has been in
-        rooms = await self.store.get_rooms_for_local_user_where_membership_is(
+        rooms = await self._store.get_rooms_for_local_user_where_membership_is(
             user_id,
             membership_list=(
                 Membership.JOIN,
@@ -124,7 +128,7 @@ class AdminHandler:
         # We only try and fetch events for rooms the user has been in. If
         # they've been e.g. invited to a room without joining then we handle
         # those separately.
-        rooms_user_has_been_in = await self.store.get_rooms_user_has_been_in(user_id)
+        rooms_user_has_been_in = await self._store.get_rooms_user_has_been_in(user_id)
 
         for index, room in enumerate(rooms):
             room_id = room.room_id
@@ -133,7 +137,7 @@ class AdminHandler:
                 "[%s] Handling room %s, %d/%d", user_id, room_id, index + 1, len(rooms)
             )
 
-            forgotten = await self.store.did_forget(user_id, room_id)
+            forgotten = await self._store.did_forget(user_id, room_id)
             if forgotten:
                 logger.info("[%s] User forgot room %d, ignoring", user_id, room_id)
                 continue
@@ -145,14 +149,14 @@ class AdminHandler:
 
                 if room.membership == Membership.INVITE:
                     event_id = room.event_id
-                    invite = await self.store.get_event(event_id, allow_none=True)
+                    invite = await self._store.get_event(event_id, allow_none=True)
                     if invite:
                         invited_state = invite.unsigned["invite_room_state"]
                         writer.write_invite(room_id, invite, invited_state)
 
                 if room.membership == Membership.KNOCK:
                     event_id = room.event_id
-                    knock = await self.store.get_event(event_id, allow_none=True)
+                    knock = await self._store.get_event(event_id, allow_none=True)
                     if knock:
                         knock_state = knock.unsigned["knock_room_state"]
                         writer.write_knock(room_id, knock, knock_state)
@@ -163,7 +167,7 @@ class AdminHandler:
             # were joined. We estimate that point by looking at the
             # stream_ordering of the last membership if it wasn't a join.
             if room.membership == Membership.JOIN:
-                stream_ordering = self.store.get_room_max_stream_ordering()
+                stream_ordering = self._store.get_room_max_stream_ordering()
             else:
                 stream_ordering = room.stream_ordering
 
@@ -190,8 +194,8 @@ class AdminHandler:
             # events that we have and then filtering, this isn't the most
             # efficient method perhaps but it does guarantee we get everything.
             while True:
-                events, _ = await self.store.paginate_room_events(
-                    room_id, from_key, to_key, limit=100, direction="f"
+                events, _ = await self._store.paginate_room_events(
+                    room_id, from_key, to_key, limit=100, direction=Direction.FORWARDS
                 )
                 if not events:
                     break
@@ -240,6 +244,54 @@ class AdminHandler:
                     event_id
                 )
                 writer.write_state(room_id, event_id, state)
+
+        # Get the user profile
+        profile = await self.get_user(UserID.from_string(user_id))
+        if profile is not None:
+            writer.write_profile(profile)
+            logger.info("[%s] Written profile", user_id)
+
+        # Get all devices the user has
+        devices = await self._device_handler.get_devices_by_user(user_id)
+        writer.write_devices(devices)
+        logger.info("[%s] Written %s devices", user_id, len(devices))
+
+        # Get all connections the user has
+        connections = await self.get_whois(UserID.from_string(user_id))
+        writer.write_connections(
+            connections["devices"][""]["sessions"][0]["connections"]
+        )
+        logger.info("[%s] Written %s connections", user_id, len(connections))
+
+        # Get all account data the user has global and in rooms
+        global_data = await self._store.get_global_account_data_for_user(user_id)
+        by_room_data = await self._store.get_room_account_data_for_user(user_id)
+        writer.write_account_data("global", global_data)
+        for room_id in by_room_data:
+            writer.write_account_data(room_id, by_room_data[room_id])
+        logger.info(
+            "[%s] Written account data for %s rooms", user_id, len(by_room_data)
+        )
+
+        # Get all media ids the user has
+        limit = 100
+        start = 0
+        while True:
+            media_ids, total = await self._store.get_local_media_by_user_paginate(
+                start, limit, user_id
+            )
+            for media in media_ids:
+                writer.write_media_id(media["media_id"], media)
+
+            logger.info(
+                "[%s] Written %d media_ids of %s",
+                user_id,
+                (start + len(media_ids)),
+                total,
+            )
+            if (start + limit) >= total:
+                break
+            start += limit
 
         return writer.finished()
 
@@ -290,6 +342,57 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
                 event keys (type, state_key content and sender).
         """
         raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_profile(self, profile: JsonMapping) -> None:
+        """Write the profile of a user.
+
+        Args:
+            profile: The user profile.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_devices(self, devices: Sequence[JsonMapping]) -> None:
+        """Write the devices of a user.
+
+        Args:
+            devices: The list of devices.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_connections(self, connections: Sequence[JsonMapping]) -> None:
+        """Write the connections of a user.
+
+        Args:
+            connections: The list of connections / sessions.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_account_data(
+        self, file_name: str, account_data: Mapping[str, JsonMapping]
+    ) -> None:
+        """Write the account data of a user.
+
+        Args:
+            file_name: file name to write data
+            account_data: mapping of global or room account_data
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_media_id(self, media_id: str, media_metadata: JsonMapping) -> None:
+        """Write the media's metadata of a user.
+        Exports only the metadata, as this can be fetched from the database via
+        read only. In order to access the files, a connection to the correct
+        media repository would be required.
+
+        Args:
+            media_id: ID of the media.
+            media_metadata: Metadata of one media file.
+        """
 
     @abc.abstractmethod
     def finished(self) -> Any:

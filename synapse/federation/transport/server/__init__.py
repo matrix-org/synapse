@@ -25,7 +25,7 @@ from synapse.federation.transport.server._base import (
 from synapse.federation.transport.server.federation import (
     FEDERATION_SERVLET_CLASSES,
     FederationAccountStatusServlet,
-    FederationTimestampLookupServlet,
+    FederationUnstableClientKeysClaimServlet,
 )
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import (
@@ -109,6 +109,7 @@ class PublicRoomList(BaseFederationServlet):
     """
 
     PATH = "/publicRooms"
+    CATEGORY = "Federation requests"
 
     def __init__(
         self,
@@ -213,6 +214,7 @@ class OpenIdUserInfo(BaseFederationServlet):
     """
 
     PATH = "/openid/userinfo"
+    CATEGORY = "Federation requests"
 
     REQUIRE_AUTH = False
 
@@ -291,17 +293,15 @@ def register_servlets(
             )
 
         for servletclass in SERVLET_GROUPS[servlet_group]:
-            # Only allow the `/timestamp_to_event` servlet if msc3030 is enabled
-            if (
-                servletclass == FederationTimestampLookupServlet
-                and not hs.config.experimental.msc3030_enabled
-            ):
-                continue
-
             # Only allow the `/account_status` servlet if msc3720 is enabled
             if (
                 servletclass == FederationAccountStatusServlet
                 and not hs.config.experimental.msc3720_enabled
+            ):
+                continue
+            if (
+                servletclass == FederationUnstableClientKeysClaimServlet
+                and not hs.config.experimental.msc3983_appservice_otk_claims
             ):
                 continue
 

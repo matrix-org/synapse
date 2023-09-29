@@ -1,6 +1,6 @@
 # Request log format
 
-HTTP request logs are written by synapse (see [`site.py`](../synapse/http/site.py) for details).
+HTTP request logs are written by synapse (see [`synapse/http/site.py`](https://github.com/matrix-org/synapse/tree/develop/synapse/http/site.py) for details).
 
 See the following for how to decode the dense data available from the default logging configuration.
 
@@ -10,16 +10,16 @@ See the following for how to decode the dense data available from the default lo
 ```
 
 
-| Part  | Explanation | 
+| Part  | Explanation |
 | ----- | ------------ |
-| AAAA  | Timestamp request was logged (not recieved) |
-| BBBB  | Logger name (`synapse.access.(http\|https).<tag>`, where 'tag' is defined in the `listeners` config section, normally the port) |
+| AAAA  | Timestamp request was logged (not received) |
+| BBBB  | Logger name (`synapse.access.(http\|https).<tag>`, where 'tag' is defined in the [`listeners`](../configuration/config_documentation.md#listeners) config section, normally the port) |
 | CCCC  | Line number in code |
 | DDDD  | Log Level |
 | EEEE  | Request Identifier (This identifier is shared by related log lines)|
 | FFFF  | Source IP (Or X-Forwarded-For if enabled) |
 | GGGG  | Server Port |
-| HHHH  | Federated Server or Local User making request (blank if unauthenticated or not supplied) |
+| HHHH  | Federated Server or Local User making request (blank if unauthenticated or not supplied).<br/>If this is of the form `@aaa:example.com|@bbb:example.com`, then that means that `@aaa:example.com` is authenticated but they are controlling `@bbb:example.com`, e.g. if `aaa` is controlling `bbb` [via the admin API](https://matrix-org.github.io/synapse/latest/admin_api/user_admin_api.html#login-as-a-user). |
 | IIII  | Total Time to process the request |
 | JJJJ  | Time to send response over network once generated (this may be negative if the socket is closed before the response is generated)|
 | KKKK  | Userland CPU time |

@@ -37,7 +37,7 @@ import os
 import shutil
 import sys
 
-from synapse.rest.media.v1.filepath import MediaFilePaths
+from synapse.media.filepath import MediaFilePaths
 
 logger = logging.getLogger()
 

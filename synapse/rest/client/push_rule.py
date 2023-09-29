@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, List, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, List, Tuple, Union
 
 from synapse.api.errors import (
     NotFoundError,
@@ -28,11 +28,11 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.http.site import SynapseRequest
-from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.types import JsonDict
+from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -44,6 +44,9 @@ class PushRuleRestServlet(RestServlet):
         "Unrecognised request: You probably wanted a trailing slash"
     )
 
+    WORKERS_DENIED_METHODS = ["PUT", "DELETE"]
+    CATEGORY = "Push rule requests"
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
@@ -51,25 +54,31 @@ class PushRuleRestServlet(RestServlet):
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker.worker_app is not None
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._push_rule_linearizer = Linearizer(name="push_rules")
 
     async def on_PUT(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         if self._is_worker:
             raise Exception("Cannot handle PUT /push_rules on worker")
 
+        requester = await self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+
+        async with self._push_rule_linearizer.queue(user_id):
+            return await self.handle_put(request, path, user_id)
+
+    async def handle_put(
+        self, request: SynapseRequest, path: str, user_id: str
+    ) -> Tuple[int, JsonDict]:
         spec = _rule_spec_from_path(path.split("/"))
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
             raise SynapseError(400, str(e))
 
-        requester = await self.auth.get_user_by_req(request)
-
         if "/" in spec.rule_id or "\\" in spec.rule_id:
             raise SynapseError(400, "rule_id may not contain slashes")
 
         content = parse_json_value_from_request(request)
-
-        user_id = requester.user.to_string()
 
         if spec.attr:
             try:
@@ -124,10 +133,19 @@ class PushRuleRestServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle DELETE /push_rules on worker")
 
-        spec = _rule_spec_from_path(path.split("/"))
-
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
+
+        async with self._push_rule_linearizer.queue(user_id):
+            return await self.handle_delete(request, path, user_id)
+
+    async def handle_delete(
+        self,
+        request: SynapseRequest,
+        path: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
+        spec = _rule_spec_from_path(path.split("/"))
 
         namespaced_rule_id = f"global/{spec.template}/{spec.rule_id}"
 
@@ -143,14 +161,12 @@ class PushRuleRestServlet(RestServlet):
 
     async def on_GET(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
-        user_id = requester.user.to_string()
+        requester.user.to_string()
 
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rules_raw = await self.store.get_push_rules_for_user(user_id)
-
-        rules = format_push_rules_for_user(requester.user, rules_raw)
+        rules = await self._push_rules_handler.push_rules_for_user(requester.user)
 
         path_parts = path.split("/")[1:]
 
@@ -169,7 +185,7 @@ class PushRuleRestServlet(RestServlet):
             raise UnrecognizedRequestError()
 
 
-def _rule_spec_from_path(path: Sequence[str]) -> RuleSpec:
+def _rule_spec_from_path(path: List[str]) -> RuleSpec:
     """Turn a sequence of path components into a rule spec
 
     Args:

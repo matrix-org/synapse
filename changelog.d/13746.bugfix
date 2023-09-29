@@ -1,1 +1,0 @@
-Fix a long standing bug where Synapse would fail to handle malformed user IDs or room aliases gracefully in certain cases.

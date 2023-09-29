@@ -14,12 +14,15 @@
 
 from typing import List
 
-from synapse.api.constants import EventTypes, RelationTypes
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.api.constants import Direction, EventTypes, RelationTypes
 from synapse.api.filtering import Filter
-from synapse.events import EventBase
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -38,12 +41,14 @@ class PaginationTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
-        config["experimental_features"] = {"msc3440_enabled": True}
+        config["experimental_features"] = {"msc3874_enabled": True}
         return config
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.user_id = self.register_user("test", "test")
         self.tok = self.login("test", "test")
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
@@ -58,6 +63,11 @@ class PaginationTestCase(HomeserverTestCase):
         self.third_tok = self.login("third", "test")
         self.helper.join(room=self.room_id, user=self.third_user_id, tok=self.third_tok)
 
+        # Store a token which is after all the room creation events.
+        self.from_token = self.get_success(
+            self.hs.get_event_sources().get_current_token_for_pagination(self.room_id)
+        )
+
         # An initial event with a relation from second user.
         res = self.helper.send_event(
             room_id=self.room_id,
@@ -66,7 +76,7 @@ class PaginationTestCase(HomeserverTestCase):
             tok=self.tok,
         )
         self.event_id_1 = res["event_id"]
-        self.helper.send_event(
+        res = self.helper.send_event(
             room_id=self.room_id,
             type="m.reaction",
             content={
@@ -78,6 +88,7 @@ class PaginationTestCase(HomeserverTestCase):
             },
             tok=self.second_tok,
         )
+        self.event_id_annotation = res["event_id"]
 
         # Another event with a relation from third user.
         res = self.helper.send_event(
@@ -87,7 +98,7 @@ class PaginationTestCase(HomeserverTestCase):
             tok=self.tok,
         )
         self.event_id_2 = res["event_id"]
-        self.helper.send_event(
+        res = self.helper.send_event(
             room_id=self.room_id,
             type="m.reaction",
             content={
@@ -98,68 +109,59 @@ class PaginationTestCase(HomeserverTestCase):
             },
             tok=self.third_tok,
         )
+        self.event_id_reference = res["event_id"]
 
         # An event with no relations.
-        self.helper.send_event(
+        res = self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
             content={"msgtype": "m.text", "body": "No relations"},
             tok=self.tok,
         )
+        self.event_id_none = res["event_id"]
 
-    def _filter_messages(self, filter: JsonDict) -> List[EventBase]:
+    def _filter_messages(self, filter: JsonDict) -> List[str]:
         """Make a request to /messages with a filter, returns the chunk of events."""
-
-        from_token = self.get_success(
-            self.hs.get_event_sources().get_current_token_for_pagination(self.room_id)
-        )
 
         events, next_key = self.get_success(
             self.hs.get_datastores().main.paginate_room_events(
                 room_id=self.room_id,
-                from_key=from_token.room_key,
+                from_key=self.from_token.room_key,
                 to_key=None,
-                direction="b",
+                direction=Direction.FORWARDS,
                 limit=10,
                 event_filter=Filter(self.hs, filter),
             )
         )
 
-        return events
+        return [ev.event_id for ev in events]
 
-    def test_filter_relation_senders(self):
+    def test_filter_relation_senders(self) -> None:
         # Messages which second user reacted to.
         filter = {"related_by_senders": [self.second_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
 
         # Messages which third user reacted to.
         filter = {"related_by_senders": [self.third_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_2)
+        self.assertEqual(chunk, [self.event_id_2])
 
         # Messages which either user reacted to.
         filter = {"related_by_senders": [self.second_user_id, self.third_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c.event_id for c in chunk], [self.event_id_1, self.event_id_2]
-        )
+        self.assertCountEqual(chunk, [self.event_id_1, self.event_id_2])
 
-    def test_filter_relation_type(self):
+    def test_filter_relation_type(self) -> None:
         # Messages which have annotations.
         filter = {"related_by_rel_types": [RelationTypes.ANNOTATION]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
 
         # Messages which have references.
         filter = {"related_by_rel_types": [RelationTypes.REFERENCE]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_2)
+        self.assertEqual(chunk, [self.event_id_2])
 
         # Messages which have either annotations or references.
         filter = {
@@ -169,22 +171,18 @@ class PaginationTestCase(HomeserverTestCase):
             ]
         }
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 2, chunk)
-        self.assertCountEqual(
-            [c.event_id for c in chunk], [self.event_id_1, self.event_id_2]
-        )
+        self.assertCountEqual(chunk, [self.event_id_1, self.event_id_2])
 
-    def test_filter_relation_senders_and_type(self):
+    def test_filter_relation_senders_and_type(self) -> None:
         # Messages which second user reacted to.
         filter = {
             "related_by_senders": [self.second_user_id],
             "related_by_rel_types": [RelationTypes.ANNOTATION],
         }
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
 
-    def test_duplicate_relation(self):
+    def test_duplicate_relation(self) -> None:
         """An event should only be returned once if there are multiple relations to it."""
         self.helper.send_event(
             room_id=self.room_id,
@@ -201,5 +199,65 @@ class PaginationTestCase(HomeserverTestCase):
 
         filter = {"related_by_senders": [self.second_user_id]}
         chunk = self._filter_messages(filter)
-        self.assertEqual(len(chunk), 1, chunk)
-        self.assertEqual(chunk[0].event_id, self.event_id_1)
+        self.assertEqual(chunk, [self.event_id_1])
+
+    def test_filter_rel_types(self) -> None:
+        # Messages which are annotations.
+        filter = {"org.matrix.msc3874.rel_types": [RelationTypes.ANNOTATION]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(chunk, [self.event_id_annotation])
+
+        # Messages which are references.
+        filter = {"org.matrix.msc3874.rel_types": [RelationTypes.REFERENCE]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(chunk, [self.event_id_reference])
+
+        # Messages which are either annotations or references.
+        filter = {
+            "org.matrix.msc3874.rel_types": [
+                RelationTypes.ANNOTATION,
+                RelationTypes.REFERENCE,
+            ]
+        }
+        chunk = self._filter_messages(filter)
+        self.assertCountEqual(
+            chunk,
+            [self.event_id_annotation, self.event_id_reference],
+        )
+
+    def test_filter_not_rel_types(self) -> None:
+        # Messages which are not annotations.
+        filter = {"org.matrix.msc3874.not_rel_types": [RelationTypes.ANNOTATION]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(
+            chunk,
+            [
+                self.event_id_1,
+                self.event_id_2,
+                self.event_id_reference,
+                self.event_id_none,
+            ],
+        )
+
+        # Messages which are not references.
+        filter = {"org.matrix.msc3874.not_rel_types": [RelationTypes.REFERENCE]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(
+            chunk,
+            [
+                self.event_id_1,
+                self.event_id_annotation,
+                self.event_id_2,
+                self.event_id_none,
+            ],
+        )
+
+        # Messages which are neither annotations or references.
+        filter = {
+            "org.matrix.msc3874.not_rel_types": [
+                RelationTypes.ANNOTATION,
+                RelationTypes.REFERENCE,
+            ]
+        }
+        chunk = self._filter_messages(filter)
+        self.assertEqual(chunk, [self.event_id_1, self.event_id_2, self.event_id_none])

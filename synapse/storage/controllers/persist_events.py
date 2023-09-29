@@ -19,6 +19,7 @@ import logging
 from collections import deque
 from typing import (
     TYPE_CHECKING,
+    AbstractSet,
     Any,
     Awaitable,
     Callable,
@@ -45,6 +46,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.handlers.worker_lock import NEW_EVENT_DURING_PURGE_LOCK_NAME
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -58,13 +60,13 @@ from synapse.storage.controllers.state import StateStorageController
 from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.state import StateFilter
 from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
     get_domain_from_id,
 )
+from synapse.types.state import StateFilter
 from synapse.util.async_helpers import ObservableDeferred, yieldable_gather_results
 from synapse.util.metrics import Measure
 
@@ -153,21 +155,19 @@ class _UpdateCurrentStateTask:
 
 
 _EventPersistQueueTask = Union[_PersistEventsTask, _UpdateCurrentStateTask]
+_PersistResult = TypeVar("_PersistResult")
 
 
 @attr.s(auto_attribs=True, slots=True)
-class _EventPersistQueueItem:
+class _EventPersistQueueItem(Generic[_PersistResult]):
     task: _EventPersistQueueTask
-    deferred: ObservableDeferred
+    deferred: ObservableDeferred[_PersistResult]
 
     parent_opentracing_span_contexts: List = attr.ib(factory=list)
     """A list of opentracing spans waiting for this batch"""
 
     opentracing_span_context: Any = None
     """The opentracing span under which the persistence actually happened"""
-
-
-_PersistResult = TypeVar("_PersistResult")
 
 
 class _EventPeristenceQueue(Generic[_PersistResult]):
@@ -204,9 +204,8 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
         process to to so, calling the per_item_callback for each item.
 
         Args:
-            room_id (str):
-            task (_EventPersistQueueTask): A _PersistEventsTask or
-                _UpdateCurrentStateTask to process.
+            room_id:
+            task: A _PersistEventsTask or _UpdateCurrentStateTask to process.
 
         Returns:
             the result returned by the `_per_item_callback` passed to
@@ -339,6 +338,7 @@ class EventsPersistenceStorageController:
         )
         self._state_resolution_handler = hs.get_state_resolution_handler()
         self._state_controller = state_controller
+        self.hs = hs
 
     async def _process_event_persist_queue_task(
         self,
@@ -351,15 +351,22 @@ class EventsPersistenceStorageController:
             A dictionary of event ID to event ID we didn't persist as we already
             had another event persisted with the same TXN ID.
         """
-        if isinstance(task, _PersistEventsTask):
-            return await self._persist_event_batch(room_id, task)
-        elif isinstance(task, _UpdateCurrentStateTask):
-            await self._update_current_state(room_id, task)
-            return {}
-        else:
-            raise AssertionError(
-                f"Found an unexpected task type in event persistence queue: {task}"
-            )
+
+        # Ensure that the room can't be deleted while we're persisting events to
+        # it. We might already have taken out the lock, but since this is just a
+        # "read" lock its inherently reentrant.
+        async with self.hs.get_worker_locks_handler().acquire_read_write_lock(
+            NEW_EVENT_DURING_PURGE_LOCK_NAME, room_id, write=False
+        ):
+            if isinstance(task, _PersistEventsTask):
+                return await self._persist_event_batch(room_id, task)
+            elif isinstance(task, _UpdateCurrentStateTask):
+                await self._update_current_state(room_id, task)
+                return {}
+            else:
+                raise AssertionError(
+                    f"Found an unexpected task type in event persistence queue: {task}"
+                )
 
     @trace
     async def persist_events(
@@ -423,16 +430,18 @@ class EventsPersistenceStorageController:
         for d in ret_vals:
             replaced_events.update(d)
 
-        events = []
+        persisted_events = []
         for event, _ in events_and_contexts:
             existing_event_id = replaced_events.get(event.event_id)
             if existing_event_id:
-                events.append(await self.main_store.get_event(existing_event_id))
+                persisted_events.append(
+                    await self.main_store.get_event(existing_event_id)
+                )
             else:
-                events.append(event)
+                persisted_events.append(event)
 
         return (
-            events,
+            persisted_events,
             self.main_store.get_room_max_token(),
         )
 
@@ -598,11 +607,6 @@ class EventsPersistenceStorageController:
             # room
             state_delta_for_room: Dict[str, DeltaState] = {}
 
-            # Set of remote users which were in rooms the server has left. We
-            # should check if we still share any rooms and if not we mark their
-            # device lists as stale.
-            potentially_left_users: Set[str] = set()
-
             if not backfilled:
                 with Measure(self._clock, "_calculate_state_and_extrem"):
                     # Work out the new "current state" for each room.
@@ -615,7 +619,7 @@ class EventsPersistenceStorageController:
                         )
 
                     for room_id, ev_ctx_rm in events_by_room.items():
-                        latest_event_ids = set(
+                        latest_event_ids = (
                             await self.main_store.get_latest_event_ids_in_room(room_id)
                         )
                         new_latest_event_ids = await self._calculate_new_extremities(
@@ -716,13 +720,9 @@ class EventsPersistenceStorageController:
                                 room_id,
                                 ev_ctx_rm,
                                 delta,
-                                current_state,
-                                potentially_left_users,
                             )
                             if not is_still_joined:
                                 logger.info("Server no longer in room %s", room_id)
-                                latest_event_ids = set()
-                                current_state = {}
                                 delta.no_longer_in_room = True
 
                             state_delta_for_room[room_id] = delta
@@ -735,15 +735,13 @@ class EventsPersistenceStorageController:
                 inhibit_local_membership_updates=backfilled,
             )
 
-            await self._handle_potentially_left_users(potentially_left_users)
-
         return replaced_events
 
     async def _calculate_new_extremities(
         self,
         room_id: str,
         event_contexts: List[Tuple[EventBase, EventContext]],
-        latest_event_ids: Collection[str],
+        latest_event_ids: AbstractSet[str],
     ) -> Set[str]:
         """Calculates the new forward extremities for a room given events to
         persist.
@@ -760,8 +758,6 @@ class EventsPersistenceStorageController:
             and not ctx.rejected
             and not event.internal_metadata.is_soft_failed()
         ]
-
-        latest_event_ids = set(latest_event_ids)
 
         # start with the existing forward extremities
         result = set(latest_event_ids)
@@ -801,7 +797,7 @@ class EventsPersistenceStorageController:
         self,
         room_id: str,
         events_context: List[Tuple[EventBase, EventContext]],
-        old_latest_event_ids: Set[str],
+        old_latest_event_ids: AbstractSet[str],
         new_latest_event_ids: Set[str],
     ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]], Set[str]]:
         """Calculate the current state dict after adding some new events to
@@ -849,9 +845,8 @@ class EventsPersistenceStorageController:
                         "group" % (ev.event_id,)
                     )
                 continue
-
-            if ctx.prev_group:
-                state_group_deltas[(ctx.prev_group, ctx.state_group)] = ctx.delta_ids
+            if ctx.state_group_deltas:
+                state_group_deltas.update(ctx.state_group_deltas)
 
         # We need to map the event_ids to their state groups. First, let's
         # check if the event is one we're persisting, in which case we can
@@ -1112,8 +1107,6 @@ class EventsPersistenceStorageController:
         room_id: str,
         ev_ctx_rm: List[Tuple[EventBase, EventContext]],
         delta: DeltaState,
-        current_state: Optional[StateMap[str]],
-        potentially_left_users: Set[str],
     ) -> bool:
         """Check if the server will still be joined after the given events have
         been persised.
@@ -1123,11 +1116,6 @@ class EventsPersistenceStorageController:
             ev_ctx_rm
             delta: The delta of current state between what is in the database
                 and what the new current state will be.
-            current_state: The new current state if it already been calculated,
-                otherwise None.
-            potentially_left_users: If the server has left the room, then joined
-                remote users will be added to this set to indicate that the
-                server may no longer be sharing a room with them.
         """
 
         if not any(
@@ -1181,45 +1169,4 @@ class EventsPersistenceStorageController:
         ):
             return True
 
-        # The server will leave the room, so we go and find out which remote
-        # users will still be joined when we leave.
-        if current_state is None:
-            current_state = await self.main_store.get_partial_current_state_ids(room_id)
-            current_state = dict(current_state)
-            for key in delta.to_delete:
-                current_state.pop(key, None)
-
-            current_state.update(delta.to_insert)
-
-        remote_event_ids = [
-            event_id
-            for (
-                typ,
-                state_key,
-            ), event_id in current_state.items()
-            if typ == EventTypes.Member and not self.is_mine_id(state_key)
-        ]
-        members = await self.main_store.get_membership_from_event_ids(remote_event_ids)
-        potentially_left_users.update(
-            member.user_id
-            for member in members.values()
-            if member and member.membership == Membership.JOIN
-        )
-
         return False
-
-    async def _handle_potentially_left_users(self, user_ids: Set[str]) -> None:
-        """Given a set of remote users check if the server still shares a room with
-        them. If not then mark those users' device cache as stale.
-        """
-
-        if not user_ids:
-            return
-
-        joined_users = await self.main_store.get_users_server_still_shares_room_with(
-            user_ids
-        )
-        left_users = user_ids - joined_users
-
-        for user_id in left_users:
-            await self.main_store.mark_remote_user_device_list_as_unsubscribed(user_id)

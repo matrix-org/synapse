@@ -17,7 +17,6 @@ import logging
 from typing import (
     Awaitable,
     Callable,
-    Collection,
     Dict,
     Iterable,
     List,
@@ -32,7 +31,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateMap, StrCollection
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ async def resolve_events_with_store(
     room_version: RoomVersion,
     state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
-    state_map_factory: Callable[[Collection[str]], Awaitable[Dict[str, EventBase]]],
+    state_map_factory: Callable[[StrCollection], Awaitable[Dict[str, EventBase]]],
 ) -> StateMap[str]:
     """
     Args:

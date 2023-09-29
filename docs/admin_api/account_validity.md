@@ -1,11 +1,13 @@
 # Account validity API
 
+**Note:** This API is disabled when MSC3861 is enabled. [See #15582](https://github.com/matrix-org/synapse/pull/15582)
+
 This API allows a server administrator to manage the validity of an account. To
 use it, you must enable the account validity feature (under
 `account_validity`) in Synapse's configuration.
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [Admin API](../usage/administration/admin_api).
+for a server admin: see [Admin API](../usage/administration/admin_api/).
 
 ## Renew account
 

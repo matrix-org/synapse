@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Union
 
+from synapse.logging.opentracing import tag_args, trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -22,8 +23,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.state import StateFilter
 from synapse.types import MutableStateMap, StateMap
+from synapse.types.state import StateFilter
 from synapse.util.caches import intern_string
 
 if TYPE_CHECKING:
@@ -40,6 +41,8 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
     updates.
     """
 
+    @trace
+    @tag_args
     def _count_state_group_hops_txn(
         self, txn: LoggingTransaction, state_group: int
     ) -> int:
@@ -83,22 +86,29 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
             return count
 
+    @trace
+    @tag_args
     def _get_state_groups_from_groups_txn(
         self,
         txn: LoggingTransaction,
         groups: List[int],
         state_filter: Optional[StateFilter] = None,
     ) -> Mapping[int, StateMap[str]]:
+        """
+        Given a number of state groups, fetch the latest state for each group.
+
+        Args:
+            txn: The transaction object.
+            groups: The given state groups that you want to fetch the latest state for.
+            state_filter: The state filter to apply the state we fetch state from the database.
+
+        Returns:
+            Map from state_group to a StateMap at that point.
+        """
+
         state_filter = state_filter or StateFilter.all()
 
         results: Dict[int, MutableStateMap[str]] = {group: {} for group in groups}
-
-        where_clause, where_args = state_filter.make_sql_filter_clause()
-
-        # Unless the filter clause is empty, we're going to append it after an
-        # existing where clause
-        if where_clause:
-            where_clause = " AND (%s)" % (where_clause,)
 
         if isinstance(self.database_engine, PostgresEngine):
             # Temporarily disable sequential scans in this transaction. This is
@@ -110,31 +120,91 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             # against `state_groups_state` to fetch the latest state.
             # It assumes that previous state groups are always numerically
             # lesser.
-            # The PARTITION is used to get the event_id in the greatest state
-            # group for the given type, state_key.
             # This may return multiple rows per (type, state_key), but last_value
             # should be the same.
             sql = """
-                WITH RECURSIVE state(state_group) AS (
+                WITH RECURSIVE sgs(state_group) AS (
                     VALUES(?::bigint)
                     UNION ALL
-                    SELECT prev_state_group FROM state_group_edges e, state s
+                    SELECT prev_state_group FROM state_group_edges e, sgs s
                     WHERE s.state_group = e.state_group
                 )
-                SELECT DISTINCT ON (type, state_key)
-                    type, state_key, event_id
-                FROM state_groups_state
-                WHERE state_group IN (
-                    SELECT state_group FROM state
-                ) %s
-                ORDER BY type, state_key, state_group DESC
+                %s
             """
+
+            overall_select_query_args: List[Union[int, str]] = []
+
+            # This is an optimization to create a select clause per-condition. This
+            # makes the query planner a lot smarter on what rows should pull out in the
+            # first place and we end up with something that takes 10x less time to get a
+            # result.
+            use_condition_optimization = (
+                not state_filter.include_others and not state_filter.is_full()
+            )
+            state_filter_condition_combos: List[Tuple[str, Optional[str]]] = []
+            # We don't need to caclculate this list if we're not using the condition
+            # optimization
+            if use_condition_optimization:
+                for etype, state_keys in state_filter.types.items():
+                    if state_keys is None:
+                        state_filter_condition_combos.append((etype, None))
+                    else:
+                        for state_key in state_keys:
+                            state_filter_condition_combos.append((etype, state_key))
+            # And here is the optimization itself. We don't want to do the optimization
+            # if there are too many individual conditions. 10 is an arbitrary number
+            # with no testing behind it but we do know that we specifically made this
+            # optimization for when we grab the necessary state out for
+            # `filter_events_for_client` which just uses 2 conditions
+            # (`EventTypes.RoomHistoryVisibility` and `EventTypes.Member`).
+            if use_condition_optimization and len(state_filter_condition_combos) < 10:
+                select_clause_list: List[str] = []
+                for etype, skey in state_filter_condition_combos:
+                    if skey is None:
+                        where_clause = "(type = ?)"
+                        overall_select_query_args.extend([etype])
+                    else:
+                        where_clause = "(type = ? AND state_key = ?)"
+                        overall_select_query_args.extend([etype, skey])
+
+                    select_clause_list.append(
+                        f"""
+                        (
+                            SELECT DISTINCT ON (type, state_key)
+                                type, state_key, event_id
+                            FROM state_groups_state
+                            INNER JOIN sgs USING (state_group)
+                            WHERE {where_clause}
+                            ORDER BY type, state_key, state_group DESC
+                        )
+                        """
+                    )
+
+                overall_select_clause = " UNION ".join(select_clause_list)
+            else:
+                where_clause, where_args = state_filter.make_sql_filter_clause()
+                # Unless the filter clause is empty, we're going to append it after an
+                # existing where clause
+                if where_clause:
+                    where_clause = " AND (%s)" % (where_clause,)
+
+                overall_select_query_args.extend(where_args)
+
+                overall_select_clause = f"""
+                    SELECT DISTINCT ON (type, state_key)
+                        type, state_key, event_id
+                    FROM state_groups_state
+                    WHERE state_group IN (
+                        SELECT state_group FROM sgs
+                    ) {where_clause}
+                    ORDER BY type, state_key, state_group DESC
+                """
 
             for group in groups:
                 args: List[Union[int, str]] = [group]
-                args.extend(where_args)
+                args.extend(overall_select_query_args)
 
-                txn.execute(sql % (where_clause,), args)
+                txn.execute(sql % (overall_select_clause,), args)
                 for row in txn:
                     typ, state_key, event_id = row
                     key = (intern_string(typ), intern_string(state_key))
@@ -142,8 +212,16 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         else:
             max_entries_returned = state_filter.max_entries_returned()
 
-            # We don't use WITH RECURSIVE on sqlite3 as there are distributions
-            # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
+            where_clause, where_args = state_filter.make_sql_filter_clause()
+            # Unless the filter clause is empty, we're going to append it after an
+            # existing where clause
+            if where_clause:
+                where_clause = " AND (%s)" % (where_clause,)
+
+            # XXX: We could `WITH RECURSIVE` here since it's supported on SQLite 3.8.3
+            # or higher and our minimum supported version is greater than that.
+            #
+            # We just haven't put in the time to refactor this.
             for group in groups:
                 next_group: Optional[int] = group
 
@@ -192,11 +270,20 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
 
 
 class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
-
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
     STATE_GROUPS_ROOM_INDEX_UPDATE_NAME = "state_groups_room_id_idx"
     STATE_GROUP_EDGES_UNIQUE_INDEX_UPDATE_NAME = "state_group_edges_unique_idx"
+
+    CURRENT_STATE_EVENTS_STREAM_ORDERING_INDEX_UPDATE_NAME = (
+        "current_state_events_stream_ordering_idx"
+    )
+    ROOM_MEMBERSHIPS_STREAM_ORDERING_INDEX_UPDATE_NAME = (
+        "room_memberships_stream_ordering_idx"
+    )
+    LOCAL_CURRENT_MEMBERSHIP_STREAM_ORDERING_INDEX_UPDATE_NAME = (
+        "local_current_membership_stream_ordering_idx"
+    )
 
     def __init__(
         self,
@@ -232,6 +319,27 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             unique=True,
             # The old index was on (state_group) and was not unique.
             replaces_index="state_group_edges_idx",
+        )
+
+        # These indices are needed to validate the foreign key constraint
+        # when events are deleted.
+        self.db_pool.updates.register_background_index_update(
+            self.CURRENT_STATE_EVENTS_STREAM_ORDERING_INDEX_UPDATE_NAME,
+            index_name="current_state_events_stream_ordering_idx",
+            table="current_state_events",
+            columns=["event_stream_ordering"],
+        )
+        self.db_pool.updates.register_background_index_update(
+            self.ROOM_MEMBERSHIPS_STREAM_ORDERING_INDEX_UPDATE_NAME,
+            index_name="room_memberships_stream_ordering_idx",
+            table="room_memberships",
+            columns=["event_stream_ordering"],
+        )
+        self.db_pool.updates.register_background_index_update(
+            self.LOCAL_CURRENT_MEMBERSHIP_STREAM_ORDERING_INDEX_UPDATE_NAME,
+            index_name="local_current_membership_stream_ordering_idx",
+            table="local_current_membership",
+            columns=["event_stream_ordering"],
         )
 
     async def _background_deduplicate_state(

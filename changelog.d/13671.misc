@@ -1,1 +1,0 @@
-Introduce a `CommonUsageMetrics` class to share some usage metrics between the Prometheus exporter and the phone home stats.

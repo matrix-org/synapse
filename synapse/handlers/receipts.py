@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Tuple
 
 from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     ReadReceipt,
     StreamKeyType,
     UserID,
@@ -37,6 +38,8 @@ class ReceiptsHandler:
         self.server_name = hs.config.server.server_name
         self.store = hs.get_datastores().main
         self.event_auth_handler = hs.get_event_auth_handler()
+        self.event_handler = hs.get_event_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.hs = hs
 
@@ -70,12 +73,26 @@ class ReceiptsHandler:
             # If we're not in the room just ditch the event entirely. This is
             # probably an old server that has come back and thinks we're still in
             # the room (or we've been rejoined to the room by a state reset).
-            is_in_room = await self.event_auth_handler.check_host_in_room(
+            is_in_room = await self.event_auth_handler.is_host_in_room(
                 room_id, self.server_name
             )
             if not is_in_room:
                 logger.info(
                     "Ignoring receipt for room %r from server %s as we're not in the room",
+                    room_id,
+                    origin,
+                )
+                continue
+
+            # Let's check that the origin server is in the room before accepting the receipt.
+            # We don't want to block waiting on a partial state so take an
+            # approximation if needed.
+            domains = await self._storage_controllers.state.get_current_hosts_in_room_or_partial_state_approximation(
+                room_id
+            )
+            if origin not in domains:
+                logger.info(
+                    "Ignoring receipt for room %r from server %s as they're not in the room",
                     room_id,
                     origin,
                 )
@@ -91,13 +108,21 @@ class ReceiptsHandler:
                         )
                         continue
 
+                    # Check if these receipts apply to a thread.
+                    data = user_values.get("data", {})
+                    thread_id = data.get("thread_id")
+                    # If the thread ID is invalid, consider it missing.
+                    if not isinstance(thread_id, str):
+                        thread_id = None
+
                     receipts.append(
                         ReadReceipt(
                             room_id=room_id,
                             receipt_type=receipt_type,
                             user_id=user_id,
                             event_ids=user_values["event_ids"],
-                            data=user_values.get("data", {}),
+                            thread_id=thread_id,
+                            data=data,
                         )
                     )
 
@@ -114,6 +139,7 @@ class ReceiptsHandler:
                 receipt.receipt_type,
                 receipt.user_id,
                 receipt.event_ids,
+                receipt.thread_id,
                 receipt.data,
             )
 
@@ -146,16 +172,28 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str
+        self,
+        room_id: str,
+        receipt_type: str,
+        user_id: UserID,
+        event_id: str,
+        thread_id: Optional[str],
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
+
+        # Ensure the room/event exists, this will raise an error if the user
+        # cannot view the event.
+        if not await self.event_handler.get_event(user_id, room_id, event_id):
+            return
+
         receipt = ReadReceipt(
             room_id=room_id,
             receipt_type=receipt_type,
-            user_id=user_id,
+            user_id=user_id.to_string(),
             event_ids=[event_id],
+            thread_id=thread_id,
             data={"ts": int(self.clock.time_msec())},
         )
 
@@ -167,15 +205,15 @@ class ReceiptsHandler:
             await self.federation_sender.send_read_receipt(receipt)
 
 
-class ReceiptEventSource(EventSource[int, JsonDict]):
+class ReceiptEventSource(EventSource[int, JsonMapping]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.config = hs.config
 
     @staticmethod
     def filter_out_private_receipts(
-        rooms: List[JsonDict], user_id: str
-    ) -> List[JsonDict]:
+        rooms: Sequence[JsonMapping], user_id: str
+    ) -> List[JsonMapping]:
         """
         Filters a list of serialized receipts (as returned by /sync and /initialSync)
         and removes private read receipts of other users.
@@ -192,7 +230,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             The same as rooms, but filtered.
         """
 
-        result = []
+        result: List[JsonMapping] = []
 
         # Iterate through each room's receipt content.
         for room in rooms:
@@ -241,11 +279,11 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self,
         user: UserID,
         from_key: int,
-        limit: Optional[int],
+        limit: int,
         room_ids: Iterable[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[JsonMapping], int]:
         from_key = int(from_key)
         to_key = self.get_current_key()
 
@@ -264,7 +302,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
     async def get_new_events_as(
         self, from_key: int, to_key: int, service: ApplicationService
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[JsonMapping], int]:
         """Returns a set of new read receipt events that an appservice
         may be interested in.
 
@@ -300,5 +338,5 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         return events, to_key
 
-    def get_current_key(self, direction: str = "f") -> int:
+    def get_current_key(self) -> int:
         return self.store.get_max_receipt_stream_id()

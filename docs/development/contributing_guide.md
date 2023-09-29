@@ -22,14 +22,16 @@ on Windows is not officially supported.
 
 The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://www.python.org/downloads/). Your Python also needs support for [virtual environments](https://docs.python.org/3/library/venv.html). This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running `sudo apt install python3-venv` should be enough.
 
+A recent version of the Rust compiler is needed to build the native modules. The
+easiest way of installing the latest version is to use [rustup](https://rustup.rs/).
+
 Synapse can connect to PostgreSQL via the [psycopg2](https://pypi.org/project/psycopg2/) Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with `sudo apt install libpq-dev`.
+
+Synapse has an optional, improved user search with better Unicode support. For that you need the development package of `libicu`. On Debian or Ubuntu Linux, this can be installed with `sudo apt install libicu-dev`.
 
 The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
-
-A recent version of the Rust compiler is needed to build the native modules. The
-easiest way of installing the latest version is to use [rustup](https://rustup.rs/).
 
 
 # 3. Get the source.
@@ -51,6 +53,11 @@ can find many good git tutorials on the web.
 
 # 4. Install the dependencies
 
+
+Before installing the Python dependencies, make sure you have installed a recent version
+of Rust (see the "What do I need?" section above). The easiest way of installing the
+latest version is to use [rustup](https://rustup.rs/).
+
 Synapse uses the [poetry](https://python-poetry.org/) project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
 source, you should install `poetry`.
@@ -65,7 +72,7 @@ pipx install poetry
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
 for other installation methods.
 
-Synapse requires Poetry version 1.2.0 or later.
+Developing Synapse requires Poetry version 1.3.2 or later.
 
 Next, open a terminal and install dependencies as follows:
 
@@ -74,8 +81,39 @@ cd path/where/you/have/cloned/the/repository
 poetry install --extras all
 ```
 
-This will install the runtime and developer dependencies for the project.
+This will install the runtime and developer dependencies for the project.  Be sure to check
+that the `poetry install` step completed cleanly.
 
+## Running Synapse via poetry
+
+To start a local instance of Synapse in the locked poetry environment, create a config file:
+
+```sh
+cp docs/sample_config.yaml homeserver.yaml
+cp docs/sample_log_config.yaml log_config.yaml
+```
+
+Now edit `homeserver.yaml`, things you might want to change include:
+
+- Set a `server_name`
+- Adjusting paths to be correct for your system like the `log_config` to point to the log config you just copied
+- Using a [PostgreSQL database instead of SQLite](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#database)
+- Adding a [`registration_shared_secret`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration_shared_secret) so you can use [`register_new_matrix_user` command](https://matrix-org.github.io/synapse/latest/setup/installation.html#registering-a-user).
+
+And then run Synapse with the following command:
+
+```sh
+poetry run python -m synapse.app.homeserver -c homeserver.yaml
+```
+
+If you get an error like the following:
+
+```
+importlib.metadata.PackageNotFoundError: matrix-synapse
+```
+
+this probably indicates that the `poetry install` step did not complete cleanly - go back and
+resolve any issues and re-run until successful.
 
 # 5. Get in touch.
 
@@ -104,8 +142,8 @@ regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.
 
 Synapse's code style is documented [here](../code_style.md). Please follow
-it, including the conventions for the [sample configuration
-file](../code_style.md#configuration-file-format).
+it, including the conventions for [configuration
+options and documentation](../code_style.md#configuration-code-and-documentation-format).
 
 We welcome improvements and additions to our documentation itself! When
 writing new pages, please
@@ -124,7 +162,7 @@ changes to the Rust code.
 
 
 # 8. Test, test, test!
-<a name="test-test-test"></a>
+<a name="test-test-test" id="test-test-test"></a>
 
 While you're developing and before submitting a patch, you'll
 want to test your code.
@@ -165,6 +203,12 @@ was broken. They are slower than the linters but will typically catch more error
 
 ```sh
 poetry run trial tests
+```
+
+You can run unit tests in parallel by specifying `-jX` argument to `trial` where `X` is the number of parallel runners you want. To use 4 cpu cores, you would run them like:
+
+```sh
+poetry run trial -j4 tests
 ```
 
 If you wish to only run *some* unit tests, you may specify
@@ -222,7 +266,7 @@ The easiest way to do so is to run Postgres via a docker container. In one
 terminal:
 
 ```shell
-docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 postgres:14
 ```
 
 If you see an error like
@@ -278,7 +322,7 @@ The following command will let you run the integration test with the most common
 configuration:
 
 ```sh
-$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
+$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:focal
 ```
 (Note that the paths must be full paths! You could also write `$(realpath relative/path)` if needed.)
 
@@ -318,6 +362,15 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
 
 - Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
 - Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+  - If setting `WORKERS=1`, optionally set `WORKER_TYPES=` to declare which worker
+    types you wish to test. A simple comma-delimited string containing the worker types
+    defined from the `WORKERS_CONFIG` template in
+    [here](https://github.com/matrix-org/synapse/blob/develop/docker/configure_workers_and_start.py#L54).
+    A safe example would be `WORKER_TYPES="federation_inbound, federation_sender, synchrotron"`.
+    See the [worker documentation](../workers.md) for additional information on workers.
+- Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
+- Passing `PODMAN=1` will use the [podman](https://podman.io/) container runtime, instead of docker.
+- Passing `UNIX_SOCKETS=1` will utilise Unix socket functionality for Synapse, Redis, and Postgres(when applicable).
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh
@@ -327,7 +380,7 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/compleme
 ### Prettier formatting with `gotestfmt`
 
 If you want to format the output of the tests the same way as it looks in CI,
-install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+install [gotestfmt](https://github.com/GoTestTools/gotestfmt).
 
 You can then use this incantation to format the tests appropriately:
 
@@ -368,7 +421,7 @@ To prepare a Pull Request, please:
 ## Changelog
 
 All changes, even minor ones, need a corresponding changelog / newsfragment
-entry. These are managed by [Towncrier](https://github.com/hawkowl/towncrier).
+entry. These are managed by [Towncrier](https://github.com/twisted/towncrier).
 
 To create a changelog entry, make a new file in the `changelog.d` directory named
 in the format of `PRnumber.type`. The type can be one of the following:
@@ -384,7 +437,7 @@ This file will become part of our [changelog](
 https://github.com/matrix-org/synapse/blob/master/CHANGES.md) at the next
 release, so the content of the file should be a short description of your
 change in the same style as the rest of the changelog. The file can contain Markdown
-formatting, and should end with a full stop (.) or an exclamation mark (!) for
+formatting, and must end with a full stop (.) or an exclamation mark (!) for
 consistency.
 
 Adding credits to the changelog is encouraged, we value your
@@ -410,8 +463,7 @@ chicken-and-egg problem.
 There are two options for solving this:
 
 1. Open the PR without a changelog file, see what number you got, and *then*
-   add the changelog file to your branch (see [Updating your pull
-   request](#updating-your-pull-request)), or:
+   add the changelog file to your branch, or:
 
 1. Look at the [list of all
    issues/PRs](https://github.com/matrix-org/synapse/issues?q=), add one to the

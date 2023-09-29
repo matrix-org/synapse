@@ -1,1 +1,0 @@
-Remove the ability to use direct TCP replication with workers. Direct TCP replication was deprecated in Synapse v1.18.0. Workers now require using Redis.

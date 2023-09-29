@@ -59,16 +59,16 @@ class ProfileHandler:
         self.max_avatar_size = hs.config.server.max_avatar_size
         self.allowed_avatar_mimetypes = hs.config.server.allowed_avatar_mimetypes
 
-        self.server_name = hs.config.server.server_name
+        self._is_mine_server_name = hs.is_mine_server_name
 
-        self._third_party_rules = hs.get_third_party_event_rules()
+        self._third_party_rules = hs.get_module_api_callbacks().third_party_event_rules
 
-    async def get_profile(self, user_id: str) -> JsonDict:
+    async def get_profile(self, user_id: str, ignore_backoff: bool = True) -> JsonDict:
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
-            profileinfo = await self.store.get_profileinfo(target_user.localpart)
-            if profileinfo.display_name is None:
+            profileinfo = await self.store.get_profileinfo(target_user)
+            if profileinfo.display_name is None and profileinfo.avatar_url is None:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
 
             return {
@@ -81,7 +81,7 @@ class ProfileHandler:
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": user_id},
-                    ignore_backoff=True,
+                    ignore_backoff=ignore_backoff,
                 )
                 return result
             except RequestSendFailed as e:
@@ -99,9 +99,7 @@ class ProfileHandler:
     async def get_displayname(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
             try:
-                displayname = await self.store.get_profile_displayname(
-                    target_user.localpart
-                )
+                displayname = await self.store.get_profile_displayname(target_user)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
@@ -147,7 +145,7 @@ class ProfileHandler:
             raise AuthError(400, "Cannot set another user's displayname")
 
         if not by_admin and not self.hs.config.registration.enable_set_displayname:
-            profile = await self.store.get_profileinfo(target_user.localpart)
+            profile = await self.store.get_profileinfo(target_user)
             if profile.display_name:
                 raise SynapseError(
                     400,
@@ -165,24 +163,22 @@ class ProfileHandler:
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
             )
 
-        displayname_to_set: Optional[str] = new_displayname
+        displayname_to_set: Optional[str] = new_displayname.strip()
         if new_displayname == "":
             displayname_to_set = None
 
         # If the admin changes the display name of a user, the requesting user cannot send
-        # the join event to update the displayname in the rooms.
-        # This must be done by the target user himself.
+        # the join event to update the display name in the rooms.
+        # This must be done by the target user themselves.
         if by_admin:
             requester = create_requester(
                 target_user,
                 authenticated_entity=requester.authenticated_entity,
             )
 
-        await self.store.set_profile_displayname(
-            target_user.localpart, displayname_to_set
-        )
+        await self.store.set_profile_displayname(target_user, displayname_to_set)
 
-        profile = await self.store.get_profileinfo(target_user.localpart)
+        profile = await self.store.get_profileinfo(target_user)
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
         )
@@ -196,9 +192,7 @@ class ProfileHandler:
     async def get_avatar_url(self, target_user: UserID) -> Optional[str]:
         if self.hs.is_mine(target_user):
             try:
-                avatar_url = await self.store.get_profile_avatar_url(
-                    target_user.localpart
-                )
+                avatar_url = await self.store.get_profile_avatar_url(target_user)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
@@ -243,7 +237,7 @@ class ProfileHandler:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
         if not by_admin and not self.hs.config.registration.enable_set_avatar_url:
-            profile = await self.store.get_profileinfo(target_user.localpart)
+            profile = await self.store.get_profileinfo(target_user)
             if profile.avatar_url:
                 raise SynapseError(
                     400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
@@ -272,11 +266,9 @@ class ProfileHandler:
                 target_user, authenticated_entity=requester.authenticated_entity
             )
 
-        await self.store.set_profile_avatar_url(
-            target_user.localpart, avatar_url_to_set
-        )
+        await self.store.set_profile_avatar_url(target_user, avatar_url_to_set)
 
-        profile = await self.store.get_profileinfo(target_user.localpart)
+        profile = await self.store.get_profileinfo(target_user)
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
         )
@@ -307,9 +299,13 @@ class ProfileHandler:
         if not self.max_avatar_size and not self.allowed_avatar_mimetypes:
             return True
 
-        server_name, _, media_id = parse_and_validate_mxc_uri(mxc)
+        host, port, media_id = parse_and_validate_mxc_uri(mxc)
+        if port is not None:
+            server_name = host + ":" + str(port)
+        else:
+            server_name = host
 
-        if server_name == self.server_name:
+        if self._is_mine_server_name(server_name):
             media_info = await self.store.get_local_media(media_id)
         else:
             media_info = await self.store.get_cached_remote_media(server_name, media_id)
@@ -369,14 +365,10 @@ class ProfileHandler:
         response = {}
         try:
             if just_field is None or just_field == "displayname":
-                response["displayname"] = await self.store.get_profile_displayname(
-                    user.localpart
-                )
+                response["displayname"] = await self.store.get_profile_displayname(user)
 
             if just_field is None or just_field == "avatar_url":
-                response["avatar_url"] = await self.store.get_profile_avatar_url(
-                    user.localpart
-                )
+                response["avatar_url"] = await self.store.get_profile_avatar_url(user)
         except StoreError as e:
             if e.code == 404:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)

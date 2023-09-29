@@ -34,6 +34,7 @@ from twisted.logger import (
 
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
+from synapse.synapse_rust import reset_logging_config
 from synapse.types import JsonDict
 
 from ..util import SYNAPSE_VERSION
@@ -53,7 +54,7 @@ DEFAULT_LOG_CONFIG = Template(
 # Synapse also supports structured logging for machine readable logs which can
 # be ingested by ELK stacks. See [2] for details.
 #
-# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [1]: https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema
 # [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
@@ -116,9 +117,7 @@ root:
     # Write logs to the `buffer` handler, which will buffer them together in memory,
     # then write them to a file.
     #
-    # Replace "buffer" with "console" to log to stderr instead. (Note that you'll
-    # also need to update the configuration for the `twisted` logger above, in
-    # this case.)
+    # Replace "buffer" with "console" to log to stderr instead.
     #
     handlers: [buffer]
 
@@ -200,24 +199,6 @@ def _setup_stdlib_logging(
     """
     Set up Python standard library logging.
     """
-    if log_config_path is None:
-        log_format = (
-            "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
-            " - %(message)s"
-        )
-
-        logger = logging.getLogger("")
-        logger.setLevel(logging.INFO)
-        logging.getLogger("synapse.storage.SQL").setLevel(logging.INFO)
-
-        formatter = logging.Formatter(log_format)
-
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    else:
-        # Load the logging configuration.
-        _load_logging_config(log_config_path)
 
     # We add a log record factory that runs all messages through the
     # LoggingContextFilter so that we get the context *at the time we log*
@@ -236,6 +217,26 @@ def _setup_stdlib_logging(
         return record
 
     logging.setLogRecordFactory(factory)
+
+    # Configure the logger with the initial configuration.
+    if log_config_path is None:
+        log_format = (
+            "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
+            " - %(message)s"
+        )
+
+        logger = logging.getLogger("")
+        logger.setLevel(logging.INFO)
+        logging.getLogger("synapse.storage.SQL").setLevel(logging.INFO)
+
+        formatter = logging.Formatter(log_format)
+
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    else:
+        # Load the logging configuration.
+        _load_logging_config(log_config_path)
 
     # Route Twisted's native logging through to the standard library logging
     # system.
@@ -294,6 +295,9 @@ def _load_logging_config(log_config_path: str) -> None:
 
     logging.config.dictConfig(log_config)
 
+    # Blow away the pyo3-log cache so that it reloads the configuration.
+    reset_logging_config()
+
 
 def _reload_logging_config(log_config_path: Optional[str]) -> None:
     """
@@ -317,15 +321,16 @@ def setup_logging(
     Set up the logging subsystem.
 
     Args:
-        config (LoggingConfig | synapse.config.worker.WorkerConfig):
-            configuration data
+        config: configuration data
 
-        use_worker_options (bool): True to use the 'worker_log_config' option
+        use_worker_options: True to use the 'worker_log_config' option
             instead of 'log_config'.
 
         logBeginner: The Twisted logBeginner to use.
 
     """
+    from twisted.internet import reactor
+
     log_config_path = (
         config.worker.worker_log_config
         if use_worker_options
@@ -348,3 +353,4 @@ def setup_logging(
     )
     logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())
+    logging.info("Twisted reactor: %s", type(reactor).__name__)

@@ -21,16 +21,13 @@ require. But this is probably just symptomatic of Python's package management.
 """
 
 import logging
+from importlib import metadata
 from typing import Iterable, NamedTuple, Optional
 
 from packaging.requirements import Requirement
 
 DISTRIBUTION_NAME = "matrix-synapse"
 
-try:
-    from importlib import metadata
-except ImportError:
-    import importlib_metadata as metadata  # type: ignore[no-redef]
 
 __all__ = ["check_requirements"]
 
@@ -54,9 +51,9 @@ class DependencyException(Exception):
 
 
 DEV_EXTRAS = {"lint", "mypy", "test", "dev"}
-RUNTIME_EXTRAS = (
-    set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")) - DEV_EXTRAS
-)
+ALL_EXTRAS = metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")
+assert ALL_EXTRAS is not None
+RUNTIME_EXTRAS = set(ALL_EXTRAS) - DEV_EXTRAS
 VERSION = metadata.version(DISTRIBUTION_NAME)
 
 
@@ -64,6 +61,21 @@ def _is_dev_dependency(req: Requirement) -> bool:
     return req.marker is not None and any(
         req.marker.evaluate({"extra": e}) for e in DEV_EXTRAS
     )
+
+
+def _should_ignore_runtime_requirement(req: Requirement) -> bool:
+    # This is a build-time dependency. Irritatingly, `poetry build` ignores the
+    # requirements listed in the [build-system] section of pyproject.toml, so in order
+    # to support `poetry install --no-dev` we have to mark it as a runtime dependency.
+    # See discussion on https://github.com/python-poetry/poetry/issues/6154 (it sounds
+    # like the poetry authors don't consider this a bug?)
+    #
+    # In any case, workaround this by ignoring setuptools_rust here. (It might be
+    # slightly cleaner to put `setuptools_rust` in a `build` extra or similar, but for
+    # now let's do something quick and dirty.
+    if req.name == "setuptools_rust":
+        return True
+    return False
 
 
 class Dependency(NamedTuple):
@@ -77,7 +89,7 @@ def _generic_dependencies() -> Iterable[Dependency]:
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
-        if _is_dev_dependency(req):
+        if _is_dev_dependency(req) or _should_ignore_runtime_requirement(req):
             continue
 
         # https://packaging.pypa.io/en/latest/markers.html#usage notes that
@@ -168,7 +180,7 @@ def check_requirements(extra: Optional[str] = None) -> None:
     deps_unfulfilled = []
     errors = []
 
-    for (requirement, must_be_installed) in dependencies:
+    for requirement, must_be_installed in dependencies:
         try:
             dist: metadata.Distribution = metadata.distribution(requirement.name)
         except metadata.PackageNotFoundError:

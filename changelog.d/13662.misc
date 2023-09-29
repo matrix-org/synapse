@@ -1,1 +1,0 @@
-Generalise the `@cancellable` annotation so it can be used on functions other than just servlet methods.

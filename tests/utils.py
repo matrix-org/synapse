@@ -15,7 +15,7 @@
 
 import atexit
 import os
-from typing import Any, Callable, Dict, List, Tuple, Union, overload
+from typing import Any, Callable, Dict, List, Tuple, Type, TypeVar, Union, overload
 
 import attr
 from typing_extensions import Literal, ParamSpec
@@ -125,11 +125,15 @@ def default_config(
     """
     config_dict = {
         "server_name": name,
-        "send_federation": False,
+        # Setting this to an empty list turns off federation sending.
+        "federation_sender_instances": [],
         "media_store_path": "media",
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
+        # Disable trusted key servers, otherwise unit tests might try to actually
+        # reach out to matrix.org.
+        "trusted_key_servers": [],
         "event_cache_size": 1,
         "enable_registration": True,
         "enable_registration_captcha": False,
@@ -183,8 +187,9 @@ def default_config(
         # rooms will fail.
         "default_room_version": DEFAULT_ROOM_VERSION,
         # disable user directory updates, because they get done in the
-        # background, which upsets the test runner.
-        "update_user_directory": False,
+        # background, which upsets the test runner. Setting this to an
+        # (obviously) fake worker name disables updating the user directory.
+        "update_user_directory_from_worker": "does_not_exist_worker_name",
         "caches": {"global_factor": 1, "sync_response_cache_duration": 0},
         "listeners": [{"port": 0, "type": "http"}],
     }
@@ -270,9 +275,7 @@ class MockClock:
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        # This type-ignore should be redundant once we use a mypy release with
-        # https://github.com/python/mypy/pull/12668.
-        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))  # type: ignore[arg-type]
+        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))
 
     def cancel_call_later(self, timer: Timer, ignore_errs: bool = False) -> None:
         if timer.expired:
@@ -335,6 +338,33 @@ async def create_room(hs: HomeServer, room_id: str, creator_id: str) -> None:
         },
     )
 
-    event, context = await event_creation_handler.create_new_client_event(builder)
+    event, unpersisted_context = await event_creation_handler.create_new_client_event(
+        builder
+    )
+    context = await unpersisted_context.persist(event)
 
     await persistence_store.persist_event(event, context)
+
+
+T = TypeVar("T")
+
+
+def checked_cast(type: Type[T], x: object) -> T:
+    """A version of typing.cast that is checked at runtime.
+
+    We have our own function for this for two reasons:
+
+    1. typing.cast itself is deliberately a no-op at runtime, see
+       https://docs.python.org/3/library/typing.html#typing.cast
+    2. To help workaround a mypy-zope bug https://github.com/Shoobx/mypy-zope/issues/91
+       where mypy would erroneously consider `isinstance(x, type)` to be false in all
+       circumstances.
+
+    For this to make sense, `T` needs to be something that `isinstance` can check; see
+        https://docs.python.org/3/library/functions.html?highlight=isinstance#isinstance
+        https://docs.python.org/3/glossary.html#term-abstract-base-class
+        https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+    for more details.
+    """
+    assert isinstance(x, type)
+    return x

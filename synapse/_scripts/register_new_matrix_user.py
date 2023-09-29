@@ -47,7 +47,6 @@ def request_registration(
     _print: Callable[[str], None] = print,
     exit: Callable[[int], None] = sys.exit,
 ) -> None:
-
     url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
 
     # Get the nonce
@@ -154,7 +153,6 @@ def register_new_user(
 
 
 def main() -> None:
-
     logging.captureWarnings(True)
 
     parser = argparse.ArgumentParser(
@@ -222,6 +220,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    config: Optional[Dict[str, Any]] = None
     if "config" in args and args.config:
         config = yaml.safe_load(args.config)
 
@@ -229,7 +228,7 @@ def main() -> None:
         secret = args.shared_secret
     else:
         # argparse should check that we have either config or shared secret
-        assert config
+        assert config is not None
 
         secret = config.get("registration_shared_secret")
         secret_file = config.get("registration_shared_secret_path")
@@ -244,7 +243,7 @@ def main() -> None:
 
     if args.server_url:
         server_url = args.server_url
-    elif config:
+    elif config is not None:
         server_url = _find_client_listener(config)
         if not server_url:
             server_url = _DEFAULT_SERVER_URL

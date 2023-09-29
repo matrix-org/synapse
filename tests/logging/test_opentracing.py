@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import cast
+from typing import Awaitable, cast
 
 from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactorClock
@@ -153,7 +153,7 @@ class LogContextScopeManagerTestCase(TestCase):
 
         scopes = []
 
-        async def task(i: int):
+        async def task(i: int) -> None:
             scope = start_active_span(
                 f"task{i}",
                 tracer=self._tracer,
@@ -165,7 +165,7 @@ class LogContextScopeManagerTestCase(TestCase):
             self.assertEqual(self._tracer.active_span, scope.span)
             scope.close()
 
-        async def root():
+        async def root() -> None:
             with start_active_span("root span", tracer=self._tracer) as root_scope:
                 self.assertEqual(self._tracer.active_span, root_scope.span)
                 scopes.append(root_scope)
@@ -227,8 +227,6 @@ class LogContextScopeManagerTestCase(TestCase):
         Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
         with functions that return deferreds
         """
-        reactor = MemoryReactorClock()
-
         with LoggingContext("root context"):
 
             @trace_with_opname("fixture_deferred_func", tracer=self._tracer)
@@ -239,9 +237,6 @@ class LogContextScopeManagerTestCase(TestCase):
                 return d1
 
             result_d1 = fixture_deferred_func()
-
-            # let the tasks complete
-            reactor.pump((2,) * 8)
 
             self.assertEqual(self.successResultOf(result_d1), "foo")
 
@@ -256,8 +251,6 @@ class LogContextScopeManagerTestCase(TestCase):
         Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
         with async functions
         """
-        reactor = MemoryReactorClock()
-
         with LoggingContext("root context"):
 
             @trace_with_opname("fixture_async_func", tracer=self._tracer)
@@ -267,13 +260,41 @@ class LogContextScopeManagerTestCase(TestCase):
 
             d1 = defer.ensureDeferred(fixture_async_func())
 
-            # let the tasks complete
-            reactor.pump((2,) * 8)
-
             self.assertEqual(self.successResultOf(d1), "foo")
 
         # the span should have been reported
         self.assertEqual(
             [span.operation_name for span in self._reporter.get_spans()],
             ["fixture_async_func"],
+        )
+
+    def test_trace_decorator_awaitable_return(self) -> None:
+        """
+        Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
+        with functions that return an awaitable (e.g. a coroutine)
+        """
+        with LoggingContext("root context"):
+            # Something we can return without `await` to get a coroutine
+            async def fixture_async_func() -> str:
+                return "foo"
+
+            # The actual kind of function we want to test that returns an awaitable
+            @trace_with_opname("fixture_awaitable_return_func", tracer=self._tracer)
+            @tag_args
+            def fixture_awaitable_return_func() -> Awaitable[str]:
+                return fixture_async_func()
+
+            # Something we can run with `defer.ensureDeferred(runner())` and pump the
+            # whole async tasks through to completion.
+            async def runner() -> str:
+                return await fixture_awaitable_return_func()
+
+            d1 = defer.ensureDeferred(runner())
+
+            self.assertEqual(self.successResultOf(d1), "foo")
+
+        # the span should have been reported
+        self.assertEqual(
+            [span.operation_name for span in self._reporter.get_spans()],
+            ["fixture_awaitable_return_func"],
         )

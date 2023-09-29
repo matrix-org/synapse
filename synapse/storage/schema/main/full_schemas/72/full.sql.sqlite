@@ -1,0 +1,646 @@
+CREATE TABLE application_services_txns( as_id TEXT NOT NULL, txn_id INTEGER NOT NULL, event_ids TEXT NOT NULL, UNIQUE(as_id, txn_id) );
+CREATE INDEX application_services_txns_id ON application_services_txns ( as_id );
+CREATE TABLE presence( user_id TEXT NOT NULL, state VARCHAR(20), status_msg TEXT, mtime BIGINT, UNIQUE (user_id) );
+CREATE TABLE users( name TEXT, password_hash TEXT, creation_ts BIGINT, admin SMALLINT DEFAULT 0 NOT NULL, upgrade_ts BIGINT, is_guest SMALLINT DEFAULT 0 NOT NULL, appservice_id TEXT, consent_version TEXT, consent_server_notice_sent TEXT, user_type TEXT DEFAULT NULL, deactivated SMALLINT DEFAULT 0 NOT NULL, shadow_banned BOOLEAN, consent_ts bigint, UNIQUE(name) );
+CREATE TABLE user_ips ( user_id TEXT NOT NULL, access_token TEXT NOT NULL, device_id TEXT, ip TEXT NOT NULL, user_agent TEXT NOT NULL, last_seen BIGINT NOT NULL );
+CREATE TABLE profiles( user_id TEXT NOT NULL, displayname TEXT, avatar_url TEXT, UNIQUE(user_id) );
+CREATE TABLE received_transactions( transaction_id TEXT, origin TEXT, ts BIGINT, response_code INTEGER, response_json bytea, has_been_referenced smallint default 0, UNIQUE (transaction_id, origin) );
+CREATE TABLE destinations( destination TEXT PRIMARY KEY, retry_last_ts BIGINT, retry_interval INTEGER , failure_ts BIGINT, last_successful_stream_ordering BIGINT);
+CREATE TABLE events( stream_ordering INTEGER PRIMARY KEY, topological_ordering BIGINT NOT NULL, event_id TEXT NOT NULL, type TEXT NOT NULL, room_id TEXT NOT NULL, content TEXT, unrecognized_keys TEXT, processed BOOL NOT NULL, outlier BOOL NOT NULL, depth BIGINT DEFAULT 0 NOT NULL, origin_server_ts BIGINT, received_ts BIGINT, sender TEXT, contains_url BOOLEAN, instance_name TEXT, state_key TEXT DEFAULT NULL, rejection_reason TEXT DEFAULT NULL, UNIQUE (event_id) );
+CREATE INDEX events_order_room ON events ( room_id, topological_ordering, stream_ordering );
+CREATE TABLE event_json( event_id TEXT NOT NULL, room_id TEXT NOT NULL, internal_metadata TEXT NOT NULL, json TEXT NOT NULL, format_version INTEGER, UNIQUE (event_id) );
+CREATE TABLE state_events( event_id TEXT NOT NULL, room_id TEXT NOT NULL, type TEXT NOT NULL, state_key TEXT NOT NULL, prev_state TEXT, UNIQUE (event_id) );
+CREATE TABLE current_state_events( event_id TEXT NOT NULL, room_id TEXT NOT NULL, type TEXT NOT NULL, state_key TEXT NOT NULL, membership TEXT, UNIQUE (event_id), UNIQUE (room_id, type, state_key) );
+CREATE TABLE room_memberships( event_id TEXT NOT NULL, user_id TEXT NOT NULL, sender TEXT NOT NULL, room_id TEXT NOT NULL, membership TEXT NOT NULL, forgotten INTEGER DEFAULT 0, display_name TEXT, avatar_url TEXT, UNIQUE (event_id) );
+CREATE INDEX room_memberships_room_id ON room_memberships (room_id);
+CREATE INDEX room_memberships_user_id ON room_memberships (user_id);
+CREATE TABLE rooms( room_id TEXT PRIMARY KEY NOT NULL, is_public BOOL, creator TEXT , room_version TEXT, has_auth_chain_index BOOLEAN);
+CREATE TABLE server_signature_keys( server_name TEXT, key_id TEXT, from_server TEXT, ts_added_ms BIGINT, verify_key bytea, ts_valid_until_ms BIGINT, UNIQUE (server_name, key_id) );
+CREATE TABLE rejections( event_id TEXT NOT NULL, reason TEXT NOT NULL, last_check TEXT NOT NULL, UNIQUE (event_id) );
+CREATE TABLE push_rules ( id BIGINT PRIMARY KEY, user_name TEXT NOT NULL, rule_id TEXT NOT NULL, priority_class SMALLINT NOT NULL, priority INTEGER NOT NULL DEFAULT 0, conditions TEXT NOT NULL, actions TEXT NOT NULL, UNIQUE(user_name, rule_id) );
+CREATE INDEX push_rules_user_name on push_rules (user_name);
+CREATE TABLE push_rules_enable ( id BIGINT PRIMARY KEY, user_name TEXT NOT NULL, rule_id TEXT NOT NULL, enabled SMALLINT, UNIQUE(user_name, rule_id) );
+CREATE INDEX push_rules_enable_user_name on push_rules_enable (user_name);
+CREATE TABLE event_forward_extremities( event_id TEXT NOT NULL, room_id TEXT NOT NULL, UNIQUE (event_id, room_id) );
+CREATE INDEX ev_extrem_room ON event_forward_extremities(room_id);
+CREATE INDEX ev_extrem_id ON event_forward_extremities(event_id);
+CREATE TABLE event_backward_extremities( event_id TEXT NOT NULL, room_id TEXT NOT NULL, UNIQUE (event_id, room_id) );
+CREATE INDEX ev_b_extrem_room ON event_backward_extremities(room_id);
+CREATE INDEX ev_b_extrem_id ON event_backward_extremities(event_id);
+CREATE TABLE room_depth( room_id TEXT NOT NULL, min_depth INTEGER NOT NULL, UNIQUE (room_id) );
+CREATE TABLE event_to_state_groups( event_id TEXT NOT NULL, state_group BIGINT NOT NULL, UNIQUE (event_id) );
+CREATE TABLE local_media_repository ( media_id TEXT, media_type TEXT, media_length INTEGER, created_ts BIGINT, upload_name TEXT, user_id TEXT, quarantined_by TEXT, url_cache TEXT, last_access_ts BIGINT, safe_from_quarantine BOOLEAN NOT NULL DEFAULT 0, UNIQUE (media_id) );
+CREATE TABLE remote_media_cache ( media_origin TEXT, media_id TEXT, media_type TEXT, created_ts BIGINT, upload_name TEXT, media_length INTEGER, filesystem_id TEXT, last_access_ts BIGINT, quarantined_by TEXT, UNIQUE (media_origin, media_id) );
+CREATE TABLE redactions ( event_id TEXT NOT NULL, redacts TEXT NOT NULL, have_censored BOOL NOT NULL DEFAULT false, received_ts BIGINT, UNIQUE (event_id) );
+CREATE INDEX redactions_redacts ON redactions (redacts);
+CREATE TABLE room_aliases( room_alias TEXT NOT NULL, room_id TEXT NOT NULL, creator TEXT, UNIQUE (room_alias) );
+CREATE INDEX room_aliases_id ON room_aliases(room_id);
+CREATE TABLE room_alias_servers( room_alias TEXT NOT NULL, server TEXT NOT NULL );
+CREATE INDEX room_alias_servers_alias ON room_alias_servers(room_alias);
+CREATE TABLE IF NOT EXISTS "server_keys_json" ( server_name TEXT NOT NULL, key_id TEXT NOT NULL, from_server TEXT NOT NULL, ts_added_ms BIGINT NOT NULL, ts_valid_until_ms BIGINT NOT NULL, key_json bytea NOT NULL, CONSTRAINT server_keys_json_uniqueness UNIQUE (server_name, key_id, from_server) );
+CREATE TABLE e2e_device_keys_json ( user_id TEXT NOT NULL, device_id TEXT NOT NULL, ts_added_ms BIGINT NOT NULL, key_json TEXT NOT NULL, CONSTRAINT e2e_device_keys_json_uniqueness UNIQUE (user_id, device_id) );
+CREATE TABLE e2e_one_time_keys_json ( user_id TEXT NOT NULL, device_id TEXT NOT NULL, algorithm TEXT NOT NULL, key_id TEXT NOT NULL, ts_added_ms BIGINT NOT NULL, key_json TEXT NOT NULL, CONSTRAINT e2e_one_time_keys_json_uniqueness UNIQUE (user_id, device_id, algorithm, key_id) );
+CREATE TABLE IF NOT EXISTS "user_threepids" ( user_id TEXT NOT NULL, medium TEXT NOT NULL, address TEXT NOT NULL, validated_at BIGINT NOT NULL, added_at BIGINT NOT NULL, CONSTRAINT medium_address UNIQUE (medium, address) );
+CREATE INDEX user_threepids_user_id ON user_threepids(user_id);
+CREATE VIRTUAL TABLE event_search USING fts4 ( event_id, room_id, sender, key, value )
+/* event_search(event_id,room_id,sender,"key",value) */;
+CREATE TABLE room_tags( user_id TEXT NOT NULL, room_id TEXT NOT NULL, tag     TEXT NOT NULL, content TEXT NOT NULL, CONSTRAINT room_tag_uniqueness UNIQUE (user_id, room_id, tag) );
+CREATE TABLE room_tags_revisions ( user_id TEXT NOT NULL, room_id TEXT NOT NULL, stream_id BIGINT NOT NULL, instance_name TEXT, CONSTRAINT room_tag_revisions_uniqueness UNIQUE (user_id, room_id) );
+CREATE TABLE account_data( user_id TEXT NOT NULL, account_data_type TEXT NOT NULL, stream_id BIGINT NOT NULL, content TEXT NOT NULL, instance_name TEXT, CONSTRAINT account_data_uniqueness UNIQUE (user_id, account_data_type) );
+CREATE TABLE room_account_data( user_id TEXT NOT NULL, room_id TEXT NOT NULL, account_data_type TEXT NOT NULL, stream_id BIGINT NOT NULL, content TEXT NOT NULL, instance_name TEXT, CONSTRAINT room_account_data_uniqueness UNIQUE (user_id, room_id, account_data_type) );
+CREATE INDEX account_data_stream_id on account_data(user_id, stream_id);
+CREATE INDEX room_account_data_stream_id on room_account_data(user_id, stream_id);
+CREATE INDEX events_ts ON events(origin_server_ts, stream_ordering);
+CREATE TABLE event_push_actions( room_id TEXT NOT NULL, event_id TEXT NOT NULL, user_id TEXT NOT NULL, profile_tag VARCHAR(32), actions TEXT NOT NULL, topological_ordering BIGINT, stream_ordering BIGINT, notif SMALLINT, highlight SMALLINT, unread SMALLINT, thread_id TEXT, CONSTRAINT event_id_user_id_profile_tag_uniqueness UNIQUE (room_id, event_id, user_id, profile_tag) );
+CREATE INDEX event_push_actions_room_id_user_id on event_push_actions(room_id, user_id);
+CREATE INDEX events_room_stream on events(room_id, stream_ordering);
+CREATE INDEX public_room_index on rooms(is_public);
+CREATE INDEX event_push_actions_rm_tokens on event_push_actions( user_id, room_id, topological_ordering, stream_ordering );
+CREATE TABLE presence_stream( stream_id BIGINT, user_id TEXT, state TEXT, last_active_ts BIGINT, last_federation_update_ts BIGINT, last_user_sync_ts BIGINT, status_msg TEXT, currently_active BOOLEAN , instance_name TEXT);
+CREATE INDEX presence_stream_id ON presence_stream(stream_id, user_id);
+CREATE INDEX presence_stream_user_id ON presence_stream(user_id);
+CREATE TABLE push_rules_stream( stream_id BIGINT NOT NULL, event_stream_ordering BIGINT NOT NULL, user_id TEXT NOT NULL, rule_id TEXT NOT NULL, op TEXT NOT NULL, priority_class SMALLINT, priority INTEGER, conditions TEXT, actions TEXT );
+CREATE INDEX push_rules_stream_id ON push_rules_stream(stream_id);
+CREATE INDEX push_rules_stream_user_stream_id on push_rules_stream(user_id, stream_id);
+CREATE TABLE ex_outlier_stream( event_stream_ordering BIGINT PRIMARY KEY NOT NULL, event_id TEXT NOT NULL, state_group BIGINT NOT NULL , instance_name TEXT);
+CREATE TABLE threepid_guest_access_tokens( medium TEXT, address TEXT, guest_access_token TEXT, first_inviter TEXT );
+CREATE UNIQUE INDEX threepid_guest_access_tokens_index ON threepid_guest_access_tokens(medium, address);
+CREATE INDEX event_push_actions_stream_ordering on event_push_actions( stream_ordering, user_id );
+CREATE TABLE open_id_tokens ( token TEXT NOT NULL PRIMARY KEY, ts_valid_until_ms bigint NOT NULL, user_id TEXT NOT NULL, UNIQUE (token) );
+CREATE INDEX open_id_tokens_ts_valid_until_ms ON open_id_tokens(ts_valid_until_ms);
+CREATE TABLE pusher_throttle( pusher BIGINT NOT NULL, room_id TEXT NOT NULL, last_sent_ts BIGINT, throttle_ms BIGINT, PRIMARY KEY (pusher, room_id) );
+CREATE TABLE event_reports( id BIGINT NOT NULL PRIMARY KEY, received_ts BIGINT NOT NULL, room_id TEXT NOT NULL, event_id TEXT NOT NULL, user_id TEXT NOT NULL, reason TEXT, content TEXT );
+CREATE TABLE appservice_stream_position( Lock CHAR(1) NOT NULL DEFAULT 'X' UNIQUE, stream_ordering BIGINT, CHECK (Lock='X') );
+CREATE TABLE device_inbox ( user_id TEXT NOT NULL, device_id TEXT NOT NULL, stream_id BIGINT NOT NULL, message_json TEXT NOT NULL , instance_name TEXT);
+CREATE INDEX device_inbox_user_stream_id ON device_inbox(user_id, device_id, stream_id);
+CREATE INDEX received_transactions_ts ON received_transactions(ts);
+CREATE TABLE device_federation_outbox ( destination TEXT NOT NULL, stream_id BIGINT NOT NULL, queued_ts BIGINT NOT NULL, messages_json TEXT NOT NULL , instance_name TEXT);
+CREATE INDEX device_federation_outbox_destination_id ON device_federation_outbox(destination, stream_id);
+CREATE TABLE device_federation_inbox ( origin TEXT NOT NULL, message_id TEXT NOT NULL, received_ts BIGINT NOT NULL , instance_name TEXT);
+CREATE INDEX device_federation_inbox_sender_id ON device_federation_inbox(origin, message_id);
+CREATE TABLE stream_ordering_to_exterm ( stream_ordering BIGINT NOT NULL, room_id TEXT NOT NULL, event_id TEXT NOT NULL );
+CREATE INDEX stream_ordering_to_exterm_idx on stream_ordering_to_exterm( stream_ordering );
+CREATE INDEX stream_ordering_to_exterm_rm_idx on stream_ordering_to_exterm( room_id, stream_ordering );
+CREATE TABLE IF NOT EXISTS "event_auth"( event_id TEXT NOT NULL, auth_id TEXT NOT NULL, room_id TEXT NOT NULL );
+CREATE INDEX evauth_edges_id ON event_auth(event_id);
+CREATE INDEX user_threepids_medium_address on user_threepids (medium, address);
+CREATE TABLE appservice_room_list( appservice_id TEXT NOT NULL, network_id TEXT NOT NULL, room_id TEXT NOT NULL );
+CREATE UNIQUE INDEX appservice_room_list_idx ON appservice_room_list( appservice_id, network_id, room_id );
+CREATE INDEX device_federation_outbox_id ON device_federation_outbox(stream_id);
+CREATE TABLE federation_stream_position( type TEXT NOT NULL, stream_id INTEGER NOT NULL , instance_name TEXT NOT NULL DEFAULT 'master');
+CREATE TABLE device_lists_remote_cache ( user_id TEXT NOT NULL, device_id TEXT NOT NULL, content TEXT NOT NULL );
+CREATE TABLE device_lists_remote_extremeties ( user_id TEXT NOT NULL, stream_id TEXT NOT NULL );
+CREATE TABLE device_lists_stream ( stream_id BIGINT NOT NULL, user_id TEXT NOT NULL, device_id TEXT NOT NULL );
+CREATE INDEX device_lists_stream_id ON device_lists_stream(stream_id, user_id);
+CREATE TABLE device_lists_outbound_pokes ( destination TEXT NOT NULL, stream_id BIGINT NOT NULL, user_id TEXT NOT NULL, device_id TEXT NOT NULL, sent BOOLEAN NOT NULL, ts BIGINT NOT NULL , opentracing_context TEXT);
+CREATE INDEX device_lists_outbound_pokes_id ON device_lists_outbound_pokes(destination, stream_id);
+CREATE INDEX device_lists_outbound_pokes_user ON device_lists_outbound_pokes(destination, user_id);
+CREATE TABLE event_push_summary ( user_id TEXT NOT NULL, room_id TEXT NOT NULL, notif_count BIGINT NOT NULL, stream_ordering BIGINT NOT NULL , unread_count BIGINT, last_receipt_stream_ordering BIGINT, thread_id TEXT);
+CREATE TABLE event_push_summary_stream_ordering ( Lock CHAR(1) NOT NULL DEFAULT 'X' UNIQUE, stream_ordering BIGINT NOT NULL, CHECK (Lock='X') );
+CREATE TABLE IF NOT EXISTS "pushers" ( id BIGINT PRIMARY KEY, user_name TEXT NOT NULL, access_token BIGINT DEFAULT NULL, profile_tag TEXT NOT NULL, kind TEXT NOT NULL, app_id TEXT NOT NULL, app_display_name TEXT NOT NULL, device_display_name TEXT NOT NULL, pushkey TEXT NOT NULL, ts BIGINT NOT NULL, lang TEXT, data TEXT, last_stream_ordering INTEGER, last_success BIGINT, failing_since BIGINT, UNIQUE (app_id, pushkey, user_name) );
+CREATE INDEX device_lists_outbound_pokes_stream ON device_lists_outbound_pokes(stream_id);
+CREATE TABLE ratelimit_override ( user_id TEXT NOT NULL, messages_per_second BIGINT, burst_count BIGINT );
+CREATE UNIQUE INDEX ratelimit_override_idx ON ratelimit_override(user_id);
+CREATE TABLE current_state_delta_stream ( stream_id BIGINT NOT NULL, room_id TEXT NOT NULL, type TEXT NOT NULL, state_key TEXT NOT NULL, event_id TEXT, prev_event_id TEXT , instance_name TEXT);
+CREATE INDEX current_state_delta_stream_idx ON current_state_delta_stream(stream_id);
+CREATE TABLE user_directory_stream_pos ( Lock CHAR(1) NOT NULL DEFAULT 'X' UNIQUE, stream_id BIGINT, CHECK (Lock='X') );
+CREATE VIRTUAL TABLE user_directory_search USING fts4 ( user_id, value )
+/* user_directory_search(user_id,value) */;
+CREATE TABLE blocked_rooms ( room_id TEXT NOT NULL, user_id TEXT NOT NULL );
+CREATE UNIQUE INDEX blocked_rooms_idx ON blocked_rooms(room_id);
+CREATE TABLE IF NOT EXISTS "local_media_repository_url_cache"( url TEXT, response_code INTEGER, etag TEXT, expires_ts BIGINT, og TEXT, media_id TEXT, download_ts BIGINT );
+CREATE INDEX local_media_repository_url_cache_expires_idx ON local_media_repository_url_cache(expires_ts);
+CREATE INDEX local_media_repository_url_cache_by_url_download_ts ON local_media_repository_url_cache(url, download_ts);
+CREATE INDEX local_media_repository_url_cache_media_idx ON local_media_repository_url_cache(media_id);
+CREATE TABLE IF NOT EXISTS "deleted_pushers" ( stream_id BIGINT NOT NULL, app_id TEXT NOT NULL, pushkey TEXT NOT NULL, user_id TEXT NOT NULL );
+CREATE INDEX deleted_pushers_stream_id ON deleted_pushers (stream_id);
+CREATE TABLE IF NOT EXISTS "user_directory" ( user_id TEXT NOT NULL, room_id TEXT, display_name TEXT, avatar_url TEXT );
+CREATE INDEX user_directory_room_idx ON user_directory(room_id);
+CREATE UNIQUE INDEX user_directory_user_idx ON user_directory(user_id);
+CREATE TABLE event_push_actions_staging ( event_id TEXT NOT NULL, user_id TEXT NOT NULL, actions TEXT NOT NULL, notif SMALLINT NOT NULL, highlight SMALLINT NOT NULL , unread SMALLINT, thread_id TEXT);
+CREATE INDEX event_push_actions_staging_id ON event_push_actions_staging(event_id);
+CREATE TABLE users_pending_deactivation ( user_id TEXT NOT NULL );
+CREATE TABLE user_daily_visits ( user_id TEXT NOT NULL, device_id TEXT, timestamp BIGINT NOT NULL , user_agent TEXT);
+CREATE INDEX user_daily_visits_uts_idx ON user_daily_visits(user_id, timestamp);
+CREATE INDEX user_daily_visits_ts_idx ON user_daily_visits(timestamp);
+CREATE TABLE erased_users ( user_id TEXT NOT NULL );
+CREATE UNIQUE INDEX erased_users_user ON erased_users(user_id);
+CREATE TABLE monthly_active_users ( user_id TEXT NOT NULL, timestamp BIGINT NOT NULL );
+CREATE UNIQUE INDEX monthly_active_users_users ON monthly_active_users(user_id);
+CREATE INDEX monthly_active_users_time_stamp ON monthly_active_users(timestamp);
+CREATE TABLE IF NOT EXISTS "e2e_room_keys_versions" ( user_id TEXT NOT NULL, version BIGINT NOT NULL, algorithm TEXT NOT NULL, auth_data TEXT NOT NULL, deleted SMALLINT DEFAULT 0 NOT NULL , etag BIGINT);
+CREATE UNIQUE INDEX e2e_room_keys_versions_idx ON e2e_room_keys_versions(user_id, version);
+CREATE TABLE IF NOT EXISTS "e2e_room_keys" ( user_id TEXT NOT NULL, room_id TEXT NOT NULL, session_id TEXT NOT NULL, version BIGINT NOT NULL, first_message_index INT, forwarded_count INT, is_verified BOOLEAN, session_data TEXT NOT NULL );
+CREATE TABLE users_who_share_private_rooms ( user_id TEXT NOT NULL, other_user_id TEXT NOT NULL, room_id TEXT NOT NULL );
+CREATE UNIQUE INDEX users_who_share_private_rooms_u_idx ON users_who_share_private_rooms(user_id, other_user_id, room_id);
+CREATE INDEX users_who_share_private_rooms_r_idx ON users_who_share_private_rooms(room_id);
+CREATE INDEX users_who_share_private_rooms_o_idx ON users_who_share_private_rooms(other_user_id);
+CREATE TABLE user_threepid_id_server ( user_id TEXT NOT NULL, medium TEXT NOT NULL, address TEXT NOT NULL, id_server TEXT NOT NULL );
+CREATE UNIQUE INDEX user_threepid_id_server_idx ON user_threepid_id_server( user_id, medium, address, id_server );
+CREATE TABLE users_in_public_rooms ( user_id TEXT NOT NULL, room_id TEXT NOT NULL );
+CREATE UNIQUE INDEX users_in_public_rooms_u_idx ON users_in_public_rooms(user_id, room_id);
+CREATE TABLE account_validity ( user_id TEXT PRIMARY KEY, expiration_ts_ms BIGINT NOT NULL, email_sent BOOLEAN NOT NULL, renewal_token TEXT , token_used_ts_ms BIGINT);
+CREATE TABLE event_relations ( event_id TEXT NOT NULL, relates_to_id TEXT NOT NULL, relation_type TEXT NOT NULL, aggregation_key TEXT );
+CREATE UNIQUE INDEX event_relations_id ON event_relations(event_id);
+CREATE INDEX event_relations_relates ON event_relations(relates_to_id, relation_type, aggregation_key);
+CREATE TABLE room_stats_earliest_token ( room_id TEXT NOT NULL, token BIGINT NOT NULL );
+CREATE UNIQUE INDEX room_stats_earliest_token_idx ON room_stats_earliest_token(room_id);
+CREATE INDEX user_ips_device_id ON user_ips (user_id, device_id, last_seen);
+CREATE INDEX event_push_actions_u_highlight ON event_push_actions (user_id, stream_ordering);
+CREATE INDEX device_inbox_stream_id_user_id ON device_inbox (stream_id, user_id);
+CREATE INDEX device_lists_stream_user_id ON device_lists_stream (user_id, device_id);
+CREATE INDEX user_ips_last_seen ON user_ips (user_id, last_seen);
+CREATE INDEX user_ips_last_seen_only ON user_ips (last_seen);
+CREATE INDEX users_creation_ts ON users (creation_ts);
+CREATE INDEX event_to_state_groups_sg_index ON event_to_state_groups (state_group);
+CREATE UNIQUE INDEX device_lists_remote_cache_unique_id ON device_lists_remote_cache (user_id, device_id);
+CREATE UNIQUE INDEX device_lists_remote_extremeties_unique_idx ON device_lists_remote_extremeties (user_id);
+CREATE UNIQUE INDEX user_ips_user_token_ip_unique_index ON user_ips (user_id, access_token, ip);
+CREATE TABLE threepid_validation_session (
+    session_id TEXT PRIMARY KEY,
+    medium TEXT NOT NULL,
+    address TEXT NOT NULL,
+    client_secret TEXT NOT NULL,
+    last_send_attempt BIGINT NOT NULL,
+    validated_at BIGINT
+);
+CREATE TABLE threepid_validation_token (
+    token TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    next_link TEXT,
+    expires BIGINT NOT NULL
+);
+CREATE INDEX threepid_validation_token_session_id ON threepid_validation_token(session_id);
+CREATE TABLE event_expiry (
+    event_id TEXT PRIMARY KEY,
+    expiry_ts BIGINT NOT NULL
+);
+CREATE INDEX event_expiry_expiry_ts_idx ON event_expiry(expiry_ts);
+CREATE TABLE event_labels (
+    event_id TEXT,
+    label TEXT,
+    room_id TEXT NOT NULL,
+    topological_ordering BIGINT NOT NULL,
+    PRIMARY KEY(event_id, label)
+);
+CREATE INDEX event_labels_room_id_label_idx ON event_labels(room_id, label, topological_ordering);
+CREATE UNIQUE INDEX e2e_room_keys_with_version_idx ON e2e_room_keys(user_id, version, room_id, session_id);
+CREATE TABLE IF NOT EXISTS "devices" (
+    user_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    display_name TEXT,
+    last_seen BIGINT,
+    ip TEXT,
+    user_agent TEXT,
+    hidden BOOLEAN DEFAULT 0,
+    CONSTRAINT device_uniqueness UNIQUE (user_id, device_id)
+);
+CREATE TABLE room_retention(
+    room_id TEXT,
+    event_id TEXT,
+    min_lifetime BIGINT,
+    max_lifetime BIGINT,
+
+    PRIMARY KEY(room_id, event_id)
+);
+CREATE INDEX room_retention_max_lifetime_idx on room_retention(max_lifetime);
+CREATE TABLE e2e_cross_signing_keys (
+    user_id TEXT NOT NULL,
+    -- the type of cross-signing key (master, user_signing, or self_signing)
+    keytype TEXT NOT NULL,
+    -- the full key information, as a json-encoded dict
+    keydata TEXT NOT NULL,
+    -- for keeping the keys in order, so that we can fetch the latest one
+    stream_id BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX e2e_cross_signing_keys_idx ON e2e_cross_signing_keys(user_id, keytype, stream_id);
+CREATE TABLE e2e_cross_signing_signatures (
+    -- user who did the signing
+    user_id TEXT NOT NULL,
+    -- key used to sign
+    key_id TEXT NOT NULL,
+    -- user who was signed
+    target_user_id TEXT NOT NULL,
+    -- device/key that was signed
+    target_device_id TEXT NOT NULL,
+    -- the actual signature
+    signature TEXT NOT NULL
+);
+CREATE TABLE user_signature_stream (
+    -- uses the same stream ID as device list stream
+    stream_id BIGINT NOT NULL,
+    -- user who did the signing
+    from_user_id TEXT NOT NULL,
+    -- list of users who were signed, as a JSON array
+    user_ids TEXT NOT NULL
+);
+CREATE UNIQUE INDEX user_signature_stream_idx ON user_signature_stream(stream_id);
+CREATE INDEX e2e_cross_signing_signatures2_idx ON e2e_cross_signing_signatures(user_id, target_user_id, target_device_id);
+CREATE TABLE stats_incremental_position (
+    Lock CHAR(1) NOT NULL DEFAULT 'X' UNIQUE,  -- Makes sure this table only has one row.
+    stream_id  BIGINT NOT NULL,
+    CHECK (Lock='X')
+);
+CREATE TABLE room_stats_current (
+    room_id TEXT NOT NULL PRIMARY KEY,
+
+    -- These are absolute counts
+    current_state_events INT NOT NULL,
+    joined_members INT NOT NULL,
+    invited_members INT NOT NULL,
+    left_members INT NOT NULL,
+    banned_members INT NOT NULL,
+
+    local_users_in_room INT NOT NULL,
+
+    -- The maximum delta stream position that this row takes into account.
+    completed_delta_stream_id BIGINT NOT NULL
+, knocked_members INT);
+CREATE TABLE user_stats_current (
+    user_id TEXT NOT NULL PRIMARY KEY,
+
+    joined_rooms BIGINT NOT NULL,
+
+    -- The maximum delta stream position that this row takes into account.
+    completed_delta_stream_id BIGINT NOT NULL
+);
+CREATE TABLE room_stats_state (
+    room_id TEXT NOT NULL,
+    name TEXT,
+    canonical_alias TEXT,
+    join_rules TEXT,
+    history_visibility TEXT,
+    encryption TEXT,
+    avatar TEXT,
+    guest_access TEXT,
+    is_federatable BOOLEAN,
+    topic TEXT
+, room_type TEXT);
+CREATE UNIQUE INDEX room_stats_state_room ON room_stats_state(room_id);
+CREATE TABLE IF NOT EXISTS "user_filters" ( user_id TEXT NOT NULL, filter_id BIGINT NOT NULL, filter_json BYTEA NOT NULL );
+CREATE UNIQUE INDEX user_filters_unique ON "user_filters" (user_id, filter_id);
+CREATE TABLE user_external_ids (
+    auth_provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    UNIQUE (auth_provider, external_id)
+);
+CREATE INDEX users_in_public_rooms_r_idx ON users_in_public_rooms(room_id);
+CREATE TABLE device_lists_remote_resync (
+    user_id TEXT NOT NULL,
+    added_ts BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX device_lists_remote_resync_idx ON device_lists_remote_resync (user_id);
+CREATE INDEX device_lists_remote_resync_ts_idx ON device_lists_remote_resync (added_ts);
+CREATE TABLE local_current_membership (
+            room_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            event_id TEXT NOT NULL,
+            membership TEXT NOT NULL
+        );
+CREATE UNIQUE INDEX local_current_membership_idx ON local_current_membership(user_id, room_id);
+CREATE INDEX local_current_membership_room_idx ON local_current_membership(room_id);
+CREATE TABLE ui_auth_sessions(
+    session_id TEXT NOT NULL,  -- The session ID passed to the client.
+    creation_time BIGINT NOT NULL,  -- The time this session was created (epoch time in milliseconds).
+    serverdict TEXT NOT NULL,  -- A JSON dictionary of arbitrary data added by Synapse.
+    clientdict TEXT NOT NULL,  -- A JSON dictionary of arbitrary data from the client.
+    uri TEXT NOT NULL,  -- The URI the UI authentication session is using.
+    method TEXT NOT NULL,  -- The HTTP method the UI authentication session is using.
+    -- The clientdict, uri, and method make up an tuple that must be immutable
+    -- throughout the lifetime of the UI Auth session.
+    description TEXT NOT NULL,  -- A human readable description of the operation which caused the UI Auth flow to occur.
+    UNIQUE (session_id)
+);
+CREATE TABLE ui_auth_sessions_credentials(
+    session_id TEXT NOT NULL,  -- The corresponding UI Auth session.
+    stage_type TEXT NOT NULL,  -- The stage type.
+    result TEXT NOT NULL,  -- The result of the stage verification, stored as JSON.
+    UNIQUE (session_id, stage_type),
+    FOREIGN KEY (session_id)
+        REFERENCES ui_auth_sessions (session_id)
+);
+CREATE TABLE IF NOT EXISTS "device_lists_outbound_last_success" ( destination TEXT NOT NULL, user_id TEXT NOT NULL, stream_id BIGINT NOT NULL );
+CREATE UNIQUE INDEX device_lists_outbound_last_success_unique_idx ON "device_lists_outbound_last_success" (destination, user_id);
+CREATE TABLE IF NOT EXISTS "local_media_repository_thumbnails" ( media_id TEXT, thumbnail_width INTEGER, thumbnail_height INTEGER, thumbnail_type TEXT, thumbnail_method TEXT, thumbnail_length INTEGER, UNIQUE ( media_id, thumbnail_width, thumbnail_height, thumbnail_type, thumbnail_method ) );
+CREATE INDEX local_media_repository_thumbnails_media_id ON local_media_repository_thumbnails (media_id);
+CREATE TABLE IF NOT EXISTS "remote_media_cache_thumbnails" ( media_origin TEXT, media_id TEXT, thumbnail_width INTEGER, thumbnail_height INTEGER, thumbnail_method TEXT, thumbnail_type TEXT, thumbnail_length INTEGER, filesystem_id TEXT, UNIQUE ( media_origin, media_id, thumbnail_width, thumbnail_height, thumbnail_type, thumbnail_method ) );
+CREATE TABLE ui_auth_sessions_ips(
+    session_id TEXT NOT NULL,
+    ip TEXT NOT NULL,
+    user_agent TEXT NOT NULL,
+    UNIQUE (session_id, ip, user_agent),
+    FOREIGN KEY (session_id)
+        REFERENCES ui_auth_sessions (session_id)
+);
+CREATE UNIQUE INDEX federation_stream_position_instance ON federation_stream_position(type, instance_name);
+CREATE TABLE dehydrated_devices(
+    user_id TEXT NOT NULL PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    device_data TEXT NOT NULL -- JSON-encoded client-defined data
+);
+CREATE TABLE e2e_fallback_keys_json (
+    user_id TEXT NOT NULL, -- The user this fallback key is for.
+    device_id TEXT NOT NULL, -- The device this fallback key is for.
+    algorithm TEXT NOT NULL, -- Which algorithm this fallback key is for.
+    key_id TEXT NOT NULL, -- An id for suppressing duplicate uploads.
+    key_json TEXT NOT NULL, -- The key as a JSON blob.
+    used BOOLEAN NOT NULL DEFAULT FALSE, -- Whether the key has been used or not.
+    CONSTRAINT e2e_fallback_keys_json_uniqueness UNIQUE (user_id, device_id, algorithm)
+);
+CREATE TABLE destination_rooms (
+  -- the destination in question.
+  destination TEXT NOT NULL REFERENCES destinations (destination),
+  -- the ID of the room in question
+  room_id TEXT NOT NULL REFERENCES rooms (room_id),
+  -- the stream_ordering of the event
+  stream_ordering BIGINT NOT NULL,
+  PRIMARY KEY (destination, room_id)
+  -- We don't declare a foreign key on stream_ordering here because that'd mean
+  -- we'd need to either maintain an index (expensive) or do a table scan of
+  -- destination_rooms whenever we delete an event (also potentially expensive).
+  -- In addition to that, a foreign key on stream_ordering would be redundant
+  -- as this row doesn't need to refer to a specific event; if the event gets
+  -- deleted then it doesn't affect the validity of the stream_ordering here.
+);
+CREATE INDEX destination_rooms_room_id
+    ON destination_rooms (room_id);
+CREATE TABLE stream_positions (
+    stream_name TEXT NOT NULL,
+    instance_name TEXT NOT NULL,
+    stream_id BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX stream_positions_idx ON stream_positions(stream_name, instance_name);
+CREATE TABLE IF NOT EXISTS "access_tokens" (
+    id BIGINT PRIMARY KEY, 
+    user_id TEXT NOT NULL, 
+    device_id TEXT, 
+    token TEXT NOT NULL,
+    valid_until_ms BIGINT,
+    puppets_user_id TEXT,
+    last_validated BIGINT, refresh_token_id BIGINT REFERENCES refresh_tokens (id) ON DELETE CASCADE, used BOOLEAN,
+    UNIQUE(token) 
+);
+CREATE INDEX access_tokens_device_id ON access_tokens (user_id, device_id);
+CREATE TABLE IF NOT EXISTS "event_txn_id" (
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    token_id BIGINT NOT NULL,
+    txn_id TEXT NOT NULL,
+    inserted_ts BIGINT NOT NULL,
+    FOREIGN KEY (event_id)
+        REFERENCES events (event_id) ON DELETE CASCADE,
+    FOREIGN KEY (token_id)
+        REFERENCES access_tokens (id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX event_txn_id_event_id ON event_txn_id(event_id);
+CREATE UNIQUE INDEX event_txn_id_txn_id ON event_txn_id(room_id, user_id, token_id, txn_id);
+CREATE INDEX event_txn_id_ts ON event_txn_id(inserted_ts);
+CREATE TABLE ignored_users( ignorer_user_id TEXT NOT NULL, ignored_user_id TEXT NOT NULL );
+CREATE UNIQUE INDEX ignored_users_uniqueness ON ignored_users (ignorer_user_id, ignored_user_id);
+CREATE INDEX ignored_users_ignored_user_id ON ignored_users (ignored_user_id);
+CREATE TABLE event_auth_chains (
+  event_id TEXT PRIMARY KEY,
+  chain_id BIGINT NOT NULL,
+  sequence_number BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX event_auth_chains_c_seq_index ON event_auth_chains (chain_id, sequence_number);
+CREATE TABLE event_auth_chain_links (
+  origin_chain_id BIGINT NOT NULL,
+  origin_sequence_number BIGINT NOT NULL,
+
+  target_chain_id BIGINT NOT NULL,
+  target_sequence_number BIGINT NOT NULL
+);
+CREATE INDEX event_auth_chain_links_idx ON event_auth_chain_links (origin_chain_id, target_chain_id);
+CREATE TABLE event_auth_chain_to_calculate (
+  event_id TEXT PRIMARY KEY,
+  room_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  state_key TEXT NOT NULL
+);
+CREATE INDEX event_auth_chain_to_calculate_rm_id ON event_auth_chain_to_calculate(room_id);
+CREATE TABLE users_to_send_full_presence_to(
+    -- The user ID to send full presence to.
+    user_id TEXT PRIMARY KEY,
+    -- A presence stream ID token - the current presence stream token when the row was last upserted.
+    -- If a user calls /sync and this token is part of the update they're to receive, we also include
+    -- full user presence in the response.
+    -- This allows multiple devices for a user to receive full presence whenever they next call /sync.
+    presence_stream_id BIGINT,
+    FOREIGN KEY (user_id)
+        REFERENCES users (name)
+);
+CREATE TABLE refresh_tokens (
+  id BIGINT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  -- When consumed, a new refresh token is generated, which is tracked by
+  -- this foreign key
+  next_token_id BIGINT REFERENCES refresh_tokens (id) ON DELETE CASCADE, expiry_ts BIGINT DEFAULT NULL, ultimate_session_expiry_ts BIGINT DEFAULT NULL,
+  UNIQUE(token)
+);
+CREATE TABLE worker_locks (
+    lock_name TEXT NOT NULL,
+    lock_key TEXT NOT NULL,
+    -- We write the instance name to ease manual debugging, we don't ever read
+    -- from it.
+    -- Note: instance names aren't guarenteed to be unique.
+    instance_name TEXT NOT NULL,
+    -- A random string generated each time an instance takes out a lock. Used by
+    -- the instance to tell whether the lock is still held by it (e.g. in the
+    -- case where the process stalls for a long time the lock may time out and
+    -- be taken out by another instance, at which point the original instance
+    -- can tell it no longer holds the lock as the tokens no longer match).
+    token TEXT NOT NULL,
+    last_renewed_ts BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX worker_locks_key ON worker_locks (lock_name, lock_key);
+CREATE TABLE federation_inbound_events_staging (
+    origin TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    received_ts BIGINT NOT NULL,
+    event_json TEXT NOT NULL,
+    internal_metadata TEXT NOT NULL
+);
+CREATE INDEX federation_inbound_events_staging_room ON federation_inbound_events_staging(room_id, received_ts);
+CREATE UNIQUE INDEX federation_inbound_events_staging_instance_event ON federation_inbound_events_staging(origin, event_id);
+CREATE TABLE insertion_event_edges(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    insertion_prev_event_id TEXT NOT NULL
+);
+CREATE INDEX insertion_event_edges_insertion_room_id ON insertion_event_edges(room_id);
+CREATE INDEX insertion_event_edges_insertion_prev_event_id ON insertion_event_edges(insertion_prev_event_id);
+CREATE TABLE insertion_event_extremities(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL
+);
+CREATE UNIQUE INDEX insertion_event_extremities_event_id ON insertion_event_extremities(event_id);
+CREATE INDEX insertion_event_extremities_room_id ON insertion_event_extremities(room_id);
+CREATE TABLE registration_tokens(
+    token TEXT NOT NULL,  -- The token that can be used for authentication.
+    uses_allowed INT,  -- The total number of times this token can be used. NULL if no limit.
+    pending INT NOT NULL, -- The number of in progress registrations using this token.
+    completed INT NOT NULL, -- The number of times this token has been used to complete a registration.
+    expiry_time BIGINT,  -- The latest time this token will be valid (epoch time in milliseconds). NULL if token doesn't expire.
+    UNIQUE (token)
+);
+CREATE TABLE sessions(
+    session_type TEXT NOT NULL,  -- The unique key for this type of session.
+    session_id TEXT NOT NULL,  -- The session ID passed to the client.
+    value TEXT NOT NULL, -- A JSON dictionary to persist.
+    expiry_time_ms BIGINT NOT NULL,  -- The time this session will expire (epoch time in milliseconds).
+    UNIQUE (session_type, session_id)
+);
+CREATE TABLE insertion_events(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    next_batch_id TEXT NOT NULL
+);
+CREATE UNIQUE INDEX insertion_events_event_id ON insertion_events(event_id);
+CREATE INDEX insertion_events_next_batch_id ON insertion_events(next_batch_id);
+CREATE TABLE batch_events(
+    event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    batch_id TEXT NOT NULL
+);
+CREATE UNIQUE INDEX batch_events_event_id ON batch_events(event_id);
+CREATE INDEX batch_events_batch_id ON batch_events(batch_id);
+CREATE INDEX insertion_event_edges_event_id ON insertion_event_edges(event_id);
+CREATE TABLE device_auth_providers (
+  user_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  auth_provider_id TEXT NOT NULL,
+  auth_provider_session_id TEXT NOT NULL
+);
+CREATE INDEX device_auth_providers_devices
+  ON device_auth_providers (user_id, device_id);
+CREATE INDEX device_auth_providers_sessions
+  ON device_auth_providers (auth_provider_id, auth_provider_session_id);
+CREATE INDEX refresh_tokens_next_token_id
+    ON refresh_tokens(next_token_id)
+    WHERE next_token_id IS NOT NULL;
+CREATE TABLE partial_state_rooms (
+    room_id TEXT PRIMARY KEY,
+    FOREIGN KEY(room_id) REFERENCES rooms(room_id)
+);
+CREATE TABLE partial_state_rooms_servers (
+    room_id TEXT NOT NULL REFERENCES partial_state_rooms(room_id),
+    server_name TEXT NOT NULL,
+    UNIQUE(room_id, server_name)
+);
+CREATE TABLE partial_state_events (
+    -- the room_id is denormalised for efficient indexing (the canonical source is `events`)
+    room_id TEXT NOT NULL REFERENCES partial_state_rooms(room_id),
+    event_id TEXT NOT NULL REFERENCES events(event_id),
+    UNIQUE(event_id)
+);
+CREATE INDEX partial_state_events_room_id_idx
+     ON partial_state_events (room_id);
+CREATE TRIGGER partial_state_events_bad_room_id
+            BEFORE INSERT ON partial_state_events
+            FOR EACH ROW
+            BEGIN
+                SELECT RAISE(ABORT, 'Incorrect room_id in partial_state_events')
+                WHERE EXISTS (
+                    SELECT 1 FROM events
+                    WHERE events.event_id = NEW.event_id
+                       AND events.room_id != NEW.room_id
+                );
+            END;
+CREATE TABLE device_lists_changes_in_room (
+    user_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+
+    -- This initially matches `device_lists_stream.stream_id`. Note that we
+    -- delete older values from `device_lists_stream`, so we can't use a foreign
+    -- constraint here.
+    --
+    -- The table will contain rows with the same `stream_id` but different
+    -- `room_id`, as for each device update we store a row per room the user is
+    -- joined to. Therefore `(stream_id, room_id)` gives a unique index.
+    stream_id BIGINT NOT NULL,
+
+    -- We have a background process which goes through this table and converts
+    -- entries into rows in `device_lists_outbound_pokes`. Once we have processed
+    -- a row, we mark it as such by setting `converted_to_destinations=TRUE`.
+    converted_to_destinations BOOLEAN NOT NULL,
+    opentracing_context TEXT
+);
+CREATE UNIQUE INDEX device_lists_changes_in_stream_id ON device_lists_changes_in_room(stream_id, room_id);
+CREATE INDEX device_lists_changes_in_stream_id_unconverted ON device_lists_changes_in_room(stream_id) WHERE NOT converted_to_destinations;
+CREATE TABLE IF NOT EXISTS "event_edges" (
+  event_id TEXT NOT NULL,
+  prev_event_id TEXT NOT NULL,
+  room_id TEXT NULL,
+  is_state BOOL NOT NULL DEFAULT 0,
+  FOREIGN KEY(event_id) REFERENCES events(event_id)
+);
+CREATE UNIQUE INDEX event_edges_event_id_prev_event_id_idx
+  ON event_edges (event_id, prev_event_id);
+CREATE INDEX ev_edges_prev_id ON event_edges (prev_event_id);
+CREATE TABLE event_push_summary_last_receipt_stream_id (
+    Lock CHAR(1) NOT NULL DEFAULT 'X' UNIQUE,  -- Makes sure this table only has one row.
+    stream_id BIGINT NOT NULL,
+    CHECK (Lock='X')
+);
+CREATE TABLE IF NOT EXISTS "application_services_state" (
+    as_id TEXT PRIMARY KEY NOT NULL,
+    state VARCHAR(5),
+    read_receipt_stream_id BIGINT,
+    presence_stream_id BIGINT,
+    to_device_stream_id BIGINT,
+    device_list_stream_id BIGINT
+);
+CREATE TABLE IF NOT EXISTS "receipts_linearized" (
+    stream_id BIGINT NOT NULL,
+    room_id TEXT NOT NULL,
+    receipt_type TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    thread_id TEXT,
+    event_stream_ordering BIGINT,
+    data TEXT NOT NULL,
+    CONSTRAINT receipts_linearized_uniqueness UNIQUE (room_id, receipt_type, user_id),
+    CONSTRAINT receipts_linearized_uniqueness_thread UNIQUE (room_id, receipt_type, user_id, thread_id)
+);
+CREATE TABLE IF NOT EXISTS "receipts_graph" (
+    room_id TEXT NOT NULL,
+    receipt_type TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    event_ids TEXT NOT NULL,
+    thread_id TEXT,
+    data TEXT NOT NULL,
+    CONSTRAINT receipts_graph_uniqueness UNIQUE (room_id, receipt_type, user_id),
+    CONSTRAINT receipts_graph_uniqueness_thread UNIQUE (room_id, receipt_type, user_id, thread_id)
+);
+CREATE INDEX receipts_linearized_id ON receipts_linearized( stream_id );
+CREATE INDEX receipts_linearized_room_stream ON receipts_linearized( room_id, stream_id );
+CREATE INDEX receipts_linearized_user ON receipts_linearized( user_id );
+CREATE INDEX redactions_have_censored_ts ON redactions (received_ts) WHERE NOT have_censored;
+CREATE INDEX room_memberships_user_room_forgotten ON room_memberships (user_id, room_id) WHERE forgotten = 1;
+CREATE INDEX users_have_local_media ON local_media_repository (user_id, created_ts) ;
+CREATE UNIQUE INDEX e2e_cross_signing_keys_stream_idx ON e2e_cross_signing_keys (stream_id) ;
+CREATE INDEX user_external_ids_user_id_idx ON user_external_ids (user_id) ;
+CREATE INDEX presence_stream_state_not_offline_idx ON presence_stream (state) WHERE state != 'offline';
+CREATE UNIQUE INDEX event_push_summary_unique_index ON event_push_summary (user_id, room_id) ;
+CREATE UNIQUE INDEX event_push_summary_unique_index2 ON event_push_summary (user_id, room_id, thread_id) ;
+CREATE UNIQUE INDEX receipts_graph_unique_index ON receipts_graph (room_id, receipt_type, user_id) WHERE thread_id IS NULL;
+CREATE UNIQUE INDEX receipts_linearized_unique_index ON receipts_linearized (room_id, receipt_type, user_id) WHERE thread_id IS NULL;
+CREATE INDEX event_push_actions_stream_highlight_index ON event_push_actions (highlight, stream_ordering) WHERE highlight=0;
+CREATE INDEX current_state_events_member_index ON current_state_events (state_key) WHERE type='m.room.member';
+CREATE INDEX event_contains_url_index ON events (room_id, topological_ordering, stream_ordering) WHERE contains_url = true AND outlier = false;
+CREATE INDEX event_push_actions_highlights_index ON event_push_actions (user_id, room_id, topological_ordering, stream_ordering) WHERE highlight=1;
+CREATE INDEX local_media_repository_url_idx ON local_media_repository (created_ts) WHERE url_cache IS NOT NULL;
+INSERT INTO appservice_stream_position VALUES('X',0);
+INSERT INTO federation_stream_position VALUES('federation',-1,'master');
+INSERT INTO federation_stream_position VALUES('events',-1,'master');
+INSERT INTO event_push_summary_stream_ordering VALUES('X',0);
+INSERT INTO user_directory_stream_pos VALUES('X',1);
+INSERT INTO stats_incremental_position VALUES('X',1);
+INSERT INTO event_push_summary_last_receipt_stream_id VALUES('X',0);

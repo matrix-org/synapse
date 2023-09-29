@@ -19,25 +19,30 @@ from typing import TYPE_CHECKING, Any, Generator, Optional, Tuple, Union
 import attr
 from zope.interface import implementer
 
+from twisted.internet.address import UNIXAddress
 from twisted.internet.defer import Deferred
-from twisted.internet.interfaces import IAddress, IReactorTime
+from twisted.internet.interfaces import IAddress
 from twisted.python.failure import Failure
 from twisted.web.http import HTTPChannel
 from twisted.web.resource import IResource, Resource
-from twisted.web.server import Request, Site
+from twisted.web.server import Request
 
 from synapse.config.server import ListenerConfig
 from synapse.http import get_request_user_agent, redact_uri
+from synapse.http.proxy import ProxySite
 from synapse.http.request_metrics import RequestMetrics, requests_counter
 from synapse.logging.context import (
     ContextRequest,
     LoggingContext,
     PreserveLoggingContext,
 )
-from synapse.types import Requester
+from synapse.types import ISynapseReactor, Requester
 
 if TYPE_CHECKING:
     import opentracing
+
+    from synapse.server import HomeServer
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,14 +77,17 @@ class SynapseRequest(Request):
         site: "SynapseSite",
         *args: Any,
         max_request_body_size: int = 1024,
+        request_id_header: Optional[str] = None,
         **kw: Any,
     ):
         super().__init__(channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
+        self.request_id_header = request_id_header
         self.synapse_site = site
         self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
+        self.experimental_cors_msc3886 = site.experimental_cors_msc3886
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
@@ -98,7 +106,7 @@ class SynapseRequest(Request):
         # A boolean indicating whether `render_deferred` should be cancelled if the
         # client disconnects early. Expected to be set by the coroutine started by
         # `Resource.render`, if rendering is asynchronous.
-        self.is_render_cancellable = False
+        self.is_render_cancellable: bool = False
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -172,7 +180,14 @@ class SynapseRequest(Request):
         self._opentracing_span = span
 
     def get_request_id(self) -> str:
-        return "%s-%i" % (self.get_method(), self.request_seq)
+        request_id_value = None
+        if self.request_id_header:
+            request_id_value = self.getHeader(self.request_id_header)
+
+        if request_id_value is None:
+            request_id_value = str(self.request_seq)
+
+        return "%s-%s" % (self.get_method(), request_id_value)
 
     def get_redacted_uri(self) -> str:
         """Gets the redacted URI associated with the request (or placeholder if the URI
@@ -247,7 +262,7 @@ class SynapseRequest(Request):
             request_id,
             request=ContextRequest(
                 request_id=request_id,
-                ip_address=self.getClientAddress().host,
+                ip_address=self.get_client_ip_if_available(),
                 site_tag=self.synapse_site.site_tag,
                 # The requester is going to be unknown at this point.
                 requester=None,
@@ -390,7 +405,7 @@ class SynapseRequest(Request):
         be sure to call finished_processing.
 
         Args:
-            servlet_name (str): the name of the servlet which will be
+            servlet_name: the name of the servlet which will be
                 processing this request. This is used in the metrics.
 
                 It is possible to update this afterwards by updating
@@ -404,7 +419,7 @@ class SynapseRequest(Request):
 
         self.synapse_site.access_logger.debug(
             "%s - %s - Received request: %s %s",
-            self.getClientAddress().host,
+            self.get_client_ip_if_available(),
             self.synapse_site.site_tag,
             self.get_method(),
             self.get_redacted_uri(),
@@ -452,7 +467,7 @@ class SynapseRequest(Request):
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
-            self.getClientAddress().host,
+            self.get_client_ip_if_available(),
             self.synapse_site.site_tag,
             requester,
             processing_time,
@@ -489,6 +504,31 @@ class SynapseRequest(Request):
             return False
 
         return True
+
+    def get_client_ip_if_available(self) -> str:
+        """Logging helper. Return something useful when a client IP is not retrievable
+        from a unix socket.
+
+        In practice, this returns the socket file path on a SynapseRequest if using a
+        unix socket and the normal IP address for TCP sockets.
+
+        """
+        # getClientAddress().host returns a proper IP address for a TCP socket. But
+        # unix sockets have no concept of IP addresses or ports and return a
+        # UNIXAddress containing a 'None' value. In order to get something usable for
+        # logs(where this is used) get the unix socket file. getHost() returns a
+        # UNIXAddress containing a value of the socket file and has an instance
+        # variable of 'name' encoded as a byte string containing the path we want.
+        # Decode to utf-8 so it looks nice.
+        if isinstance(self.getClientAddress(), UNIXAddress):
+            return self.getHost().name.decode("utf-8")
+        else:
+            return self.getClientAddress().host
+
+    def request_info(self) -> "RequestInfo":
+        h = self.getHeader(b"User-Agent")
+        user_agent = h.decode("ascii", "replace") if h else None
+        return RequestInfo(user_agent=user_agent, ip=self.get_client_ip_if_available())
 
 
 class XForwardedForRequest(SynapseRequest):
@@ -565,7 +605,7 @@ class _XForwardedForAddress:
     host: str
 
 
-class SynapseSite(Site):
+class SynapseSite(ProxySite):
     """
     Synapse-specific twisted http Site
 
@@ -587,7 +627,8 @@ class SynapseSite(Site):
         resource: IResource,
         server_version_string: str,
         max_request_body_size: int,
-        reactor: IReactorTime,
+        reactor: ISynapseReactor,
+        hs: "HomeServer",
     ):
         """
 
@@ -602,7 +643,11 @@ class SynapseSite(Site):
                 dropping the connection
             reactor: reactor to be used to manage connection timeouts
         """
-        Site.__init__(self, resource, reactor=reactor)
+        super().__init__(
+            resource=resource,
+            reactor=reactor,
+            hs=hs,
+        )
 
         self.site_tag = site_tag
         self.reactor = reactor
@@ -611,12 +656,19 @@ class SynapseSite(Site):
         proxied = config.http_options.x_forwarded
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
+        request_id_header = config.http_options.request_id_header
+
+        self.experimental_cors_msc3886: bool = (
+            config.http_options.experimental_cors_msc3886
+        )
+
         def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(
                 channel,
                 self,
                 max_request_body_size=max_request_body_size,
                 queued=queued,
+                request_id_header=request_id_header,
             )
 
         self.requestFactory = request_factory  # type: ignore
@@ -625,3 +677,9 @@ class SynapseSite(Site):
 
     def log(self, request: SynapseRequest) -> None:
         pass
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class RequestInfo:
+    user_agent: Optional[str]
+    ip: str

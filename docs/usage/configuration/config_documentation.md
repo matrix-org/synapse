@@ -25,8 +25,10 @@ messages from the database after 5 minutes, rather than 5 months.
 
 In addition, configuration options referring to size use the following suffixes:
 
-* `M` = MiB, or 1,048,576 bytes
 * `K` = KiB, or 1024 bytes
+* `M` = MiB, or 1,048,576 bytes
+* `G` = GiB, or 1,073,741,824 bytes
+* `T` = TiB, or 1,099,511,627,776 bytes
 
 For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
 for a user avatar.
@@ -99,7 +101,7 @@ modules:
     config: {}
 ```
 ---
-## Server ##
+## Server
 
 Define your homeserver name and other base options.
 
@@ -159,7 +161,7 @@ including _matrix/...). This is the same URL a user might enter into the
 'Custom Homeserver URL' field on their client. If you use Synapse with a
 reverse proxy, this should be the URL to reach Synapse via the proxy.
 Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
-'listeners' below).
+['listeners'](#listeners) below).
 
 Defaults to `https://<server_name>/`.
 
@@ -179,7 +181,7 @@ This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
 
-See https://matrix-org.github.io/synapse/latest/delegate.html for more
+See [Delegation of incoming federation traffic](../../delegate.md) for more
 information.
 
 Example configuration:
@@ -295,7 +297,9 @@ Known room versions are listed [here](https://spec.matrix.org/latest/rooms/#comp
 For example, for room version 1, `default_room_version` should be set
 to "1".
 
-Currently defaults to "9".
+Currently defaults to ["10"](https://spec.matrix.org/v1.5/rooms/v10/).
+
+_Changed in Synapse 1.76:_ the default version room version was increased from [9](https://spec.matrix.org/v1.5/rooms/v9/) to [10](https://spec.matrix.org/v1.5/rooms/v10/).
 
 Example configuration:
 ```yaml
@@ -422,6 +426,10 @@ Sub-options for each listener include:
 
 * `port`: the TCP port to bind to.
 
+* `tag`: An alias for the port in the logger name. If set the tag is logged instead
+of the port. Default to `None`, is optional and only valid for listener with `type: http`.
+See the docs [request log format](../administration/request_log.md).
+
 * `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
@@ -434,7 +442,16 @@ Sub-options for each listener include:
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
 * `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-   behind a reverse-proxy.
+   behind a [reverse-proxy](../../reverse_proxy.md).
+
+* `request_id_header`: The header extracted from each incoming request that is
+   used as the basis for the request ID. The request ID is used in
+   [logs](../administration/request_log.md#request-log-format) and tracing to
+   correlate and match up requests. When unset, Synapse will automatically
+   generate sequential request IDs. This option is useful when Synapse is behind
+   a [reverse-proxy](../../reverse_proxy.md).
+
+   _Added in Synapse 1.68.0._
 
 * `resources`: Only valid for an 'http' listener. A list of resources to host
    on this port. Sub-options for each resource are:
@@ -446,6 +463,20 @@ Sub-options for each listener include:
 
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
+
+Unix socket support (_Added in Synapse 1.89.0_):
+* `path`: A path and filename for a Unix socket. Make sure it is located in a
+  directory with read and write permissions, and that it already exists (the directory
+  will not be created). Defaults to `None`.
+  * **Note**: The use of both `path` and `port` options for the same `listener` is not
+    compatible.
+  * The `x_forwarded` option defaults to true  when using Unix sockets and can be omitted.
+  * Other options that would not make sense to use with a UNIX socket, such as 
+    `bind_addresses` and `tls` will be ignored and can be removed.
+* `mode`: The file permissions to set on the UNIX socket. Defaults to `666`
+* **Note:** Must be set as `type: http` (does not support `metrics` and `manhole`). 
+  Also make sure that `metrics` is not included in `resources` -> `names`
+
 
 Valid resource names are:
 
@@ -459,13 +490,19 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See [here](../../metrics-howto.md).
+* `metrics`: the metrics interface. See [here](../../metrics-howto.md). (Not compatible with Unix sockets)
 
 * `openid`: OpenID authentication. See [here](../../openid.md).
 
 * `replication`: the HTTP replication API (/_synapse/replication). See [here](../../workers.md).
 
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
+
+* `health`: the [health check endpoint](../../reverse_proxy.md#health-check-endpoint). This endpoint
+  is by default active for all other resources and does not have to be activated separately.
+  This is only useful if you want to use the health endpoint explicitly on a dedicated port or
+  for [workers](../../workers.md) and containers without listener e.g.
+  [application services](../../workers.md#notifying-application-services).
 
 Example configuration #1:
 ```yaml
@@ -484,7 +521,7 @@ listeners:
 Example configuration #2:
 ```yaml
 listeners:
-  # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+  # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
@@ -512,6 +549,22 @@ listeners:
     bind_addresses: ['::1', '127.0.0.1']
     type: manhole
 ```
+Example configuration #3:
+```yaml
+listeners:
+  # Unix socket listener: Ideal for Synapse deployments behind a reverse proxy, offering
+  # lightweight interprocess communication without TCP/IP overhead, avoid port
+  # conflicts, and providing enhanced security through system file permissions.
+  #
+  # Note that x_forwarded will default to true, when using a UNIX socket. Please see
+  # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
+  #
+  - path: /var/run/synapse/main_public.sock
+    type: http
+    resources:
+      - names: [client, federation]
+```
+
 ---
 ### `manhole_settings`
 
@@ -556,12 +609,125 @@ delete any device that hasn't been accessed for more than the specified amount o
 
 Defaults to no duration, which means devices are never pruned.
 
+**Note:** This task will always run on the main process, regardless of the value of
+`run_background_tasks_on`. This is due to workers currently not having the ability to
+delete devices.
+
 Example configuration:
 ```yaml
 delete_stale_devices_after: 1y
 ```
+---
+### `email`
 
-## Homeserver blocking ##
+Configuration for sending emails from Synapse.
+
+Server admins can configure custom templates for email content. See
+[here](../../templates.md) for more information.
+
+This setting has the following sub-options:
+* `smtp_host`: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
+* `smtp_port`: The port on the mail server for outgoing SMTP. Defaults to 465 if `force_tls` is true, else 25.
+
+  _Changed in Synapse 1.64.0:_ the default port is now aware of `force_tls`.
+* `smtp_user` and `smtp_pass`: Username/password for authentication to the SMTP server. By default, no
+   authentication is attempted.
+* `force_tls`: By default, Synapse connects over plain text and then optionally upgrades
+   to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
+   and the option `require_transport_security` is ignored.
+   It is recommended to enable this if supported by your mail server.
+
+  _New in Synapse 1.64.0._
+* `require_transport_security`: Set to true to require TLS transport security for SMTP.
+   By default, Synapse will connect over plain text, and will then switch to
+   TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
+   Synapse will refuse to connect unless the server supports STARTTLS.
+* `enable_tls`: By default, if the server supports TLS, it will be used, and the server
+   must present a certificate that is valid for 'smtp_host'. If this option
+   is set to false, TLS will not be used.
+* `notif_from`: defines the "From" address to use when sending emails.
+    It must be set if email sending is enabled. The placeholder '%(app)s' will be replaced by the application name,
+    which is normally set in `app_name`, but may be overridden by the
+    Matrix client application. Note that the placeholder must be written '%(app)s', including the
+    trailing 's'.
+* `app_name`: `app_name` defines the default value for '%(app)s' in `notif_from` and email
+   subjects. It defaults to 'Matrix'.
+* `enable_notifs`: Set to true to enable sending emails for messages that the user
+   has missed. Disabled by default.
+* `notif_for_new_users`: Set to false to disable automatic subscription to email
+   notifications for new users. Enabled by default.
+* `client_base_url`: Custom URL for client links within the email notifications. By default
+   links will be based on "https://matrix.to". (This setting used to be called `riot_base_url`;
+   the old name is still supported for backwards-compatibility but is now deprecated.)
+* `validation_token_lifetime`: Configures the time that a validation email will expire after sending.
+   Defaults to 1h.
+* `invite_client_location`: The web client location to direct users to during an invite. This is passed
+   to the identity server as the `org.matrix.web_client_location` key. Defaults
+   to unset, giving no guidance to the identity server.
+* `subjects`: Subjects to use when sending emails from Synapse. The placeholder '%(app)s' will
+   be replaced with the value of the `app_name` setting, or by a value dictated by the Matrix client application.
+   In addition, each subject can use the following placeholders: '%(person)s', which will be replaced by the displayname
+   of the user(s) that sent the message(s), e.g. "Alice and Bob", and '%(room)s', which will be replaced by the name of the room the
+   message(s) have been sent to, e.g. "My super room". In addition, emails related to account administration will
+   can use the '%(server_name)s' placeholder, which will be replaced by the value of the
+   `server_name` setting in your Synapse configuration.
+
+   Here is a list of subjects for notification emails that can be set:
+     * `message_from_person_in_room`: Subject to use to notify about one message from one or more user(s) in a
+        room which has a name. Defaults to "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room..."
+     * `message_from_person`: Subject to use to notify about one message from one or more user(s) in a
+        room which doesn't have a name. Defaults to "[%(app)s] You have a message on %(app)s from %(person)s..."
+     * `messages_from_person`: Subject to use to notify about multiple messages from one or more users in
+        a room which doesn't have a name. Defaults to "[%(app)s] You have messages on %(app)s from %(person)s..."
+     * `messages_in_room`: Subject to use to notify about multiple messages in a room which has a
+        name. Defaults to "[%(app)s] You have messages on %(app)s in the %(room)s room..."
+     * `messages_in_room_and_others`: Subject to use to notify about multiple messages in multiple rooms.
+        Defaults to "[%(app)s] You have messages on %(app)s in the %(room)s room and others..."
+     * `messages_from_person_and_others`: Subject to use to notify about multiple messages from multiple persons in
+        multiple rooms. This is similar to the setting above except it's used when
+        the room in which the notification was triggered has no name. Defaults to
+        "[%(app)s] You have messages on %(app)s from %(person)s and others..."
+     * `invite_from_person_to_room`: Subject to use to notify about an invite to a room which has a name.
+        Defaults to  "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s..."
+     * `invite_from_person`: Subject to use to notify about an invite to a room which doesn't have a
+        name. Defaults to "[%(app)s] %(person)s has invited you to chat on %(app)s..."
+     * `password_reset`: Subject to use when sending a password reset email. Defaults to "[%(server_name)s] Password reset"
+     * `email_validation`: Subject to use when sending a verification email to assert an address's
+        ownership. Defaults to "[%(server_name)s] Validate your email"
+
+Example configuration:
+
+```yaml
+email:
+  smtp_host: mail.server
+  smtp_port: 587
+  smtp_user: "exampleusername"
+  smtp_pass: "examplepassword"
+  force_tls: true
+  require_transport_security: true
+  enable_tls: false
+  notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
+  app_name: my_branded_matrix_server
+  enable_notifs: true
+  notif_for_new_users: false
+  client_base_url: "http://localhost/riot"
+  validation_token_lifetime: 15m
+  invite_client_location: https://app.element.io
+
+  subjects:
+    message_from_person_in_room: "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room..."
+    message_from_person: "[%(app)s] You have a message on %(app)s from %(person)s..."
+    messages_from_person: "[%(app)s] You have messages on %(app)s from %(person)s..."
+    messages_in_room: "[%(app)s] You have messages on %(app)s in the %(room)s room..."
+    messages_in_room_and_others: "[%(app)s] You have messages on %(app)s in the %(room)s room and others..."
+    messages_from_person_and_others: "[%(app)s] You have messages on %(app)s from %(person)s and others..."
+    invite_from_person_to_room: "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s..."
+    invite_from_person: "[%(app)s] %(person)s has invited you to chat on %(app)s..."
+    password_reset: "[%(server_name)s] Password reset"
+    email_validation: "[%(server_name)s] Validate your email"
+```
+
+## Homeserver blocking
 Useful options for Synapse admins.
 
 ---
@@ -770,6 +936,17 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
+### `forgotten_room_retention_period`
+
+How long to keep locally forgotten rooms before purging them from the DB.
+
+Defaults to `null`, meaning it's disabled.
+
+Example configuration:
+```yaml
+forgotten_room_retention_period: 28d
+```
+---
 ### `user_ips_max_age`
 
 How long to track users' last seen time and IPs in the database.
@@ -849,11 +1026,8 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default. Please be advised 
-that enabling this feature carries some risk. There are known bugs with the implementation
-which can cause database corruption. Setting retention to delete older history
-is less risky than deleting newer history but in general caution is advised when enabling this
-experimental feature. You can read more about this feature [here](../../message_retention_policies.md).
+The message retention policies feature is disabled by default. You can read more
+about this feature [here](../../message_retention_policies.md).
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
@@ -913,7 +1087,7 @@ retention:
       interval: 1d
 ```
 ---
-## TLS ##
+## TLS
 
 Options related to TLS.
 
@@ -956,14 +1130,14 @@ federation_verify_certificates: false
 
 The minimum TLS version that will be used for outbound federation requests.
 
-Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
-that setting this value higher than `1.2` will prevent federation to most
-of the public Matrix network: only configure it to `1.3` if you have an
+Defaults to `"1"`. Configurable to `"1"`, `"1.1"`, `"1.2"`, or `"1.3"`. Note
+that setting this value higher than `"1.2"` will prevent federation to most
+of the public Matrix network: only configure it to `"1.3"` if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.
 
 Example configuration:
 ```yaml
-federation_client_minimum_tls_version: 1.2
+federation_client_minimum_tls_version: "1.2"
 ```
 ---
 ### `federation_certificate_verification_whitelist`
@@ -975,7 +1149,7 @@ This setting should only be used in very specific cases, such as
 federation over Tor hidden services and similar. For private networks
 of homeservers, you likely want to use a private CA instead.
 
-Only effective if `federation_verify_certicates` is `true`.
+Only effective if `federation_verify_certificates` is `true`.
 
 Example configuration:
 ```yaml
@@ -1003,7 +1177,7 @@ federation_custom_ca_list:
   - myCA3.pem
 ```
 ---
-## Federation ##
+## Federation
 
 Options related to federation.
 
@@ -1062,7 +1236,44 @@ Example configuration:
 allow_device_name_lookup_over_federation: true
 ```
 ---
-## Caching ##
+### `federation`
+
+The federation section defines some sub-options related to federation.
+
+The following options are related to configuring timeout and retry logic for one request,
+independently of the others.
+Short retry algorithm is used when something or someone will wait for the request to have an
+answer, while long retry is used for requests that happen in the background,
+like sending a federation transaction.
+
+* `client_timeout`: timeout for the federation requests. Default to 60s.
+* `max_short_retry_delay`: maximum delay to be used for the short retry algo. Default to 2s.
+* `max_long_retry_delay`: maximum delay to be used for the short retry algo. Default to 60s.
+* `max_short_retries`: maximum number of retries for the short retry algo. Default to 3 attempts.
+* `max_long_retries`: maximum number of retries for the long retry algo. Default to 10 attempts.
+
+The following options control the retry logic when communicating with a specific homeserver destination.
+Unlike the previous configuration options, these values apply across all requests
+for a given destination and the state of the backoff is stored in the database.
+
+* `destination_min_retry_interval`: the initial backoff, after the first request fails. Defaults to 10m.
+* `destination_retry_multiplier`: how much we multiply the backoff by after each subsequent fail. Defaults to 2.
+* `destination_max_retry_interval`: a cap on the backoff. Defaults to a week.
+
+Example configuration:
+```yaml
+federation:
+  client_timeout: 180s
+  max_short_retry_delay: 7s
+  max_long_retry_delay: 100s
+  max_short_retries: 5
+  max_long_retries: 20
+  destination_min_retry_interval: 30s
+  destination_retry_multiplier: 5
+  destination_max_retry_interval: 12h
+```
+---
+## Caching
 
 Options related to caching.
 
@@ -1130,7 +1341,7 @@ number of entries that can be stored.
 
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory
-   usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu)
+   usage and cache entry availability. You must be using [jemalloc](../administration/admin_faq.md#help-synapse-is-slow-and-eats-all-my-ramcpu)
    to utilize this option, and all three of the options must be specified for this feature to work. This option
    defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
    and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
@@ -1139,7 +1350,7 @@ number of entries that can be stored.
      * `max_cache_memory_usage` sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
         They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
         the setting below, or until the `min_cache_ttl` is hit. There is no default value for this option.
-     * `target_memory_usage` sets a rough target for the desired memory usage of the caches. There is no default value
+     * `target_cache_memory_usage` sets a rough target for the desired memory usage of the caches. There is no default value
         for this option.
      * `min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
         caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
@@ -1176,7 +1387,7 @@ file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using
 `systemctl reload matrix-synapse`.
 
 ---
-## Database ##
+## Database
 Config options related to database settings.
 
 ---
@@ -1203,7 +1414,7 @@ Associated sub-options:
   connection pool. For a reference to valid arguments, see:
     * for [sqlite](https://docs.python.org/3/library/sqlite3.html#sqlite3.connect)
     * for [postgres](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
-    * for [the connection pool](https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
+    * for [the connection pool](https://docs.twistedmatrix.com/en/stable/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
 
 For more information on using Synapse with Postgres,
 see [here](../../postgres.md).
@@ -1323,20 +1534,21 @@ databases:
       cp_max: 10
 ```
 ---
-## Logging ##
+## Logging
 Config options related to logging.
 
 ---
 ### `log_config`
 
-This option specifies a yaml python logging config file as described [here](https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema).
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
 
 Example configuration:
 ```yaml
 log_config: "CONFDIR/SERVERNAME.log.config"
 ```
 ---
-## Ratelimiting ##
+## Ratelimiting
 Options related to ratelimiting in Synapse.
 
 Each ratelimiting configuration is made of two parameters:
@@ -1387,13 +1599,13 @@ rc_registration_token_validity:
 
 This option specifies several limits for login:
 * `address` ratelimits login requests based on the client's IP
-      address. Defaults to `per_second: 0.17`, `burst_count: 3`.
+      address. Defaults to `per_second: 0.003`, `burst_count: 5`.
 
 * `account` ratelimits login requests based on the account the
-  client is attempting to log into. Defaults to `per_second: 0.17`,
-  `burst_count: 3`.
+  client is attempting to log into. Defaults to `per_second: 0.003`,
+  `burst_count: 5`.
 
-* `failted_attempts` ratelimits login requests based on the account the
+* `failed_attempts` ratelimits login requests based on the account the
   client is attempting to log into, based on the amount of failed login
   attempts for this account. Defaults to `per_second: 0.17`, `burst_count: 3`.
 
@@ -1567,7 +1779,7 @@ Example configuration:
 federation_rr_transactions_per_room_per_second: 40
 ```
 ---
-## Media Store ##
+## Media Store
 Config options related to Synapse's media store.
 
 ---
@@ -1631,6 +1843,30 @@ Maximum number of pixels that will be thumbnailed. Defaults to 32M.
 Example configuration:
 ```yaml
 max_image_pixels: 35M
+```
+---
+### `prevent_media_downloads_from`
+
+A list of domains to never download media from. Media from these
+domains that is already downloaded will not be deleted, but will be
+inaccessible to users. This option does not affect admin APIs trying
+to download/operate on media.
+
+This will not prevent the listed domains from accessing media themselves.
+It simply prevents users on this server from downloading media originating
+from the listed servers.
+
+This will have no effect on media originating from the local server.
+This only affects media downloaded from other Matrix servers, to
+block domains from URL previews see [`url_preview_url_blacklist`](#url_preview_url_blacklist).
+
+Defaults to an empty list (nothing blocked).
+
+Example configuration:
+```yaml
+prevent_media_downloads_from:
+  - evil.example.org
+  - evil2.example.org
 ```
 ---
 ### `dynamic_thumbnails`
@@ -1757,7 +1993,7 @@ url_preview_ip_range_blacklist:
   - 'ff00::/8'
   - 'fec0::/10'
 ```
-----
+---
 ### `url_preview_ip_range_whitelist`
 
 This option sets a list of IP address CIDR ranges that the URL preview spider is allowed
@@ -1851,7 +2087,7 @@ Example configuration:
    - 'fr;q=0.8'
    - '*;q=0.7'
 ```
-----
+---
 ### `oembed`
 
 oEmbed allows for easier embedding content from a website. It can be
@@ -1868,7 +2104,7 @@ oembed:
     - oembed/my_providers.json
 ```
 ---
-## Captcha ##
+## Captcha
 
 See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 
@@ -1917,7 +2153,7 @@ Example configuration:
 recaptcha_siteverify_api: "https://my.recaptcha.site"
 ```
 ---
-## TURN ##
+## TURN
 Options related to adding a TURN server to Synapse.
 
 ---
@@ -1938,7 +2174,7 @@ Example configuration:
 ```yaml
 turn_shared_secret: "YOUR_SHARED_SECRET"
 ```
-----
+---
 ### `turn_username` and `turn_password`
 
 The Username and password if the TURN server needs them and does not use a token.
@@ -2079,7 +2315,7 @@ set.
 
 This is primarily intended for use with the `register_new_matrix_user` script
 (see [Registering a user](../../setup/installation.md#registering-a-user));
-however, the interface is [documented](../admin_api/register_api.html).
+however, the interface is [documented](../../admin_api/register_api.html).
 
 See also [`registration_shared_secret_path`](#registration_shared_secret_path).
 
@@ -2096,12 +2332,12 @@ allows the shared secret to be specified in an external file.
 
 The file should be a plain text file, containing only the shared secret.
 
-If this file does not exist, Synapse will create a new signing
-key on startup and store it in this file.
+If this file does not exist, Synapse will create a new shared
+secret on startup and store it in this file.
 
 Example configuration:
 ```yaml
-registration_shared_secret_file: /path/to/secrets/file
+registration_shared_secret_path: /path/to/secrets/file
 ```
 
 _Added in Synapse 1.67.0._
@@ -2220,6 +2456,9 @@ homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below.
 
+As Spaces are just rooms under the hood, Space aliases may also be
+used.
+
 Example configuration:
 ```yaml
 auto_join_rooms:
@@ -2231,7 +2470,7 @@ auto_join_rooms:
 
 Where `auto_join_rooms` are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
-homeserver registers.
+homeserver registers. This option will not create Spaces.
 
 By default the auto-created rooms are publicly joinable from any federated
 server. Use the `autocreate_auto_join_rooms_federated` and
@@ -2249,7 +2488,7 @@ autocreate_auto_join_rooms: false
 ---
 ### `autocreate_auto_join_rooms_federated`
 
-Whether the rooms listen in `auto_join_rooms` that are auto-created are available
+Whether the rooms listed in `auto_join_rooms` that are auto-created are available
 via federation. Only has an effect if `autocreate_auto_join_rooms` is true.
 
 Note that whether a room is federated cannot be modified after
@@ -2354,7 +2593,7 @@ Example configuration:
 ```yaml
 session_lifetime: 24h
 ```
-----
+---
 ### `refresh_access_token_lifetime`
 
 Time that an access token remains valid for, if the session is using refresh tokens.
@@ -2408,9 +2647,52 @@ Example configuration:
 ```yaml
 nonrefreshable_access_token_lifetime: 24h
 ```
-
 ---
-## Metrics ###
+### `ui_auth`
+
+The amount of time to allow a user-interactive authentication session to be active.
+
+This defaults to 0, meaning the user is queried for their credentials
+before every action, but this can be overridden to allow a single
+validation to be re-used.  This weakens the protections afforded by
+the user-interactive authentication process, by allowing for multiple
+(and potentially different) operations to use the same validation session.
+
+This is ignored for potentially "dangerous" operations (including
+deactivating an account, modifying an account password, adding a 3PID,
+and minting additional login tokens).
+
+Use the `session_timeout` sub-option here to change the time allowed for credential validation.
+
+Example configuration:
+```yaml
+ui_auth:
+    session_timeout: "15s"
+```
+---
+### `login_via_existing_session`
+
+Matrix supports the ability of an existing session to mint a login token for
+another client.
+
+Synapse disables this by default as it has security ramifications -- a malicious
+client could use the mechanism to spawn more than one session.
+
+The duration of time the generated token is valid for can be configured with the
+`token_timeout` sub-option.
+
+User-interactive authentication is required when this is enabled unless the
+`require_ui_auth` sub-option is set to `False`.
+
+Example configuration:
+```yaml
+login_via_existing_session:
+    enabled: true
+    require_ui_auth: false
+    token_timeout: "5m"
+```
+---
+## Metrics
 Config options related to metrics.
 
 ---
@@ -2482,38 +2764,59 @@ Example configuration:
 report_stats_endpoint: https://example.com/report-usage-stats/push
 ```
 ---
-## API Configuration ##
+## API Configuration
 Config settings related to the client/server API
 
 ---
 ### `room_prejoin_state`
 
-Controls for the state that is shared with users who receive an invite
-to a room. By default, the following state event types are shared with users who
-receive invites to the room:
-- m.room.join_rules
-- m.room.canonical_alias
-- m.room.avatar
-- m.room.encryption
-- m.room.name
-- m.room.create
-- m.room.topic
+This setting controls the state that is shared with users upon receiving an
+invite to a room, or in reply to a knock on a room. By default, the following
+state events are shared with users:
+
+- `m.room.join_rules`
+- `m.room.canonical_alias`
+- `m.room.avatar`
+- `m.room.encryption`
+- `m.room.name`
+- `m.room.create`
+- `m.room.topic`
 
 To change the default behavior, use the following sub-options:
-* `disable_default_event_types`: set to true to disable the above defaults. If this
-   is enabled, only the event types listed in `additional_event_types` are shared.
-   Defaults to false.
-* `additional_event_types`: Additional state event types to share with users when they are invited
-   to a room. By default, this list is empty (so only the default event types are shared).
+* `disable_default_event_types`: boolean. Set to `true` to disable the above
+  defaults. If this is enabled, only the event types listed in
+  `additional_event_types` are shared. Defaults to `false`.
+* `additional_event_types`: A list of additional state events to include in the
+  events to be shared. By default, this list is empty (so only the default event
+  types are shared).
+
+  Each entry in this list should be either a single string or a list of two
+  strings.
+  * A standalone string `t` represents all events with type `t` (i.e.
+    with no restrictions on state keys).
+  * A pair of strings `[t, s]` represents a single event with type `t` and
+    state key `s`. The same type can appear in two entries with different state
+    keys: in this situation, both state keys are included in prejoin state.
 
 Example configuration:
 ```yaml
 room_prejoin_state:
-   disable_default_event_types: true
+   disable_default_event_types: false
    additional_event_types:
-     - org.example.custom.event.type
-     - m.room.join_rules
+     # Share all events of type `org.example.custom.event.typeA`
+     - org.example.custom.event.typeA
+     # Share only events of type `org.example.custom.event.typeB` whose
+     # state_key is "foo"
+     - ["org.example.custom.event.typeB", "foo"]
+     # Share only events of type `org.example.custom.event.typeC` whose
+     # state_key is "bar" or "baz"
+     - ["org.example.custom.event.typeC", "bar"]
+     - ["org.example.custom.event.typeC", "baz"]
 ```
+
+*Changed in Synapse 1.74:* admins can filter the events in prejoin state based
+on their state key.
+
 ---
 ### `track_puppeted_user_ips`
 
@@ -2556,6 +2859,20 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
+### `use_appservice_legacy_authorization`
+
+Whether to send the application service access tokens via the `access_token` query parameter
+per older versions of the Matrix specification. Defaults to false. Set to true to enable sending
+access tokens via a query parameter.
+
+**Enabling this option is considered insecure and is not recommended. **
+
+Example configuration:
+```yaml
+use_appservice_legacy_authorization: true 
+```
+
+---
 ### `macaroon_secret_key`
 
 A secret which is used to sign
@@ -2582,7 +2899,7 @@ Example configuration:
 form_secret: <PRIVATE STRING>
 ```
 ---
-## Signing Keys ##
+## Signing Keys
 Config options relating to signing keys
 
 ---
@@ -2636,12 +2953,18 @@ Normally, the connection to the key server is validated via TLS certificates.
 Additional security can be provided by configuring a `verify key`, which
 will make synapse check that the response is signed by that key.
 
-This setting supercedes an older setting named `perspectives`. The old format
+This setting supersedes an older setting named `perspectives`. The old format
 is still supported for backwards-compatibility, but it is deprecated.
 
 `trusted_key_servers` defaults to matrix.org, but using it will generate a
 warning on start-up. To suppress this warning, set
 `suppress_key_server_warning` to true.
+
+If the use of a trusted key server has to be deactivated, e.g. in a private
+federation or for privacy reasons, this can be realised by setting
+an empty array (`trusted_key_servers: []`). Then Synapse will request the keys
+directly from the server that owns the keys. If Synapse does not get keys directly
+from the server, the events of this server will be rejected.
 
 Options for each entry in the list include:
 * `server_name`: the name of the server. Required.
@@ -2691,7 +3014,7 @@ Example configuration:
 key_server_signing_keys_path: "key_server_signing_keys.key"
 ```
 ---
-## Single sign-on integration ##
+## Single sign-on integration
 
 The following settings can be used to make Synapse use a single sign-on
 provider for authentication, instead of its internal password database.
@@ -2712,6 +3035,16 @@ enable SAML login. You can either put your entire pysaml config inline using the
 option, or you can specify a path to a psyaml config file with the sub-option `config_path`.
 This setting has the following sub-options:
 
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `sp_config`: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
    Default values will be used for the `entityid` and `service` settings,
    so it is not normally necessary to specify them unless you need to
@@ -2863,7 +3196,7 @@ Options for each entry include:
 
 * `idp_icon`: An optional icon for this identity provider, which is presented
    by clients and Synapse's own IdP picker page. If given, must be an
-   MXC URI of the format mxc://<server-name>/<media-id>. (An easy way to
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
    obtain such an MXC URI is to upload an image to an (unencrypted) room
    and then copy the "url" from the source of the event.)
 
@@ -2881,6 +3214,14 @@ Options for each entry include:
 
 * `client_secret`: oauth2 client secret to use. May be omitted if
   `client_secret_jwt_key` is given, or if `client_auth_method` is 'none'.
+  Must be omitted if `client_secret_path` is specified.
+
+* `client_secret_path`: path to the oauth2 client secret to use. With that
+   it's not necessary to leak secrets into the config file itself.
+   Mutually exclusive with `client_secret`. Can be omitted if
+   `client_secret_jwt_key` is specified.
+
+   *Added in Synapse 1.91.0.*
 
 * `client_secret_jwt_key`: Alternative to client_secret: details of a key used
    to create a JSON Web Token to be used as an OAuth2 client secret. If
@@ -2904,8 +3245,13 @@ Options for each entry include:
    values are `client_secret_basic` (default), `client_secret_post` and
    `none`.
 
+* `pkce_method`: Whether to use proof key for code exchange when requesting
+   and exchanging the token. Valid values are: `auto`, `always`, or `never`. Defaults
+   to `auto`, which uses PKCE if supported during metadata discovery. Set to `always`
+   to force enable PKCE or `never` to force disable PKCE.
+
 * `scopes`: list of scopes to request. This should normally include the "openid"
-   scope. Defaults to ["openid"].
+   scope. Defaults to `["openid"]`.
 
 * `authorization_endpoint`: the oauth2 authorization endpoint. Required if
    provider discovery is disabled.
@@ -2934,13 +3280,18 @@ Options for each entry include:
    match a pre-existing account instead of failing. This could be used if
    switching from password logins to OIDC. Defaults to false.
 
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the OIDC SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
 * `user_mapping_provider`: Configuration for how attributes returned from a OIDC
    provider are mapped onto a matrix user. This setting has the following
    sub-properties:
 
      * `module`: The class name of a custom mapping module. Default is
        `synapse.handlers.oidc.JinjaOidcMappingProvider`.
-        See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
+        See [OpenID Mapping Providers](../../sso_mapping_providers.md#openid-mapping-providers)
         for information on implementing a custom mapping provider.
 
      * `config`: Configuration for the mapping provider module. This section will
@@ -2949,9 +3300,34 @@ Options for each entry include:
 
         For the default provider, the following settings are available:
 
-       * subject_claim: name of the claim containing a unique identifier
+       * `subject_template`: Jinja2 template for a unique identifier for the user.
+         Defaults to `{{ user.sub }}`, which OpenID Connect compliant providers should provide.
+
+         This replaces and overrides `subject_claim`.
+
+       * `subject_claim`: name of the claim containing a unique identifier
          for the user. Defaults to 'sub', which OpenID Connect
          compliant providers should provide.
+
+         *Deprecated in Synapse v1.75.0.*
+
+       * `picture_template`: Jinja2 template for an url for the user's profile picture.
+         Defaults to `{{ user.picture }}`, which OpenID Connect compliant providers should
+         provide and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+
+         This replaces and overrides `picture_claim`.
+
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
+
+       * `picture_claim`: name of the claim containing an url for the user's profile picture.
+         Defaults to 'picture', which OpenID Connect compliant providers should provide
+         and has to refer to a direct image file such as PNG, JPEG, or GIF image file.
+
+         Currently only supported in monolithic (single-process) server configurations
+         where the media repository runs within the Synapse process.
+
+         *Deprecated in Synapse v1.75.0.*
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
@@ -2977,6 +3353,15 @@ Options for each entry include:
      which is set to the claims returned by the UserInfo Endpoint and/or
      in the ID Token.
 
+* `backchannel_logout_enabled`: set to `true` to process OIDC Back-Channel Logout notifications.
+  Those notifications are expected to be received on `/_synapse/client/oidc/backchannel_logout`.
+  Defaults to `false`.
+
+* `backchannel_logout_ignore_sub`: by default, the OIDC Back-Channel Logout feature checks that the
+  `sub` claim matches the subject claim received during login. This check can be disabled by setting
+  this to `true`. Defaults to `false`.
+
+  You might want to disable this if the `subject_claim` returned by the mapping provider is not `sub`.
 
 It is possible to configure Synapse to only allow logins if certain attributes
 match particular values in the OIDC userinfo. The requirements can be listed under
@@ -3016,6 +3401,7 @@ oidc_providers:
     userinfo_endpoint: "https://accounts.example.com/userinfo"
     jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
     skip_verification: true
+    enable_registration: true
     user_mapping_provider:
       config:
         subject_claim: "id"
@@ -3033,7 +3419,18 @@ Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:
 * `enabled`: Set this to true to enable authorization against a CAS server.
    Defaults to false.
+* `idp_name`: A user-facing name for this identity provider, which is used to
+   offer the user a choice of login mechanisms.
+* `idp_icon`: An optional icon for this identity provider, which is presented
+   by clients and Synapse's own IdP picker page. If given, must be an
+   MXC URI of the format `mxc://<server-name>/<media-id>`. (An easy way to
+   obtain such an MXC URI is to upload an image to an (unencrypted) room
+   and then copy the "url" from the source of the event.)
+* `idp_brand`: An optional brand for this identity provider, allowing clients
+   to style the login flow according to the identity provider in question.
+   See the [spec](https://spec.matrix.org/latest/) for possible options here.
 * `server_url`: The URL of the CAS authorization endpoint.
+* `protocol_version`: The CAS protocol version, defaults to none (version 3 is required if you want to use "required_attributes").
 * `displayname_attribute`: The attribute of the CAS response to use as the display name.
    If no name is given here, no displayname will be set.
 * `required_attributes`:  It is possible to configure Synapse to only allow logins if CAS attributes
@@ -3041,16 +3438,24 @@ Has the following sub-options:
    and the values must match the given value. Alternately if the given value
    is `None` then any value is allowed (the attribute just must exist).
    All of the listed attributes must match for the login to be permitted.
+* `enable_registration`: set to 'false' to disable automatic registration of new
+   users. This allows the CAS SSO flow to be limited to sign in only, rather than
+   automatically registering users that have a valid SSO login but do not have
+   a pre-registered account. Defaults to true.
+
+   *Added in Synapse 1.93.0.*
 
 Example configuration:
 ```yaml
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
+  protocol_version: 3
   displayname_attribute: name
   required_attributes:
     userGroup: "staff"
     department: None
+  enable_registration: true
 ```
 ---
 ### `sso`
@@ -3181,137 +3586,7 @@ password_config:
       require_uppercase: true
 ```
 ---
-### `ui_auth`
-
-The amount of time to allow a user-interactive authentication session to be active.
-
-This defaults to 0, meaning the user is queried for their credentials
-before every action, but this can be overridden to allow a single
-validation to be re-used.  This weakens the protections afforded by
-the user-interactive authentication process, by allowing for multiple
-(and potentially different) operations to use the same validation session.
-
-This is ignored for potentially "dangerous" operations (including
-deactivating an account, modifying an account password, and
-adding a 3PID).
-
-Use the `session_timeout` sub-option here to change the time allowed for credential validation.
-
-Example configuration:
-```yaml
-ui_auth:
-    session_timeout: "15s"
-```
----
-### `email`
-
-Configuration for sending emails from Synapse.
-
-Server admins can configure custom templates for email content. See
-[here](../../templates.md) for more information.
-
-This setting has the following sub-options:
-* `smtp_host`: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
-* `smtp_port`: The port on the mail server for outgoing SMTP. Defaults to 465 if `force_tls` is true, else 25.
-
-  _Changed in Synapse 1.64.0:_ the default port is now aware of `force_tls`.
-* `smtp_user` and `smtp_pass`: Username/password for authentication to the SMTP server. By default, no
-   authentication is attempted.
-* `force_tls`: By default, Synapse connects over plain text and then optionally upgrades
-   to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
-   and the option `require_transport_security` is ignored.
-   It is recommended to enable this if supported by your mail server.
-
-  _New in Synapse 1.64.0._
-* `require_transport_security`: Set to true to require TLS transport security for SMTP.
-   By default, Synapse will connect over plain text, and will then switch to
-   TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
-   Synapse will refuse to connect unless the server supports STARTTLS.
-* `enable_tls`: By default, if the server supports TLS, it will be used, and the server
-   must present a certificate that is valid for 'smtp_host'. If this option
-   is set to false, TLS will not be used.
-* `notif_from`: defines the "From" address to use when sending emails.
-    It must be set if email sending is enabled. The placeholder '%(app)s' will be replaced by the application name,
-    which is normally set in `app_name`, but may be overridden by the
-    Matrix client application. Note that the placeholder must be written '%(app)s', including the
-    trailing 's'.
-* `app_name`: `app_name` defines the default value for '%(app)s' in `notif_from` and email
-   subjects. It defaults to 'Matrix'.
-* `enable_notifs`: Set to true to enable sending emails for messages that the user
-   has missed. Disabled by default.
-* `notif_for_new_users`: Set to false to disable automatic subscription to email
-   notifications for new users. Enabled by default.
-* `client_base_url`: Custom URL for client links within the email notifications. By default
-   links will be based on "https://matrix.to". (This setting used to be called `riot_base_url`;
-   the old name is still supported for backwards-compatibility but is now deprecated.)
-* `validation_token_lifetime`: Configures the time that a validation email will expire after sending.
-   Defaults to 1h.
-* `invite_client_location`: The web client location to direct users to during an invite. This is passed
-   to the identity server as the `org.matrix.web_client_location` key. Defaults
-   to unset, giving no guidance to the identity server.
-* `subjects`: Subjects to use when sending emails from Synapse. The placeholder '%(app)s' will
-   be replaced with the value of the `app_name` setting, or by a value dictated by the Matrix client application.
-   In addition, each subject can use the following placeholders: '%(person)s', which will be replaced by the displayname
-   of the user(s) that sent the message(s), e.g. "Alice and Bob", and '%(room)s', which will be replaced by the name of the room the
-   message(s) have been sent to, e.g. "My super room". In addition, emails related to account administration will
-   can use the '%(server_name)s' placeholder, which will be replaced by the value of the
-   `server_name` setting in your Synapse configuration.
-
-   Here is a list of subjects for notification emails that can be set:
-     * `message_from_person_in_room`: Subject to use to notify about one message from one or more user(s) in a
-        room which has a name. Defaults to "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room..."
-     * `message_from_person`: Subject to use to notify about one message from one or more user(s) in a
-        room which doesn't have a name. Defaults to "[%(app)s] You have a message on %(app)s from %(person)s..."
-     * `messages_from_person`: Subject to use to notify about multiple messages from one or more users in
-        a room which doesn't have a name. Defaults to "[%(app)s] You have messages on %(app)s from %(person)s..."
-     * `messages_in_room`: Subject to use to notify about multiple messages in a room which has a
-        name. Defaults to "[%(app)s] You have messages on %(app)s in the %(room)s room..."
-     * `messages_in_room_and_others`: Subject to use to notify about multiple messages in multiple rooms.
-        Defaults to "[%(app)s] You have messages on %(app)s in the %(room)s room and others..."
-     * `messages_from_person_and_others`: Subject to use to notify about multiple messages from multiple persons in
-        multiple rooms. This is similar to the setting above except it's used when
-        the room in which the notification was triggered has no name. Defaults to
-        "[%(app)s] You have messages on %(app)s from %(person)s and others..."
-     * `invite_from_person_to_room`: Subject to use to notify about an invite to a room which has a name.
-        Defaults to  "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s..."
-     * `invite_from_person`: Subject to use to notify about an invite to a room which doesn't have a
-        name. Defaults to "[%(app)s] %(person)s has invited you to chat on %(app)s..."
-     * `password_reset`: Subject to use when sending a password reset email. Defaults to "[%(server_name)s] Password reset"
-     * `email_validation`: Subject to use when sending a verification email to assert an address's
-        ownership. Defaults to "[%(server_name)s] Validate your email"
-
-Example configuration:
-```yaml
-email:
-  smtp_host: mail.server
-  smtp_port: 587
-  smtp_user: "exampleusername"
-  smtp_pass: "examplepassword"
-  force_tls: true
-  require_transport_security: true
-  enable_tls: false
-  notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
-  app_name: my_branded_matrix_server
-  enable_notifs: true
-  notif_for_new_users: false
-  client_base_url: "http://localhost/riot"
-  validation_token_lifetime: 15m
-  invite_client_location: https://app.element.io
-
-  subjects:
-    message_from_person_in_room: "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room..."
-    message_from_person: "[%(app)s] You have a message on %(app)s from %(person)s..."
-    messages_from_person: "[%(app)s] You have messages on %(app)s from %(person)s..."
-    messages_in_room: "[%(app)s] You have messages on %(app)s in the %(room)s room..."
-    messages_in_room_and_others: "[%(app)s] You have messages on %(app)s in the %(room)s room and others..."
-    messages_from_person_and_others: "[%(app)s] You have messages on %(app)s from %(person)s and others..."
-    invite_from_person_to_room: "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s..."
-    invite_from_person: "[%(app)s] %(person)s has invited you to chat on %(app)s..."
-    password_reset: "[%(server_name)s] Password reset"
-    email_validation: "[%(server_name)s] Validate your email"
-```
----
-## Push ##
+## Push
 Configuration settings related to push notifications
 
 ---
@@ -3320,6 +3595,10 @@ Configuration settings related to push notifications
 This setting defines options for push notifications.
 
 This option has a number of sub-options. They are as follows:
+* `enabled`: Enables or disables push notification calculation. Note, disabling this will also
+   stop unread counts being calculated for rooms. This mode of operation is intended
+   for homeservers which may only have bots or appservice users connected, or are otherwise
+   not interested in push/unread counters. This is enabled by default.
 * `include_content`: Clients requesting push notifications can either have the body of
    the message sent in the notification poke along with other details
    like the sender, or just the event ID and room ID (`event_id_only`).
@@ -3336,19 +3615,24 @@ This option has a number of sub-options. They are as follows:
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
+* `jitter_delay`: Delays push notifications by a random amount up to the given
+  duration. Useful for mitigating timing attacks. Optional, defaults to no
+  delay. _Added in Synapse 1.84.0._
 
 Example configuration:
 ```yaml
 push:
+  enabled: true
   include_content: false
   group_unread_count_by_room: false
+  jitter_delay: "10s"
 ```
 ---
-## Rooms ##
+## Rooms
 Config options relating to rooms.
 
 ---
-### `encryption_enabled_by_default`
+### `encryption_enabled_by_default_for_room_type`
 
 Controls whether locally-created rooms should be end-to-end encrypted by
 default.
@@ -3377,21 +3661,24 @@ This setting defines options related to the user directory.
 This option has the following sub-options:
 * `enabled`:  Defines whether users can search the user directory. If false then
    empty responses are returned to all queries. Defaults to true.
-* `search_all_users`: Defines whether to search all users visible to your HS when searching
-   the user directory. If false, search results will only contain users
+* `search_all_users`: Defines whether to search all users visible to your HS at the time the search is performed. If set to true, will return all users who share a room with the user from the homeserver.
+   If false, search results will only contain users
     visible in public rooms and users sharing a room with the requester.
     Defaults to false.
+
     NB. If you set this to true, and the last time the user_directory search
     indexes were (re)built was before Synapse 1.44, you'll have to
     rebuild the indexes in order to search through all known users.
+
     These indexes are built the first time Synapse starts; admins can
-    manually trigger a rebuild via API following the instructions at
-         https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
-    Set to true to return search results containing all known users, even if that
+    manually trigger a rebuild via the API following the instructions
+    [for running background updates](../administration/admin_api/background_updates.md#run),
+    set to true to return search results containing all known users, even if that
     user does not share a room with the requester.
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
    If set to true, local users are more likely to appear above remote users when searching the
    user directory. Defaults to false.
+* `show_locked_users`: Defines whether to show locked users in search query results. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -3399,6 +3686,7 @@ user_directory:
     enabled: false
     search_all_users: true
     prefer_local_users: true
+    show_locked_users: true
 ```
 ---
 ### `user_consent`
@@ -3502,9 +3790,9 @@ Example configuration:
 enable_room_list_search: false
 ```
 ---
-### `alias_creation`
+### `alias_creation_rules`
 
-The `alias_creation` option controls who is allowed to create aliases
+The `alias_creation_rules` option controls who is allowed to create aliases
 on this server.
 
 The format of this option is a list of rules that contain globs that
@@ -3586,9 +3874,32 @@ default_power_level_content_override:
    trusted_private_chat: null
    public_chat: null
 ```
+---
+### `forget_rooms_on_leave`
+
+Set to true to automatically forget rooms for users when they leave them, either
+normally or via a kick or ban. Defaults to false.
+
+Example configuration:
+```yaml
+forget_rooms_on_leave: false
+```
+---
+### `exclude_rooms_from_sync`
+A list of rooms to exclude from sync responses. This is useful for server
+administrators wishing to group users into a room without these users being able
+to see it from their client.
+
+By default, no room is excluded.
+
+Example configuration:
+```yaml
+exclude_rooms_from_sync:
+    - !foo:example.com
+```
 
 ---
-## Opentracing ##
+## Opentracing
 Configuration options related to Opentracing support.
 
 ---
@@ -3631,14 +3942,78 @@ opentracing:
         false
 ```
 ---
-## Workers ##
-Configuration options related to workers.
+## Coordinating workers
+Configuration options related to workers which belong in the main config file
+(usually called `homeserver.yaml`).
+A Synapse deployment can scale horizontally by running multiple Synapse processes
+called _workers_. Incoming requests are distributed between workers to handle higher
+loads. Some workers are privileged and can accept requests from other workers.
+
+As a result, the worker configuration is divided into two parts.
+
+1. The first part (in this section of the manual) defines which shardable tasks
+   are delegated to privileged workers. This allows unprivileged workers to make
+   requests to a privileged worker to act on their behalf.
+1. [The second part](#individual-worker-configuration)
+   controls the behaviour of individual workers in isolation.
+
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
+
+---
+### `worker_replication_secret`
+
+A shared secret used by the replication APIs on the main process to authenticate
+HTTP requests from workers.
+
+The default, this value is omitted (equivalently `null`), which means that
+traffic between the workers and the main process is not authenticated.
+
+Example configuration:
+```yaml
+worker_replication_secret: "secret_secret"
+```
+---
+### `start_pushers`
+
+Unnecessary to set if using [`pusher_instances`](#pusher_instances) with [`generic_workers`](../../workers.md#synapseappgeneric_worker).
+
+Controls sending of push notifications on the main process. Set to `false`
+if using a [pusher worker](../../workers.md#synapseapppusher). Defaults to `true`.
+
+Example configuration:
+```yaml
+start_pushers: false
+```
+---
+### `pusher_instances`
+
+It is possible to scale the processes that handle sending push notifications to [sygnal](https://github.com/matrix-org/sygnal)
+and email by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
+a `pusher_instances` map. Doing so will remove handling of this function from the main
+process. Multiple workers can be added to this map, in which case the work is balanced
+across them. Ensure the main process and all pusher workers are restarted after changing
+this option.
+
+Example configuration for a single worker:
+```yaml
+pusher_instances:
+  - pusher_worker1
+```
+And for multiple workers:
+```yaml
+pusher_instances:
+  - pusher_worker1
+  - pusher_worker2
+```
 
 ---
 ### `send_federation`
 
+Unnecessary to set if using [`federation_sender_instances`](#federation_sender_instances) with [`generic_workers`](../../workers.md#synapseappgeneric_worker).
+
 Controls sending of outbound federation transactions on the main process.
-Set to false if using a federation sender worker. Defaults to true.
+Set to `false` if using a [federation sender worker](../../workers.md#synapseappfederation_sender).
+Defaults to `true`.
 
 Example configuration:
 ```yaml
@@ -3647,38 +4022,68 @@ send_federation: false
 ---
 ### `federation_sender_instances`
 
-It is possible to run multiple federation sender workers, in which case the
-work is balanced across them. Use this setting to list the senders.
+It is possible to scale the processes that handle sending outbound federation requests
+by running a [`generic_worker`](../../workers.md#synapseappgeneric_worker) and adding it's [`worker_name`](#worker_name) to
+a `federation_sender_instances` map. Doing so will remove handling of this function from
+the main process. Multiple workers can be added to this map, in which case the work is
+balanced across them.
 
-This configuration setting must be shared between all federation sender workers, and if
-changed all federation sender workers must be stopped at the same time and then
-started, to ensure that all instances are running with the same config (otherwise
+This configuration setting must be shared between all workers handling federation
+sending, and if changed all federation sender workers must be stopped at the same time
+and then started, to ensure that all instances are running with the same config (otherwise
 events may be dropped).
 
-Example configuration:
+Example configuration for a single worker:
 ```yaml
 federation_sender_instances:
   - federation_sender1
 ```
+And for multiple workers:
+```yaml
+federation_sender_instances:
+  - federation_sender1
+  - federation_sender2
+```
 ---
 ### `instance_map`
 
-When using workers this should be a map from worker name to the
-HTTP replication listener of the worker, if configured.
+When using workers this should be a map from [`worker_name`](#worker_name) to the HTTP
+replication listener of the worker, if configured, and to the main process. Each worker
+declared under [`stream_writers`](../../workers.md#stream-writers) and
+[`outbound_federation_restricted_to`](#outbound_federation_restricted_to) needs a HTTP
+replication listener, and that listener should be included in the `instance_map`. The
+main process also needs an entry on the `instance_map`, and it should be listed under
+`main` **if even one other worker exists**. Ensure the port matches with what is
+declared inside the `listener` block for a `replication` listener.
+
 
 Example configuration:
 ```yaml
 instance_map:
+  main:
+    host: localhost
+    port: 8030
   worker1:
     host: localhost
     port: 8034
+```
+Example configuration(#2, for UNIX sockets):
+```yaml
+instance_map:
+  main:
+    path: /var/run/synapse/main_replication.sock
+  worker1:
+    path: /var/run/synapse/worker1_replication.sock
 ```
 ---
 ### `stream_writers`
 
 Experimental: When using workers you can define which workers should
-handle event persistence and typing notifications. Any worker
-specified here must also be in the `instance_map`.
+handle writing to streams such as event persistence and typing notifications.
+Any worker specified here must also be in the [`instance_map`](#instance_map).
+
+See the list of available streams in the
+[worker documentation](../../workers.md#stream-writers).
 
 Example configuration:
 ```yaml
@@ -3687,36 +4092,99 @@ stream_writers:
   typing: worker1
 ```
 ---
+### `outbound_federation_restricted_to`
+
+When using workers, you can restrict outbound federation traffic to only go through a
+specific subset of workers. Any worker specified here must also be in the
+[`instance_map`](#instance_map).
+[`worker_replication_secret`](#worker_replication_secret) must also be configured to
+authorize inter-worker communication.
+
+```yaml
+outbound_federation_restricted_to:
+  - federation_sender1
+  - federation_sender2
+```
+
+Also see the [worker
+documentation](../../workers.md#restrict-outbound-federation-traffic-to-a-specific-set-of-workers)
+for more info.
+---
 ### `run_background_tasks_on`
 
-The worker that is used to run background tasks (e.g. cleaning up expired
-data). If not provided this defaults to the main process.
+The [worker](../../workers.md#background-tasks) that is used to run
+background tasks (e.g. cleaning up expired data). If not provided this
+defaults to the main process.
 
 Example configuration:
 ```yaml
 run_background_tasks_on: worker1
 ```
 ---
-### `worker_replication_secret`
+### `update_user_directory_from_worker`
 
-A shared secret used by the replication APIs to authenticate HTTP requests
-from workers.
-
-By default this is unused and traffic is not authenticated.
+The [worker](../../workers.md#updating-the-user-directory) that is used to
+update the user directory. If not provided this defaults to the main process.
 
 Example configuration:
 ```yaml
-worker_replication_secret: "secret_secret"
+update_user_directory_from_worker: worker1
 ```
+
+_Added in Synapse 1.59.0._
+
+---
+### `notify_appservices_from_worker`
+
+The [worker](../../workers.md#notifying-application-services) that is used to
+send output traffic to Application Services. If not provided this defaults
+to the main process.
+
+Example configuration:
+```yaml
+notify_appservices_from_worker: worker1
+```
+
+_Added in Synapse 1.59.0._
+
+---
+### `media_instance_running_background_jobs`
+
+The [worker](../../workers.md#synapseappmedia_repository) that is used to run
+background tasks for media repository. If running multiple media repositories
+you must configure a single instance to run the background tasks. If not provided
+this defaults to the main process or your single `media_repository` worker.
+
+Example configuration:
+```yaml
+media_instance_running_background_jobs: worker1
+```
+
+_Added in Synapse 1.16.0._
+
+---
 ### `redis`
 
-Configuration for Redis when using workers. This *must* be enabled when
-using workers (unless using old style direct TCP configuration).
+Configuration for Redis when using workers. This *must* be enabled when using workers.
 This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
+* `path`: The full path to a local Unix socket file. **If this is used, `host` and
+ `port` are ignored.** Defaults to `/tmp/redis.sock'
 * `password`: Optional password if configured on the Redis instance.
+* `dbid`: Optional redis dbid if needs to connect to specific redis logical db.
+* `use_tls`: Whether to use tls connection. Defaults to false.
+* `certificate_file`: Optional path to the certificate file
+* `private_key_file`: Optional path to the private key file
+* `ca_file`: Optional path to the CA certificate file. Use this one or:
+* `ca_path`: Optional path to the folder containing the CA certificate file
+
+  _Added in Synapse 1.78.0._
+
+  _Changed in Synapse 1.84.0: Added use\_tls, certificate\_file, private\_key\_file, ca\_file and ca\_path attributes_
+
+  _Changed in Synapse 1.85.0: Added path option to use a local Unix socket_
 
 Example configuration:
 ```yaml
@@ -3725,8 +4193,140 @@ redis:
   host: localhost
   port: 6379
   password: <secret_password>
+  dbid: <dbid>
+  #use_tls: True
+  #certificate_file: <path_to_the_certificate_file>
+  #private_key_file: <path_to_the_private_key_file>
+  #ca_file: <path_to_the_ca_certificate_file>
 ```
-## Background Updates ##
+---
+## Individual worker configuration
+These options configure an individual worker, in its worker configuration file.
+They should be not be provided when configuring the main process.
+
+Note also the configuration above for
+[coordinating a cluster of workers](#coordinating-workers).
+
+For guidance on setting up workers, see the [worker documentation](../../workers.md).
+
+---
+### `worker_app`
+
+The type of worker. The currently available worker applications are listed
+in [worker documentation](../../workers.md#available-worker-applications).
+
+The most common worker is the
+[`synapse.app.generic_worker`](../../workers.md#synapseappgeneric_worker).
+
+Example configuration:
+```yaml
+worker_app: synapse.app.generic_worker
+```
+---
+### `worker_name`
+
+A unique name for the worker. The worker needs a name to be addressed in
+further parameters and identification in log files. We strongly recommend
+giving each worker a unique `worker_name`.
+
+Example configuration:
+```yaml
+worker_name: generic_worker1
+```
+---
+### `worker_listeners`
+
+A worker can handle HTTP requests. To do so, a `worker_listeners` option
+must be declared, in the same way as the [`listeners` option](#listeners)
+in the shared config.
+
+Workers declared in [`stream_writers`](#stream_writers) and [`instance_map`](#instance_map)
+ will need to include a `replication` listener here, in order to accept internal HTTP 
+requests from other workers.
+
+Example configuration:
+```yaml
+worker_listeners:
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
+```
+Example configuration(#2, using UNIX sockets with a `replication` listener):
+```yaml
+worker_listeners:
+  - type: http
+    path: /var/run/synapse/worker_public.sock
+    resources:
+      - names: [client, federation]
+  - type: http
+    path: /var/run/synapse/worker_replication.sock
+    resources:
+      - names: [replication]
+```
+---
+### `worker_manhole`
+
+A worker may have a listener for [`manhole`](../../manhole.md).
+It allows server administrators to access a Python shell on the worker.
+
+Example configuration:
+```yaml
+worker_manhole: 9000
+```
+
+This is a short form for:
+```yaml
+worker_listeners:
+  - port: 9000
+    bind_addresses: ['127.0.0.1']
+    type: manhole
+```
+
+It needs also an additional [`manhole_settings`](#manhole_settings) configuration.
+
+---
+### `worker_daemonize`
+
+Specifies whether the worker should be started as a daemon process.
+If Synapse is being managed by [systemd](../../systemd-with-workers/), this option
+must be omitted or set to `false`.
+
+Defaults to `false`.
+
+Example configuration:
+```yaml
+worker_daemonize: true
+```
+---
+### `worker_pid_file`
+
+When running a worker as a daemon, we need a place to store the
+[PID](https://en.wikipedia.org/wiki/Process_identifier) of the worker.
+This option defines the location of that "pid file".
+
+This option is required if `worker_daemonize` is `true` and ignored
+otherwise. It has no default.
+
+See also the [`pid_file` option](#pid_file) option for the main Synapse process.
+
+Example configuration:
+```yaml
+worker_pid_file: DATADIR/generic_worker1.pid
+```
+---
+### `worker_log_config`
+
+This option specifies a yaml python logging config file as described
+[here](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema).
+See also the [`log_config` option](#log_config) option for the main Synapse process.
+
+Example configuration:
+```yaml
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+```
+---
+## Background Updates
 Configuration settings related to background updates.
 
 ---
@@ -3755,4 +4355,3 @@ background_updates:
     min_batch_size: 10
     default_batch_size: 50
 ```
-

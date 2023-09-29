@@ -13,12 +13,17 @@ import jinja2
 
 # Utility functions
 def log(txt: str) -> None:
-    print(txt, file=sys.stderr)
+    print(txt)
 
 
 def error(txt: str) -> NoReturn:
-    log(txt)
+    print(txt, file=sys.stderr)
     sys.exit(2)
+
+
+def flush_buffers() -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 def convert(src: str, dst: str, environ: Mapping[str, object]) -> None:
@@ -77,7 +82,7 @@ def generate_config_from_template(
                 with open(filename) as handle:
                     value = handle.read()
             else:
-                log("Generating a random secret for {}".format(secret))
+                log(f"Generating a random secret for {secret}")
                 value = codecs.encode(os.urandom(32), "hex").decode()
                 with open(filename, "w") as handle:
                     handle.write(value)
@@ -131,10 +136,10 @@ def generate_config_from_template(
 
     if ownership is not None:
         log(f"Setting ownership on /data to {ownership}")
-        subprocess.check_output(["chown", "-R", ownership, "/data"])
+        subprocess.run(["chown", "-R", ownership, "/data"], check=True)
         args = ["gosu", ownership] + args
 
-    subprocess.check_output(args)
+    subprocess.run(args, check=True)
 
 
 def run_generate_config(environ: Mapping[str, str], ownership: Optional[str]) -> None:
@@ -158,7 +163,7 @@ def run_generate_config(environ: Mapping[str, str], ownership: Optional[str]) ->
     if ownership is not None:
         # make sure that synapse has perms to write to the data dir.
         log(f"Setting ownership on {data_dir} to {ownership}")
-        subprocess.check_output(["chown", ownership, data_dir])
+        subprocess.run(["chown", ownership, data_dir], check=True)
 
     # create a suitable log config from our template
     log_config_file = "%s/%s.log.config" % (config_dir, server_name)
@@ -185,6 +190,7 @@ def run_generate_config(environ: Mapping[str, str], ownership: Optional[str]) ->
         "--open-private-ports",
     ]
     # log("running %s" % (args, ))
+    flush_buffers()
     os.execv(sys.executable, args)
 
 
@@ -233,7 +239,7 @@ def main(args: List[str], environ: MutableMapping[str, str]) -> None:
         log("Could not find %s, will not use" % (jemallocpath,))
 
     # if there are no config files passed to synapse, try adding the default file
-    if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
+    if not any(p.startswith(("--config-path", "-c")) for p in args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
         config_path = environ.get(
             "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
@@ -267,8 +273,10 @@ running with 'migrate_config'. See the README for more details.
     args = [sys.executable] + args
     if ownership is not None:
         args = ["gosu", ownership] + args
+        flush_buffers()
         os.execve("/usr/sbin/gosu", args, environ)
     else:
+        flush_buffers()
         os.execve(sys.executable, args, environ)
 
 

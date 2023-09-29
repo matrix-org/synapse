@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from synapse.storage.database import LoggingDatabaseConnection
 
 
-class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
+class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection, sqlite3.Cursor]):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(sqlite3, database_config)
 
@@ -32,6 +32,13 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         self._is_in_memory = database in (
             None,
             ":memory:",
+        )
+
+        # A connection to a database that has already been prepared, to use as a
+        # base for an in-memory connection. This is used during unit tests to
+        # speed up setting up the DB.
+        self._prepped_conn: Optional[sqlite3.Connection] = database_config.get(
+            "_TEST_PREPPED_CONN"
         )
 
         if platform.python_implementation() == "PyPy":
@@ -84,10 +91,22 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
             # In memory databases need to be rebuilt each time. Ideally we'd
             # reuse the same connection as we do when starting up, but that
             # would involve using adbapi before we have started the reactor.
-            prepare_database(db_conn, self, config=None)
+            #
+            # If we have a `prepped_conn` we can use that to initialise the DB,
+            # otherwise we need to call `prepare_database`.
+            if self._prepped_conn is not None:
+                # Initialise the new DB from the pre-prepared DB.
+                assert isinstance(db_conn.conn, sqlite3.Connection)
+                self._prepped_conn.backup(db_conn.conn)
+            else:
+                prepare_database(db_conn, self, config=None)
 
         db_conn.create_function("rank", 1, _rank)
         db_conn.execute("PRAGMA foreign_keys = ON;")
+
+        # Enable WAL.
+        # see https://www.sqlite.org/wal.html
+        db_conn.execute("PRAGMA journal_mode = WAL;")
         db_conn.commit()
 
     def is_deadlock(self, error: Exception) -> bool:
@@ -104,6 +123,10 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         """Gets a string giving the server version. For example: '3.22.0'."""
         return "%i.%i.%i" % sqlite3.sqlite_version_info
 
+    @property
+    def row_id_name(self) -> str:
+        return "rowid"
+
     def in_transaction(self, conn: sqlite3.Connection) -> bool:
         return conn.in_transaction
 
@@ -119,6 +142,28 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
     ) -> None:
         # All transactions are SERIALIZABLE by default in sqlite
         pass
+
+    @staticmethod
+    def executescript(cursor: sqlite3.Cursor, script: str) -> None:
+        """Execute a chunk of SQL containing multiple semicolon-delimited statements.
+
+        Python's built-in SQLite driver does not allow you to do this with DBAPI2's
+        `execute`:
+
+        > execute() will only execute a single SQL statement. If you try to execute more
+        > than one statement with it, it will raise a Warning. Use executescript() if
+        > you want to execute multiple SQL statements with one call.
+
+        The script is prefixed with a `BEGIN TRANSACTION`, since the docs for
+        `executescript` warn:
+
+        > If there is a pending transaction, an implicit COMMIT statement is executed
+        > first. No other implicit transaction control is performed; any transaction
+        > control must be added to sql_script.
+        """
+        # The implementation of `executescript` can be found at
+        # https://github.com/python/cpython/blob/3.11/Modules/_sqlite/cursor.c#L1035.
+        cursor.executescript(f"BEGIN TRANSACTION; {script}")
 
 
 # Following functions taken from: https://github.com/coleifer/peewee

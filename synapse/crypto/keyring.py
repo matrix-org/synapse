@@ -14,7 +14,6 @@
 
 import abc
 import logging
-import urllib
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple
 
 import attr
@@ -24,12 +23,7 @@ from signedjson.key import (
     get_verify_key,
     is_signing_algorithm_supported,
 )
-from signedjson.sign import (
-    SignatureVerifyException,
-    encode_canonical_json,
-    signature_ids,
-    verify_signed_json,
-)
+from signedjson.sign import SignatureVerifyException, signature_ids, verify_signed_json
 from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
@@ -151,25 +145,30 @@ class Keyring:
     def __init__(
         self, hs: "HomeServer", key_fetchers: "Optional[Iterable[KeyFetcher]]" = None
     ):
-        self.clock = hs.get_clock()
-
         if key_fetchers is None:
-            key_fetchers = (
-                StoreKeyFetcher(hs),
-                PerspectivesKeyFetcher(hs),
-                ServerKeyFetcher(hs),
-            )
-        self._key_fetchers = key_fetchers
+            # Always fetch keys from the database.
+            mutable_key_fetchers: List[KeyFetcher] = [StoreKeyFetcher(hs)]
+            # Fetch keys from configured trusted key servers, if any exist.
+            key_servers = hs.config.key.key_servers
+            if key_servers:
+                mutable_key_fetchers.append(PerspectivesKeyFetcher(hs))
+            # Finally, fetch keys from the origin server directly.
+            mutable_key_fetchers.append(ServerKeyFetcher(hs))
 
-        self._server_queue: BatchingQueue[
+            self._key_fetchers: Iterable[KeyFetcher] = tuple(mutable_key_fetchers)
+        else:
+            self._key_fetchers = key_fetchers
+
+        self._fetch_keys_queue: BatchingQueue[
             _FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]
         ] = BatchingQueue(
             "keyring_server",
             clock=hs.get_clock(),
+            # The method called to fetch each key
             process_batch_callback=self._inner_fetch_key_requests,
         )
 
-        self._hostname = hs.hostname
+        self._is_mine_server_name = hs.is_mine_server_name
 
         # build a FetchKeyResult for each of our own keys, to shortcircuit the
         # fetcher.
@@ -213,7 +212,7 @@ class Keyring:
 
     def verify_json_objects_for_server(
         self, server_and_json: Iterable[Tuple[str, dict, int]]
-    ) -> List[defer.Deferred]:
+    ) -> List["defer.Deferred[None]"]:
         """Bulk verifies signatures of json objects, bulk fetching keys as
         necessary.
 
@@ -226,10 +225,9 @@ class Keyring:
                 valid.
 
         Returns:
-            List<Deferred[None]>: for each input triplet, a deferred indicating success
-                or failure to verify each json object's signature for the given
-                server_name. The deferreds run their callbacks in the sentinel
-                logcontext.
+            For each input triplet, a deferred indicating success or failure to
+            verify each json object's signature for the given server_name. The
+            deferreds run their callbacks in the sentinel logcontext.
         """
         return [
             run_in_background(
@@ -274,7 +272,7 @@ class Keyring:
 
         # If we are the originating server, short-circuit the key-fetch for any keys
         # we already have
-        if verify_request.server_name == self._hostname:
+        if self._is_mine_server_name(verify_request.server_name):
             for key_id in verify_request.key_ids:
                 if key_id in self._local_verify_keys:
                     found_keys[key_id] = self._local_verify_keys[key_id]
@@ -289,7 +287,7 @@ class Keyring:
                 minimum_valid_until_ts=verify_request.minimum_valid_until_ts,
                 key_ids=list(key_ids_to_find),
             )
-            found_keys_by_server = await self._server_queue.add_to_queue(
+            found_keys_by_server = await self._fetch_keys_queue.add_to_queue(
                 key_request, key=verify_request.server_name
             )
 
@@ -354,7 +352,17 @@ class Keyring:
     async def _inner_fetch_key_requests(
         self, requests: List[_FetchKeyRequest]
     ) -> Dict[str, Dict[str, FetchKeyResult]]:
-        """Processing function for the queue of `_FetchKeyRequest`."""
+        """Processing function for the queue of `_FetchKeyRequest`.
+
+        Takes a list of key fetch requests, de-duplicates them and then carries out
+        each request by invoking self._inner_fetch_key_request.
+
+        Args:
+            requests: A list of requests for homeserver verify keys.
+
+        Returns:
+            {server name: {key id: fetch key result}}
+        """
 
         logger.debug("Starting fetch for %s", requests)
 
@@ -387,7 +395,7 @@ class Keyring:
         # We now convert the returned list of results into a map from server
         # name to key ID to FetchKeyResult, to return.
         to_return: Dict[str, Dict[str, FetchKeyResult]] = {}
-        for (request, results) in zip(deduped_requests, results_per_request):
+        for request, results in zip(deduped_requests, results_per_request):
             to_return_by_server = to_return.setdefault(request.server_name, {})
             for key_id, key_result in results.items():
                 existing = to_return_by_server.get(key_id)
@@ -399,8 +407,23 @@ class Keyring:
     async def _inner_fetch_key_request(
         self, verify_request: _FetchKeyRequest
     ) -> Dict[str, FetchKeyResult]:
-        """Attempt to fetch the given key by calling each key fetcher one by
-        one.
+        """Attempt to fetch the given key by calling each key fetcher one by one.
+
+        If a key is found, check whether its `valid_until_ts` attribute satisfies the
+        `minimum_valid_until_ts` attribute of the `verify_request`. If it does, we
+        refrain from asking subsequent fetchers for that key.
+
+        Even if the above check fails, we still return the found key - the caller may
+        still find the invalid key result useful. In this case, we continue to ask
+        subsequent fetchers for the invalid key, in case they return a valid result
+        for it. This can happen when fetching a stale key result from the database,
+        before querying the origin server for an up-to-date result.
+
+        Args:
+            verify_request: The request for a verify key. Can include multiple key IDs.
+
+        Returns:
+            A map of {key_id: the key fetch result}.
         """
         logger.debug("Starting fetch for %s", verify_request)
 
@@ -422,25 +445,21 @@ class Keyring:
                 if not key:
                     continue
 
-                # If we already have a result for the given key ID we keep the
+                # If we already have a result for the given key ID, we keep the
                 # one with the highest `valid_until_ts`.
                 existing_key = found_keys.get(key_id)
-                if existing_key:
-                    if key.valid_until_ts <= existing_key.valid_until_ts:
-                        continue
-
-                # We always store the returned key even if it doesn't the
-                # `minimum_valid_until_ts` requirement, as some verification
-                # requests may still be able to be satisfied by it.
-                #
-                # We still keep looking for the key from other fetchers in that
-                # case though.
-                found_keys[key_id] = key
-
-                if key.valid_until_ts < verify_request.minimum_valid_until_ts:
+                if existing_key and existing_key.valid_until_ts > key.valid_until_ts:
                     continue
 
-                missing_key_ids.discard(key_id)
+                # Check if this key's expiry timestamp is valid for the verify request.
+                if key.valid_until_ts >= verify_request.minimum_valid_until_ts:
+                    # Stop looking for this key from subsequent fetchers.
+                    missing_key_ids.discard(key_id)
+
+                # We always store the returned key even if it doesn't meet the
+                # `minimum_valid_until_ts` requirement, as some verification
+                # requests may still be able to be satisfied by it.
+                found_keys[key_id] = key
 
         return found_keys
 
@@ -487,7 +506,7 @@ class StoreKeyFetcher(KeyFetcher):
             for key_id in queue_value.key_ids
         )
 
-        res = await self.store.get_server_verify_keys(key_ids_to_fetch)
+        res = await self.store.get_server_keys_json(key_ids_to_fetch)
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
@@ -499,7 +518,6 @@ class BaseV2KeyFetcher(KeyFetcher):
         super().__init__(hs)
 
         self.store = hs.get_datastores().main
-        self.config = hs.config
 
     async def process_v2_response(
         self, from_server: str, response_json: JsonDict, time_added_ms: int
@@ -573,24 +591,12 @@ class BaseV2KeyFetcher(KeyFetcher):
                     verify_key=verify_key, valid_until_ts=key_data["expired_ts"]
                 )
 
-        key_json_bytes = encode_canonical_json(response_json)
-
-        await make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store.store_server_keys_json,
-                        server_name=server_name,
-                        key_id=key_id,
-                        from_server=from_server,
-                        ts_now_ms=time_added_ms,
-                        ts_expires_ms=ts_valid_until_ms,
-                        key_json_bytes=key_json_bytes,
-                    )
-                    for key_id in verify_keys
-                ],
-                consumeErrors=True,
-            ).addErrback(unwrapFirstError)
+        await self.store.store_server_keys_response(
+            server_name=server_name,
+            from_server=from_server,
+            ts_added_ms=time_added_ms,
+            verify_keys=verify_keys,
+            response_json=response_json,
         )
 
         return verify_keys
@@ -603,7 +609,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_federation_http_client()
-        self.key_servers = self.config.key.key_servers
+        self.key_servers = hs.config.key.key_servers
 
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]
@@ -698,7 +704,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         )
 
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
-        added_keys: List[Tuple[str, str, FetchKeyResult]] = []
+        added_keys: Dict[Tuple[str, str], FetchKeyResult] = {}
 
         time_now_ms = self.clock.time_msec()
 
@@ -729,14 +735,28 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 # we continue to process the rest of the response
                 continue
 
-            added_keys.extend(
-                (server_name, key_id, key) for key_id, key in processed_response.items()
-            )
-            keys.setdefault(server_name, {}).update(processed_response)
+            for key_id, key in processed_response.items():
+                dict_key = (server_name, key_id)
+                if dict_key in added_keys:
+                    already_present_key = added_keys[dict_key]
+                    logger.warning(
+                        "Duplicate server keys for %s (%s) from perspective %s (%r, %r)",
+                        server_name,
+                        key_id,
+                        perspective_name,
+                        already_present_key,
+                        key,
+                    )
 
-        await self.store.store_server_verify_keys(
-            perspective_name, time_now_ms, added_keys
-        )
+                    if already_present_key.valid_until_ts > key.valid_until_ts:
+                        # Favour the entry with the largest valid_until_ts,
+                        # as `old_verify_keys` are also collected from this
+                        # response.
+                        continue
+
+                added_keys[dict_key] = key
+
+            keys.setdefault(server_name, {}).update(processed_response)
 
         return keys
 
@@ -814,31 +834,27 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
 
         results = {}
 
-        async def get_key(key_to_fetch_item: _FetchKeyRequest) -> None:
+        async def get_keys(key_to_fetch_item: _FetchKeyRequest) -> None:
             server_name = key_to_fetch_item.server_name
-            key_ids = key_to_fetch_item.key_ids
 
             try:
-                keys = await self.get_server_verify_key_v2_direct(server_name, key_ids)
+                keys = await self.get_server_verify_keys_v2_direct(server_name)
                 results[server_name] = keys
             except KeyLookupError as e:
-                logger.warning(
-                    "Error looking up keys %s from %s: %s", key_ids, server_name, e
-                )
+                logger.warning("Error looking up keys from %s: %s", server_name, e)
             except Exception:
-                logger.exception("Error getting keys %s from %s", key_ids, server_name)
+                logger.exception("Error getting keys from %s", server_name)
 
-        await yieldable_gather_results(get_key, keys_to_fetch)
+        await yieldable_gather_results(get_keys, keys_to_fetch)
         return results
 
-    async def get_server_verify_key_v2_direct(
-        self, server_name: str, key_ids: Iterable[str]
+    async def get_server_verify_keys_v2_direct(
+        self, server_name: str
     ) -> Dict[str, FetchKeyResult]:
         """
 
         Args:
-            server_name:
-            key_ids:
+            server_name: Server to request keys from
 
         Returns:
             Map from key ID to lookup result
@@ -846,57 +862,41 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
         Raises:
             KeyLookupError if there was a problem making the lookup
         """
-        keys: Dict[str, FetchKeyResult] = {}
-
-        for requested_key_id in key_ids:
-            # we may have found this key as a side-effect of asking for another.
-            if requested_key_id in keys:
-                continue
-
-            time_now_ms = self.clock.time_msec()
-            try:
-                response = await self.client.get_json(
-                    destination=server_name,
-                    path="/_matrix/key/v2/server/"
-                    + urllib.parse.quote(requested_key_id),
-                    ignore_backoff=True,
-                    # we only give the remote server 10s to respond. It should be an
-                    # easy request to handle, so if it doesn't reply within 10s, it's
-                    # probably not going to.
-                    #
-                    # Furthermore, when we are acting as a notary server, we cannot
-                    # wait all day for all of the origin servers, as the requesting
-                    # server will otherwise time out before we can respond.
-                    #
-                    # (Note that get_json may make 4 attempts, so this can still take
-                    # almost 45 seconds to fetch the headers, plus up to another 60s to
-                    # read the response).
-                    timeout=10000,
-                )
-            except (NotRetryingDestination, RequestSendFailed) as e:
-                # these both have str() representations which we can't really improve
-                # upon
-                raise KeyLookupError(str(e))
-            except HttpResponseException as e:
-                raise KeyLookupError("Remote server returned an error: %s" % (e,))
-
-            assert isinstance(response, dict)
-            if response["server_name"] != server_name:
-                raise KeyLookupError(
-                    "Expected a response for server %r not %r"
-                    % (server_name, response["server_name"])
-                )
-
-            response_keys = await self.process_v2_response(
-                from_server=server_name,
-                response_json=response,
-                time_added_ms=time_now_ms,
+        time_now_ms = self.clock.time_msec()
+        try:
+            response = await self.client.get_json(
+                destination=server_name,
+                path="/_matrix/key/v2/server",
+                ignore_backoff=True,
+                # we only give the remote server 10s to respond. It should be an
+                # easy request to handle, so if it doesn't reply within 10s, it's
+                # probably not going to.
+                #
+                # Furthermore, when we are acting as a notary server, we cannot
+                # wait all day for all of the origin servers, as the requesting
+                # server will otherwise time out before we can respond.
+                #
+                # (Note that get_json may make 4 attempts, so this can still take
+                # almost 45 seconds to fetch the headers, plus up to another 60s to
+                # read the response).
+                timeout=10000,
             )
-            await self.store.store_server_verify_keys(
-                server_name,
-                time_now_ms,
-                ((server_name, key_id, key) for key_id, key in response_keys.items()),
-            )
-            keys.update(response_keys)
+        except (NotRetryingDestination, RequestSendFailed) as e:
+            # these both have str() representations which we can't really improve
+            # upon
+            raise KeyLookupError(str(e))
+        except HttpResponseException as e:
+            raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
-        return keys
+        assert isinstance(response, dict)
+        if response["server_name"] != server_name:
+            raise KeyLookupError(
+                "Expected a response for server %r not %r"
+                % (server_name, response["server_name"])
+            )
+
+        return await self.process_v2_response(
+            from_server=server_name,
+            response_json=response,
+            time_added_ms=time_now_ms,
+        )

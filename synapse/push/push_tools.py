@@ -13,6 +13,7 @@
 # limitations under the License.
 from typing import Dict
 
+from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 from synapse.storage.controllers import StorageControllers
@@ -25,29 +26,65 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
 
     badge = len(invites)
 
-    for room_id in joins:
-        notifs = await (
-            store.get_unread_event_push_actions_by_room_for_user(
-                room_id,
-                user_id,
-            )
-        )
-        if notifs.notify_count == 0:
+    room_to_count = await store.get_unread_counts_by_room_for_user(user_id)
+    for room_id, notify_count in room_to_count.items():
+        # room_to_count may include rooms which the user has left,
+        # ignore those.
+        if room_id not in joins:
+            continue
+
+        if notify_count == 0:
             continue
 
         if group_by_room:
             # return one badge count per conversation
             badge += 1
         else:
-            # increment the badge count by the number of unread messages in the room
-            badge += notifs.notify_count
+            # Increase badge by number of notifications in room
+            # NOTE: this includes threaded and unthreaded notifications.
+            badge += notify_count
+
     return badge
 
 
 async def get_context_for_event(
     storage: StorageControllers, ev: EventBase, user_id: str
 ) -> Dict[str, str]:
-    ctx = {}
+    ctx: Dict[str, str] = {}
+
+    if ev.internal_metadata.outlier:
+        # We don't have state for outliers, so we can't compute the context
+        # except for invites and knocks. (Such events are known as 'out-of-band
+        # memberships' for the user).
+        if ev.type != EventTypes.Member:
+            return ctx
+
+        # We might be able to pull out the display name for the sender straight
+        # from the membership event
+        event_display_name = ev.content.get("displayname")
+        if event_display_name and ev.state_key == ev.sender:
+            ctx["sender_display_name"] = event_display_name
+
+        room_state = []
+        if ev.content.get("membership") == Membership.INVITE:
+            room_state = ev.unsigned.get("invite_room_state", [])
+        elif ev.content.get("membership") == Membership.KNOCK:
+            room_state = ev.unsigned.get("knock_room_state", [])
+
+        # Ideally we'd reuse the logic in `calculate_room_name`, but that gets
+        # complicated to handle partial events vs pulling events from the DB.
+        for state_dict in room_state:
+            type_tuple = (state_dict["type"], state_dict.get("state_key"))
+            if type_tuple == (EventTypes.Member, ev.sender):
+                display_name = state_dict["content"].get("displayname")
+                if display_name:
+                    ctx["sender_display_name"] = display_name
+            elif type_tuple == (EventTypes.Name, ""):
+                room_name = state_dict["content"].get("name")
+                if room_name:
+                    ctx["name"] = room_name
+
+        return ctx
 
     room_state_ids = await storage.state.get_state_ids_for_event(ev.event_id)
 

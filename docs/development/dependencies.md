@@ -2,6 +2,13 @@
 
 This is a quick cheat sheet for developers on how to use [`poetry`](https://python-poetry.org/).
 
+# Installing
+
+See the [contributing guide](contributing_guide.md#4-install-the-dependencies).
+
+Developers should use Poetry 1.3.2 or higher. If you encounter problems related
+to poetry, please [double-check your poetry version](#check-the-version-of-poetry-with-poetry---version).
+
 # Background
 
 Synapse uses a variety of third-party Python packages to function as a homeserver.
@@ -123,7 +130,24 @@ context of poetry's venv, without having to run `poetry shell` beforehand.
 ## ...reset my venv to the locked environment?
 
 ```shell
-poetry install --extras all --remove-untracked
+poetry install --all-extras --sync
+```
+
+## ...delete everything and start over from scratch?
+
+```shell
+# Stop the current virtualenv if active
+$ deactivate
+
+# Remove all of the files from the current environment.
+# Don't worry, even though it says "all", this will only
+# remove the Poetry virtualenvs for the current project.
+$ poetry env remove --all
+
+# Reactivate Poetry shell to create the virtualenv again
+$ poetry shell
+# Install everything again
+$ poetry install --extras all
 ```
 
 ## ...run a command in the `poetry` virtualenv?
@@ -166,7 +190,6 @@ Either:
 - manually update `pyproject.toml`; then `poetry lock --no-update`; or else
 - `poetry add packagename`. See `poetry add --help`; note the `--dev`,
   `--extras` and `--optional` flags in particular.
-  - **NB**: this specifies the new package with a version given by a "caret bound". This won't get forced to its lowest version in the old deps CI job: see [this TODO](https://github.com/matrix-org/synapse/blob/4e1374373857f2f7a911a31c50476342d9070681/.ci/scripts/test_old_deps.sh#L35-L39).
 
 Include the updated `pyproject.toml` and `poetry.lock` files in your commit.
 
@@ -179,7 +202,7 @@ poetry remove packagename
 ```
 
 ought to do the trick. Alternatively, manually update `pyproject.toml` and
-`poetry lock --no-update`. Include the updated `pyproject.toml` and poetry.lock`
+`poetry lock --no-update`. Include the updated `pyproject.toml` and `poetry.lock`
 files in your commit.
 
 ## ...update the version range for an existing dependency?
@@ -223,9 +246,6 @@ poetry export --extras all
 
 Be wary of bugs in `poetry export` and `pip install -r requirements.txt`.
 
-Note: `poetry export` will be made a plugin in Poetry 1.2. Additional config may
-be required.
-
 ## ...build a test wheel?
 
 I usually use
@@ -238,12 +258,28 @@ because [`build`](https://github.com/pypa/build) is a standardish tool which
 doesn't require poetry. (It's what we use in CI too). However, you could try
 `poetry build` too.
 
+## ...handle a Dependabot pull request?
+
+Synapse uses Dependabot to keep the `poetry.lock` and `Cargo.lock` file 
+up-to-date with the latest releases of our dependencies. The changelog check is
+omitted for Dependabot PRs; the release script will include them in the 
+changelog.
+
+When reviewing a dependabot PR, ensure that:
+
+* the lockfile changes look reasonable;
+* the upstream changelog file (linked in the description) doesn't include any
+  breaking changes;
+* continuous integration passes.
+
+In particular, any updates to the type hints (usually packages which start with `types-`)
+should be safe to merge if linting passes.
 
 # Troubleshooting
 
 ## Check the version of poetry with `poetry --version`.
 
-The minimum version of poetry supported by Synapse is 1.2.
+The minimum version of poetry supported by Synapse is 1.3.2.
 
 It can also be useful to check the version of `poetry-core` in use. If you've
 installed `poetry` with `pipx`, try `pipx runpip poetry list | grep
@@ -255,6 +291,16 @@ Poetry caches a bunch of information about packages that isn't readily available
 from PyPI. (This is what makes poetry seem slow when doing the first
 `poetry install`.) Try `poetry cache list` and `poetry cache clear --all
 <name of cache>` to see if that fixes things.
+
+## Remove outdated egg-info
+
+Delete the `matrix_synapse.egg-info/` directory from the root of your Synapse
+install.
+
+This stores some cached information about dependencies and often conflicts with
+letting Poetry do the right thing.
+
+
 
 ## Try `--verbose` or `--dry-run` arguments.
 

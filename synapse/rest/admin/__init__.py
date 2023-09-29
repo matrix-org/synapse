@@ -21,6 +21,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
+from synapse.handlers.pagination import PURGE_HISTORY_ACTION_NAME
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -39,6 +40,7 @@ from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
 )
+from synapse.rest.admin.experimental_features import ExperimentalFeaturesRestServlet
 from synapse.rest.admin.federation import (
     DestinationMembershipRestServlet,
     DestinationResetConnectionRestServlet,
@@ -68,7 +70,10 @@ from synapse.rest.admin.rooms import (
     RoomTimestampToEventRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
-from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
+from synapse.rest.admin.statistics import (
+    LargestRoomsStatistics,
+    UserMediaStatisticsRestServlet,
+)
 from synapse.rest.admin.username_available import UsernameAvailableRestServlet
 from synapse.rest.admin.users import (
     AccountDataRestServlet,
@@ -80,6 +85,8 @@ from synapse.rest.admin.users import (
     SearchUsersRestServlet,
     ShadowBanRestServlet,
     UserAdminServlet,
+    UserByExternalId,
+    UserByThreePid,
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
@@ -87,7 +94,7 @@ from synapse.rest.admin.users import (
     UserTokenRestServlet,
     WhoisRestServlet,
 )
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, TaskStatus
 from synapse.util import SYNAPSE_VERSION
 
 if TYPE_CHECKING:
@@ -150,7 +157,7 @@ class PurgeHistoryRestServlet(RestServlet):
             logger.info("[purge] purging up to token %s (event_id %s)", token, event_id)
         elif "purge_up_to_ts" in body:
             ts = body["purge_up_to_ts"]
-            if not isinstance(ts, int):
+            if type(ts) is not int:  # noqa: E721
                 raise SynapseError(
                     HTTPStatus.BAD_REQUEST,
                     "purge_up_to_ts must be an int",
@@ -190,7 +197,7 @@ class PurgeHistoryRestServlet(RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = self.pagination_handler.start_purge_history(
+        purge_id = await self.pagination_handler.start_purge_history(
             room_id, token, delete_local_events=delete_local_events
         )
 
@@ -209,11 +216,20 @@ class PurgeHistoryStatusRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        purge_status = self.pagination_handler.get_purge_status(purge_id)
-        if purge_status is None:
+        purge_task = await self.pagination_handler.get_delete_task(purge_id)
+        if purge_task is None or purge_task.action != PURGE_HISTORY_ACTION_NAME:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        return HTTPStatus.OK, purge_status.asdict()
+        result: JsonDict = {
+            "status": purge_task.status
+            if purge_task.status == TaskStatus.COMPLETE
+            or purge_task.status == TaskStatus.FAILED
+            else "active",
+        }
+        if purge_task.error:
+            result["error"] = purge_task.error
+
+        return HTTPStatus.OK, result
 
 
 ########################################################################################
@@ -236,6 +252,10 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     """
     Register all the admin servlets.
     """
+    # Admin servlets aren't registered on workers.
+    if hs.config.worker.worker_app is not None:
+        return
+
     register_servlets_for_client_rest_resource(hs, http_server)
     BlockRoomRestServlet(hs).register(http_server)
     ListRoomRestServlet(hs).register(http_server)
@@ -247,15 +267,15 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     DeleteRoomStatusByRoomIdRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
-    UserAdminServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        UserAdminServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
-    UserTokenRestServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
-    DeviceRestServlet(hs).register(http_server)
-    DevicesRestServlet(hs).register(http_server)
-    DeleteDevicesRestServlet(hs).register(http_server)
     UserMediaStatisticsRestServlet(hs).register(http_server)
+    LargestRoomsStatistics(hs).register(http_server)
     EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
     AccountDataRestServlet(hs).register(http_server)
@@ -266,22 +286,27 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomEventContextServlet(hs).register(http_server)
     RateLimitRestServlet(hs).register(http_server)
     UsernameAvailableRestServlet(hs).register(http_server)
-    ListRegistrationTokensRestServlet(hs).register(http_server)
-    NewRegistrationTokenRestServlet(hs).register(http_server)
-    RegistrationTokenRestServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        ListRegistrationTokensRestServlet(hs).register(http_server)
+        NewRegistrationTokenRestServlet(hs).register(http_server)
+        RegistrationTokenRestServlet(hs).register(http_server)
     DestinationMembershipRestServlet(hs).register(http_server)
     DestinationResetConnectionRestServlet(hs).register(http_server)
     DestinationRestServlet(hs).register(http_server)
     ListDestinationsRestServlet(hs).register(http_server)
     RoomMessagesRestServlet(hs).register(http_server)
     RoomTimestampToEventRestServlet(hs).register(http_server)
+    UserByExternalId(hs).register(http_server)
+    UserByThreePid(hs).register(http_server)
 
-    # Some servlets only get registered for the main process.
-    if hs.config.worker.worker_app is None:
-        SendServerNoticeServlet(hs).register(http_server)
-        BackgroundUpdateEnabledRestServlet(hs).register(http_server)
-        BackgroundUpdateRestServlet(hs).register(http_server)
-        BackgroundUpdateStartJobRestServlet(hs).register(http_server)
+    DeviceRestServlet(hs).register(http_server)
+    DevicesRestServlet(hs).register(http_server)
+    DeleteDevicesRestServlet(hs).register(http_server)
+    SendServerNoticeServlet(hs).register(http_server)
+    BackgroundUpdateEnabledRestServlet(hs).register(http_server)
+    BackgroundUpdateRestServlet(hs).register(http_server)
+    BackgroundUpdateStartJobRestServlet(hs).register(http_server)
+    ExperimentalFeaturesRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
@@ -290,12 +315,16 @@ def register_servlets_for_client_rest_resource(
     """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
-    DeactivateAccountRestServlet(hs).register(http_server)
     PurgeHistoryRestServlet(hs).register(http_server)
-    ResetPasswordRestServlet(hs).register(http_server)
+    # The following resources can only be run on the main process.
+    if hs.config.worker.worker_app is None:
+        DeactivateAccountRestServlet(hs).register(http_server)
+        if not hs.config.experimental.msc3861.enabled:
+            ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
-    UserRegisterServlet(hs).register(http_server)
-    AccountValidityRenewServlet(hs).register(http_server)
+    if not hs.config.experimental.msc3861.enabled:
+        UserRegisterServlet(hs).register(http_server)
+        AccountValidityRenewServlet(hs).register(http_server)
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which
     # don't need a media repo (typically readonly admin APIs).

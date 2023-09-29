@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.20.0 that would cause the unstable unread counts from [MSC2654](https://github.com/matrix-org/matrix-spec-proposals/pull/2654) to be calculated even if the feature is disabled.

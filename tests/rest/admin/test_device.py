@@ -19,6 +19,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
+from synapse.handlers.device import DeviceHandler
 from synapse.rest.client import login
 from synapse.server import HomeServer
 from synapse.util import Clock
@@ -27,14 +28,15 @@ from tests import unittest
 
 
 class DeviceRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.handler = hs.get_device_handler()
+        handler = hs.get_device_handler()
+        assert isinstance(handler, DeviceHandler)
+        self.handler = handler
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -288,7 +290,6 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
 
 class DevicesRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
@@ -412,7 +413,6 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
 
 class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,

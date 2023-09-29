@@ -1,7 +1,12 @@
 groups:
 - name: synapse
   rules:
-  # These 3 rules are used in the included Prometheus console
+
+  ###
+  ### Prometheus Console Only
+  ### The following rules are only needed if you use the Prometheus Console
+  ### in contrib/prometheus/consoles/synapse.html
+  ###
   - record: 'synapse_federation_client_sent'
     labels:
       type: "EDU"
@@ -15,7 +20,6 @@ groups:
       type: "Query"
     expr: 'sum(synapse_federation_client_sent_queries) by (job)'
 
-  # These 3 rules are used in the included Prometheus console
   - record: 'synapse_federation_server_received'
     labels:
       type: "EDU"
@@ -29,7 +33,6 @@ groups:
       type: "Query"
     expr: 'sum(synapse_federation_server_received_queries) by (job)'
 
-  # These 2 rules are used in the included Prometheus console
   - record: 'synapse_federation_transaction_queue_pending'
     labels:
       type: "EDU"
@@ -38,8 +41,16 @@ groups:
     labels:
       type: "PDU"
     expr: 'synapse_federation_transaction_queue_pending_pdus + 0'
+  ###
+  ### End of 'Prometheus Console Only' rules block
+  ###
 
-  # These 3 rules are used in the included Grafana dashboard
+
+  ###
+  ### Grafana Only
+  ### The following rules are only needed if you use the Grafana dashboard
+  ### in contrib/grafana/synapse.json
+  ###
   - record: synapse_storage_events_persisted_by_source_type
     expr: sum without(type, origin_type, origin_entity) (synapse_storage_events_persisted_events_sep_total{origin_type="remote"})
     labels:
@@ -53,11 +64,11 @@ groups:
     labels:
       type: bridges
 
-  # This rule is used in the included Grafana dashboard
   - record: synapse_storage_events_persisted_by_event_type
     expr: sum without(origin_entity, origin_type) (synapse_storage_events_persisted_events_sep_total)
 
-  # This rule is used in the included Grafana dashboard
   - record: synapse_storage_events_persisted_by_origin
     expr: sum without(type) (synapse_storage_events_persisted_events_sep_total)
-
+  ###
+  ### End of 'Grafana Only' rules block
+  ###
