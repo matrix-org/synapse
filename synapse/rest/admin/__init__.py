@@ -106,9 +106,7 @@ class VersionServlet(RestServlet):
     PATTERNS = admin_patterns("/server_version$")
 
     def __init__(self, hs: "HomeServer"):
-        self.res = {
-            "server_version": SYNAPSE_VERSION
-        }
+        self.res = {"server_version": SYNAPSE_VERSION}
 
     def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         return HTTPStatus.OK, self.res
