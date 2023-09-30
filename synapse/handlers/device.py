@@ -1111,6 +1111,10 @@ class DeviceListUpdater(DeviceListWorkerUpdater):
             )
         prev_ids = [str(p) for p in prev_ids]  # They may come as ints
 
+        # The result of `is_valid` is not used yet because for now we only want to
+        # log invalid mxids in the wild.
+        UserID.is_valid(user_id, allow_historical_mxids=True)
+
         if get_domain_from_id(user_id) != origin:
             # TODO: Raise?
             logger.warning(

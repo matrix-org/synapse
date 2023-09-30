@@ -377,6 +377,10 @@ class TypingWriterHandler(FollowerTypingHandler):
         room_id = content["room_id"]
         user_id = content["user_id"]
 
+        # The result of `is_valid` is not used yet because for now we only want to
+        # log invalid mxids in the wild.
+        UserID.is_valid(user_id, allow_historical_mxids=True)
+
         # If we're not in the room just ditch the event entirely. This is
         # probably an old server that has come back and thinks we're still in
         # the room (or we've been rejoined to the room by a state reset).

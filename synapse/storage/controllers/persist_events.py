@@ -64,6 +64,7 @@ from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
+    UserID,
     get_domain_from_id,
 )
 from synapse.types.state import StateFilter
@@ -396,6 +397,10 @@ class EventsPersistenceStorageController:
         event_ids: List[str] = []
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
+            # The result of `is_valid` is not used yet because for now we only want to
+            # log invalid mxids in the wild.
+            UserID.is_valid(event.user_id, allow_historical_mxids=True)
+
             partitioned.setdefault(event.room_id, []).append((event, ctx))
             event_ids.append(event.event_id)
 
