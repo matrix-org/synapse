@@ -20,7 +20,6 @@ from synapse.http.server import respond_with_json_bytes
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.media.media_storage import MediaStorage
-from synapse.media.url_previewer import UrlPreviewer
 
 if TYPE_CHECKING:
     from synapse.media.media_repository import MediaRepository
@@ -60,8 +59,6 @@ class PreviewUrlResource(RestServlet):
         self.media_repo = media_repo
         self.media_storage = media_storage
 
-        self._url_previewer = UrlPreviewer(hs, media_repo, media_storage)
-
     async def on_GET(self, request: SynapseRequest) -> None:
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
@@ -70,5 +67,5 @@ class PreviewUrlResource(RestServlet):
         if ts is None:
             ts = self.clock.time_msec()
 
-        og = await self._url_previewer.preview(url, requester.user, ts)
+        og = await self.media_repo.url_previewer.preview(url, requester.user, ts)
         respond_with_json_bytes(request, 200, og, send_cors=True)
