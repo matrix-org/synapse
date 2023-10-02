@@ -58,7 +58,9 @@ class SynapsePlugin(Plugin):
 
 
 def _get_true_return_type(signature: CallableType) -> mypy.types.Type:
-    """Get the "final" return type of a maybe async/Deferred."""
+    """
+    Get the "final" return type of a callable which might return returned an Awaitable/Deferred.
+    """
     if isinstance(signature.ret_type, Instance):
         # If a coroutine, unwrap the coroutine's return type.
         if signature.ret_type.type.fullname == "typing.Coroutine":
@@ -84,6 +86,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
         1. the `self` argument needs to be marked as "bound";
         2. any `cache_context` argument should be removed;
         3. an optional keyword argument `on_invalidated` should be added.
+        4. Wrap the return type to always be a Deferred.
     """
 
     # 1. Mark this as a bound function signature.
@@ -93,7 +96,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     #
     # Note: We should be only doing this if `cache_context=True` is set, but if
     # it isn't then the code will raise an exception when its called anyway, so
-    # its not the end of the world.
+    # it's not the end of the world.
     context_arg_index = None
     for idx, name in enumerate(signature.arg_names):
         if name == "cache_context":
@@ -153,6 +156,11 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
 
 
 def check_is_cacheable_wrapper(ctx: MethodSigContext) -> CallableType:
+    """Asserts that the signature of a method returns a value which can be cached.
+
+    Makes no changes to the provided method signature.
+    """
+    # The true signature, this isn't being modified so this is what will be returned.
     signature: CallableType = ctx.default_signature
 
     if not isinstance(ctx.args[0][0], TempNode):
@@ -164,9 +172,7 @@ def check_is_cacheable_wrapper(ctx: MethodSigContext) -> CallableType:
         ctx.api.fail("Cached 'function' is not a callable", ctx.context)
         return signature
 
-    # Unwrap the true return type from the cached function.
-    ret_arg = _get_true_return_type(orig_sig)
-    check_is_cacheable(orig_sig, ctx, ret_arg)
+    check_is_cacheable(orig_sig, ctx)
 
     return signature
 
@@ -174,8 +180,17 @@ def check_is_cacheable_wrapper(ctx: MethodSigContext) -> CallableType:
 def check_is_cacheable(
     signature: CallableType,
     ctx: Union[MethodSigContext, FunctionSigContext],
-    return_type: mypy.types.Type,
 ) -> None:
+    """
+    Check if a callable returns a type which can be cached.
+
+    Args:
+        signature: The callable to check.
+        ctx: The signature context, used for error reporting.
+    """
+    # Unwrap the true return type from the cached function.
+    return_type = _get_true_return_type(signature)
+
     verbose = ctx.api.options.verbosity >= 1
     # TODO Technically a cachedList only needs immutable values, but forcing them
     # to return Mapping instead of Dict is fine.
@@ -190,7 +205,6 @@ def check_is_cacheable(
         message += f" ({note})"
     message = message.replace("builtins.", "").replace("typing.", "")
 
-    # TODO The context is the context of the caller, not the method itself.
     if ok and note:
         ctx.api.note(message, ctx.context)  # type: ignore[attr-defined]
     elif not ok:
@@ -240,6 +254,11 @@ def is_cacheable(
     rt: mypy.types.Type, signature: CallableType, verbose: bool
 ) -> Tuple[bool, Optional[str]]:
     """
+    Check if a particular type is cachable.
+
+    A type is cachable if it is immutable; for complex types this recurses to
+    check each type parameter.
+
     Returns: a 2-tuple (cacheable, message).
         - cachable: False means the type is definitely not cacheable;
             true means anything else.
