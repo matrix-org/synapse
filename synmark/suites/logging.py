@@ -21,7 +21,6 @@ from typing import Optional
 from unittest.mock import Mock
 
 from pyperf import perf_counter
-from synapse.synapse_rust import reset_logging_config
 
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.defer import Deferred
@@ -31,6 +30,7 @@ from twisted.protocols.basic import LineOnlyReceiver
 
 from synapse.config.logger import _setup_stdlib_logging
 from synapse.logging import RemoteHandler
+from synapse.synapse_rust import reset_logging_config
 from synapse.types import ISynapseReactor
 from synapse.util import Clock
 
