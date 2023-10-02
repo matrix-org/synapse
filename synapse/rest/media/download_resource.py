@@ -13,14 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 from typing import TYPE_CHECKING, Optional
 
-from synapse.http.server import (
-    DirectServeJsonResource,
-    set_corp_headers,
-    set_cors_headers,
-)
-from synapse.http.servlet import parse_boolean
+from synapse.http.server import set_corp_headers, set_cors_headers
+from synapse.http.servlet import RestServlet, parse_boolean
 from synapse.http.site import SynapseRequest
 from synapse.media._base import respond_404
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -32,13 +29,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class DownloadResource(DirectServeJsonResource):
+class DownloadResource(RestServlet):
+    PATTERNS = [
+        re.compile(
+            "/_matrix/media/(r0|v3|v1)/download/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)(/(?P<file_name>[^/]*))?$"
+        )
+    ]
+
     def __init__(self, hs: "HomeServer", media_repo: "MediaRepository"):
         super().__init__()
         self.media_repo = media_repo
         self._is_mine_server_name = hs.is_mine_server_name
 
-    async def _async_render_GET(
+    async def on_GET(
         self,
         request: SynapseRequest,
         server_name: str,

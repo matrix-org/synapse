@@ -14,11 +14,12 @@
 # limitations under the License.
 
 import logging
+import re
 from typing import IO, TYPE_CHECKING, Dict, List, Optional
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.server import DirectServeJsonResource, respond_with_json
-from synapse.http.servlet import parse_bytes_from_args
+from synapse.http.server import respond_with_json
+from synapse.http.servlet import RestServlet, parse_bytes_from_args
 from synapse.http.site import SynapseRequest
 from synapse.media.media_storage import SpamMediaException
 
@@ -29,7 +30,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class UploadResource(DirectServeJsonResource):
+class UploadResource(RestServlet):
+    PATTERNS = [re.compile("/_matrix/media/(r0|v3|v1)/upload")]
+
     def __init__(self, hs: "HomeServer", media_repo: "MediaRepository"):
         super().__init__()
 
@@ -41,7 +44,7 @@ class UploadResource(DirectServeJsonResource):
         self.max_upload_size = hs.config.media.max_upload_size
         self.clock = hs.get_clock()
 
-    async def _async_render_POST(self, request: SynapseRequest) -> None:
+    async def on_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
         raw_content_length = request.getHeader("Content-Length")
         if raw_content_length is None:

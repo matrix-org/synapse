@@ -12,11 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import re
 from typing import TYPE_CHECKING
 
 from synapse.config._base import ConfigError
-from synapse.http.server import JsonResource, HttpServer
+from synapse.http.server import HttpServer, JsonResource
 
 from .config_resource import MediaConfigResource
 from .download_resource import DownloadResource
@@ -93,48 +92,13 @@ class MediaRepositoryResource(JsonResource):
         # Note that many of these should not exist as v1 endpoints, but empirically
         # a lot of traffic still goes to them.
 
-        # TODO Convert the individual resources to use RestServlet and then call
-        # FooResource(...).register(...).
-        http_server.register_paths(
-            "POST",
-            [re.compile("/_matrix/media/(r0|v3|v1)/upload")],
-            UploadResource(hs, media_repo)._async_render_POST,
-            "UploadResource",
-        )
-        http_server.register_paths(
-            "GET",
-            [
-                re.compile(
-                    "/_matrix/media/(r0|v3|v1)/download/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)(/(?P<file_name>[^/]*))?$"
-                )
-            ],
-            DownloadResource(hs, media_repo)._async_render_GET,
-            "DownloadResource",
-        )
-        http_server.register_paths(
-            "GET",
-            [
-                re.compile(
-                    "/_matrix/media/(r0|v3|v1)/thumbnail/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
-                )
-            ],
-            ThumbnailResource(
-                hs, media_repo, media_repo.media_storage
-            )._async_render_GET,
-            "ThumbnailResource",
+        UploadResource(hs, media_repo).register(http_server)
+        DownloadResource(hs, media_repo).register(http_server)
+        ThumbnailResource(hs, media_repo, media_repo.media_storage).register(
+            http_server
         )
         if hs.config.media.url_preview_enabled:
-            http_server.register_paths(
-                "GET",
-                [re.compile("/_matrix/media/(r0|v3|v1)/preview_url$")],
-                PreviewUrlResource(
-                    hs, media_repo, media_repo.media_storage
-                )._async_render_GET,
-                "PreviewUrlResource",
+            PreviewUrlResource(hs, media_repo, media_repo.media_storage).register(
+                http_server
             )
-        http_server.register_paths(
-            "GET",
-            [re.compile("/_matrix/media/(r0|v3|v1)/config$")],
-            MediaConfigResource(hs)._async_render_GET,
-            "MediaConfigResource",
-        )
+        MediaConfigResource(hs).register(http_server)

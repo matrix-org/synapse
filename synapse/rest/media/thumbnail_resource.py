@@ -13,19 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import logging
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.config.repository import THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP
-from synapse.http.server import (
-    DirectServeJsonResource,
-    respond_with_json,
-    set_corp_headers,
-    set_cors_headers,
-)
-from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.server import respond_with_json, set_corp_headers, set_cors_headers
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.media._base import (
     FileInfo,
@@ -44,7 +39,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ThumbnailResource(DirectServeJsonResource):
+class ThumbnailResource(RestServlet):
+    PATTERNS = [
+        re.compile(
+            "/_matrix/media/(r0|v3|v1)/thumbnail/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
+        )
+    ]
+
     def __init__(
         self,
         hs: "HomeServer",
@@ -60,7 +61,7 @@ class ThumbnailResource(DirectServeJsonResource):
         self._is_mine_server_name = hs.is_mine_server_name
         self.prevent_media_downloads_from = hs.config.media.prevent_media_downloads_from
 
-    async def _async_render_GET(
+    async def on_GET(
         self, request: SynapseRequest, server_name: str, media_id: str
     ) -> None:
         # Validate the server name, raising if invalid
