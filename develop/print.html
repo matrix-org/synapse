@@ -15027,8 +15027,8 @@ for more information.</p>
 </code></pre>
 <p><em>Added in Synapse 1.72.0.</em></p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="version-api"><a class="header" href="#version-api">Version API</a></h1>
-<p>This API returns the running Synapse version and the Python version
-on which Synapse is being run. This is useful when a Synapse instance
+<p>This API returns the running Synapse version.
+This is useful when a Synapse instance
 is behind a proxy that does not forward the 'Server' header (which also
 contains Synapse version information).</p>
 <p>The api is:</p>
@@ -15036,10 +15036,11 @@ contains Synapse version information).</p>
 </code></pre>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
-    &quot;server_version&quot;: &quot;0.99.2rc1 (b=develop, abcdef123)&quot;,
-    &quot;python_version&quot;: &quot;3.7.8&quot;
+    &quot;server_version&quot;: &quot;0.99.2rc1 (b=develop, abcdef123)&quot;
 }
 </code></pre>
+<p><em>Changed in Synapse 1.94.0:</em> The <code>python_version</code> key was removed from the
+response body.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="federation-api"><a class="header" href="#federation-api">Federation API</a></h1>
 <p>This API allows a server administrator to manage Synapse's federation with other homeservers.</p>
 <p>Note: This API is new, experimental and &quot;subject to change&quot;.</p>
