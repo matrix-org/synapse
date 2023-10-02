@@ -45,6 +45,7 @@ class ProfileInfo:
     display_name: Optional[str]
 
 
+# TODO This is used as a cached value and is mutable.
 @attr.s(slots=True, frozen=True, weakref_slot=False, auto_attribs=True)
 class MemberSummary:
     # A truncated list of (user_id, event_id) tuples for users of a given

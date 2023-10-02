@@ -50,6 +50,39 @@ TEXT_CONTENT_TYPES = [
     "text/xml",
 ]
 
+# A list of all content types that are "safe" to be rendered inline in a browser.
+INLINE_CONTENT_TYPES = [
+    "text/css",
+    "text/plain",
+    "text/csv",
+    "application/json",
+    "application/ld+json",
+    # We allow some media files deemed as safe, which comes from the matrix-react-sdk.
+    # https://github.com/matrix-org/matrix-react-sdk/blob/a70fcfd0bcf7f8c85986da18001ea11597989a7c/src/utils/blobs.ts#L51
+    # SVGs are *intentionally* omitted.
+    "image/jpeg",
+    "image/gif",
+    "image/png",
+    "image/apng",
+    "image/webp",
+    "image/avif",
+    "video/mp4",
+    "video/webm",
+    "video/ogg",
+    "video/quicktime",
+    "audio/mp4",
+    "audio/webm",
+    "audio/aac",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/wave",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/x-pn-wav",
+    "audio/flac",
+    "audio/x-flac",
+]
+
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     """Parses the server name, media ID and optional file name from the request URI
@@ -153,8 +186,13 @@ def add_file_headers(
 
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
 
-    # Use a Content-Disposition of attachment to force download of media.
-    disposition = "attachment"
+    # A strict subset of content types is allowed to be inlined  so that they may
+    # be viewed directly in a browser. Other file types are forced to be downloads.
+    if media_type.lower() in INLINE_CONTENT_TYPES:
+        disposition = "inline"
+    else:
+        disposition = "attachment"
+
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #

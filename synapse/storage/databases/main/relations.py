@@ -458,7 +458,7 @@ class RelationsWorkerStore(SQLBaseStore):
         )
         return result is not None
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     async def get_references_for_event(self, event_id: str) -> List[JsonDict]:
         raise NotImplementedError()
 
@@ -512,11 +512,12 @@ class RelationsWorkerStore(SQLBaseStore):
             "_get_references_for_events_txn", _get_references_for_events_txn
         )
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     def get_applicable_edit(self, event_id: str) -> Optional[EventBase]:
         raise NotImplementedError()
 
-    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")
+    # TODO: This returns a mutable object, which is generally bad.
+    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_applicable_edits(
         self, event_ids: Collection[str]
     ) -> Mapping[str, Optional[EventBase]]:
@@ -598,11 +599,12 @@ class RelationsWorkerStore(SQLBaseStore):
             for original_event_id in event_ids
         }
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     def get_thread_summary(self, event_id: str) -> Optional[Tuple[int, EventBase]]:
         raise NotImplementedError()
 
-    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
+    # TODO: This returns a mutable object, which is generally bad.
+    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_thread_summaries(
         self, event_ids: Collection[str]
     ) -> Mapping[str, Optional[Tuple[int, EventBase]]]:
