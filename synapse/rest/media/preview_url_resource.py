@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 
 from synapse.http.server import (
     DirectServeJsonResource,
-    respond_with_json,
     respond_with_json_bytes,
 )
 from synapse.http.servlet import parse_integer, parse_string
@@ -48,8 +47,6 @@ class PreviewUrlResource(DirectServeJsonResource):
       * Matrix cannot be used to distribute the metadata between homeservers.
     """
 
-    isLeaf = True
-
     def __init__(
         self,
         hs: "HomeServer",
@@ -64,10 +61,6 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.media_storage = media_storage
 
         self._url_previewer = UrlPreviewer(hs, media_repo, media_storage)
-
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        request.setHeader(b"Allow", b"OPTIONS, GET")
-        respond_with_json(request, 200, {}, send_cors=True)
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         # XXX: if get_user_by_req fails, what should we do in an async render?

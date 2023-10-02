@@ -45,8 +45,6 @@ logger = logging.getLogger(__name__)
 
 
 class ThumbnailResource(DirectServeJsonResource):
-    isLeaf = True
-
     def __init__(
         self,
         hs: "HomeServer",

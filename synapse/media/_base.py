@@ -105,7 +105,7 @@ def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
 
         # This allows users to append e.g. /test.png to the URL. Useful for
         # clients that parse the URL to see content type.
-        server_name_bytes, media_id_bytes = postpath[:2]
+        server_name_bytes, media_id_bytes = postpath[1:3]
         server_name = server_name_bytes.decode("utf-8")
         media_id = media_id_bytes.decode("utf8")
 

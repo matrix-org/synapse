@@ -30,8 +30,6 @@ logger = logging.getLogger(__name__)
 
 
 class UploadResource(DirectServeJsonResource):
-    isLeaf = True
-
     def __init__(self, hs: "HomeServer", media_repo: "MediaRepository"):
         super().__init__()
 
@@ -42,9 +40,6 @@ class UploadResource(DirectServeJsonResource):
         self.auth = hs.get_auth()
         self.max_upload_size = hs.config.media.max_upload_size
         self.clock = hs.get_clock()
-
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        respond_with_json(request, 200, {}, send_cors=True)
 
     async def _async_render_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)

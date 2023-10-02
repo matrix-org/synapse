@@ -32,8 +32,6 @@ logger = logging.getLogger(__name__)
 
 
 class DownloadResource(DirectServeJsonResource):
-    isLeaf = True
-
     def __init__(self, hs: "HomeServer", media_repo: "MediaRepository"):
         super().__init__()
         self.media_repo = media_repo

@@ -24,8 +24,6 @@ if TYPE_CHECKING:
 
 
 class MediaConfigResource(DirectServeJsonResource):
-    isLeaf = True
-
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         config = hs.config
@@ -36,6 +34,3 @@ class MediaConfigResource(DirectServeJsonResource):
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         await self.auth.get_user_by_req(request)
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
-
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        respond_with_json(request, 200, {}, send_cors=True)
