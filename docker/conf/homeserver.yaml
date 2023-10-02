@@ -151,6 +151,7 @@ turn_allow_guests: True
 ## Registration ##
 
 enable_registration: {{ "True" if SYNAPSE_ENABLE_REGISTRATION else "False" }}
+enable_registration_without_verification: {{ "True" if SYNAPSE_ENABLE_REGISTRATION_WITHOUT_VERIFICATION else "False" }}
 registration_shared_secret: "{{ SYNAPSE_REGISTRATION_SHARED_SECRET }}"
 bcrypt_rounds: 12
 allow_guest_access: {{ "True" if SYNAPSE_ALLOW_GUEST else "False" }}
