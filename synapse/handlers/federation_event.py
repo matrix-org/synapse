@@ -1538,7 +1538,7 @@ class FederationEventHandler:
             logger.exception("Failed to resync device for %s", sender)
 
     async def backfill_event_id(
-        self, destinations: List[str], room_id: str, event_id: str
+        self, destinations: StrCollection, room_id: str, event_id: str
     ) -> PulledPduInfo:
         """Backfill a single event and persist it as a non-outlier which means
         we also pull in all of the state and auth events necessary for it.
@@ -2341,6 +2341,12 @@ class FederationEventHandler:
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             # TODO retrieve the previous state, and exclude join -> join transitions
             self._notifier.notify_user_joined_room(event.event_id, event.room_id)
+
+        # If this is a server ACL event, clear the cache in the storage controller.
+        if event.type == EventTypes.ServerACL:
+            self._state_storage_controller.get_server_acl_for_room.invalidate(
+                (event.room_id,)
+            )
 
     def _sanity_check_event(self, ev: EventBase) -> None:
         """

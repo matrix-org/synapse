@@ -42,9 +42,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, shorthand=False)
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertEqual(
-            {"server_version", "python_version"}, set(channel.json_body.keys())
-        )
+        self.assertEqual({"server_version"}, set(channel.json_body.keys()))
 
 
 class QuarantineMediaTestCase(unittest.HomeserverTestCase):

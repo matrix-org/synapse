@@ -41,7 +41,7 @@ from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient, is_unknown_endpoint
 from synapse.logging import opentracing
-from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
+from synapse.types import DeviceListUpdates, JsonDict, JsonMapping, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -306,8 +306,8 @@ class ApplicationServiceApi(SimpleHttpClient):
         self,
         service: "ApplicationService",
         events: Sequence[EventBase],
-        ephemeral: List[JsonDict],
-        to_device_messages: List[JsonDict],
+        ephemeral: List[JsonMapping],
+        to_device_messages: List[JsonMapping],
         one_time_keys_count: TransactionOneTimeKeysCount,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
         device_list_summary: DeviceListUpdates,

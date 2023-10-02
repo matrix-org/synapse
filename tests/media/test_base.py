@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.media._base import get_filename_from_headers
+from unittest.mock import Mock
+
+from synapse.media._base import add_file_headers, get_filename_from_headers
 
 from tests import unittest
 
@@ -36,3 +38,28 @@ class GetFileNameFromHeadersTests(unittest.TestCase):
                 expected,
                 f"expected output for {hdr!r} to be {expected} but was {res}",
             )
+
+
+class AddFileHeadersTests(unittest.TestCase):
+    TEST_CASES = {
+        "text/plain": b"inline; filename=file.name",
+        "text/csv": b"inline; filename=file.name",
+        "image/png": b"inline; filename=file.name",
+        "text/html": b"attachment; filename=file.name",
+        "any/thing": b"attachment; filename=file.name",
+    }
+
+    def test_content_disposition(self) -> None:
+        for media_type, expected in self.TEST_CASES.items():
+            request = Mock()
+            add_file_headers(request, media_type, 0, "file.name")
+            request.setHeader.assert_any_call(b"Content-Disposition", expected)
+
+    def test_no_filename(self) -> None:
+        request = Mock()
+        add_file_headers(request, "text/plain", 0, None)
+        request.setHeader.assert_any_call(b"Content-Disposition", b"inline")
+
+        request.reset_mock()
+        add_file_headers(request, "text/html", 0, None)
+        request.setHeader.assert_any_call(b"Content-Disposition", b"attachment")

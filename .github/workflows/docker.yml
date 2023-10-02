@@ -24,13 +24,13 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Inspect builder
         run: docker buildx inspect
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Extract version from pyproject.toml
         # Note: explicitly requesting bash will mean bash is invoked with `-eo pipefail`, see
