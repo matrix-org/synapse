@@ -58,6 +58,8 @@ class PreviewUrlResource(RestServlet):
         self.clock = hs.get_clock()
         self.media_repo = media_repo
         self.media_storage = media_storage
+        assert self.media_repo.url_previewer is not None
+        self.url_previewer = self.media_repo.url_previewer
 
     async def on_GET(self, request: SynapseRequest) -> None:
         # XXX: if get_user_by_req fails, what should we do in an async render?
@@ -67,5 +69,5 @@ class PreviewUrlResource(RestServlet):
         if ts is None:
             ts = self.clock.time_msec()
 
-        og = await self.media_repo.url_previewer.preview(url, requester.user, ts)
+        og = await self.url_previewer.preview(url, requester.user, ts)
         respond_with_json_bytes(request, 200, og, send_cors=True)

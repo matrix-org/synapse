@@ -115,7 +115,7 @@ class MediaRepository:
             )
             storage_providers.append(provider)
 
-        self.media_storage = MediaStorage(
+        self.media_storage: MediaStorage = MediaStorage(
             self.hs, self.primary_base_path, self.filepaths, storage_providers
         )
 
@@ -144,7 +144,9 @@ class MediaRepository:
             )
 
         if hs.config.media.url_preview_enabled:
-            self.url_previewer = UrlPreviewer(hs, self, self.media_storage)
+            self.url_previewer: Optional[UrlPreviewer] = UrlPreviewer(
+                hs, self, self.media_storage
+            )
         else:
             self.url_previewer = None
 

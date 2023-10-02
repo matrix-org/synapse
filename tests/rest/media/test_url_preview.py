@@ -117,6 +117,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.media_repo = hs.get_media_repository()
+        assert self.media_repo.url_previewer is not None
+        self.url_previewer = self.media_repo.url_previewer
 
         self.lookups: Dict[str, Any] = {}
 
@@ -200,9 +202,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         # Clear the in-memory cache
-        self.assertIn("http://matrix.org", self.media_repo.url_previewer._cache)
-        self.media_repo.url_previewer._cache.pop("http://matrix.org")
-        self.assertNotIn("http://matrix.org", self.media_repo.url_previewer._cache)
+        self.assertIn("http://matrix.org", self.url_previewer._cache)
+        self.url_previewer._cache.pop("http://matrix.org")
+        self.assertNotIn("http://matrix.org", self.url_previewer._cache)
 
         # Check the database cache returns the correct response
         channel = self.make_request(
@@ -1365,7 +1367,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertTrue(os.path.isdir(thumbnail_dir))
 
         self.reactor.advance(IMAGE_CACHE_EXPIRY_MS * 1000 + 1)
-        self.get_success(self.media_repo.url_previewer._expire_url_cache_data())
+        self.get_success(self.url_previewer._expire_url_cache_data())
 
         for path in [file_path] + file_dirs + [thumbnail_dir] + thumbnail_dirs:
             self.assertFalse(
