@@ -30,12 +30,12 @@ from synapse.http.site import SynapseRequest
 from synapse.media._base import (
     FileInfo,
     ThumbnailInfo,
-    parse_media_id,
     respond_404,
     respond_with_file,
     respond_with_responder,
 )
 from synapse.media.media_storage import MediaStorage
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.media.media_repository import MediaRepository
@@ -60,10 +60,14 @@ class ThumbnailResource(DirectServeJsonResource):
         self._is_mine_server_name = hs.is_mine_server_name
         self.prevent_media_downloads_from = hs.config.media.prevent_media_downloads_from
 
-    async def _async_render_GET(self, request: SynapseRequest) -> None:
+    async def _async_render_GET(
+        self, request: SynapseRequest, server_name: str, media_id: str
+    ) -> None:
+        # Validate the server name, raising if invalid
+        parse_and_validate_server_name(server_name)
+
         set_cors_headers(request)
         set_corp_headers(request)
-        server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width", required=True)
         height = parse_integer(request, "height", required=True)
         method = parse_string(request, "method", "scale")

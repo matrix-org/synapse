@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from synapse.http.server import (
     DirectServeJsonResource,
@@ -22,7 +22,8 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_boolean
 from synapse.http.site import SynapseRequest
-from synapse.media._base import parse_media_id, respond_404
+from synapse.media._base import respond_404
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.media.media_repository import MediaRepository
@@ -37,7 +38,16 @@ class DownloadResource(DirectServeJsonResource):
         self.media_repo = media_repo
         self._is_mine_server_name = hs.is_mine_server_name
 
-    async def _async_render_GET(self, request: SynapseRequest) -> None:
+    async def _async_render_GET(
+        self,
+        request: SynapseRequest,
+        server_name: str,
+        media_id: str,
+        file_name: Optional[str] = None,
+    ) -> None:
+        # Validate the server name, raising if invalid
+        parse_and_validate_server_name(server_name)
+
         set_cors_headers(request)
         set_corp_headers(request)
         request.setHeader(
@@ -56,9 +66,8 @@ class DownloadResource(DirectServeJsonResource):
             b"Referrer-Policy",
             b"no-referrer",
         )
-        server_name, media_id, name = parse_media_id(request)
         if self._is_mine_server_name(server_name):
-            await self.media_repo.get_local_media(request, media_id, name)
+            await self.media_repo.get_local_media(request, media_id, file_name)
         else:
             allow_remote = parse_boolean(request, "allow_remote", default=True)
             if not allow_remote:
@@ -70,4 +79,6 @@ class DownloadResource(DirectServeJsonResource):
                 respond_404(request)
                 return
 
-            await self.media_repo.get_remote_media(request, server_name, media_id, name)
+            await self.media_repo.get_remote_media(
+                request, server_name, media_id, file_name
+            )

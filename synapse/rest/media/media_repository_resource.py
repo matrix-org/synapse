@@ -103,13 +103,21 @@ class MediaRepositoryResource(JsonResource):
         )
         http_server.register_paths(
             "GET",
-            [re.compile("/_matrix/media/(r0|v3|v1)/download")],
+            [
+                re.compile(
+                    "/_matrix/media/(r0|v3|v1)/download/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)(/(?P<file_name>[^/]*))?$"
+                )
+            ],
             DownloadResource(hs, media_repo)._async_render_GET,
             "DownloadResource",
         )
         http_server.register_paths(
             "GET",
-            [re.compile("/_matrix/media/(r0|v3|v1)/thumbnail")],
+            [
+                re.compile(
+                    "/_matrix/media/(r0|v3|v1)/thumbnail/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
+                )
+            ],
             ThumbnailResource(
                 hs, media_repo, media_repo.media_storage
             )._async_render_GET,
@@ -118,7 +126,7 @@ class MediaRepositoryResource(JsonResource):
         if hs.config.media.url_preview_enabled:
             http_server.register_paths(
                 "GET",
-                [re.compile("/_matrix/media/(r0|v3|v1)/preview_url")],
+                [re.compile("/_matrix/media/(r0|v3|v1)/preview_url$")],
                 PreviewUrlResource(
                     hs, media_repo, media_repo.media_storage
                 )._async_render_GET,
@@ -126,7 +134,7 @@ class MediaRepositoryResource(JsonResource):
             )
         http_server.register_paths(
             "GET",
-            [re.compile("/_matrix/media/(r0|v3|v1)/config")],
+            [re.compile("/_matrix/media/(r0|v3|v1)/config$")],
             MediaConfigResource(hs)._async_render_GET,
             "MediaConfigResource",
         )
