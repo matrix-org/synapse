@@ -18,3 +18,6 @@ It returns a JSON body like the following:
     "server_version": "0.99.2rc1 (b=develop, abcdef123)"
 }
 ```
+
+*Changed in Synapse 1.94.0:* The `python_version` key was removed from the
+response body.
