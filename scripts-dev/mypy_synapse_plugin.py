@@ -59,7 +59,7 @@ class SynapsePlugin(Plugin):
 
 def _get_true_return_type(signature: CallableType) -> mypy.types.Type:
     """
-    Get the "final" return type of a callable which might return returned an Awaitable/Deferred.
+    Get the "final" return type of a callable which might return an Awaitable/Deferred.
     """
     if isinstance(signature.ret_type, Instance):
         # If a coroutine, unwrap the coroutine's return type.
