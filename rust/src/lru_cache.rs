@@ -51,6 +51,13 @@ struct LruCacheNodeInner {
     value: Arc<Mutex<PyObject>>,
     callbacks: Py<PySet>,
     memory: usize,
+    last_access_ts_secs: usize,
+}
+
+impl LruCacheNodeInner {
+    fn update_last_access(&mut self, ts_secs: usize) {
+        self.last_access_ts_secs = ts_secs;
+    }
 }
 
 #[pyclass]
@@ -66,6 +73,7 @@ impl LruCacheNode {
         value: PyObject,
         callbacks: Py<PySet>,
         memory: usize,
+        ts_secs: usize,
     ) -> Self {
         let node = Arc::new(LruCacheNodeInner {
             per_cache_link: Default::default(),
@@ -76,6 +84,7 @@ impl LruCacheNode {
             value: Arc::new(Mutex::new(value)),
             callbacks,
             memory,
+            last_access_ts_secs: ts_secs,
         });
 
         GLOBAL_LIST
@@ -159,7 +168,7 @@ impl LruCacheNode {
         }
     }
 
-    fn move_to_front(&self) {
+    fn move_to_front(&self, ts_secs: usize) {
         if self.0.global_list_link.is_linked() {
             let mut global_list = GLOBAL_LIST.lock().expect("poisoned");
 
@@ -171,6 +180,8 @@ impl LruCacheNode {
             curor_mut.remove();
 
             global_list.push_front(self.0.clone());
+
+            // TODO Update self.0.last_access_ts_secs
         }
 
         if self.0.per_cache_link.is_linked() {
@@ -207,6 +218,9 @@ impl LruCacheNode {
     fn memory(&self) -> usize {
         self.0.memory
     }
+
+    #[getter]
+    fn last_access_ts_secs(&self) -> usize { self.0.last_access_ts_secs }
 }
 
 #[pyfunction]
