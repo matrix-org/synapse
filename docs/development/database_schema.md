@@ -209,7 +209,7 @@ async def _my_background_update(self, progress: JsonDict, batch_size: int) -> in
 Synapse will attempt to rate-limit how often background updates are run via the
 given batch-size and the returned number of processed entries (and how long the
 function took to run). See
-[background update controller callbacks](modules/background_update_controller_callbacks.md).
+[background update controller callbacks](../modules/background_update_controller_callbacks.md).
 
 ## Boolean columns
 
