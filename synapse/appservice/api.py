@@ -39,7 +39,8 @@ from synapse.appservice import (
 )
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
-from synapse.http.client import SimpleHttpClient, is_unknown_endpoint
+from synapse.http.appserviceagent import ApplicationServiceAgent
+from synapse.http.client import BaseHttpClient, is_unknown_endpoint
 from synapse.logging import opentracing
 from synapse.types import DeviceListUpdates, JsonDict, JsonMapping, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
@@ -112,7 +113,7 @@ def _is_valid_3pe_result(r: object, field: str) -> TypeGuard[JsonDict]:
     return True
 
 
-class ApplicationServiceApi(SimpleHttpClient):
+class ApplicationServiceApi(BaseHttpClient):
     """This class manages HS -> AS communications, including querying and
     pushing.
     """
@@ -121,6 +122,12 @@ class ApplicationServiceApi(SimpleHttpClient):
         super().__init__(hs)
         self.clock = hs.get_clock()
         self.config = hs.config.appservice
+
+        # TODO: Do we want an HttpConnectionPool for this?
+        self.agent: ApplicationServiceAgent = ApplicationServiceAgent(
+            self.reactor,
+            self.hs.get_http_client_context_factory(),
+        )
 
         self.protocol_meta_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
