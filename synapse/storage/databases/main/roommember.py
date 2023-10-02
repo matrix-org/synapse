@@ -275,7 +275,7 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
             _get_users_in_room_with_profiles,
         )
 
-    @cached(max_entries=100000)
+    @cached(max_entries=100000)  # type: ignore[synapse-@cached-mutable]
     async def get_room_summary(self, room_id: str) -> Mapping[str, MemberSummary]:
         """Get the details of a room roughly suitable for use by the room
         summary extension to /sync. Useful when lazy loading room members.
@@ -1071,7 +1071,8 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         )
         return {row["event_id"]: row["membership"] for row in rows}
 
-    @cached(max_entries=10000)
+    # TODO This returns a mutable object, which is generally confusing when using a cache.
+    @cached(max_entries=10000)  # type: ignore[synapse-@cached-mutable]
     def _get_joined_hosts_cache(self, room_id: str) -> "_JoinedHostsCache":
         return _JoinedHostsCache()
 
