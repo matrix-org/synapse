@@ -3070,13 +3070,13 @@ files = [
 
 [[package]]
 name = "types-netaddr"
-version = "0.8.0.9"
+version = "0.9.0.1"
 description = "Typing stubs for netaddr"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-netaddr-0.8.0.9.tar.gz", hash = "sha256:68900c267fd31627c1721c5c52b32a257657ac2777457dca49b6b096ba2faf74"},
-    {file = "types_netaddr-0.8.0.9-py3-none-any.whl", hash = "sha256:63e871f064cd59473cec1177f372526f0fa3d565050247d5305bdc325be5c3f6"},
+    {file = "types-netaddr-0.9.0.1.tar.gz", hash = "sha256:e04638435abad3e3b13a4a6b1b07f36619a47597fd5c10f330474196c058dfb3"},
+    {file = "types_netaddr-0.9.0.1-py3-none-any.whl", hash = "sha256:81b98c959d14de96eb53507ac606e8876c91413d273554a59fd42b34e3811fe0"},
 ]
 
 [[package]]
