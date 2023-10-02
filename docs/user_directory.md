@@ -83,7 +83,7 @@ The search term is then split into words:
   available, then the system's [default locale](https://unicode-org.github.io/icu/userguide/locale/#default-locales)
   will be used to break the search term into words. (See the
   [installation instructions](setup/installation.md) for how to install ICU.)
-* If unavailable, then runs of ASCII characters, numbers, underscores, and hypens
+* If unavailable, then runs of ASCII characters, numbers, underscores, and hyphens
   are considered words.
 
 The queries for PostgreSQL and SQLite are detailed below, by their overall goal
