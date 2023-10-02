@@ -59,6 +59,7 @@ class ThumbnailResource(RestServlet):
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
         self._is_mine_server_name = hs.is_mine_server_name
+        self._server_name = hs.hostname
         self.prevent_media_downloads_from = hs.config.media.prevent_media_downloads_from
 
     async def on_GET(
@@ -421,13 +422,14 @@ class ThumbnailResource(RestServlet):
             # `dynamic_thumbnails` is disabled.
             logger.info("Failed to find any generated thumbnails")
 
+            assert request.path is not None
             respond_with_json(
                 request,
                 400,
                 cs_error(
-                    "Cannot find any thumbnails for the requested media (%r). This might mean the media is not a supported_media_format=(%s) or that thumbnailing failed for some other reason. (Dynamic thumbnails are disabled on this server.)"
+                    "Cannot find any thumbnails for the requested media ('%s'). This might mean the media is not a supported_media_format=(%s) or that thumbnailing failed for some other reason. (Dynamic thumbnails are disabled on this server.)"
                     % (
-                        request.postpath,
+                        request.path.decode(),
                         ", ".join(THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP.keys()),
                     ),
                     code=Codes.UNKNOWN,

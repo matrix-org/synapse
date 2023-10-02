@@ -85,10 +85,11 @@ INLINE_CONTENT_TYPES = [
 
 
 def respond_404(request: SynapseRequest) -> None:
+    assert request.path is not None
     respond_with_json(
         request,
         404,
-        cs_error("Not found %r" % (request.postpath,), code=Codes.NOT_FOUND),
+        cs_error("Not found '%s'" % (request.path.decode(),), code=Codes.NOT_FOUND),
         send_cors=True,
     )
 
