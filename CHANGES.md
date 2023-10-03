@@ -1,3 +1,55 @@
+# Synapse 1.94.0rc1 (2023-10-03)
+
+### Features
+
+- Render plain, CSS, CSV, JSON and common image formats media content in the browser (inline) when requested through the /download endpoint. ([\#15988](https://github.com/matrix-org/synapse/issues/15988))
+- Experimental support for [MSC4028](https://github.com/matrix-org/matrix-spec-proposals/pull/4028) to push all encrypted events to clients. ([\#16361](https://github.com/matrix-org/synapse/issues/16361))
+- Minor performance improvement when sending presence to federated servers. ([\#16385](https://github.com/matrix-org/synapse/issues/16385))
+- Minor performance improvement by caching server ACL checking. ([\#16360](https://github.com/matrix-org/synapse/issues/16360))
+
+### Improved Documentation
+
+- Add developer documentation concerning gradual schema migrations with column alterations. ([\#15691](https://github.com/matrix-org/synapse/issues/15691))
+- Improve documentation of the user directory search algorithm. ([\#16320](https://github.com/matrix-org/synapse/issues/16320))
+- Fix rendering of user admin API documentation around deactivation. This was broken in Synapse 1.91.0. ([\#16355](https://github.com/matrix-org/synapse/issues/16355))
+- Update documentation around message retention policies. ([\#16382](https://github.com/matrix-org/synapse/issues/16382))
+- Add note to `federation_domain_whitelist` config option to clarify its usage. ([\#16416](https://github.com/matrix-org/synapse/issues/16416))
+- Improve legacy release notes. ([\#16418](https://github.com/matrix-org/synapse/issues/16418))
+
+### Deprecations and Removals
+
+- Remove Python version from `/_synapse/admin/v1/server_version`. ([\#16380](https://github.com/matrix-org/synapse/issues/16380))
+
+### Internal Changes
+
+- Avoid running CI steps when the files they check have not been changed. ([\#14745](https://github.com/matrix-org/synapse/issues/14745), [\#16387](https://github.com/matrix-org/synapse/issues/16387))
+- Improve type hints. ([\#14911](https://github.com/matrix-org/synapse/issues/14911), [\#16350](https://github.com/matrix-org/synapse/issues/16350), [\#16356](https://github.com/matrix-org/synapse/issues/16356), [\#16395](https://github.com/matrix-org/synapse/issues/16395))
+- Added support for pydantic v2 in addition to pydantic v1. Contributed by Maxwell G (@gotmax23). ([\#16332](https://github.com/matrix-org/synapse/issues/16332))
+- Get CI to check PRs have been signed-off. ([\#16348](https://github.com/matrix-org/synapse/issues/16348))
+- Add missing licence header. ([\#16359](https://github.com/matrix-org/synapse/issues/16359))
+- Improve type hints, and bump types-psycopg2 from 2.9.21.11 to 2.9.21.14. ([\#16381](https://github.com/matrix-org/synapse/issues/16381))
+- Improve comments in `StateGroupBackgroundUpdateStore`. ([\#16383](https://github.com/matrix-org/synapse/issues/16383))
+- Update maturin configuration. ([\#16394](https://github.com/matrix-org/synapse/issues/16394))
+- Downgrade replication stream time out error log lines to warning. ([\#16401](https://github.com/matrix-org/synapse/issues/16401))
+
+### Updates to locked dependencies
+
+* Bump actions/checkout from 3 to 4. ([\#16250](https://github.com/matrix-org/synapse/issues/16250))
+* Bump cryptography from 41.0.3 to 41.0.4. ([\#16362](https://github.com/matrix-org/synapse/issues/16362))
+* Bump dawidd6/action-download-artifact from 2.27.0 to 2.28.0. ([\#16374](https://github.com/matrix-org/synapse/issues/16374))
+* Bump docker/setup-buildx-action from 2 to 3. ([\#16375](https://github.com/matrix-org/synapse/issues/16375))
+* Bump gitpython from 3.1.35 to 3.1.37. ([\#16376](https://github.com/matrix-org/synapse/issues/16376))
+* Bump msgpack from 1.0.5 to 1.0.6. ([\#16377](https://github.com/matrix-org/synapse/issues/16377))
+* Bump msgpack from 1.0.6 to 1.0.7. ([\#16412](https://github.com/matrix-org/synapse/issues/16412))
+* Bump phonenumbers from 8.13.19 to 8.13.22. ([\#16413](https://github.com/matrix-org/synapse/issues/16413))
+* Bump psycopg2 from 2.9.7 to 2.9.8. ([\#16409](https://github.com/matrix-org/synapse/issues/16409))
+* Bump pydantic from 2.3.0 to 2.4.2. ([\#16410](https://github.com/matrix-org/synapse/issues/16410))
+* Bump regex from 1.9.5 to 1.9.6. ([\#16408](https://github.com/matrix-org/synapse/issues/16408))
+* Bump sentry-sdk from 1.30.0 to 1.31.0. ([\#16378](https://github.com/matrix-org/synapse/issues/16378))
+* Bump types-netaddr from 0.8.0.9 to 0.9.0.1. ([\#16411](https://github.com/matrix-org/synapse/issues/16411))
+* Bump types-psycopg2 from 2.9.21.11 to 2.9.21.14. ([\#16381](https://github.com/matrix-org/synapse/issues/16381))
+* Bump urllib3 from 1.26.15 to 1.26.17. ([\#16422](https://github.com/matrix-org/synapse/issues/16422))
+
 # Synapse 1.93.0 (2023-09-26)
 
 No significant changes since 1.93.0rc1.
