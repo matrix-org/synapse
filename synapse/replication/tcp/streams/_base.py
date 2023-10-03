@@ -371,7 +371,7 @@ class ReceiptsStream(Stream):
         store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
-            current_token_without_instance(store.get_max_receipt_stream_id),
+            store.get_receipt_stream_id_for_instance,
             store.get_all_updated_receipts,
         )
 

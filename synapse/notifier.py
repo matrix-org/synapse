@@ -44,6 +44,7 @@ from synapse.metrics import LaterGauge
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
+    MultiWriterStreamToken,
     PersistedEventPosition,
     RoomStreamToken,
     StrCollection,
@@ -127,7 +128,7 @@ class _NotifierUserStream:
     def notify(
         self,
         stream_key: StreamKeyType,
-        stream_id: Union[int, RoomStreamToken],
+        stream_id: Union[int, RoomStreamToken, MultiWriterStreamToken],
         time_now_ms: int,
     ) -> None:
         """Notify any listeners for this user of a new event from an
@@ -455,7 +456,7 @@ class Notifier:
     def on_new_event(
         self,
         stream_key: StreamKeyType,
-        new_token: Union[int, RoomStreamToken],
+        new_token: Union[int, RoomStreamToken, MultiWriterStreamToken],
         users: Optional[Collection[Union[str, UserID]]] = None,
         rooms: Optional[StrCollection] = None,
     ) -> None:
