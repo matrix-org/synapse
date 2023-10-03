@@ -82,6 +82,7 @@ class ApplicationService:
         msc3202_transaction_extensions: bool = False,
     ):
         self.token = token
+        # the url as brought in could be a [hostname|ip][:port] or a [unix_socket_path]
         self.url = (
             url.rstrip("/") if isinstance(url, str) else None
         )  # url must not end with a slash
