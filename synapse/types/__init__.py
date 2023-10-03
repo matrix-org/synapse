@@ -22,8 +22,8 @@ from typing import (
     Any,
     ClassVar,
     Dict,
-    Final,
     List,
+    Literal,
     Mapping,
     Match,
     MutableMapping,
@@ -34,6 +34,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    overload,
 )
 
 import attr
@@ -649,20 +650,20 @@ class RoomStreamToken:
             return "s%d" % (self.stream,)
 
 
-class StreamKeyType:
+class StreamKeyType(Enum):
     """Known stream types.
 
     A stream is a list of entities ordered by an incrementing "stream token".
     """
 
-    ROOM: Final = "room_key"
-    PRESENCE: Final = "presence_key"
-    TYPING: Final = "typing_key"
-    RECEIPT: Final = "receipt_key"
-    ACCOUNT_DATA: Final = "account_data_key"
-    PUSH_RULES: Final = "push_rules_key"
-    TO_DEVICE: Final = "to_device_key"
-    DEVICE_LIST: Final = "device_list_key"
+    ROOM = "room_key"
+    PRESENCE = "presence_key"
+    TYPING = "typing_key"
+    RECEIPT = "receipt_key"
+    ACCOUNT_DATA = "account_data_key"
+    PUSH_RULES = "push_rules_key"
+    TO_DEVICE = "to_device_key"
+    DEVICE_LIST = "device_list_key"
     UN_PARTIAL_STATED_ROOMS = "un_partial_stated_rooms_key"
 
 
@@ -784,7 +785,7 @@ class StreamToken:
     def room_stream_id(self) -> int:
         return self.room_key.stream
 
-    def copy_and_advance(self, key: str, new_value: Any) -> "StreamToken":
+    def copy_and_advance(self, key: StreamKeyType, new_value: Any) -> "StreamToken":
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
 
@@ -797,16 +798,44 @@ class StreamToken:
             return new_token
 
         new_token = self.copy_and_replace(key, new_value)
-        new_id = int(getattr(new_token, key))
-        old_id = int(getattr(self, key))
+        new_id = new_token.get_field(key)
+        old_id = self.get_field(key)
 
         if old_id < new_id:
             return new_token
         else:
             return self
 
-    def copy_and_replace(self, key: str, new_value: Any) -> "StreamToken":
-        return attr.evolve(self, **{key: new_value})
+    def copy_and_replace(self, key: StreamKeyType, new_value: Any) -> "StreamToken":
+        return attr.evolve(self, **{key.value: new_value})
+
+    @overload
+    def get_field(self, key: Literal[StreamKeyType.ROOM]) -> RoomStreamToken:
+        ...
+
+    @overload
+    def get_field(
+        self,
+        key: Literal[
+            StreamKeyType.ACCOUNT_DATA,
+            StreamKeyType.DEVICE_LIST,
+            StreamKeyType.PRESENCE,
+            StreamKeyType.PUSH_RULES,
+            StreamKeyType.RECEIPT,
+            StreamKeyType.TO_DEVICE,
+            StreamKeyType.TYPING,
+            StreamKeyType.UN_PARTIAL_STATED_ROOMS,
+        ],
+    ) -> int:
+        ...
+
+    @overload
+    def get_field(self, key: StreamKeyType) -> Union[int, RoomStreamToken]:
+        ...
+
+    def get_field(self, key: StreamKeyType) -> Union[int, RoomStreamToken]:
+        """Returns the stream ID for the given key."""
+        return getattr(self, key.value)
 
 
 StreamToken.START = StreamToken(RoomStreamToken(None, 0), 0, 0, 0, 0, 0, 0, 0, 0, 0)
