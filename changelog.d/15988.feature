@@ -1,1 +1,0 @@
-Render plain, CSS, CSV, JSON and common image formats media content in the browser (inline) when requested through the /download endpoint.
