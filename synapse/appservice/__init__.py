@@ -86,6 +86,9 @@ class ApplicationService:
         self.url = (
             url.rstrip("/") if isinstance(url, str) else None
         )  # url must not end with a slash
+        if self.url and self.url.startswith("unix"):
+            # This is probably a Unix Socket, append a ':' to the end so we can parse it
+            self.url = self.url + ":"
         self.hs_token = hs_token
         # The full Matrix ID for this application service's sender.
         self.sender = sender
