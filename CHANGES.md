@@ -2,8 +2,8 @@
 
 ### Features
 
-- Render plain, CSS, CSV, JSON and common image formats media content in the browser (inline) when requested through the /download endpoint. ([\#15988](https://github.com/matrix-org/synapse/issues/15988))
-- Experimental support for [MSC4028](https://github.com/matrix-org/matrix-spec-proposals/pull/4028) to push all encrypted events to clients. ([\#16361](https://github.com/matrix-org/synapse/issues/16361))
+- Render plain, CSS, CSV, JSON and common image formats in the browser (inline) when requested through the /download endpoint. ([\#15988](https://github.com/matrix-org/synapse/issues/15988))
+- Add experimental support for [MSC4028](https://github.com/matrix-org/matrix-spec-proposals/pull/4028) to push all encrypted events to clients. ([\#16361](https://github.com/matrix-org/synapse/issues/16361))
 - Minor performance improvement when sending presence to federated servers. ([\#16385](https://github.com/matrix-org/synapse/issues/16385))
 - Minor performance improvement by caching server ACL checking. ([\#16360](https://github.com/matrix-org/synapse/issues/16360))
 
