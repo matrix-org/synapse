@@ -165,9 +165,7 @@ class ReceiptsHandler:
             StreamKeyType.RECEIPT, max_batch_id, rooms=affected_room_ids
         )
         # Note that the min here shouldn't be relied upon to be accurate.
-        await self.hs.get_pusherpool().on_new_receipts(
-            min_batch_id, max_batch_id, affected_room_ids
-        )
+        await self.hs.get_pusherpool().on_new_receipts({r.user_id for r in receipts})
 
         return True
 
