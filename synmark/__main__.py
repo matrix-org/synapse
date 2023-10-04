@@ -15,7 +15,7 @@ import sys
 from argparse import REMAINDER, Namespace
 from contextlib import redirect_stderr
 from io import StringIO
-from typing import Any, Callable, Coroutine, List, TypeVar, cast
+from typing import Any, Callable, Coroutine, List, TypeVar
 
 import pyperf
 

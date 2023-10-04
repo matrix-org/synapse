@@ -69,8 +69,12 @@ async def main(reactor: ISynapseReactor, loops: int) -> float:
         class server:
             server_name = "synmark-" + str(loops)
 
-        class logging:
+        # This odd construct is to avoid mypy thinking that logging escapes the
+        # scope of Config.
+        class _logging:
             no_redirect_stdio = True
+
+        logging = _logging
 
     hs_config = Config()
 
