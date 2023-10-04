@@ -69,6 +69,9 @@ async def main(reactor: ISynapseReactor, loops: int) -> float:
         class server:
             server_name = "synmark-" + str(loops)
 
+        class logging:
+            no_redirect_stdio = True
+
     hs_config = Config()
 
     # To be able to sleep.
@@ -90,7 +93,7 @@ async def main(reactor: ISynapseReactor, loops: int) -> float:
         "handlers": {
             "tersejson": {
                 "class": "synapse.logging.RemoteHandler",
-                "host": "127.0.0.1",
+                "host": address.host,
                 "port": address.port,
                 "maximum_buffer": 100,
             }
