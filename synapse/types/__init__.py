@@ -871,18 +871,23 @@ StreamToken.START = StreamToken(RoomStreamToken(stream=0), 0, 0, 0, 0, 0, 0, 0, 
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class PersistedEventPosition:
+class PersistedPosition:
+    """Position of a newly persisted row with instance that persisted it."""
+
+    instance_name: str
+    stream: int
+
+    def persisted_after(self, token: AbstractMultiWriterStreamToken) -> bool:
+        return token.get_stream_pos_for_instance(self.instance_name) < self.stream
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class PersistedEventPosition(PersistedPosition):
     """Position of a newly persisted event with instance that persisted it.
 
     This can be used to test whether the event is persisted before or after a
     RoomStreamToken.
     """
-
-    instance_name: str
-    stream: int
-
-    def persisted_after(self, token: RoomStreamToken) -> bool:
-        return token.get_stream_pos_for_instance(self.instance_name) < self.stream
 
     def to_room_stream_token(self) -> RoomStreamToken:
         """Converts the position to a room stream token such that events
