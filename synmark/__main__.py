@@ -89,11 +89,19 @@ if __name__ == "__main__":
         setupdb()
 
     if runner.args.tests:
-        SUITES = list(
-            filter(lambda x: x[0].__name__.split(".")[-1] in runner.args.tests, SUITES)
-        )
+        existing_suites = {s.__name__.split(".")[-1] for s, _ in SUITES}
+        for test in runner.args.tests:
+            if test not in existing_suites:
+                print(f"Test suite {test} does not exist.")
+                exit(-1)
 
-    for suite, loops in SUITES:
+        suites = list(
+            filter(lambda t: t[0].__name__.split(".")[-1] in runner.args.tests, SUITES)
+        )
+    else:
+        suites = SUITES
+
+    for suite, loops in suites:
         if loops:
             runner.args.loops = loops
             loops_desc = str(loops)
