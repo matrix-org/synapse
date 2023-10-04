@@ -129,9 +129,7 @@ class ReplicationDataHandler:
             self.notifier.on_new_event(
                 StreamKeyType.RECEIPT, token, rooms=[row.room_id for row in rows]
             )
-            await self._pusher_pool.on_new_receipts(
-                token, token, {row.room_id for row in rows}
-            )
+            await self._pusher_pool.on_new_receipts({row.user_id for row in rows})
         elif stream_name == ToDeviceStream.NAME:
             entities = [row.entity for row in rows if row.entity.startswith("@")]
             if entities:

@@ -216,7 +216,7 @@ class ApplicationServicesHandler:
 
     def notify_interested_services_ephemeral(
         self,
-        stream_key: str,
+        stream_key: StreamKeyType,
         new_token: Union[int, RoomStreamToken],
         users: Collection[Union[str, UserID]],
     ) -> None:
@@ -326,7 +326,7 @@ class ApplicationServicesHandler:
     async def _notify_interested_services_ephemeral(
         self,
         services: List[ApplicationService],
-        stream_key: str,
+        stream_key: StreamKeyType,
         new_token: int,
         users: Collection[Union[str, UserID]],
     ) -> None:

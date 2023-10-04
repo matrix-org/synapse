@@ -208,7 +208,7 @@ class EndToEndRoomKeyStore(EndToEndRoomKeyBackgroundStore):
                     "message": "Set room key",
                     "room_id": room_id,
                     "session_id": session_id,
-                    StreamKeyType.ROOM: room_key,
+                    StreamKeyType.ROOM.value: room_key,
                 }
             )
 
