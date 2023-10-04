@@ -742,7 +742,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         event_ids: List[str],
         thread_id: Optional[str],
         data: dict,
-    ) -> Optional[Tuple[int, int]]:
+    ) -> Optional[int]:
         """Insert a receipt, either from local client or remote server.
 
         Automatically does conversion between linearized and graph
@@ -804,9 +804,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             data,
         )
 
-        max_persisted_id = self._receipts_id_gen.get_current_token()
-
-        return stream_id, max_persisted_id
+        return stream_id
 
     async def _insert_graph_receipt(
         self,
