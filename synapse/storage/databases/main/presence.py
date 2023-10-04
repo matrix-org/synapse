@@ -385,28 +385,31 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         limit = 100
         offset = 0
         while True:
-            rows = await self.db_pool.runInteraction(
-                "get_presence_for_all_users",
-                self.db_pool.simple_select_list_paginate_txn,
-                "presence_stream",
-                orderby="stream_id",
-                start=offset,
-                limit=limit,
-                exclude_keyvalues=exclude_keyvalues,
-                retcols=(
-                    "user_id",
-                    "state",
-                    "last_active_ts",
-                    "last_federation_update_ts",
-                    "last_user_sync_ts",
-                    "status_msg",
-                    "currently_active",
+            rows = cast(
+                List[Tuple[str, str, int, int, int, Optional[str], bool]],
+                await self.db_pool.runInteraction(
+                    "get_presence_for_all_users",
+                    self.db_pool.simple_select_list_paginate_txn,
+                    "presence_stream",
+                    orderby="stream_id",
+                    start=offset,
+                    limit=limit,
+                    exclude_keyvalues=exclude_keyvalues,
+                    retcols=(
+                        "user_id",
+                        "state",
+                        "last_active_ts",
+                        "last_federation_update_ts",
+                        "last_user_sync_ts",
+                        "status_msg",
+                        "currently_active",
+                    ),
+                    order_direction="ASC",
                 ),
-                order_direction="ASC",
             )
 
             for row in rows:
-                users_to_state[row["user_id"]] = UserPresenceState(**row)
+                users_to_state[row[0]] = UserPresenceState.from_db(row)
 
             # We've run out of updates to query
             if len(rows) < limit:

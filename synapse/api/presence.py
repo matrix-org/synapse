@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import attr
 
@@ -81,8 +81,18 @@ class UserPresenceState:
         return attr.asdict(self)
 
     @staticmethod
-    def from_dict(d: JsonDict) -> "UserPresenceState":
-        return UserPresenceState(**d)
+    def from_db(
+        row: Tuple[str, str, int, int, int, Optional[str], bool]
+    ) -> "UserPresenceState":
+        return UserPresenceState(
+            user_id=row[0],
+            state=row[1],
+            last_active_ts=row[2],
+            last_federation_update_ts=row[3],
+            last_user_sync_ts=row[4],
+            status_msg=row[5],
+            currently_active=bool(row[6]),
+        )
 
     def copy_and_replace(self, **kwargs: Any) -> "UserPresenceState":
         return attr.evolve(self, **kwargs)

@@ -2418,7 +2418,7 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         exclude_keyvalues: Optional[Dict[str, Any]] = None,
         order_direction: str = "ASC",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """
         Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
@@ -2474,7 +2474,7 @@ class DatabasePool:
         )
         txn.execute(sql, arg_list + [limit, start])
 
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_search_list(
         self,

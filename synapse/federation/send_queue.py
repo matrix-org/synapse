@@ -395,7 +395,7 @@ class PresenceDestinationsRow(BaseFederationRow):
     @staticmethod
     def from_data(data: JsonDict) -> "PresenceDestinationsRow":
         return PresenceDestinationsRow(
-            state=UserPresenceState.from_dict(data["state"]), destinations=data["dests"]
+            state=UserPresenceState(**data["state"]), destinations=data["dests"]
         )
 
     def to_data(self) -> JsonDict:
