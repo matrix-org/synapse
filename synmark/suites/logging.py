@@ -88,11 +88,12 @@ async def main(reactor: ISynapseReactor, loops: int) -> float:
     assert isinstance(address, (IPv4Address, IPv6Address))
     log_config = {
         "version": 1,
-        "loggers": {"synapse": {"level": "DEBUG", "handlers": ["tersejson"]}},
+        "loggers": {"synapse": {"level": "DEBUG", "handlers": ["remote"]}},
         "formatters": {"tersejson": {"class": "synapse.logging.TerseJsonFormatter"}},
         "handlers": {
-            "tersejson": {
+            "remote": {
                 "class": "synapse.logging.RemoteHandler",
+                "formatter": "tersejson",
                 "host": address.host,
                 "port": address.port,
                 "maximum_buffer": 100,
@@ -100,7 +101,7 @@ async def main(reactor: ISynapseReactor, loops: int) -> float:
         },
     }
 
-    logger = logging.getLogger("synapse.logging.test_terse_json")
+    logger = logging.getLogger("synapse")
     _setup_stdlib_logging(
         hs_config,  # type: ignore[arg-type]
         None,
@@ -118,7 +119,7 @@ async def main(reactor: ISynapseReactor, loops: int) -> float:
     else:
         raise RuntimeError("Improperly configured: no RemoteHandler found.")
 
-    await handler._service.whenConnected()
+    await handler._service.whenConnected(failAfterFailures=10)
 
     start = perf_counter()
 
