@@ -647,19 +647,7 @@ class RoomStreamToken(AbstractMultiWriterStreamToken):
         if self.topological or other.topological:
             raise Exception("Can't advance topological tokens")
 
-        max_stream = max(self.stream, other.stream)
-
-        instance_map = {
-            instance: max(
-                self.instance_map.get(instance, self.stream),
-                other.instance_map.get(instance, other.stream),
-            )
-            for instance in set(self.instance_map).union(other.instance_map)
-        }
-
-        return RoomStreamToken(
-            stream=max_stream, instance_map=immutabledict(instance_map)
-        )
+        return super().copy_and_advance(other)
 
     def as_historical_tuple(self) -> Tuple[int, int]:
         """Returns a tuple of `(topological, stream)` for historical tokens.
