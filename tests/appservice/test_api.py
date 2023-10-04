@@ -14,6 +14,8 @@
 from typing import Any, List, Mapping, Optional, Sequence, Union
 from unittest.mock import Mock
 
+from parameterized import parameterized
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.appservice import ApplicationService
@@ -27,20 +29,38 @@ from tests.unittest import override_config
 PROTOCOL = "myproto"
 TOKEN = "myastoken"
 URL = "http://mytestservice"
+UNIX_URL = "unix:/var/run/testservice.socket"
 
 
 class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.api = hs.get_application_service_api()
-        self.service = ApplicationService(
-            id="unique_identifier",
-            sender="@as:test",
-            url=URL,
-            token="unused",
-            hs_token=TOKEN,
-        )
 
-    def test_query_3pe_authenticates_token_via_header(self) -> None:
+    @parameterized.expand(
+        [
+            (
+                ApplicationService(
+                    id="unique_identifier",
+                    sender="@as:test",
+                    url=URL,
+                    token="unused",
+                    hs_token=TOKEN,
+                ),
+            ),
+            (
+                ApplicationService(
+                    id="unique_identifier",
+                    sender="@as:test",
+                    url=UNIX_URL,
+                    token="unused",
+                    hs_token=TOKEN,
+                ),
+            ),
+        ]
+    )
+    def test_query_3pe_authenticates_token_via_header(
+        self, service_to_test: ApplicationService
+    ) -> None:
         """
         Tests that 3pe queries to the appservice are authenticated
         with the appservice's token.
@@ -65,8 +85,10 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             }
         ]
 
-        URL_USER = f"{URL}/_matrix/app/v1/thirdparty/user/{PROTOCOL}"
-        URL_LOCATION = f"{URL}/_matrix/app/v1/thirdparty/location/{PROTOCOL}"
+        URL_USER = f"{service_to_test.url}/_matrix/app/v1/thirdparty/user/{PROTOCOL}"
+        URL_LOCATION = (
+            f"{service_to_test.url}/_matrix/app/v1/thirdparty/location/{PROTOCOL}"
+        )
 
         self.request_url = None
 
@@ -101,20 +123,44 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
         self.api.get_json = Mock(side_effect=get_json)  # type: ignore[method-assign]
 
         result = self.get_success(
-            self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
+            self.api.query_3pe(service_to_test, "user", PROTOCOL, {b"some": [b"field"]})
         )
         self.assertEqual(self.request_url, URL_USER)
         self.assertEqual(result, SUCCESS_RESULT_USER)
         result = self.get_success(
             self.api.query_3pe(
-                self.service, "location", PROTOCOL, {b"some": [b"field"]}
+                service_to_test, "location", PROTOCOL, {b"some": [b"field"]}
             )
         )
         self.assertEqual(self.request_url, URL_LOCATION)
         self.assertEqual(result, SUCCESS_RESULT_LOCATION)
 
+    @parameterized.expand(
+        [
+            (
+                ApplicationService(
+                    id="unique_identifier",
+                    sender="@as:test",
+                    url=URL,
+                    token="unused",
+                    hs_token=TOKEN,
+                ),
+            ),
+            (
+                ApplicationService(
+                    id="unique_identifier",
+                    sender="@as:test",
+                    url=UNIX_URL,
+                    token="unused",
+                    hs_token=TOKEN,
+                ),
+            ),
+        ]
+    )
     @override_config({"use_appservice_legacy_authorization": True})
-    def test_query_3pe_authenticates_token_via_param(self) -> None:
+    def test_query_3pe_authenticates_token_via_param(
+        self, service_to_test: ApplicationService
+    ) -> None:
         """
         Tests that 3pe queries to the appservice are authenticated
         with the appservice's token.
@@ -139,8 +185,10 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             }
         ]
 
-        URL_USER = f"{URL}/_matrix/app/v1/thirdparty/user/{PROTOCOL}"
-        URL_LOCATION = f"{URL}/_matrix/app/v1/thirdparty/location/{PROTOCOL}"
+        URL_USER = f"{service_to_test.url}/_matrix/app/v1/thirdparty/user/{PROTOCOL}"
+        URL_LOCATION = (
+            f"{service_to_test.url}/_matrix/app/v1/thirdparty/location/{PROTOCOL}"
+        )
 
         self.request_url = None
 
@@ -175,19 +223,41 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
         self.api.get_json = Mock(side_effect=get_json)  # type: ignore[method-assign]
 
         result = self.get_success(
-            self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
+            self.api.query_3pe(service_to_test, "user", PROTOCOL, {b"some": [b"field"]})
         )
         self.assertEqual(self.request_url, URL_USER)
         self.assertEqual(result, SUCCESS_RESULT_USER)
         result = self.get_success(
             self.api.query_3pe(
-                self.service, "location", PROTOCOL, {b"some": [b"field"]}
+                service_to_test, "location", PROTOCOL, {b"some": [b"field"]}
             )
         )
         self.assertEqual(self.request_url, URL_LOCATION)
         self.assertEqual(result, SUCCESS_RESULT_LOCATION)
 
-    def test_claim_keys(self) -> None:
+    @parameterized.expand(
+        [
+            (
+                ApplicationService(
+                    id="unique_identifier",
+                    sender="@as:test",
+                    url=URL,
+                    token="unused",
+                    hs_token=TOKEN,
+                ),
+            ),
+            (
+                ApplicationService(
+                    id="unique_identifier",
+                    sender="@as:test",
+                    url=UNIX_URL,
+                    token="unused",
+                    hs_token=TOKEN,
+                ),
+            ),
+        ]
+    )
+    def test_claim_keys(self, service_to_test: ApplicationService) -> None:
         """
         Tests that the /keys/claim response is properly parsed for missing
         keys.
@@ -234,7 +304,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
 
         claimed_keys, missing = self.get_success(
             self.api.claim_client_keys(
-                self.service,
+                service_to_test,
                 [
                     # Found devices
                     ("@alice:example.org", "DEVICE_1", "signed_curve25519", 1),
