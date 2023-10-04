@@ -18,7 +18,7 @@ allowed to be sent by which side.
 """
 import abc
 import logging
-from typing import Optional, Tuple, Type, TypeVar
+from typing import List, Optional, Tuple, Type, TypeVar
 
 from synapse.replication.tcp.streams._base import StreamRow
 from synapse.util import json_decoder, json_encoder
@@ -241,7 +241,7 @@ class ReplicateCommand(Command):
         REPLICATE
     """
 
-    __slots__ = []
+    __slots__: List[str] = []
 
     NAME = "REPLICATE"
 
