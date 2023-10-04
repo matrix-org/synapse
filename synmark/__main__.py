@@ -33,7 +33,7 @@ T = TypeVar("T")
 
 
 def make_test(
-    main: Callable[[ISynapseReactor, int], Coroutine[float, Any, Any]]
+    main: Callable[[ISynapseReactor, int], Coroutine[Any, Any, float]]
 ) -> Callable[[int], float]:
     """
     Take a benchmark function and wrap it in a reactor start and stop.
@@ -45,7 +45,7 @@ def make_test(
         file_out = StringIO()
         with redirect_stderr(file_out):
             d: "Deferred[float]" = Deferred()
-            d.addCallback(lambda _: ensureDeferred(main(reactor, loops)))  # type: ignore
+            d.addCallback(lambda _: ensureDeferred(main(reactor, loops)))
 
             def on_done(res: T) -> T:
                 if isinstance(res, Failure):
@@ -58,7 +58,8 @@ def make_test(
             reactor.callWhenRunning(lambda: d.callback(True))
             reactor.run()
 
-        return cast(float, d.result)
+        # mypy thinks this is an object for some reason.
+        return d.result  # type: ignore[return-value]
 
     return _main
 
