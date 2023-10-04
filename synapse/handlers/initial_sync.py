@@ -192,8 +192,7 @@ class InitialSyncHandler:
                     )
                 elif event.membership == Membership.LEAVE:
                     room_end_token = RoomStreamToken(
-                        None,
-                        event.stream_ordering,
+                        stream=event.stream_ordering,
                     )
                     deferred_room_state = run_in_background(
                         self._state_storage_controller.get_state_for_events,

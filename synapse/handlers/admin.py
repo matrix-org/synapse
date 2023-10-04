@@ -171,8 +171,8 @@ class AdminHandler:
             else:
                 stream_ordering = room.stream_ordering
 
-            from_key = RoomStreamToken(0, 0)
-            to_key = RoomStreamToken(None, stream_ordering)
+            from_key = RoomStreamToken(topological=0, stream=0)
+            to_key = RoomStreamToken(stream=stream_ordering)
 
             # Events that we've processed in this room
             written_events: Set[str] = set()
