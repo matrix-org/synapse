@@ -1193,11 +1193,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         # Paginating backwards includes the event at the token, but paginating
         # forward doesn't.
         before_token = RoomStreamToken(
-            topological=results["topological_ordering"] - 1,stream= results["stream_ordering"]
+            topological=results["topological_ordering"] - 1,
+            stream=results["stream_ordering"],
         )
 
         after_token = RoomStreamToken(
-            topological=results["topological_ordering"], stream=results["stream_ordering"]
+            topological=results["topological_ordering"],
+            stream=results["stream_ordering"],
         )
 
         rows, start_token = self._paginate_room_events_txn(

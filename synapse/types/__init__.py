@@ -15,7 +15,6 @@
 import abc
 import re
 import string
-import sys
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
