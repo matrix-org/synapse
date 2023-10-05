@@ -434,13 +434,21 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
 
         txn = db_conn.cursor()
         txn.execute(sql, (PresenceState.OFFLINE,))
-        rows = self.db_pool.cursor_to_dict(txn)
+        rows = txn.fetchall()
         txn.close()
 
-        for row in rows:
-            row["currently_active"] = bool(row["currently_active"])
-
-        return [UserPresenceState(**row) for row in rows]
+        return [
+            UserPresenceState(
+                user_id=user_id,
+                state=state,
+                last_active_ts=last_active_ts,
+                last_federation_update_ts=last_federation_update_ts,
+                last_user_sync_ts=last_user_sync_ts,
+                status_msg=status_msg,
+                currently_active=bool(currently_active),
+            )
+            for user_id, state, last_active_ts, last_federation_update_ts, last_user_sync_ts, status_msg, currently_active in rows
+        ]
 
     def take_presence_startup_info(self) -> List[UserPresenceState]:
         active_on_startup = self._presence_on_startup
