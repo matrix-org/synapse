@@ -493,15 +493,18 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             A map from (algorithm, key_id) to json string for key
         """
 
-        rows = await self.db_pool.simple_select_many_batch(
-            table="e2e_one_time_keys_json",
-            column="key_id",
-            iterable=key_ids,
-            retcols=("algorithm", "key_id", "key_json"),
-            keyvalues={"user_id": user_id, "device_id": device_id},
-            desc="add_e2e_one_time_keys_check",
+        rows = cast(
+            List[Tuple[str, str, str]],
+            await self.db_pool.simple_select_many_batch(
+                table="e2e_one_time_keys_json",
+                column="key_id",
+                iterable=key_ids,
+                retcols=("algorithm", "key_id", "key_json"),
+                keyvalues={"user_id": user_id, "device_id": device_id},
+                desc="add_e2e_one_time_keys_check",
+            ),
         )
-        result = {(row["algorithm"], row["key_id"]): row["key_json"] for row in rows}
+        result = {(algorithm, key_id): key_json for algorithm, key_id, key_json in rows}
         log_kv({"message": "Fetched one time keys for user", "one_time_keys": result})
         return result
 

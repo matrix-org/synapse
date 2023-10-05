@@ -261,27 +261,38 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
     async def get_presence_for_users(
         self, user_ids: Iterable[str]
     ) -> Mapping[str, UserPresenceState]:
-        rows = await self.db_pool.simple_select_many_batch(
-            table="presence_stream",
-            column="user_id",
-            iterable=user_ids,
-            keyvalues={},
-            retcols=(
-                "user_id",
-                "state",
-                "last_active_ts",
-                "last_federation_update_ts",
-                "last_user_sync_ts",
-                "status_msg",
-                "currently_active",
+        rows = cast(
+            List[Tuple[str, str, int, int, int, Optional[str], bool]],
+            await self.db_pool.simple_select_many_batch(
+                table="presence_stream",
+                column="user_id",
+                iterable=user_ids,
+                keyvalues={},
+                retcols=(
+                    "user_id",
+                    "state",
+                    "last_active_ts",
+                    "last_federation_update_ts",
+                    "last_user_sync_ts",
+                    "status_msg",
+                    "currently_active",
+                ),
+                desc="get_presence_for_users",
             ),
-            desc="get_presence_for_users",
         )
 
-        for row in rows:
-            row["currently_active"] = bool(row["currently_active"])
-
-        return {row["user_id"]: UserPresenceState(**row) for row in rows}
+        return {
+            user_id: UserPresenceState(
+                user_id=user_id,
+                state=state,
+                last_active_ts=last_active_ts,
+                last_federation_update_ts=last_federation_update_ts,
+                last_user_sync_ts=last_user_sync_ts,
+                status_msg=status_msg,
+                currently_active=currently_active,
+            )
+            for user_id, state, last_active_ts, last_federation_update_ts, last_user_sync_ts, status_msg, currently_active in rows
+        }
 
     async def should_user_receive_full_presence_with_token(
         self,

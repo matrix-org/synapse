@@ -211,18 +211,28 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
     async def get_destination_retry_timings_batch(
         self, destinations: StrCollection
     ) -> Mapping[str, Optional[DestinationRetryTimings]]:
-        rows = await self.db_pool.simple_select_many_batch(
-            table="destinations",
-            iterable=destinations,
-            column="destination",
-            retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
-            desc="get_destination_retry_timings_batch",
+        rows = cast(
+            List[Tuple[str, int, int, int]],
+            await self.db_pool.simple_select_many_batch(
+                table="destinations",
+                iterable=destinations,
+                column="destination",
+                retcols=(
+                    "destination",
+                    "failure_ts",
+                    "retry_last_ts",
+                    "retry_interval",
+                ),
+                desc="get_destination_retry_timings_batch",
+            ),
         )
 
         return {
-            row.pop("destination"): DestinationRetryTimings(**row)
-            for row in rows
-            if row["retry_last_ts"] and row["failure_ts"] and row["retry_interval"]
+            destination: DestinationRetryTimings(
+                failure_ts, retry_last_ts, retry_interval
+            )
+            for destination, failure_ts, retry_last_ts, retry_interval in rows
+            if retry_last_ts and failure_ts and retry_interval
         }
 
     async def set_destination_retry_timings(

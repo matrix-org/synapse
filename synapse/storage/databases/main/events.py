@@ -501,16 +501,19 @@ class PersistEventsStore:
 
         # We ignore legacy rooms that we aren't filling the chain cover index
         # for.
-        rows = self.db_pool.simple_select_many_txn(
-            txn,
-            table="rooms",
-            column="room_id",
-            iterable={event.room_id for event in events if event.is_state()},
-            keyvalues={},
-            retcols=("room_id", "has_auth_chain_index"),
+        rows = cast(
+            List[Tuple[str, bool]],
+            self.db_pool.simple_select_many_txn(
+                txn,
+                table="rooms",
+                column="room_id",
+                iterable={event.room_id for event in events if event.is_state()},
+                keyvalues={},
+                retcols=("room_id", "has_auth_chain_index"),
+            ),
         )
         rooms_using_chain_index = {
-            row["room_id"] for row in rows if row["has_auth_chain_index"]
+            room_id for room_id, has_auth_chain_index in rows if has_auth_chain_index
         }
 
         state_events = {
@@ -571,19 +574,18 @@ class PersistEventsStore:
         # We check if there are any events that need to be handled in the rooms
         # we're looking at. These should just be out of band memberships, where
         # we didn't have the auth chain when we first persisted.
-        rows = db_pool.simple_select_many_txn(
-            txn,
-            table="event_auth_chain_to_calculate",
-            keyvalues={},
-            column="room_id",
-            iterable=set(event_to_room_id.values()),
-            retcols=("event_id", "type", "state_key"),
+        auth_chain_to_calc_rows = cast(
+            List[Tuple[str, str, str]],
+            db_pool.simple_select_many_txn(
+                txn,
+                table="event_auth_chain_to_calculate",
+                keyvalues={},
+                column="room_id",
+                iterable=set(event_to_room_id.values()),
+                retcols=("event_id", "type", "state_key"),
+            ),
         )
-        for row in rows:
-            event_id = row["event_id"]
-            event_type = row["type"]
-            state_key = row["state_key"]
-
+        for event_id, event_type, state_key in auth_chain_to_calc_rows:
             # (We could pull out the auth events for all rows at once using
             # simple_select_many, but this case happens rarely and almost always
             # with a single row.)
@@ -753,23 +755,31 @@ class PersistEventsStore:
         # Step 1, fetch all existing links from all the chains we've seen
         # referenced.
         chain_links = _LinkMap()
-        rows = db_pool.simple_select_many_txn(
-            txn,
-            table="event_auth_chain_links",
-            column="origin_chain_id",
-            iterable={chain_id for chain_id, _ in chain_map.values()},
-            keyvalues={},
-            retcols=(
-                "origin_chain_id",
-                "origin_sequence_number",
-                "target_chain_id",
-                "target_sequence_number",
+        auth_chain_rows = cast(
+            List[Tuple[int, int, int, int]],
+            db_pool.simple_select_many_txn(
+                txn,
+                table="event_auth_chain_links",
+                column="origin_chain_id",
+                iterable={chain_id for chain_id, _ in chain_map.values()},
+                keyvalues={},
+                retcols=(
+                    "origin_chain_id",
+                    "origin_sequence_number",
+                    "target_chain_id",
+                    "target_sequence_number",
+                ),
             ),
         )
-        for row in rows:
+        for (
+            origin_chain_id,
+            origin_sequence_number,
+            target_chain_id,
+            target_sequence_number,
+        ) in auth_chain_rows:
             chain_links.add_link(
-                (row["origin_chain_id"], row["origin_sequence_number"]),
-                (row["target_chain_id"], row["target_sequence_number"]),
+                (origin_chain_id, origin_sequence_number),
+                (target_chain_id, target_sequence_number),
                 new=False,
             )
 
