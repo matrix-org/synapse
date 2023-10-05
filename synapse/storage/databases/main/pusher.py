@@ -49,23 +49,23 @@ logger = logging.getLogger(__name__)
 
 # The type of a row in the pushers table.
 PusherRow = Tuple[
-    int,
-    str,
-    Optional[int],
-    str,
-    str,
-    str,
-    str,
-    str,
-    str,
-    int,
-    str,
-    str,
-    int,
-    int,
-    int,
-    bool,
-    str,
+    int,  # id
+    str,  # user_name
+    Optional[int],  # access_token
+    str,  # profile_tag
+    str,  # kind
+    str,  # app_id
+    str,  # app_display_name
+    str,  # device_display_name
+    str,  # pushkey
+    int,  # ts
+    str,  # lang
+    str,  # data
+    int,  # last_stream_ordering
+    int,  # last_success
+    int,  # failing_since
+    bool,  # enabled
+    str,  # device_id
 ]
 
 
@@ -222,7 +222,15 @@ class PusherWorkerStore(SQLBaseStore):
 
     async def get_enabled_pushers(self) -> Iterator[PusherConfig]:
         def get_enabled_pushers_txn(txn: LoggingTransaction) -> List[PusherRow]:
-            txn.execute("SELECT * FROM pushers WHERE COALESCE(enabled, TRUE)")
+            txn.execute(
+                """
+                SELECT id, user_name, access_token, profile_tag, kind, app_id,
+                    app_display_name, device_display_name, pushkey, ts, lang, data,
+                    last_stream_ordering, last_success, failing_since,
+                    enabled, device_id
+                FROM pushers WHERE COALESCE(enabled, TRUE)
+                """
+            )
             return cast(List[PusherRow], txn.fetchall())
 
         return self._decode_pushers_rows(
