@@ -316,9 +316,7 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(
-        self, term: str
-    ) -> Optional[List[Tuple[str, str, bool, bool, str]]]:
+    async def search_users(self, term: str) -> List[Tuple[str, str, bool, bool, str]]:
         """Function to search users list for one or more users with
         the matched term.
 

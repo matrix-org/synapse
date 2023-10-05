@@ -842,19 +842,16 @@ class SearchUsersRestServlet(RestServlet):
         logger.info("term: %s ", term)
 
         ret = await self.store.search_users(term)
-        if ret is not None:
-            results = [
-                {
-                    "name": name,
-                    "password_hash": password_hash,
-                    "is_guest": is_guest,
-                    "admin": admin,
-                    "user_type": user_type,
-                }
-                for name, password_hash, is_guest, admin, user_type in ret
-            ]
-        else:
-            results = None
+        results = [
+            {
+                "name": name,
+                "password_hash": password_hash,
+                "is_guest": is_guest,
+                "admin": admin,
+                "user_type": user_type,
+            }
+            for name, password_hash, is_guest, admin, user_type in ret
+        ]
 
         return HTTPStatus.OK, results
 

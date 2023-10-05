@@ -2479,11 +2479,11 @@ class DatabasePool:
     async def simple_search_list(
         self,
         table: str,
-        term: Optional[str],
+        term: str,
         col: str,
         retcols: Collection[str],
         desc: str = "simple_search_list",
-    ) -> Optional[List[Tuple[Any, ...]]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -2494,7 +2494,7 @@ class DatabasePool:
             retcols: the names of the columns to return
 
         Returns:
-            A list of tuples or None.
+            A list of tuples.
         """
 
         return await self.runInteraction(
@@ -2512,10 +2512,10 @@ class DatabasePool:
         cls,
         txn: LoggingTransaction,
         table: str,
-        term: Optional[str],
+        term: str,
         col: str,
         retcols: Iterable[str],
-    ) -> Optional[List[Tuple[Any, ...]]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -2527,14 +2527,14 @@ class DatabasePool:
             retcols: the names of the columns to return
 
         Returns:
-            A list of tuples or None.
+            A list of tuples.
         """
         if term:
             sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
             termvalues = ["%%" + term + "%%"]
             txn.execute(sql, termvalues)
         else:
-            return None
+            return []
 
         return txn.fetchall()
 
