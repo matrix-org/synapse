@@ -316,7 +316,9 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
+    async def search_users(
+        self, term: str
+    ) -> Optional[List[Tuple[str, str, bool, bool, str]]]:
         """Function to search users list for one or more users with
         the matched term.
 
@@ -324,14 +326,17 @@ class DataStore(
             term: search term
 
         Returns:
-            A list of dictionaries or None.
+            A list of tuples of name, password_hash, is_guest, admin, user_type or None.
         """
-        return await self.db_pool.simple_search_list(
-            table="users",
-            term=term,
-            col="name",
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
-            desc="search_users",
+        return cast(
+            List[Tuple[str, str, bool, bool, str]],
+            await self.db_pool.simple_search_list(
+                table="users",
+                term=term,
+                col="name",
+                retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
+                desc="search_users",
+            ),
         )
 
 

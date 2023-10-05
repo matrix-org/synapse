@@ -2483,7 +2483,7 @@ class DatabasePool:
         col: str,
         retcols: Collection[str],
         desc: str = "simple_search_list",
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> Optional[List[Tuple[Any, ...]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -2494,7 +2494,7 @@ class DatabasePool:
             retcols: the names of the columns to return
 
         Returns:
-            A list of dictionaries or None.
+            A list of tuples or None.
         """
 
         return await self.runInteraction(
@@ -2515,7 +2515,7 @@ class DatabasePool:
         term: Optional[str],
         col: str,
         retcols: Iterable[str],
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> Optional[List[Tuple[Any, ...]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -2527,7 +2527,7 @@ class DatabasePool:
             retcols: the names of the columns to return
 
         Returns:
-            None if no term is given, otherwise a list of dictionaries.
+            A list of tuples or None.
         """
         if term:
             sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
@@ -2536,7 +2536,7 @@ class DatabasePool:
         else:
             return None
 
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
 
 def make_in_list_sql_clause(
