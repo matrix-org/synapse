@@ -155,7 +155,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEqual([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
+        self.assertEqual([(1,), (2,), (3,)], ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA FROM tablename WHERE keycol = ?", ["A set"]
         )

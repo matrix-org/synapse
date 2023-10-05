@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import secrets
-from typing import Generator, Tuple
+from typing import Generator, List, Tuple, cast
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -47,14 +47,14 @@ class UpdateUpsertManyTests(unittest.HomeserverTestCase):
         )
 
     def _dump_table_to_tuple(self) -> Generator[Tuple[int, str, str], None, None]:
-        res = self.get_success(
-            self.storage.db_pool.simple_select_list(
-                self.table_name, None, ["id, username, value"]
-            )
+        yield from cast(
+            List[Tuple[int, str, str]],
+            self.get_success(
+                self.storage.db_pool.simple_select_list(
+                    self.table_name, None, ["id, username, value"]
+                )
+            ),
         )
-
-        for i in res:
-            yield (i["id"], i["username"], i["value"])
 
     def test_upsert_many(self) -> None:
         """

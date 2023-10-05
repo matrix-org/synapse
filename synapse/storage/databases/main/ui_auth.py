@@ -169,13 +169,17 @@ class UIAuthWorkerStore(SQLBaseStore):
             that auth-type.
         """
         results = {}
-        for row in await self.db_pool.simple_select_list(
-            table="ui_auth_sessions_credentials",
-            keyvalues={"session_id": session_id},
-            retcols=("stage_type", "result"),
-            desc="get_completed_ui_auth_stages",
-        ):
-            results[row["stage_type"]] = db_to_json(row["result"])
+        rows = cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="ui_auth_sessions_credentials",
+                keyvalues={"session_id": session_id},
+                retcols=("stage_type", "result"),
+                desc="get_completed_ui_auth_stages",
+            ),
+        )
+        for stage_type, result in rows:
+            results[stage_type] = db_to_json(result)
 
         return results
 
@@ -295,13 +299,15 @@ class UIAuthWorkerStore(SQLBaseStore):
         Returns:
             List of user_agent/ip pairs
         """
-        rows = await self.db_pool.simple_select_list(
-            table="ui_auth_sessions_ips",
-            keyvalues={"session_id": session_id},
-            retcols=("user_agent", "ip"),
-            desc="get_user_agents_ips_to_ui_auth_session",
+        return cast(
+            List[Tuple[str, str]],
+            await self.db_pool.simple_select_list(
+                table="ui_auth_sessions_ips",
+                keyvalues={"session_id": session_id},
+                retcols=("user_agent", "ip"),
+                desc="get_user_agents_ips_to_ui_auth_session",
+            ),
         )
-        return [(row["user_agent"], row["ip"]) for row in rows]
 
     async def delete_old_ui_auth_sessions(self, expiration_time: int) -> None:
         """

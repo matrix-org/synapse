@@ -283,16 +283,20 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
 
         def get_account_data_for_room_txn(
             txn: LoggingTransaction,
-        ) -> Dict[str, JsonDict]:
-            rows = self.db_pool.simple_select_list_txn(
-                txn,
-                "room_account_data",
-                {"user_id": user_id, "room_id": room_id},
-                ["account_data_type", "content"],
+        ) -> Dict[str, JsonMapping]:
+            rows = cast(
+                List[Tuple[str, str]],
+                self.db_pool.simple_select_list_txn(
+                    txn,
+                    table="room_account_data",
+                    keyvalues={"user_id": user_id, "room_id": room_id},
+                    retcols=["account_data_type", "content"],
+                ),
             )
 
             return {
-                row["account_data_type"]: db_to_json(row["content"]) for row in rows
+                account_data_type: db_to_json(content)
+                for account_data_type, content in rows
             }
 
         return await self.db_pool.runInteraction(
