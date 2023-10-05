@@ -101,7 +101,7 @@ if TYPE_CHECKING:
 class PusherConfig:
     """Parameters necessary to configure a pusher."""
 
-    id: Optional[str]
+    id: Optional[int]
     user_name: str
 
     profile_tag: str
