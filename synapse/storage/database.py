@@ -2447,7 +2447,7 @@ class DatabasePool:
             order_direction: Whether the results should be ordered "ASC" or "DESC".
 
         Returns:
-            The result as a list of dictionaries.
+            The result as a list of tuples.
         """
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
