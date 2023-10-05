@@ -170,15 +170,15 @@ class ThumbnailResource(DirectServeJsonResource):
                         height=info["thumbnail_height"],
                         type=info["thumbnail_type"],
                         method=info["thumbnail_method"],
+                        length=info["thumbnail_length"],
                     ),
                 )
 
-                t_type = file_info.thumbnail_type
-                t_length = info["thumbnail_length"]
-
                 responder = await self.media_storage.fetch_media(file_info)
                 if responder:
-                    await respond_with_responder(request, responder, t_type, t_length)
+                    await respond_with_responder(
+                        request, responder, info.type, info.length
+                    )
                     return
 
         logger.debug("We don't have a thumbnail of that size. Generating")
@@ -232,15 +232,15 @@ class ThumbnailResource(DirectServeJsonResource):
                         height=info["thumbnail_height"],
                         type=info["thumbnail_type"],
                         method=info["thumbnail_method"],
+                        length=info["thumbnail_length"],
                     ),
                 )
 
-                t_type = file_info.thumbnail_type
-                t_length = info["thumbnail_length"]
-
                 responder = await self.media_storage.fetch_media(file_info)
                 if responder:
-                    await respond_with_responder(request, responder, t_type, t_length)
+                    await respond_with_responder(
+                        request, responder, info.type, info.length
+                    )
                     return
 
         logger.debug("We don't have a thumbnail of that size. Generating")

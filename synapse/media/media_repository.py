@@ -616,6 +616,7 @@ class MediaRepository:
                         height=t_height,
                         method=t_method,
                         type=t_type,
+                        length=t_byte_source.tell(),
                     ),
                 )
 
@@ -686,6 +687,7 @@ class MediaRepository:
                         height=t_height,
                         method=t_method,
                         type=t_type,
+                        length=t_byte_source.tell(),
                     ),
                 )
 
@@ -831,6 +833,7 @@ class MediaRepository:
                         height=t_height,
                         method=t_method,
                         type=t_type,
+                        length=t_byte_source.tell(),
                     ),
                 )
 
