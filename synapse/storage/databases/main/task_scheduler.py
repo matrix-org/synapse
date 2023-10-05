@@ -207,7 +207,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
                     row["action"],
                     row["status"],
                     row["timestamp"],
-                    row["resouce_id"],
+                    row["resource_id"],
                     row["params"],
                     row["result"],
                     row["error"],
