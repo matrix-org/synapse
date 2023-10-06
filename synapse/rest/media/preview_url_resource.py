@@ -13,24 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 from typing import TYPE_CHECKING
 
-from synapse.http.server import (
-    DirectServeJsonResource,
-    respond_with_json,
-    respond_with_json_bytes,
-)
-from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.server import respond_with_json_bytes
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.media.media_storage import MediaStorage
-from synapse.media.url_previewer import UrlPreviewer
 
 if TYPE_CHECKING:
     from synapse.media.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 
-class PreviewUrlResource(DirectServeJsonResource):
+class PreviewUrlResource(RestServlet):
     """
     The `GET /_matrix/media/r0/preview_url` endpoint provides a generic preview API
     for URLs which outputs Open Graph (https://ogp.me/) responses (with some Matrix
@@ -48,7 +44,7 @@ class PreviewUrlResource(DirectServeJsonResource):
       * Matrix cannot be used to distribute the metadata between homeservers.
     """
 
-    isLeaf = True
+    PATTERNS = [re.compile("/_matrix/media/(r0|v3|v1)/preview_url$")]
 
     def __init__(
         self,
@@ -62,14 +58,10 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.clock = hs.get_clock()
         self.media_repo = media_repo
         self.media_storage = media_storage
+        assert self.media_repo.url_previewer is not None
+        self.url_previewer = self.media_repo.url_previewer
 
-        self._url_previewer = UrlPreviewer(hs, media_repo, media_storage)
-
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        request.setHeader(b"Allow", b"OPTIONS, GET")
-        respond_with_json(request, 200, {}, send_cors=True)
-
-    async def _async_render_GET(self, request: SynapseRequest) -> None:
+    async def on_GET(self, request: SynapseRequest) -> None:
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
         url = parse_string(request, "url", required=True)
@@ -77,5 +69,5 @@ class PreviewUrlResource(DirectServeJsonResource):
         if ts is None:
             ts = self.clock.time_msec()
 
-        og = await self._url_previewer.preview(url, requester.user, ts)
+        og = await self.url_previewer.preview(url, requester.user, ts)
         respond_with_json_bytes(request, 200, og, send_cors=True)

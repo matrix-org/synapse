@@ -67,7 +67,7 @@ The loop continues so long as there is anything to send. At each iteration of th
 
 When the `PerDestinationQueue` has the catch-up flag set, the *Catch-Up Transmission Loop*
 (`_catch_up_transmission_loop`) is used in lieu of the regular `_transaction_transmission_loop`.
-(Only once the catch-up mode has been exited can the regular tranaction transmission behaviour
+(Only once the catch-up mode has been exited can the regular transaction transmission behaviour
 be resumed.)
 
 *Catch-Up Mode*, entered upon Synapse startup or once a homeserver has fallen behind due to
