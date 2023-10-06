@@ -46,17 +46,14 @@ class AddFileHeadersTests(unittest.TestCase):
         "text/plain": b"inline; filename=file.name",
         "text/csv": b"inline; filename=file.name",
         "image/png": b"inline; filename=file.name",
-
         # Unlisted values are set to attachment.
         "text/html": b"attachment; filename=file.name",
         "any/thing": b"attachment; filename=file.name",
-
         # Parameters get ignored.
         "text/plain; charset=utf-8": b"inline; filename=file.name",
         "text/markdown; charset=utf-8; variant=CommonMark": b"attachment; filename=file.name",
         # Parsed as lowercase.
         "Text/Plain": b"inline; filename=file.name",
-
         # Bad values don't choke.
         "": b"attachment; filename=file.name",
         ";": b"attachment; filename=file.name",
