@@ -415,7 +415,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Returns:
             Tuple of event ID and stream ordering position
         """
-
         user_id = target.to_string()
 
         if content is None:
@@ -475,21 +474,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     (EventTypes.Member, user_id), None
                 )
 
-                if event.membership == Membership.JOIN:
-                    newly_joined = True
-                    if prev_member_event_id:
-                        prev_member_event = await self.store.get_event(
-                            prev_member_event_id
-                        )
-                        newly_joined = prev_member_event.membership != Membership.JOIN
-
-                    # Only rate-limit if the user actually joined the room, otherwise we'll end
-                    # up blocking profile updates.
-                    if newly_joined and ratelimit:
-                        await self._join_rate_limiter_local.ratelimit(requester)
-                        await self._join_rate_per_room_limiter.ratelimit(
-                            requester, key=room_id, update=False
-                        )
                 with opentracing.start_active_span("handle_new_client_event"):
                     result_event = (
                         await self.event_creation_handler.handle_new_client_event(
@@ -618,6 +602,23 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
+        if ratelimit:
+            if action == Membership.JOIN:
+                # Only rate-limit if the user isn't already joined to the room, otherwise
+                # we'll end up blocking profile updates.
+                (
+                    current_membership,
+                    _,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    requester.user.to_string(),
+                    room_id,
+                )
+                if current_membership != Membership.JOIN:
+                    await self._join_rate_limiter_local.ratelimit(requester)
+                    await self._join_rate_per_room_limiter.ratelimit(
+                        requester, key=room_id, update=False
+                    )
+
         if action == Membership.INVITE and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
