@@ -973,6 +973,10 @@ class StreamToken:
         ...
 
     @overload
+    def get_field(self, key: Literal[StreamKeyType.RECEIPT]) -> MultiWriterStreamToken:
+        ...
+
+    @overload
     def get_field(
         self,
         key: Literal[
@@ -980,7 +984,6 @@ class StreamToken:
             StreamKeyType.DEVICE_LIST,
             StreamKeyType.PRESENCE,
             StreamKeyType.PUSH_RULES,
-            StreamKeyType.RECEIPT,
             StreamKeyType.TO_DEVICE,
             StreamKeyType.TYPING,
             StreamKeyType.UN_PARTIAL_STATED_ROOMS,
@@ -989,10 +992,14 @@ class StreamToken:
         ...
 
     @overload
-    def get_field(self, key: StreamKeyType) -> Union[int, RoomStreamToken]:
+    def get_field(
+        self, key: StreamKeyType
+    ) -> Union[int, RoomStreamToken, MultiWriterStreamToken]:
         ...
 
-    def get_field(self, key: StreamKeyType) -> Union[int, RoomStreamToken]:
+    def get_field(
+        self, key: StreamKeyType
+    ) -> Union[int, RoomStreamToken, MultiWriterStreamToken]:
         """Returns the stream ID for the given key."""
         return getattr(self, key.value)
 
