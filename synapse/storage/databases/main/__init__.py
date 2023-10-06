@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
 
 from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
@@ -296,7 +296,9 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> List[Tuple[str, str, bool, bool, str]]:
+    async def search_users(
+        self, term: str
+    ) -> List[Tuple[str, Optional[str], bool, bool, Optional[str]]]:
         """Function to search users list for one or more users with
         the matched term.
 
@@ -309,7 +311,9 @@ class DataStore(
 
         def search_users(
             txn: LoggingTransaction,
-        ) -> List[Tuple[str, str, bool, bool, str]]:
+        ) -> List[
+            Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+        ]:
             search_term = "%%" + term + "%%"
 
             sql = """
