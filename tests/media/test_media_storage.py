@@ -34,7 +34,7 @@ from synapse.api.errors import Codes
 from synapse.events import EventBase
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
-from synapse.media._base import FileInfo
+from synapse.media._base import FileInfo, ThumbnailInfo
 from synapse.media.filepath import MediaFilePaths
 from synapse.media.media_storage import MediaStorage, ReadableFileWrapper
 from synapse.media.storage_provider import FileStorageProviderBackend
@@ -605,6 +605,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         """Test that choosing between thumbnails with the same quality rating succeeds.
 
         We are not particular about which thumbnail is chosen."""
+
+        content_type = self.test_image.content_type.decode()
         media_repo = self.hs.get_media_repository()
         thumbnail_resouce = ThumbnailResource(
             self.hs, media_repo, media_repo.media_storage
@@ -615,26 +617,24 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 desired_width=desired_size,
                 desired_height=desired_size,
                 desired_method=method,
-                desired_type=self.test_image.content_type,  # type: ignore[arg-type]
+                desired_type=content_type,
                 # Provide two identical thumbnails which are guaranteed to have the same
                 # quality rating.
                 thumbnail_infos=[
-                    {
-                        "thumbnail_width": 32,
-                        "thumbnail_height": 32,
-                        "thumbnail_method": method,
-                        "thumbnail_type": self.test_image.content_type,
-                        "thumbnail_length": 256,
-                        "filesystem_id": f"thumbnail1{self.test_image.extension.decode()}",
-                    },
-                    {
-                        "thumbnail_width": 32,
-                        "thumbnail_height": 32,
-                        "thumbnail_method": method,
-                        "thumbnail_type": self.test_image.content_type,
-                        "thumbnail_length": 256,
-                        "filesystem_id": f"thumbnail2{self.test_image.extension.decode()}",
-                    },
+                    ThumbnailInfo(
+                        width=32,
+                        height=32,
+                        method=method,
+                        type=content_type,
+                        length=256,
+                    ),
+                    ThumbnailInfo(
+                        width=32,
+                        height=32,
+                        method=method,
+                        type=content_type,
+                        length=256,
+                    ),
                 ],
                 file_id=f"image{self.test_image.extension.decode()}",
                 url_cache=False,

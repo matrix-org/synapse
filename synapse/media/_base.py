@@ -332,7 +332,7 @@ class ThumbnailInfo:
     # Content type of thumbnail, e.g. image/png
     type: str
     # The size of the media file, in bytes.
-    length: Optional[int] = None
+    length: int
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)

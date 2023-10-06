@@ -15,7 +15,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.config.repository import THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP
@@ -159,30 +159,24 @@ class ThumbnailResource(RestServlet):
 
         thumbnail_infos = await self.store.get_local_media_thumbnails(media_id)
         for info in thumbnail_infos:
-            t_w = info["thumbnail_width"] == desired_width
-            t_h = info["thumbnail_height"] == desired_height
-            t_method = info["thumbnail_method"] == desired_method
-            t_type = info["thumbnail_type"] == desired_type
+            t_w = info.width == desired_width
+            t_h = info.height == desired_height
+            t_method = info.method == desired_method
+            t_type = info.type == desired_type
 
             if t_w and t_h and t_method and t_type:
                 file_info = FileInfo(
                     server_name=None,
                     file_id=media_id,
                     url_cache=media_info["url_cache"],
-                    thumbnail=ThumbnailInfo(
-                        width=info["thumbnail_width"],
-                        height=info["thumbnail_height"],
-                        type=info["thumbnail_type"],
-                        method=info["thumbnail_method"],
-                    ),
+                    thumbnail=info,
                 )
-
-                t_type = file_info.thumbnail_type
-                t_length = info["thumbnail_length"]
 
                 responder = await self.media_storage.fetch_media(file_info)
                 if responder:
-                    await respond_with_responder(request, responder, t_type, t_length)
+                    await respond_with_responder(
+                        request, responder, info.type, info.length
+                    )
                     return
 
         logger.debug("We don't have a thumbnail of that size. Generating")
@@ -222,29 +216,23 @@ class ThumbnailResource(RestServlet):
         file_id = media_info["filesystem_id"]
 
         for info in thumbnail_infos:
-            t_w = info["thumbnail_width"] == desired_width
-            t_h = info["thumbnail_height"] == desired_height
-            t_method = info["thumbnail_method"] == desired_method
-            t_type = info["thumbnail_type"] == desired_type
+            t_w = info.width == desired_width
+            t_h = info.height == desired_height
+            t_method = info.method == desired_method
+            t_type = info.type == desired_type
 
             if t_w and t_h and t_method and t_type:
                 file_info = FileInfo(
                     server_name=server_name,
                     file_id=media_info["filesystem_id"],
-                    thumbnail=ThumbnailInfo(
-                        width=info["thumbnail_width"],
-                        height=info["thumbnail_height"],
-                        type=info["thumbnail_type"],
-                        method=info["thumbnail_method"],
-                    ),
+                    thumbnail=info,
                 )
-
-                t_type = file_info.thumbnail_type
-                t_length = info["thumbnail_length"]
 
                 responder = await self.media_storage.fetch_media(file_info)
                 if responder:
-                    await respond_with_responder(request, responder, t_type, t_length)
+                    await respond_with_responder(
+                        request, responder, info.type, info.length
+                    )
                     return
 
         logger.debug("We don't have a thumbnail of that size. Generating")
@@ -304,7 +292,7 @@ class ThumbnailResource(RestServlet):
         desired_height: int,
         desired_method: str,
         desired_type: str,
-        thumbnail_infos: List[Dict[str, Any]],
+        thumbnail_infos: List[ThumbnailInfo],
         media_id: str,
         file_id: str,
         url_cache: bool,
@@ -319,7 +307,7 @@ class ThumbnailResource(RestServlet):
             desired_height: The desired height, the returned thumbnail may be larger than this.
             desired_method: The desired method used to generate the thumbnail.
             desired_type: The desired content-type of the thumbnail.
-            thumbnail_infos: A list of dictionaries of candidate thumbnails.
+            thumbnail_infos: A list of thumbnail info of candidate thumbnails.
             file_id: The ID of the media that a thumbnail is being requested for.
             url_cache: True if this is from a URL cache.
             server_name: The server name, if this is a remote thumbnail.
@@ -443,7 +431,7 @@ class ThumbnailResource(RestServlet):
         desired_height: int,
         desired_method: str,
         desired_type: str,
-        thumbnail_infos: List[Dict[str, Any]],
+        thumbnail_infos: List[ThumbnailInfo],
         file_id: str,
         url_cache: bool,
         server_name: Optional[str],
@@ -456,7 +444,7 @@ class ThumbnailResource(RestServlet):
             desired_height: The desired height, the returned thumbnail may be larger than this.
             desired_method: The desired method used to generate the thumbnail.
             desired_type: The desired content-type of the thumbnail.
-            thumbnail_infos: A list of dictionaries of candidate thumbnails.
+            thumbnail_infos: A list of thumbnail infos of candidate thumbnails.
             file_id: The ID of the media that a thumbnail is being requested for.
             url_cache: True if this is from a URL cache.
             server_name: The server name, if this is a remote thumbnail.
@@ -474,21 +462,25 @@ class ThumbnailResource(RestServlet):
 
         if desired_method == "crop":
             # Thumbnails that match equal or larger sizes of desired width/height.
-            crop_info_list: List[Tuple[int, int, int, bool, int, Dict[str, Any]]] = []
+            crop_info_list: List[
+                Tuple[int, int, int, bool, Optional[int], ThumbnailInfo]
+            ] = []
             # Other thumbnails.
-            crop_info_list2: List[Tuple[int, int, int, bool, int, Dict[str, Any]]] = []
+            crop_info_list2: List[
+                Tuple[int, int, int, bool, Optional[int], ThumbnailInfo]
+            ] = []
             for info in thumbnail_infos:
                 # Skip thumbnails generated with different methods.
-                if info["thumbnail_method"] != "crop":
+                if info.method != "crop":
                     continue
 
-                t_w = info["thumbnail_width"]
-                t_h = info["thumbnail_height"]
+                t_w = info.width
+                t_h = info.height
                 aspect_quality = abs(d_w * t_h - d_h * t_w)
                 min_quality = 0 if d_w <= t_w and d_h <= t_h else 1
                 size_quality = abs((d_w - t_w) * (d_h - t_h))
-                type_quality = desired_type != info["thumbnail_type"]
-                length_quality = info["thumbnail_length"]
+                type_quality = desired_type != info.type
+                length_quality = info.length
                 if t_w >= d_w or t_h >= d_h:
                     crop_info_list.append(
                         (
@@ -513,7 +505,7 @@ class ThumbnailResource(RestServlet):
                     )
             # Pick the most appropriate thumbnail. Some values of `desired_width` and
             # `desired_height` may result in a tie, in which case we avoid comparing on
-            # the thumbnail info dictionary and pick the thumbnail that appears earlier
+            # the thumbnail info and pick the thumbnail that appears earlier
             # in the list of candidates.
             if crop_info_list:
                 thumbnail_info = min(crop_info_list, key=lambda t: t[:-1])[-1]
@@ -521,20 +513,20 @@ class ThumbnailResource(RestServlet):
                 thumbnail_info = min(crop_info_list2, key=lambda t: t[:-1])[-1]
         elif desired_method == "scale":
             # Thumbnails that match equal or larger sizes of desired width/height.
-            info_list: List[Tuple[int, bool, int, Dict[str, Any]]] = []
+            info_list: List[Tuple[int, bool, int, ThumbnailInfo]] = []
             # Other thumbnails.
-            info_list2: List[Tuple[int, bool, int, Dict[str, Any]]] = []
+            info_list2: List[Tuple[int, bool, int, ThumbnailInfo]] = []
 
             for info in thumbnail_infos:
                 # Skip thumbnails generated with different methods.
-                if info["thumbnail_method"] != "scale":
+                if info.method != "scale":
                     continue
 
-                t_w = info["thumbnail_width"]
-                t_h = info["thumbnail_height"]
+                t_w = info.width
+                t_h = info.height
                 size_quality = abs((d_w - t_w) * (d_h - t_h))
-                type_quality = desired_type != info["thumbnail_type"]
-                length_quality = info["thumbnail_length"]
+                type_quality = desired_type != info.type
+                length_quality = info.length
                 if t_w >= d_w or t_h >= d_h:
                     info_list.append((size_quality, type_quality, length_quality, info))
                 else:
@@ -543,7 +535,7 @@ class ThumbnailResource(RestServlet):
                     )
             # Pick the most appropriate thumbnail. Some values of `desired_width` and
             # `desired_height` may result in a tie, in which case we avoid comparing on
-            # the thumbnail info dictionary and pick the thumbnail that appears earlier
+            # the thumbnail info and pick the thumbnail that appears earlier
             # in the list of candidates.
             if info_list:
                 thumbnail_info = min(info_list, key=lambda t: t[:-1])[-1]
@@ -555,13 +547,7 @@ class ThumbnailResource(RestServlet):
                 file_id=file_id,
                 url_cache=url_cache,
                 server_name=server_name,
-                thumbnail=ThumbnailInfo(
-                    width=thumbnail_info["thumbnail_width"],
-                    height=thumbnail_info["thumbnail_height"],
-                    type=thumbnail_info["thumbnail_type"],
-                    method=thumbnail_info["thumbnail_method"],
-                    length=thumbnail_info["thumbnail_length"],
-                ),
+                thumbnail=thumbnail_info,
             )
 
         # No matching thumbnail was found.
