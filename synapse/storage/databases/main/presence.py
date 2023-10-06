@@ -20,6 +20,7 @@ from typing import (
     Mapping,
     Optional,
     Tuple,
+    Union,
     cast,
 )
 
@@ -386,7 +387,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         offset = 0
         while True:
             rows = cast(
-                List[Tuple[str, str, int, int, int, Optional[str], bool]],
+                List[Tuple[str, str, int, int, int, Optional[str], Union[int, bool]]],
                 await self.db_pool.runInteraction(
                     "get_presence_for_all_users",
                     self.db_pool.simple_select_list_paginate_txn,
@@ -408,8 +409,24 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
                 ),
             )
 
-            for row in rows:
-                users_to_state[row[0]] = UserPresenceState.from_db(row)
+            for (
+                user_id,
+                state,
+                last_active_ts,
+                last_federation_update_ts,
+                last_user_sync_ts,
+                status_msg,
+                currently_active,
+            ) in rows:
+                users_to_state[user_id] = UserPresenceState(
+                    user_id=user_id,
+                    state=state,
+                    last_active_ts=last_active_ts,
+                    last_federation_update_ts=last_federation_update_ts,
+                    last_user_sync_ts=last_user_sync_ts,
+                    status_msg=status_msg,
+                    currently_active=bool(currently_active),
+                )
 
             # We've run out of updates to query
             if len(rows) < limit:
