@@ -125,8 +125,8 @@ Changes in SCHEMA_VERSION = 82
 
 
 SCHEMA_COMPAT_VERSION = (
-    # The `event_txn_id_device_id` must be written to for new events.
-    80
+    # The event_txn_id table and tables from MSC2716 no longer exist.
+    82
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 
