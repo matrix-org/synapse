@@ -13,29 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import logging
+import re
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.config.repository import THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP
-from synapse.http.server import (
-    DirectServeJsonResource,
-    respond_with_json,
-    set_corp_headers,
-    set_cors_headers,
-)
-from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.server import respond_with_json, set_corp_headers, set_cors_headers
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.media._base import (
     FileInfo,
     ThumbnailInfo,
-    parse_media_id,
     respond_404,
     respond_with_file,
     respond_with_responder,
 )
 from synapse.media.media_storage import MediaStorage
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.media.media_repository import MediaRepository
@@ -44,8 +39,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ThumbnailResource(DirectServeJsonResource):
-    isLeaf = True
+class ThumbnailResource(RestServlet):
+    PATTERNS = [
+        re.compile(
+            "/_matrix/media/(r0|v3|v1)/thumbnail/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
+        )
+    ]
 
     def __init__(
         self,
@@ -60,12 +59,17 @@ class ThumbnailResource(DirectServeJsonResource):
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
         self._is_mine_server_name = hs.is_mine_server_name
+        self._server_name = hs.hostname
         self.prevent_media_downloads_from = hs.config.media.prevent_media_downloads_from
 
-    async def _async_render_GET(self, request: SynapseRequest) -> None:
+    async def on_GET(
+        self, request: SynapseRequest, server_name: str, media_id: str
+    ) -> None:
+        # Validate the server name, raising if invalid
+        parse_and_validate_server_name(server_name)
+
         set_cors_headers(request)
         set_corp_headers(request)
-        server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width", required=True)
         height = parse_integer(request, "height", required=True)
         method = parse_string(request, "method", "scale")
@@ -406,13 +410,14 @@ class ThumbnailResource(DirectServeJsonResource):
             # `dynamic_thumbnails` is disabled.
             logger.info("Failed to find any generated thumbnails")
 
+            assert request.path is not None
             respond_with_json(
                 request,
                 400,
                 cs_error(
-                    "Cannot find any thumbnails for the requested media (%r). This might mean the media is not a supported_media_format=(%s) or that thumbnailing failed for some other reason. (Dynamic thumbnails are disabled on this server.)"
+                    "Cannot find any thumbnails for the requested media ('%s'). This might mean the media is not a supported_media_format=(%s) or that thumbnailing failed for some other reason. (Dynamic thumbnails are disabled on this server.)"
                     % (
-                        request.postpath,
+                        request.path.decode(),
                         ", ".join(THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP.keys()),
                     ),
                     code=Codes.UNKNOWN,
