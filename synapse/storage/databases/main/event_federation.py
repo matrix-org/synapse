@@ -1570,9 +1570,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 desc="get_event_ids_with_failed_pull_attempts",
             ),
         )
-        event_ids_with_failed_pull_attempts: Set[str] = {row[0] for row in rows}
-
-        return event_ids_with_failed_pull_attempts
+        return {row[0] for row in rows}
 
     @trace
     async def get_event_ids_to_not_pull_from_backoff(
