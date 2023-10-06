@@ -148,7 +148,9 @@ def add_file_headers(
 
     # A strict subset of content types is allowed to be inlined  so that they may
     # be viewed directly in a browser. Other file types are forced to be downloads.
-    if media_type.lower() in INLINE_CONTENT_TYPES:
+    #
+    # Only the type & subtype are important, parameters can be ignored.
+    if media_type.lower().split(";", 1)[0] in INLINE_CONTENT_TYPES:
         disposition = "inline"
     else:
         disposition = "attachment"
