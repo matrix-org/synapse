@@ -382,8 +382,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         and persist a new event for the new membership change.
 
         Args:
-            requester:
-            target:
+            requester: User requesting the membership change, i.e. the sender of the
+                desired membership event.
+            target: Use whose membership should change, i.e. the state_key of the
+                desired membership event.
             room_id:
             membership:
 
