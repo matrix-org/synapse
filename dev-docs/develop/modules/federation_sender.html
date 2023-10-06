@@ -234,7 +234,7 @@ the in-memory queues are emptied and we enter <a class="reference internal" href
 <h3 class="rubric" id="catch-up-mode">Catch-Up Mode</h3>
 <p>When the <code class="docutils literal notranslate"><span class="pre">PerDestinationQueue</span></code> has the catch-up flag set, the <em>Catch-Up Transmission Loop</em>
 (<code class="docutils literal notranslate"><span class="pre">_catch_up_transmission_loop</span></code>) is used in lieu of the regular <code class="docutils literal notranslate"><span class="pre">_transaction_transmission_loop</span></code>.
-(Only once the catch-up mode has been exited can the regular tranaction transmission behaviour
+(Only once the catch-up mode has been exited can the regular transaction transmission behaviour
 be resumed.)</p>
 <p><em>Catch-Up Mode</em>, entered upon Synapse startup or once a homeserver has fallen behind due to
 connection problems, is responsible for sending PDUs that have been missed by the destination
