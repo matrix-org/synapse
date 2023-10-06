@@ -353,32 +353,31 @@ class ReceiptsWorkerStore(SQLBaseStore):
     ) -> Sequence[JsonMapping]:
         """See get_linearized_receipts_for_room"""
 
-        def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
+        def f(txn: LoggingTransaction) -> List[Tuple[str, str, str, str]]:
             if from_key:
                 sql = """
-                    SELECT * FROM receipts_linearized
-                    WHERE
-                    room_id = ? AND stream_id > ? AND stream_id <= ?
+                    SELECT stream_id, instance_name, receipt_type, user_id, event_id, data
+                    FROM receipts_linearized
+                    WHERE room_id = ? AND stream_id > ? AND stream_id <= ?
                 """
 
                 txn.execute(
                     sql, (room_id, from_key.stream, to_key.get_max_stream_pos())
                 )
             else:
-                sql = (
-                    "SELECT * FROM receipts_linearized WHERE"
-                    " room_id = ? AND stream_id <= ?"
-                )
+                sql = """
+                    SELECT stream_id, instance_name, receipt_type, user_id, event_id, data
+                    FROM receipts_linearized WHERE
+                    room_id = ? AND stream_id <= ?
+                """
 
                 txn.execute(sql, (room_id, to_key.get_max_stream_pos()))
 
-            rows = self.db_pool.cursor_to_dict(txn)
-
             return [
-                row
-                for row in rows
+                (receipt_type, user_id, event_id, data)
+                for stream_id, instance_name, receipt_type, user_id, event_id, data in txn
                 if MultiWriterStreamToken.is_stream_position_in_range(
-                    from_key, to_key, row["instance_name"], row["stream_id"]
+                    from_key, to_key, instance_name, stream_id
                 )
             ]
 
@@ -388,10 +387,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
             return []
 
         content: JsonDict = {}
-        for row in rows:
-            content.setdefault(row["event_id"], {}).setdefault(row["receipt_type"], {})[
-                row["user_id"]
-            ] = db_to_json(row["data"])
+        for receipt_type, user_id, event_id, data in rows:
+            content.setdefault(event_id, {}).setdefault(receipt_type, {})[
+                user_id
+            ] = db_to_json(data)
 
         return [{"type": EduTypes.RECEIPT, "room_id": room_id, "content": content}]
 
@@ -409,10 +408,14 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if not room_ids:
             return {}
 
-        def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
+        def f(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[str, str, str, str, Optional[str], str]]:
             if from_key:
                 sql = """
-                    SELECT * FROM receipts_linearized WHERE
+                    SELECT stream_id, instance_name, room_id, receipt_type,
+                        user_id, event_id, thread_id, data
+                    FROM receipts_linearized WHERE
                     stream_id > ? AND stream_id <= ? AND
                 """
                 clause, args = make_in_list_sql_clause(
@@ -425,7 +428,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 )
             else:
                 sql = """
-                    SELECT * FROM receipts_linearized WHERE
+                    SELECT stream_id, instance_name, room_id, receipt_type,
+                        user_id, event_id, thread_id, data
+                    FROM receipts_linearized WHERE
                     stream_id <= ? AND
                 """
 
@@ -435,13 +440,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
                 txn.execute(sql + clause, [to_key.get_max_stream_pos()] + list(args))
 
-            rows = self.db_pool.cursor_to_dict(txn)
-
             return [
-                row
-                for row in rows
+                (room_id, receipt_type, user_id, event_id, thread_id, data)
+                for stream_id, instance_name, room_id, receipt_type, user_id, event_id, thread_id, data in txn
                 if MultiWriterStreamToken.is_stream_position_in_range(
-                    from_key, to_key, row["instance_name"], row["stream_id"]
+                    from_key, to_key, instance_name, stream_id
                 )
             ]
 
@@ -450,22 +453,22 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
         results: JsonDict = {}
-        for row in txn_results:
+        for room_id, receipt_type, user_id, event_id, thread_id, data in txn_results:
             # We want a single event per room, since we want to batch the
             # receipts by room, event and type.
             room_event = results.setdefault(
-                row["room_id"],
-                {"type": EduTypes.RECEIPT, "room_id": row["room_id"], "content": {}},
+                room_id,
+                {"type": EduTypes.RECEIPT, "room_id": room_id, "content": {}},
             )
 
             # The content is of the form:
             # {"$foo:bar": { "read": { "@user:host": <receipt> }, .. }, .. }
-            event_entry = room_event["content"].setdefault(row["event_id"], {})
-            receipt_type = event_entry.setdefault(row["receipt_type"], {})
+            event_entry = room_event["content"].setdefault(event_id, {})
+            receipt_type_dict = event_entry.setdefault(receipt_type, {})
 
-            receipt_type[row["user_id"]] = db_to_json(row["data"])
-            if row["thread_id"]:
-                receipt_type[row["user_id"]]["thread_id"] = row["thread_id"]
+            receipt_type_dict[user_id] = db_to_json(data)
+            if thread_id:
+                receipt_type_dict[user_id]["thread_id"] = thread_id
 
         results = {
             room_id: [results[room_id]] if room_id in results else []
@@ -493,10 +496,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
             A dictionary of roomids to a list of receipts.
         """
 
-        def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
+        def f(txn: LoggingTransaction) -> List[Tuple[str, str, str, str, str]]:
             if from_key:
                 sql = """
-                    SELECT * FROM receipts_linearized WHERE
+                    SELECT stream_id, instance_name, room_id, receipt_type, user_id, event_id, data
+                    FROM receipts_linearized WHERE
                     stream_id > ? AND stream_id <= ?
                     ORDER BY stream_id DESC
                     LIMIT 100
@@ -504,7 +508,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 txn.execute(sql, [from_key.stream, to_key.get_max_stream_pos()])
             else:
                 sql = """
-                    SELECT * FROM receipts_linearized WHERE
+                    SELECT stream_id, instance_name, room_id, receipt_type, user_id, event_id, data
+                    FROM receipts_linearized WHERE
                     stream_id <= ?
                     ORDER BY stream_id DESC
                     LIMIT 100
@@ -512,12 +517,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
                 txn.execute(sql, [to_key.get_max_stream_pos()])
 
-            rows = self.db_pool.cursor_to_dict(txn)
             return [
-                row
-                for row in rows
+                (room_id, receipt_type, user_id, event_id, data)
+                for stream_id, instance_name, room_id, receipt_type, user_id, event_id, data in txn
                 if MultiWriterStreamToken.is_stream_position_in_range(
-                    from_key, to_key, row["instance_name"], row["stream_id"]
+                    from_key, to_key, instance_name, stream_id
                 )
             ]
 
@@ -526,20 +530,20 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
         results: JsonDict = {}
-        for row in txn_results:
+        for room_id, receipt_type, user_id, event_id, data in txn_results:
             # We want a single event per room, since we want to batch the
             # receipts by room, event and type.
             room_event = results.setdefault(
-                row["room_id"],
-                {"type": EduTypes.RECEIPT, "room_id": row["room_id"], "content": {}},
+                room_id,
+                {"type": EduTypes.RECEIPT, "room_id": room_id, "content": {}},
             )
 
             # The content is of the form:
             # {"$foo:bar": { "read": { "@user:host": <receipt> }, .. }, .. }
-            event_entry = room_event["content"].setdefault(row["event_id"], {})
-            receipt_type = event_entry.setdefault(row["receipt_type"], {})
+            event_entry = room_event["content"].setdefault(event_id, {})
+            receipt_type_dict = event_entry.setdefault(receipt_type, {})
 
-            receipt_type[row["user_id"]] = db_to_json(row["data"])
+            receipt_type_dict[user_id] = db_to_json(data)
 
         return results
 

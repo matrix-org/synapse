@@ -921,14 +921,10 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 }
 
             txn.execute(sql, params)
-            rows = self.db_pool.cursor_to_dict(txn)
 
-            for row in rows:
-                user_id = row["user_id"]
-                key_type = row["keytype"]
-                key = db_to_json(row["keydata"])
+            for user_id, key_type, key_data, _ in txn:
                 user_keys = result.setdefault(user_id, {})
-                user_keys[key_type] = key
+                user_keys[key_type] = db_to_json(key_data)
 
         return result
 
@@ -988,13 +984,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                 query_params.extend(item)
 
             txn.execute(sql, query_params)
-            rows = self.db_pool.cursor_to_dict(txn)
 
             # and add the signatures to the appropriate keys
-            for row in rows:
-                key_id: str = row["key_id"]
-                target_user_id: str = row["target_user_id"]
-                target_device_id: str = row["target_device_id"]
+            for target_user_id, target_device_id, key_id, signature in txn:
                 key_type = devices[(target_user_id, target_device_id)]
                 # We need to copy everything, because the result may have come
                 # from the cache.  dict.copy only does a shallow copy, so we
@@ -1012,13 +1004,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
                     ].copy()
                     if from_user_id in signatures:
                         user_sigs = signatures[from_user_id] = signatures[from_user_id]
-                        user_sigs[key_id] = row["signature"]
+                        user_sigs[key_id] = signature
                     else:
-                        signatures[from_user_id] = {key_id: row["signature"]}
+                        signatures[from_user_id] = {key_id: signature}
                 else:
-                    target_user_key["signatures"] = {
-                        from_user_id: {key_id: row["signature"]}
-                    }
+                    target_user_key["signatures"] = {from_user_id: {key_id: signature}}
 
         return keys
 

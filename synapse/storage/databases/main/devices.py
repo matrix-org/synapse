@@ -1413,13 +1413,13 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
 
         def get_devices_not_accessed_since_txn(
             txn: LoggingTransaction,
-        ) -> List[Dict[str, str]]:
+        ) -> List[Tuple[str, str]]:
             sql = """
                 SELECT user_id, device_id
                 FROM devices WHERE last_seen < ? AND hidden = FALSE
             """
             txn.execute(sql, (since_ms,))
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(List[Tuple[str, str]], txn.fetchall())
 
         rows = await self.db_pool.runInteraction(
             "get_devices_not_accessed_since",
@@ -1427,11 +1427,11 @@ class DeviceWorkerStore(RoomMemberWorkerStore, EndToEndKeyWorkerStore):
         )
 
         devices: Dict[str, List[str]] = {}
-        for row in rows:
+        for user_id, device_id in rows:
             # Remote devices are never stale from our point of view.
-            if self.hs.is_mine_id(row["user_id"]):
-                user_devices = devices.setdefault(row["user_id"], [])
-                user_devices.append(row["device_id"])
+            if self.hs.is_mine_id(user_id):
+                user_devices = devices.setdefault(user_id, [])
+                user_devices.append(device_id)
 
         return devices
 

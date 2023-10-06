@@ -1349,18 +1349,16 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
 
             txn.execute(sql, (target_min_stream_id, max_stream_id, batch_size))
 
-            rows = self.db_pool.cursor_to_dict(txn)
+            rows = txn.fetchall()
             if not rows:
                 return 0
 
-            min_stream_id = rows[-1]["stream_ordering"]
+            min_stream_id = rows[-1][0]
 
             to_update = []
-            for row in rows:
-                event_id = row["event_id"]
-                room_id = row["room_id"]
+            for _, event_id, room_id, json in rows:
                 try:
-                    event_json = db_to_json(row["json"])
+                    event_json = db_to_json(json)
                     content = event_json["content"]
                 except Exception:
                     continue

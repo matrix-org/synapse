@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, cast
 
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
@@ -27,6 +27,8 @@ from synapse.util import json_encoder
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+ScheduledTaskRow = Tuple[str, str, str, int, str, str, str, str]
+
 
 class TaskSchedulerWorkerStore(SQLBaseStore):
     def __init__(
@@ -38,13 +40,18 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         super().__init__(database, db_conn, hs)
 
     @staticmethod
-    def _convert_row_to_task(row: Dict[str, Any]) -> ScheduledTask:
-        row["status"] = TaskStatus(row["status"])
-        if row["params"] is not None:
-            row["params"] = db_to_json(row["params"])
-        if row["result"] is not None:
-            row["result"] = db_to_json(row["result"])
-        return ScheduledTask(**row)
+    def _convert_row_to_task(row: ScheduledTaskRow) -> ScheduledTask:
+        task_id, action, status, timestamp, resource_id, params, result, error = row
+        return ScheduledTask(
+            id=task_id,
+            action=action,
+            status=TaskStatus(status),
+            timestamp=timestamp,
+            resource_id=resource_id,
+            params=db_to_json(params) if params is not None else None,
+            result=db_to_json(result) if result is not None else None,
+            error=error,
+        )
 
     async def get_scheduled_tasks(
         self,
@@ -68,7 +75,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
         Returns: a list of `ScheduledTask`, ordered by increasing timestamps
         """
 
-        def get_scheduled_tasks_txn(txn: LoggingTransaction) -> List[Dict[str, Any]]:
+        def get_scheduled_tasks_txn(txn: LoggingTransaction) -> List[ScheduledTaskRow]:
             clauses: List[str] = []
             args: List[Any] = []
             if resource_id:
@@ -101,7 +108,7 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
                 args.append(limit)
 
             txn.execute(sql, args)
-            return self.db_pool.cursor_to_dict(txn)
+            return cast(List[ScheduledTaskRow], txn.fetchall())
 
         rows = await self.db_pool.runInteraction(
             "get_scheduled_tasks", get_scheduled_tasks_txn
@@ -193,7 +200,22 @@ class TaskSchedulerWorkerStore(SQLBaseStore):
             desc="get_scheduled_task",
         )
 
-        return TaskSchedulerWorkerStore._convert_row_to_task(row) if row else None
+        return (
+            TaskSchedulerWorkerStore._convert_row_to_task(
+                (
+                    row["id"],
+                    row["action"],
+                    row["status"],
+                    row["timestamp"],
+                    row["resource_id"],
+                    row["params"],
+                    row["result"],
+                    row["error"],
+                )
+            )
+            if row
+            else None
+        )
 
     async def delete_scheduled_task(self, id: str) -> None:
         """Delete a specific task from its id.
