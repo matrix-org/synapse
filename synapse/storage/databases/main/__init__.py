@@ -298,7 +298,9 @@ class DataStore(
 
     async def search_users(
         self, term: str
-    ) -> List[Tuple[str, Optional[str], bool, bool, Optional[str]]]:
+    ) -> List[
+        Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+    ]:
         """Function to search users list for one or more users with
         the matched term.
 
@@ -323,7 +325,18 @@ class DataStore(
             """
             txn.execute(sql, (search_term,))
 
-            return txn.fetchall()
+            return cast(
+                List[
+                    Tuple[
+                        str,
+                        Optional[str],
+                        Union[int, bool],
+                        Union[int, bool],
+                        Optional[str],
+                    ]
+                ],
+                txn.fetchall(),
+            )
 
         return await self.db_pool.runInteraction("search_users", search_users)
 

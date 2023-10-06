@@ -846,8 +846,8 @@ class SearchUsersRestServlet(RestServlet):
             {
                 "name": name,
                 "password_hash": password_hash,
-                "is_guest": is_guest,
-                "admin": admin,
+                "is_guest": bool(is_guest),
+                "admin": bool(admin),
                 "user_type": user_type,
             }
             for name, password_hash, is_guest, admin, user_type in ret
