@@ -266,7 +266,7 @@ class HttpServer(Protocol):
     def register_paths(
         self,
         method: str,
-        path_patterns: Iterable[Pattern],
+        path_patterns: Iterable[Pattern[str]],
         callback: ServletCallback,
         servlet_classname: str,
     ) -> None:

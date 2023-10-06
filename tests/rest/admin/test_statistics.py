@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.resource import Resource
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
@@ -34,8 +35,6 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.media_repo = hs.get_media_repository_resource()
-
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -43,6 +42,11 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.other_user_tok = self.login("user", "pass")
 
         self.url = "/_synapse/admin/v1/statistics/users/media"
+
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        resources = super().create_resource_dict()
+        resources["/_matrix/media"] = self.hs.get_media_repository_resource()
+        return resources
 
     def test_no_auth(self) -> None:
         """
@@ -470,12 +474,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             user_token: Access token of the user
             number_media: Number of media to be created for the user
         """
-        upload_resource = self.media_repo.children[b"upload"]
         for _ in range(number_media):
             # Upload some media into the room
-            self.helper.upload_media(
-                upload_resource, SMALL_PNG, tok=user_token, expect_code=200
-            )
+            self.helper.upload_media(SMALL_PNG, tok=user_token, expect_code=200)
 
     def _check_fields(self, content: List[JsonDict]) -> None:
         """Checks that all attributes are present in content

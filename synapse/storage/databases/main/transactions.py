@@ -526,7 +526,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         start: int,
         limit: int,
         direction: Direction = Direction.FORWARDS,
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[List[Tuple[str, int]], int]:
         """Function to retrieve a paginated list of destination's rooms.
         This will return a json list of rooms and the
         total number of rooms.
@@ -537,12 +537,14 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             limit: number of rows to retrieve
             direction: sort ascending or descending by room_id
         Returns:
-            A tuple of a dict of rooms and a count of total rooms.
+            A tuple of a list of room tuples and a count of total rooms.
+
+            Each room tuple is room_id, stream_ordering.
         """
 
         def get_destination_rooms_paginate_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
+        ) -> Tuple[List[Tuple[str, int]], int]:
             if direction == Direction.BACKWARDS:
                 order = "DESC"
             else:
@@ -556,14 +558,17 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             txn.execute(sql, [destination])
             count = cast(Tuple[int], txn.fetchone())[0]
 
-            rooms = self.db_pool.simple_select_list_paginate_txn(
-                txn=txn,
-                table="destination_rooms",
-                orderby="room_id",
-                start=start,
-                limit=limit,
-                retcols=("room_id", "stream_ordering"),
-                order_direction=order,
+            rooms = cast(
+                List[Tuple[str, int]],
+                self.db_pool.simple_select_list_paginate_txn(
+                    txn=txn,
+                    table="destination_rooms",
+                    orderby="room_id",
+                    start=start,
+                    limit=limit,
+                    retcols=("room_id", "stream_ordering"),
+                    order_direction=order,
+                ),
             )
             return rooms, count
 

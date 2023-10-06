@@ -1654,8 +1654,6 @@ class PersistEventsStore:
     ) -> None:
         to_prefill = []
 
-        rows = []
-
         ev_map = {e.event_id: e for e, _ in events_and_contexts}
         if not ev_map:
             return
@@ -1676,10 +1674,9 @@ class PersistEventsStore:
         )
 
         txn.execute(sql + clause, args)
-        rows = self.db_pool.cursor_to_dict(txn)
-        for row in rows:
-            event = ev_map[row["event_id"]]
-            if not row["rejects"] and not row["redacts"]:
+        for event_id, redacts, rejects in txn:
+            event = ev_map[event_id]
+            if not rejects and not redacts:
                 to_prefill.append(EventCacheEntry(event=event, redacted_event=None))
 
         async def external_prefill() -> None:

@@ -150,6 +150,67 @@ def run_upgrade(
     ...
 ```
 
+## Background updates
+
+It is sometimes appropriate to perform database migrations as part of a background
+process (instead of blocking Synapse until the migration is done). In particular,
+this is useful for migrating data when adding new columns or tables.
+
+Pending background updates stored in the `background_updates` table and are denoted
+by a unique name, the current status (stored in JSON), and some dependency information:
+
+* Whether the update requires a previous update to be complete.
+* A rough ordering for which to complete updates.
+
+A new background updates needs to be added to the `background_updates` table:
+
+```sql
+INSERT INTO background_updates (ordering, update_name, depends_on, progress_json) VALUES
+  (7706, 'my_background_update', 'a_previous_background_update' '{}');
+```
+
+And then needs an associated handler in the appropriate datastore:
+
+```python
+self.db_pool.updates.register_background_update_handler(
+    "my_background_update",
+    update_handler=self._my_background_update,
+)
+```
+
+There are a few types of updates that can be performed, see the `BackgroundUpdater`:
+
+* `register_background_update_handler`: A generic handler for custom SQL
+* `register_background_index_update`: Create an index in the background
+* `register_background_validate_constraint`: Validate a constraint in the background
+  (PostgreSQL-only)
+* `register_background_validate_constraint_and_delete_rows`: Similar to
+  `register_background_validate_constraint`, but deletes rows which don't fit
+  the constraint.
+
+For `register_background_update_handler`, the generic handler must track progress
+and then finalize the background update:
+
+```python
+async def _my_background_update(self, progress: JsonDict, batch_size: int) -> int:
+    def _do_something(txn: LoggingTransaction) -> int:
+        ...
+        self.db_pool.updates._background_update_progress_txn(
+            txn, "my_background_update", {"last_processed": last_processed}
+        )
+        return last_processed - prev_last_processed
+
+    num_processed = await self.db_pool.runInteraction("_do_something", _do_something)
+    await self.db_pool.updates._end_background_update("my_background_update")
+
+    return num_processed
+```
+
+Synapse will attempt to rate-limit how often background updates are run via the
+given batch-size and the returned number of processed entries (and how long the
+function took to run). See
+[background update controller callbacks](../modules/background_update_controller_callbacks.md).
+
 ## Boolean columns
 
 Boolean columns require special treatment, since SQLite treats booleans the

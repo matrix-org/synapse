@@ -26,11 +26,11 @@ from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 from twisted.web.server import Request
 
-from synapse.api.errors import Codes, SynapseError, cs_error
+from synapse.api.errors import Codes, cs_error
 from synapse.http.server import finish_request, respond_with_json
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
-from synapse.util.stringutils import is_ascii, parse_and_validate_server_name
+from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
 
@@ -84,52 +84,12 @@ INLINE_CONTENT_TYPES = [
 ]
 
 
-def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
-    """Parses the server name, media ID and optional file name from the request URI
-
-    Also performs some rough validation on the server name.
-
-    Args:
-        request: The `Request`.
-
-    Returns:
-        A tuple containing the parsed server name, media ID and optional file name.
-
-    Raises:
-        SynapseError(404): if parsing or validation fail for any reason
-    """
-    try:
-        # The type on postpath seems incorrect in Twisted 21.2.0.
-        postpath: List[bytes] = request.postpath  # type: ignore
-        assert postpath
-
-        # This allows users to append e.g. /test.png to the URL. Useful for
-        # clients that parse the URL to see content type.
-        server_name_bytes, media_id_bytes = postpath[:2]
-        server_name = server_name_bytes.decode("utf-8")
-        media_id = media_id_bytes.decode("utf8")
-
-        # Validate the server name, raising if invalid
-        parse_and_validate_server_name(server_name)
-
-        file_name = None
-        if len(postpath) > 2:
-            try:
-                file_name = urllib.parse.unquote(postpath[-1].decode("utf-8"))
-            except UnicodeDecodeError:
-                pass
-        return server_name, media_id, file_name
-    except Exception:
-        raise SynapseError(
-            404, "Invalid media id token %r" % (request.postpath,), Codes.UNKNOWN
-        )
-
-
 def respond_404(request: SynapseRequest) -> None:
+    assert request.path is not None
     respond_with_json(
         request,
         404,
-        cs_error("Not found %r" % (request.postpath,), code=Codes.NOT_FOUND),
+        cs_error("Not found '%s'" % (request.path.decode(),), code=Codes.NOT_FOUND),
         send_cors=True,
     )
 
@@ -372,7 +332,7 @@ class ThumbnailInfo:
     # Content type of thumbnail, e.g. image/png
     type: str
     # The size of the media file, in bytes.
-    length: Optional[int] = None
+    length: int
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
