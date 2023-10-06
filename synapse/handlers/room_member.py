@@ -620,6 +620,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     await self._join_rate_per_room_limiter.ratelimit(
                         requester, key=room_id, update=False
                     )
+            elif action == Membership.INVITE:
+                await self.ratelimit_invite(requester, room_id, target.to_string())
 
         if action == Membership.INVITE and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester.
@@ -797,8 +799,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if effective_membership_state == Membership.INVITE:
             target_id = target.to_string()
-            if ratelimit:
-                await self.ratelimit_invite(requester, room_id, target_id)
 
             # block any attempts to invite the server notices mxid
             if target_id == self._server_notices_mxid:
