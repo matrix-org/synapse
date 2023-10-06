@@ -60,7 +60,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.http.server import JsonResource
+from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import (
     SENTINEL_CONTEXT,
@@ -459,7 +459,7 @@ class HomeserverTestCase(TestCase):
         The default calls `self.create_resource_dict` and builds the resultant dict
         into a tree.
         """
-        root_resource = Resource()
+        root_resource = OptionsResource()
         create_resource_tree(self.create_resource_dict(), root_resource)
         return root_resource
 

@@ -17,12 +17,13 @@ import hmac
 import os
 import urllib.parse
 from binascii import unhexlify
-from typing import List, Optional
+from typing import Dict, List, Optional
 from unittest.mock import AsyncMock, Mock, patch
 
 from parameterized import parameterized, parameterized_class
 
 from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.resource import Resource
 
 import synapse.rest.admin
 from synapse.api.constants import ApprovalNoticeMedium, LoginType, UserTypes
@@ -45,7 +46,6 @@ from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import FakeSite, make_request
 from tests.test_utils import SMALL_PNG
 from tests.unittest import override_config
 
@@ -3421,7 +3421,6 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
-        self.media_repo = hs.get_media_repository_resource()
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -3431,6 +3430,11 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.url = "/_synapse/admin/v1/users/%s/media" % urllib.parse.quote(
             self.other_user
         )
+
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        resources = super().create_resource_dict()
+        resources["/_matrix/media"] = self.hs.get_media_repository_resource()
+        return resources
 
     @parameterized.expand(["GET", "DELETE"])
     def test_no_auth(self, method: str) -> None:
@@ -3907,12 +3911,9 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         Returns:
             The ID of the newly created media.
         """
-        upload_resource = self.media_repo.children[b"upload"]
-        download_resource = self.media_repo.children[b"download"]
-
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, user_token, filename, expect_code=200
+            image_data, user_token, filename, expect_code=200
         )
 
         # Extract media ID from the response
@@ -3920,11 +3921,9 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         media_id = server_and_media_id.split("/")[1]
 
         # Try to access a media and to create `last_access_ts`
-        channel = make_request(
-            self.reactor,
-            FakeSite(download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_and_media_id,
+            f"/_matrix/media/v3/download/{server_and_media_id}",
             shorthand=False,
             access_token=user_token,
         )
