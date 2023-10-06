@@ -446,8 +446,6 @@ class RemoteServerUpCommand(_SimpleCommand):
     """Sent when a worker has detected that a remote server is no longer
     "down" and retry timings should be reset.
 
-    If sent from a client the server will relay to all other workers.
-
     Format::
 
         REMOTE_SERVER_UP <server>
