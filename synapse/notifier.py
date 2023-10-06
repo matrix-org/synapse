@@ -21,11 +21,13 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Literal,
     Optional,
     Set,
     Tuple,
     TypeVar,
     Union,
+    overload,
 )
 
 import attr
@@ -452,6 +454,44 @@ class Notifier:
             self._pusher_pool.on_new_notifications(max_room_stream_token)
         except Exception:
             logger.exception("Error pusher pool of event")
+
+    @overload
+    def on_new_event(
+        self,
+        stream_key: Literal[StreamKeyType.ROOM],
+        new_token: RoomStreamToken,
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[StrCollection] = None,
+    ) -> None:
+        ...
+
+    @overload
+    def on_new_event(
+        self,
+        stream_key: Literal[StreamKeyType.RECEIPT],
+        new_token: MultiWriterStreamToken,
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[StrCollection] = None,
+    ) -> None:
+        ...
+
+    @overload
+    def on_new_event(
+        self,
+        stream_key: Literal[
+            StreamKeyType.ACCOUNT_DATA,
+            StreamKeyType.DEVICE_LIST,
+            StreamKeyType.PRESENCE,
+            StreamKeyType.PUSH_RULES,
+            StreamKeyType.TO_DEVICE,
+            StreamKeyType.TYPING,
+            StreamKeyType.UN_PARTIAL_STATED_ROOMS,
+        ],
+        new_token: int,
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[StrCollection] = None,
+    ) -> None:
+        ...
 
     def on_new_event(
         self,
