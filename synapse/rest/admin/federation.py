@@ -198,7 +198,13 @@ class DestinationMembershipRestServlet(RestServlet):
         rooms, total = await self._store.get_destination_rooms_paginate(
             destination, start, limit, direction
         )
-        response = {"rooms": rooms, "total": total}
+        response = {
+            "rooms": [
+                {"room_id": room_id, "stream_ordering": stream_ordering}
+                for room_id, stream_ordering in rooms
+            ],
+            "total": total,
+        }
         if (start + limit) < total:
             response["next_token"] = str(start + len(rooms))
 
