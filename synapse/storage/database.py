@@ -2476,68 +2476,6 @@ class DatabasePool:
 
         return txn.fetchall()
 
-    async def simple_search_list(
-        self,
-        table: str,
-        term: str,
-        col: str,
-        retcols: Collection[str],
-        desc: str = "simple_search_list",
-    ) -> List[Tuple[Any, ...]]:
-        """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
-
-        Args:
-            table: the table name
-            term: term for searching the table matched to a column.
-            col: column to query term should be matched to
-            retcols: the names of the columns to return
-
-        Returns:
-            A list of tuples.
-        """
-
-        return await self.runInteraction(
-            desc,
-            self.simple_search_list_txn,
-            table,
-            term,
-            col,
-            retcols,
-            db_autocommit=True,
-        )
-
-    @classmethod
-    def simple_search_list_txn(
-        cls,
-        txn: LoggingTransaction,
-        table: str,
-        term: str,
-        col: str,
-        retcols: Iterable[str],
-    ) -> List[Tuple[Any, ...]]:
-        """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
-
-        Args:
-            txn: Transaction object
-            table: the table name
-            term: term for searching the table matched to a column.
-            col: column to query term should be matched to
-            retcols: the names of the columns to return
-
-        Returns:
-            A list of tuples.
-        """
-        if term:
-            sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
-            termvalues = ["%%" + term + "%%"]
-            txn.execute(sql, termvalues)
-        else:
-            return []
-
-        return txn.fetchall()
-
 
 def make_in_list_sql_clause(
     database_engine: BaseDatabaseEngine, column: str, iterable: Collection[Any]

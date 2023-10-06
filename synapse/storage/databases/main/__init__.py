@@ -306,16 +306,22 @@ class DataStore(
         Returns:
             A list of tuples of name, password_hash, is_guest, admin, user_type or None.
         """
-        return cast(
-            List[Tuple[str, str, bool, bool, str]],
-            await self.db_pool.simple_search_list(
-                table="users",
-                term=term,
-                col="name",
-                retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
-                desc="search_users",
-            ),
-        )
+
+        def search_users(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[str, str, bool, bool, str]]:
+            search_term = "%%" + term + "%%"
+
+            sql = """
+            SELECT name, password_hash, is_guest, admin, user_type
+            FROM users
+            WHERE name LIKE ?
+            """
+            txn.execute(sql, (search_term,))
+
+            return txn.fetchall()
+
+        return await self.db_pool.runInteraction("search_users", search_users)
 
 
 def check_database_before_upgrade(
