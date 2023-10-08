@@ -21,7 +21,3 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py')
-
-                  - name: Cache
-                uses: actions/cache@v3.3.2
-            
