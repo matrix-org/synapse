@@ -89,6 +89,11 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # furthermore, we might already have the table from a previous (failed)
         # purge attempt, so let's drop the table first.
 
+        if isinstance(self.database_engine, PostgresEngine):
+            # Disable statement timeouts for this transaction; purging rooms can
+            # take a while!
+            txn.execute("SET LOCAL statement_timeout = 0")
+
         txn.execute("DROP TABLE IF EXISTS events_to_purge")
 
         txn.execute(
