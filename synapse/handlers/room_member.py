@@ -500,7 +500,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # we know it was persisted, so should have a stream ordering
         assert result_event.internal_metadata.stream_ordering
@@ -2005,7 +2004,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # we know it was persisted, so must have a stream ordering
         assert result_event.internal_metadata.stream_ordering

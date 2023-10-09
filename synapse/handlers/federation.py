@@ -1497,7 +1497,6 @@ class FederationHandler:
                     # in the meantime and context needs to be recomputed, so let's do so.
                     if i == max_retries - 1:
                         raise e
-                    pass
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
 
@@ -1573,7 +1572,6 @@ class FederationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
     async def add_display_name_to_third_party_invite(
         self,
