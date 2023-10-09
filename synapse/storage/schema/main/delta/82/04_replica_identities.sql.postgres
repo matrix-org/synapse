@@ -1,0 +1,83 @@
+/* Copyright 2023 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- Annotate some tables in Postgres with a REPLICA IDENTITY.
+-- Any table that doesn't have a primary key should be annotated explicitly with
+-- a REPLICA IDENTITY so that logical replication can be used.
+-- If this is not done, then UPDATE and DELETE statements on those tables
+-- will fail if logical replication is in use.
+
+
+-- Where possible, re-use unique indices already defined on tables as a replica
+-- identity.
+ALTER TABLE appservice_room_list REPLICA IDENTITY USING INDEX appservice_room_list_idx;
+ALTER TABLE blocked_rooms REPLICA IDENTITY USING INDEX blocked_rooms_idx;
+ALTER TABLE cache_invalidation_stream_by_instance REPLICA IDENTITY USING INDEX cache_invalidation_stream_by_instance_id;
+ALTER TABLE device_lists_changes_in_room REPLICA IDENTITY USING INDEX device_lists_changes_in_stream_id;
+ALTER TABLE device_lists_outbound_last_success REPLICA IDENTITY USING INDEX device_lists_outbound_last_success_unique_idx;
+ALTER TABLE device_lists_remote_cache REPLICA IDENTITY USING INDEX device_lists_remote_cache_unique_id;
+ALTER TABLE device_lists_remote_extremeties REPLICA IDENTITY USING INDEX device_lists_remote_extremeties_unique_idx;
+ALTER TABLE device_lists_remote_resync REPLICA IDENTITY USING INDEX device_lists_remote_resync_idx;
+ALTER TABLE e2e_cross_signing_keys REPLICA IDENTITY USING INDEX e2e_cross_signing_keys_stream_idx;
+ALTER TABLE e2e_room_keys REPLICA IDENTITY USING INDEX e2e_room_keys_with_version_idx;
+ALTER TABLE e2e_room_keys_versions REPLICA IDENTITY USING INDEX e2e_room_keys_versions_idx;
+ALTER TABLE erased_users REPLICA IDENTITY USING INDEX erased_users_user;
+ALTER TABLE event_relations REPLICA IDENTITY USING INDEX event_relations_id;
+ALTER TABLE federation_inbound_events_staging REPLICA IDENTITY USING INDEX federation_inbound_events_staging_instance_event;
+ALTER TABLE federation_stream_position REPLICA IDENTITY USING INDEX federation_stream_position_instance;
+ALTER TABLE ignored_users REPLICA IDENTITY USING INDEX ignored_users_uniqueness;
+ALTER TABLE monthly_active_users REPLICA IDENTITY USING INDEX monthly_active_users_users;
+ALTER TABLE ratelimit_override REPLICA IDENTITY USING INDEX ratelimit_override_idx;
+ALTER TABLE room_stats_earliest_token REPLICA IDENTITY USING INDEX room_stats_earliest_token_idx;
+ALTER TABLE room_stats_state REPLICA IDENTITY USING INDEX room_stats_state_room;
+ALTER TABLE stream_positions REPLICA IDENTITY USING INDEX stream_positions_idx;
+ALTER TABLE user_directory REPLICA IDENTITY USING INDEX user_directory_user_idx;
+ALTER TABLE user_directory_search REPLICA IDENTITY USING INDEX user_directory_search_user_idx;
+ALTER TABLE user_ips REPLICA IDENTITY USING INDEX user_ips_user_token_ip_unique_index;
+ALTER TABLE user_signature_stream REPLICA IDENTITY USING INDEX user_signature_stream_idx;
+ALTER TABLE users_in_public_rooms REPLICA IDENTITY USING INDEX users_in_public_rooms_u_idx;
+ALTER TABLE users_who_share_private_rooms REPLICA IDENTITY USING INDEX users_who_share_private_rooms_u_idx;
+ALTER TABLE user_threepid_id_server REPLICA IDENTITY USING INDEX user_threepid_id_server_idx;
+ALTER TABLE worker_locks REPLICA IDENTITY USING INDEX worker_locks_key;
+
+
+-- Where there are no unique indices, use the entire rows as replica identities.
+ALTER TABLE current_state_delta_stream REPLICA IDENTITY FULL;
+ALTER TABLE deleted_pushers REPLICA IDENTITY FULL;
+ALTER TABLE device_auth_providers REPLICA IDENTITY FULL;
+ALTER TABLE device_federation_inbox REPLICA IDENTITY FULL;
+ALTER TABLE device_federation_outbox REPLICA IDENTITY FULL;
+ALTER TABLE device_inbox REPLICA IDENTITY FULL;
+ALTER TABLE device_lists_outbound_pokes REPLICA IDENTITY FULL;
+ALTER TABLE device_lists_stream REPLICA IDENTITY FULL;
+ALTER TABLE e2e_cross_signing_signatures REPLICA IDENTITY FULL;
+ALTER TABLE event_auth_chain_links REPLICA IDENTITY FULL;
+ALTER TABLE event_auth REPLICA IDENTITY FULL;
+ALTER TABLE event_push_actions_staging REPLICA IDENTITY FULL;
+ALTER TABLE local_media_repository_url_cache REPLICA IDENTITY FULL;
+ALTER TABLE presence_stream REPLICA IDENTITY FULL;
+ALTER TABLE push_rules_stream REPLICA IDENTITY FULL;
+ALTER TABLE room_alias_servers REPLICA IDENTITY FULL;
+ALTER TABLE stream_ordering_to_exterm REPLICA IDENTITY FULL;
+ALTER TABLE user_daily_visits REPLICA IDENTITY FULL;
+ALTER TABLE users_pending_deactivation REPLICA IDENTITY FULL;
+
+-- special cases: unique indices on nullable columns can't be used
+ALTER TABLE event_push_summary REPLICA IDENTITY FULL;
+ALTER TABLE event_search REPLICA IDENTITY FULL;
+ALTER TABLE local_media_repository_thumbnails REPLICA IDENTITY FULL;
+ALTER TABLE remote_media_cache_thumbnails REPLICA IDENTITY FULL;
+ALTER TABLE threepid_guest_access_tokens REPLICA IDENTITY FULL;
+ALTER TABLE user_filters REPLICA IDENTITY FULL; -- sadly the `CHECK` constraint is not enough here
