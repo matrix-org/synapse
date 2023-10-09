@@ -1,1 +1,1 @@
-Prevent the purging of large rooms from timing out when Postgres is in use.
+Prevent the purging of large rooms from timing out when Postgres is in use. The timeout which causes this issue was introduced in Synapse 1.88.0.
