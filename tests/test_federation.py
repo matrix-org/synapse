@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from typing import Collection, List, Optional, Union
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -31,7 +31,6 @@ from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
 from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class MessageAcceptTests(unittest.HomeserverTestCase):
@@ -52,9 +51,15 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.store = self.hs.get_datastores().main
 
         # Figure out what the most recent event is
-        most_recent = self.get_success(
-            self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
-        )[0]
+        most_recent = next(
+            iter(
+                self.get_success(
+                    self.hs.get_datastores().main.get_latest_event_ids_in_room(
+                        self.room_id
+                    )
+                )
+            )
+        )
 
         join_event = make_event_from_dict(
             {
@@ -81,7 +86,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         ) -> None:
             pass
 
-        federation_event_handler._check_event_auth = _check_event_auth  # type: ignore[assignment]
+        federation_event_handler._check_event_auth = _check_event_auth  # type: ignore[method-assign]
         self.client = self.hs.get_federation_client()
 
         async def _check_sigs_and_hash_for_pulled_events_and_fetch(
@@ -101,8 +106,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Make sure we actually joined the room
         self.assertEqual(
-            self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))[0],
-            "$join:test.serv",
+            self.get_success(self.store.get_latest_event_ids_in_room(self.room_id)),
+            {"$join:test.serv"},
         )
 
     def test_cant_hide_direct_ancestors(self) -> None:
@@ -128,9 +133,11 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.http_client.post_json = post_json
 
         # Figure out what the most recent event is
-        most_recent = self.get_success(
-            self.store.get_latest_event_ids_in_room(self.room_id)
-        )[0]
+        most_recent = next(
+            iter(
+                self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))
+            )
+        )
 
         # Now lie about an event
         lying_event = make_event_from_dict(
@@ -166,7 +173,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Make sure the invalid event isn't there
         extrem = self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))
-        self.assertEqual(extrem[0], "$join:test.serv")
+        self.assertEqual(extrem, {"$join:test.serv"})
 
     def test_retry_device_list_resync(self) -> None:
         """Tests that device lists are marked as stale if they couldn't be synced, and
@@ -191,12 +198,12 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Register the mock on the federation client.
         federation_client = self.hs.get_federation_client()
-        federation_client.query_user_devices = Mock(side_effect=query_user_devices)  # type: ignore[assignment]
+        federation_client.query_user_devices = Mock(side_effect=query_user_devices)  # type: ignore[method-assign]
 
         # Register a mock on the store so that the incoming update doesn't fail because
         # we don't share a room with the user.
         store = self.hs.get_datastores().main
-        store.get_rooms_for_user = Mock(return_value=make_awaitable(["!someroom:test"]))
+        store.get_rooms_for_user = AsyncMock(return_value=["!someroom:test"])
 
         # Manually inject a fake device list update. We need this update to include at
         # least one prev_id so that the user's device list will need to be retried.
@@ -241,27 +248,24 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Register mock device list retrieval on the federation client.
         federation_client = self.hs.get_federation_client()
-        federation_client.query_user_devices = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable(
-                {
+        federation_client.query_user_devices = AsyncMock(  # type: ignore[method-assign]
+            return_value={
+                "user_id": remote_user_id,
+                "stream_id": 1,
+                "devices": [],
+                "master_key": {
                     "user_id": remote_user_id,
-                    "stream_id": 1,
-                    "devices": [],
-                    "master_key": {
-                        "user_id": remote_user_id,
-                        "usage": ["master"],
-                        "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                    "usage": ["master"],
+                    "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                },
+                "self_signing_key": {
+                    "user_id": remote_user_id,
+                    "usage": ["self_signing"],
+                    "keys": {
+                        "ed25519:" + remote_self_signing_key: remote_self_signing_key
                     },
-                    "self_signing_key": {
-                        "user_id": remote_user_id,
-                        "usage": ["self_signing"],
-                        "keys": {
-                            "ed25519:"
-                            + remote_self_signing_key: remote_self_signing_key
-                        },
-                    },
-                }
-            )
+                },
+            }
         )
 
         # Resync the device list.

@@ -11,13 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Optional, Tuple
 
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest import admin, login, room
 from synapse.server import HomeServer
-from synapse.types import PublicRoom, ThirdPartyInstanceID
 from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
@@ -87,6 +85,7 @@ class PublicRoomsTestCase(HomeserverTestCase):
     def test_pagination_limit_1(self) -> None:
         returned_rooms = set()
 
+        channel = None
         for i in range(10):
             next_batch = None if i == 0 else channel.json_body["next_batch"]
             since_query_str = f"&since={next_batch}" if next_batch else ""
@@ -115,6 +114,7 @@ class PublicRoomsTestCase(HomeserverTestCase):
     def test_pagination_limit_2(self) -> None:
         returned_rooms = set()
 
+        channel = None
         for i in range(5):
             next_batch = None if i == 0 else channel.json_body["next_batch"]
             since_query_str = f"&since={next_batch}" if next_batch else ""

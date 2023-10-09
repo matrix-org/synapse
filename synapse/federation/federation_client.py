@@ -64,7 +64,7 @@ from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.client import is_unknown_endpoint
 from synapse.http.types import QueryParams
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, tag_args, trace
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, StrCollection, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -236,6 +236,7 @@ class FederationClient(FederationBase):
 
     async def claim_client_keys(
         self,
+        user: UserID,
         destination: str,
         query: Dict[str, Dict[str, Dict[str, int]]],
         timeout: Optional[int],
@@ -243,6 +244,7 @@ class FederationClient(FederationBase):
         """Claims one-time keys for a device hosted on a remote server.
 
         Args:
+            user: The user id of the requesting user
             destination: Domain name of the remote homeserver
             content: The query content.
 
@@ -258,7 +260,9 @@ class FederationClient(FederationBase):
         use_unstable = False
         for user_id, one_time_keys in query.items():
             for device_id, algorithms in one_time_keys.items():
-                if any(count > 1 for count in algorithms.values()):
+                # If more than one algorithm is requested, attempt to use the unstable
+                # endpoint.
+                if sum(algorithms.values()) > 1:
                     use_unstable = True
                 if algorithms:
                     # For the stable query, choose only the first algorithm.
@@ -279,7 +283,7 @@ class FederationClient(FederationBase):
         if use_unstable:
             try:
                 return await self.transport_layer.claim_client_keys_unstable(
-                    destination, unstable_content, timeout
+                    user, destination, unstable_content, timeout
                 )
             except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised endpoint,
@@ -294,8 +298,9 @@ class FederationClient(FederationBase):
         else:
             logger.debug("Skipping unstable claim client keys API")
 
+        # TODO Potentially attempt multiple queries and combine the results?
         return await self.transport_layer.claim_client_keys(
-            destination, content, timeout
+            user, destination, content, timeout
         )
 
     @trace
@@ -978,7 +983,7 @@ class FederationClient(FederationBase):
             if not room_version:
                 raise UnsupportedRoomVersionError()
 
-            if not room_version.msc2403_knocking and membership == Membership.KNOCK:
+            if not room_version.knock_join_rule and membership == Membership.KNOCK:
                 raise SynapseError(
                     400,
                     "This room version does not support knocking",
@@ -1064,7 +1069,7 @@ class FederationClient(FederationBase):
             # * Ensure the signatures are good.
             #
             # Otherwise, fallback to the provided event.
-            if room_version.msc3083_join_rules and response.event:
+            if room_version.restricted_join_rule and response.event:
                 event = response.event
 
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
@@ -1190,7 +1195,7 @@ class FederationClient(FederationBase):
 
         # MSC3083 defines additional error codes for room joins.
         failover_errcodes = None
-        if room_version.msc3083_join_rules:
+        if room_version.restricted_join_rule:
             failover_errcodes = (
                 Codes.UNABLE_AUTHORISE_JOIN,
                 Codes.UNABLE_TO_GRANT_JOIN,
@@ -1397,7 +1402,7 @@ class FederationClient(FederationBase):
             The remote homeserver return some state from the room. The response
             dictionary is in the form:
 
-            {"knock_state_events": [<state event dict>, ...]}
+            {"knock_room_state": [<state event dict>, ...]}
 
             The list of state events may be empty.
 
@@ -1424,7 +1429,7 @@ class FederationClient(FederationBase):
             The remote homeserver can optionally return some state from the room. The response
             dictionary is in the form:
 
-            {"knock_state_events": [<state event dict>, ...]}
+            {"knock_room_state": [<state event dict>, ...]}
 
             The list of state events may be empty.
         """
@@ -1699,7 +1704,7 @@ class FederationClient(FederationBase):
     async def timestamp_to_event(
         self,
         *,
-        destinations: List[str],
+        destinations: StrCollection,
         room_id: str,
         timestamp: int,
         direction: Direction,
@@ -1886,7 +1891,7 @@ class TimestampToEventResponse:
             )
 
         origin_server_ts = d.get("origin_server_ts")
-        if type(origin_server_ts) is not int:
+        if type(origin_server_ts) is not int:  # noqa: E721
             raise ValueError(
                 "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts

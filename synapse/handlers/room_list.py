@@ -33,7 +33,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.types import JsonDict, PublicRoom, ThirdPartyInstanceID
+from synapse.types import JsonDict, JsonMapping, PublicRoom, ThirdPartyInstanceID
 from synapse.util import filter_none
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
@@ -195,12 +195,14 @@ class RoomListHandler:
 
         nb_modules = len(self._module_api_callbacks.fetch_public_rooms_callbacks)
 
-        module_range = range(0, nb_modules)
+        module_range = range(nb_modules)
         # if not forwards:
         #     module_range = reversed(module_range)
 
         for module_index in module_range:
-            fetch_public_rooms = self._module_api_callbacks.fetch_public_rooms_callbacks[module_index]
+            fetch_public_rooms = (
+                self._module_api_callbacks.fetch_public_rooms_callbacks[module_index]
+            )
             # Ask each module for a list of public rooms given the last_joined_members
             # value from the since token and the probing limit
             # last_joined_members needs to be reduce by one if this module has already
@@ -238,7 +240,6 @@ class RoomListHandler:
             # if not forwards:
             #     rooms.reverse()
             results += rooms
-
 
         print([(r.room_id, r.num_joined_members) for r in results])
 
@@ -322,7 +323,7 @@ class RoomListHandler:
         cache_context: _CacheContext,
         with_alias: bool = True,
         allow_private: bool = False,
-    ) -> Optional[JsonDict]:
+    ) -> Optional[JsonMapping]:
         """Returns the entry for a room
 
         Args:

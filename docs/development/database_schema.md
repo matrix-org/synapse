@@ -150,6 +150,67 @@ def run_upgrade(
     ...
 ```
 
+## Background updates
+
+It is sometimes appropriate to perform database migrations as part of a background
+process (instead of blocking Synapse until the migration is done). In particular,
+this is useful for migrating data when adding new columns or tables.
+
+Pending background updates stored in the `background_updates` table and are denoted
+by a unique name, the current status (stored in JSON), and some dependency information:
+
+* Whether the update requires a previous update to be complete.
+* A rough ordering for which to complete updates.
+
+A new background updates needs to be added to the `background_updates` table:
+
+```sql
+INSERT INTO background_updates (ordering, update_name, depends_on, progress_json) VALUES
+  (7706, 'my_background_update', 'a_previous_background_update' '{}');
+```
+
+And then needs an associated handler in the appropriate datastore:
+
+```python
+self.db_pool.updates.register_background_update_handler(
+    "my_background_update",
+    update_handler=self._my_background_update,
+)
+```
+
+There are a few types of updates that can be performed, see the `BackgroundUpdater`:
+
+* `register_background_update_handler`: A generic handler for custom SQL
+* `register_background_index_update`: Create an index in the background
+* `register_background_validate_constraint`: Validate a constraint in the background
+  (PostgreSQL-only)
+* `register_background_validate_constraint_and_delete_rows`: Similar to
+  `register_background_validate_constraint`, but deletes rows which don't fit
+  the constraint.
+
+For `register_background_update_handler`, the generic handler must track progress
+and then finalize the background update:
+
+```python
+async def _my_background_update(self, progress: JsonDict, batch_size: int) -> int:
+    def _do_something(txn: LoggingTransaction) -> int:
+        ...
+        self.db_pool.updates._background_update_progress_txn(
+            txn, "my_background_update", {"last_processed": last_processed}
+        )
+        return last_processed - prev_last_processed
+
+    num_processed = await self.db_pool.runInteraction("_do_something", _do_something)
+    await self.db_pool.updates._end_background_update("my_background_update")
+
+    return num_processed
+```
+
+Synapse will attempt to rate-limit how often background updates are run via the
+given batch-size and the returned number of processed entries (and how long the
+function took to run). See
+[background update controller callbacks](../modules/background_update_controller_callbacks.md).
+
 ## Boolean columns
 
 Boolean columns require special treatment, since SQLite treats booleans the
@@ -184,3 +245,160 @@ version `3`, that can only happen with a hash collision, which we basically hope
 will never happen (SHA256 has a massive big key space).
 
 
+## Worked examples of gradual migrations
+
+Some migrations need to be performed gradually. A prime example of this is anything
+which would need to do a large table scan — including adding columns, indices or
+`NOT NULL` constraints to non-empty tables — such a migration should be done as a
+background update where possible, at least on Postgres.
+We can afford to be more relaxed about SQLite databases since they are usually
+used on smaller deployments and SQLite does not support the same concurrent
+DDL operations as Postgres.
+
+We also typically insist on having at least one Synapse version's worth of
+backwards compatibility, so that administrators can roll back Synapse if an upgrade
+did not go smoothly.
+
+This sometimes results in having to plan a migration across multiple versions
+of Synapse.
+
+This section includes an example and may include more in the future.
+
+
+
+### Transforming a column into another one, with `NOT NULL` constraints
+
+This example illustrates how you would introduce a new column, write data into it
+based on data from an old column and then drop the old column.
+
+We are aiming for semantic equivalence to:
+
+```sql
+ALTER TABLE mytable ADD COLUMN new_column INTEGER;
+UPDATE mytable SET new_column = old_column * 100;
+ALTER TABLE mytable ALTER COLUMN new_column ADD CONSTRAINT NOT NULL;
+ALTER TABLE mytable DROP COLUMN old_column;
+```
+
+#### Synapse version `N`
+
+```python
+SCHEMA_VERSION = S
+SCHEMA_COMPAT_VERSION = ... # unimportant at this stage
+```
+
+**Invariants:**
+1. `old_column` is read by Synapse and written to by Synapse.
+
+
+#### Synapse version `N + 1`
+
+```python
+SCHEMA_VERSION = S + 1
+SCHEMA_COMPAT_VERSION = ... # unimportant at this stage
+```
+
+**Changes:**
+1.
+   ```sql
+   ALTER TABLE mytable ADD COLUMN new_column INTEGER;
+   ```
+
+**Invariants:**
+1. `old_column` is read by Synapse and written to by Synapse.
+2. `new_column` is written to by Synapse.
+
+**Notes:**
+1. `new_column` can't have a `NOT NULL NOT VALID` constraint yet, because the previous Synapse version did not write to the new column (since we haven't bumped the `SCHEMA_COMPAT_VERSION` yet, we still need to be compatible with the previous version).
+
+
+#### Synapse version `N + 2`
+
+```python
+SCHEMA_VERSION = S + 2
+SCHEMA_COMPAT_VERSION = S + 1 # this signals that we can't roll back to a time before new_column existed
+```
+
+**Changes:**
+1. On Postgres, add a `NOT VALID` constraint to ensure new rows are compliant. *SQLite does not have such a construct, but it would be unnecessary anyway since there is no way to concurrently perform this migration on SQLite.*
+   ```sql
+   ALTER TABLE mytable ADD CONSTRAINT CHECK new_column_not_null (new_column IS NOT NULL) NOT VALID;
+   ```
+2. Start a background update to perform migration: it should gradually run e.g.
+   ```sql
+   UPDATE mytable SET new_column = old_column * 100 WHERE 0 < mytable_id AND mytable_id <= 5;
+   ```
+   This background update is technically pointless on SQLite, but you must schedule it anyway so that the `portdb` script to migrate to Postgres still works.
+3. Upon completion of the background update, you should run `VALIDATE CONSTRAINT` on Postgres to turn the `NOT VALID` constraint into a valid one.
+   ```sql
+   ALTER TABLE mytable VALIDATE CONSTRAINT new_column_not_null;
+   ```
+   This will take some time but does **NOT** hold an exclusive lock over the table.
+
+**Invariants:**
+1. `old_column` is read by Synapse and written to by Synapse.
+2. `new_column` is written to by Synapse and new rows always have a non-`NULL` value in this field.
+
+
+**Notes:**
+1. If you wish, you can convert the `CHECK (new_column IS NOT NULL)` to a `NOT NULL` constraint free of charge in Postgres by adding the `NOT NULL` constraint and then dropping the `CHECK` constraint, because Postgres can statically verify that the `NOT NULL` constraint is implied by the `CHECK` constraint without performing a table scan.
+2. It might be tempting to make version `N + 2` redundant by moving the background update to `N + 1` and delaying adding the `NOT NULL` constraint to `N + 3`, but that would mean the constraint would always be validated in the foreground in `N + 3`. Whereas if the `N + 2` step is kept, the migration in `N + 3` would be fast in the happy case.
+
+#### Synapse version `N + 3`
+
+```python
+SCHEMA_VERSION = S + 3
+SCHEMA_COMPAT_VERSION = S + 1 # we can't roll back to a time before new_column existed
+```
+
+**Changes:**
+1. (Postgres) Update the table to populate values of `new_column` in case the background update had not completed. Additionally, `VALIDATE CONSTRAINT` to make the check fully valid.
+   ```sql
+   -- you ideally want an index on `new_column` or e.g. `(new_column) WHERE new_column IS NULL` first, or perhaps you can find a way to skip this if the `NOT NULL` constraint has already been validated.
+   UPDATE mytable SET new_column = old_column * 100 WHERE new_column IS NULL;
+
+   -- this is a no-op if it already ran as part of the background update
+   ALTER TABLE mytable VALIDATE CONSTRAINT new_column_not_null;
+   ```
+2. (SQLite) Recreate the table by precisely following [the 12-step procedure for SQLite table schema changes](https://www.sqlite.org/lang_altertable.html#otheralter).
+   During this table rewrite, you should recreate `new_column` as `NOT NULL` and populate any outstanding `NULL` values at the same time.
+   Unfortunately, you can't drop `old_column` yet because it must be present for compatibility with the Postgres schema, as needed by `portdb`.
+   (Otherwise you could do this all in one go with SQLite!)
+
+**Invariants:**
+1. `old_column` is written to by Synapse (but no longer read by Synapse!).
+2. `new_column` is read by Synapse and written to by Synapse. Moreover, all rows have a non-`NULL` value in this field, as guaranteed by a schema constraint.
+
+**Notes:**
+1. We can't drop `old_column` yet, or even stop writing to it, because that would break a rollback to the previous version of Synapse.
+2. Application code can now rely on `new_column` being populated. The remaining steps are only motivated by the wish to clean-up old columns.
+
+
+#### Synapse version `N + 4`
+
+```python
+SCHEMA_VERSION = S + 4
+SCHEMA_COMPAT_VERSION = S + 3 # we can't roll back to a time before new_column was entirely non-NULL
+```
+
+**Invariants:**
+1. `old_column` exists but is not written to or read from by Synapse.
+2. `new_column` is read by Synapse and written to by Synapse. Moreover, all rows have a non-`NULL` value in this field, as guaranteed by a schema constraint.
+
+**Notes:**
+1. We can't drop `old_column` yet because that would break a rollback to the previous version of Synapse. \
+   **TODO:** It may be possible to relax this and drop the column straight away as long as the previous version of Synapse detected a rollback occurred and stopped attempting to write to the column. This could possibly be done by checking whether the database's schema compatibility version was `S + 3`.
+
+
+#### Synapse version `N + 5`
+
+```python
+SCHEMA_VERSION = S + 5
+SCHEMA_COMPAT_VERSION = S + 4 # we can't roll back to a time before old_column was no longer being touched
+```
+
+**Changes:**
+1.
+   ```sql
+   ALTER TABLE mytable DROP COLUMN old_column;
+   ```

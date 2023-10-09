@@ -365,6 +365,36 @@ class RelationsWorkerStore(SQLBaseStore):
             func=get_all_relation_ids_for_event_with_types_txn,
         )
 
+    async def get_all_relations_for_event(
+        self,
+        event_id: str,
+    ) -> List[str]:
+        """Get the event IDs of all events that have a relation to the given event.
+
+        Args:
+            event_id: The event for which to look for related events.
+
+        Returns:
+            A list of the IDs of the events that relate to the given event.
+        """
+
+        def get_all_relation_ids_for_event_txn(
+            txn: LoggingTransaction,
+        ) -> List[str]:
+            rows = self.db_pool.simple_select_list_txn(
+                txn=txn,
+                table="event_relations",
+                keyvalues={"relates_to_id": event_id},
+                retcols=["event_id"],
+            )
+
+            return [row["event_id"] for row in rows]
+
+        return await self.db_pool.runInteraction(
+            desc="get_all_relation_ids_for_event",
+            func=get_all_relation_ids_for_event_txn,
+        )
+
     async def event_includes_relation(self, event_id: str) -> bool:
         """Check if the given event relates to another event.
 
@@ -428,14 +458,14 @@ class RelationsWorkerStore(SQLBaseStore):
         )
         return result is not None
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     async def get_references_for_event(self, event_id: str) -> List[JsonDict]:
         raise NotImplementedError()
 
     @cachedList(cached_method_name="get_references_for_event", list_name="event_ids")
     async def get_references_for_events(
         self, event_ids: Collection[str]
-    ) -> Mapping[str, Optional[List[_RelatedEvent]]]:
+    ) -> Mapping[str, Optional[Sequence[_RelatedEvent]]]:
         """Get a list of references to the given events.
 
         Args:
@@ -482,14 +512,15 @@ class RelationsWorkerStore(SQLBaseStore):
             "_get_references_for_events_txn", _get_references_for_events_txn
         )
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     def get_applicable_edit(self, event_id: str) -> Optional[EventBase]:
         raise NotImplementedError()
 
-    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")
+    # TODO: This returns a mutable object, which is generally bad.
+    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_applicable_edits(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[EventBase]]:
+    ) -> Mapping[str, Optional[EventBase]]:
         """Get the most recent edit (if any) that has happened for the given
         events.
 
@@ -568,14 +599,15 @@ class RelationsWorkerStore(SQLBaseStore):
             for original_event_id in event_ids
         }
 
-    @cached()
+    @cached()  # type: ignore[synapse-@cached-mutable]
     def get_thread_summary(self, event_id: str) -> Optional[Tuple[int, EventBase]]:
         raise NotImplementedError()
 
-    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
+    # TODO: This returns a mutable object, which is generally bad.
+    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")  # type: ignore[synapse-@cached-mutable]
     async def get_thread_summaries(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[Tuple[int, EventBase]]]:
+    ) -> Mapping[str, Optional[Tuple[int, EventBase]]]:
         """Get the number of threaded replies and the latest reply (if any) for the given events.
 
         Args:
@@ -749,7 +781,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_thread_participated", list_name="event_ids")
     async def get_threads_participated(
         self, event_ids: Collection[str], user_id: str
-    ) -> Dict[str, bool]:
+    ) -> Mapping[str, bool]:
         """Get whether the requesting user participated in the given threads.
 
         This is separate from get_thread_summaries since that can be cached across
@@ -901,7 +933,7 @@ class RelationsWorkerStore(SQLBaseStore):
         room_id: str,
         limit: int = 5,
         from_token: Optional[ThreadsNextBatch] = None,
-    ) -> Tuple[List[str], Optional[ThreadsNextBatch]]:
+    ) -> Tuple[Sequence[str], Optional[ThreadsNextBatch]]:
         """Get a list of thread IDs, ordered by topological ordering of their
         latest reply.
 

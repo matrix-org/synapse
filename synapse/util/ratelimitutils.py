@@ -20,6 +20,7 @@ import typing
 from typing import (
     Any,
     Callable,
+    ContextManager,
     DefaultDict,
     Dict,
     Iterator,
@@ -33,7 +34,6 @@ from typing import (
 from weakref import WeakSet
 
 from prometheus_client.core import Counter
-from typing_extensions import ContextManager
 
 from twisted.internet import defer
 
@@ -291,7 +291,8 @@ class _PerHostRatelimiter:
             if self.metrics_name:
                 rate_limit_reject_counter.labels(self.metrics_name).inc()
             raise LimitExceededError(
-                retry_after_ms=int(self.window_size / self.sleep_limit)
+                limiter_name="rc_federation",
+                retry_after_ms=int(self.window_size / self.sleep_limit),
             )
 
         self.request_times.append(time_now)

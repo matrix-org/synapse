@@ -70,7 +70,9 @@ pub struct PushRuleEvaluator {
     /// The "content.body", if any.
     body: String,
 
-    /// True if the event has a mentions property and MSC3952 support is enabled.
+    /// True if the event has a m.mentions property. (Note that this is a separate
+    /// flag instead of checking flattened_keys since the m.mentions property
+    /// might be an empty map and not appear in flattened_keys.
     has_mentions: bool,
 
     /// The number of users in the room.
@@ -103,6 +105,17 @@ impl PushRuleEvaluator {
     /// Create a new `PushRuleEvaluator`. See struct docstring for details.
     #[allow(clippy::too_many_arguments)]
     #[new]
+    #[pyo3(signature = (
+        flattened_keys,
+        has_mentions,
+        room_member_count,
+        sender_power_level,
+        notification_power_levels,
+        related_events_flattened,
+        related_event_match_enabled,
+        room_version_feature_flags,
+        msc3931_enabled,
+    ))]
     pub fn py_new(
         flattened_keys: BTreeMap<String, JsonValue>,
         has_mentions: bool,
@@ -115,7 +128,7 @@ impl PushRuleEvaluator {
         msc3931_enabled: bool,
     ) -> Result<Self, Error> {
         let body = match flattened_keys.get("content.body") {
-            Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone(),
+            Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone().into_owned(),
             _ => String::new(),
         };
 
@@ -155,9 +168,7 @@ impl PushRuleEvaluator {
             let rule_id = &push_rule.rule_id().to_string();
 
             // For backwards-compatibility the legacy mention rules are disabled
-            // if the event contains the 'm.mentions' property (and if the
-            // experimental feature is enabled, both of these are represented
-            // by the has_mentions flag).
+            // if the event contains the 'm.mentions' property.
             if self.has_mentions
                 && (rule_id == "global/override/.m.rule.contains_display_name"
                     || rule_id == "global/content/.m.rule.contains_user_name"
@@ -313,13 +324,15 @@ impl PushRuleEvaluator {
                 };
 
                 let pattern = match &*exact_event_match.value_type {
-                    EventMatchPatternType::UserId => user_id,
-                    EventMatchPatternType::UserLocalpart => get_localpart_from_id(user_id)?,
+                    EventMatchPatternType::UserId => user_id.to_owned(),
+                    EventMatchPatternType::UserLocalpart => {
+                        get_localpart_from_id(user_id)?.to_owned()
+                    }
                 };
 
                 self.match_event_property_contains(
                     exact_event_match.key.clone(),
-                    Cow::Borrowed(&SimpleJsonValue::Str(pattern.to_string())),
+                    Cow::Borrowed(&SimpleJsonValue::Str(Cow::Owned(pattern))),
                 )?
             }
             KnownCondition::ContainsDisplayName => {
@@ -494,7 +507,7 @@ fn push_rule_evaluator() {
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert(
         "content.body".to_string(),
-        JsonValue::Value(SimpleJsonValue::Str("foo bar bob hello".to_string())),
+        JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("foo bar bob hello"))),
     );
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
@@ -522,7 +535,7 @@ fn test_requires_room_version_supports_condition() {
     let mut flattened_keys = BTreeMap::new();
     flattened_keys.insert(
         "content.body".to_string(),
-        JsonValue::Value(SimpleJsonValue::Str("foo bar bob hello".to_string())),
+        JsonValue::Value(SimpleJsonValue::Str(Cow::Borrowed("foo bar bob hello"))),
     );
     let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
     let evaluator = PushRuleEvaluator::py_new(
@@ -562,7 +575,7 @@ fn test_requires_room_version_supports_condition() {
     };
     let rules = PushRules::new(vec![custom_rule]);
     result = evaluator.run(
-        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true, false, false),
+        &FilteredPushRules::py_new(rules, BTreeMap::new(), true, false, true, false),
         None,
         None,
     );

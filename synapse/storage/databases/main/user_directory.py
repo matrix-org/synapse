@@ -17,6 +17,7 @@ import re
 import unicodedata
 from typing import (
     TYPE_CHECKING,
+    Collection,
     Iterable,
     List,
     Mapping,
@@ -45,7 +46,7 @@ from synapse.util.stringutils import non_null_str_or_none
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, UserTypes
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -61,7 +62,6 @@ from synapse.types import (
     get_domain_from_id,
     get_localpart_from_id,
 )
-from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -356,13 +356,30 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         Add all local users to the user directory.
         """
 
-        def _get_next_batch(txn: LoggingTransaction) -> Optional[List[str]]:
-            sql = "SELECT user_id FROM %s LIMIT %s" % (
-                TEMP_TABLE + "_users",
-                str(batch_size),
-            )
-            txn.execute(sql)
-            user_result = cast(List[Tuple[str]], txn.fetchall())
+        def _populate_user_directory_process_users_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[int]:
+            if self.database_engine.supports_returning:
+                # Note: we use an ORDER BY in the SELECT to force usage of an
+                # index. Otherwise, postgres does a sequential scan that is
+                # surprisingly slow (I think due to the fact it will read/skip
+                # over lots of already deleted rows).
+                sql = f"""
+                    DELETE FROM {TEMP_TABLE + "_users"}
+                    WHERE user_id IN (
+                        SELECT user_id FROM {TEMP_TABLE + "_users"} ORDER BY user_id LIMIT ?
+                    )
+                    RETURNING user_id
+                """
+                txn.execute(sql, (batch_size,))
+                user_result = cast(List[Tuple[str]], txn.fetchall())
+            else:
+                sql = "SELECT user_id FROM %s ORDER BY user_id LIMIT %s" % (
+                    TEMP_TABLE + "_users",
+                    str(batch_size),
+                )
+                txn.execute(sql)
+                user_result = cast(List[Tuple[str]], txn.fetchall())
 
             if not user_result:
                 return None
@@ -378,85 +395,80 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 assert count_result is not None
                 progress["remaining"] = count_result[0]
 
-            return users_to_work_on
+            if not users_to_work_on:
+                return None
 
-        users_to_work_on = await self.db_pool.runInteraction(
-            "populate_user_directory_temp_read", _get_next_batch
+            logger.debug(
+                "Processing the next %d users of %d remaining",
+                len(users_to_work_on),
+                progress["remaining"],
+            )
+
+            # First filter down to users we want to insert into the user directory.
+            users_to_insert = self._filter_local_users_for_dir_txn(
+                txn, users_to_work_on
+            )
+
+            # Next fetch their profiles. Note that not all users have profiles.
+            profile_rows = self.db_pool.simple_select_many_txn(
+                txn,
+                table="profiles",
+                column="full_user_id",
+                iterable=list(users_to_insert),
+                retcols=(
+                    "full_user_id",
+                    "displayname",
+                    "avatar_url",
+                ),
+                keyvalues={},
+            )
+            profiles = {
+                row["full_user_id"]: _UserDirProfile(
+                    row["full_user_id"],
+                    row["displayname"],
+                    row["avatar_url"],
+                )
+                for row in profile_rows
+            }
+
+            profiles_to_insert = [
+                profiles.get(user_id) or _UserDirProfile(user_id)
+                for user_id in users_to_insert
+            ]
+
+            # Actually insert the users with their profiles into the directory.
+            self._update_profiles_in_user_dir_txn(txn, profiles_to_insert)
+
+            # We've finished processing the users. Delete it from the table, if
+            # we haven't already.
+            if not self.database_engine.supports_returning:
+                self.db_pool.simple_delete_many_txn(
+                    txn,
+                    table=TEMP_TABLE + "_users",
+                    column="user_id",
+                    values=users_to_work_on,
+                    keyvalues={},
+                )
+
+            # Update the remaining counter.
+            progress["remaining"] -= len(users_to_work_on)
+            self.db_pool.updates._background_update_progress_txn(
+                txn, "populate_user_directory_process_users", progress
+            )
+            return len(users_to_work_on)
+
+        processed_count = await self.db_pool.runInteraction(
+            "populate_user_directory_temp", _populate_user_directory_process_users_txn
         )
 
         # No more users -- complete the transaction.
-        if not users_to_work_on:
+        if not processed_count:
             await self.db_pool.updates._end_background_update(
                 "populate_user_directory_process_users"
             )
             return 1
 
-        logger.debug(
-            "Processing the next %d users of %d remaining"
-            % (len(users_to_work_on), progress["remaining"])
-        )
-
-        # First filter down to users we want to insert into the user directory.
-        users_to_insert = [
-            user_id
-            for user_id in users_to_work_on
-            if await self.should_include_local_user_in_dir(user_id)
-        ]
-
-        # Next fetch their profiles. Note that the `user_id` here is the
-        # *localpart*, and that not all users have profiles.
-        profile_rows = await self.db_pool.simple_select_many_batch(
-            table="profiles",
-            column="user_id",
-            iterable=[get_localpart_from_id(u) for u in users_to_insert],
-            retcols=(
-                "user_id",
-                "displayname",
-                "avatar_url",
-            ),
-            keyvalues={},
-            desc="populate_user_directory_process_users_get_profiles",
-        )
-        profiles = {
-            f"@{row['user_id']}:{self.server_name}": _UserDirProfile(
-                f"@{row['user_id']}:{self.server_name}",
-                row["displayname"],
-                row["avatar_url"],
-            )
-            for row in profile_rows
-        }
-
-        profiles_to_insert = [
-            profiles.get(user_id) or _UserDirProfile(user_id)
-            for user_id in users_to_insert
-        ]
-
-        # Actually insert the users with their profiles into the directory.
-        await self.db_pool.runInteraction(
-            "populate_user_directory_process_users_insertion",
-            self._update_profiles_in_user_dir_txn,
-            profiles_to_insert,
-        )
-
-        # We've finished processing the users. Delete it from the table.
-        await self.db_pool.simple_delete_many(
-            table=TEMP_TABLE + "_users",
-            column="user_id",
-            iterable=users_to_work_on,
-            keyvalues={},
-            desc="populate_user_directory_process_users_delete",
-        )
-
-        # Update the remaining counter.
-        progress["remaining"] -= len(users_to_work_on)
-        await self.db_pool.runInteraction(
-            "populate_user_directory",
-            self.db_pool.updates._background_update_progress_txn,
-            "populate_user_directory_process_users",
-            progress,
-        )
-
-        return len(users_to_work_on)
+        return processed_count
 
     async def should_include_local_user_in_dir(self, user: str) -> bool:
         """Certain classes of local user are omitted from the user directory.
@@ -493,6 +505,30 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             return False
 
         return True
+
+    def _filter_local_users_for_dir_txn(
+        self, txn: LoggingTransaction, users: Collection[str]
+    ) -> Collection[str]:
+        """A batched version of `should_include_local_user_in_dir`"""
+        users = [
+            user
+            for user in users
+            if self.get_app_service_by_user_id(user) is None  # type: ignore[attr-defined]
+            and not self.get_if_app_services_interested_in_user(user)  # type: ignore[attr-defined]
+        ]
+
+        rows = self.db_pool.simple_select_many_txn(
+            txn,
+            table="users",
+            column="name",
+            iterable=users,
+            keyvalues={
+                "deactivated": 0,
+            },
+            retcols=("name", "user_type"),
+        )
+
+        return [row["name"] for row in rows if row["user_type"] != UserTypes.SUPPORT]
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
         """Check if the room is either world_readable or publically joinable"""
@@ -733,9 +769,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
-        for p in profiles:
-            txn.call_after(self.get_user_in_directory.invalidate, (p.user_id,))
-
     async def add_users_who_share_private_room(
         self, room_id: str, user_id_tuples: Iterable[Tuple[str, str]]
     ) -> None:
@@ -793,14 +826,12 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             txn.execute(f"{truncate} user_directory_search")
             txn.execute(f"{truncate} users_in_public_rooms")
             txn.execute(f"{truncate} users_who_share_private_rooms")
-            txn.call_after(self.get_user_in_directory.invalidate_all)
 
         await self.db_pool.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
         )
 
-    @cached()
-    async def get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
+    async def _get_user_in_directory(self, user_id: str) -> Optional[Mapping[str, str]]:
         return await self.db_pool.simple_select_one(
             table="user_directory",
             keyvalues={"user_id": user_id},
@@ -862,7 +893,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 table="users_who_share_private_rooms",
                 keyvalues={"other_user_id": user_id},
             )
-            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
         await self.db_pool.runInteraction(
             "remove_from_user_dir", _remove_from_user_dir_txn
@@ -965,7 +995,11 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         )
 
     async def search_user_dir(
-        self, user_id: str, search_term: str, limit: int
+        self,
+        user_id: str,
+        search_term: str,
+        limit: int,
+        show_locked_users: bool = False,
     ) -> SearchResult:
         """Searches for users in directory
 
@@ -999,6 +1033,9 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 )
             """
 
+        if not show_locked_users:
+            where_clause += " AND (u.locked IS NULL OR u.locked = FALSE)"
+
         # We allow manipulating the ranking algorithm by injecting statements
         # based on config options.
         additional_ordering_statements = []
@@ -1023,12 +1060,16 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             # The array of numbers are the weights for the various part of the
             # search: (domain, _, display name, localpart)
             sql = """
+                WITH matching_users AS (
+                    SELECT user_id, vector FROM user_directory_search WHERE vector @@ to_tsquery('simple', ?)
+                    LIMIT 10000
+                )
                 SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search as t
+                FROM matching_users as t
                 INNER JOIN user_directory AS d USING (user_id)
+                LEFT JOIN users AS u ON t.user_id = u.name
                 WHERE
                     %(where_clause)s
-                    AND vector @@ to_tsquery('simple', ?)
                 ORDER BY
                     (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
@@ -1057,8 +1098,9 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 "order_case_statements": " ".join(additional_ordering_statements),
             }
             args = (
-                join_args
-                + (full_query, exact_query, prefix_query)
+                (full_query,)
+                + join_args
+                + (exact_query, prefix_query)
                 + ordering_arguments
                 + (limit + 1,)
             )
@@ -1081,6 +1123,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 SELECT d.user_id AS user_id, display_name, avatar_url
                 FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
+                LEFT JOIN users AS u ON t.user_id = u.name
                 WHERE
                     %(where_clause)s
                     AND value MATCH ?

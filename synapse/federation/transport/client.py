@@ -45,7 +45,7 @@ from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
 from synapse.http.matrixfederationclient import ByteParser, LegacyJsonSendParser
 from synapse.http.types import QueryParams
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import ExceptionBundle
 
 if TYPE_CHECKING:
@@ -249,8 +249,10 @@ class TransportLayerClient:
             data=json_data,
             json_data_callback=json_data_callback,
             long_retries=True,
-            backoff_on_404=True,  # If we get a 404 the other side has gone
             try_trailing_slash_on_400=True,
+            # Sending a transaction should always succeed, if it doesn't
+            # then something is wrong and we should backoff.
+            backoff_on_all_error_codes=True,
         )
 
     async def make_query(
@@ -429,7 +431,7 @@ class TransportLayerClient:
             The remote homeserver can optionally return some state from the room. The response
             dictionary is in the form:
 
-            {"knock_state_events": [<state event dict>, ...]}
+            {"knock_room_state": [<state event dict>, ...]}
 
             The list of state events may be empty.
         """
@@ -475,13 +477,11 @@ class TransportLayerClient:
         See synapse.federation.federation_client.FederationClient.get_public_rooms for
         more information.
         """
+        path = _create_v1_path("/publicRooms")
+
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
-            path = _create_v1_path("/publicRooms")
-
-            data: Dict[str, Any] = {
-                "include_all_networks": "true" if include_all_networks else "false"
-            }
+            data: Dict[str, Any] = {"include_all_networks": include_all_networks}
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
@@ -505,17 +505,15 @@ class TransportLayerClient:
                     )
                 raise
         else:
-            path = _create_v1_path("/publicRooms")
-
             args: Dict[str, Union[str, Iterable[str]]] = {
                 "include_all_networks": "true" if include_all_networks else "false"
             }
             if third_party_instance_id:
-                args["third_party_instance_id"] = (third_party_instance_id,)
+                args["third_party_instance_id"] = third_party_instance_id
             if limit:
-                args["limit"] = [str(limit)]
+                args["limit"] = str(limit)
             if since_token:
-                args["since"] = [since_token]
+                args["since"] = since_token
 
             try:
                 response = await self.client.get_json(
@@ -630,7 +628,11 @@ class TransportLayerClient:
         )
 
     async def claim_client_keys(
-        self, destination: str, query_content: JsonDict, timeout: Optional[int]
+        self,
+        user: UserID,
+        destination: str,
+        query_content: JsonDict,
+        timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
 
@@ -655,6 +657,7 @@ class TransportLayerClient:
             }
 
         Args:
+            user: the user_id of the requesting user
             destination: The server to query.
             query_content: The user ids to query.
         Returns:
@@ -671,7 +674,11 @@ class TransportLayerClient:
         )
 
     async def claim_client_keys_unstable(
-        self, destination: str, query_content: JsonDict, timeout: Optional[int]
+        self,
+        user: UserID,
+        destination: str,
+        query_content: JsonDict,
+        timeout: Optional[int],
     ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
 
@@ -696,6 +703,7 @@ class TransportLayerClient:
             }
 
         Args:
+            user: the user_id of the requesting user
             destination: The server to query.
             query_content: The user ids to query.
         Returns:

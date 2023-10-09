@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pymacaroons
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.auth import Auth
+from synapse.api.auth.internal import InternalAuth
 from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.constants import UserTypes
 from synapse.api.errors import (
@@ -35,7 +35,6 @@ from synapse.types import Requester, UserID
 from synapse.util import Clock
 
 from tests import unittest
-from tests.test_utils import simple_async_mock
 from tests.unittest import override_config
 from tests.utils import mock_getRawHeaders
 
@@ -48,7 +47,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # have been called by the HomeserverTestCase machinery.
         hs.datastores.main = self.store  # type: ignore[union-attr]
         hs.get_auth_handler().store = self.store
-        self.auth = Auth(hs)
+        self.auth = InternalAuth(hs)
 
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
@@ -60,15 +59,16 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # this is overridden for the appservice tests
         self.store.get_app_service_by_token = Mock(return_value=None)
 
-        self.store.insert_client_ip = simple_async_mock(None)
-        self.store.is_support_user = simple_async_mock(False)
+        self.store.insert_client_ip = AsyncMock(return_value=None)
+        self.store.is_support_user = AsyncMock(return_value=False)
 
     def test_get_user_by_req_user_valid_token(self) -> None:
         user_info = TokenLookupResult(
             user_id=self.test_user, token_id=5, device_id="device"
         )
-        self.store.get_user_by_access_token = simple_async_mock(user_info)
-        self.store.mark_access_token_as_used = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=user_info)
+        self.store.mark_access_token_as_used = AsyncMock(return_value=None)
+        self.store.get_user_locked_status = AsyncMock(return_value=False)
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
@@ -77,7 +77,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_user_bad_token(self) -> None:
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
@@ -90,7 +90,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def test_get_user_by_req_user_missing_token(self) -> None:
         user_info = TokenLookupResult(user_id=self.test_user, token_id=5)
-        self.store.get_user_by_access_token = simple_async_mock(user_info)
+        self.store.get_user_by_access_token = AsyncMock(return_value=user_info)
 
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
@@ -105,7 +105,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             token="foobar", url="a_url", sender=self.test_user, ip_range_whitelist=None
         )
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
@@ -124,7 +124,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             ip_range_whitelist=IPSet(["192.168/16"]),
         )
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.getClientAddress.return_value.host = "192.168.10.10"
@@ -143,7 +143,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             ip_range_whitelist=IPSet(["192.168/16"]),
         )
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.getClientAddress.return_value.host = "131.111.8.42"
@@ -157,7 +157,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def test_get_user_by_req_appservice_bad_token(self) -> None:
         self.store.get_app_service_by_token = Mock(return_value=None)
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
@@ -171,7 +171,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
     def test_get_user_by_req_appservice_missing_token(self) -> None:
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
@@ -188,9 +188,12 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         app_service.is_interested_in_user = Mock(return_value=True)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        # This just needs to return a truth-y value.
-        self.store.get_user_by_id = simple_async_mock({"is_guest": False})
-        self.store.get_user_by_access_token = simple_async_mock(None)
+
+        class FakeUserInfo:
+            is_guest = False
+
+        self.store.get_user_by_id = AsyncMock(return_value=FakeUserInfo())
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
@@ -209,7 +212,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         app_service.is_interested_in_user = Mock(return_value=False)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
@@ -233,10 +236,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
         app_service.is_interested_in_user = Mock(return_value=True)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         # This just needs to return a truth-y value.
-        self.store.get_user_by_id = simple_async_mock({"is_guest": False})
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_id = AsyncMock(return_value={"is_guest": False})
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
         # This also needs to just return a truth-y value
-        self.store.get_device = simple_async_mock({"hidden": False})
+        self.store.get_device = AsyncMock(return_value={"hidden": False})
 
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
@@ -265,10 +268,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
         app_service.is_interested_in_user = Mock(return_value=True)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         # This just needs to return a truth-y value.
-        self.store.get_user_by_id = simple_async_mock({"is_guest": False})
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_id = AsyncMock(return_value={"is_guest": False})
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
         # This also needs to just return a falsey value
-        self.store.get_device = simple_async_mock(None)
+        self.store.get_device = AsyncMock(return_value=None)
 
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
@@ -282,8 +285,8 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(failure.value.errcode, Codes.EXCLUSIVE)
 
     def test_get_user_by_req__puppeted_token__not_tracking_puppeted_mau(self) -> None:
-        self.store.get_user_by_access_token = simple_async_mock(
-            TokenLookupResult(
+        self.store.get_user_by_access_token = AsyncMock(
+            return_value=TokenLookupResult(
                 user_id="@baldrick:matrix.org",
                 device_id="device",
                 token_id=5,
@@ -291,8 +294,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
                 token_used=True,
             )
         )
-        self.store.insert_client_ip = simple_async_mock(None)
-        self.store.mark_access_token_as_used = simple_async_mock(None)
+        self.store.insert_client_ip = AsyncMock(return_value=None)
+        self.store.mark_access_token_as_used = AsyncMock(return_value=None)
+        self.store.get_user_locked_status = AsyncMock(return_value=False)
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
@@ -302,8 +306,8 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def test_get_user_by_req__puppeted_token__tracking_puppeted_mau(self) -> None:
         self.auth._track_puppeted_user_ips = True
-        self.store.get_user_by_access_token = simple_async_mock(
-            TokenLookupResult(
+        self.store.get_user_by_access_token = AsyncMock(
+            return_value=TokenLookupResult(
                 user_id="@baldrick:matrix.org",
                 device_id="device",
                 token_id=5,
@@ -311,8 +315,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
                 token_used=True,
             )
         )
-        self.store.insert_client_ip = simple_async_mock(None)
-        self.store.mark_access_token_as_used = simple_async_mock(None)
+        self.store.get_user_locked_status = AsyncMock(return_value=False)
+        self.store.insert_client_ip = AsyncMock(return_value=None)
+        self.store.mark_access_token_as_used = AsyncMock(return_value=None)
         request = Mock(args={})
         request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
@@ -321,7 +326,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.store.insert_client_ip.call_count, 2)
 
     def test_get_user_from_macaroon(self) -> None:
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
@@ -339,8 +344,11 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
 
     def test_get_guest_user_from_macaroon(self) -> None:
-        self.store.get_user_by_id = simple_async_mock({"is_guest": True})
-        self.store.get_user_by_access_token = simple_async_mock(None)
+        class FakeUserInfo:
+            is_guest = True
+
+        self.store.get_user_by_id = AsyncMock(return_value=FakeUserInfo())
+        self.store.get_user_by_access_token = AsyncMock(return_value=None)
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
@@ -370,7 +378,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         self.auth_blocking._limit_usage_by_mau = True
 
-        self.store.get_monthly_active_count = simple_async_mock(lots_of_users)
+        self.store.get_monthly_active_count = AsyncMock(return_value=lots_of_users)
 
         e = self.get_failure(
             self.auth_blocking.check_auth_blocking(), ResourceLimitError
@@ -380,25 +388,27 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(e.value.code, 403)
 
         # Ensure does not throw an error
-        self.store.get_monthly_active_count = simple_async_mock(small_number_of_users)
+        self.store.get_monthly_active_count = AsyncMock(
+            return_value=small_number_of_users
+        )
         self.get_success(self.auth_blocking.check_auth_blocking())
 
     def test_blocking_mau__depending_on_user_type(self) -> None:
         self.auth_blocking._max_mau_value = 50
         self.auth_blocking._limit_usage_by_mau = True
 
-        self.store.get_monthly_active_count = simple_async_mock(100)
+        self.store.get_monthly_active_count = AsyncMock(return_value=100)
         # Support users allowed
         self.get_success(
             self.auth_blocking.check_auth_blocking(user_type=UserTypes.SUPPORT)
         )
-        self.store.get_monthly_active_count = simple_async_mock(100)
+        self.store.get_monthly_active_count = AsyncMock(return_value=100)
         # Bots not allowed
         self.get_failure(
             self.auth_blocking.check_auth_blocking(user_type=UserTypes.BOT),
             ResourceLimitError,
         )
-        self.store.get_monthly_active_count = simple_async_mock(100)
+        self.store.get_monthly_active_count = AsyncMock(return_value=100)
         # Real users not allowed
         self.get_failure(self.auth_blocking.check_auth_blocking(), ResourceLimitError)
 
@@ -409,9 +419,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._limit_usage_by_mau = True
         self.auth_blocking._track_appservice_user_ips = False
 
-        self.store.get_monthly_active_count = simple_async_mock(100)
-        self.store.user_last_seen_monthly_active = simple_async_mock()
-        self.store.is_trial_user = simple_async_mock()
+        self.store.get_monthly_active_count = AsyncMock(return_value=100)
+        self.store.user_last_seen_monthly_active = AsyncMock(return_value=None)
+        self.store.is_trial_user = AsyncMock(return_value=False)
 
         appservice = ApplicationService(
             "abcd",
@@ -426,6 +436,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
+            scope=set(),
             shadow_banned=False,
             app_service=appservice,
             authenticated_entity="@appservice:server",
@@ -439,9 +450,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._limit_usage_by_mau = True
         self.auth_blocking._track_appservice_user_ips = True
 
-        self.store.get_monthly_active_count = simple_async_mock(100)
-        self.store.user_last_seen_monthly_active = simple_async_mock()
-        self.store.is_trial_user = simple_async_mock()
+        self.store.get_monthly_active_count = AsyncMock(return_value=100)
+        self.store.user_last_seen_monthly_active = AsyncMock(return_value=None)
+        self.store.is_trial_user = AsyncMock(return_value=False)
 
         appservice = ApplicationService(
             "abcd",
@@ -456,6 +467,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             access_token_id=None,
             device_id="FOOBAR",
             is_guest=False,
+            scope=set(),
             shadow_banned=False,
             app_service=appservice,
             authenticated_entity="@appservice:server",
@@ -468,7 +480,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
     def test_reserved_threepid(self) -> None:
         self.auth_blocking._limit_usage_by_mau = True
         self.auth_blocking._max_mau_value = 1
-        self.store.get_monthly_active_count = simple_async_mock(2)
+        self.store.get_monthly_active_count = AsyncMock(return_value=2)
         threepid = {"medium": "email", "address": "reserved@server.com"}
         unknown_threepid = {"medium": "email", "address": "unreserved@server.com"}
         self.auth_blocking._mau_limits_reserved_threepids = [threepid]

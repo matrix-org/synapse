@@ -46,6 +46,7 @@ from synapse.storage.databases.main.directory import RoomAliasMapping
 from synapse.types import (
     DeviceListUpdates,
     JsonDict,
+    JsonMapping,
     RoomAlias,
     RoomStreamToken,
     StreamKeyType,
@@ -215,7 +216,7 @@ class ApplicationServicesHandler:
 
     def notify_interested_services_ephemeral(
         self,
-        stream_key: str,
+        stream_key: StreamKeyType,
         new_token: Union[int, RoomStreamToken],
         users: Collection[Union[str, UserID]],
     ) -> None:
@@ -325,7 +326,7 @@ class ApplicationServicesHandler:
     async def _notify_interested_services_ephemeral(
         self,
         services: List[ApplicationService],
-        stream_key: str,
+        stream_key: StreamKeyType,
         new_token: int,
         users: Collection[Union[str, UserID]],
     ) -> None:
@@ -397,7 +398,7 @@ class ApplicationServicesHandler:
 
     async def _handle_typing(
         self, service: ApplicationService, new_token: int
-    ) -> List[JsonDict]:
+    ) -> List[JsonMapping]:
         """
         Return the typing events since the given stream token that the given application
         service should receive.
@@ -432,7 +433,7 @@ class ApplicationServicesHandler:
 
     async def _handle_receipts(
         self, service: ApplicationService, new_token: int
-    ) -> List[JsonDict]:
+    ) -> List[JsonMapping]:
         """
         Return the latest read receipts that the given application service should receive.
 
@@ -471,7 +472,7 @@ class ApplicationServicesHandler:
         service: ApplicationService,
         users: Collection[Union[str, UserID]],
         new_token: Optional[int],
-    ) -> List[JsonDict]:
+    ) -> List[JsonMapping]:
         """
         Return the latest presence updates that the given application service should receive.
 
@@ -491,7 +492,7 @@ class ApplicationServicesHandler:
             A list of json dictionaries containing data derived from the presence events
             that should be sent to the given application service.
         """
-        events: List[JsonDict] = []
+        events: List[JsonMapping] = []
         presence_source = self.event_sources.sources.presence
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"

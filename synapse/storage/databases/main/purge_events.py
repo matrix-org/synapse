@@ -249,12 +249,11 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         # Mark all state and own events as outliers
         logger.info("[purge] marking remaining events as outliers")
         txn.execute(
-            "UPDATE events SET outlier = ?"
+            "UPDATE events SET outlier = TRUE"
             " WHERE event_id IN ("
-            "    SELECT event_id FROM events_to_purge "
-            "    WHERE NOT should_delete"
-            ")",
-            (True,),
+            "   SELECT event_id FROM events_to_purge "
+            "   WHERE NOT should_delete"
+            ")"
         )
 
         # synapse tries to take out an exclusive lock on room_depth whenever it
@@ -307,6 +306,8 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 self.invalidate_get_event_cache_after_txn(txn, event_id)
 
         logger.info("[purge] done")
+
+        self._invalidate_caches_for_room_events_and_stream(txn, room_id)
 
         return referenced_state_groups
 
@@ -449,10 +450,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "e2e_room_keys",
             "event_push_summary",
             "pusher_throttle",
-            "insertion_events",
-            "insertion_event_extremities",
-            "insertion_event_edges",
-            "batch_events",
             "room_account_data",
             "room_tags",
             # "rooms" happens last, to keep the foreign keys in the other tables
@@ -485,10 +482,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         #       index on them. In any case we should be clearing out 'stream' tables
         #       periodically anyway (#5888)
 
-        # TODO: we could probably usefully do a bunch more cache invalidation here
-
-        # XXX: as with purge_history, this is racy, but no worse than other races
-        #   that already exist.
-        self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
+        self._invalidate_caches_for_room_and_stream(txn, room_id)
 
         return state_groups

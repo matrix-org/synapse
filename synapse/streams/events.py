@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Iterator, Tuple
+from typing import TYPE_CHECKING, Sequence, Tuple
 
 import attr
 
@@ -23,7 +23,7 @@ from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
 from synapse.logging.opentracing import trace
 from synapse.streams import EventSource
-from synapse.types import StreamToken
+from synapse.types import StreamKeyType, StreamToken
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -37,9 +37,14 @@ class _EventSourcesInner:
     receipt: ReceiptEventSource
     account_data: AccountDataEventSource
 
-    def get_sources(self) -> Iterator[Tuple[str, EventSource]]:
-        for attribute in attr.fields(_EventSourcesInner):
-            yield attribute.name, getattr(self, attribute.name)
+    def get_sources(self) -> Sequence[Tuple[StreamKeyType, EventSource]]:
+        return [
+            (StreamKeyType.ROOM, self.room),
+            (StreamKeyType.PRESENCE, self.presence),
+            (StreamKeyType.TYPING, self.typing),
+            (StreamKeyType.RECEIPT, self.receipt),
+            (StreamKeyType.ACCOUNT_DATA, self.account_data),
+        ]
 
 
 class EventSources:

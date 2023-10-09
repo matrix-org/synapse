@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
 import gc
 import hashlib
 import hmac
@@ -59,7 +60,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.http.server import JsonResource
+from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import (
     SENTINEL_CONTEXT,
@@ -69,6 +70,7 @@ from synapse.logging.context import (
 )
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
+from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
@@ -150,7 +152,11 @@ def deepcopy_config(config: _TConfig) -> _TConfig:
     return new_config
 
 
-_make_homeserver_config_obj_cache: Dict[str, Union[RootConfig, Config]] = {}
+@functools.lru_cache(maxsize=8)
+def _parse_config_dict(config: str) -> RootConfig:
+    config_obj = HomeServerConfig()
+    config_obj.parse_config_dict(json.loads(config), "", "")
+    return config_obj
 
 
 def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
@@ -164,21 +170,7 @@ def make_homeserver_config_obj(config: Dict[str, Any]) -> RootConfig:
     but it keeps a cache of `HomeServerConfig` instances and deepcopies them as needed,
     to avoid validating the whole configuration every time.
     """
-    cache_key = json.dumps(config)
-
-    if cache_key in _make_homeserver_config_obj_cache:
-        # Cache hit: reuse the existing instance
-        config_obj = _make_homeserver_config_obj_cache[cache_key]
-    else:
-        # Cache miss; create the actual instance
-        config_obj = HomeServerConfig()
-        config_obj.parse_config_dict(config, "", "")
-
-        # Add to the cache
-        _make_homeserver_config_obj_cache[cache_key] = config_obj
-
-    assert isinstance(config_obj, RootConfig)
-
+    config_obj = _parse_config_dict(json.dumps(config, sort_keys=True))
     return deepcopy_config(config_obj)
 
 
@@ -322,7 +314,7 @@ class HomeserverTestCase(TestCase):
         servlets: List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
         hijack_auth: Whether to hijack auth to return the user specified
-        in user_id.
+           in user_id.
     """
 
     hijack_auth: ClassVar[bool] = True
@@ -367,6 +359,7 @@ class HomeserverTestCase(TestCase):
             server_version_string="1",
             max_request_body_size=4096,
             reactor=self.reactor,
+            hs=self.hs,
         )
 
         from tests.rest.client.utils import RestHelper
@@ -403,9 +396,9 @@ class HomeserverTestCase(TestCase):
                     )
 
                 # Type ignore: mypy doesn't like us assigning to methods.
-                self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[assignment]
-                self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[assignment]
-                self.hs.get_auth().get_access_token_from_request = Mock(return_value=token)  # type: ignore[assignment]
+                self.hs.get_auth().get_user_by_req = get_requester  # type: ignore[method-assign]
+                self.hs.get_auth().get_user_by_access_token = get_requester  # type: ignore[method-assign]
+                self.hs.get_auth().get_access_token_from_request = Mock(return_value=token)  # type: ignore[method-assign]
 
         if self.needs_threadpool:
             self.reactor.threadpool = ThreadPool()  # type: ignore[assignment]
@@ -466,7 +459,7 @@ class HomeserverTestCase(TestCase):
         The default calls `self.create_resource_dict` and builds the resultant dict
         into a tree.
         """
-        root_resource = Resource()
+        root_resource = OptionsResource()
         create_resource_tree(self.create_resource_dict(), root_resource)
         return root_resource
 
@@ -866,23 +859,22 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
         verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
         self.get_success(
-            hs.get_datastores().main.store_server_keys_json(
+            hs.get_datastores().main.store_server_keys_response(
                 self.OTHER_SERVER_NAME,
-                verify_key_id,
                 from_server=self.OTHER_SERVER_NAME,
-                ts_now_ms=clock.time_msec(),
-                ts_expires_ms=clock.time_msec() + 10000,
-                key_json_bytes=canonicaljson.encode_canonical_json(
-                    {
-                        "verify_keys": {
-                            verify_key_id: {
-                                "key": signedjson.key.encode_verify_key_base64(
-                                    verify_key
-                                )
-                            }
+                ts_added_ms=clock.time_msec(),
+                verify_keys={
+                    verify_key_id: FetchKeyResult(
+                        verify_key=verify_key, valid_until_ts=clock.time_msec() + 10000
+                    ),
+                },
+                response_json={
+                    "verify_keys": {
+                        verify_key_id: {
+                            "key": signedjson.key.encode_verify_key_base64(verify_key)
                         }
                     }
-                ),
+                },
             )
         )
 

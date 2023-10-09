@@ -88,7 +88,7 @@ from synapse.types import (
 )
 from synapse.types.state import StateFilter
 from synapse.util.async_helpers import Linearizer, concurrently_execute
-from synapse.util.iterutils import batch_iter
+from synapse.util.iterutils import batch_iter, partition
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
 
@@ -601,18 +601,6 @@ class FederationEventHandler:
                 room_id, [(event, context)]
             )
 
-            # If we're joining the room again, check if there is new marker
-            # state indicating that there is new history imported somewhere in
-            # the DAG. Multiple markers can exist in the current state with
-            # unique state_keys.
-            #
-            # Do this after the state from the remote join was persisted (via
-            # `persist_events_and_notify`). Otherwise we can run into a
-            # situation where the create event doesn't exist yet in the
-            # `current_state_events`
-            for e in state:
-                await self._handle_marker_event(origin, e)
-
             return stream_id_after_persist
 
     async def update_state_for_partial_state_event(
@@ -735,12 +723,11 @@ class FederationEventHandler:
         if not prevs - seen:
             return
 
-        latest_list = await self._store.get_latest_event_ids_in_room(room_id)
+        latest_frozen = await self._store.get_latest_event_ids_in_room(room_id)
 
         # We add the prev events that we have seen to the latest
         # list to ensure the remote server doesn't give them to us
-        latest = set(latest_list)
-        latest |= seen
+        latest = seen | latest_frozen
 
         logger.info(
             "Requesting missing events between %s and %s",
@@ -865,7 +852,7 @@ class FederationEventHandler:
             [event.event_id for event in events]
         )
 
-        new_events = []
+        new_events: List[EventBase] = []
         for event in events:
             event_id = event.event_id
 
@@ -890,12 +877,64 @@ class FederationEventHandler:
             # Continue on with the events that are new to us.
             new_events.append(event)
 
-        # We want to sort these by depth so we process them and
-        # tell clients about them in order.
-        sorted_events = sorted(new_events, key=lambda x: x.depth)
-        for ev in sorted_events:
-            with nested_logging_context(ev.event_id):
-                await self._process_pulled_event(origin, ev, backfilled=backfilled)
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "new_events.length",
+            str(len(new_events)),
+        )
+
+        @trace
+        async def _process_new_pulled_events(new_events: Collection[EventBase]) -> None:
+            # We want to sort these by depth so we process them and tell clients about
+            # them in order. It's also more efficient to backfill this way (`depth`
+            # ascending) because one backfill event is likely to be the `prev_event` of
+            # the next event we're going to process.
+            sorted_events = sorted(new_events, key=lambda x: x.depth)
+            for ev in sorted_events:
+                with nested_logging_context(ev.event_id):
+                    await self._process_pulled_event(origin, ev, backfilled=backfilled)
+
+        # Check if we've already tried to process these events at some point in the
+        # past. We aren't concerned with the expontntial backoff here, just whether it
+        # has failed to be processed before.
+        event_ids_with_failed_pull_attempts = (
+            await self._store.get_event_ids_with_failed_pull_attempts(
+                [event.event_id for event in new_events]
+            )
+        )
+
+        events_with_failed_pull_attempts, fresh_events = partition(
+            new_events, lambda e: e.event_id in event_ids_with_failed_pull_attempts
+        )
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "events_with_failed_pull_attempts",
+            str(event_ids_with_failed_pull_attempts),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "events_with_failed_pull_attempts.length",
+            str(len(events_with_failed_pull_attempts)),
+        )
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "fresh_events",
+            str([event.event_id for event in fresh_events]),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "fresh_events.length",
+            str(len(fresh_events)),
+        )
+
+        # Process previously failed backfill events in the background to not waste
+        # time on something that is likely to fail again.
+        if len(events_with_failed_pull_attempts) > 0:
+            run_as_background_process(
+                "_process_new_pulled_events_with_failed_pull_attempts",
+                _process_new_pulled_events,
+                events_with_failed_pull_attempts,
+            )
+
+        # We can optimistically try to process and wait for the event to be fully
+        # persisted if we've never tried before.
+        if len(fresh_events) > 0:
+            await _process_new_pulled_events(fresh_events)
 
     @trace
     @tag_args
@@ -1401,8 +1440,6 @@ class FederationEventHandler:
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
 
-        await self._handle_marker_event(origin, event)
-
         if backfilled or context.rejected:
             return
 
@@ -1500,96 +1537,8 @@ class FederationEventHandler:
         except Exception:
             logger.exception("Failed to resync device for %s", sender)
 
-    @trace
-    async def _handle_marker_event(self, origin: str, marker_event: EventBase) -> None:
-        """Handles backfilling the insertion event when we receive a marker
-        event that points to one.
-
-        Args:
-            origin: Origin of the event. Will be called to get the insertion event
-            marker_event: The event to process
-        """
-
-        if marker_event.type != EventTypes.MSC2716_MARKER:
-            # Not a marker event
-            return
-
-        if marker_event.rejected_reason is not None:
-            # Rejected event
-            return
-
-        # Skip processing a marker event if the room version doesn't
-        # support it or the event is not from the room creator.
-        room_version = await self._store.get_room_version(marker_event.room_id)
-        create_event = await self._store.get_create_event_for_room(marker_event.room_id)
-        if not room_version.msc2175_implicit_room_creator:
-            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
-        else:
-            room_creator = create_event.sender
-        if not room_version.msc2716_historical and (
-            not self._config.experimental.msc2716_enabled
-            or marker_event.sender != room_creator
-        ):
-            return
-
-        logger.debug("_handle_marker_event: received %s", marker_event)
-
-        insertion_event_id = marker_event.content.get(
-            EventContentFields.MSC2716_INSERTION_EVENT_REFERENCE
-        )
-
-        if insertion_event_id is None:
-            # Nothing to retrieve then (invalid marker)
-            return
-
-        already_seen_insertion_event = await self._store.have_seen_event(
-            marker_event.room_id, insertion_event_id
-        )
-        if already_seen_insertion_event:
-            # No need to process a marker again if we have already seen the
-            # insertion event that it was pointing to
-            return
-
-        logger.debug(
-            "_handle_marker_event: backfilling insertion event %s", insertion_event_id
-        )
-
-        await self._get_events_and_persist(
-            origin,
-            marker_event.room_id,
-            [insertion_event_id],
-        )
-
-        insertion_event = await self._store.get_event(
-            insertion_event_id, allow_none=True
-        )
-        if insertion_event is None:
-            logger.warning(
-                "_handle_marker_event: server %s didn't return insertion event %s for marker %s",
-                origin,
-                insertion_event_id,
-                marker_event.event_id,
-            )
-            return
-
-        logger.debug(
-            "_handle_marker_event: succesfully backfilled insertion event %s from marker event %s",
-            insertion_event,
-            marker_event,
-        )
-
-        await self._store.insert_insertion_extremity(
-            insertion_event_id, marker_event.room_id
-        )
-
-        logger.debug(
-            "_handle_marker_event: insertion extremity added for %s from marker event %s",
-            insertion_event,
-            marker_event,
-        )
-
     async def backfill_event_id(
-        self, destinations: List[str], room_id: str, event_id: str
+        self, destinations: StrCollection, room_id: str, event_id: str
     ) -> PulledPduInfo:
         """Backfill a single event and persist it as a non-outlier which means
         we also pull in all of the state and auth events necessary for it.
@@ -2026,8 +1975,7 @@ class FederationEventHandler:
             # partial and full state and may not be accurate.
             return
 
-        extrem_ids_list = await self._store.get_latest_event_ids_in_room(event.room_id)
-        extrem_ids = set(extrem_ids_list)
+        extrem_ids = await self._store.get_latest_event_ids_in_room(event.room_id)
         prev_event_ids = set(event.prev_event_ids())
 
         if extrem_ids == prev_event_ids:
@@ -2393,6 +2341,12 @@ class FederationEventHandler:
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             # TODO retrieve the previous state, and exclude join -> join transitions
             self._notifier.notify_user_joined_room(event.event_id, event.room_id)
+
+        # If this is a server ACL event, clear the cache in the storage controller.
+        if event.type == EventTypes.ServerACL:
+            self._state_storage_controller.get_server_acl_for_room.invalidate(
+                (event.room_id,)
+            )
 
     def _sanity_check_event(self, ev: EventBase) -> None:
         """

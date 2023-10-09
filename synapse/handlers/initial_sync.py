@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.constants import (
     AccountDataTypes,
@@ -23,7 +23,6 @@ from synapse.api.constants import (
     Membership,
 )
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
@@ -33,9 +32,9 @@ from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
+    JsonMapping,
     Requester,
     RoomStreamToken,
-    StateMap,
     StreamKeyType,
     StreamToken,
     UserID,
@@ -193,15 +192,12 @@ class InitialSyncHandler:
                     )
                 elif event.membership == Membership.LEAVE:
                     room_end_token = RoomStreamToken(
-                        None,
-                        event.stream_ordering,
+                        stream=event.stream_ordering,
                     )
                     deferred_room_state = run_in_background(
                         self._state_storage_controller.get_state_for_events,
                         [event.event_id],
-                    ).addCallback(
-                        lambda states: cast(StateMap[EventBase], states[event.event_id])
-                    )
+                    ).addCallback(lambda states: states[event.event_id])
 
                 (messages, token), current_state = await make_deferred_yieldable(
                     gather_results(
@@ -458,7 +454,7 @@ class InitialSyncHandler:
                 for s in states
             ]
 
-        async def get_receipts() -> List[JsonDict]:
+        async def get_receipts() -> List[JsonMapping]:
             receipts = await self.store.get_linearized_receipts_for_room(
                 room_id, to_key=now_token.receipt_key
             )

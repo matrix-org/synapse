@@ -1125,7 +1125,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         # Ensure the redacts property in the content matches the one provided in
         # the URL.
         room_version = await self._store.get_room_version(room_id)
-        if room_version.msc2176_redaction_rules:
+        if room_version.updated_redaction_rules:
             if "redacts" in content and content["redacts"] != event_id:
                 raise SynapseError(
                     400,
@@ -1159,7 +1159,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
                     "sender": requester.user.to_string(),
                 }
                 # Earlier room versions had a top-level redacts property.
-                if not room_version.msc2176_redaction_rules:
+                if not room_version.updated_redaction_rules:
                     event_dict["redacts"] = event_id
 
                 (
@@ -1237,7 +1237,9 @@ class RoomTypingRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
+        await self.presence_handler.bump_presence_active_time(
+            requester.user, requester.device_id
+        )
 
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)

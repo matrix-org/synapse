@@ -22,6 +22,9 @@ on Windows is not officially supported.
 
 The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://www.python.org/downloads/). Your Python also needs support for [virtual environments](https://docs.python.org/3/library/venv.html). This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running `sudo apt install python3-venv` should be enough.
 
+A recent version of the Rust compiler is needed to build the native modules. The
+easiest way of installing the latest version is to use [rustup](https://rustup.rs/).
+
 Synapse can connect to PostgreSQL via the [psycopg2](https://pypi.org/project/psycopg2/) Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with `sudo apt install libpq-dev`.
 
 Synapse has an optional, improved user search with better Unicode support. For that you need the development package of `libicu`. On Debian or Ubuntu Linux, this can be installed with `sudo apt install libicu-dev`.
@@ -29,9 +32,6 @@ Synapse has an optional, improved user search with better Unicode support. For t
 The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
 
 For some tests, you will need [a recent version of Docker](https://docs.docker.com/get-docker/).
-
-A recent version of the Rust compiler is needed to build the native modules. The
-easiest way of installing the latest version is to use [rustup](https://rustup.rs/).
 
 
 # 3. Get the source.
@@ -52,6 +52,11 @@ If you need help getting started with git, this is beyond the scope of the docum
 can find many good git tutorials on the web.
 
 # 4. Install the dependencies
+
+
+Before installing the Python dependencies, make sure you have installed a recent version
+of Rust (see the "What do I need?" section above). The easiest way of installing the
+latest version is to use [rustup](https://rustup.rs/).
 
 Synapse uses the [poetry](https://python-poetry.org/) project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
@@ -76,7 +81,8 @@ cd path/where/you/have/cloned/the/repository
 poetry install --extras all
 ```
 
-This will install the runtime and developer dependencies for the project.
+This will install the runtime and developer dependencies for the project.  Be sure to check
+that the `poetry install` step completed cleanly.
 
 ## Running Synapse via poetry
 
@@ -84,13 +90,30 @@ To start a local instance of Synapse in the locked poetry environment, create a 
 
 ```sh
 cp docs/sample_config.yaml homeserver.yaml
+cp docs/sample_log_config.yaml log_config.yaml
 ```
 
-Now edit homeserver.yaml, and run Synapse with:
+Now edit `homeserver.yaml`, things you might want to change include:
+
+- Set a `server_name`
+- Adjusting paths to be correct for your system like the `log_config` to point to the log config you just copied
+- Using a [PostgreSQL database instead of SQLite](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#database)
+- Adding a [`registration_shared_secret`](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#registration_shared_secret) so you can use [`register_new_matrix_user` command](https://matrix-org.github.io/synapse/latest/setup/installation.html#registering-a-user).
+
+And then run Synapse with the following command:
 
 ```sh
 poetry run python -m synapse.app.homeserver -c homeserver.yaml
 ```
+
+If you get an error like the following:
+
+```
+importlib.metadata.PackageNotFoundError: matrix-synapse
+```
+
+this probably indicates that the `poetry install` step did not complete cleanly - go back and
+resolve any issues and re-run until successful.
 
 # 5. Get in touch.
 
@@ -243,7 +266,7 @@ The easiest way to do so is to run Postgres via a docker container. In one
 terminal:
 
 ```shell
-docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p 5432:5432 postgres:14
 ```
 
 If you see an error like
@@ -299,7 +322,7 @@ The following command will let you run the integration test with the most common
 configuration:
 
 ```sh
-$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
+$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:focal
 ```
 (Note that the paths must be full paths! You could also write `$(realpath relative/path)` if needed.)
 
@@ -347,6 +370,7 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
     See the [worker documentation](../workers.md) for additional information on workers.
 - Passing `ASYNCIO_REACTOR=1` as an environment variable to use the Twisted asyncio reactor instead of the default one.
 - Passing `PODMAN=1` will use the [podman](https://podman.io/) container runtime, instead of docker.
+- Passing `UNIX_SOCKETS=1` will utilise Unix socket functionality for Synapse, Redis, and Postgres(when applicable).
 
 To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
 ```sh

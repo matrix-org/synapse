@@ -20,7 +20,7 @@ from tests import unittest
 
 class DataStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
-        super(DataStoreTestCase, self).setUp()
+        super().setUp()
 
         self.store = self.hs.get_datastores().main
 

@@ -19,6 +19,7 @@ from typing import (
     TYPE_CHECKING,
     Collection,
     Dict,
+    FrozenSet,
     Iterable,
     List,
     Optional,
@@ -31,13 +32,14 @@ from typing import (
 import attr
 from prometheus_client import Counter, Gauge
 
-from synapse.api.constants import MAX_DEPTH, EventTypes
+from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.events import EventBase, make_event_from_dict
 from synapse.logging.opentracing import tag_args, trace
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
+from synapse.storage.background_updates import ForeignKeyConstraint
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -46,7 +48,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StrCollection
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
@@ -139,6 +141,17 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
         self._clock.looping_call(self._get_stats_for_federation_staging, 30 * 1000)
+
+        if isinstance(self.database_engine, PostgresEngine):
+            self.db_pool.updates.register_background_validate_constraint_and_delete_rows(
+                update_name="event_forward_extremities_event_id_foreign_key_constraint_update",
+                table="event_forward_extremities",
+                constraint_name="event_forward_extremities_event_id",
+                constraint=ForeignKeyConstraint(
+                    "events", [("event_id", "event_id")], deferred=True
+                ),
+                unique_columns=("event_id", "room_id"),
+            )
 
     async def get_auth_chain(
         self, room_id: str, event_ids: Collection[str], include_given: bool = False
@@ -440,33 +453,56 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # sets.
         seen_chains: Set[int] = set()
 
-        sql = """
-            SELECT event_id, chain_id, sequence_number
-            FROM event_auth_chains
-            WHERE %s
-        """
-        for batch in batch_iter(initial_events, 1000):
-            clause, args = make_in_list_sql_clause(
-                txn.database_engine, "event_id", batch
-            )
-            txn.execute(sql % (clause,), args)
+        # Fetch the chain cover index for the initial set of events we're
+        # considering.
+        def fetch_chain_info(events_to_fetch: Collection[str]) -> None:
+            sql = """
+                SELECT event_id, chain_id, sequence_number
+                FROM event_auth_chains
+                WHERE %s
+            """
+            for batch in batch_iter(events_to_fetch, 1000):
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "event_id", batch
+                )
+                txn.execute(sql % (clause,), args)
 
-            for event_id, chain_id, sequence_number in txn:
-                chain_info[event_id] = (chain_id, sequence_number)
-                seen_chains.add(chain_id)
-                chain_to_event.setdefault(chain_id, {})[sequence_number] = event_id
+                for event_id, chain_id, sequence_number in txn:
+                    chain_info[event_id] = (chain_id, sequence_number)
+                    seen_chains.add(chain_id)
+                    chain_to_event.setdefault(chain_id, {})[sequence_number] = event_id
+
+        fetch_chain_info(initial_events)
 
         # Check that we actually have a chain ID for all the events.
         events_missing_chain_info = initial_events.difference(chain_info)
+
+        # The result set to return, i.e. the auth chain difference.
+        result: Set[str] = set()
+
         if events_missing_chain_info:
-            # This can happen due to e.g. downgrade/upgrade of the server. We
-            # raise an exception and fall back to the previous algorithm.
-            logger.info(
-                "Unexpectedly found that events don't have chain IDs in room %s: %s",
+            # For some reason we have events we haven't calculated the chain
+            # index for, so we need to handle those separately. This should only
+            # happen for older rooms where the server doesn't have all the auth
+            # events.
+            result = self._fixup_auth_chain_difference_sets(
+                txn,
                 room_id,
-                events_missing_chain_info,
+                state_sets=state_sets,
+                events_missing_chain_info=events_missing_chain_info,
+                events_that_have_chain_index=chain_info,
             )
-            raise _NoChainCoverIndex(room_id)
+
+            # We now need to refetch any events that we have added to the state
+            # sets.
+            new_events_to_fetch = {
+                event_id
+                for state_set in state_sets
+                for event_id in state_set
+                if event_id not in initial_events
+            }
+
+            fetch_chain_info(new_events_to_fetch)
 
         # Corresponds to `state_sets`, except as a map from chain ID to max
         # sequence number reachable from the state set.
@@ -475,8 +511,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             chains: Dict[int, int] = {}
             set_to_chain.append(chains)
 
-            for event_id in state_set:
-                chain_id, seq_no = chain_info[event_id]
+            for state_id in state_set:
+                chain_id, seq_no = chain_info[state_id]
 
                 chains[chain_id] = max(seq_no, chains.get(chain_id, 0))
 
@@ -520,7 +556,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # from *any* state set and the minimum sequence number reachable from
         # *all* state sets. Events in that range are in the auth chain
         # difference.
-        result = set()
 
         # Mapping from chain ID to the range of sequence numbers that should be
         # pulled from the database.
@@ -575,6 +610,122 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 result.update(r for r, in txn)
 
         return result
+
+    def _fixup_auth_chain_difference_sets(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        state_sets: List[Set[str]],
+        events_missing_chain_info: Set[str],
+        events_that_have_chain_index: Collection[str],
+    ) -> Set[str]:
+        """Helper for `_get_auth_chain_difference_using_cover_index_txn` to
+        handle the case where we haven't calculated the chain cover index for
+        all events.
+
+        This modifies `state_sets` so that they only include events that have a
+        chain cover index, and returns a set of event IDs that are part of the
+        auth difference.
+        """
+
+        # This works similarly to the handling of unpersisted events in
+        # `synapse.state.v2_get_auth_chain_difference`. We uses the observation
+        # that if you can split the set of events into two classes X and Y,
+        # where no events in Y have events in X in their auth chain, then we can
+        # calculate the auth difference by considering X and Y separately.
+        #
+        # We do this in three steps:
+        #   1. Compute the set of events without chain cover index belonging to
+        #      the auth difference.
+        #   2. Replacing the un-indexed events in the state_sets with their auth
+        #      events, recursively, until the state_sets contain only indexed
+        #      events. We can then calculate the auth difference of those state
+        #      sets using the chain cover index.
+        #   3. Add the results of 1 and 2 together.
+
+        # By construction we know that all events that we haven't persisted the
+        # chain cover index for are contained in
+        # `event_auth_chain_to_calculate`, so we pull out the events from those
+        # rather than doing recursive queries to walk the auth chain.
+        #
+        # We pull out those events with their auth events, which gives us enough
+        # information to construct the auth chain of an event up to auth events
+        # that have the chain cover index.
+        sql = """
+            SELECT tc.event_id, ea.auth_id, eac.chain_id IS NOT NULL
+            FROM event_auth_chain_to_calculate AS tc
+            LEFT JOIN event_auth AS ea USING (event_id)
+            LEFT JOIN event_auth_chains AS eac ON (ea.auth_id = eac.event_id)
+            WHERE tc.room_id = ?
+        """
+        txn.execute(sql, (room_id,))
+        event_to_auth_ids: Dict[str, Set[str]] = {}
+        events_that_have_chain_index = set(events_that_have_chain_index)
+        for event_id, auth_id, auth_id_has_chain in txn:
+            s = event_to_auth_ids.setdefault(event_id, set())
+            if auth_id is not None:
+                s.add(auth_id)
+                if auth_id_has_chain:
+                    events_that_have_chain_index.add(auth_id)
+
+        if events_missing_chain_info - event_to_auth_ids.keys():
+            # Uh oh, we somehow haven't correctly done the chain cover index,
+            # bail and fall back to the old method.
+            logger.info(
+                "Unexpectedly found that events don't have chain IDs in room %s: %s",
+                room_id,
+                events_missing_chain_info - event_to_auth_ids.keys(),
+            )
+            raise _NoChainCoverIndex(room_id)
+
+        # Create a map from event IDs we care about to their partial auth chain.
+        event_id_to_partial_auth_chain: Dict[str, Set[str]] = {}
+        for event_id, auth_ids in event_to_auth_ids.items():
+            if not any(event_id in state_set for state_set in state_sets):
+                continue
+
+            processing = set(auth_ids)
+            to_add = set()
+            while processing:
+                auth_id = processing.pop()
+                to_add.add(auth_id)
+
+                sub_auth_ids = event_to_auth_ids.get(auth_id)
+                if sub_auth_ids is None:
+                    continue
+
+                processing.update(sub_auth_ids - to_add)
+
+            event_id_to_partial_auth_chain[event_id] = to_add
+
+        # Now we do two things:
+        #   1. Update the state sets to only include indexed events; and
+        #   2. Create a new list containing the auth chains of the un-indexed
+        #      events
+        unindexed_state_sets: List[Set[str]] = []
+        for state_set in state_sets:
+            unindexed_state_set = set()
+            for event_id, auth_chain in event_id_to_partial_auth_chain.items():
+                if event_id not in state_set:
+                    continue
+
+                unindexed_state_set.add(event_id)
+
+                state_set.discard(event_id)
+                state_set.difference_update(auth_chain)
+                for auth_id in auth_chain:
+                    if auth_id in events_that_have_chain_index:
+                        state_set.add(auth_id)
+                    else:
+                        unindexed_state_set.add(auth_id)
+
+            unindexed_state_sets.append(unindexed_state_set)
+
+        # Calculate and return the auth difference of the un-indexed events.
+        union = unindexed_state_sets[0].union(*unindexed_state_sets[1:])
+        intersection = unindexed_state_sets[0].intersection(*unindexed_state_sets[1:])
+
+        return union - intersection
 
     def _get_auth_chain_difference_txn(
         self, txn: LoggingTransaction, state_sets: List[Set[str]]
@@ -831,7 +982,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                      * because the schema change is in a background update, it's not
                      * necessarily safe to assume that it will have been completed.
                      */
-                    AND edge.is_state is ? /* False */
+                    AND edge.is_state is FALSE
                     /**
                      * We only want backwards extremities that are older than or at
                      * the same position of the given `current_depth` (where older
@@ -874,7 +1025,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 sql,
                 (
                     room_id,
-                    False,
                     current_depth,
                     self._clock.time_msec(),
                     BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
@@ -888,124 +1038,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         return await self.db_pool.runInteraction(
             "get_backfill_points_in_room",
             get_backfill_points_in_room_txn,
-            room_id,
-        )
-
-    @trace
-    async def get_insertion_event_backward_extremities_in_room(
-        self,
-        room_id: str,
-        current_depth: int,
-        limit: int,
-    ) -> List[Tuple[str, int]]:
-        """
-        Get the insertion events we know about that we haven't backfilled yet
-        along with the approximate depth. Only returns insertion events that are
-        at a depth lower than or equal to the `current_depth`. Sorted by depth,
-        highest to lowest (descending) so the closest events to the
-        `current_depth` are first in the list.
-
-        We ignore insertion events that are newer than the user's current scroll
-        position (ie, those with depth greater than `current_depth`) as:
-            1. we don't really care about getting events that have happened
-               after our current position; and
-            2. by the nature of paginating and scrolling back, we have likely
-               previously tried and failed to backfill from that insertion event, so
-               to avoid getting "stuck" requesting the same backfill repeatedly
-               we drop those insertion event.
-
-        Args:
-            room_id: Room where we want to find the oldest events
-            current_depth: The depth at the user's current scrollback position
-            limit: The max number of insertion event extremities to return
-
-        Returns:
-            List of (event_id, depth) tuples. Sorted by depth, highest to lowest
-            (descending) so the closest events to the `current_depth` are first
-            in the list.
-        """
-
-        def get_insertion_event_backward_extremities_in_room_txn(
-            txn: LoggingTransaction, room_id: str
-        ) -> List[Tuple[str, int]]:
-            if isinstance(self.database_engine, PostgresEngine):
-                least_function = "LEAST"
-            elif isinstance(self.database_engine, Sqlite3Engine):
-                least_function = "MIN"
-            else:
-                raise RuntimeError("Unknown database engine")
-
-            sql = f"""
-                SELECT
-                    insertion_event_extremity.event_id, event.depth
-                /* We only want insertion events that are also marked as backwards extremities */
-                FROM insertion_event_extremities AS insertion_event_extremity
-                /* Get the depth of the insertion event from the events table */
-                INNER JOIN events AS event USING (event_id)
-                /**
-                 * We use this info to make sure we don't retry to use a backfill point
-                 * if we've already attempted to backfill from it recently.
-                 */
-                LEFT JOIN event_failed_pull_attempts AS failed_backfill_attempt_info
-                ON
-                    failed_backfill_attempt_info.room_id = insertion_event_extremity.room_id
-                    AND failed_backfill_attempt_info.event_id = insertion_event_extremity.event_id
-                WHERE
-                    insertion_event_extremity.room_id = ?
-                    /**
-                     * We only want extremities that are older than or at
-                     * the same position of the given `current_depth` (where older
-                     * means less than the given depth) because we're looking backwards
-                     * from the `current_depth` when backfilling.
-                     *
-                     *                         current_depth (ignore events that come after this, ignore 2-4)
-                     *                         |
-                     *                         ▼
-                     * <oldest-in-time> [0]<--[1]<--[2]<--[3]<--[4] <newest-in-time>
-                     */
-                    AND event.depth <= ? /* current_depth */
-                    /**
-                     * Exponential back-off (up to the upper bound) so we don't retry the
-                     * same backfill point over and over. ex. 2hr, 4hr, 8hr, 16hr, etc
-                     *
-                     * We use `1 << n` as a power of 2 equivalent for compatibility
-                     * with older SQLites. The left shift equivalent only works with
-                     * powers of 2 because left shift is a binary operation (base-2).
-                     * Otherwise, we would use `power(2, n)` or the power operator, `2^n`.
-                     */
-                    AND (
-                        failed_backfill_attempt_info.event_id IS NULL
-                        OR ? /* current_time */ >= failed_backfill_attempt_info.last_attempt_ts + (
-                            (1 << {least_function}(failed_backfill_attempt_info.num_attempts, ? /* max doubling steps */))
-                            * ? /* step */
-                        )
-                    )
-                /**
-                 * Sort from highest (closest to the `current_depth`) to the lowest depth
-                 * because the closest are most relevant to backfill from first.
-                 * Then tie-break on alphabetical order of the event_ids so we get a
-                 * consistent ordering which is nice when asserting things in tests.
-                 */
-                ORDER BY event.depth DESC, insertion_event_extremity.event_id DESC
-                LIMIT ?
-            """
-
-            txn.execute(
-                sql,
-                (
-                    room_id,
-                    current_depth,
-                    self._clock.time_msec(),
-                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_MAXIMUM_DOUBLING_STEPS,
-                    BACKFILL_EVENT_EXPONENTIAL_BACKOFF_STEP_MILLISECONDS,
-                    limit,
-                ),
-            )
-            return cast(List[Tuple[str, int]], txn.fetchall())
-
-        return await self.db_pool.runInteraction(
-            "get_insertion_event_backward_extremities_in_room",
-            get_insertion_event_backward_extremities_in_room_txn,
             room_id,
         )
 
@@ -1148,13 +1180,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
 
     @cached(max_entries=5000, iterable=True)
-    async def get_latest_event_ids_in_room(self, room_id: str) -> Sequence[str]:
-        return await self.db_pool.simple_select_onecol(
+    async def get_latest_event_ids_in_room(self, room_id: str) -> FrozenSet[str]:
+        event_ids = await self.db_pool.simple_select_onecol(
             table="event_forward_extremities",
             keyvalues={"room_id": room_id},
             retcol="event_id",
             desc="get_latest_event_ids_in_room",
         )
+        return frozenset(event_ids)
 
     async def get_min_depth(self, room_id: str) -> Optional[int]:
         """For the given room, get the minimum depth we have seen for it."""
@@ -1279,50 +1312,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             raise StoreError(400, "stream_ordering too old %s" % (stream_ordering,))
 
         return event_ids
-
-    def _get_connected_batch_event_backfill_results_txn(
-        self, txn: LoggingTransaction, insertion_event_id: str, limit: int
-    ) -> List[BackfillQueueNavigationItem]:
-        """
-        Find any batch connections of a given insertion event.
-        A batch event points at a insertion event via:
-        batch_event.content[MSC2716_BATCH_ID] -> insertion_event.content[MSC2716_NEXT_BATCH_ID]
-
-        Args:
-            txn: The database transaction to use
-            insertion_event_id: The event ID to navigate from. We will find
-                batch events that point back at this insertion event.
-            limit: Max number of event ID's to query for and return
-
-        Returns:
-            List of batch events that the backfill queue can process
-        """
-        batch_connection_query = """
-            SELECT e.depth, e.stream_ordering, c.event_id, e.type FROM insertion_events AS i
-            /* Find the batch that connects to the given insertion event */
-            INNER JOIN batch_events AS c
-            ON i.next_batch_id = c.batch_id
-            /* Get the depth of the batch start event from the events table */
-            INNER JOIN events AS e ON c.event_id = e.event_id
-            /* Find an insertion event which matches the given event_id */
-            WHERE i.event_id = ?
-            LIMIT ?
-        """
-
-        # Find any batch connections for the given insertion event
-        txn.execute(
-            batch_connection_query,
-            (insertion_event_id, limit),
-        )
-        return [
-            BackfillQueueNavigationItem(
-                depth=row[0],
-                stream_ordering=row[1],
-                event_id=row[2],
-                type=row[3],
-            )
-            for row in txn
-        ]
 
     def _get_connected_prev_event_backfill_results_txn(
         self, txn: LoggingTransaction, event_id: str, limit: int
@@ -1472,40 +1461,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             event_id_results.add(event_id)
 
-            # Try and find any potential historical batches of message history.
-            if self.hs.config.experimental.msc2716_enabled:
-                # We need to go and try to find any batch events connected
-                # to a given insertion event (by batch_id). If we find any, we'll
-                # add them to the queue and navigate up the DAG like normal in the
-                # next iteration of the loop.
-                if event_type == EventTypes.MSC2716_INSERTION:
-                    # Find any batch connections for the given insertion event
-                    connected_batch_event_backfill_results = (
-                        self._get_connected_batch_event_backfill_results_txn(
-                            txn, event_id, limit - len(event_id_results)
-                        )
-                    )
-                    logger.debug(
-                        "_get_backfill_events(room_id=%s): connected_batch_event_backfill_results=%s",
-                        room_id,
-                        connected_batch_event_backfill_results,
-                    )
-                    for (
-                        connected_batch_event_backfill_item
-                    ) in connected_batch_event_backfill_results:
-                        if (
-                            connected_batch_event_backfill_item.event_id
-                            not in event_id_results
-                        ):
-                            queue.put(
-                                (
-                                    -connected_batch_event_backfill_item.depth,
-                                    -connected_batch_event_backfill_item.stream_ordering,
-                                    connected_batch_event_backfill_item.event_id,
-                                    connected_batch_event_backfill_item.type,
-                                )
-                            )
-
             # Now we just look up the DAG by prev_events as normal
             connected_prev_event_backfill_results = (
                 self._get_connected_prev_event_backfill_results_txn(
@@ -1582,6 +1537,35 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         """
 
         txn.execute(sql, (room_id, event_id, 1, self._clock.time_msec(), cause))
+
+    @trace
+    async def get_event_ids_with_failed_pull_attempts(
+        self, event_ids: StrCollection
+    ) -> Set[str]:
+        """
+        Filter the given list of `event_ids` and return events which have any failed
+        pull attempts.
+
+        Args:
+            event_ids: A list of events to filter down.
+
+        Returns:
+            A filtered down list of `event_ids` that have previous failed pull attempts.
+        """
+
+        rows = await self.db_pool.simple_select_many_batch(
+            table="event_failed_pull_attempts",
+            column="event_id",
+            iterable=event_ids,
+            keyvalues={},
+            retcols=("event_id",),
+            desc="get_event_ids_with_failed_pull_attempts",
+        )
+        event_ids_with_failed_pull_attempts: Set[str] = {
+            row["event_id"] for row in rows
+        }
+
+        return event_ids_with_failed_pull_attempts
 
     @trace
     async def get_event_ids_to_not_pull_from_backoff(
@@ -1717,19 +1701,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         await self.db_pool.runInteraction(
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
-        )
-
-    @trace
-    async def insert_insertion_extremity(self, event_id: str, room_id: str) -> None:
-        await self.db_pool.simple_upsert(
-            table="insertion_event_extremities",
-            keyvalues={"event_id": event_id},
-            values={
-                "event_id": event_id,
-                "room_id": room_id,
-            },
-            insertion_values={},
-            desc="insert_insertion_extremity",
         )
 
     async def insert_received_event_to_staging(

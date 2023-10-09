@@ -179,22 +179,24 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
             # store_search_entries_txn with a generator function, but that
             # would mean having two cursors open on the database at once.
             # Instead we just build a list of results.
-            rows = self.db_pool.cursor_to_dict(txn)
+            rows = txn.fetchall()
             if not rows:
                 return 0
 
-            min_stream_id = rows[-1]["stream_ordering"]
+            min_stream_id = rows[-1][0]
 
             event_search_rows = []
-            for row in rows:
+            for (
+                stream_ordering,
+                event_id,
+                room_id,
+                etype,
+                json,
+                origin_server_ts,
+            ) in rows:
                 try:
-                    event_id = row["event_id"]
-                    room_id = row["room_id"]
-                    etype = row["type"]
-                    stream_ordering = row["stream_ordering"]
-                    origin_server_ts = row["origin_server_ts"]
                     try:
-                        event_json = db_to_json(row["json"])
+                        event_json = db_to_json(json)
                         content = event_json["content"]
                     except Exception:
                         continue

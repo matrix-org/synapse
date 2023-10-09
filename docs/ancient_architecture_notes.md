@@ -24,7 +24,7 @@ Server with a domain specific API.
 1. **Messaging Layer**
 
     This is what the rest of the homeserver hits to send messages, join rooms,
-    etc. It also allows you to register callbacks for when it get's notified by
+    etc. It also allows you to register callbacks for when it gets notified by
     lower levels that e.g. a new message has been received.
 
     It is responsible for serializing requests to send to the data

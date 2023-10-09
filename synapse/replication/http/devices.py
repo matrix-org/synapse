@@ -20,7 +20,7 @@ from twisted.web.server import Request
 from synapse.http.server import HttpServer
 from synapse.logging.opentracing import active_span
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.types import JsonDict
+from synapse.types import JsonDict, JsonMapping
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -62,7 +62,7 @@ class ReplicationMultiUserDevicesResyncRestServlet(ReplicationEndpoint):
 
     NAME = "multi_user_device_resync"
     PATH_ARGS = ()
-    CACHE = False
+    CACHE = True
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -82,7 +82,7 @@ class ReplicationMultiUserDevicesResyncRestServlet(ReplicationEndpoint):
 
     async def _handle_request(  # type: ignore[override]
         self, request: Request, content: JsonDict
-    ) -> Tuple[int, Dict[str, Optional[JsonDict]]]:
+    ) -> Tuple[int, Dict[str, Optional[JsonMapping]]]:
         user_ids: List[str] = content["user_ids"]
 
         logger.info("Resync for %r", user_ids)
@@ -107,8 +107,7 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
     Calls to e2e_keys_handler.upload_keys_for_user(user_id, device_id, keys) on
     the main process to accomplish this.
 
-    Defined in https://spec.matrix.org/v1.4/client-server-api/#post_matrixclientv3keysupload
-    Request format(borrowed and expanded from KeyUploadServlet):
+    Request format for this endpoint (borrowed and expanded from KeyUploadServlet):
 
         POST /_synapse/replication/upload_keys_for_user
 
@@ -117,6 +116,7 @@ class ReplicationUploadKeysForUserRestServlet(ReplicationEndpoint):
         "device_id": "<device_id>",
         "keys": {
             ....this part can be found in KeyUploadServlet in rest/client/keys.py....
+            or as defined in https://spec.matrix.org/v1.4/client-server-api/#post_matrixclientv3keysupload
         }
     }
 

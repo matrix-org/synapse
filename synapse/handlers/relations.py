@@ -13,7 +13,17 @@
 # limitations under the License.
 import enum
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, FrozenSet, Iterable, List, Optional
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+)
 
 import attr
 
@@ -205,16 +215,22 @@ class RelationsHandler:
             event_id: The event IDs to look and redact relations of.
             initial_redaction_event: The redaction for the event referred to by
                 event_id.
-            relation_types: The types of relations to look for.
+            relation_types: The types of relations to look for. If "*" is in the list,
+                all related events will be redacted regardless of the type.
 
         Raises:
             ShadowBanError if the requester is shadow-banned
         """
-        related_event_ids = (
-            await self._main_store.get_all_relations_for_event_with_types(
-                event_id, relation_types
+        if "*" in relation_types:
+            related_event_ids = await self._main_store.get_all_relations_for_event(
+                event_id
             )
-        )
+        else:
+            related_event_ids = (
+                await self._main_store.get_all_relations_for_event_with_types(
+                    event_id, relation_types
+                )
+            )
 
         for related_event_id in related_event_ids:
             try:
@@ -239,7 +255,7 @@ class RelationsHandler:
 
     async def get_references_for_events(
         self, event_ids: Collection[str], ignored_users: FrozenSet[str] = frozenset()
-    ) -> Dict[str, List[_RelatedEvent]]:
+    ) -> Mapping[str, Sequence[_RelatedEvent]]:
         """Get a list of references to the given events.
 
         Args:

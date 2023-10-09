@@ -78,7 +78,7 @@ from synapse.http.replicationagent import ReplicationAgent
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
-from synapse.types import ISynapseReactor
+from synapse.types import ISynapseReactor, StrSequence
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 
@@ -108,10 +108,9 @@ RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValu
 # the value actually has to be a List, but List is invariant so we can't specify that
 # the entries can either be Lists or bytes.
 RawHeaderValue = Union[
-    List[str],
+    StrSequence,
     List[bytes],
     List[Union[str, bytes]],
-    Tuple[str, ...],
     Tuple[bytes, ...],
     Tuple[Union[str, bytes], ...],
 ]
@@ -835,6 +834,7 @@ class ReplicationClient(BaseHttpClient):
 
         self.agent: IAgent = ReplicationAgent(
             hs.get_reactor(),
+            hs.config.worker.instance_map,
             contextFactory=hs.get_http_client_context_factory(),
             pool=pool,
         )
@@ -1036,7 +1036,12 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
         if reason.check(ResponseDone):
             self.deferred.callback(self.length)
         elif reason.check(PotentialDataLoss):
-            # stolen from https://github.com/twisted/treq/pull/49/files
+            # This applies to requests which don't set `Content-Length` or a
+            # `Transfer-Encoding` in the response because in this case the end of the
+            # response is indicated by the connection being closed, an event which may
+            # also be due to a transient network problem or other error. But since this
+            # behavior is expected of some servers (like YouTube), let's ignore it.
+            # Stolen from https://github.com/twisted/treq/pull/49/files
             # http://twistedmatrix.com/trac/ticket/4840
             self.deferred.callback(self.length)
         else:

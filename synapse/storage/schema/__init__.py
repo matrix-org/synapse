@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 77  # remember to update the list below when updating
+SCHEMA_VERSION = 82  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -103,16 +103,30 @@ Changes in SCHEMA_VERSION = 76:
 
 Changes in SCHEMA_VERSION = 77
     - (Postgres) Add NOT VALID CHECK (full_user_id IS NOT NULL) to tables profiles and user_filters
+
+Changes in SCHEMA_VERSION = 78
+    - Validate check (full_user_id IS NOT NULL) on tables profiles and user_filters
+
+Changes in SCHEMA_VERSION = 79
+    - Add tables to handle in DB read-write locks.
+    - Add some mitigations for a painful race between foreground and background updates, cf #15677.
+
+Changes in SCHEMA_VERSION = 80
+    - The event_txn_id_device_id is always written to for new events.
+    - Add tables for the task scheduler.
+
+Changes in SCHEMA_VERSION = 81
+    - The event_txn_id is no longer written to for new events.
+
+Changes in SCHEMA_VERSION = 82
+    - The insertion_events, insertion_event_extremities, insertion_event_edges, and
+      batch_events tables are no longer purged in preparation for their removal.
 """
 
 
 SCHEMA_COMPAT_VERSION = (
-    # Queries against `event_stream_ordering` columns in membership tables must
-    # be disambiguated.
-    #
-    # insertions to the column `full_user_id` of tables profiles and user_filters can no
-    # longer be null
-    76
+    # The event_txn_id table and tables from MSC2716 no longer exist.
+    82
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

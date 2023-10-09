@@ -1,6 +1,6 @@
 from typing import Callable, Collection, List, Optional, Tuple
 from unittest import mock
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -19,7 +19,7 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
-from tests.test_utils import event_injection, make_awaitable
+from tests.test_utils import event_injection
 from tests.unittest import FederatingHomeserverTestCase
 
 
@@ -50,8 +50,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # This mock is crucial for destination_rooms to be populated.
         # TODO: this seems to no longer be the case---tests pass with this mock
         # commented out.
-        state_storage_controller.get_current_hosts_in_room = Mock(  # type: ignore[assignment]
-            return_value=make_awaitable({"test", "host2"})
+        state_storage_controller.get_current_hosts_in_room = AsyncMock(  # type: ignore[method-assign]
+            return_value={"test", "host2"}
         )
 
         # whenever send_transaction is called, record the pdu data
@@ -431,28 +431,24 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # ACT: call _wake_destinations_needing_catchup
 
         # patch wake_destination to just count the destinations instead
-        woken = []
+        woken = set()
 
         def wake_destination_track(destination: str) -> None:
-            woken.append(destination)
+            woken.add(destination)
 
-        self.federation_sender.wake_destination = wake_destination_track  # type: ignore[assignment]
+        self.federation_sender.wake_destination = wake_destination_track  # type: ignore[method-assign]
 
-        # cancel the pre-existing timer for _wake_destinations_needing_catchup
-        # this is because we are calling it manually rather than waiting for it
-        # to be called automatically
-        assert self.federation_sender._catchup_after_startup_timer is not None
-        self.federation_sender._catchup_after_startup_timer.cancel()
-
-        self.get_success(
-            self.federation_sender._wake_destinations_needing_catchup(), by=5.0
-        )
+        # We wait quite long so that all dests can be woken up, since there is a delay
+        # between them.
+        self.pump(by=5.0)
 
         # ASSERT (_wake_destinations_needing_catchup):
         # - all remotes are woken up, save for zzzerver
         self.assertNotIn("zzzerver", woken)
-        # - all destinations are woken exactly once; they appear once in woken.
-        self.assertCountEqual(woken, server_names[:-1])
+        # - all destinations are woken, potentially more than once, since the
+        # wake up is called regularly and we don't ack in this test that a transaction
+        # has been successfully sent.
+        self.assertCountEqual(woken, set(server_names[:-1]))
 
     def test_not_latest_event(self) -> None:
         """Test that we send the latest event in the room even if its not ours."""

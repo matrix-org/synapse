@@ -35,6 +35,7 @@ from synapse.api.errors import (
     LoginError,
     NotApprovedError,
     SynapseError,
+    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
@@ -49,7 +50,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.http.site import SynapseRequest
+from synapse.http.site import RequestInfo, SynapseRequest
 from synapse.rest.client._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
@@ -84,6 +85,7 @@ class LoginRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
+        self._main_store = hs.get_datastores().main
 
         # JWT configuration variables.
         self.jwt_enabled = hs.config.jwt.jwt_enabled
@@ -102,6 +104,9 @@ class LoginRestServlet(RestServlet):
             and hs.config.experimental.msc3866.require_approval_for_new_accounts
         )
 
+        # Whether get login token is enabled.
+        self._get_login_token_enabled = hs.config.auth.login_via_existing_enabled
+
         self.auth = hs.get_auth()
 
         self.clock = hs.get_clock()
@@ -109,19 +114,18 @@ class LoginRestServlet(RestServlet):
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self._sso_handler = hs.get_sso_handler()
+        self._spam_checker = hs.get_module_api_callbacks().spam_checker
 
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = Ratelimiter(
-            store=hs.get_datastores().main,
+            store=self._main_store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_address.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_address.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_address,
         )
         self._account_ratelimiter = Ratelimiter(
-            store=hs.get_datastores().main,
+            store=self._main_store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
-            burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
+            cfg=self.hs.config.ratelimiting.rc_login_account,
         )
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
@@ -140,6 +144,9 @@ class LoginRestServlet(RestServlet):
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
+        # The login token flow requires m.login.token to be advertised.
+        support_login_token_flow = self._get_login_token_enabled
+
         if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
             flows.append(
                 {
@@ -151,14 +158,23 @@ class LoginRestServlet(RestServlet):
                 }
             )
 
-            # While it's valid for us to advertise this login type generally,
-            # synapse currently only gives out these tokens as part of the
-            # SSO login flow.
-            # Generally we don't want to advertise login flows that clients
-            # don't know how to implement, since they (currently) will always
-            # fall back to the fallback API if they don't understand one of the
-            # login flow types returned.
-            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
+            # SSO requires a login token to be generated, so we need to advertise that flow
+            support_login_token_flow = True
+
+        # While it's valid for us to advertise this login type generally,
+        # synapse currently only gives out these tokens as part of the
+        # SSO login flow or as part of login via an existing session.
+        #
+        # Generally we don't want to advertise login flows that clients
+        # don't know how to implement, since they (currently) will always
+        # fall back to the fallback API if they don't understand one of the
+        # login flow types returned.
+        if support_login_token_flow:
+            tokenTypeFlow: Dict[str, Any] = {"type": LoginRestServlet.TOKEN_TYPE}
+            # If the login token flow is enabled advertise the get_login_token flag.
+            if self._get_login_token_enabled:
+                tokenTypeFlow["get_login_token"] = True
+            flows.append(tokenTypeFlow)
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
@@ -180,6 +196,8 @@ class LoginRestServlet(RestServlet):
             self._refresh_tokens_enabled and client_requested_refresh_token
         )
 
+        request_info = request.request_info()
+
         try:
             if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
                 requester = await self.auth.get_user_by_req(request)
@@ -199,6 +217,7 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     appservice,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
             elif (
                 self.jwt_enabled
@@ -210,6 +229,7 @@ class LoginRestServlet(RestServlet):
                 result = await self._do_jwt_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
                 await self._address_ratelimiter.ratelimit(
@@ -218,6 +238,7 @@ class LoginRestServlet(RestServlet):
                 result = await self._do_token_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
             else:
                 await self._address_ratelimiter.ratelimit(
@@ -226,6 +247,7 @@ class LoginRestServlet(RestServlet):
                 result = await self._do_other_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
+                    request_info=request_info,
                 )
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
@@ -248,6 +270,8 @@ class LoginRestServlet(RestServlet):
         login_submission: JsonDict,
         appservice: ApplicationService,
         should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         identifier = login_submission.get("identifier")
         logger.info("Got appservice login request with identifier: %r", identifier)
@@ -280,10 +304,18 @@ class LoginRestServlet(RestServlet):
             login_submission,
             ratelimit=appservice.is_rate_limited(),
             should_issue_refresh_token=should_issue_refresh_token,
+            # The user represented by an appservice's configured sender_localpart
+            # is not actually created in Synapse.
+            should_check_deactivated=qualified_user_id != appservice.sender,
+            request_info=request_info,
         )
 
     async def _do_other_login(
-        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+        self,
+        login_submission: JsonDict,
+        should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """Handle non-token/saml/jwt logins
 
@@ -313,6 +345,7 @@ class LoginRestServlet(RestServlet):
             login_submission,
             callback,
             should_issue_refresh_token=should_issue_refresh_token,
+            request_info=request_info,
         )
         return result
 
@@ -326,6 +359,9 @@ class LoginRestServlet(RestServlet):
         auth_provider_id: Optional[str] = None,
         should_issue_refresh_token: bool = False,
         auth_provider_session_id: Optional[str] = None,
+        should_check_deactivated: bool = True,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -345,6 +381,12 @@ class LoginRestServlet(RestServlet):
             should_issue_refresh_token: True if this login should issue
                 a refresh token alongside the access token.
             auth_provider_session_id: The session ID got during login from the SSO IdP.
+            should_check_deactivated: True if the user should be checked for
+                deactivation status before logging in.
+
+                This exists purely for appservice's configured sender_localpart
+                which doesn't have an associated user in the database.
+            request_info: The user agent/IP address of the user.
 
         Returns:
             Dictionary of account information after successful login.
@@ -363,6 +405,12 @@ class LoginRestServlet(RestServlet):
                     localpart=UserID.from_string(user_id).localpart
                 )
             user_id = canonical_uid
+
+        # If the account has been deactivated, do not proceed with the login.
+        if should_check_deactivated:
+            deactivated = await self._main_store.get_user_deactivated_status(user_id)
+            if deactivated:
+                raise UserDeactivatedError("This account has been deactivated")
 
         device_id = login_submission.get("device_id")
 
@@ -385,6 +433,22 @@ class LoginRestServlet(RestServlet):
                 )
 
         initial_display_name = login_submission.get("initial_device_display_name")
+        spam_check = await self._spam_checker.check_login_for_spam(
+            user_id,
+            device_id=device_id,
+            initial_display_name=initial_display_name,
+            request_info=[(request_info.user_agent, request_info.ip)],
+            auth_provider_id=auth_provider_id,
+        )
+        if spam_check != self._spam_checker.NOT_SPAM:
+            logger.info("Blocking login due to spam checker")
+            raise SynapseError(
+                403,
+                msg="Login was blocked by the server",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
+            )
+
         (
             device_id,
             access_token,
@@ -419,7 +483,11 @@ class LoginRestServlet(RestServlet):
         return result
 
     async def _do_token_login(
-        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+        self,
+        login_submission: JsonDict,
+        should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """
         Handle token login.
@@ -442,10 +510,15 @@ class LoginRestServlet(RestServlet):
             auth_provider_id=res.auth_provider_id,
             should_issue_refresh_token=should_issue_refresh_token,
             auth_provider_session_id=res.auth_provider_session_id,
+            request_info=request_info,
         )
 
     async def _do_jwt_login(
-        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+        self,
+        login_submission: JsonDict,
+        should_issue_refresh_token: bool = False,
+        *,
+        request_info: RequestInfo,
     ) -> LoginResponse:
         """
         Handle the custom JWT login.
@@ -458,12 +531,13 @@ class LoginRestServlet(RestServlet):
         Returns:
             The body of the JSON response.
         """
-        user_id = await self.hs.get_jwt_handler().validate_login(login_submission)
+        user_id = self.hs.get_jwt_handler().validate_login(login_submission)
         return await self._complete_login(
             user_id,
             login_submission,
             create_non_existent_users=True,
             should_issue_refresh_token=should_issue_refresh_token,
+            request_info=request_info,
         )
 
 
@@ -616,6 +690,9 @@ class CasTicketServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
+    if hs.config.experimental.msc3861.enabled:
+        return
+
     LoginRestServlet(hs).register(http_server)
     if (
         hs.config.worker.worker_app is None

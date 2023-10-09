@@ -46,6 +46,9 @@ instead.
 
 If the authentication is unsuccessful, the module must return `None`.
 
+Note that the user is not automatically registered, the `register_user(..)` method of
+the [module API](writing_a_module.html) can be used to lazily create users.
+
 If multiple modules register an auth checker for the same login type but with different
 fields, Synapse will refuse to start.
 

@@ -17,26 +17,36 @@ import hmac
 import os
 import urllib.parse
 from binascii import unhexlify
-from typing import List, Optional
-from unittest.mock import Mock, patch
+from typing import Dict, List, Optional
+from unittest.mock import AsyncMock, Mock, patch
 
 from parameterized import parameterized, parameterized_class
 
 from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.resource import Resource
 
 import synapse.rest.admin
 from synapse.api.constants import ApprovalNoticeMedium, LoginType, UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
 from synapse.media.filepath import MediaFilePaths
-from synapse.rest.client import devices, login, logout, profile, register, room, sync
+from synapse.rest.client import (
+    devices,
+    login,
+    logout,
+    profile,
+    register,
+    room,
+    sync,
+    user_directory,
+)
 from synapse.server import HomeServer
+from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import FakeSite, make_request
-from tests.test_utils import SMALL_PNG, make_awaitable
+from tests.test_utils import SMALL_PNG
 from tests.unittest import override_config
 
 
@@ -62,8 +72,8 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.hs.config.registration.registration_shared_secret = "shared"
 
-        self.hs.get_media_repository = Mock()  # type: ignore[assignment]
-        self.hs.get_deactivate_account_handler = Mock()  # type: ignore[assignment]
+        self.hs.get_media_repository = Mock()  # type: ignore[method-assign]
+        self.hs.get_deactivate_account_handler = Mock()  # type: ignore[method-assign]
 
         return self.hs
 
@@ -410,8 +420,8 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         store = self.hs.get_datastores().main
 
         # Set monthly active users to the limit
-        store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.server.max_mau_value)
+        store.get_monthly_active_count = AsyncMock(
+            return_value=self.hs.config.server.max_mau_value
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -447,6 +457,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
+        room.register_servlets,
     ]
     url = "/_synapse/admin/v2/users"
 
@@ -496,6 +507,62 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         # Check that all fields are available
         self._check_fields(channel.json_body["users"])
+
+    def test_last_seen(self) -> None:
+        """
+        Test that last_seen_ts field is properly working.
+        """
+        user1 = self.register_user("u1", "pass")
+        user1_token = self.login("u1", "pass")
+        user2 = self.register_user("u2", "pass")
+        user2_token = self.login("u2", "pass")
+        user3 = self.register_user("u3", "pass")
+        user3_token = self.login("u3", "pass")
+
+        self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        self.reactor.advance(10)
+        self.helper.create_room_as(user2, tok=user2_token)
+        self.reactor.advance(10)
+        self.helper.create_room_as(user1, tok=user1_token)
+        self.reactor.advance(10)
+        self.helper.create_room_as(user3, tok=user3_token)
+        self.reactor.advance(10)
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(4, len(channel.json_body["users"]))
+        self.assertEqual(4, channel.json_body["total"])
+
+        admin_last_seen = channel.json_body["users"][0]["last_seen_ts"]
+        user1_last_seen = channel.json_body["users"][1]["last_seen_ts"]
+        user2_last_seen = channel.json_body["users"][2]["last_seen_ts"]
+        user3_last_seen = channel.json_body["users"][3]["last_seen_ts"]
+        self.assertTrue(admin_last_seen > 0 and admin_last_seen < 10000)
+        self.assertTrue(user2_last_seen > 10000 and user2_last_seen < 20000)
+        self.assertTrue(user1_last_seen > 20000 and user1_last_seen < 30000)
+        self.assertTrue(user3_last_seen > 30000 and user3_last_seen < 40000)
+
+        self._order_test([self.admin_user, user2, user1, user3], "last_seen_ts")
+
+        self.reactor.advance(LAST_SEEN_GRANULARITY / 1000)
+        self.helper.create_room_as(user1, tok=user1_token)
+        self.reactor.advance(10)
+
+        channel = self.make_request(
+            "GET",
+            self.url + "/" + user1,
+            access_token=self.admin_user_tok,
+        )
+        self.assertTrue(
+            channel.json_body["last_seen_ts"] > 40000 + LAST_SEEN_GRANULARITY
+        )
+
+        self._order_test([self.admin_user, user2, user3, user1], "last_seen_ts")
 
     def test_search_term(self) -> None:
         """Test that searching for a users works correctly"""
@@ -870,6 +937,44 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self._order_test([self.admin_user, user1, user2], "creation_ts", "f")
         self._order_test([user2, user1, self.admin_user], "creation_ts", "b")
 
+    def test_filter_admins(self) -> None:
+        """
+        Tests whether the various values of the query parameter `admins` lead to the
+        expected result set.
+        """
+
+        # Register an additional non admin user
+        self.register_user("user", "pass", admin=False)
+
+        # Query all users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(2, channel.json_body["total"])
+
+        # Query only admin users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}?admins=true",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertEqual(1, channel.json_body["users"][0]["admin"])
+
+        # Query only non admin users
+        channel = self.make_request(
+            "GET",
+            f"{self.url}?admins=false",
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(1, channel.json_body["total"])
+        self.assertFalse(channel.json_body["users"][0]["admin"])
+
     @override_config(
         {
             "experimental_features": {
@@ -933,6 +1038,84 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(1, len(non_admin_user_ids), non_admin_user_ids)
         self.assertEqual(not_approved_user, non_admin_user_ids[0])
 
+    def test_filter_not_user_types(self) -> None:
+        """Tests that the endpoint handles the not_user_types param"""
+
+        regular_user_id = self.register_user("normalo", "secret")
+
+        bot_user_id = self.register_user("robo", "secret")
+        self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/" + urllib.parse.quote(bot_user_id),
+            {"user_type": UserTypes.BOT},
+            access_token=self.admin_user_tok,
+        )
+
+        support_user_id = self.register_user("foo", "secret")
+        self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/" + urllib.parse.quote(support_user_id),
+            {"user_type": UserTypes.SUPPORT},
+            access_token=self.admin_user_tok,
+        )
+
+        def test_user_type(
+            expected_user_ids: List[str], not_user_types: Optional[List[str]] = None
+        ) -> None:
+            """Runs a test for the not_user_types param
+            Args:
+                expected_user_ids: Ids of the users that are expected to be returned
+                not_user_types: List of values for the not_user_types param
+            """
+
+            user_type_query = ""
+
+            if not_user_types is not None:
+                user_type_query = "&".join(
+                    [f"not_user_type={u}" for u in not_user_types]
+                )
+
+            test_url = f"{self.url}?{user_type_query}"
+            channel = self.make_request(
+                "GET",
+                test_url,
+                access_token=self.admin_user_tok,
+            )
+
+            self.assertEqual(200, channel.code)
+            self.assertEqual(channel.json_body["total"], len(expected_user_ids))
+            self.assertEqual(
+                expected_user_ids,
+                [u["name"] for u in channel.json_body["users"]],
+            )
+
+        # Request without user_types →  all users expected
+        test_user_type([self.admin_user, support_user_id, regular_user_id, bot_user_id])
+
+        # Request and exclude bot users
+        test_user_type(
+            [self.admin_user, support_user_id, regular_user_id],
+            not_user_types=[UserTypes.BOT],
+        )
+
+        # Request and exclude bot and support users
+        test_user_type(
+            [self.admin_user, regular_user_id],
+            not_user_types=[UserTypes.BOT, UserTypes.SUPPORT],
+        )
+
+        # Request and exclude empty user types →  only expected the bot and support user
+        test_user_type([support_user_id, bot_user_id], not_user_types=[""])
+
+        # Request and exclude empty user types and bots →  only expected the support user
+        test_user_type([support_user_id], not_user_types=["", UserTypes.BOT])
+
+        # Request and exclude a custom type (neither service nor bot) →  expect all users
+        test_user_type(
+            [self.admin_user, support_user_id, regular_user_id, bot_user_id],
+            not_user_types=["custom"],
+        )
+
     def test_erasure_status(self) -> None:
         # Create a new user.
         user_id = self.register_user("eraseme", "eraseme")
@@ -962,6 +1145,32 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         )
         users = {user["name"]: user for user in channel.json_body["users"]}
         self.assertIs(users[user_id]["erased"], True)
+
+    def test_filter_locked(self) -> None:
+        # Create a new user.
+        user_id = self.register_user("lockme", "lockme")
+
+        # Lock them
+        self.get_success(self.store.set_user_locked_status(user_id, True))
+
+        # Locked user should appear in list users API
+        channel = self.make_request(
+            "GET",
+            self.url + "?locked=true",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertIn(user_id, users)
+        self.assertTrue(users[user_id]["locked"])
+
+        # Locked user should not appear in list users API
+        channel = self.make_request(
+            "GET",
+            self.url + "?locked=false",
+            access_token=self.admin_user_tok,
+        )
+        users = {user["name"]: user for user in channel.json_body["users"]}
+        self.assertNotIn(user_id, users)
 
     def _order_test(
         self,
@@ -1010,6 +1219,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             self.assertIn("displayname", u)
             self.assertIn("avatar_url", u)
             self.assertIn("creation_ts", u)
+            self.assertIn("last_seen_ts", u)
 
     def _create_users(self, number_users: int) -> None:
         """
@@ -1340,7 +1550,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         # To test deactivation for users without a profile, we delete the profile information for our user.
         self.get_success(
             self.store.db_pool.simple_delete_one(
-                table="profiles", keyvalues={"user_id": "user"}
+                table="profiles", keyvalues={"full_user_id": "@user:test"}
             )
         )
 
@@ -1399,6 +1609,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         sync.register_servlets,
         register.register_servlets,
+        user_directory.register_servlets,
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -1708,8 +1919,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             )
 
         # Set monthly active users to the limit
-        self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.server.max_mau_value)
+        self.store.get_monthly_active_count = AsyncMock(
+            return_value=self.hs.config.server.max_mau_value
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -1745,8 +1956,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         handler = self.hs.get_registration_handler()
 
         # Set monthly active users to the limit
-        self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.server.max_mau_value)
+        self.store.get_monthly_active_count = AsyncMock(
+            return_value=self.hs.config.server.max_mau_value
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -2386,6 +2597,105 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # This key was removed intentionally. Ensure it is not accidentally re-included.
         self.assertNotIn("password_hash", channel.json_body)
 
+    def test_locked_user(self) -> None:
+        # User can sync
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/v3/sync",
+            access_token=self.other_user_token,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        # Lock user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"locked": True},
+        )
+
+        # User is not authorized to sync anymore
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/v3/sync",
+            access_token=self.other_user_token,
+        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.USER_LOCKED, channel.json_body["errcode"])
+        self.assertTrue(channel.json_body["soft_logout"])
+
+    @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
+    def test_locked_user_not_in_user_dir(self) -> None:
+        # User is available in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
+        # Lock user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"locked": True},
+        )
+
+        # User is not available anymore in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(0, len(channel.json_body["results"]))
+
+    @override_config(
+        {
+            "user_directory": {
+                "enabled": True,
+                "search_all_users": True,
+                "show_locked_users": True,
+            }
+        }
+    )
+    def test_locked_user_in_user_dir_with_show_locked_users_option(self) -> None:
+        # User is available in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
+        # Lock user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"locked": True},
+        )
+
+        # User is still available in the user dir
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/user_directory/search",
+            {"search_term": self.other_user},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("results", channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
     @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
     def test_change_name_deactivate_user_user_directory(self) -> None:
         """
@@ -2394,7 +2704,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # is in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         assert profile is not None
         self.assertTrue(profile["display_name"] == "User")
 
@@ -2411,7 +2721,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertTrue(channel.json_body["deactivated"])
 
         # is not in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         self.assertIsNone(profile)
 
         # Set new displayname user
@@ -2428,7 +2738,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Foobar", channel.json_body["displayname"])
 
         # is not in user directory
-        profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        profile = self.get_success(self.store._get_user_in_directory(self.other_user))
         self.assertIsNone(profile)
 
     def test_reactivate_user(self) -> None:
@@ -2810,6 +3120,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("consent_version", content)
         self.assertIn("consent_ts", content)
         self.assertIn("external_ids", content)
+        self.assertIn("last_seen_ts", content)
 
         # This key was removed intentionally. Ensure it is not accidentally re-included.
         self.assertNotIn("password_hash", content)
@@ -3110,7 +3421,6 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
-        self.media_repo = hs.get_media_repository_resource()
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -3120,6 +3430,11 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.url = "/_synapse/admin/v1/users/%s/media" % urllib.parse.quote(
             self.other_user
         )
+
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        resources = super().create_resource_dict()
+        resources["/_matrix/media"] = self.hs.get_media_repository_resource()
+        return resources
 
     @parameterized.expand(["GET", "DELETE"])
     def test_no_auth(self, method: str) -> None:
@@ -3596,12 +3911,9 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         Returns:
             The ID of the newly created media.
         """
-        upload_resource = self.media_repo.children[b"upload"]
-        download_resource = self.media_repo.children[b"download"]
-
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, user_token, filename, expect_code=200
+            image_data, user_token, filename, expect_code=200
         )
 
         # Extract media ID from the response
@@ -3609,11 +3921,9 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         media_id = server_and_media_id.split("/")[1]
 
         # Try to access a media and to create `last_access_ts`
-        channel = make_request(
-            self.reactor,
-            FakeSite(download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_and_media_id,
+            f"/_matrix/media/v3/download/{server_and_media_id}",
             shorthand=False,
             access_token=user_token,
         )

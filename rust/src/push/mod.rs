@@ -256,7 +256,7 @@ impl<'de> Deserialize<'de> for Action {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SimpleJsonValue {
-    Str(String),
+    Str(Cow<'static, str>),
     Int(i64),
     Bool(bool),
     Null,
@@ -265,7 +265,7 @@ pub enum SimpleJsonValue {
 impl<'source> FromPyObject<'source> for SimpleJsonValue {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
         if let Ok(s) = <PyString as pyo3::PyTryFrom>::try_from(ob) {
-            Ok(SimpleJsonValue::Str(s.to_string()))
+            Ok(SimpleJsonValue::Str(Cow::Owned(s.to_string())))
         // A bool *is* an int, ensure we try bool first.
         } else if let Ok(b) = <PyBool as pyo3::PyTryFrom>::try_from(ob) {
             Ok(SimpleJsonValue::Bool(b.extract()?))
@@ -527,8 +527,7 @@ pub struct FilteredPushRules {
     msc1767_enabled: bool,
     msc3381_polls_enabled: bool,
     msc3664_enabled: bool,
-    msc3952_intentional_mentions: bool,
-    msc3958_suppress_edits_enabled: bool,
+    msc4028_push_encrypted_events: bool,
 }
 
 #[pymethods]
@@ -540,8 +539,7 @@ impl FilteredPushRules {
         msc1767_enabled: bool,
         msc3381_polls_enabled: bool,
         msc3664_enabled: bool,
-        msc3952_intentional_mentions: bool,
-        msc3958_suppress_edits_enabled: bool,
+        msc4028_push_encrypted_events: bool,
     ) -> Self {
         Self {
             push_rules,
@@ -549,8 +547,7 @@ impl FilteredPushRules {
             msc1767_enabled,
             msc3381_polls_enabled,
             msc3664_enabled,
-            msc3952_intentional_mentions,
-            msc3958_suppress_edits_enabled,
+            msc4028_push_encrypted_events,
         }
     }
 
@@ -587,12 +584,8 @@ impl FilteredPushRules {
                     return false;
                 }
 
-                if !self.msc3952_intentional_mentions && rule.rule_id.contains("org.matrix.msc3952")
-                {
-                    return false;
-                }
-                if !self.msc3958_suppress_edits_enabled
-                    && rule.rule_id == "global/override/.com.beeper.suppress_edits"
+                if !self.msc4028_push_encrypted_events
+                    && rule.rule_id == "global/override/.org.matrix.msc4028.encrypted_event"
                 {
                     return false;
                 }
