@@ -411,7 +411,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
             # Next fetch their profiles. Note that not all users have profiles.
             profile_rows = cast(
-                List[Tuple[str, str, str]],
+                List[Tuple[str, Optional[str], Optional[str]]],
                 self.db_pool.simple_select_many_txn(
                     txn,
                     table="profiles",
@@ -517,7 +517,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         ]
 
         rows = cast(
-            List[Tuple[str, str]],
+            List[Tuple[str, Optional[str]]],
             self.db_pool.simple_select_many_txn(
                 txn,
                 table="users",

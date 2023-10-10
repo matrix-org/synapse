@@ -262,7 +262,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         self, user_ids: Iterable[str]
     ) -> Mapping[str, UserPresenceState]:
         rows = cast(
-            List[Tuple[str, str, int, int, int, Optional[str], bool]],
+            List[Tuple[str, str, int, int, int, Optional[str], Union[int, bool]]],
             await self.db_pool.simple_select_many_batch(
                 table="presence_stream",
                 column="user_id",

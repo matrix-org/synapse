@@ -27,6 +27,7 @@ from typing import (
     Optional,
     Set,
     Tuple,
+    Union,
     cast,
 )
 
@@ -502,7 +503,7 @@ class PersistEventsStore:
         # We ignore legacy rooms that we aren't filling the chain cover index
         # for.
         rows = cast(
-            List[Tuple[str, bool]],
+            List[Tuple[str, Optional[Union[int, bool]]]],
             self.db_pool.simple_select_many_txn(
                 txn,
                 table="rooms",

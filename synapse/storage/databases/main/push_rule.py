@@ -284,7 +284,7 @@ class PushRulesWorkerStore(
         results: Dict[str, Dict[str, bool]] = {user_id: {} for user_id in user_ids}
 
         rows = cast(
-            List[Tuple[str, str, int]],
+            List[Tuple[str, str, Optional[int]]],
             await self.db_pool.simple_select_many_batch(
                 table="push_rules_enable",
                 column="user_name",

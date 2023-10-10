@@ -212,7 +212,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         self, destinations: StrCollection
     ) -> Mapping[str, Optional[DestinationRetryTimings]]:
         rows = cast(
-            List[Tuple[str, int, int, int]],
+            List[Tuple[str, Optional[int], Optional[int], Optional[int]]],
             await self.db_pool.simple_select_many_batch(
                 table="destinations",
                 iterable=destinations,
