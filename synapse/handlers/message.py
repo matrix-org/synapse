@@ -1129,7 +1129,6 @@ class EventCreationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # we know it was persisted, so must have a stream ordering
         assert ev.internal_metadata.stream_ordering
@@ -2034,7 +2033,6 @@ class EventCreationHandler:
                         # in the meantime and context needs to be recomputed, so let's do so.
                         if i == max_retries - 1:
                             raise e
-                        pass
                 return True
             except AuthError:
                 logger.info(
