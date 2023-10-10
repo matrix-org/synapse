@@ -1,3 +1,21 @@
+# Synapse 1.94.0 (2023-10-10)
+
+No significant changes since 1.94.0rc1.
+However, please take note of the security advisory that follows.
+
+## Security advisory
+
+The following issue is fixed in 1.94.0 (and RC).
+
+- [GHSA-5chr-wjw5-3gq4](https://github.com/matrix-org/synapse/security/advisories/GHSA-5chr-wjw5-3gq4) — Moderate Severity
+
+  A malicious server ACL event can impact performance temporarily or permanently leading to a persistent denial of service.
+
+  Homeservers running on a closed federation (which presumably do not need to use server ACLs) are not affected.
+
+See the advisory for more details. If you have any questions, email security@matrix.org.
+
+
 # Synapse 1.94.0rc1 (2023-10-03)
 
 ### Features

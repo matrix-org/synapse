@@ -261,7 +261,6 @@ class RoomCreationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # This is to satisfy mypy and should never happen
         raise PartialStateConflictError()
