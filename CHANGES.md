@@ -1,3 +1,8 @@
+# Synapse 1.94.0 (2023-10-10)
+
+No significant changes since 1.94.0rc1.
+
+
 # Synapse 1.94.0rc1 (2023-10-03)
 
 ### Features
