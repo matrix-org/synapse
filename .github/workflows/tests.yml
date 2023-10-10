@@ -280,7 +280,6 @@ jobs:
       - check-lockfile
       - lint-clippy
       - lint-rustfmt
-      - check-signoff
     runs-on: ubuntu-latest
     steps:
       - run: "true"

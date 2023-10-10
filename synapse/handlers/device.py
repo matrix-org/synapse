@@ -845,7 +845,6 @@ class DeviceHandler(DeviceWorkerHandler):
                     else:
                         assert max_stream_id == stream_id
                         # Avoid moving `room_id` backwards.
-                        pass
 
                     if self._handle_new_device_update_new_data:
                         continue
