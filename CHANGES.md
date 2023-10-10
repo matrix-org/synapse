@@ -7,7 +7,7 @@ However, please take note of the security advisory that follows.
 
 The following issue is fixed in 1.94.0 (and RC).
 
-- [GHSA-5chr-wjw5-3gq4](https://github.com/matrix-org/synapse/security/advisories/GHSA-5chr-wjw5-3gq4) — Moderate Severity
+- [GHSA-5chr-wjw5-3gq4](https://github.com/matrix-org/synapse/security/advisories/GHSA-5chr-wjw5-3gq4) / [CVE-2023-45129](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-45129) — Moderate Severity
 
   A malicious server ACL event can impact performance temporarily or permanently leading to a persistent denial of service.
 
