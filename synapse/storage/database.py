@@ -2418,7 +2418,7 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         exclude_keyvalues: Optional[Dict[str, Any]] = None,
         order_direction: str = "ASC",
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """
         Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
@@ -2447,7 +2447,7 @@ class DatabasePool:
             order_direction: Whether the results should be ordered "ASC" or "DESC".
 
         Returns:
-            The result as a list of dictionaries.
+            The result as a list of tuples.
         """
         if order_direction not in ["ASC", "DESC"]:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
@@ -2474,7 +2474,7 @@ class DatabasePool:
         )
         txn.execute(sql, arg_list + [limit, start])
 
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_search_list(
         self,
