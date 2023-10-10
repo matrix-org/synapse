@@ -4576,11 +4576,8 @@ the <code>allowed_lifetime_min</code> and <code>allowed_lifetime_max</code> conf
 which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.</p>
-<p>The message retention policies feature is disabled by default. Please be advised
-that enabling this feature carries some risk. There are known bugs with the implementation
-which can cause database corruption. Setting retention to delete older history
-is less risky than deleting newer history but in general caution is advised when enabling this
-experimental feature. You can read more about this feature <a href="usage/configuration/../../message_retention_policies.html">here</a>.</p>
+<p>The message retention policies feature is disabled by default. You can read more
+about this feature <a href="usage/configuration/../../message_retention_policies.html">here</a>.</p>
 <p>This setting has the following sub-options:</p>
 <ul>
 <li>
@@ -4712,6 +4709,10 @@ N.B. we recommend also firewalling your federation listener to limit
 inbound federation traffic as early as possible, rather than relying
 purely on this application-layer restriction.  If not specified, the
 default is to whitelist everything.</p>
+<p>Note: this does not stop a server from joining rooms that servers not on the
+whitelist are in. As such, this option is really only useful to establish a
+&quot;private federation&quot;, where a group of servers all whitelist each other and have
+the same whitelist.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">federation_domain_whitelist:
   - lon.example.com
@@ -9452,40 +9453,40 @@ consent uri for that user.</p>
 URI that clients use to connect to the server. (It is used to construct
 <code>consent_uri</code> in the error.)</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="user-directory-api-implementation"><a class="header" href="#user-directory-api-implementation">User Directory API Implementation</a></h1>
-<p>The user directory is currently maintained based on the 'visible' users
-on this particular server - i.e. ones which your account shares a room with, or
-who are present in a publicly viewable room present on the server.</p>
-<p>The directory info is stored in various tables, which can (typically after
-DB corruption) get stale or out of sync. If this happens, for now the
+<p>The user directory is maintained based on users that are 'visible' to the homeserver -
+i.e. ones which are local to the server and ones which any local user shares a
+room with.</p>
+<p>The directory info is stored in various tables, which can sometimes get out of
+sync (although this is considered a bug). If this happens, for now the
 solution to fix it is to use the <a href="usage/administration/admin_api/background_updates.html#run">admin API</a>
 and execute the job <code>regenerate_directory</code>. This should then start a background task to
-flush the current tables and regenerate the directory.</p>
+flush the current tables and regenerate the directory. Depending on the size
+of your homeserver (number of users and rooms) this can take a while.</p>
 <h2 id="data-model"><a class="header" href="#data-model">Data model</a></h2>
 <p>There are five relevant tables that collectively form the &quot;user directory&quot;.
-Three of them track a master list of all the users we could search for.
-The last two (collectively called the &quot;search tables&quot;) track who can
-see who.</p>
+Three of them track a list of all known users. The last two (collectively called
+the &quot;search tables&quot;) track which users are visible to each other.</p>
 <p>From all of these tables we exclude three types of local user:</p>
 <ul>
 <li>support users</li>
 <li>appservice users</li>
 <li>deactivated users</li>
 </ul>
+<p>A description of each table follows:</p>
 <ul>
 <li>
-<p><code>user_directory</code>. This contains the user_id, display name and avatar we'll
-return when you search the directory.</p>
+<p><code>user_directory</code>. This contains the user ID, display name and avatar of each user.</p>
 <ul>
-<li>Because there's only one directory entry per user, it's important that we only
-ever put publicly visible names here. Otherwise we might leak a private
+<li>Because there is only one directory entry per user, it is important that it
+only contain publicly visible information. Otherwise, this will leak the
 nickname or avatar used in a private room.</li>
 <li>Indexed on rooms. Indexed on users.</li>
 </ul>
 </li>
 <li>
 <p><code>user_directory_search</code>. To be joined to <code>user_directory</code>. It contains an extra
-column that enables full text search based on user ids and display names.
-Different schemas for SQLite and Postgres with different code paths to match.</p>
+column that enables full text search based on user IDs and display names.
+Different schemas for SQLite and Postgres are used.</p>
 <ul>
 <li>Indexed on the full text search data. Indexed on users.</li>
 </ul>
@@ -9494,18 +9495,93 @@ Different schemas for SQLite and Postgres with different code paths to match.</p
 <p><code>user_directory_stream_pos</code>. When the initial background update to populate
 the directory is complete, we record a stream position here. This indicates
 that synapse should now listen for room changes and incrementally update
-the directory where necessary.</p>
+the directory where necessary. (See <a href="development/synapse_architecture/streams.html">stream positions</a>.)</p>
 </li>
 <li>
-<p><code>users_in_public_rooms</code>. Contains associations between users and the public rooms they're in.
-Used to determine which users are in public rooms and should be publicly visible in the directory.</p>
+<p><code>users_in_public_rooms</code>. Contains associations between users and the public
+rooms they're in.  Used to determine which users are in public rooms and should
+be publicly visible in the directory. Both local and remote users are tracked.</p>
 </li>
 <li>
 <p><code>users_who_share_private_rooms</code>. Rows are triples <code>(L, M, room id)</code> where <code>L</code>
 is a local user and <code>M</code> is a local or remote user. <code>L</code> and <code>M</code> should be
 different, but this isn't enforced by a constraint.</p>
+<p>Note that if two local users share a room then there will be two entries:
+<code>(user1, user2, !room_id)</code> and <code>(user2, user1, !room_id)</code>.</p>
 </li>
 </ul>
+<h2 id="configuration-options"><a class="header" href="#configuration-options">Configuration options</a></h2>
+<p>The exact way user search works can be tweaked via some server-level
+<a href="usage/configuration/config_documentation.html#user_directory">configuration options</a>.</p>
+<p>The information is not repeated here, but the options are mentioned below.</p>
+<h2 id="search-algorithm"><a class="header" href="#search-algorithm">Search algorithm</a></h2>
+<p>If <code>search_all_users</code> is <code>false</code>, then results are limited to users who:</p>
+<ol>
+<li>Are found in the <code>users_in_public_rooms</code> table, or</li>
+<li>Are found in the <code>users_who_share_private_rooms</code> where <code>L</code> is the requesting
+user and <code>M</code> is the search result.</li>
+</ol>
+<p>Otherwise, if <code>search_all_users</code> is <code>true</code>, no such limits are placed and all
+users known to the server (matching the search query) will be returned.</p>
+<p>By default, locked users are not returned. If <code>show_locked_users</code> is <code>true</code> then
+no filtering on the locked status of a user is done.</p>
+<p>The user provided search term is lowercased and normalized using <a href="https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization">NFKC</a>,
+this treats the string as case-insensitive, canonicalizes different forms of the
+same text, and maps some &quot;roughly equivalent&quot; characters together.</p>
+<p>The search term is then split into words:</p>
+<ul>
+<li>If <a href="https://en.wikipedia.org/wiki/International_Components_for_Unicode">ICU</a> is
+available, then the system's <a href="https://unicode-org.github.io/icu/userguide/locale/#default-locales">default locale</a>
+will be used to break the search term into words. (See the
+<a href="setup/installation.html">installation instructions</a> for how to install ICU.)</li>
+<li>If unavailable, then runs of ASCII characters, numbers, underscores, and hyphens
+are considered words.</li>
+</ul>
+<p>The queries for PostgreSQL and SQLite are detailed below, by their overall goal
+is to find matching users, preferring users who are &quot;real&quot; (e.g. not bots,
+not deactivated). It is assumed that real users will have an display name and
+avatar set.</p>
+<h3 id="postgresql"><a class="header" href="#postgresql">PostgreSQL</a></h3>
+<p>The above words are then transformed into two queries:</p>
+<ol>
+<li>&quot;exact&quot; which matches the parsed words exactly (using <a href="https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES"><code>to_tsquery</code></a>);</li>
+<li>&quot;prefix&quot; which matches the parsed words as prefixes (using <code>to_tsquery</code>).</li>
+</ol>
+<p>Results are composed of all rows in the <code>user_directory_search</code> table whose information
+matches one (or both) of these queries. Results are ordered by calculating a weighted
+score for each result, higher scores are returned first:</p>
+<ul>
+<li>4x if a user ID exists.</li>
+<li>1.2x if the user has a display name set.</li>
+<li>1.2x if the user has an avatar set.</li>
+<li>0x-3x by the full text search results using the <a href="https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-RANKING"><code>ts_rank_cd</code> function</a>
+against the &quot;exact&quot; search query; this has four variables with the following weightings:
+<ul>
+<li><code>D</code>: 0.1 for the user ID's domain</li>
+<li><code>C</code>: 0.1 for unused</li>
+<li><code>B</code>: 0.9 for the user's display name (or an empty string if it is not set)</li>
+<li><code>A</code>: 0.1 for the user ID's localpart</li>
+</ul>
+</li>
+<li>0x-1x by the full text search results using the <code>ts_rank_cd</code> function against the
+&quot;prefix&quot; search query. (Using the same weightings as above.)</li>
+<li>If <code>prefer_local_users</code> is <code>true</code>, then 2x if the user is local to the homeserver.</li>
+</ul>
+<p>Note that <code>ts_rank_cd</code> returns a weight between 0 and 1. The initial weighting of
+all results is 1.</p>
+<h3 id="sqlite"><a class="header" href="#sqlite">SQLite</a></h3>
+<p>Results are composed of all rows in the <code>user_directory_search</code> whose information
+matches the query. Results are ordered by the following information, with each
+subsequent column used as a tiebreaker, for each result:</p>
+<ol>
+<li>By the <a href="https://www.sqlite.org/windowfunctions.html#built_in_window_functions"><code>rank</code></a>
+of the full text search results using the <a href="https://www.sqlite.org/fts3.html#matchinfo"><code>matchinfo</code> function</a>. Higher
+ranks are returned first.</li>
+<li>If <code>prefer_local_users</code> is <code>true</code>, then users local to the homeserver are
+returned first.</li>
+<li>Users with a display name set are returned first.</li>
+<li>Users with an avatar set are returned first.</li>
+</ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="message-retention-policies"><a class="header" href="#message-retention-policies">Message retention policies</a></h1>
 <p>Synapse admins can enable support for message retention policies on
 their homeserver. Message retention policies exist at a room level,
@@ -9515,8 +9591,7 @@ and allow server and room admins to configure how long messages should
 be kept in a homeserver's database before being purged from it.
 <strong>Please note that, as this feature isn't part of the Matrix
 specification yet, this implementation is to be considered as
-experimental. There are known bugs which may cause database corruption.
-Proceed with caution.</strong> </p>
+experimental.</strong></p>
 <p>A message retention policy is mainly defined by its <code>max_lifetime</code>
 parameter, which defines how long a message can be kept around after
 it was sent to the room. If a room doesn't have a message retention
@@ -13985,9 +14060,6 @@ granting them access to the Admin API, among other things.</p>
 </li>
 <li>
 <p><code>deactivated</code> - <strong>bool</strong>, optional. If unspecified, deactivation state will be left unchanged.</p>
-</li>
-<li>
-<p><code>locked</code> - <strong>bool</strong>, optional. If unspecified, locked state will be left unchanged.</p>
 <p>Note: the <code>password</code> field must also be set if both of the following are true:</p>
 <ul>
 <li><code>deactivated</code> is set to <code>false</code> and the user was previously deactivated (you are reactivating this user)</li>
@@ -13997,6 +14069,9 @@ Users' passwords are wiped upon account deactivation, hence the need to set a ne
 </ul>
 <p>Note: a user cannot be erased with this API. For more details on
 deactivating and erasing users see <a href="admin_api/user_admin_api.html#deactivate-account">Deactivate Account</a>.</p>
+</li>
+<li>
+<p><code>locked</code> - <strong>bool</strong>, optional. If unspecified, locked state will be left unchanged.</p>
 </li>
 <li>
 <p><code>user_type</code> - <strong>string</strong> or null, optional. If not provided, the user type will be
@@ -14956,8 +15031,8 @@ for more information.</p>
 </code></pre>
 <p><em>Added in Synapse 1.72.0.</em></p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="version-api"><a class="header" href="#version-api">Version API</a></h1>
-<p>This API returns the running Synapse version and the Python version
-on which Synapse is being run. This is useful when a Synapse instance
+<p>This API returns the running Synapse version.
+This is useful when a Synapse instance
 is behind a proxy that does not forward the 'Server' header (which also
 contains Synapse version information).</p>
 <p>The api is:</p>
@@ -14965,10 +15040,11 @@ contains Synapse version information).</p>
 </code></pre>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
-    &quot;server_version&quot;: &quot;0.99.2rc1 (b=develop, abcdef123)&quot;,
-    &quot;python_version&quot;: &quot;3.7.8&quot;
+    &quot;server_version&quot;: &quot;0.99.2rc1 (b=develop, abcdef123)&quot;
 }
 </code></pre>
+<p><em>Changed in Synapse 1.94.0:</em> The <code>python_version</code> key was removed from the
+response body.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="federation-api"><a class="header" href="#federation-api">Federation API</a></h1>
 <p>This API allows a server administrator to manage Synapse's federation with other homeservers.</p>
 <p>Note: This API is new, experimental and &quot;subject to change&quot;.</p>
@@ -17119,6 +17195,140 @@ purged (no need to use sub-<code>select</code> query or join from the <code>even
 two events with the same <code>event_id</code> (in the same or different rooms). After room
 version <code>3</code>, that can only happen with a hash collision, which we basically hope
 will never happen (SHA256 has a massive big key space).</p>
+<h2 id="worked-examples-of-gradual-migrations"><a class="header" href="#worked-examples-of-gradual-migrations">Worked examples of gradual migrations</a></h2>
+<p>Some migrations need to be performed gradually. A prime example of this is anything
+which would need to do a large table scan — including adding columns, indices or
+<code>NOT NULL</code> constraints to non-empty tables — such a migration should be done as a
+background update where possible, at least on Postgres.
+We can afford to be more relaxed about SQLite databases since they are usually
+used on smaller deployments and SQLite does not support the same concurrent
+DDL operations as Postgres.</p>
+<p>We also typically insist on having at least one Synapse version's worth of
+backwards compatibility, so that administrators can roll back Synapse if an upgrade
+did not go smoothly.</p>
+<p>This sometimes results in having to plan a migration across multiple versions
+of Synapse.</p>
+<p>This section includes an example and may include more in the future.</p>
+<h3 id="transforming-a-column-into-another-one-with-not-null-constraints"><a class="header" href="#transforming-a-column-into-another-one-with-not-null-constraints">Transforming a column into another one, with <code>NOT NULL</code> constraints</a></h3>
+<p>This example illustrates how you would introduce a new column, write data into it
+based on data from an old column and then drop the old column.</p>
+<p>We are aiming for semantic equivalence to:</p>
+<pre><code class="language-sql">ALTER TABLE mytable ADD COLUMN new_column INTEGER;
+UPDATE mytable SET new_column = old_column * 100;
+ALTER TABLE mytable ALTER COLUMN new_column ADD CONSTRAINT NOT NULL;
+ALTER TABLE mytable DROP COLUMN old_column;
+</code></pre>
+<h4 id="synapse-version-n"><a class="header" href="#synapse-version-n">Synapse version <code>N</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S
+SCHEMA_COMPAT_VERSION = ... # unimportant at this stage
+</code></pre>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is read by Synapse and written to by Synapse.</li>
+</ol>
+<h4 id="synapse-version-n--1"><a class="header" href="#synapse-version-n--1">Synapse version <code>N + 1</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 1
+SCHEMA_COMPAT_VERSION = ... # unimportant at this stage
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>
+<pre><code class="language-sql">ALTER TABLE mytable ADD COLUMN new_column INTEGER;
+</code></pre>
+</li>
+</ol>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is read by Synapse and written to by Synapse.</li>
+<li><code>new_column</code> is written to by Synapse.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li><code>new_column</code> can't have a <code>NOT NULL NOT VALID</code> constraint yet, because the previous Synapse version did not write to the new column (since we haven't bumped the <code>SCHEMA_COMPAT_VERSION</code> yet, we still need to be compatible with the previous version).</li>
+</ol>
+<h4 id="synapse-version-n--2"><a class="header" href="#synapse-version-n--2">Synapse version <code>N + 2</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 2
+SCHEMA_COMPAT_VERSION = S + 1 # this signals that we can't roll back to a time before new_column existed
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>On Postgres, add a <code>NOT VALID</code> constraint to ensure new rows are compliant. <em>SQLite does not have such a construct, but it would be unnecessary anyway since there is no way to concurrently perform this migration on SQLite.</em>
+<pre><code class="language-sql">ALTER TABLE mytable ADD CONSTRAINT CHECK new_column_not_null (new_column IS NOT NULL) NOT VALID;
+</code></pre>
+</li>
+<li>Start a background update to perform migration: it should gradually run e.g.
+<pre><code class="language-sql">UPDATE mytable SET new_column = old_column * 100 WHERE 0 &lt; mytable_id AND mytable_id &lt;= 5;
+</code></pre>
+This background update is technically pointless on SQLite, but you must schedule it anyway so that the <code>portdb</code> script to migrate to Postgres still works.</li>
+<li>Upon completion of the background update, you should run <code>VALIDATE CONSTRAINT</code> on Postgres to turn the <code>NOT VALID</code> constraint into a valid one.
+<pre><code class="language-sql">ALTER TABLE mytable VALIDATE CONSTRAINT new_column_not_null;
+</code></pre>
+This will take some time but does <strong>NOT</strong> hold an exclusive lock over the table.</li>
+</ol>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is read by Synapse and written to by Synapse.</li>
+<li><code>new_column</code> is written to by Synapse and new rows always have a non-<code>NULL</code> value in this field.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li>If you wish, you can convert the <code>CHECK (new_column IS NOT NULL)</code> to a <code>NOT NULL</code> constraint free of charge in Postgres by adding the <code>NOT NULL</code> constraint and then dropping the <code>CHECK</code> constraint, because Postgres can statically verify that the <code>NOT NULL</code> constraint is implied by the <code>CHECK</code> constraint without performing a table scan.</li>
+<li>It might be tempting to make version <code>N + 2</code> redundant by moving the background update to <code>N + 1</code> and delaying adding the <code>NOT NULL</code> constraint to <code>N + 3</code>, but that would mean the constraint would always be validated in the foreground in <code>N + 3</code>. Whereas if the <code>N + 2</code> step is kept, the migration in <code>N + 3</code> would be fast in the happy case.</li>
+</ol>
+<h4 id="synapse-version-n--3"><a class="header" href="#synapse-version-n--3">Synapse version <code>N + 3</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 3
+SCHEMA_COMPAT_VERSION = S + 1 # we can't roll back to a time before new_column existed
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>(Postgres) Update the table to populate values of <code>new_column</code> in case the background update had not completed. Additionally, <code>VALIDATE CONSTRAINT</code> to make the check fully valid.
+<pre><code class="language-sql">-- you ideally want an index on `new_column` or e.g. `(new_column) WHERE new_column IS NULL` first, or perhaps you can find a way to skip this if the `NOT NULL` constraint has already been validated.
+UPDATE mytable SET new_column = old_column * 100 WHERE new_column IS NULL;
+
+-- this is a no-op if it already ran as part of the background update
+ALTER TABLE mytable VALIDATE CONSTRAINT new_column_not_null;
+</code></pre>
+</li>
+<li>(SQLite) Recreate the table by precisely following <a href="https://www.sqlite.org/lang_altertable.html#otheralter">the 12-step procedure for SQLite table schema changes</a>.
+During this table rewrite, you should recreate <code>new_column</code> as <code>NOT NULL</code> and populate any outstanding <code>NULL</code> values at the same time.
+Unfortunately, you can't drop <code>old_column</code> yet because it must be present for compatibility with the Postgres schema, as needed by <code>portdb</code>.
+(Otherwise you could do this all in one go with SQLite!)</li>
+</ol>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> is written to by Synapse (but no longer read by Synapse!).</li>
+<li><code>new_column</code> is read by Synapse and written to by Synapse. Moreover, all rows have a non-<code>NULL</code> value in this field, as guaranteed by a schema constraint.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li>We can't drop <code>old_column</code> yet, or even stop writing to it, because that would break a rollback to the previous version of Synapse.</li>
+<li>Application code can now rely on <code>new_column</code> being populated. The remaining steps are only motivated by the wish to clean-up old columns.</li>
+</ol>
+<h4 id="synapse-version-n--4"><a class="header" href="#synapse-version-n--4">Synapse version <code>N + 4</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 4
+SCHEMA_COMPAT_VERSION = S + 3 # we can't roll back to a time before new_column was entirely non-NULL
+</code></pre>
+<p><strong>Invariants:</strong></p>
+<ol>
+<li><code>old_column</code> exists but is not written to or read from by Synapse.</li>
+<li><code>new_column</code> is read by Synapse and written to by Synapse. Moreover, all rows have a non-<code>NULL</code> value in this field, as guaranteed by a schema constraint.</li>
+</ol>
+<p><strong>Notes:</strong></p>
+<ol>
+<li>We can't drop <code>old_column</code> yet because that would break a rollback to the previous version of Synapse. <br />
+<strong>TODO:</strong> It may be possible to relax this and drop the column straight away as long as the previous version of Synapse detected a rollback occurred and stopped attempting to write to the column. This could possibly be done by checking whether the database's schema compatibility version was <code>S + 3</code>.</li>
+</ol>
+<h4 id="synapse-version-n--5"><a class="header" href="#synapse-version-n--5">Synapse version <code>N + 5</code></a></h4>
+<pre><code class="language-python">SCHEMA_VERSION = S + 5
+SCHEMA_COMPAT_VERSION = S + 4 # we can't roll back to a time before old_column was no longer being touched
+</code></pre>
+<p><strong>Changes:</strong></p>
+<ol>
+<li>
+<pre><code class="language-sql">ALTER TABLE mytable DROP COLUMN old_column;
+</code></pre>
+</li>
+</ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="implementing-experimental-features-in-synapse"><a class="header" href="#implementing-experimental-features-in-synapse">Implementing experimental features in Synapse</a></h1>
 <p>It can be desirable to implement &quot;experimental&quot; features which are disabled by
 default and must be explicitly enabled via the Synapse configuration. This is
