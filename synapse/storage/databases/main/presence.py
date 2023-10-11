@@ -289,7 +289,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
                 last_federation_update_ts=last_federation_update_ts,
                 last_user_sync_ts=last_user_sync_ts,
                 status_msg=status_msg,
-                currently_active=currently_active,
+                currently_active=bool(currently_active),
             )
             for user_id, state, last_active_ts, last_federation_update_ts, last_user_sync_ts, status_msg, currently_active in rows
         }
