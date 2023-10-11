@@ -226,7 +226,8 @@ class KeyStore(CacheInvalidationWorkerStore):
         if not rows:
             return {}
 
-        # We sort the rows by ts_added_ms so that the most recently added entry is picked up.
+        # We sort the rows by ts_added_ms so that the most recently added entry
+        # will stomp over older entries in the dictionary.
         rows.sort(key=lambda r: r[2])
 
         return {
@@ -263,6 +264,8 @@ class KeyStore(CacheInvalidationWorkerStore):
         if not rows:
             return {}
 
+        # We sort the rows by ts_added_ms so that the most recently added entry
+        # will stomp over older entries in the dictionary.
         rows.sort(key=lambda r: r["ts_added_ms"])
 
         return {

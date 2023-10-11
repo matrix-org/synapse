@@ -256,7 +256,7 @@ class PushRulesWorkerStore(
             ),
         )
 
-        # Sort by negated priority_class, then negated priority.
+        # Sort by highest priority_class, then highest priority.
         rows.sort(key=lambda row: (-int(row[2]), -int(row[3])))
 
         for user_name, rule_id, priority_class, _, conditions, actions in rows:
