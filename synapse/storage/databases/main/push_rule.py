@@ -68,6 +68,20 @@ def _load_rules(
 ) -> FilteredPushRules:
     """Take the DB rows returned from the DB and convert them into a full
     `FilteredPushRules` object.
+
+    Args:
+        rawrules: List of tuples of:
+            * rule ID
+            * Priority lass
+            * Conditions (as serialized JSON)
+            * Actions (as serialized JSON)
+        enabled_map: A dictionary of rule ID to a boolean of whether the rule is
+            enabled. This might not include all rule IDs from rawrules.
+        experimental_config: The `experimental_features` section of the Synapse
+            config. (Used to check if various features are enabled.)
+
+    Returns:
+        A new FilteredPushRules object.
     """
 
     ruleslist = [
