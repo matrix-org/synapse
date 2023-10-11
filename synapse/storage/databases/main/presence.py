@@ -261,6 +261,8 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
     async def get_presence_for_users(
         self, user_ids: Iterable[str]
     ) -> Mapping[str, UserPresenceState]:
+        # TODO All these columns are nullable, but we don't expect that:
+        #      https://github.com/matrix-org/synapse/issues/16467
         rows = cast(
             List[Tuple[str, str, int, int, int, Optional[str], Union[int, bool]]],
             await self.db_pool.simple_select_many_batch(
@@ -397,6 +399,8 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
         limit = 100
         offset = 0
         while True:
+            # TODO All these columns are nullable, but we don't expect that:
+            #      https://github.com/matrix-org/synapse/issues/16467
             rows = cast(
                 List[Tuple[str, str, int, int, int, Optional[str], Union[int, bool]]],
                 await self.db_pool.runInteraction(
