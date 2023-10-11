@@ -251,29 +251,28 @@ class UserDirectoryHandler(StateDeltasHandler):
     async def _handle_deltas(self, deltas: List[StateDelta]) -> None:
         """Called with the state deltas to process"""
         for delta in deltas:
-            typ = delta.event_type
-            state_key = delta.state_key
-            room_id = delta.room_id
-            event_id: Optional[str] = delta.event_id
-            prev_event_id: Optional[str] = delta.prev_event_id
-
-            logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
+            logger.debug(
+                "Handling: %r %r, %s", delta.event_type, delta.state_key, delta.event_id
+            )
 
             # For join rule and visibility changes we need to check if the room
             # may have become public or not and add/remove the users in said room
-            if typ in (EventTypes.RoomHistoryVisibility, EventTypes.JoinRules):
+            if delta.event_type in (
+                EventTypes.RoomHistoryVisibility,
+                EventTypes.JoinRules,
+            ):
                 await self._handle_room_publicity_change(
-                    room_id, prev_event_id, event_id, typ
+                    delta.room_id, delta.prev_event_id, delta.event_id, delta.event_type
                 )
-            elif typ == EventTypes.Member:
+            elif delta.event_type == EventTypes.Member:
                 await self._handle_room_membership_event(
-                    room_id,
-                    prev_event_id,
-                    event_id,
-                    state_key,
+                    delta.room_id,
+                    delta.prev_event_id,
+                    delta.event_id,
+                    delta.state_key,
                 )
             else:
-                logger.debug("Ignoring irrelevant type: %r", typ)
+                logger.debug("Ignoring irrelevant type: %r", delta.event_type)
 
     async def _handle_room_publicity_change(
         self,
