@@ -27,6 +27,7 @@ from typing import (
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main.state_deltas import StateDelta
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -142,7 +143,7 @@ class StatsHandler:
             self.pos = max_pos
 
     async def _handle_deltas(
-        self, deltas: Iterable[JsonDict]
+        self, deltas: Iterable[StateDelta]
     ) -> Tuple[Dict[str, CounterType[str]], Dict[str, CounterType[str]]]:
         """Called with the state deltas to process
 
@@ -157,12 +158,12 @@ class StatsHandler:
         room_to_state_updates: Dict[str, Dict[str, Any]] = {}
 
         for delta in deltas:
-            typ = delta["type"]
-            state_key = delta["state_key"]
-            room_id = delta["room_id"]
-            event_id = delta["event_id"]
-            stream_id = delta["stream_id"]
-            prev_event_id = delta["prev_event_id"]
+            typ = delta.event_type
+            state_key = delta.state_key
+            room_id = delta.room_id
+            event_id = delta.event_id
+            stream_id = delta.stream_id
+            prev_event_id = delta.prev_event_id
 
             logger.debug("Handling: %r, %r %r, %s", room_id, typ, state_key, event_id)
 
