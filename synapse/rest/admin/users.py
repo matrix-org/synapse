@@ -329,9 +329,8 @@ class UserRestServletV2(RestServlet):
 
             if threepids is not None:
                 # get changed threepids (added and removed)
-                # convert List[Dict[str, Any]] into Set[Tuple[str, str]]
                 cur_threepids = {
-                    (threepid["medium"], threepid["address"])
+                    (threepid.medium, threepid.address)
                     for threepid in await self.store.user_get_threepids(user_id)
                 }
                 add_threepids = new_threepids - cur_threepids
