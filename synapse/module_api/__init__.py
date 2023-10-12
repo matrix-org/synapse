@@ -678,7 +678,7 @@ class ModuleApi:
             "msisdn" for phone numbers, and an "address" key which value is the
             threepid's address.
         """
-        return await self._store.user_get_threepids(user_id)
+        return [attr.asdict(t) for t in await self._store.user_get_threepids(user_id)]
 
     def check_user_exists(self, user_id: str) -> "defer.Deferred[Optional[str]]":
         """Check if user exists.
