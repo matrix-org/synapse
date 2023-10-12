@@ -1874,9 +1874,9 @@ class DatabasePool:
         keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows.
 
         Filters rows by whether the value of `column` is in `iterable`.
 
@@ -1888,10 +1888,13 @@ class DatabasePool:
             keyvalues: dict of column names and values to select the rows with
             desc: description of the transaction, for logging and metrics
             batch_size: the number of rows for each select query
+
+        Returns:
+            The results as a list of tuples.
         """
         keyvalues = keyvalues or {}
 
-        results: List[Dict[str, Any]] = []
+        results: List[Tuple[Any, ...]] = []
 
         for chunk in batch_iter(iterable, batch_size):
             rows = await self.runInteraction(
@@ -1918,9 +1921,9 @@ class DatabasePool:
         iterable: Collection[Any],
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Tuple[Any, ...]]:
         """Executes a SELECT query on the named table, which may return zero or
-        more rows, returning the result as a list of dicts.
+        more rows.
 
         Filters rows by whether the value of `column` is in `iterable`.
 
@@ -1931,6 +1934,9 @@ class DatabasePool:
             iterable: list
             keyvalues: dict of column names and values to select the rows with
             retcols: list of strings giving the names of the columns to return
+
+        Returns:
+            The results as a list of tuples.
         """
         if not iterable:
             return []
@@ -1949,7 +1955,7 @@ class DatabasePool:
         )
 
         txn.execute(sql, values)
-        return cls.cursor_to_dict(txn)
+        return txn.fetchall()
 
     async def simple_update(
         self,
