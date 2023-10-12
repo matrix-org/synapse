@@ -13,12 +13,8 @@
  * limitations under the License.
  */
 
--- Drop the old event transaction ID table, the event_txn_id_device_id table
--- should be used instead.
-DROP TABLE IF EXISTS event_txn_id;
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (8204, 'e2e_room_keys_index_room_id', '{}');
 
--- Drop tables related to MSC2716 since the implementation is being removed
-DROP TABLE insertion_events;
-DROP TABLE insertion_event_edges;
-DROP TABLE insertion_event_extremities;
-DROP TABLE batch_events;
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+    (8204, 'room_account_data_index_room_id', '{}');

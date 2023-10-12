@@ -143,6 +143,14 @@ class LoginTokenLookupResult:
     """The session ID advertised by the SSO Identity Provider."""
 
 
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class ThreepidResult:
+    medium: str
+    address: str
+    validated_at: int
+    added_at: int
+
+
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     def __init__(
         self,
@@ -988,13 +996,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             {"user_id": user_id, "validated_at": validated_at, "added_at": added_at},
         )
 
-    async def user_get_threepids(self, user_id: str) -> List[Dict[str, Any]]:
-        return await self.db_pool.simple_select_list(
+    async def user_get_threepids(self, user_id: str) -> List[ThreepidResult]:
+        results = await self.db_pool.simple_select_list(
             "user_threepids",
-            {"user_id": user_id},
-            ["medium", "address", "validated_at", "added_at"],
-            "user_get_threepids",
+            keyvalues={"user_id": user_id},
+            retcols=["medium", "address", "validated_at", "added_at"],
+            desc="user_get_threepids",
         )
+        return [ThreepidResult(**r) for r in results]
 
     async def user_delete_threepid(
         self, user_id: str, medium: str, address: str

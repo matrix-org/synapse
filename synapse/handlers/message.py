@@ -693,9 +693,13 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
-        # Save the the device ID and the transaction ID in the event internal metadata.
-        # This is useful to determine if we should echo the transaction_id in events.
+        # Save the access token ID, the device ID and the transaction ID in the event
+        # internal metadata. This is useful to determine if we should echo the
+        # transaction_id in events.
         # See `synapse.events.utils.EventClientSerializer.serialize_event`
+        if requester.access_token_id is not None:
+            builder.internal_metadata.token_id = requester.access_token_id
+
         if requester.device_id is not None:
             builder.internal_metadata.device_id = requester.device_id
 
@@ -1129,7 +1133,6 @@ class EventCreationHandler:
                 # in the meantime and context needs to be recomputed, so let's do so.
                 if i == max_retries - 1:
                     raise e
-                pass
 
         # we know it was persisted, so must have a stream ordering
         assert ev.internal_metadata.stream_ordering
@@ -2034,7 +2037,6 @@ class EventCreationHandler:
                         # in the meantime and context needs to be recomputed, so let's do so.
                         if i == max_retries - 1:
                             raise e
-                        pass
                 return True
             except AuthError:
                 logger.info(
