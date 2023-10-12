@@ -23,6 +23,7 @@ import sys
 from typing import Any, Callable, Dict, Optional
 
 import requests
+import requests_unixsocket
 import yaml
 
 _CONFLICTING_SHARED_SECRET_OPTS_ERROR = """\
@@ -48,6 +49,9 @@ def request_registration(
     exit: Callable[[int], None] = sys.exit,
 ) -> None:
     url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
+
+    if url.startswith("http+unix"):
+        requests_unixsocket.monkeypatch()
 
     # Get the nonce
     r = requests.get(url, verify=False)
@@ -305,8 +309,12 @@ def _find_client_listener(config: Dict[str, Any]) -> Optional[str]:
         ):
             continue
 
-        # TODO: consider bind_addresses
-        return f"http://localhost:{listener['port']}"
+        if listener.get("path"):
+            return f"http+unix:/{listener['path']}"
+
+        if listener.get("port"):
+            # TODO: consider bind_addresses
+            return f"http://localhost:{listener['port']}"
 
     # no suitable listeners?
     return None
