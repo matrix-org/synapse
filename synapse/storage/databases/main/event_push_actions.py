@@ -182,6 +182,7 @@ class UserPushAction(EmailPushAction):
     profile_tag: str
 
 
+# TODO This is used as a cached value and is mutable.
 @attr.s(slots=True, auto_attribs=True)
 class NotifCounts:
     """
@@ -193,7 +194,7 @@ class NotifCounts:
     highlight_count: int = 0
 
 
-@attr.s(slots=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class RoomNotifCounts:
     """
     The per-user, per-room count of notifications. Used by sync and push.
@@ -201,7 +202,7 @@ class RoomNotifCounts:
 
     main_timeline: NotifCounts
     # Map of thread ID to the notification counts.
-    threads: Dict[str, NotifCounts]
+    threads: Mapping[str, NotifCounts]
 
     @staticmethod
     def empty() -> "RoomNotifCounts":
@@ -483,7 +484,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         return room_to_count
 
-    @cached(tree=True, max_entries=5000, iterable=True)
+    @cached(tree=True, max_entries=5000, iterable=True)  # type: ignore[synapse-@cached-mutable]
     async def get_unread_event_push_actions_by_room_for_user(
         self,
         room_id: str,

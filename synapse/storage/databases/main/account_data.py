@@ -103,6 +103,13 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             "AccountDataAndTagsChangeCache", account_max
         )
 
+        self.db_pool.updates.register_background_index_update(
+            update_name="room_account_data_index_room_id",
+            index_name="room_account_data_room_id",
+            table="room_account_data",
+            columns=("room_id",),
+        )
+
         self.db_pool.updates.register_background_update_handler(
             "delete_account_data_for_deactivated_users",
             self._delete_account_data_for_deactivated_users,
@@ -151,10 +158,10 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 sql += " AND content != '{}'"
 
             txn.execute(sql, (user_id,))
-            rows = self.db_pool.cursor_to_dict(txn)
 
             return {
-                row["account_data_type"]: db_to_json(row["content"]) for row in rows
+                account_data_type: db_to_json(content)
+                for account_data_type, content in txn
             }
 
         return await self.db_pool.runInteraction(
@@ -196,13 +203,12 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 sql += " AND content != '{}'"
 
             txn.execute(sql, (user_id,))
-            rows = self.db_pool.cursor_to_dict(txn)
 
             by_room: Dict[str, Dict[str, JsonDict]] = {}
-            for row in rows:
-                room_data = by_room.setdefault(row["room_id"], {})
+            for room_id, account_data_type, content in txn:
+                room_data = by_room.setdefault(room_id, {})
 
-                room_data[row["account_data_type"]] = db_to_json(row["content"])
+                room_data[account_data_type] = db_to_json(content)
 
             return by_room
 

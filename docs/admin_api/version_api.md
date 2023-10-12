@@ -1,7 +1,7 @@
 # Version API
 
-This API returns the running Synapse version and the Python version
-on which Synapse is being run. This is useful when a Synapse instance
+This API returns the running Synapse version.
+This is useful when a Synapse instance
 is behind a proxy that does not forward the 'Server' header (which also
 contains Synapse version information).
 
@@ -15,7 +15,9 @@ It returns a JSON body like the following:
 
 ```json
 {
-    "server_version": "0.99.2rc1 (b=develop, abcdef123)",
-    "python_version": "3.7.8"
+    "server_version": "0.99.2rc1 (b=develop, abcdef123)"
 }
 ```
+
+*Changed in Synapse 1.94.0:* The `python_version` key was removed from the
+response body.

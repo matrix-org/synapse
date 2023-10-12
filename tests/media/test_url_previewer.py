@@ -61,9 +61,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        media_repo_resource = hs.get_media_repository_resource()
-        preview_url = media_repo_resource.children[b"preview_url"]
-        self.url_previewer = preview_url._url_previewer
+        media_repo = hs.get_media_repository()
+        assert media_repo.url_previewer is not None
+        self.url_previewer = media_repo.url_previewer
 
     def test_all_urls_allowed(self) -> None:
         self.assertFalse(self.url_previewer._is_url_blocked("http://matrix.org"))

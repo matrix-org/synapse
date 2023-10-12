@@ -22,8 +22,8 @@ from typing import (
     Any,
     ClassVar,
     Dict,
-    Final,
     List,
+    Literal,
     Mapping,
     Match,
     MutableMapping,
@@ -34,6 +34,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    overload,
 )
 
 import attr
@@ -60,6 +61,8 @@ from synapse.util.cancellation import cancellable
 from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from synapse.appservice.api import ApplicationService
     from synapse.storage.databases.main import DataStore, PurgeEventsStore
     from synapse.storage.databases.main.appservice import ApplicationServiceWorkerStore
@@ -436,7 +439,78 @@ def map_username_to_mxid_localpart(
 
 
 @attr.s(frozen=True, slots=True, order=False)
-class RoomStreamToken:
+class AbstractMultiWriterStreamToken(metaclass=abc.ABCMeta):
+    """An abstract stream token class for streams that supports multiple
+    writers.
+
+    This works by keeping track of the stream position of each writer,
+    represented by a default `stream` attribute and a map of instance name to
+    stream position of any writers that are ahead of the default stream
+    position.
+    """
+
+    stream: int = attr.ib(validator=attr.validators.instance_of(int), kw_only=True)
+
+    instance_map: "immutabledict[str, int]" = attr.ib(
+        factory=immutabledict,
+        validator=attr.validators.deep_mapping(
+            key_validator=attr.validators.instance_of(str),
+            value_validator=attr.validators.instance_of(int),
+            mapping_validator=attr.validators.instance_of(immutabledict),
+        ),
+        kw_only=True,
+    )
+
+    @classmethod
+    @abc.abstractmethod
+    async def parse(cls, store: "DataStore", string: str) -> "Self":
+        """Parse the string representation of the token."""
+        ...
+
+    @abc.abstractmethod
+    async def to_string(self, store: "DataStore") -> str:
+        """Serialize the token into its string representation."""
+        ...
+
+    def copy_and_advance(self, other: "Self") -> "Self":
+        """Return a new token such that if an event is after both this token and
+        the other token, then its after the returned token too.
+        """
+
+        max_stream = max(self.stream, other.stream)
+
+        instance_map = {
+            instance: max(
+                self.instance_map.get(instance, self.stream),
+                other.instance_map.get(instance, other.stream),
+            )
+            for instance in set(self.instance_map).union(other.instance_map)
+        }
+
+        return attr.evolve(
+            self, stream=max_stream, instance_map=immutabledict(instance_map)
+        )
+
+    def get_max_stream_pos(self) -> int:
+        """Get the maximum stream position referenced in this token.
+
+        The corresponding "min" position is, by definition just `self.stream`.
+
+        This is used to handle tokens that have non-empty `instance_map`, and so
+        reference stream positions after the `self.stream` position.
+        """
+        return max(self.instance_map.values(), default=self.stream)
+
+    def get_stream_pos_for_instance(self, instance_name: str) -> int:
+        """Get the stream position that the given writer was at at this token."""
+
+        # If we don't have an entry for the instance we can assume that it was
+        # at `self.stream`.
+        return self.instance_map.get(instance_name, self.stream)
+
+
+@attr.s(frozen=True, slots=True, order=False)
+class RoomStreamToken(AbstractMultiWriterStreamToken):
     """Tokens are positions between events. The token "s1" comes after event 1.
 
             s0    s1
@@ -513,16 +587,8 @@ class RoomStreamToken:
 
     topological: Optional[int] = attr.ib(
         validator=attr.validators.optional(attr.validators.instance_of(int)),
-    )
-    stream: int = attr.ib(validator=attr.validators.instance_of(int))
-
-    instance_map: "immutabledict[str, int]" = attr.ib(
-        factory=immutabledict,
-        validator=attr.validators.deep_mapping(
-            key_validator=attr.validators.instance_of(str),
-            value_validator=attr.validators.instance_of(int),
-            mapping_validator=attr.validators.instance_of(immutabledict),
-        ),
+        kw_only=True,
+        default=None,
     )
 
     def __attrs_post_init__(self) -> None:
@@ -582,17 +648,7 @@ class RoomStreamToken:
         if self.topological or other.topological:
             raise Exception("Can't advance topological tokens")
 
-        max_stream = max(self.stream, other.stream)
-
-        instance_map = {
-            instance: max(
-                self.instance_map.get(instance, self.stream),
-                other.instance_map.get(instance, other.stream),
-            )
-            for instance in set(self.instance_map).union(other.instance_map)
-        }
-
-        return RoomStreamToken(None, max_stream, immutabledict(instance_map))
+        return super().copy_and_advance(other)
 
     def as_historical_tuple(self) -> Tuple[int, int]:
         """Returns a tuple of `(topological, stream)` for historical tokens.
@@ -618,16 +674,6 @@ class RoomStreamToken:
         # at `self.stream`.
         return self.instance_map.get(instance_name, self.stream)
 
-    def get_max_stream_pos(self) -> int:
-        """Get the maximum stream position referenced in this token.
-
-        The corresponding "min" position is, by definition just `self.stream`.
-
-        This is used to handle tokens that have non-empty `instance_map`, and so
-        reference stream positions after the `self.stream` position.
-        """
-        return max(self.instance_map.values(), default=self.stream)
-
     async def to_string(self, store: "DataStore") -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
@@ -649,20 +695,20 @@ class RoomStreamToken:
             return "s%d" % (self.stream,)
 
 
-class StreamKeyType:
+class StreamKeyType(Enum):
     """Known stream types.
 
     A stream is a list of entities ordered by an incrementing "stream token".
     """
 
-    ROOM: Final = "room_key"
-    PRESENCE: Final = "presence_key"
-    TYPING: Final = "typing_key"
-    RECEIPT: Final = "receipt_key"
-    ACCOUNT_DATA: Final = "account_data_key"
-    PUSH_RULES: Final = "push_rules_key"
-    TO_DEVICE: Final = "to_device_key"
-    DEVICE_LIST: Final = "device_list_key"
+    ROOM = "room_key"
+    PRESENCE = "presence_key"
+    TYPING = "typing_key"
+    RECEIPT = "receipt_key"
+    ACCOUNT_DATA = "account_data_key"
+    PUSH_RULES = "push_rules_key"
+    TO_DEVICE = "to_device_key"
+    DEVICE_LIST = "device_list_key"
     UN_PARTIAL_STATED_ROOMS = "un_partial_stated_rooms_key"
 
 
@@ -784,7 +830,7 @@ class StreamToken:
     def room_stream_id(self) -> int:
         return self.room_key.stream
 
-    def copy_and_advance(self, key: str, new_value: Any) -> "StreamToken":
+    def copy_and_advance(self, key: StreamKeyType, new_value: Any) -> "StreamToken":
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
 
@@ -797,34 +843,67 @@ class StreamToken:
             return new_token
 
         new_token = self.copy_and_replace(key, new_value)
-        new_id = int(getattr(new_token, key))
-        old_id = int(getattr(self, key))
+        new_id = new_token.get_field(key)
+        old_id = self.get_field(key)
 
         if old_id < new_id:
             return new_token
         else:
             return self
 
-    def copy_and_replace(self, key: str, new_value: Any) -> "StreamToken":
-        return attr.evolve(self, **{key: new_value})
+    def copy_and_replace(self, key: StreamKeyType, new_value: Any) -> "StreamToken":
+        return attr.evolve(self, **{key.value: new_value})
+
+    @overload
+    def get_field(self, key: Literal[StreamKeyType.ROOM]) -> RoomStreamToken:
+        ...
+
+    @overload
+    def get_field(
+        self,
+        key: Literal[
+            StreamKeyType.ACCOUNT_DATA,
+            StreamKeyType.DEVICE_LIST,
+            StreamKeyType.PRESENCE,
+            StreamKeyType.PUSH_RULES,
+            StreamKeyType.RECEIPT,
+            StreamKeyType.TO_DEVICE,
+            StreamKeyType.TYPING,
+            StreamKeyType.UN_PARTIAL_STATED_ROOMS,
+        ],
+    ) -> int:
+        ...
+
+    @overload
+    def get_field(self, key: StreamKeyType) -> Union[int, RoomStreamToken]:
+        ...
+
+    def get_field(self, key: StreamKeyType) -> Union[int, RoomStreamToken]:
+        """Returns the stream ID for the given key."""
+        return getattr(self, key.value)
 
 
-StreamToken.START = StreamToken(RoomStreamToken(None, 0), 0, 0, 0, 0, 0, 0, 0, 0, 0)
+StreamToken.START = StreamToken(RoomStreamToken(stream=0), 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class PersistedEventPosition:
+class PersistedPosition:
+    """Position of a newly persisted row with instance that persisted it."""
+
+    instance_name: str
+    stream: int
+
+    def persisted_after(self, token: AbstractMultiWriterStreamToken) -> bool:
+        return token.get_stream_pos_for_instance(self.instance_name) < self.stream
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class PersistedEventPosition(PersistedPosition):
     """Position of a newly persisted event with instance that persisted it.
 
     This can be used to test whether the event is persisted before or after a
     RoomStreamToken.
     """
-
-    instance_name: str
-    stream: int
-
-    def persisted_after(self, token: RoomStreamToken) -> bool:
-        return token.get_stream_pos_for_instance(self.instance_name) < self.stream
 
     def to_room_stream_token(self) -> RoomStreamToken:
         """Converts the position to a room stream token such that events
@@ -836,7 +915,7 @@ class PersistedEventPosition:
         """
         # Doing the naive thing satisfies the desired properties described in
         # the docstring.
-        return RoomStreamToken(None, self.stream)
+        return RoomStreamToken(stream=self.stream)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)

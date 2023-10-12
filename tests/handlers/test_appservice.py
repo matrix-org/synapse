@@ -31,7 +31,7 @@ from synapse.appservice import (
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.rest.client import login, receipts, register, room, sendtodevice
 from synapse.server import HomeServer
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StreamKeyType
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -86,7 +86,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
                 [event],
             ]
         )
-        self.handler.notify_interested_services(RoomStreamToken(None, 1))
+        self.handler.notify_interested_services(RoomStreamToken(stream=1))
 
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
             interested_service, events=[event]
@@ -107,7 +107,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             ]
         )
         self.mock_store.get_events_as_list = AsyncMock(side_effect=[[event]])
-        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        self.handler.notify_interested_services(RoomStreamToken(stream=0))
 
         self.mock_as_api.query_user.assert_called_once_with(services[0], user_id)
 
@@ -126,7 +126,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             ]
         )
 
-        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        self.handler.notify_interested_services(RoomStreamToken(stream=0))
 
         self.assertFalse(
             self.mock_as_api.query_user.called,
@@ -304,7 +304,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
         self.handler.notify_interested_services_ephemeral(
-            "receipt_key", 580, ["@fakerecipient:example.com"]
+            StreamKeyType.RECEIPT, 580, ["@fakerecipient:example.com"]
         )
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
             interested_service, ephemeral=[event]
@@ -332,7 +332,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
         self.handler.notify_interested_services_ephemeral(
-            "receipt_key", 580, ["@fakerecipient:example.com"]
+            StreamKeyType.RECEIPT, 580, ["@fakerecipient:example.com"]
         )
         # This method will be called, but with an empty list of events
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
@@ -441,7 +441,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.get_success(
             self.hs.get_application_service_handler()._notify_interested_services(
                 RoomStreamToken(
-                    None, self.hs.get_application_service_handler().current_max
+                    stream=self.hs.get_application_service_handler().current_max
                 )
             )
         )
@@ -634,7 +634,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             self.get_success(
                 self.hs.get_application_service_handler()._notify_interested_services_ephemeral(
                     services=[interested_appservice],
-                    stream_key="receipt_key",
+                    stream_key=StreamKeyType.RECEIPT,
                     new_token=stream_token,
                     users=[self.exclusive_as_user],
                 )

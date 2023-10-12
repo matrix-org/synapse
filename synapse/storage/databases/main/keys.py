@@ -16,7 +16,7 @@
 import itertools
 import json
 import logging
-from typing import Dict, Iterable, Mapping, Optional, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Tuple, Union, cast
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -205,35 +205,39 @@ class KeyStore(CacheInvalidationWorkerStore):
 
         If we have multiple entries for a given key ID, returns the most recent.
         """
-        rows = await self.db_pool.simple_select_many_batch(
-            table="server_keys_json",
-            column="key_id",
-            iterable=key_ids,
-            keyvalues={"server_name": server_name},
-            retcols=(
-                "key_id",
-                "from_server",
-                "ts_added_ms",
-                "ts_valid_until_ms",
-                "key_json",
+        rows = cast(
+            List[Tuple[str, str, int, int, Union[bytes, memoryview]]],
+            await self.db_pool.simple_select_many_batch(
+                table="server_keys_json",
+                column="key_id",
+                iterable=key_ids,
+                keyvalues={"server_name": server_name},
+                retcols=(
+                    "key_id",
+                    "from_server",
+                    "ts_added_ms",
+                    "ts_valid_until_ms",
+                    "key_json",
+                ),
+                desc="get_server_keys_json_for_remote",
             ),
-            desc="get_server_keys_json_for_remote",
         )
 
         if not rows:
             return {}
 
-        # We sort the rows so that the most recently added entry is picked up.
-        rows.sort(key=lambda r: r["ts_added_ms"])
+        # We sort the rows by ts_added_ms so that the most recently added entry
+        # will stomp over older entries in the dictionary.
+        rows.sort(key=lambda r: r[2])
 
         return {
-            row["key_id"]: FetchKeyResultForRemote(
+            key_id: FetchKeyResultForRemote(
                 # Cast to bytes since postgresql returns a memoryview.
-                key_json=bytes(row["key_json"]),
-                valid_until_ts=row["ts_valid_until_ms"],
-                added_ts=row["ts_added_ms"],
+                key_json=bytes(key_json),
+                valid_until_ts=ts_valid_until_ms,
+                added_ts=ts_added_ms,
             )
-            for row in rows
+            for key_id, from_server, ts_added_ms, ts_valid_until_ms, key_json in rows
         }
 
     async def get_all_server_keys_json_for_remote(
@@ -260,6 +264,8 @@ class KeyStore(CacheInvalidationWorkerStore):
         if not rows:
             return {}
 
+        # We sort the rows by ts_added_ms so that the most recently added entry
+        # will stomp over older entries in the dictionary.
         rows.sort(key=lambda r: r["ts_added_ms"])
 
         return {

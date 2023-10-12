@@ -117,9 +117,9 @@ class DeactivateAccountHandler:
 
         # Remove any local threepid associations for this account.
         local_threepids = await self.store.user_get_threepids(user_id)
-        for threepid in local_threepids:
+        for local_threepid in local_threepids:
             await self._auth_handler.delete_local_threepid(
-                user_id, threepid["medium"], threepid["address"]
+                user_id, local_threepid.medium, local_threepid.address
             )
 
         # delete any devices belonging to the user, which will also

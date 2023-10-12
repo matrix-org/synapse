@@ -80,10 +80,6 @@ class UserPresenceState:
     def as_dict(self) -> JsonDict:
         return attr.asdict(self)
 
-    @staticmethod
-    def from_dict(d: JsonDict) -> "UserPresenceState":
-        return UserPresenceState(**d)
-
     def copy_and_replace(self, **kwargs: Any) -> "UserPresenceState":
         return attr.evolve(self, **kwargs)
 

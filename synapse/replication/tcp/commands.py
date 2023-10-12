@@ -18,7 +18,7 @@ allowed to be sent by which side.
 """
 import abc
 import logging
-from typing import Optional, Tuple, Type, TypeVar
+from typing import List, Optional, Tuple, Type, TypeVar
 
 from synapse.replication.tcp.streams._base import StreamRow
 from synapse.util import json_decoder, json_encoder
@@ -74,6 +74,8 @@ SC = TypeVar("SC", bound="_SimpleCommand")
 class _SimpleCommand(Command):
     """An implementation of Command whose argument is just a 'data' string."""
 
+    __slots__ = ["data"]
+
     def __init__(self, data: str):
         self.data = data
 
@@ -121,6 +123,8 @@ class RdataCommand(Command):
         RDATA presence master batch ["@bar:example.com", "online", ...]
         RDATA presence master 59 ["@baz:example.com", "online", ...]
     """
+
+    __slots__ = ["stream_name", "instance_name", "token", "row"]
 
     NAME = "RDATA"
 
@@ -179,6 +183,8 @@ class PositionCommand(Command):
     of the stream.
     """
 
+    __slots__ = ["stream_name", "instance_name", "prev_token", "new_token"]
+
     NAME = "POSITION"
 
     def __init__(
@@ -235,6 +241,8 @@ class ReplicateCommand(Command):
         REPLICATE
     """
 
+    __slots__: List[str] = []
+
     NAME = "REPLICATE"
 
     def __init__(self) -> None:
@@ -263,6 +271,8 @@ class UserSyncCommand(Command):
 
     Where <state> is either "start" or "end"
     """
+
+    __slots__ = ["instance_id", "user_id", "device_id", "is_syncing", "last_sync_ms"]
 
     NAME = "USER_SYNC"
 
@@ -316,6 +326,8 @@ class ClearUserSyncsCommand(Command):
         CLEAR_USER_SYNC <instance_id>
     """
 
+    __slots__ = ["instance_id"]
+
     NAME = "CLEAR_USER_SYNC"
 
     def __init__(self, instance_id: str):
@@ -343,6 +355,8 @@ class FederationAckCommand(Command):
         FEDERATION_ACK <instance_name> <token>
     """
 
+    __slots__ = ["instance_name", "token"]
+
     NAME = "FEDERATION_ACK"
 
     def __init__(self, instance_name: str, token: int):
@@ -367,6 +381,15 @@ class UserIpCommand(Command):
 
         USER_IP <user_id>, <access_token>, <ip>, <device_id>, <last_seen>, <user_agent>
     """
+
+    __slots__ = [
+        "user_id",
+        "access_token",
+        "ip",
+        "user_agent",
+        "device_id",
+        "last_seen",
+    ]
 
     NAME = "USER_IP"
 
@@ -423,8 +446,6 @@ class RemoteServerUpCommand(_SimpleCommand):
     """Sent when a worker has detected that a remote server is no longer
     "down" and retry timings should be reset.
 
-    If sent from a client the server will relay to all other workers.
-
     Format::
 
         REMOTE_SERVER_UP <server>
@@ -440,6 +461,8 @@ class LockReleasedCommand(Command):
 
         LOCK_RELEASED ["<instance_name>", "<lock_name>", "<lock_key>"]
     """
+
+    __slots__ = ["instance_name", "lock_name", "lock_key"]
 
     NAME = "LOCK_RELEASED"
 

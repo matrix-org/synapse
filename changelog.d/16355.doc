@@ -1,1 +1,0 @@
-Fix rendering of user admin API documentation around deactivation. This was broken in Synapse 1.91.0.

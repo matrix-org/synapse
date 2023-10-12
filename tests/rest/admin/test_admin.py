@@ -13,10 +13,12 @@
 # limitations under the License.
 
 import urllib.parse
+from typing import Dict
 
 from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.resource import Resource
 
 import synapse.rest.admin
 from synapse.http.server import JsonResource
@@ -26,7 +28,6 @@ from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import FakeSite, make_request
 from tests.test_utils import SMALL_PNG
 
 
@@ -42,9 +43,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, shorthand=False)
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertEqual(
-            {"server_version", "python_version"}, set(channel.json_body.keys())
-        )
+        self.assertEqual({"server_version"}, set(channel.json_body.keys()))
 
 
 class QuarantineMediaTestCase(unittest.HomeserverTestCase):
@@ -57,21 +56,18 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        # Allow for uploading and downloading to/from the media repo
-        self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b"download"]
-        self.upload_resource = self.media_repo.children[b"upload"]
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        resources = super().create_resource_dict()
+        resources["/_matrix/media"] = self.hs.get_media_repository_resource()
+        return resources
 
     def _ensure_quarantined(
         self, admin_user_tok: str, server_and_media_id: str
     ) -> None:
         """Ensure a piece of media is quarantined when trying to access it."""
-        channel = make_request(
-            self.reactor,
-            FakeSite(self.download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_and_media_id,
+            f"/_matrix/media/v3/download/{server_and_media_id}",
             shorthand=False,
             access_token=admin_user_tok,
         )
@@ -119,20 +115,16 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         non_admin_user_tok = self.login("id_nonadmin", "pass")
 
         # Upload some media into the room
-        response = self.helper.upload_media(
-            self.upload_resource, SMALL_PNG, tok=admin_user_tok
-        )
+        response = self.helper.upload_media(SMALL_PNG, tok=admin_user_tok)
 
         # Extract media ID from the response
         server_name_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
         server_name, media_id = server_name_and_media_id.split("/")
 
         # Attempt to access the media
-        channel = make_request(
-            self.reactor,
-            FakeSite(self.download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_name_and_media_id,
+            f"/_matrix/media/v3/download/{server_name_and_media_id}",
             shorthand=False,
             access_token=non_admin_user_tok,
         )
@@ -175,12 +167,8 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.helper.join(room_id, non_admin_user, tok=non_admin_user_tok)
 
         # Upload some media
-        response_1 = self.helper.upload_media(
-            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
-        )
-        response_2 = self.helper.upload_media(
-            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
-        )
+        response_1 = self.helper.upload_media(SMALL_PNG, tok=non_admin_user_tok)
+        response_2 = self.helper.upload_media(SMALL_PNG, tok=non_admin_user_tok)
 
         # Extract mxcs
         mxc_1 = response_1["content_uri"]
@@ -229,12 +217,8 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         non_admin_user_tok = self.login("user_nonadmin", "pass")
 
         # Upload some media
-        response_1 = self.helper.upload_media(
-            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
-        )
-        response_2 = self.helper.upload_media(
-            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
-        )
+        response_1 = self.helper.upload_media(SMALL_PNG, tok=non_admin_user_tok)
+        response_2 = self.helper.upload_media(SMALL_PNG, tok=non_admin_user_tok)
 
         # Extract media IDs
         server_and_media_id_1 = response_1["content_uri"][6:]
@@ -267,12 +251,8 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         non_admin_user_tok = self.login("user_nonadmin", "pass")
 
         # Upload some media
-        response_1 = self.helper.upload_media(
-            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
-        )
-        response_2 = self.helper.upload_media(
-            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
-        )
+        response_1 = self.helper.upload_media(SMALL_PNG, tok=non_admin_user_tok)
+        response_2 = self.helper.upload_media(SMALL_PNG, tok=non_admin_user_tok)
 
         # Extract media IDs
         server_and_media_id_1 = response_1["content_uri"][6:]
@@ -306,11 +286,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
 
         # Attempt to access each piece of media
-        channel = make_request(
-            self.reactor,
-            FakeSite(self.download_resource, self.reactor),
+        channel = self.make_request(
             "GET",
-            server_and_media_id_2,
+            f"/_matrix/media/v3/download/{server_and_media_id_2}",
             shorthand=False,
             access_token=non_admin_user_tok,
         )

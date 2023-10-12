@@ -1447,6 +1447,30 @@ class RoomJoinRatelimitTestCase(RoomBase):
     @unittest.override_config(
         {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
     )
+    def test_join_attempts_local_ratelimit(self) -> None:
+        """Tests that unsuccessful joins that end up being denied are rate-limited."""
+        # Create 4 rooms
+        room_ids = [
+            self.helper.create_room_as(self.user_id, is_public=True) for _ in range(4)
+        ]
+        # Pre-emptively ban the user who will attempt to join.
+        joiner_user_id = self.register_user("joiner", "secret")
+        for room_id in room_ids:
+            self.helper.ban(room_id, self.user_id, joiner_user_id)
+
+        # Now make a new user try to join some of them.
+        # The user can make 3 requests, each of which should be denied.
+        for room_id in room_ids[0:3]:
+            self.helper.join(room_id, joiner_user_id, expect_code=HTTPStatus.FORBIDDEN)
+
+        # The fourth attempt should be rate limited.
+        self.helper.join(
+            room_ids[3], joiner_user_id, expect_code=HTTPStatus.TOO_MANY_REQUESTS
+        )
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
+    )
     def test_join_local_ratelimit_profile_change(self) -> None:
         """Tests that sending a profile update into all of the user's joined rooms isn't
         rate-limited by the rate-limiter on joins."""

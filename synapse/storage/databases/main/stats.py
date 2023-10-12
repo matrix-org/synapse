@@ -506,25 +506,28 @@ class StatsStore(StateDeltasStore):
         ) -> Tuple[List[str], Dict[str, int], int, List[str], int]:
             pos = self.get_room_max_stream_ordering()  # type: ignore[attr-defined]
 
-            rows = self.db_pool.simple_select_many_txn(
-                txn,
-                table="current_state_events",
-                column="type",
-                iterable=[
-                    EventTypes.Create,
-                    EventTypes.JoinRules,
-                    EventTypes.RoomHistoryVisibility,
-                    EventTypes.RoomEncryption,
-                    EventTypes.Name,
-                    EventTypes.Topic,
-                    EventTypes.RoomAvatar,
-                    EventTypes.CanonicalAlias,
-                ],
-                keyvalues={"room_id": room_id, "state_key": ""},
-                retcols=["event_id"],
+            rows = cast(
+                List[Tuple[str]],
+                self.db_pool.simple_select_many_txn(
+                    txn,
+                    table="current_state_events",
+                    column="type",
+                    iterable=[
+                        EventTypes.Create,
+                        EventTypes.JoinRules,
+                        EventTypes.RoomHistoryVisibility,
+                        EventTypes.RoomEncryption,
+                        EventTypes.Name,
+                        EventTypes.Topic,
+                        EventTypes.RoomAvatar,
+                        EventTypes.CanonicalAlias,
+                    ],
+                    keyvalues={"room_id": room_id, "state_key": ""},
+                    retcols=["event_id"],
+                ),
             )
 
-            event_ids = cast(List[str], [row["event_id"] for row in rows])
+            event_ids = [row[0] for row in rows]
 
             txn.execute(
                 """

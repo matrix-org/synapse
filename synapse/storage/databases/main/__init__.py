@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, cast
 
 from synapse.api.constants import Direction
 from synapse.config.homeserver import HomeServerConfig
@@ -141,26 +141,6 @@ class DataStore(
         self.database_engine = database.engine
 
         super().__init__(database, db_conn, hs)
-
-    async def get_users(self) -> List[JsonDict]:
-        """Function to retrieve a list of users in users table.
-
-        Returns:
-            A list of dictionaries representing users.
-        """
-        return await self.db_pool.simple_select_list(
-            table="users",
-            keyvalues={},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "user_type",
-                "deactivated",
-            ],
-            desc="get_users",
-        )
 
     async def get_users_paginate(
         self,
@@ -316,7 +296,11 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    async def search_users(self, term: str) -> Optional[List[JsonDict]]:
+    async def search_users(
+        self, term: str
+    ) -> List[
+        Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+    ]:
         """Function to search users list for one or more users with
         the matched term.
 
@@ -324,15 +308,37 @@ class DataStore(
             term: search term
 
         Returns:
-            A list of dictionaries or None.
+            A list of tuples of name, password_hash, is_guest, admin, user_type or None.
         """
-        return await self.db_pool.simple_search_list(
-            table="users",
-            term=term,
-            col="name",
-            retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
-            desc="search_users",
-        )
+
+        def search_users(
+            txn: LoggingTransaction,
+        ) -> List[
+            Tuple[str, Optional[str], Union[int, bool], Union[int, bool], Optional[str]]
+        ]:
+            search_term = "%%" + term + "%%"
+
+            sql = """
+            SELECT name, password_hash, is_guest, admin, user_type
+            FROM users
+            WHERE name LIKE ?
+            """
+            txn.execute(sql, (search_term,))
+
+            return cast(
+                List[
+                    Tuple[
+                        str,
+                        Optional[str],
+                        Union[int, bool],
+                        Union[int, bool],
+                        Optional[str],
+                    ]
+                ],
+                txn.fetchall(),
+            )
+
+        return await self.db_pool.runInteraction("search_users", search_users)
 
 
 def check_database_before_upgrade(

@@ -1190,6 +1190,11 @@ inbound federation traffic as early as possible, rather than relying
 purely on this application-layer restriction.  If not specified, the
 default is to whitelist everything.
 
+Note: this does not stop a server from joining rooms that servers not on the
+whitelist are in. As such, this option is really only useful to establish a
+"private federation", where a group of servers all whitelist each other and have
+the same whitelist.
+
 Example configuration:
 ```yaml
 federation_domain_whitelist:

@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import logging
-import platform
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
@@ -107,10 +106,7 @@ class VersionServlet(RestServlet):
     PATTERNS = admin_patterns("/server_version$")
 
     def __init__(self, hs: "HomeServer"):
-        self.res = {
-            "server_version": SYNAPSE_VERSION,
-            "python_version": platform.python_version(),
-        }
+        self.res = {"server_version": SYNAPSE_VERSION}
 
     def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         return HTTPStatus.OK, self.res
@@ -150,7 +146,7 @@ class PurgeHistoryRestServlet(RestServlet):
             # RoomStreamToken expects [int] not Optional[int]
             assert event.internal_metadata.stream_ordering is not None
             room_token = RoomStreamToken(
-                event.depth, event.internal_metadata.stream_ordering
+                topological=event.depth, stream=event.internal_metadata.stream_ordering
             )
             token = await room_token.to_string(self.store)
 

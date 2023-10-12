@@ -160,7 +160,7 @@ class HttpPusher(Pusher):
         if should_check_for_notifs:
             self._start_processing()
 
-    def on_new_receipts(self, min_stream_id: int, max_stream_id: int) -> None:
+    def on_new_receipts(self) -> None:
         # Note that the min here shouldn't be relied upon to be accurate.
 
         # We could check the receipts are actually m.read receipts here,

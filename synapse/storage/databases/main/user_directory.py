@@ -410,25 +410,24 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             )
 
             # Next fetch their profiles. Note that not all users have profiles.
-            profile_rows = self.db_pool.simple_select_many_txn(
-                txn,
-                table="profiles",
-                column="full_user_id",
-                iterable=list(users_to_insert),
-                retcols=(
-                    "full_user_id",
-                    "displayname",
-                    "avatar_url",
+            profile_rows = cast(
+                List[Tuple[str, Optional[str], Optional[str]]],
+                self.db_pool.simple_select_many_txn(
+                    txn,
+                    table="profiles",
+                    column="full_user_id",
+                    iterable=list(users_to_insert),
+                    retcols=(
+                        "full_user_id",
+                        "displayname",
+                        "avatar_url",
+                    ),
+                    keyvalues={},
                 ),
-                keyvalues={},
             )
             profiles = {
-                row["full_user_id"]: _UserDirProfile(
-                    row["full_user_id"],
-                    row["displayname"],
-                    row["avatar_url"],
-                )
-                for row in profile_rows
+                full_user_id: _UserDirProfile(full_user_id, displayname, avatar_url)
+                for full_user_id, displayname, avatar_url in profile_rows
             }
 
             profiles_to_insert = [
@@ -517,18 +516,21 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             and not self.get_if_app_services_interested_in_user(user)  # type: ignore[attr-defined]
         ]
 
-        rows = self.db_pool.simple_select_many_txn(
-            txn,
-            table="users",
-            column="name",
-            iterable=users,
-            keyvalues={
-                "deactivated": 0,
-            },
-            retcols=("name", "user_type"),
+        rows = cast(
+            List[Tuple[str, Optional[str]]],
+            self.db_pool.simple_select_many_txn(
+                txn,
+                table="users",
+                column="name",
+                iterable=users,
+                keyvalues={
+                    "deactivated": 0,
+                },
+                retcols=("name", "user_type"),
+            ),
         )
 
-        return [row["name"] for row in rows if row["user_type"] != UserTypes.SUPPORT]
+        return [name for name, user_type in rows if user_type != UserTypes.SUPPORT]
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
         """Check if the room is either world_readable or publically joinable"""
