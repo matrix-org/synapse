@@ -193,7 +193,7 @@ SELECT rss.room_id, rss.name, rss.canonical_alias, rss.topic, rss.encryption,
     rsc.joined_members, rsc.local_users_in_room, rss.join_rules
   FROM room_stats_state rss
   LEFT JOIN room_stats_current rsc USING (room_id)
-  WHERE room_id IN ( WHERE room_id IN (
+  WHERE room_id IN (
     '!OGEhHVWSdvArJzumhm:matrix.org',
     '!YTvKGNlinIzlkMTVRl:matrix.org' 
   );
