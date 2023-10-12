@@ -15902,7 +15902,7 @@ WHERE room_stats_state.room_id = event_json.room_id&quot; | psql -d synapse -h l
     rsc.joined_members, rsc.local_users_in_room, rss.join_rules
   FROM room_stats_state rss
   LEFT JOIN room_stats_current rsc USING (room_id)
-  WHERE room_id IN ( WHERE room_id IN (
+  WHERE room_id IN (
     '!OGEhHVWSdvArJzumhm:matrix.org',
     '!YTvKGNlinIzlkMTVRl:matrix.org' 
   );
