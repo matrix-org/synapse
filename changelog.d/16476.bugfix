@@ -1,0 +1,1 @@
+Add support for `register_new_matrix_user` to connect to unix socket listeners that provide paths instead of ports. Contributed by @Sir-Photch
