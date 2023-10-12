@@ -214,7 +214,7 @@ fi
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc3874,msc3890,msc3391,msc3930,faster_joins"
+test_packages="./tests/csapi ./tests ./tests/msc3874 ./tests/msc3890 ./tests/msc3391 ./tests/msc3930 ./tests/msc3902"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
@@ -277,4 +277,4 @@ export PASS_SYNAPSE_LOG_TESTING=1
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
 
-go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/...
+go test -v -tags "synapse_blacklist" -count=1 "${extra_test_args[@]}" "$@" $test_packages
