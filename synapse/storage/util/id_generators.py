@@ -545,6 +545,14 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
                     if instance == self._instance_name:
                         self._current_positions[instance] = stream_id
 
+        if self._writers:
+            # If we have explicit writers then make sure that each instance has
+            # a position.
+            for writer in self._writers:
+                self._current_positions.setdefault(
+                    writer, self._persisted_upto_position
+                )
+
         cur.close()
 
     def _load_next_id_txn(self, txn: Cursor) -> int:
