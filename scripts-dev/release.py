@@ -685,7 +685,7 @@ def full(gh_token: str) -> None:
     click.echo("2. Check for any release blockers before proceeding.")
     click.echo("    https://github.com/matrix-org/synapse/labels/X-Release-Blocker")
     click.echo("3. Check for any other special release notes, including announcements to add to the changelog or special deployment instructions.")
-    click.echo("    https://github.com/orgs/matrix-org/projects/93/views/1")
+    click.echo("    See the 'Synapse Maintainer Report'.")
 
     click.confirm("Ready?", abort=True)
 
