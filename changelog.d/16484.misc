@@ -1,0 +1,1 @@
+Remove useless async job to delete device messages on sync, since we only deliver (and hence delete) up to 100 device messages at a time.
