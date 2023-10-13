@@ -710,9 +710,16 @@ class MultiWriterIdGenerator(AbstractStreamIdGenerator):
         # persisted up to position. This stops Synapse from doing a full table
         # scan when a new writer announces itself over replication.
         with self._lock:
-            return self._return_factor * self._current_positions.get(
+            pos = self._current_positions.get(
                 instance_name, self._persisted_upto_position
             )
+
+            # We also ensure that we always return at least the
+            # `persisted_upto_position` for ourselves, so that when we notify
+            # other workers about our position we give them the max valid value
+            # here so that nothing waits for us to advance.
+            pos = max(pos, self._persisted_upto_position)
+            return self._return_factor * pos
 
     def get_positions(self) -> Dict[str, int]:
         """Get a copy of the current positon map.
