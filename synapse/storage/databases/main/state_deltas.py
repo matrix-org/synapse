@@ -47,19 +47,19 @@ class StateDeltasStore(SQLBaseStore):
         self, prev_stream_id: int, max_stream_id: int
     ) -> Tuple[int, List[StateDelta]]:
         """Fetch a list of room state changes since the given stream id
-        =
+
                 This may be the partial state if we're lazy joining the room.
 
                 Args:
                     prev_stream_id: point to get changes since (exclusive)
                     max_stream_id: the point that we know has been correctly persisted
-                       - ie, an upper limit to return changes from.
+                        - ie, an upper limit to return changes from.
 
                 Returns:
                     A tuple consisting of:
-                       - the stream id which these results go up to
-                       - list of current_state_delta_stream rows. If it is empty, we are
-                         up to date.
+                        - the stream id which these results go up to
+                        - list of current_state_delta_stream rows. If it is empty, we are
+                          up to date.
         """
         prev_stream_id = int(prev_stream_id)
 
