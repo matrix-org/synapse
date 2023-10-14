@@ -56,6 +56,7 @@ jobs:
             - 'pyproject.toml'
             - 'poetry.lock'
             - 'docker/**'
+            - 'scripts-dev/complement.sh'
 
           linting:
             - 'synapse/**'
