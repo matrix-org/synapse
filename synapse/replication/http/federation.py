@@ -138,7 +138,11 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
                 event_and_contexts.append((event, context))
 
-        logger.info("Got %d events from federation", len(event_and_contexts))
+        logger.info(
+            "Got batch of %i events to persist to room %s",
+            len(event_and_contexts),
+            room_id,
+        )
 
         max_stream_id = await self.federation_event_handler.persist_events_and_notify(
             room_id, event_and_contexts, backfilled
